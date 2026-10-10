@@ -50,7 +50,7 @@ public final class AllInOneRenderer implements BlockEntityRenderer<AllInOneBlock
 		ModelFeatureRenderer.CrumblingOverlay breakProgress) {
 		BlockEntityRenderer.super.extractRenderState(computer, state, partialTick, cameraPos, breakProgress);
 		state.facing = computer.getBlockState().getValue(AllInOneBlock.FACING);
-		TextBuffer display = computer.machine().display();
+		TextBuffer display = computer.display().buffer();
 		state.resolution = display.resolution();
 		if (display.isBlank()) {
 			state.rows = null;

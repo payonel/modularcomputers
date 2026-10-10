@@ -3,8 +3,11 @@ package com.payonel.modularcomputers.gametest;
 import com.payonel.modularcomputers.block.AllInOneBlock;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
+import com.payonel.modularcomputers.bus.DeviceType;
+import com.payonel.modularcomputers.machine.HelloWorldProgram;
 import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.machine.PartKind;
+import java.util.List;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -27,30 +30,35 @@ public class AllInOneGameTest {
 	}
 
 	@GameTest
-	public void placedComputerIsOffWithSolderedParts(GameTestHelper helper) {
-		Machine machine = place(helper).machine();
+	public void placedComputerIsOffWithItsDevicesOnTheBus(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper);
+		Machine machine = computer.machine();
 		helper.assertTrue(!machine.isRunning(), "a new computer should be off");
-		helper.assertTrue(machine.display().isBlank(), "an off computer's display should be blank");
-		for (PartKind kind : new PartKind[] {PartKind.CPU, PartKind.MEMORY, PartKind.STORAGE}) {
-			helper.assertTrue(machine.hardware().find(kind).map(part -> part.soldered()).orElse(false), kind + " should be soldered in");
+		helper.assertTrue(computer.display().buffer().isBlank(), "an off computer's display should be blank");
+		for (PartKind kind : PartKind.values()) {
+			helper.assertTrue(machine.board().parts().find(kind).map(part -> part.soldered()).orElse(false), kind + " should be soldered in");
 		}
+		helper.assertValueEqual(machine.board().bus().devices().stream().map(device -> device.type()).toList(),
+			List.of(DeviceType.DISPLAY, DeviceType.KEYBOARD, DeviceType.STORAGE), "physical bus");
+		helper.assertTrue(machine.board().eeprom().isPresent(), "the all-in-one has a soldered EEPROM");
 		helper.succeed();
 	}
 
 	@GameTest
 	public void sneakRightClickTogglesPower(GameTestHelper helper) {
-		Machine machine = place(helper).machine();
+		AllInOneBlockEntity computer = place(helper);
+		Machine machine = computer.machine();
 		Player player = helper.makeMockPlayer(GameType.SURVIVAL);
 		player.setShiftKeyDown(true);
 
 		helper.useBlock(POS, player);
 		helper.assertTrue(machine.isRunning(), "sneak + right-click should turn the computer on");
 		helper.assertBlockProperty(POS, AllInOneBlock.RUNNING, true);
-		helper.assertValueEqual(machine.display().row(0).strip(), Machine.GREETING, "first display row");
+		helper.assertValueEqual(computer.display().buffer().row(0).strip(), HelloWorldProgram.GREETING, "first display row");
 
 		helper.useBlock(POS, player);
 		helper.assertTrue(!machine.isRunning(), "a second sneak + right-click should turn it off");
-		helper.assertTrue(machine.display().isBlank(), "turning off should blank the display");
+		helper.assertTrue(computer.display().buffer().isBlank(), "turning off should blank the display");
 		helper.succeed();
 	}
 
@@ -70,7 +78,7 @@ public class AllInOneGameTest {
 		helper.useBlock(POS, player, backClick(helper, 11.5, 11.5));
 		helper.assertTrue(computer.machine().isRunning(), "the back power button should turn the computer on");
 		helper.assertBlockProperty(POS, AllInOneBlock.RUNNING, true);
-		helper.assertValueEqual(computer.machine().display().row(0).strip(), Machine.GREETING, "first display row");
+		helper.assertValueEqual(computer.display().buffer().row(0).strip(), HelloWorldProgram.GREETING, "first display row");
 
 		helper.useBlock(POS, player, backClick(helper, 11.5, 11.5));
 		helper.assertTrue(!computer.machine().isRunning(), "pressing it again should turn the computer off");
@@ -103,8 +111,12 @@ public class AllInOneGameTest {
 		var registries = helper.getLevel().registryAccess();
 		BlockState state = computer.getBlockState();
 		BlockEntity loaded = BlockEntity.loadStatic(computer.getBlockPos(), state, computer.saveWithFullMetadata(registries), registries);
-		helper.assertTrue(loaded instanceof AllInOneBlockEntity reloaded && reloaded.machine().isRunning(),
-			"a running computer should still be running after reload");
+		helper.assertTrue(loaded instanceof AllInOneBlockEntity, "should reload as an all-in-one");
+		AllInOneBlockEntity reloaded = (AllInOneBlockEntity) loaded;
+		helper.assertTrue(reloaded.machine().isRunning(), "a running computer should still be running after reload");
+		helper.assertValueEqual(reloaded.display().buffer().rows(), computer.display().buffer().rows(), "display contents after reload");
+		var console = reloaded.machine().board().virtualBus().console();
+		helper.assertValueEqual(console.row(), 1, "console cursor row after reload");
 		helper.succeed();
 	}
 

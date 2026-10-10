@@ -1,34 +1,19 @@
 package com.payonel.modularcomputers.machine;
 
-import com.payonel.modularcomputers.display.Resolution;
-import com.payonel.modularcomputers.display.TextBuffer;
-
 /**
- * A computer's state, independent of Minecraft. There is no CPU emulation or VM yet: turning
- * a machine on just prints {@link #GREETING}. An off machine's display is blank (black).
+ * A computer and its power state, independent of Minecraft. Power-on hands control to the
+ * {@link Cpu}; power-off cuts power to the {@link Motherboard}.
  */
 public final class Machine {
-	public static final String GREETING = "hello world";
-
-	private final Hardware hardware;
-	private final TextBuffer display;
+	private final Motherboard board;
 	private boolean running;
 
-	public Machine(Hardware hardware, Resolution resolution) {
-		this.hardware = hardware;
-		this.display = new TextBuffer(resolution);
+	public Machine(Motherboard board) {
+		this.board = board;
 	}
 
-	public Hardware hardware() {
-		return hardware;
-	}
-
-	public Resolution resolution() {
-		return display.resolution();
-	}
-
-	public TextBuffer display() {
-		return display;
+	public Motherboard board() {
+		return board;
 	}
 
 	public boolean isRunning() {
@@ -40,13 +25,22 @@ public final class Machine {
 			return;
 		}
 		this.running = running;
-		display.clear();
 		if (running) {
-			display.write(0, 0, GREETING);
+			Cpu.powerOn(board);
+		} else {
+			board.powerOff();
 		}
 	}
 
 	public void togglePower() {
 		setRunning(!running);
+	}
+
+	/**
+	 * Sets the power state from a save or a sync, without booting or cutting power: the devices
+	 * restore their own state.
+	 */
+	public void restoreRunning(boolean running) {
+		this.running = running;
 	}
 }

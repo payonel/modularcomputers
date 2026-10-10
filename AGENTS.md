@@ -18,8 +18,14 @@ Last updated: 2026-10-09 (project bootstrap session; host notes revised).
   scratch, green**:
   - Do **not** copy OC source code into this repo.
   - Do **not** reuse OC's build process, versioning scheme, or plugin/addon process.
-  - **Do** use OC as the reference for design questions. The user will often ask "how did OC
-    do X?". Answer from the local clone (section 7).
+  - **Design from real hardware, not from OC.** The user designs by abstracting how real PCs
+    work (CPU, motherboard, buses, firmware, consoles). Then they decide what to mimic and
+    what to skip.
+    - Steps may be removed or skipped, but never invented ("no false steps").
+    - When discussing a design, explain the real-world mechanism first, e.g. how UEFI or Linux
+      does it.
+    - Use OC only as a source of feature and behavior ideas, when the user asks for more
+      ideas or asks "how did OC do X?". Answer those from the local clone (section 7).
 - Java mod, **Fabric** loader, targeting the **latest Minecraft version**.
 
 ## 2. Standing guidance from the user (follow always)
@@ -64,8 +70,9 @@ same thing.
   - It's listed in the mod's own creative tab, "Modular Computers" (`ModCreativeTab`). Fabric
     puts mod tabs on **page 2** of the creative inventory (the ▶ arrow by the tab title).
     It's also in creative search, and `/give @s modularcomputers:all_in_one` works.
-  - CPU, memory and disk are soldered in, with no limits. There's no EEPROM, no inventory
-    and no slots.
+  - CPU and memory are soldered parts with no limits. The display, keyboard and disk are
+    devices on its physical bus. It has a soldered EEPROM. There's no inventory and there are
+    no slots yet.
   - **Power button** (a press button, not a toggle switch):
     - **On the back, bottom right:** a dark housing at texels 9..13, holding a 3x3 button that
       sticks out half a texel. It's an emissive model element, so it glows: red when off,
@@ -82,9 +89,9 @@ same thing.
     - Lighting will depend on available power: faded red/green when unpowered, fully lit when
       powered. Only a fully lit green button actually runs the PC.
   - The power state is saved and synced to clients. Toggling plays a stone-button click.
-  - There is **no CPU emulation, Lua or programs yet**. Turning a computer on just writes
-    `Machine.GREETING` ("hello world") to row 0 of its text buffer. Turning it off blanks the
-    buffer, and a blank buffer renders black.
+  - There is **no Lua runtime yet**; see "Machine architecture" below. The EEPROM holds a
+    Java stand-in program that prints "hello world" through the console. Turning the computer
+    off blanks the display, and a blank display renders black.
   - The text renders on the block face's glass (`AllInOneRenderer`) and in the display GUI.
   - **Right-click** opens the display GUI (`DisplayScreen`). The server sends
     `OpenDisplayPayload` with the position and resolution, so the GUI has its final size from
@@ -102,8 +109,50 @@ same thing.
   - computer cases with slots, plus tiers and power
   - parts: CPUs, RAM, disks, EEPROM
   - external devices: separate screens, keyboards, cables
-- Design rule: machine logic stays in plain Java (`machine/`, `display/`) and is unit-tested.
-  Minecraft glue goes in `block/` and `network/`, and rendering goes in `client/`.
+- Design rule: machine logic stays in plain Java (`machine/`, `bus/`, `console/`, `device/`,
+  `display/`) and is unit-tested. Minecraft glue goes in `block/` and `network/`, and rendering
+  goes in `client/`.
+
+### Machine architecture (agreed with the user, modeled on real PCs)
+
+- **CPU (`Cpu`):** almost no logic of its own. At power-on it loads the program from the
+  motherboard's **EEPROM slot** and executes it.
+  - The slot is a fixed place, like a real CPU's reset vector, so the CPU never walks a bus to
+    find firmware.
+  - The CPU's only behavior of its own is panic reporting, like a kernel panic. With an empty
+    slot, or when the program throws, it prints the error to the console (`Cpu.NO_EEPROM`,
+    `Cpu.CRASHED`) and halts. Power stays on.
+- **EEPROM (`Eeprom`):** holds a `Program`. Today that's Java (`HelloWorldProgram`, a
+  stand-in). Later it's Lua code run by the user's Lua runtime, which is a separate project
+  that isn't ready yet. The CPU's side doesn't change.
+- **Motherboard (`Motherboard`):** holds the parts (CPU, memory; `Hardware`/`Part`), the
+  EEPROM slot, and two buses.
+  - **Physical bus (`bus/Bus`):** the real devices in slot order. Each describes itself
+    (`Device#type()`, the class code) and is used through its own Java type, the capability
+    (like UEFI's GOP).
+    - There are no drivers: plug and play.
+    - The CPU and memory are not on it, as on a real PC.
+  - **Virtual bus (`bus/VirtualBus`):** devices that always exist, found by fixed name, not by
+    walking (like Linux's virtual devices or UEFI's `ConOut`). Today it holds only `console`.
+- **Console (`console/ConsoleSplitter`):** modeled on UEFI's console splitter.
+  - It's never null. It writes to every display on the physical bus and drops output when
+    there are none.
+  - Its size is the smallest columns × rows among the displays. With no displays it reports
+    `HEADLESS` (a real size, never 0×0, like Linux's dummycon).
+  - It owns the cursor, wraps text at the right edge, and scrolls only its own area.
+  - A minimal EEPROM just prints to it. Advanced code can walk the physical bus instead.
+- **Power-off:** every device gets `powerOff()` (displays blank), and the console resets.
+- **Saved and synced:** the block entity saves and syncs the power state, the display rows
+  and the console cursor. Clients never run programs; they show the synced display contents.
+  `Machine.restoreRunning` sets the state without booting.
+- **Ideas discussed for later** (not built):
+  - **Console log:** a ring buffer with a read position per console and a `messages dropped`
+    line instead of silent loss, like Linux printk.
+  - **Hot-plug:** when a screen is attached to a running machine, the console takes it over
+    and redraws.
+  - **Stored console preference:** an NVRAM-like store, like UEFI's `ConOut` variable.
+  - **Beep codes:** for a headless boot.
+  - **The EEPROM as a bus device:** listed on the physical bus too, for reflashing.
 
 ### Versions in use (`gradle.properties`)
 
@@ -405,8 +454,11 @@ scripts/art/all_in_one_textures.py   draws the all-in-one textures (Pillow); PNG
 .github/workflows/build.yml
 src/main/java/com/payonel/modularcomputers/
   ModularComputers.java            MOD_ID, LOGGER, id(), INIT_MARKER; registers content + packets
-  machine/                         plain Java: Machine (power, display buffer), Hardware, Part, PartKind
-  display/                         plain Java: Resolution, TextBuffer, Viewport, DisplayLayout (GUI layout math)
+  machine/                         plain Java: Machine (power), Cpu, Motherboard, Eeprom, Program, HelloWorldProgram, Hardware, Part, PartKind
+  bus/                             plain Java: Bus (physical), VirtualBus, Device, DeviceType
+  console/ConsoleSplitter.java     the always-present console on the virtual bus
+  device/                          Keyboard, Disk (bus devices; no behavior yet)
+  display/                         plain Java: Display (bus device), Resolution, TextBuffer, Viewport, DisplayLayout (GUI layout math)
   ModCreativeTab.java              the "Modular Computers" creative tab
   block/                           AllInOneBlock, AllInOneBlockEntity, PowerButton (hit test), ModBlocks (registrations)
   network/OpenDisplayPayload.java  server->client "open this display"

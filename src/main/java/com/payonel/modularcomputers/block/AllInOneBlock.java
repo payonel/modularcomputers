@@ -59,7 +59,7 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 			computer.togglePower();
 		} else if (player instanceof ServerPlayer serverPlayer) {
 			// Right-click: the client opens the display when this arrives.
-			ServerPlayNetworking.send(serverPlayer, new OpenDisplayPayload(pos, computer.machine().resolution()));
+			ServerPlayNetworking.send(serverPlayer, new OpenDisplayPayload(pos, computer.display().buffer().resolution()));
 		}
 		return InteractionResult.SUCCESS;
 	}
