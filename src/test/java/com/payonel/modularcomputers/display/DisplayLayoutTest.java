@@ -10,7 +10,7 @@ class DisplayLayoutTest {
 
 	@ParameterizedTest
 	@CsvSource({"427, 240", "320, 240", "240, 427", "960, 540", "200, 200"})
-	void buttonSitsRightOfTheDisplayAtItsTopWithoutOverlapping(int width, int height) {
+	void buttonsSitRightOfTheDisplayFromItsTopWithoutOverlapping(int width, int height) {
 		DisplayLayout layout = DisplayLayout.of(width, height, ASPECT, 0.9, 20, 4);
 		Viewport display = layout.display();
 		Viewport button = layout.powerButton();
@@ -18,6 +18,10 @@ class DisplayLayoutTest {
 		assertThat(button.y()).isEqualTo(display.y());
 		assertThat(button.right()).isLessThanOrEqualTo(width);
 		assertThat(button.bottom()).isLessThanOrEqualTo(height);
+		Viewport toggle = layout.viewToggle();
+		assertThat(toggle.x()).isEqualTo(button.x());
+		assertThat(toggle.y()).isEqualTo(button.bottom() + 4);
+		assertThat(toggle.bottom()).isLessThanOrEqualTo(height);
 		// Display stays centered.
 		assertThat(Math.abs(display.x() - (width - display.right()))).isLessThanOrEqualTo(1);
 	}

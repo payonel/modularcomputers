@@ -4,12 +4,17 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.payonel.modularcomputers.ModCreativeTab;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
+import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
 import com.payonel.modularcomputers.display.Viewport;
+import com.payonel.modularcomputers.item.ModItems;
+import com.payonel.modularcomputers.machine.Cpu;
+import com.payonel.modularcomputers.menu.CaseMenu;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.util.function.Function;
 import java.util.function.IntPredicate;
 import javax.imageio.ImageIO;
 import net.fabricmc.fabric.api.client.creativetab.v1.FabricCreativeModeInventoryScreen;
@@ -17,6 +22,9 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -29,11 +37,13 @@ import net.minecraft.world.phys.Vec3;
  * The all-in-one computer in the real client, checked through screenshots pixel by pixel:
  * <ul>
  * <li>It's in the creative inventory.</li>
- * <li>Off, its face and display are black, and the display's power button is lit red.</li>
  * <li>Right-click opens the display at full size from its first frame.</li>
- * <li>Left- or right-clicking the display's power button toggles power: the button goes green and
- * "hello world" shows in the display and on the block face.</li>
+ * <li>A new computer has no CPU: its power button is faded, and power runs nothing.</li>
+ * <li>The view toggle opens the case view, where the CPU and EEPROM go in with real mouse
+ * clicks and a shift-click; the power button lights up.</li>
+ * <li>Powered on from the display, "hello world" shows in the display and on the block face.</li>
  * <li>The glowing button on the back toggles power with a plain right-click.</li>
+ * <li>Without an EEPROM the CPU shows the soft gray abort screen, in the display and on the face.</li>
  * <li>Breaking the computer closes its display.</li>
  * </ul>
  */
@@ -42,8 +52,13 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	private static final int WHITE_THRESHOLD = 220;
 	/** Ticks between right-clicks; the client ignores use clicks closer together than 4 ticks. */
 	private static final int USE_COOLDOWN = 5;
+	/** Ticks between mouse clicks: 300 ms, past the double-click window. */
+	private static final int CLICK_PAUSE = 6;
 	private static final IntPredicate RED = rgb -> red(rgb) > 150 && green(rgb) < 100 && blue(rgb) < 100;
 	private static final IntPredicate GREEN = rgb -> green(rgb) > 150 && red(rgb) < 130 && blue(rgb) < 130;
+	/** The power button without a CPU: the same hue, dim. */
+	private static final IntPredicate FADED_RED = rgb -> red(rgb) > 100 && red(rgb) < 170 && red(rgb) - green(rgb) > 30;
+	private static final IntPredicate FADED_GREEN = rgb -> green(rgb) > 100 && green(rgb) < 170 && green(rgb) - red(rgb) > 25;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -72,23 +87,48 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			// Off: the face shows no text.
 			check(whitePixelsOnFace(context.takeScreenshot("all-in-one-off")) == 0, "an off computer's face should show no text");
 
-			// Off: right-click opens a black display at full size from the first frame, red button beside it.
+			// A new computer has no CPU: right-click opens a black display at full size from the
+			// first frame, with a faded power button. The switch works, but nothing runs.
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(DisplayScreen.class);
 			checkDisplayLayout(context);
-			DisplayShot off = displayShot(context, "all-in-one-display-off");
-			check(off.whitePixels(0, 16) == 0, "an off display should be all black");
-			check(RED.test(off.buttonCenter()), "the power button should be lit red when off, got " + hex(off.buttonCenter()));
-
-			// The display's power button toggles with right-click (on, off) and left-click (on).
-			clickPowerButton(context, InputConstants.MOUSE_BUTTON_RIGHT);
-			context.waitFor(client -> machineRunning(client, computer));
-			clickPowerButton(context, InputConstants.MOUSE_BUTTON_RIGHT);
-			context.waitFor(client -> !machineRunning(client, computer));
-			clickPowerButton(context, InputConstants.MOUSE_BUTTON_LEFT);
-			context.waitFor(client -> machineRunning(client, computer));
+			DisplayShot empty = displayShot(context, "all-in-one-display-no-cpu", 0);
+			check(FADED_RED.test(empty.buttonCenter()), "without a CPU the power button should be faded red, got " + hex(empty.buttonCenter()));
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_RIGHT, screen -> ((DisplayScreen) screen).powerButton());
+			context.waitFor(client -> machinePowered(client, computer));
 			context.waitTicks(2);
-			DisplayShot on = displayShot(context, "all-in-one-display-on");
+			DisplayShot emptyOn = displayShot(context, "all-in-one-display-no-cpu-on", 0);
+			check(FADED_GREEN.test(emptyOn.buttonCenter()), "powered without a CPU the button should be faded green, got " + hex(emptyOn.buttonCenter()));
+			check(emptyOn.whitePixels(0, 16) == 0, "nothing runs without a CPU");
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((DisplayScreen) screen).powerButton());
+			context.waitFor(client -> !machinePowered(client, computer));
+
+			// The view toggle opens the case view; the parts go in with real mouse clicks.
+			singleplayer.getServer().runCommand("give @p modularcomputers:cpu");
+			singleplayer.getServer().runCommand("give @p modularcomputers:eeprom");
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((DisplayScreen) screen).viewToggle());
+			context.waitForScreen(CaseScreen.class);
+			context.waitFor(client -> !client.player.getInventory().getItem(1).isEmpty());
+			context.takeScreenshot("all-in-one-case-empty");
+			int hotbar = CaseMenu.PART_SLOTS + 27;
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(hotbar)); // pick up the CPU
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(CaseMenu.CPU_SLOT));
+			shiftClickOnScreen(context, screen -> ((CaseScreen) screen).slotArea(hotbar + 1)); // the EEPROM finds its slot
+			singleplayer.getServer().waitFor(server -> server.overworld().getBlockEntity(computer) instanceof AllInOneBlockEntity be
+				&& be.machine().board().cpu().isPresent() && be.machine().board().eeprom().isPresent());
+			context.waitTicks(2);
+			BufferedImage caseShot = read(context.takeScreenshot("all-in-one-case-parts"));
+			int caseButton = pixelAt(context, caseShot, screen -> ((CaseScreen) screen).powerButton());
+			check(RED.test(caseButton), "with a CPU the power button should be lit red, got " + hex(caseButton));
+
+			// Back to the screen view; the power button turns the computer on.
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).viewToggle());
+			context.waitForScreen(DisplayScreen.class);
+			checkDisplayLayout(context);
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_RIGHT, screen -> ((DisplayScreen) screen).powerButton());
+			context.waitFor(client -> machinePowered(client, computer));
+			context.waitTicks(2);
+			DisplayShot on = displayShot(context, "all-in-one-display-on", 0);
 			check(GREEN.test(on.buttonCenter()), "the power button should be lit green when on, got " + hex(on.buttonCenter()));
 			check(on.whitePixels(0, 1) >= 50, "the display's first row should show text, found " + on.whitePixels(0, 1));
 			check(on.whitePixels(1, 16) == 0, "the rest of the display should be black");
@@ -108,14 +148,40 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			int[] back = buttonColors(context.takeScreenshot("all-in-one-back-on"));
 			check(back[1] > 100 && back[0] == 0, "the back button should glow green when on, red/green pixels: " + back[0] + "/" + back[1]);
 			context.getInput().pressKey(options -> options.keyUse);
-			context.waitFor(client -> !machineRunning(client, computer));
+			context.waitFor(client -> !machinePowered(client, computer));
 			context.waitTicks(USE_COOLDOWN);
 			check(context.computeOnClient(client -> client.gui.screen() == null), "the power button should not open the display");
 			back = buttonColors(context.takeScreenshot("all-in-one-back-off"));
 			check(back[0] > 100 && back[1] == 0, "the back button should glow red when off, red/green pixels: " + back[0] + "/" + back[1]);
 
-			// Elsewhere on the back, right-click opens the display; breaking the computer closes it.
+			// Without an EEPROM the CPU shows the abort screen: soft gray with dark text.
+			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
+				.parts().setItem(CaseMenu.EEPROM_SLOT, ItemStack.EMPTY));
+			context.getInput().pressKey(options -> options.keyUse);
+			context.waitFor(client -> machinePowered(client, computer));
+			context.waitTicks(USE_COOLDOWN);
+			context.getInput().lookAt(computer); // elsewhere on the back: opens the display
+			context.getInput().pressKey(options -> options.keyUse);
+			context.waitForScreen(DisplayScreen.class);
+			context.waitTicks(2);
+			DisplayShot abort = displayShot(context, "all-in-one-display-abort", Cpu.ABORT_BACKGROUND);
+			int abortText = abort.pixels(0, 1, rgb -> (rgb & 0xFFFFFF) == Cpu.ABORT_FOREGROUND);
+			check(abortText >= 30, "the abort message should show in dark text, found " + abortText);
+
+			// The block face shows the abort screen too.
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+			context.waitFor(client -> client.gui.screen() == null);
+			teleport(singleplayer, feet, 180);
+			context.waitFor(client -> client.player.blockPosition().equals(feet));
 			context.getInput().lookAt(computer);
+			context.waitTicks(5);
+			BufferedImage abortFace = read(context.takeScreenshot("all-in-one-abort-face"));
+			int cx = abortFace.getWidth() / 2;
+			int cy = abortFace.getHeight() / 2;
+			int gray = count(abortFace, cx - 100, cy - 105, cx + 100, cy, rgb -> near(rgb, Cpu.ABORT_BACKGROUND, 16));
+			check(gray > 5000, "the face should show the gray abort screen, found " + gray + " gray pixels");
+
+			// Breaking the computer closes its display.
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(DisplayScreen.class);
 			singleplayer.getServer().runCommand("setblock %d %d %d minecraft:air"
@@ -131,7 +197,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			feet.getX() + 0.5, feet.getY(), feet.getZ() + 0.5, yaw));
 	}
 
-	/** The block is listed in the mod's own creative tab and in creative search. */
+	/** The block and its parts are listed in the mod's own creative tab; the block is in creative search. */
 	private static void checkCreativeInventory(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
 		singleplayer.getServer().runCommand("gamemode creative @a");
 		context.waitFor(client -> client.player.isCreative());
@@ -141,6 +207,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			ItemStack computer = new ItemStack(ModBlocks.ALL_IN_ONE);
 			CreativeModeTab tab = BuiltInRegistries.CREATIVE_MODE_TAB.getValueOrThrow(ModCreativeTab.KEY);
 			check(tab.contains(computer), "the all-in-one should be in the Modular Computers tab");
+			check(tab.contains(new ItemStack(ModItems.CPU)) && tab.contains(new ItemStack(ModItems.EEPROM)), "the CPU and EEPROM should be in the tab");
 			check(CreativeModeTabs.tabs().contains(tab), "the Modular Computers tab should be shown");
 			check(CreativeModeTabs.searchTab().contains(computer), "the all-in-one should be in creative search");
 			var screen = (FabricCreativeModeInventoryScreen) client.gui.screen();
@@ -152,8 +219,8 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		context.waitFor(client -> client.gui.screen() == null);
 	}
 
-	private static boolean machineRunning(Minecraft client, BlockPos pos) {
-		return client.level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer && computer.machine().isRunning();
+	private static boolean machinePowered(Minecraft client, BlockPos pos) {
+		return client.level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer && computer.machine().isPowered();
 	}
 
 	/** Checked on the same tick the screen opened, so there's no placeholder size. */
@@ -171,15 +238,41 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		});
 	}
 
-	/** Moves the real mouse cursor onto the display's power button and clicks it ({@code InputConstants.MOUSE_BUTTON_*}). */
-	private static void clickPowerButton(ClientGameTestContext context, int mouseButton) {
+	/** Moves the real mouse cursor to the middle of an area of the open screen and clicks ({@code InputConstants.MOUSE_BUTTON_*}). */
+	private static void clickOnScreen(ClientGameTestContext context, int mouseButton, Function<Screen, Viewport> area) {
 		double[] cursor = context.computeOnClient(client -> {
-			Viewport button = ((DisplayScreen) client.gui.screen()).powerButton();
+			Viewport target = area.apply(client.gui.screen());
 			int scale = client.getWindow().getGuiScale();
-			return new double[] {(button.x() + button.width() / 2.0) * scale, (button.y() + button.height() / 2.0) * scale};
+			return new double[] {(target.x() + target.width() / 2.0) * scale, (target.y() + target.height() / 2.0) * scale};
 		});
 		context.getInput().setCursorPos(cursor[0], cursor[1]);
 		context.getInput().pressMouse(mouseButton);
+		// Pause like a person would; clicks closer together than 250 ms count as a double-click.
+		context.waitTicks(CLICK_PAUSE);
+	}
+
+	/**
+	 * Shift-clicks the middle of an area of the open screen. Fabric's {@code pressMouse} always
+	 * sends no modifier flags, and 26.3 reads Shift from the click's flags, so this hands the
+	 * screen the same event a real shift-click produces.
+	 */
+	private static void shiftClickOnScreen(ClientGameTestContext context, Function<Screen, Viewport> area) {
+		context.runOnClient(client -> {
+			Screen screen = client.gui.screen();
+			Viewport target = area.apply(screen);
+			screen.mouseClicked(new MouseButtonEvent(target.x() + target.width() / 2.0, target.y() + target.height() / 2.0,
+				new MouseButtonInfo(InputConstants.MOUSE_BUTTON_LEFT, InputConstants.MOD_SHIFT)), false);
+		});
+		context.waitTicks(CLICK_PAUSE);
+	}
+
+	/** The screenshot pixel in the middle of an area of the open screen. */
+	private static int pixelAt(ClientGameTestContext context, BufferedImage image, Function<Screen, Viewport> area) {
+		return context.computeOnClient(client -> {
+			Screen screen = client.gui.screen();
+			Viewport target = scaled(area.apply(screen), (double) image.getWidth() / screen.width);
+			return image.getRGB(target.x() + target.width() / 2, target.y() + target.height() / 2);
+		});
 	}
 
 	/** Turns the player to look at the middle of the power button on the back of a south-facing computer. */
@@ -213,9 +306,14 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	private record DisplayShot(BufferedImage image, Viewport display, Viewport button, int rows) {
 		/** White pixels in display rows [from, to). */
 		int whitePixels(int fromRow, int toRow) {
+			return pixels(fromRow, toRow, AllInOneClientGameTest::isWhite);
+		}
+
+		/** Pixels of a color in display rows [from, to). */
+		int pixels(int fromRow, int toRow, IntPredicate color) {
 			double rowHeight = (double) display.height() / rows;
 			return count(image, display.x(), display.y() + (int) (fromRow * rowHeight),
-				display.right(), display.y() + (int) (toRow * rowHeight), AllInOneClientGameTest::isWhite);
+				display.right(), display.y() + (int) (toRow * rowHeight), color);
 		}
 
 		int buttonCenter() {
@@ -223,16 +321,19 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		}
 	}
 
-	/** Screenshot of the open display, with the display and button rectangles in screenshot pixels. */
-	private static DisplayShot displayShot(ClientGameTestContext context, String name) {
+	/**
+	 * Screenshot of the open display, with the display and button rectangles in screenshot
+	 * pixels. The lower middle of the display must be {@code background} (0xRRGGBB): drawn, not
+	 * see-through.
+	 */
+	private static DisplayShot displayShot(ClientGameTestContext context, String name, int background) {
 		BufferedImage image = read(context.takeScreenshot(name));
 		return context.computeOnClient(client -> {
 			DisplayScreen screen = (DisplayScreen) client.gui.screen();
 			double scale = (double) image.getWidth() / screen.width;
 			Viewport display = scaled(screen.viewport(), scale);
-			// The middle of the display is drawn black, not see-through.
 			int middle = image.getRGB(display.x() + display.width() / 2, display.y() + display.height() * 3 / 4) & 0xFFFFFF;
-			check(middle == 0, "display should be black, got " + hex(middle));
+			check(middle == background, "display background should be " + hex(background) + ", got " + hex(middle));
 			return new DisplayShot(image, display, scaled(screen.powerButton(), scale), 16);
 		});
 	}
@@ -251,6 +352,12 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			}
 		}
 		return count;
+	}
+
+	/** Each channel within {@code tolerance} of {@code expected} (0xRRGGBB). */
+	private static boolean near(int rgb, int expected, int tolerance) {
+		return Math.abs(red(rgb) - red(expected)) <= tolerance && Math.abs(green(rgb) - green(expected)) <= tolerance
+			&& Math.abs(blue(rgb) - blue(expected)) <= tolerance;
 	}
 
 	private static boolean isWhite(int rgb) {

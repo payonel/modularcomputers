@@ -7,6 +7,7 @@ import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.device.Keyboard;
 import com.payonel.modularcomputers.display.Display;
 import com.payonel.modularcomputers.display.Resolution;
+import com.payonel.modularcomputers.display.TextBuffer;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -61,12 +62,44 @@ class ConsoleSplitterTest {
 	}
 
 	@Test
-	void resetGoesBackToTheTopLeft() {
+	void writesInTheCurrentColorsAndClearsTheConsoleArea() {
+		Display small = new Display(new Resolution(2, 1));
+		Display big = new Display(new Resolution(3, 2));
+		ConsoleSplitter console = console(small, big);
+		console.setColors(0x111111, 0x222222);
+		console.clear();
+		console.write("a");
+		for (Display display : List.of(small, big)) {
+			assertThat(display.buffer().get(0, 0)).isEqualTo('a');
+			assertThat(display.buffer().foreground(0, 0)).isEqualTo(0x111111);
+			assertThat(display.buffer().background(1, 0)).as("cleared in the console's background").isEqualTo(0x222222);
+		}
+		assertThat(big.buffer().background(2, 0)).as("outside the console area").isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
+		assertThat(big.buffer().background(0, 1)).as("outside the console area").isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
+	}
+
+	@Test
+	void scrollingKeepsTheConsoleBackground() {
+		Display display = new Display(new Resolution(2, 2));
+		ConsoleSplitter console = console(display);
+		console.setColors(0x111111, 0x222222);
+		console.clear();
+		console.print("a");
+		console.print("b");
+		assertThat(display.buffer().rows()).containsExactly("b ", "  ");
+		assertThat(display.buffer().background(0, 1)).isEqualTo(0x222222);
+	}
+
+	@Test
+	void resetGoesBackToTheTopLeftInDefaultColors() {
 		ConsoleSplitter console = console(new Display(new Resolution(5, 5)));
+		console.setColors(0x111111, 0x222222);
 		console.print("a");
 		console.write("b");
 		console.reset();
 		assertThat(console.column()).isZero();
 		assertThat(console.row()).isZero();
+		assertThat(console.foreground()).isEqualTo(TextBuffer.DEFAULT_FOREGROUND);
+		assertThat(console.background()).isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
 	}
 }

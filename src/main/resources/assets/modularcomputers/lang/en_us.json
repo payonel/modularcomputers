@@ -1,5 +1,7 @@
 {
 	"itemGroup.modularcomputers": "Modular Computers",
 	"block.modularcomputers.all_in_one": "All-in-One Computer",
-	"gui.modularcomputers.display": "Display"
+	"gui.modularcomputers.display": "Display",
+	"item.modularcomputers.cpu": "CPU",
+	"item.modularcomputers.eeprom": "EEPROM"
 }

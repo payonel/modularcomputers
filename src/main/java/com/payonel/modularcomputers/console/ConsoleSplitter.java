@@ -4,6 +4,7 @@ import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.display.Display;
 import com.payonel.modularcomputers.display.Resolution;
+import com.payonel.modularcomputers.display.TextBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,8 +14,9 @@ import java.util.List;
  * there are none.
  * <p>
  * Its size is the smallest columns and rows among the displays, so console text fits on all
- * of them; with no displays it reports {@link #HEADLESS}. It keeps the cursor: text wraps at
- * the right edge, and a new line at the bottom scrolls the console area up.
+ * of them; with no displays it reports {@link #HEADLESS}. It keeps the cursor and the current
+ * colors: text wraps at the right edge, and a new line at the bottom scrolls the console area
+ * up.
  */
 public final class ConsoleSplitter {
 	/** The size reported when no display is attached; never 0x0, so callers need no special case. */
@@ -23,6 +25,8 @@ public final class ConsoleSplitter {
 	private final Bus bus;
 	private int column;
 	private int row;
+	private int foreground = TextBuffer.DEFAULT_FOREGROUND;
+	private int background = TextBuffer.DEFAULT_BACKGROUND;
 
 	public ConsoleSplitter(Bus bus) {
 		this.bus = bus;
@@ -50,6 +54,30 @@ public final class ConsoleSplitter {
 		return row;
 	}
 
+	public int foreground() {
+		return foreground;
+	}
+
+	public int background() {
+		return background;
+	}
+
+	/** Colors (0xRRGGBB) for text written from now on. */
+	public void setColors(int foreground, int background) {
+		this.foreground = foreground;
+		this.background = background;
+	}
+
+	/** Blanks the console area in the current colors and moves the cursor to the top left. */
+	public void clear() {
+		Resolution size = size();
+		for (Display display : displays()) {
+			display.buffer().fill(0, 0, size.columns(), size.rows(), foreground, background);
+		}
+		column = 0;
+		row = 0;
+	}
+
 	/** Writes text at the cursor; {@code \n} starts a new line. */
 	public void write(String text) {
 		Resolution size = size();
@@ -64,7 +92,7 @@ public final class ConsoleSplitter {
 				newLine(size, displays);
 			}
 			for (Display display : displays) {
-				display.buffer().set(column, row, c);
+				display.buffer().set(column, row, c, foreground, background);
 			}
 			column++;
 		}
@@ -75,16 +103,20 @@ public final class ConsoleSplitter {
 		write(line + "\n");
 	}
 
-	/** Back to the top-left corner, e.g. after power loss (the displays clear themselves). */
+	/** Back to the top-left corner and default colors, e.g. after power loss (the displays clear themselves). */
 	public void reset() {
 		column = 0;
 		row = 0;
+		foreground = TextBuffer.DEFAULT_FOREGROUND;
+		background = TextBuffer.DEFAULT_BACKGROUND;
 	}
 
-	/** Restores the cursor from a save. */
-	public void restoreCursor(int column, int row) {
+	/** Restores the cursor and colors from a save. */
+	public void restore(int column, int row, int foreground, int background) {
 		this.column = column;
 		this.row = row;
+		this.foreground = foreground;
+		this.background = background;
 	}
 
 	private void newLine(Resolution size, List<Display> displays) {
@@ -92,7 +124,7 @@ public final class ConsoleSplitter {
 		row++;
 		if (row >= size.rows()) {
 			for (Display display : displays) {
-				display.buffer().scrollUp(size.rows());
+				display.buffer().scrollUp(size.rows(), foreground, background);
 			}
 			row = size.rows() - 1;
 		}

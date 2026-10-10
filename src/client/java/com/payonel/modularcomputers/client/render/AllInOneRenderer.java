@@ -19,13 +19,12 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.world.phys.Vec3;
 
-/** Draws the all-in-one computer's display text onto the glass of its front face. */
+/** Draws the all-in-one computer's display (cell backgrounds and text) onto the glass of its front face. */
 public final class AllInOneRenderer implements BlockEntityRenderer<AllInOneBlockEntity, AllInOneRenderer.State> {
 	/** The glass on the front texture, in texels from the face's top-left corner. */
 	private static final float GLASS_X = 2, GLASS_Y = 2, GLASS_WIDTH = 12, GLASS_HEIGHT = 8;
 	/** How far the text floats in front of the face, in blocks. */
 	private static final float TEXT_OFFSET = 0.002f;
-	private static final int TEXT_COLOR = 0xFFFFFFFF;
 
 	private final Font font;
 
@@ -38,6 +37,8 @@ public final class AllInOneRenderer implements BlockEntityRenderer<AllInOneBlock
 		Resolution resolution = Resolution.DEFAULT;
 		/** Rows of the display, or null when there's nothing to draw. */
 		String[] rows;
+		int[] foregrounds;
+		int[] backgrounds;
 	}
 
 	@Override
@@ -56,10 +57,9 @@ public final class AllInOneRenderer implements BlockEntityRenderer<AllInOneBlock
 			state.rows = null;
 			return;
 		}
-		state.rows = new String[state.resolution.rows()];
-		for (int row = 0; row < state.rows.length; row++) {
-			state.rows[row] = display.row(row);
-		}
+		state.rows = display.rows().toArray(String[]::new);
+		state.foregrounds = display.foregrounds();
+		state.backgrounds = display.backgrounds();
 	}
 
 	@Override
@@ -83,13 +83,30 @@ public final class AllInOneRenderer implements BlockEntityRenderer<AllInOneBlock
 		pose.rotateDegrees(Axis.YP, -state.facing.toYRot());
 		pose.translate(left - 0.5f, 0.5f - top, 0.5f + TEXT_OFFSET);
 		pose.scale(grid.fontScale(), -grid.fontScale(), grid.fontScale());
+		int columns = state.resolution.columns();
+		float cellWidth = grid.cellWidth() / grid.fontScale();
+		float cellHeight = grid.cellHeight() / grid.fontScale();
+		// Backgrounds, in runs of equal color; the glass is already black.
+		for (int row = 0; row < state.rows.length; row++) {
+			int start = 0;
+			for (int column = 1; column <= columns; column++) {
+				if (column == columns || state.backgrounds[row * columns + column] != state.backgrounds[row * columns + start]) {
+					int background = state.backgrounds[row * columns + start];
+					if (background != TextBuffer.DEFAULT_BACKGROUND) {
+						collector.submitTextBackground(pose, start * cellWidth, row * cellHeight, column * cellWidth, (row + 1) * cellHeight,
+							0xFF000000 | background, Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT);
+					}
+					start = column;
+				}
+			}
+		}
 		for (int row = 0; row < state.rows.length; row++) {
 			String text = state.rows[row];
 			for (int column = 0; column < text.length(); column++) {
 				char c = text.charAt(column);
 				if (c != ' ') {
 					collector.submitText(pose, grid.x(column, c, font), grid.y(row), FormattedCharSequence.codepoint(c, Style.EMPTY), false,
-						 Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT, TEXT_COLOR, 0, 0);
+						Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT, 0xFF000000 | state.foregrounds[row * columns + column], 0, 0);
 				}
 			}
 		}

@@ -1,0 +1,6 @@
+{
+	"parent": "modularcomputers:block/all_in_one_base_faded",
+	"textures": {
+		"button": "modularcomputers:block/all_in_one_power_off_faded"
+	}
+}

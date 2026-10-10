@@ -1,12 +1,17 @@
 package com.payonel.modularcomputers.machine;
 
 /**
- * A computer and its power state, independent of Minecraft. Power-on hands control to the
- * {@link Cpu}; power-off cuts power to the {@link Motherboard}.
+ * A computer and its power switch, independent of Minecraft. Switching on hands control to the
+ * CPU in the socket, if there is one; with no CPU the machine is powered but nothing runs.
+ * Switching off cuts power to the {@link Motherboard}.
+ * <p>
+ * Parts aren't hot-plugged: installing a CPU in a powered machine does nothing until the next
+ * power-on, and removing one leaves the devices as they were (a display keeps its last
+ * picture).
  */
 public final class Machine {
 	private final Motherboard board;
-	private boolean running;
+	private boolean powered;
 
 	public Machine(Motherboard board) {
 		this.board = board;
@@ -16,31 +21,32 @@ public final class Machine {
 		return board;
 	}
 
-	public boolean isRunning() {
-		return running;
+	/** The power switch is on. */
+	public boolean isPowered() {
+		return powered;
 	}
 
-	public void setRunning(boolean running) {
-		if (this.running == running) {
+	public void setPowered(boolean powered) {
+		if (this.powered == powered) {
 			return;
 		}
-		this.running = running;
-		if (running) {
-			Cpu.powerOn(board);
+		this.powered = powered;
+		if (powered) {
+			board.cpu().ifPresent(cpu -> cpu.powerOn(board));
 		} else {
 			board.powerOff();
 		}
 	}
 
 	public void togglePower() {
-		setRunning(!running);
+		setPowered(!powered);
 	}
 
 	/**
-	 * Sets the power state from a save or a sync, without booting or cutting power: the devices
+	 * Sets the switch from a save or a sync, without booting or cutting power: the devices
 	 * restore their own state.
 	 */
-	public void restoreRunning(boolean running) {
-		this.running = running;
+	public void restorePowered(boolean powered) {
+		this.powered = powered;
 	}
 }

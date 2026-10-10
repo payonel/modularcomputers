@@ -62,6 +62,9 @@ RING = (56, 56, 60)
 LIT = {
 	"off": [(255, 128, 110), (222, 44, 34), (168, 26, 20)],  # highlight, face, shadow
 	"on": [(170, 255, 160), (64, 214, 64), (32, 150, 42)],
+	# No CPU: the same colors, faded and not glowing (the model drops the emission too).
+	"off_faded": [(150, 104, 98), (124, 72, 66), (100, 58, 54)],
+	"on_faded": [(118, 150, 114), (84, 124, 84), (64, 100, 66)],
 }
 
 def button_face(state):
@@ -86,10 +89,12 @@ def power(state):
 			im.putpixel((HOUSING[0] + 1 + dx, HOUSING[1] + 1 + dy), c)
 	return im
 
+GUI_STATES = ("off", "on", "off_faded", "on_faded")
+
 def gui_button():
-	"""GUI power button, off then on, 5x5 each: housing ring plus the same lit face."""
-	im = Image.new("RGBA", (10, 5), RING + (255,))
-	for i, state in enumerate(("off", "on")):
+	"""GUI power button, one 5x5 frame per state in GUI_STATES: housing ring plus the same face."""
+	im = Image.new("RGBA", (5 * len(GUI_STATES), 5), RING + (255,))
+	for i, state in enumerate(GUI_STATES):
 		for dy, row in enumerate(button_face(state)):
 			for dx, c in enumerate(row):
 				im.putpixel((i * 5 + 1 + dx, 1 + dy), c + (255,))
@@ -98,11 +103,48 @@ def gui_button():
 def bottom():
 	return casing(5, [(178, 169, 141), (171, 162, 134), (184, 175, 148), (166, 157, 130)])
 
+def item_canvas():
+	return Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+
+def cpu_item():
+	"""A square chip: dark package with a metal lid, gold pins on all four sides."""
+	im = item_canvas()
+	pin, pin_dark = (222, 182, 70, 255), (170, 132, 40, 255)
+	for i in range(3, 13, 2):
+		for x, y in [(i, 1), (i, 2), (i, 13), (i, 14), (1, i), (2, i), (13, i), (14, i)]:
+			im.putpixel((x, y), pin if (x + y) % 4 else pin_dark)
+	rect(im, 3, 3, 12, 12, (44, 46, 52, 255))  # package
+	rect(im, 5, 5, 10, 10, (168, 172, 180, 255))  # lid
+	rect(im, 5, 5, 10, 5, (206, 210, 216, 255))
+	rect(im, 5, 5, 5, 10, (206, 210, 216, 255))
+	rect(im, 6, 10, 10, 10, (120, 124, 132, 255))
+	rect(im, 10, 6, 10, 10, (120, 124, 132, 255))
+	im.putpixel((4, 4), (222, 182, 70, 255))  # pin-1 mark
+	return im
+
+def eeprom_item():
+	"""A small DIP chip: black body with silver legs and a paper label."""
+	im = item_canvas()
+	leg = (196, 200, 206, 255)
+	for x in range(4, 12, 2):
+		for y in (3, 12):
+			im.putpixel((x, y), leg)
+	rect(im, 2, 4, 13, 11, (30, 30, 34, 255))  # body
+	rect(im, 2, 4, 13, 4, (56, 56, 62, 255))
+	im.putpixel((2, 7), (12, 12, 14, 255))  # notch
+	im.putpixel((2, 8), (12, 12, 14, 255))
+	rect(im, 4, 6, 11, 9, (236, 232, 214, 255))  # label
+	rect(im, 5, 7, 9, 7, (90, 110, 170, 255))  # writing
+	rect(im, 5, 8, 7, 8, (90, 110, 170, 255))
+	return im
+
 for name, fn in [("front", front), ("side", side), ("top", top), ("back", back), ("bottom", bottom)]:
 	fn().save(f"{OUT}/all_in_one_{name}.png")
 for state in LIT:
 	power(state).save(f"{OUT}/all_in_one_power_{state}.png")
 gui_button().save(f"{OUT}/../gui/power_button.png")
+for name, fn in [("cpu", cpu_item), ("eeprom", eeprom_item)]:
+	fn().save(f"{OUT}/../item/{name}.png")
 
 # Preview sheet, scaled up, for review.
 sheet = Image.new("RGB", (16 * 5 + 4 * 6, 24), (40, 40, 40))

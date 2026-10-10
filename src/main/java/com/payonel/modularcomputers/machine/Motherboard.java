@@ -7,21 +7,21 @@ import com.payonel.modularcomputers.console.ConsoleSplitter;
 import java.util.Optional;
 
 /**
- * Ties a machine together: its parts (CPU, memory), the physical bus with the real devices,
- * the virtual bus with devices that always exist (like the console), and the EEPROM slot.
+ * Ties a machine together: its soldered parts, the CPU socket, the EEPROM slot, the physical
+ * bus with the real devices, and the virtual bus with devices that always exist (like the
+ * console).
  */
 public final class Motherboard {
 	private final Hardware parts;
 	private final Bus bus;
 	private final VirtualBus virtualBus;
-	private final Eeprom eeprom;
+	private Cpu cpu;
+	private Eeprom eeprom;
 
-	/** @param eeprom what's in the EEPROM slot, or null when it's empty */
-	public Motherboard(Hardware parts, Bus bus, Eeprom eeprom) {
+	public Motherboard(Hardware parts, Bus bus) {
 		this.parts = parts;
 		this.bus = bus;
 		this.virtualBus = new VirtualBus(new ConsoleSplitter(bus));
-		this.eeprom = eeprom;
 	}
 
 	public Hardware parts() {
@@ -36,8 +36,22 @@ public final class Motherboard {
 		return virtualBus;
 	}
 
+	public Optional<Cpu> cpu() {
+		return Optional.ofNullable(cpu);
+	}
+
+	/** @param cpu the CPU in the socket, or null to empty it */
+	public void setCpu(Cpu cpu) {
+		this.cpu = cpu;
+	}
+
 	public Optional<Eeprom> eeprom() {
 		return Optional.ofNullable(eeprom);
+	}
+
+	/** @param eeprom the EEPROM in the slot, or null to empty it */
+	public void setEeprom(Eeprom eeprom) {
+		this.eeprom = eeprom;
 	}
 
 	/** Power is cut: every device loses its volatile state, and the console starts over. */

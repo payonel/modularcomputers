@@ -1,7 +1,10 @@
 package com.payonel.modularcomputers;
 
 import com.payonel.modularcomputers.block.ModBlocks;
+import com.payonel.modularcomputers.item.ModItems;
+import com.payonel.modularcomputers.menu.ModMenus;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
+import com.payonel.modularcomputers.network.SwitchViewPayload;
 import com.payonel.modularcomputers.network.TogglePowerPayload;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
@@ -34,10 +37,13 @@ public final class ModularComputers implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		ModItems.init();
 		ModBlocks.init();
+		ModMenus.init();
 		ModCreativeTab.init();
 		OpenDisplayPayload.register();
 		TogglePowerPayload.register();
+		SwitchViewPayload.register();
 		initialized = true;
 		LOGGER.info("{} (version {})", INIT_MARKER, version());
 	}

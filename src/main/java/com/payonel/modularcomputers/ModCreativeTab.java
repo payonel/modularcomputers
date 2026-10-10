@@ -1,6 +1,7 @@
 package com.payonel.modularcomputers;
 
 import com.payonel.modularcomputers.block.ModBlocks;
+import com.payonel.modularcomputers.item.ModItems;
 import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -21,7 +22,11 @@ public final class ModCreativeTab {
 		Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, KEY, FabricCreativeModeTab.builder()
 			.title(Component.translatable("itemGroup.modularcomputers"))
 			.icon(() -> new ItemStack(ModBlocks.ALL_IN_ONE))
-			.displayItems((parameters, output) -> output.accept(ModBlocks.ALL_IN_ONE))
+			.displayItems((parameters, output) -> {
+				output.accept(ModBlocks.ALL_IN_ONE);
+				output.accept(ModItems.CPU);
+				output.accept(ModItems.EEPROM);
+			})
 			.build());
 	}
 }

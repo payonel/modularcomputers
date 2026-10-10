@@ -25,17 +25,19 @@ import net.minecraft.world.phys.Vec3;
  * anywhere) turns it on or off.
  */
 public final class AllInOneBlock extends HorizontalDirectionalBlock implements EntityBlock {
-	/** Mirrors the machine's power so the model can light the power button. */
-	public static final BooleanProperty RUNNING = BooleanProperty.create("running");
+	/** The power switch is on. Picks red or green for the power button. */
+	public static final BooleanProperty POWERED = BooleanProperty.create("powered");
+	/** A CPU is installed. Without one the power button is faded and doesn't glow. */
+	public static final BooleanProperty CPU = BooleanProperty.create("cpu");
 
 	public AllInOneBlock(Properties properties) {
 		super(properties);
-		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(RUNNING, false));
+		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false).setValue(CPU, false));
 	}
 
 	@Override
 	protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-		builder.add(FACING, RUNNING);
+		builder.add(FACING, POWERED, CPU);
 	}
 
 	@Override

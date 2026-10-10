@@ -70,63 +70,84 @@ same thing.
   - It's listed in the mod's own creative tab, "Modular Computers" (`ModCreativeTab`). Fabric
     puts mod tabs on **page 2** of the creative inventory (the ▶ arrow by the tab title).
     It's also in creative search, and `/give @s modularcomputers:all_in_one` works.
-  - CPU and memory are soldered parts with no limits. The display, keyboard and disk are
-    devices on its physical bus. It has a soldered EEPROM. There's no inventory and there are
-    no slots yet.
-  - **Power button** (a press button, not a toggle switch):
+  - **Parts:**
+    - Memory is soldered (no limit). The display, keyboard and disk are devices on its
+      physical bus.
+    - The **CPU** and **EEPROM** are items (`ModItems`) that go into its **case view** slots.
+    - A newly placed computer is empty. Get the parts from the creative tab, or with
+      `/give @s modularcomputers:cpu` and `/give @s modularcomputers:eeprom`.
+    - Breaking the block drops its parts.
+  - **Two views, one block:**
+    - **Right-click** opens the **screen view** (`DisplayScreen`, the user's "modal mode").
+    - A **view toggle** button switches to the **case view** and back.
+    - The case view (`CaseScreen` + `CaseMenu`, an `ExtendedMenuType` that carries the
+      position) has CPU and EEPROM slots plus the player's inventory, drawn in vanilla
+      container style with fills.
+    - Switching sends `SwitchViewPayload`. The server either opens the menu, or closes it and
+      sends `OpenDisplayPayload`.
+    - Both views show the same button column to the right (`ComputerButtons`): the power
+      button on top, the view toggle below. The toggle shows a CPU icon for "case" and a tiny
+      screen for "screen".
+  - **Power button** (a press button, not a toggle switch). It toggles the power **switch**
+    (`Machine.isPowered`, block state `powered`):
     - **On the back, bottom right:** a dark housing at texels 9..13, holding a 3x3 button that
-      sticks out half a texel. It's an emissive model element, so it glows: red when off,
-      green when on. A plain right-click on the housing toggles power (`PowerButton.isHit`).
-    - **In the display GUI:** to the right of the display, level with its top edge, never
-      covering it. It's drawn from `textures/gui/power_button.png` with the same pixel colors.
-      A left or right click sends `TogglePowerPayload`, and the server checks reach before toggling.
-    - **Sneak + right-click** anywhere also still toggles power.
-    - The `running` block-state property mirrors the machine's power and picks the
-      off/on model.
-  - User's future plan for power:
-    - Once screens are separate blocks, the GUI power button only shows when the screen is
-      connected to a case, because cases provide the power toggle.
-    - Lighting will depend on available power: faded red/green when unpowered, fully lit when
-      powered. Only a fully lit green button actually runs the PC.
-  - The power state is saved and synced to clients. Toggling plays a stone-button click.
-  - There is **no Lua runtime yet**; see "Machine architecture" below. The EEPROM holds a
-    Java stand-in program that prints "hello world" through the console. Turning the computer
-    off blanks the display, and a blank display renders black.
-  - The text renders on the block face's glass (`AllInOneRenderer`) and in the display GUI.
-  - **Right-click** opens the display GUI (`DisplayScreen`). The server sends
-    `OpenDisplayPayload` with the position and resolution, so the GUI has its final size from
-    the first frame. It's a black rectangle at 90% of the window, keeping the buffer's aspect
-    ratio, over the dimmed world.
-    - User requirement: no OC-style placeholder box, and not 100% of the window.
-    - The GUI doesn't pause the game, and it closes when the block is gone or out of reach.
-  - Resolution is 50x16 cells of 8x16 (OC tier 1), so text is readable on a one-block face.
-  - Text uses Minecraft's proportional font, centered per cell. A real monospace bitmap font
-    (OC used unifont `font.hex`) is future work.
+      sticks out half a texel. A plain right-click on the housing toggles it
+      (`PowerButton.isHit`).
+    - **In both GUI views:** left or right click sends `TogglePowerPayload`, and the server
+      checks reach.
+    - **Sneak + right-click** anywhere also still toggles it.
+    - **Look:**
+      - With a CPU (block state `cpu=true`), the button is lit (an emissive model element):
+        red when off, green when on.
+      - With no CPU it's **faded and unlit**. The switch still works, but nothing runs.
+      - There are four block models (`all_in_one[_on][_faded]`) on two base models (emissive,
+        and plain), and four frames in `textures/gui/power_button.png`.
+  - **Boot results:**
+    - CPU and EEPROM: "hello world" (the stand-in program).
+    - CPU, no EEPROM: the soft gray **ABRT** screen, `ABRT: no EEPROM installed`.
+    - No CPU: black.
+    - Parts aren't hot-plugged: changes take effect at the next power-on, and a removed CPU
+      leaves the display as it was.
+  - **Display:**
+    - It shows on the block face's glass (`AllInOneRenderer`) and in the screen view.
+    - Cells have foreground and background colors. In the world, backgrounds are drawn with
+      `submitTextBackground`.
+    - The screen view sizes itself from the resolution in `OpenDisplayPayload`, so it's right
+      from the first frame: 90% of the window, keeping the aspect ratio, over the dimmed
+      world.
+      - User requirement: no OC-style placeholder box, and not 100% of the window.
+      - It doesn't pause the game, and it closes when the block is gone or out of reach.
+    - Resolution is 50x16 cells of 8x16, so text is readable on a one-block face.
+    - Text uses Minecraft's proportional font, centered per cell. A monospace bitmap font is
+      future work.
+  - Power, parts, display contents and colors, and the console state are saved and synced.
+    Toggling plays a stone-button click.
 - **Lua runtime:** the user is building their own Lua runtime as a separate project, and it
   isn't ready. Leave VM/runtime work alone and keep building the computer's other features.
   Machine behavior stays a stand-in (like the "hello world" greeting) until the runtime lands.
-- Planned (the user's roadmap, not started):
-  - computer cases with slots, plus tiers and power
-  - parts: CPUs, RAM, disks, EEPROM
-  - external devices: separate screens, keyboards, cables
+- **Roadmap and ideas: `docs/PLAN.md`.** Record new plans and decided-but-unbuilt ideas there.
+  Move items into this section as they're built.
 - Design rule: machine logic stays in plain Java (`machine/`, `bus/`, `console/`, `device/`,
-  `display/`) and is unit-tested. Minecraft glue goes in `block/` and `network/`, and rendering
-  goes in `client/`.
+  `display/`) and is unit-tested. Minecraft glue goes in `block/`, `item/`, `menu/` and
+  `network/`, and rendering goes in `client/`.
 
 ### Machine architecture (agreed with the user, modeled on real PCs)
 
-- **CPU (`Cpu`):** almost no logic of its own. At power-on it loads the program from the
-  motherboard's **EEPROM slot** and executes it.
+- **CPU (`Cpu`):** an installable part with almost no logic of its own. At power-on it loads
+  the program from the motherboard's **EEPROM slot** and executes it.
   - The slot is a fixed place, like a real CPU's reset vector, so the CPU never walks a bus to
     find firmware.
-  - The CPU's only behavior of its own is panic reporting, like a kernel panic. With an empty
-    slot, or when the program throws, it prints the error to the console (`Cpu.NO_EEPROM`,
-    `Cpu.CRASHED`) and halts. Power stays on.
+  - The CPU's only behavior of its own is the **abort screen**, like a kernel panic. With an
+    empty slot, or when the program throws, it does this and halts, with power staying on:
+    1. sets the console colors to `ABORT_FOREGROUND` on `ABORT_BACKGROUND` (soft gray; the
+       user doesn't want blue);
+    2. clears the console;
+    3. prints `ABRT: <reason>` (`Cpu.NO_EEPROM`, or `Cpu.CRASHED` plus the message).
 - **EEPROM (`Eeprom`):** holds a `Program`. Today that's Java (`HelloWorldProgram`, a
-  stand-in). Later it's Lua code run by the user's Lua runtime, which is a separate project
-  that isn't ready yet. The CPU's side doesn't change.
-- **Motherboard (`Motherboard`):** holds the parts (CPU, memory; `Hardware`/`Part`), the
-  EEPROM slot, and two buses.
+  stand-in). Later it's Lua code run by the user's Lua runtime. The CPU's side doesn't
+  change.
+- **Motherboard (`Motherboard`):** holds the soldered parts (`Hardware`/`Part`, memory), the
+  CPU socket, the EEPROM slot, and two buses.
   - **Physical bus (`bus/Bus`):** the real devices in slot order. Each describes itself
     (`Device#type()`, the class code) and is used through its own Java type, the capability
     (like UEFI's GOP).
@@ -134,25 +155,20 @@ same thing.
     - The CPU and memory are not on it, as on a real PC.
   - **Virtual bus (`bus/VirtualBus`):** devices that always exist, found by fixed name, not by
     walking (like Linux's virtual devices or UEFI's `ConOut`). Today it holds only `console`.
+- **Machine (`Machine`):** the power switch. Switching on with a CPU runs it; switching on
+  without one runs nothing.
 - **Console (`console/ConsoleSplitter`):** modeled on UEFI's console splitter.
   - It's never null. It writes to every display on the physical bus and drops output when
     there are none.
   - Its size is the smallest columns × rows among the displays. With no displays it reports
     `HEADLESS` (a real size, never 0×0, like Linux's dummycon).
-  - It owns the cursor, wraps text at the right edge, and scrolls only its own area.
+  - It owns the cursor and the current colors. It wraps text at the right edge, `clear()`
+    fills its area, and it scrolls only its own area.
   - A minimal EEPROM just prints to it. Advanced code can walk the physical bus instead.
 - **Power-off:** every device gets `powerOff()` (displays blank), and the console resets.
-- **Saved and synced:** the block entity saves and syncs the power state, the display rows
-  and the console cursor. Clients never run programs; they show the synced display contents.
-  `Machine.restoreRunning` sets the state without booting.
-- **Ideas discussed for later** (not built):
-  - **Console log:** a ring buffer with a read position per console and a `messages dropped`
-    line instead of silent loss, like Linux printk.
-  - **Hot-plug:** when a screen is attached to a running machine, the console takes it over
-    and redraws.
-  - **Stored console preference:** an NVRAM-like store, like UEFI's `ConOut` variable.
-  - **Beep codes:** for a headless boot.
-  - **The EEPROM as a bus device:** listed on the physical bus too, for reflashing.
+- **Saved and synced:** the block entity saves and syncs the switch, the parts, the display
+  (characters and colors) and the console state. Clients never run programs; they show the
+  synced display contents. `Machine.restorePowered` sets the switch without booting.
 
 ### Versions in use (`gradle.properties`)
 
@@ -254,6 +270,17 @@ MAJOR.MINOR.PATCH+MCVERSION        e.g. 0.1.0+26.3   ->  modularcomputers-0.1.0+
   - Model elements accept `"light_emission": 15` (and `"shade": false`) for glowing parts.
     A child model can't add elements to its parent's, so `all_in_one_base` holds the cube and
     the button, and the off/on models only swap the `#button` texture.
+  - Container screens: `AbstractContainerScreen(menu, inventory, title, width, height)`.
+    `imageWidth` and `imageHeight` are final. Draw the panel in `extractBackground`, after
+    calling `super`.
+  - Fabric menus that send data on open use `ExtendedMenuType<Menu, Data>(factory,
+    StreamCodec)`, plus a provider that implements `ExtendedMenuProvider<Data>`. Open one with
+    `player.openMenu(provider)`. Register the screen with `MenuScreens.register`.
+  - Drop a block entity's contents in `BlockEntity#preRemoveSideEffects(pos, state)` with
+    `Containers.dropContents`.
+  - `submitTextBackground(pose, x0, y0, x1, y1, argb, mode, light)` fills a rectangle in text
+    space (the four floats are corners). Use it for colored cell backgrounds on a block face.
+  - Draw an item icon in a GUI with `graphics.item(stack, x, y)`.
   - GLFW isn't on the compile classpath. Use `InputConstants.KEY_*` for key codes, e.g. in
     client tests.
   - **Mouse buttons use SDL numbering: left = 1, middle = 2, right = 3.** GLFW's old numbering
@@ -306,7 +333,7 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
    `net.fabricmc.fabric.api.gametest.v1.GameTest` that take a
    `net.minecraft.gametest.framework.GameTestHelper`.
    - They run headless inside `./gradlew build` via `runGameTest`.
-   - The run reports "All 7 required tests passed": 6 are ours, and one is of unknown origin
+   - The run reports "All 14 required tests passed": 13 are ours, and one is of unknown origin
      (not investigated).
    - `helper.makeMockPlayer(GameType)` and `helper.useBlock(pos, player)` exercise real
      right-click handling. Call `player.setShiftKeyDown(true)` for sneak-use.
@@ -366,6 +393,13 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
   becomes `-4.5`, which is inside block -5.
 - `context.getInput().setCursorPos(x, y)` takes window pixels (GUI coordinates times
   `getWindow().getGuiScale()`), and `pressMouse(0)` left-clicks.
+- **`pressMouse` sends no modifier flags**, and 26.3 reads Shift from the click event's flags.
+  So `holdShift()` + `pressMouse()` is a plain click.
+  - To shift-click, call `screen.mouseClicked(new MouseButtonEvent(x, y,
+    new MouseButtonInfo(MOUSE_BUTTON_LEFT, InputConstants.MOD_SHIFT)), false)` on the client.
+    That still runs the real container click path.
+- **Wait about 6 ticks between clicks.** Clicks less than 250 ms apart count as a
+  double-click, which, for example, swallows "place the carried item".
 - `lookAt(yaw, pitch)` aims at an exact point. Compute yaw as `atan2(-dx, dz)` and pitch as
   `-atan2(dy, horizontal)`.
 
@@ -448,9 +482,10 @@ LICENSE                      MIT
 README.md
 docs/TESTING.md              test layers, outputs, headless setup
 docs/VERSIONING.md           version format, bump rules, branches
+docs/PLAN.md                 roadmap and design ideas (record user plans here)
 build.gradle, settings.gradle, gradle.properties, gradle/ (wrapper + daemon JVM criteria)
 scripts/setup-headless-host.sh, scripts/headless.sh
-scripts/art/all_in_one_textures.py   draws the all-in-one textures (Pillow); PNGs are committed
+scripts/art/all_in_one_textures.py   draws the block, GUI and item textures (Pillow); PNGs are committed
 .github/workflows/build.yml
 src/main/java/com/payonel/modularcomputers/
   ModularComputers.java            MOD_ID, LOGGER, id(), INIT_MARKER; registers content + packets
@@ -460,13 +495,18 @@ src/main/java/com/payonel/modularcomputers/
   device/                          Keyboard, Disk (bus devices; no behavior yet)
   display/                         plain Java: Display (bus device), Resolution, TextBuffer, Viewport, DisplayLayout (GUI layout math)
   ModCreativeTab.java              the "Modular Computers" creative tab
+  item/ModItems.java               CPU and EEPROM items
+  menu/                            CaseMenu (part slots + inventory), ModMenus
   block/                           AllInOneBlock, AllInOneBlockEntity, PowerButton (hit test), ModBlocks (registrations)
   network/OpenDisplayPayload.java  server->client "open this display"
-  network/TogglePowerPayload.java  client->server "power button clicked in the display"
+  network/TogglePowerPayload.java  client->server "power button clicked in a GUI"
+  network/SwitchViewPayload.java   client->server "view toggle clicked" (screen view <-> case view)
 src/client/java/com/payonel/modularcomputers/client/
   ModularComputersClient.java      registers renderer + packet receiver
   render/                          AllInOneRenderer (text on the block face), TextGrid (cell layout)
-  screen/DisplayScreen.java        the right-click display GUI
+  screen/DisplayScreen.java        the screen view (right-click; "modal mode")
+  screen/CaseScreen.java           the case view (slots)
+  screen/ComputerButtons.java      power button + view toggle, shared by both views
 src/main/resources/                fabric.mod.json, assets (blockstates, models, items, textures, lang), data (loot table, pickaxe tag)
 src/test/java/...                  unit tests (ModularComputersTest, machine/, display/)
 src/gametest/java/.../gametest/    ModularComputersGameTest + AllInOneGameTest (server),
