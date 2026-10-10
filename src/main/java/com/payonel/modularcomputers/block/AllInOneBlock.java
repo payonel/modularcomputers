@@ -1,6 +1,7 @@
 package com.payonel.modularcomputers.block;
 
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
+import java.util.Optional;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -21,8 +22,8 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * A single-block computer: screen and keyboard on the front face, parts soldered inside.
- * Right-click opens its display. The power button on the back (or sneak + right-click
- * anywhere) turns it on or off.
+ * Right-click opens its display. On the back, the power button (or sneak + right-click
+ * anywhere) turns it on or off, and the window into the case opens the case view.
  */
 public final class AllInOneBlock extends HorizontalDirectionalBlock implements EntityBlock {
 	/** The power switch is on. Picks red or green for the power button. */
@@ -56,11 +57,14 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 		if (level.isClientSide() || !(level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer)) {
 			return InteractionResult.SUCCESS;
 		}
-		if (PowerButton.isHit(state.getValue(FACING), hit.getDirection(), hit.getLocation().subtract(Vec3.atLowerCornerOf(pos)))
-			|| player.isSecondaryUseActive()) {
+		var region = BackPanel.hit(state.getValue(FACING), hit.getDirection(), hit.getLocation().subtract(Vec3.atLowerCornerOf(pos)));
+		if (region.equals(Optional.of(BackPanel.Region.POWER)) || player.isSecondaryUseActive()) {
 			computer.togglePower();
+		} else if (region.equals(Optional.of(BackPanel.Region.CASE))) {
+			// The window into the case opens the case view.
+			player.openMenu(computer);
 		} else if (player instanceof ServerPlayer serverPlayer) {
-			// Right-click: the client opens the display when this arrives.
+			// Anywhere else: the screen wins. The client opens the display when this arrives.
 			ServerPlayNetworking.send(serverPlayer, new OpenDisplayPayload(pos, computer.display().buffer().resolution()));
 		}
 		return InteractionResult.SUCCESS;

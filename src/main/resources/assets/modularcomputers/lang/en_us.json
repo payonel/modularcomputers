@@ -3,5 +3,6 @@
 	"block.modularcomputers.all_in_one": "All-in-One Computer",
 	"gui.modularcomputers.display": "Display",
 	"item.modularcomputers.cpu": "CPU",
-	"item.modularcomputers.eeprom": "EEPROM"
+	"item.modularcomputers.eeprom": "EEPROM",
+	"commands.modularcomputers.giveall": "Gave %s Modular Computers items"
 }

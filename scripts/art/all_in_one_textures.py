@@ -72,10 +72,35 @@ def button_face(state):
 	hl, face, dark = LIT[state]
 	return [[hl, face, face], [face, face, face], [face, face, dark]]
 
+# Motherboard colors, shared by the back's case window and the GUI case button.
+PCB = (46, 116, 64)
+PCB_DARK = (32, 88, 48)
+TRACE = (196, 160, 72)
+SOCKET = (40, 40, 46)
+SOCKET_LID = (150, 154, 162)
+RAM_SLOT = (214, 212, 200)
+
+# Case window: an opening into the case at the top of the back, showing the motherboard.
+# Clicking it opens the case view. Keep in sync with BackPanel.java.
+WINDOW = (3, 2, 12, 7)  # x0, y0, x1, y1 texels, inclusive (frame included)
+
 def back():
 	im = casing(4)
-	for y in (3, 5, 7):  # vents
-		rect(im, 3, y, 12, y, (92, 86, 70))
+	x0, y0, x1, y1 = WINDOW
+	# Recessed frame: deep shadow top/left, the case's lit edge bottom/right.
+	rect(im, x0, y0, x1, y0, (34, 32, 28))
+	rect(im, x0, y0, x0, y1, (34, 32, 28))
+	rect(im, x0 + 1, y1, x1, y1, LIGHT)
+	rect(im, x1, y0 + 1, x1, y1, LIGHT)
+	# The board, in shade near the top edge.
+	rect(im, x0 + 1, y0 + 1, x1 - 1, y1 - 1, PCB)
+	rect(im, x0 + 1, y0 + 1, x1 - 1, y0 + 1, PCB_DARK)
+	rect(im, x0 + 2, y0 + 2, x0 + 3, y0 + 3, SOCKET)  # CPU socket
+	im.putpixel((x0 + 2, y0 + 2), SOCKET_LID)
+	rect(im, x0 + 6, y0 + 1, x0 + 6, y1 - 1, RAM_SLOT)  # RAM slots
+	rect(im, x0 + 8, y0 + 1, x0 + 8, y1 - 1, RAM_SLOT)
+	rect(im, x0 + 1, y1 - 1, x0 + 4, y1 - 1, TRACE)  # traces
+	im.putpixel((x0 + 4, y0 + 2), TRACE)
 	rect(im, 2, 12, 4, 13, (60, 60, 64))  # port
 	hx, hy = HOUSING
 	rect(im, hx, hy, hx + 4, hy + 4, RING)
@@ -102,6 +127,25 @@ def gui_button():
 
 def bottom():
 	return casing(5, [(178, 169, 141), (171, 162, 134), (184, 175, 148), (166, 157, 130)])
+
+def case_button():
+	"""GUI case-view button: the same motherboard as the back's window, at 16x16."""
+	im = Image.new("RGBA", (16, 16), PCB + (255,))
+	px = lambda x, y, c: im.putpixel((x, y), c + (255,))
+	box = lambda x0, y0, x1, y1, c: [px(x, y, c) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)]
+	box(0, 0, 15, 0, PCB_DARK); box(0, 0, 0, 15, PCB_DARK)
+	box(0, 15, 15, 15, PCB_DARK); box(15, 0, 15, 15, PCB_DARK)
+	box(2, 2, 7, 7, SOCKET)  # CPU socket with its lid
+	box(3, 3, 6, 6, SOCKET_LID)
+	box(3, 3, 6, 3, (196, 200, 206))
+	for x in (10, 12):  # RAM slots
+		box(x, 2, x, 13, RAM_SLOT)
+	box(2, 10, 7, 10, TRACE)  # traces
+	box(7, 8, 7, 10, TRACE)
+	box(2, 12, 5, 12, TRACE)
+	box(2, 13, 3, 13, (60, 60, 64))  # a chip
+	px(14, 14, TRACE)
+	return im
 
 def item_canvas():
 	return Image.new("RGBA", (16, 16), (0, 0, 0, 0))
@@ -143,6 +187,7 @@ for name, fn in [("front", front), ("side", side), ("top", top), ("back", back),
 for state in LIT:
 	power(state).save(f"{OUT}/all_in_one_power_{state}.png")
 gui_button().save(f"{OUT}/../gui/power_button.png")
+case_button().save(f"{OUT}/../gui/case_button.png")
 for name, fn in [("cpu", cpu_item), ("eeprom", eeprom_item)]:
 	fn().save(f"{OUT}/../item/{name}.png")
 

@@ -8,10 +8,12 @@ skip steps freely, never invent false steps (see `AGENTS.md` section 1).
 
 - **All-in-one computer:** screen + keyboard on the front, power button on the back, built-in
   display, keyboard and disk on its bus, soldered memory.
-- **Case view** in the all-in-one, with **CPU** and **EEPROM** slots. The CPU is optional:
+- **Case view** in the all-in-one, opened from the GUI's motherboard toggle or from the
+  window into the case on the block's back, with **CPU** and **EEPROM** slots. The CPU is optional:
   without one the power switch still works, but the button is faded and unlit, and nothing
   runs. The EEPROM holds the stand-in "hello world" program; without one the CPU shows the
   soft gray **ABRT** screen.
+- **`/modularcomputers giveall`:** a cheat command that gives one of every mod item.
 - **Machine model:**
   - The CPU loads its program from the fixed EEPROM slot.
   - A physical bus of self-describing devices, and a virtual bus with the always-present

@@ -74,25 +74,33 @@ same thing.
     - Memory is soldered (no limit). The display, keyboard and disk are devices on its
       physical bus.
     - The **CPU** and **EEPROM** are items (`ModItems`) that go into its **case view** slots.
-    - A newly placed computer is empty. Get the parts from the creative tab, or with
-      `/give @s modularcomputers:cpu` and `/give @s modularcomputers:eeprom`.
+    - A newly placed computer is empty. Get the parts from the creative tab, or with the
+      cheat command **`/modularcomputers giveall`**.
+      - It gives one of every item registered under the mod's namespace, so new items are
+        included automatically (`ModCommands`).
+      - It needs operator permission, like `/give`: cheats on in singleplayer.
     - Breaking the block drops its parts.
   - **Two views, one block:**
     - **Right-click** opens the **screen view** (`DisplayScreen`, the user's "modal mode").
-    - A **view toggle** button switches to the **case view** and back.
+      The display sits in a beige **bezel** (`DisplayLayout.bezel`, 6 GUI units) that matches
+      the screen surround on the block's front.
+    - A **view toggle** button switches to the **case view** and back. In the world, the
+      **window into the case** across the top of the back (texels 3..12 by 2..7, showing the
+      motherboard) opens the case view directly.
     - The case view (`CaseScreen` + `CaseMenu`, an `ExtendedMenuType` that carries the
       position) has CPU and EEPROM slots plus the player's inventory, drawn in vanilla
       container style with fills.
     - Switching sends `SwitchViewPayload`. The server either opens the menu, or closes it and
       sends `OpenDisplayPayload`.
     - Both views show the same button column to the right (`ComputerButtons`): the power
-      button on top, the view toggle below. The toggle shows a CPU icon for "case" and a tiny
-      screen for "screen".
+      button on top, the view toggle below. The toggle shows a motherboard
+      (`textures/gui/case_button.png`, the same art as the back's window) for "case", and a
+      tiny screen for "screen".
   - **Power button** (a press button, not a toggle switch). It toggles the power **switch**
     (`Machine.isPowered`, block state `powered`):
     - **On the back, bottom right:** a dark housing at texels 9..13, holding a 3x3 button that
-      sticks out half a texel. A plain right-click on the housing toggles it
-      (`PowerButton.isHit`).
+      sticks out half a texel. A plain right-click on the housing toggles it. `BackPanel.hit`
+      maps back-face clicks to its regions: `POWER` and `CASE`.
     - **In both GUI views:** left or right click sends `TogglePowerPayload`, and the server
       checks reach.
     - **Sneak + right-click** anywhere also still toggles it.
@@ -337,7 +345,7 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
    - They run headless via `runGameTest`, which is part of `testAll` but **not** of `build`.
      Loom adds `runGameTest` to `check` by name; `build.gradle` removes it so `build` stays fast
      (the user wants `build` quick and iterative).
-   - The run reports "All 14 required tests passed": 13 are ours, and one is of unknown origin
+   - The run reports "All 16 required tests passed": 15 are ours, and one is of unknown origin
      (not investigated).
    - `helper.makeMockPlayer(GameType)` and `helper.useBlock(pos, player)` exercise real
      right-click handling. Call `player.setShiftKeyDown(true)` for sneak-use.
@@ -389,6 +397,10 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
 
 ### Client test worlds and gotchas
 
+- **Test worlds have cheats off by default**, so the player can't run operator commands. A
+  command the player isn't allowed to use answers "Unknown or incomplete command".
+  `AllInOneClientGameTest` turns cheats on with
+  `.adjustSettings(settings -> settings.setAllowCommands(true))`.
 - `context.worldBuilder()` uses "consistent settings" by default, and the test spells this out
   with `setUseConsistentSettings(true)`:
   - the superflat preset, with seed `1`
@@ -501,7 +513,8 @@ src/main/java/com/payonel/modularcomputers/
   ModCreativeTab.java              the "Modular Computers" creative tab
   item/ModItems.java               CPU and EEPROM items
   menu/                            CaseMenu (part slots + inventory), ModMenus
-  block/                           AllInOneBlock, AllInOneBlockEntity, PowerButton (hit test), ModBlocks (registrations)
+  block/                           AllInOneBlock, AllInOneBlockEntity, BackPanel (back-face hit regions), ModBlocks (registrations)
+  command/ModCommands.java         /modularcomputers giveall (cheat: one of every mod item)
   network/OpenDisplayPayload.java  server->client "open this display"
   network/TogglePowerPayload.java  client->server "power button clicked in a GUI"
   network/SwitchViewPayload.java   client->server "view toggle clicked" (screen view <-> case view)

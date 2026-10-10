@@ -17,7 +17,8 @@ import net.minecraft.network.chat.Component;
  * as soon as it opens (no placeholder box) and fills most of the window. It shows the same
  * text as the screen block's face; an off computer shows black.
  * <p>
- * Right of the display, from its top edge down: the power button, which looks like the one on
+ * The display sits in a bezel like the screen surround on the computer's front. Right of the
+ * bezel, from its top edge down: the power button, which looks like the one on
  * the computer's back, and the toggle to the case view (see {@link ComputerButtons}). Once
  * screens are separate blocks, these show only when the screen is connected to a case.
  */
@@ -25,10 +26,17 @@ public final class DisplayScreen extends Screen {
 	/** Share of the window, in each direction, that the display may fill. */
 	public static final double FILL = 0.9;
 	private static final int BLACK = 0xFF000000;
+	/** The frame around the display, in GUI units, in the computer case's colors. */
+	private static final int BEZEL = 6;
+	private static final int CASE = 0xFFCEC5A8;
+	private static final int CASE_LIGHT = 0xFFE2DAC0;
+	private static final int CASE_SHADE = 0xFFACA387;
+	private static final int CASE_DARK = 0xFF948B71;
 
 	private final BlockPos pos;
 	private final Resolution resolution;
-	private DisplayLayout layout = new DisplayLayout(new Viewport(0, 0, 0, 0), new Viewport(0, 0, 0, 0), new Viewport(0, 0, 0, 0));
+	private static final Viewport NONE = new Viewport(0, 0, 0, 0);
+	private DisplayLayout layout = new DisplayLayout(NONE, NONE, NONE, NONE);
 
 	public DisplayScreen(BlockPos pos, Resolution resolution) {
 		super(Component.translatable("gui.modularcomputers.display"));
@@ -44,6 +52,11 @@ public final class DisplayScreen extends Screen {
 		return layout.display();
 	}
 
+	/** The display plus its frame. */
+	public Viewport bezel() {
+		return layout.bezel();
+	}
+
 	public Viewport powerButton() {
 		return layout.powerButton();
 	}
@@ -54,7 +67,7 @@ public final class DisplayScreen extends Screen {
 
 	@Override
 	protected void init() {
-		layout = DisplayLayout.of(width, height, resolution.aspectRatio(), FILL, ComputerButtons.SIZE, ComputerButtons.GAP);
+		layout = DisplayLayout.of(width, height, resolution.aspectRatio(), FILL, BEZEL, ComputerButtons.SIZE, ComputerButtons.GAP);
 	}
 
 	@Override
@@ -71,6 +84,7 @@ public final class DisplayScreen extends Screen {
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+		extractBezel(graphics);
 		Viewport display = layout.display();
 		graphics.fill(display.x(), display.y(), display.right(), display.bottom(), BLACK);
 		if (minecraft.level != null && minecraft.level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer) {
@@ -78,6 +92,20 @@ public final class DisplayScreen extends Screen {
 			ComputerButtons.extract(graphics, layout.powerButton(), layout.viewToggle(), ComputerButtons.Target.CASE, computer.getBlockState());
 		}
 		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+	}
+
+	/**
+	 * A frame like the screen surround on the computer's front: beige case with a lit outer
+	 * edge, and a recessed inner edge (shadow top and left, light bottom and right).
+	 */
+	private void extractBezel(GuiGraphicsExtractor graphics) {
+		Viewport b = layout.bezel();
+		Viewport d = layout.display();
+		graphics.fill(b.x(), b.y(), b.right(), b.bottom(), CASE_SHADE);
+		graphics.fill(b.x(), b.y(), b.right() - 1, b.bottom() - 1, CASE_LIGHT);
+		graphics.fill(b.x() + 1, b.y() + 1, b.right() - 1, b.bottom() - 1, CASE);
+		graphics.fill(d.x() - 1, d.y() - 1, d.right() + 1, d.bottom() + 1, CASE_LIGHT);
+		graphics.fill(d.x() - 1, d.y() - 1, d.right(), d.bottom(), CASE_DARK);
 	}
 
 	private void extractText(GuiGraphicsExtractor graphics, TextBuffer buffer) {

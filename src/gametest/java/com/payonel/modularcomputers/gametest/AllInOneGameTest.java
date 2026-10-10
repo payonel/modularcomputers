@@ -4,6 +4,7 @@ import com.payonel.modularcomputers.block.AllInOneBlock;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.bus.DeviceType;
+import com.payonel.modularcomputers.command.ModCommands;
 import com.payonel.modularcomputers.display.TextBuffer;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
@@ -15,6 +16,7 @@ import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
@@ -146,8 +148,29 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = install(place(helper), true, true);
 		Player player = helper.makeMockPlayer(GameType.SURVIVAL);
 		helper.useBlock(POS, player, backClick(helper, 4.5, 11.5));
-		helper.useBlock(POS, player, backClick(helper, 11.5, 4.5));
-		helper.assertTrue(!computer.machine().isPowered(), "only the button should toggle power");
+		helper.useBlock(POS, player, backClick(helper, 7.5, 4.5));
+		helper.assertTrue(!computer.machine().isPowered(), "only the power button should toggle power");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void caseWindowOnTheBackOpensTheCaseView(GameTestHelper helper) {
+		place(helper);
+		ServerPlayer player = helper.makeMockServerPlayerInLevel();
+		helper.useBlock(POS, player, backClick(helper, 7.5, 4.5));
+		helper.assertTrue(player.containerMenu instanceof CaseMenu menu && menu.pos().equals(helper.absolutePos(POS)),
+			"the case window should open this computer's case view, got " + player.containerMenu);
+		helper.succeed();
+	}
+
+	@GameTest
+	public void giveAllGivesEveryModItem(GameTestHelper helper) {
+		ServerPlayer player = helper.makeMockServerPlayerInLevel();
+		int given = ModCommands.giveAll(player);
+		helper.assertValueEqual(given, ModCommands.modItems().size(), "items given");
+		for (var item : List.of(ModBlocks.ALL_IN_ONE.asItem(), ModItems.CPU, ModItems.EEPROM)) {
+			helper.assertTrue(player.getInventory().contains(new ItemStack(item)), "should have " + item);
+		}
 		helper.succeed();
 	}
 

@@ -4,7 +4,6 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.payonel.modularcomputers.ModularComputers;
 import com.payonel.modularcomputers.block.AllInOneBlock;
 import com.payonel.modularcomputers.display.Viewport;
-import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.network.SwitchViewPayload;
 import com.payonel.modularcomputers.network.TogglePowerPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -13,13 +12,13 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * The button column shared by the screen view and the case view: the power button (it looks
  * like the one on the computer's back: red off, green on, faded and unlit without a CPU) and
- * the toggle between the two views. Left or right click presses either.
+ * the toggle between the two views (a motherboard to open the case, a little screen to go
+ * back). Left or right click presses either.
  */
 final class ComputerButtons {
 	static final int SIZE = 20;
@@ -29,6 +28,8 @@ final class ComputerButtons {
 	private static final Identifier POWER_TEXTURE = ModularComputers.id("textures/gui/power_button.png");
 	private static final int TEXELS = 5;
 	private static final int SCALE = SIZE / TEXELS;
+	/** The view toggle's motherboard icon, 16x16. */
+	private static final Identifier CASE_TEXTURE = ModularComputers.id("textures/gui/case_button.png");
 	private static final int RING = 0xFF38383C;
 	private static final int FACE = 0xFF8B8B8B;
 
@@ -79,8 +80,8 @@ final class ComputerButtons {
 		int y = button.y() + 2;
 		graphics.fill(x, y, x + 16, y + 16, FACE);
 		if (target == Target.CASE) {
-			// The case's parts: show a CPU.
-			graphics.item(new ItemStack(ModItems.CPU), x, y);
+			// A motherboard, like the window into the case on the computer's back.
+			graphics.blit(RenderPipelines.GUI_TEXTURED, CASE_TEXTURE, x, y, 0, 0, 16, 16, 16, 16);
 		} else {
 			// A little screen with a line of text.
 			graphics.fill(x + 1, y + 3, x + 15, y + 13, RING);

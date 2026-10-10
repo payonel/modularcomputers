@@ -1,6 +1,7 @@
 package com.payonel.modularcomputers;
 
 import com.payonel.modularcomputers.block.ModBlocks;
+import com.payonel.modularcomputers.command.ModCommands;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.ModMenus;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
@@ -40,6 +41,7 @@ public final class ModularComputers implements ModInitializer {
 		ModItems.init();
 		ModBlocks.init();
 		ModMenus.init();
+		ModCommands.init();
 		ModCreativeTab.init();
 		OpenDisplayPayload.register();
 		TogglePowerPayload.register();

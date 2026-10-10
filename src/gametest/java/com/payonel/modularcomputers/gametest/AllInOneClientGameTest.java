@@ -39,8 +39,10 @@ import net.minecraft.world.phys.Vec3;
  * <li>It's in the creative inventory.</li>
  * <li>Right-click opens the display at full size from its first frame.</li>
  * <li>A new computer has no CPU: its power button is faded, and power runs nothing.</li>
+ * <li>{@code /modularcomputers giveall}, sent from the player, gives every part.</li>
  * <li>The view toggle opens the case view, where the CPU and EEPROM go in with real mouse
  * clicks and a shift-click; the power button lights up.</li>
+ * <li>The window into the case on the back opens the case view.</li>
  * <li>Powered on from the display, "hello world" shows in the display and on the block face.</li>
  * <li>The glowing button on the back toggles power with a plain right-click.</li>
  * <li>Without an EEPROM the CPU shows the soft gray abort screen, in the display and on the face.</li>
@@ -63,7 +65,9 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	@Override
 	public void runTest(ClientGameTestContext context) {
 		// Consistent settings (the default, spelled out): superflat, fixed seed, no time or weather.
-		try (TestSingleplayerContext singleplayer = context.worldBuilder().setUseConsistentSettings(true).create()) {
+		// Cheats on, like a creative test world, so the player may use operator commands (giveall).
+		try (TestSingleplayerContext singleplayer = context.worldBuilder().setUseConsistentSettings(true)
+			.adjustSettings(settings -> settings.setAllowCommands(true)).create()) {
 			singleplayer.getConnection().waitForChunksRender();
 			checkCreativeInventory(context, singleplayer);
 
@@ -103,17 +107,21 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((DisplayScreen) screen).powerButton());
 			context.waitFor(client -> !machinePowered(client, computer));
 
+			// The player gets every part with the cheat command, typed as they would.
+			context.runOnClient(client -> client.player.connection.sendCommand("modularcomputers giveall"));
+			context.waitFor(client -> client.player.getInventory().contains(new ItemStack(ModItems.CPU))
+				&& client.player.getInventory().contains(new ItemStack(ModItems.EEPROM)));
+			int cpuHotbar = hotbarSlotOf(context, ModItems.CPU);
+			int eepromHotbar = hotbarSlotOf(context, ModItems.EEPROM);
+
 			// The view toggle opens the case view; the parts go in with real mouse clicks.
-			singleplayer.getServer().runCommand("give @p modularcomputers:cpu");
-			singleplayer.getServer().runCommand("give @p modularcomputers:eeprom");
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((DisplayScreen) screen).viewToggle());
 			context.waitForScreen(CaseScreen.class);
-			context.waitFor(client -> !client.player.getInventory().getItem(1).isEmpty());
 			context.takeScreenshot("all-in-one-case-empty");
-			int hotbar = CaseMenu.PART_SLOTS + 27;
-			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(hotbar)); // pick up the CPU
+			int hotbar = CaseMenu.PART_SLOTS + 27; // the case menu's first hotbar slot
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(hotbar + cpuHotbar)); // pick up the CPU
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(CaseMenu.CPU_SLOT));
-			shiftClickOnScreen(context, screen -> ((CaseScreen) screen).slotArea(hotbar + 1)); // the EEPROM finds its slot
+			shiftClickOnScreen(context, screen -> ((CaseScreen) screen).slotArea(hotbar + eepromHotbar)); // the EEPROM finds its slot
 			singleplayer.getServer().waitFor(server -> server.overworld().getBlockEntity(computer) instanceof AllInOneBlockEntity be
 				&& be.machine().board().cpu().isPresent() && be.machine().board().eeprom().isPresent());
 			context.waitTicks(2);
@@ -143,7 +151,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			BlockPos behind = computer.north(2).below();
 			teleport(singleplayer, behind, 0);
 			context.waitFor(client -> client.player.blockPosition().equals(behind));
-			aimAtBackButton(context, computer);
+			aimAtBack(context, computer, 11.5, 11.5); // the power button
 			context.waitTicks(5);
 			int[] back = buttonColors(context.takeScreenshot("all-in-one-back-on"));
 			check(back[1] > 100 && back[0] == 0, "the back button should glow green when on, red/green pixels: " + back[0] + "/" + back[1]);
@@ -154,13 +162,24 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			back = buttonColors(context.takeScreenshot("all-in-one-back-off"));
 			check(back[0] > 100 && back[1] == 0, "the back button should glow red when off, red/green pixels: " + back[0] + "/" + back[1]);
 
+			// The window into the case, across the top of the back, opens the case view.
+			aimAtBack(context, computer, 7.5, 4.5);
+			context.getInput().pressKey(options -> options.keyUse);
+			context.waitForScreen(CaseScreen.class);
+			context.takeScreenshot("all-in-one-case-from-back");
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+			context.waitFor(client -> client.gui.screen() == null);
+			check(!context.computeOnClient(client -> machinePowered(client, computer)), "the case window should not toggle power");
+			context.waitTicks(USE_COOLDOWN);
+
 			// Without an EEPROM the CPU shows the abort screen: soft gray with dark text.
 			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
 				.parts().setItem(CaseMenu.EEPROM_SLOT, ItemStack.EMPTY));
+			aimAtBack(context, computer, 11.5, 11.5);
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitFor(client -> machinePowered(client, computer));
 			context.waitTicks(USE_COOLDOWN);
-			context.getInput().lookAt(computer); // elsewhere on the back: opens the display
+			aimAtBack(context, computer, 5.5, 10.5); // elsewhere on the back: opens the display
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(DisplayScreen.class);
 			context.waitTicks(2);
@@ -219,22 +238,39 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		context.waitFor(client -> client.gui.screen() == null);
 	}
 
+	/** Which hotbar slot (0-8) holds the item. */
+	private static int hotbarSlotOf(ClientGameTestContext context, net.minecraft.world.item.Item item) {
+		int slot = context.computeOnClient(client -> {
+			for (int i = 0; i < 9; i++) {
+				if (client.player.getInventory().getItem(i).is(item)) {
+					return i;
+				}
+			}
+			return -1;
+		});
+		check(slot >= 0, item + " should be in the hotbar");
+		return slot;
+	}
+
 	private static boolean machinePowered(Minecraft client, BlockPos pos) {
 		return client.level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer && computer.machine().isPowered();
 	}
 
-	/** Checked on the same tick the screen opened, so there's no placeholder size. */
+	/** Checked on the same tick the screen opened, so there's no placeholder size. The bezel frames the display. */
 	private static void checkDisplayLayout(ClientGameTestContext context) {
 		context.runOnClient(client -> {
 			DisplayScreen screen = (DisplayScreen) client.gui.screen();
+			Viewport bezel = screen.bezel();
 			Viewport display = screen.viewport();
 			Viewport button = screen.powerButton();
-			boolean large = display.width() >= 0.85 * screen.width || display.height() >= 0.85 * screen.height;
-			boolean notFull = display.width() < screen.width && display.height() < screen.height;
-			check(large && notFull, "display should fill most but not all of the window: " + display
+			boolean large = bezel.width() >= 0.85 * screen.width || bezel.height() >= 0.85 * screen.height;
+			boolean notFull = bezel.width() < screen.width && bezel.height() < screen.height;
+			check(large && notFull, "the framed display should fill most but not all of the window: " + bezel
 				+ " in " + screen.width + "x" + screen.height);
-			check(button.x() >= display.right() && button.y() == display.y(), "power button should be right of the display at its top: " + button);
-			check(button.right() <= screen.width, "power button should be inside the window: " + button);
+			check(display.x() > bezel.x() && display.right() < bezel.right() && display.y() > bezel.y() && display.bottom() < bezel.bottom(),
+				"the bezel should frame the display: " + bezel + " around " + display);
+			check(button.x() >= bezel.right() && button.y() == bezel.y(), "power button should be right of the bezel at its top: " + button);
+			check(screen.viewToggle().bottom() <= screen.height, "view toggle should be inside the window: " + screen.viewToggle());
 		});
 	}
 
@@ -275,11 +311,13 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		});
 	}
 
-	/** Turns the player to look at the middle of the power button on the back of a south-facing computer. */
-	private static void aimAtBackButton(ClientGameTestContext context, BlockPos computer) {
-		// From behind (looking south) right is west, so texel u counts from the east edge.
-		double texel = 11.5 / 16;
-		Vec3 target = new Vec3(computer.getX() + 1 - texel, computer.getY() + 1 - texel, computer.getZ());
+	/**
+	 * Turns the player to look at texel (u, v) on the back of a south-facing computer, as seen
+	 * from behind (u to the right, v down).
+	 */
+	private static void aimAtBack(ClientGameTestContext context, BlockPos computer, double u, double v) {
+		// From behind (looking south) right is west, so u counts from the east edge.
+		Vec3 target = new Vec3(computer.getX() + 1 - u / 16, computer.getY() + 1 - v / 16, computer.getZ());
 		Vec3 eye = context.computeOnClient(client -> client.player.getEyePosition());
 		Vec3 d = target.subtract(eye);
 		float yaw = (float) Math.toDegrees(Math.atan2(-d.x, d.z));
