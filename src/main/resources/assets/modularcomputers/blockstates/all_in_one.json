@@ -1,0 +1,8 @@
+{
+	"variants": {
+		"facing=north": { "model": "modularcomputers:block/all_in_one" },
+		"facing=east": { "model": "modularcomputers:block/all_in_one", "y": 90 },
+		"facing=south": { "model": "modularcomputers:block/all_in_one", "y": 180 },
+		"facing=west": { "model": "modularcomputers:block/all_in_one", "y": 270 }
+	}
+}

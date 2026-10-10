@@ -1,0 +1,12 @@
+{
+	"parent": "minecraft:block/cube",
+	"textures": {
+		"particle": "modularcomputers:block/all_in_one_side",
+		"north": "modularcomputers:block/all_in_one_front",
+		"south": "modularcomputers:block/all_in_one_back",
+		"east": "modularcomputers:block/all_in_one_side",
+		"west": "modularcomputers:block/all_in_one_side",
+		"up": "modularcomputers:block/all_in_one_top",
+		"down": "modularcomputers:block/all_in_one_bottom"
+	}
+}

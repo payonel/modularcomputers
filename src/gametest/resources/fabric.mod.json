@@ -5,8 +5,14 @@
 	"name": "Modular Computers Game Tests",
 	"environment": "*",
 	"entrypoints": {
-		"fabric-gametest": ["com.payonel.modularcomputers.gametest.ModularComputersGameTest"],
-		"fabric-client-gametest": ["com.payonel.modularcomputers.gametest.ModularComputersClientGameTest"]
+		"fabric-gametest": [
+			"com.payonel.modularcomputers.gametest.ModularComputersGameTest",
+			"com.payonel.modularcomputers.gametest.AllInOneGameTest"
+		],
+		"fabric-client-gametest": [
+			"com.payonel.modularcomputers.gametest.ModularComputersClientGameTest",
+			"com.payonel.modularcomputers.gametest.AllInOneClientGameTest"
+		]
 	},
 	"depends": {
 		"modularcomputers": "*"

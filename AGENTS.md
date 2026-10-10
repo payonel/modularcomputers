@@ -41,7 +41,7 @@ Last updated: 2026-10-09 (project bootstrap session; host notes revised).
 4. **Commits:** only commit when the user asks. Don't create pull requests unless asked. No
    model identifiers in commit messages or code.
 
-## 3. Current state (end of bootstrap session)
+## 3. Current state
 
 - Repo: `~/code/ModularComputers`, branch `master`. The bootstrap is the initial commit.
 - **Local only:** there's no remote. Don't add one or push anywhere (including GitHub) until
@@ -50,11 +50,34 @@ Last updated: 2026-10-09 (project bootstrap session; host notes revised).
   - unit tests
   - server game tests
   - client game tests against the release jar, on Xvfb
-- The mod is a skeleton with no gameplay content:
-  - a common entrypoint and a client entrypoint
-  - startup log markers
-  - an `id()` helper
-  - tests at every layer
+- Gameplay so far: one block, the **all-in-one computer** (`modularcomputers:all_in_one`).
+  - It's a full cube in beige retro style, with a screen above a keyboard on the front face.
+    It faces the player who places it.
+  - CPU, memory and disk are soldered in, with no limits. There's no EEPROM, no inventory
+    and no slots.
+  - **Sneak + right-click** toggles power. The power state is saved and synced to clients.
+  - There is **no CPU emulation, Lua or programs yet**. Turning a computer on just writes
+    `Machine.GREETING` ("hello world") to row 0 of its text buffer. Turning it off blanks the
+    buffer, and a blank buffer renders black.
+  - The text renders on the block face's glass (`AllInOneRenderer`) and in the display GUI.
+  - **Right-click** opens the display GUI (`DisplayScreen`). The server sends
+    `OpenDisplayPayload` with the position and resolution, so the GUI has its final size from
+    the first frame. It's a black rectangle at 90% of the window, keeping the buffer's aspect
+    ratio, over the dimmed world.
+    - User requirement: no OC-style placeholder box, and not 100% of the window.
+    - The GUI doesn't pause the game, and it closes when the block is gone or out of reach.
+  - Resolution is 50x16 cells of 8x16 (OC tier 1), so text is readable on a one-block face.
+  - Text uses Minecraft's proportional font, centered per cell. A real monospace bitmap font
+    (OC used unifont `font.hex`) is future work.
+- **Lua runtime:** the user is building their own Lua runtime as a separate project, and it
+  isn't ready. Leave VM/runtime work alone and keep building the computer's other features.
+  Machine behavior stays a stand-in (like the "hello world" greeting) until the runtime lands.
+- Planned (the user's roadmap, not started):
+  - computer cases with slots, plus tiers and power
+  - parts: CPUs, RAM, disks, EEPROM
+  - external devices: separate screens, keyboards, cables
+- Design rule: machine logic stays in plain Java (`machine/`, `display/`) and is unit-tested.
+  Minecraft glue goes in `block/` and `network/`, and rendering goes in `client/`.
 
 ### Versions in use (`gradle.properties`)
 
@@ -135,6 +158,26 @@ MAJOR.MINOR.PATCH+MCVERSION        e.g. 0.1.0+26.3   ->  modularcomputers-0.1.0+
     Construct ids with `Identifier.fromNamespaceAndPath`, `Identifier.withDefaultNamespace`,
     or `Identifier.parse`.
   - `ServerLevel#getSharedSpawnPos` no longer exists.
+  - `Block#codec()` is gone, so blocks don't declare a `MapCodec`.
+  - GUI: `GuiGraphics` became `GuiGraphicsExtractor`, and `Screen#render` /
+    `renderBackground` became `extractRenderState` / `extractBackground`.
+    `graphics.pose()` is a JOML `Matrix3x2fStack` (`pushMatrix`, `translate`, `scale`).
+    Draw text with `graphics.text(...)`.
+  - The current screen moved off `Minecraft`: use `minecraft.gui.setScreen(...)` and
+    `minecraft.gui.screen()`. Hide the HUD (F1) with `minecraft.gui.hud.toggle()` and check it
+    with `isHidden()`.
+  - `PoseStack#mulPose(Quaternionf)` is gone. Use `pose.rotateDegrees(Axis.YP, deg)` or
+    `rotate(Quaternionfc)`.
+  - Block entity renderers use render states. Implement `createRenderState`,
+    `extractRenderState` (copy what you need off the block entity) and `submit(state, pose,
+    collector, camera)`, and register with `BlockEntityRenderers.register`.
+    - Text goes through `collector.submitText(pose, x, y, FormattedCharSequence, shadow,
+      Font.DisplayMode, light, color, background, outline)`.
+    - Full brightness is `LightCoordsUtil.FULL_BRIGHT`.
+  - Block entity save/load uses `saveAdditional(ValueOutput)` / `loadAdditional(ValueInput)`.
+  - Loot table pools use `"condition": {"type": ...}`, not `"conditions": [{"condition": ...}]`.
+  - GLFW isn't on the compile classpath. Use `InputConstants.KEY_*` for key codes, e.g. in
+    client tests.
 - **Rendering:** Minecraft 26.3 bundles LWJGL Vulkan and SDL libraries, but on the dev host it picked
   the **OpenGL** backend ("Using graphics backend OpenGL ... Mesa"). Keep an eye on this if
   Mojang changes the default backend.
@@ -178,8 +221,10 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
    `net.fabricmc.fabric.api.gametest.v1.GameTest` that take a
    `net.minecraft.gametest.framework.GameTestHelper`.
    - They run headless inside `./gradlew build` via `runGameTest`.
-   - The run currently reports "All 2 required tests passed". Only one is ours; the second's
-     origin has not been investigated.
+   - The run reports "All 7 required tests passed": 6 are ours, and one is of unknown origin
+     (not investigated).
+   - `helper.makeMockPlayer(GameType)` and `helper.useBlock(pos, player)` exercise real
+     right-click handling. Call `player.setShiftKeyDown(true)` for sneak-use.
 3. **Client game tests** in `src/gametest/java`, implementing `FabricClientGameTest`.
    - The current test:
      - asserts both entrypoints ran
@@ -225,6 +270,15 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
   - No system JDK is needed.
 - `gradle.properties` turns on parallel builds, the build cache and the configuration cache,
   with `-Xmx4G`.
+
+### Pixel assertions in client tests
+
+`AllInOneClientGameTest` reads screenshots with `ImageIO` and counts near-white pixels in
+regions: the block face, and each display row.
+- It hides the HUD first, so the crosshair and hand stay out of the frame.
+- It was checked against a deliberate break: with the renderer disabled, it fails.
+- Use the same approach for new visual features rather than golden-image comparisons, which
+  break whenever vanilla's art or lighting changes.
 
 ### Outputs
 
@@ -298,13 +352,22 @@ docs/TESTING.md              test layers, outputs, headless setup
 docs/VERSIONING.md           version format, bump rules, branches
 build.gradle, settings.gradle, gradle.properties, gradle/ (wrapper + daemon JVM criteria)
 scripts/setup-headless-host.sh, scripts/headless.sh
+scripts/art/all_in_one_textures.py   draws the all-in-one textures (Pillow); PNGs are committed
 .github/workflows/build.yml
-src/main/java/com/payonel/modularcomputers/ModularComputers.java         MOD_ID, LOGGER, id(), INIT_MARKER, isInitialized(), version()
-src/client/java/com/payonel/modularcomputers/client/ModularComputersClient.java   CLIENT_INIT_MARKER, isInitialized()
-src/main/resources/fabric.mod.json, assets/modularcomputers/lang/en_us.json
-src/test/java/.../ModularComputersTest.java                              unit tests
-src/gametest/java/.../gametest/ModularComputersGameTest.java             server game test
-src/gametest/java/.../gametest/ModularComputersClientGameTest.java       client game test
+src/main/java/com/payonel/modularcomputers/
+  ModularComputers.java            MOD_ID, LOGGER, id(), INIT_MARKER; registers content + packets
+  machine/                         plain Java: Machine (power, display buffer), Hardware, Part, PartKind
+  display/                         plain Java: Resolution, TextBuffer, Viewport (GUI fit math)
+  block/                           AllInOneBlock, AllInOneBlockEntity, ModBlocks (registrations, creative tab)
+  network/OpenDisplayPayload.java  server->client "open this display"
+src/client/java/com/payonel/modularcomputers/client/
+  ModularComputersClient.java      registers renderer + packet receiver
+  render/                          AllInOneRenderer (text on the block face), TextGrid (cell layout)
+  screen/DisplayScreen.java        the right-click display GUI
+src/main/resources/                fabric.mod.json, assets (blockstates, models, items, textures, lang), data (loot table, pickaxe tag)
+src/test/java/...                  unit tests (ModularComputersTest, machine/, display/)
+src/gametest/java/.../gametest/    ModularComputersGameTest + AllInOneGameTest (server),
+                                   ModularComputersClientGameTest + AllInOneClientGameTest (client)
 src/gametest/resources/fabric.mod.json                                   test mod (entrypoints fabric-gametest, fabric-client-gametest)
 ```
 

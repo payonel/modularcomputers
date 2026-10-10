@@ -1,0 +1,11 @@
+{
+	"type": "minecraft:block",
+	"pools": [
+		{
+			"condition": { "type": "minecraft:survives_explosion" },
+			"entries": [{ "type": "minecraft:item", "name": "modularcomputers:all_in_one" }],
+			"rolls": 1
+		}
+	],
+	"random_sequence": "modularcomputers:blocks/all_in_one"
+}
