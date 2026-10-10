@@ -310,8 +310,10 @@ Sources:
 ### Commands
 
 ```sh
-./gradlew build                     # compile + unit tests + server game tests (no display needed)
-./gradlew testAll                   # + client game tests against the release jar on Xvfb
+./gradlew assemble                  # compile + jars only
+./gradlew build                     # compile + jars + unit tests: the fast loop (seconds, no Minecraft)
+./gradlew runGameTest               # server game tests (boots a headless dedicated server)
+./gradlew testAll                   # everything: build + server game tests + client game tests on Xvfb
 ./gradlew runProductionClientGameTest   # just the release-jar client tests (Loom starts Xvfb itself)
 scripts/headless.sh ./gradlew runClientGameTest   # client tests on the dev classpath, under xvfb-run
 scripts/headless.sh ./gradlew runClient           # run the game on a virtual display
@@ -332,7 +334,9 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
 2. **Server game tests** in `src/gametest/java`: methods annotated with
    `net.fabricmc.fabric.api.gametest.v1.GameTest` that take a
    `net.minecraft.gametest.framework.GameTestHelper`.
-   - They run headless inside `./gradlew build` via `runGameTest`.
+   - They run headless via `runGameTest`, which is part of `testAll` but **not** of `build`.
+     Loom adds `runGameTest` to `check` by name; `build.gradle` removes it so `build` stays fast
+     (the user wants `build` quick and iterative).
    - The run reports "All 14 required tests passed": 13 are ours, and one is of unknown origin
      (not investigated).
    - `helper.makeMockPlayer(GameType)` and `helper.useBlock(pos, player)` exercise real
@@ -516,8 +520,8 @@ src/gametest/resources/fabric.mod.json                                   test mo
 
 ## 10. Working conventions for agents
 
-- Before claiming something works, run `./gradlew testAll` (or `build` when no client-side
-  code changed). Report failures with their output.
+- Use `./gradlew build` (seconds) while iterating. Before claiming something works, and before
+  every commit, run `./gradlew testAll`. Report failures with their output.
 - Every new feature ships with tests at the lowest workable layer, plus a client game test
   when it has a visible or interactive part. Check screenshots when rendering is involved.
 - Verify Minecraft and Fabric API names against the actual jars instead of from memory; many

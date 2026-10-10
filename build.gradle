@@ -115,11 +115,17 @@ tasks.register("runProductionClientGameTest", net.fabricmc.loom.task.prod.Client
 	timeout = java.time.Duration.ofMinutes(10)
 }
 
-// Everything: unit tests, server game tests (both via `build`), then the headless client.
+// Loom puts the server game tests under `check`, which would make every `build` boot a Minecraft
+// server. Keep `build` fast (compile, jars, unit tests) and run the game tests from `testAll`.
+tasks.named("check") {
+	setDependsOn(dependsOn.findAll { it != "runGameTest" })
+}
+
+// Everything: `build` (unit tests), then the server game tests, then the headless client.
 tasks.register("testAll") {
 	group = "verification"
 	description = "Runs unit tests, server game tests, and headless client game tests."
-	dependsOn "build", "runProductionClientGameTest"
+	dependsOn "build", "runGameTest", "runProductionClientGameTest"
 }
 
 jar {

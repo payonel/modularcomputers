@@ -6,10 +6,14 @@ Gradle and exits with a pass/fail code.
 | Layer | Where | Runs | Needs | Speed |
 |---|---|---|---|---|
 | Unit tests | `src/test/java` | `./gradlew test` (part of `build`) | nothing | seconds |
-| Server game tests | `src/gametest/java`, `@GameTest` | `./gradlew runGameTest` (part of `build`) | nothing (headless dedicated server) | ~20s |
+| Server game tests | `src/gametest/java`, `@GameTest` | `./gradlew runGameTest` (part of `testAll`, not `build`) | nothing (headless dedicated server) | ~20s |
 | Client game tests (dev) | `src/gametest/java`, `FabricClientGameTest` | `scripts/headless.sh ./gradlew runClientGameTest` | Xvfb | ~30s |
 | Client game tests (release jar) | same | `./gradlew runProductionClientGameTest` | Xvfb | ~20s |
 | Everything | | `./gradlew testAll` | Xvfb | ~1 min |
+
+`./gradlew build` (compile, jars, unit tests) is the fast inner loop and never starts
+Minecraft. Loom adds the server game tests to `check`, and `build.gradle` takes them back out.
+Run `./gradlew testAll` before committing.
 
 ## Where to put a test
 

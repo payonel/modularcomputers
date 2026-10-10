@@ -10,8 +10,8 @@ Programmable computers for Minecraft, built on Fabric. A spiritual successor to
 ## Build
 
 ```sh
-./gradlew build      # compile, unit tests, server game tests -> build/libs/
-./gradlew testAll    # + headless client game tests (needs Xvfb, see docs/TESTING.md)
+./gradlew build      # compile + unit tests -> build/libs/ (seconds; doesn't start Minecraft)
+./gradlew testAll    # everything: + server and headless client game tests (needs Xvfb, see docs/TESTING.md)
 ```
 
 You do not need to install a JDK: Gradle downloads JDK 25 on first run.
