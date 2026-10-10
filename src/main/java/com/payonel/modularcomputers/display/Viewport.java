@@ -28,4 +28,8 @@ public record Viewport(int x, int y, int width, int height) {
 	public int bottom() {
 		return y + height;
 	}
+
+	public boolean contains(double px, double py) {
+		return px >= x && px < right() && py >= y && py < bottom();
+	}
 }

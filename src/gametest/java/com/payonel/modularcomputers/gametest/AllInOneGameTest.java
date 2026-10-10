@@ -14,6 +14,8 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 
 /** Server game tests for the all-in-one computer block. */
 public class AllInOneGameTest {
@@ -43,11 +45,46 @@ public class AllInOneGameTest {
 
 		helper.useBlock(POS, player);
 		helper.assertTrue(machine.isRunning(), "sneak + right-click should turn the computer on");
+		helper.assertBlockProperty(POS, AllInOneBlock.RUNNING, true);
 		helper.assertValueEqual(machine.display().row(0).strip(), Machine.GREETING, "first display row");
 
 		helper.useBlock(POS, player);
 		helper.assertTrue(!machine.isRunning(), "a second sneak + right-click should turn it off");
 		helper.assertTrue(machine.display().isBlank(), "turning off should blank the display");
+		helper.succeed();
+	}
+
+	/** A right-click on the computer's back face at texel (u, v), as seen from behind. Placed facing south. */
+	private static BlockHitResult backClick(GameTestHelper helper, double u, double v) {
+		// Facing south, the back faces north; from behind (looking south) right is west (-X).
+		BlockPos abs = helper.absolutePos(POS);
+		Vec3 location = new Vec3(abs.getX() + 1 - u / 16, abs.getY() + 1 - v / 16, abs.getZ());
+		return new BlockHitResult(location, Direction.NORTH, abs, false);
+	}
+
+	@GameTest
+	public void backPowerButtonTogglesWithoutSneaking(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper);
+		Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+
+		helper.useBlock(POS, player, backClick(helper, 11.5, 11.5));
+		helper.assertTrue(computer.machine().isRunning(), "the back power button should turn the computer on");
+		helper.assertBlockProperty(POS, AllInOneBlock.RUNNING, true);
+		helper.assertValueEqual(computer.machine().display().row(0).strip(), Machine.GREETING, "first display row");
+
+		helper.useBlock(POS, player, backClick(helper, 11.5, 11.5));
+		helper.assertTrue(!computer.machine().isRunning(), "pressing it again should turn the computer off");
+		helper.assertBlockProperty(POS, AllInOneBlock.RUNNING, false);
+		helper.succeed();
+	}
+
+	@GameTest
+	public void restOfTheBackDoesNotTogglePower(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper);
+		Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+		helper.useBlock(POS, player, backClick(helper, 4.5, 11.5));
+		helper.useBlock(POS, player, backClick(helper, 11.5, 4.5));
+		helper.assertTrue(!computer.machine().isRunning(), "only the button should toggle power");
 		helper.succeed();
 	}
 

@@ -1,12 +1,6 @@
 {
-	"parent": "minecraft:block/cube",
+	"parent": "modularcomputers:block/all_in_one_base",
 	"textures": {
-		"particle": "modularcomputers:block/all_in_one_side",
-		"north": "modularcomputers:block/all_in_one_front",
-		"south": "modularcomputers:block/all_in_one_back",
-		"east": "modularcomputers:block/all_in_one_side",
-		"west": "modularcomputers:block/all_in_one_side",
-		"up": "modularcomputers:block/all_in_one_top",
-		"down": "modularcomputers:block/all_in_one_bottom"
+		"button": "modularcomputers:block/all_in_one_power_off"
 	}
 }

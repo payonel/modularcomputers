@@ -9,6 +9,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -32,13 +34,19 @@ public final class AllInOneBlockEntity extends BlockEntity {
 		return machine;
 	}
 
-	/** Server side: flips the power and tells clients. */
+	/** Server side: flips the power, lights the power button, clicks, and tells clients. */
 	public void togglePower() {
 		machine.togglePower();
 		setChanged();
-		if (level != null) {
-			level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+		if (level == null) {
+			return;
 		}
+		BlockState state = getBlockState().setValue(AllInOneBlock.RUNNING, machine.isRunning());
+		// Changing the block state also sends this block entity's update to clients.
+		level.setBlock(worldPosition, state, Block.UPDATE_CLIENTS);
+		level.playSound(null, worldPosition,
+			machine.isRunning() ? SoundEvents.STONE_BUTTON_CLICK_ON : SoundEvents.STONE_BUTTON_CLICK_OFF,
+			SoundSource.BLOCKS, 0.3f, machine.isRunning() ? 0.6f : 0.5f);
 	}
 
 	@Override

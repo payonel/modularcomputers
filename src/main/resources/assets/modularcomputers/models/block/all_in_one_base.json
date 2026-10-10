@@ -1,0 +1,39 @@
+{
+	"parent": "minecraft:block/block",
+	"textures": {
+		"particle": "modularcomputers:block/all_in_one_side",
+		"north": "modularcomputers:block/all_in_one_front",
+		"south": "modularcomputers:block/all_in_one_back",
+		"east": "modularcomputers:block/all_in_one_side",
+		"west": "modularcomputers:block/all_in_one_side",
+		"up": "modularcomputers:block/all_in_one_top",
+		"down": "modularcomputers:block/all_in_one_bottom"
+	},
+	"elements": [
+		{
+			"from": [0, 0, 0],
+			"to": [16, 16, 16],
+			"faces": {
+				"down": { "texture": "#down", "cullface": "down" },
+				"up": { "texture": "#up", "cullface": "up" },
+				"north": { "texture": "#north", "cullface": "north" },
+				"south": { "texture": "#south", "cullface": "south" },
+				"west": { "texture": "#west", "cullface": "west" },
+				"east": { "texture": "#east", "cullface": "east" }
+			}
+		},
+		{
+			"from": [10, 3, 16],
+			"to": [13, 6, 16.5],
+			"shade": false,
+			"light_emission": 15,
+			"faces": {
+				"south": { "uv": [10, 10, 13, 13], "texture": "#button" },
+				"east": { "uv": [12, 10, 12.5, 13], "texture": "#button" },
+				"west": { "uv": [10, 10, 10.5, 13], "texture": "#button" },
+				"up": { "uv": [10, 10, 13, 10.5], "texture": "#button" },
+				"down": { "uv": [10, 12.5, 13, 13], "texture": "#button" }
+			}
+		}
+	]
+}

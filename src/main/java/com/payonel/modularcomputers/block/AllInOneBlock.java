@@ -15,21 +15,27 @@ import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * A single-block computer: screen and keyboard on the front face, parts soldered inside.
- * Right-click opens its display; sneak + right-click turns it on or off.
+ * Right-click opens its display. The power button on the back (or sneak + right-click
+ * anywhere) turns it on or off.
  */
 public final class AllInOneBlock extends HorizontalDirectionalBlock implements EntityBlock {
+	/** Mirrors the machine's power so the model can light the power button. */
+	public static final BooleanProperty RUNNING = BooleanProperty.create("running");
+
 	public AllInOneBlock(Properties properties) {
 		super(properties);
-		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
+		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(RUNNING, false));
 	}
 
 	@Override
 	protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-		builder.add(FACING);
+		builder.add(FACING, RUNNING);
 	}
 
 	@Override
@@ -48,8 +54,8 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 		if (level.isClientSide() || !(level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer)) {
 			return InteractionResult.SUCCESS;
 		}
-		if (player.isSecondaryUseActive()) {
-			// Sneak + right-click: power switch.
+		if (PowerButton.isHit(state.getValue(FACING), hit.getDirection(), hit.getLocation().subtract(Vec3.atLowerCornerOf(pos)))
+			|| player.isSecondaryUseActive()) {
 			computer.togglePower();
 		} else if (player instanceof ServerPlayer serverPlayer) {
 			// Right-click: the client opens the display when this arrives.

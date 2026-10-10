@@ -2,6 +2,7 @@ package com.payonel.modularcomputers;
 
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
+import com.payonel.modularcomputers.network.TogglePowerPayload;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.resources.Identifier;
@@ -34,7 +35,9 @@ public final class ModularComputers implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		ModBlocks.init();
+		ModCreativeTab.init();
 		OpenDisplayPayload.register();
+		TogglePowerPayload.register();
 		initialized = true;
 		LOGGER.info("{} (version {})", INIT_MARKER, version());
 	}

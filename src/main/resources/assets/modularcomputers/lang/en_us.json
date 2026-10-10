@@ -1,4 +1,5 @@
 {
+	"itemGroup.modularcomputers": "Modular Computers",
 	"block.modularcomputers.all_in_one": "All-in-One Computer",
 	"gui.modularcomputers.display": "Display"
 }

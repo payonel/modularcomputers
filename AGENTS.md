@@ -38,8 +38,12 @@ Last updated: 2026-10-09 (project bootstrap session; host notes revised).
      down. This has been designed in from day one; keep it working.
 3. **Versioning** follows the ecosystem convention in section 4. Users must be able to see at a
    glance which Minecraft version a jar is for.
-4. **Commits:** only commit when the user asks. Don't create pull requests unless asked. No
-   model identifiers in commit messages or code.
+4. **Commits:** commit **autonomously**, without asking, every time a new addition is done
+   and `./gradlew testAll` passes.
+   - Run `git add -A`, then commit on `master` with a message describing the addition.
+   - Never commit with failing tests.
+   - Don't push (the repo is local only), and don't open pull requests unless asked.
+   - Keep model identifiers out of commit messages and code.
 
 ## 3. Current state
 
@@ -53,9 +57,27 @@ Last updated: 2026-10-09 (project bootstrap session; host notes revised).
 - Gameplay so far: one block, the **all-in-one computer** (`modularcomputers:all_in_one`).
   - It's a full cube in beige retro style, with a screen above a keyboard on the front face.
     It faces the player who places it.
+  - It's listed in the mod's own creative tab, "Modular Computers" (`ModCreativeTab`). Fabric
+    puts mod tabs on **page 2** of the creative inventory (the ▶ arrow by the tab title).
+    It's also in creative search, and `/give @s modularcomputers:all_in_one` works.
   - CPU, memory and disk are soldered in, with no limits. There's no EEPROM, no inventory
     and no slots.
-  - **Sneak + right-click** toggles power. The power state is saved and synced to clients.
+  - **Power button** (a press button, not a toggle switch):
+    - **On the back, bottom right:** a dark housing at texels 9..13, holding a 3x3 button that
+      sticks out half a texel. It's an emissive model element, so it glows: red when off,
+      green when on. A plain right-click on the housing toggles power (`PowerButton.isHit`).
+    - **In the display GUI:** to the right of the display, level with its top edge, never
+      covering it. It's drawn from `textures/gui/power_button.png` with the same pixel colors.
+      Clicking it sends `TogglePowerPayload`, and the server checks reach before toggling.
+    - **Sneak + right-click** anywhere also still toggles power.
+    - The `running` block-state property mirrors the machine's power and picks the
+      off/on model.
+  - User's future plan for power:
+    - Once screens are separate blocks, the GUI power button only shows when the screen is
+      connected to a case, because cases provide the power toggle.
+    - Lighting will depend on available power: faded red/green when unpowered, fully lit when
+      powered. Only a fully lit green button actually runs the PC.
+  - The power state is saved and synced to clients. Toggling plays a stone-button click.
   - There is **no CPU emulation, Lua or programs yet**. Turning a computer on just writes
     `Machine.GREETING` ("hello world") to row 0 of its text buffer. Turning it off blanks the
     buffer, and a blank buffer renders black.
@@ -176,6 +198,9 @@ MAJOR.MINOR.PATCH+MCVERSION        e.g. 0.1.0+26.3   ->  modularcomputers-0.1.0+
     - Full brightness is `LightCoordsUtil.FULL_BRIGHT`.
   - Block entity save/load uses `saveAdditional(ValueOutput)` / `loadAdditional(ValueInput)`.
   - Loot table pools use `"condition": {"type": ...}`, not `"conditions": [{"condition": ...}]`.
+  - Model elements accept `"light_emission": 15` (and `"shade": false`) for glowing parts.
+    A child model can't add elements to its parent's, so `all_in_one_base` holds the cube and
+    the button, and the off/on models only swap the `#button` texture.
   - GLFW isn't on the compile classpath. Use `InputConstants.KEY_*` for key codes, e.g. in
     client tests.
 - **Rendering:** Minecraft 26.3 bundles LWJGL Vulkan and SDL libraries, but on the dev host it picked
@@ -271,6 +296,19 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
 - `gradle.properties` turns on parallel builds, the build cache and the configuration cache,
   with `-Xmx4G`.
 
+### Client test worlds and gotchas
+
+- `context.worldBuilder()` uses "consistent settings" by default, and the test spells this out
+  with `setUseConsistentSettings(true)`:
+  - the superflat preset, with seed `1`
+  - time and weather frozen
+- Teleports: format block centers as `getX() + 0.5`, never `"%d.5"`. With `"%d.5"`, block -4
+  becomes `-4.5`, which is inside block -5.
+- `context.getInput().setCursorPos(x, y)` takes window pixels (GUI coordinates times
+  `getWindow().getGuiScale()`), and `pressMouse(0)` left-clicks.
+- `lookAt(yaw, pitch)` aims at an exact point. Compute yaw as `atan2(-dx, dz)` and pitch as
+  `-atan2(dy, horizontal)`.
+
 ### Pixel assertions in client tests
 
 `AllInOneClientGameTest` reads screenshots with `ImageIO` and counts near-white pixels in
@@ -357,9 +395,11 @@ scripts/art/all_in_one_textures.py   draws the all-in-one textures (Pillow); PNG
 src/main/java/com/payonel/modularcomputers/
   ModularComputers.java            MOD_ID, LOGGER, id(), INIT_MARKER; registers content + packets
   machine/                         plain Java: Machine (power, display buffer), Hardware, Part, PartKind
-  display/                         plain Java: Resolution, TextBuffer, Viewport (GUI fit math)
-  block/                           AllInOneBlock, AllInOneBlockEntity, ModBlocks (registrations, creative tab)
+  display/                         plain Java: Resolution, TextBuffer, Viewport, DisplayLayout (GUI layout math)
+  ModCreativeTab.java              the "Modular Computers" creative tab
+  block/                           AllInOneBlock, AllInOneBlockEntity, PowerButton (hit test), ModBlocks (registrations)
   network/OpenDisplayPayload.java  server->client "open this display"
+  network/TogglePowerPayload.java  client->server "power button clicked in the display"
 src/client/java/com/payonel/modularcomputers/client/
   ModularComputersClient.java      registers renderer + packet receiver
   render/                          AllInOneRenderer (text on the block face), TextGrid (cell layout)
