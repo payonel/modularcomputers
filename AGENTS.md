@@ -207,6 +207,13 @@ MAJOR.MINOR.PATCH+MCVERSION        e.g. 0.1.0+26.3   ->  modularcomputers-0.1.0+
     the button, and the off/on models only swap the `#button` texture.
   - GLFW isn't on the compile classpath. Use `InputConstants.KEY_*` for key codes, e.g. in
     client tests.
+  - **Mouse buttons use SDL numbering: left = 1, middle = 2, right = 3.** GLFW's old numbering
+    was left = 0, right = 1.
+    - Always compare `MouseButtonEvent#button()` against `InputConstants.MOUSE_BUTTON_LEFT` /
+      `_RIGHT` / `_MIDDLE`.
+    - Pass those same constants to `TestInput.pressMouse`.
+    - Hard-coding 0 or 1 once broke right-click for the user while the test still passed,
+      because the test made the same mistake.
 - **Rendering:** Minecraft 26.3 bundles LWJGL Vulkan and SDL libraries, but on the dev host it picked
   the **OpenGL** backend ("Using graphics backend OpenGL ... Mesa"). Keep an eye on this if
   Mojang changes the default backend.

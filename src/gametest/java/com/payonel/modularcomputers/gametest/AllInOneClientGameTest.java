@@ -81,11 +81,11 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			check(RED.test(off.buttonCenter()), "the power button should be lit red when off, got " + hex(off.buttonCenter()));
 
 			// The display's power button toggles with right-click (on, off) and left-click (on).
-			clickPowerButton(context, 1);
+			clickPowerButton(context, InputConstants.MOUSE_BUTTON_RIGHT);
 			context.waitFor(client -> machineRunning(client, computer));
-			clickPowerButton(context, 1);
+			clickPowerButton(context, InputConstants.MOUSE_BUTTON_RIGHT);
 			context.waitFor(client -> !machineRunning(client, computer));
-			clickPowerButton(context, 0);
+			clickPowerButton(context, InputConstants.MOUSE_BUTTON_LEFT);
 			context.waitFor(client -> machineRunning(client, computer));
 			context.waitTicks(2);
 			DisplayShot on = displayShot(context, "all-in-one-display-on");
@@ -171,7 +171,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		});
 	}
 
-	/** Moves the real mouse cursor onto the display's power button and clicks it (0 = left, 1 = right). */
+	/** Moves the real mouse cursor onto the display's power button and clicks it ({@code InputConstants.MOUSE_BUTTON_*}). */
 	private static void clickPowerButton(ClientGameTestContext context, int mouseButton) {
 		double[] cursor = context.computeOnClient(client -> {
 			Viewport button = ((DisplayScreen) client.gui.screen()).powerButton();
