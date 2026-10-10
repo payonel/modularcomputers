@@ -4,5 +4,6 @@
 	"gui.modularcomputers.display": "Display",
 	"item.modularcomputers.cpu": "CPU",
 	"item.modularcomputers.eeprom": "EEPROM",
-	"commands.modularcomputers.giveall": "Gave %s Modular Computers items"
+	"commands.modularcomputers.giveall": "Gave %s Modular Computers items",
+	"subtitles.modularcomputers.error_beep": "Computer beeps an error"
 }

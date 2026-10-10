@@ -74,8 +74,9 @@ final class ComputerButtons {
 
 	private static void extractPower(GuiGraphicsExtractor graphics, Viewport button, BlockState state, boolean held) {
 		// With a CPU: lit red or green. Without one the machine can't be on: faded red, or faded
-		// green just while the button is held down.
-		int frame = state.getValue(AllInOneBlock.CPU) ? (state.getValue(AllInOneBlock.POWERED) ? 1 : 0) : (held ? 3 : 2);
+		// green while the button is held down and for the moment a refused press lasts.
+		boolean green = state.getValue(AllInOneBlock.POWERED);
+		int frame = state.getValue(AllInOneBlock.CPU) ? (green ? 1 : 0) : (held || green ? 3 : 2);
 		var pose = graphics.pose();
 		pose.pushMatrix();
 		pose.translate(button.x(), button.y());

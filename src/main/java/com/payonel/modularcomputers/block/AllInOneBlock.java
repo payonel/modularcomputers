@@ -5,7 +5,9 @@ import java.util.Optional;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -26,8 +28,13 @@ import net.minecraft.world.phys.Vec3;
  * anywhere) turns it on or off, and the window into the case opens the case view.
  */
 public final class AllInOneBlock extends HorizontalDirectionalBlock implements EntityBlock {
-	/** The power switch is on. Picks red or green for the power button. */
+	/**
+	 * The power light shows green. With a CPU that means the machine is on; without one it only
+	 * flashes, for {@link #ATTEMPT_TICKS}, when someone presses power and the press is refused.
+	 */
 	public static final BooleanProperty POWERED = BooleanProperty.create("powered");
+	/** How long a refused power press shows (faded) green: about as long as the error beep. */
+	public static final int ATTEMPT_TICKS = 4;
 	/** A CPU is installed. Without one the power button is faded and doesn't glow. */
 	public static final BooleanProperty CPU = BooleanProperty.create("cpu");
 
@@ -45,6 +52,14 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 	public BlockState getStateForPlacement(BlockPlaceContext context) {
 		// The front faces the player who placed it.
 		return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+	}
+
+	@Override
+	protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+		// End of a refused power press: the light goes back to what the machine really is.
+		if (level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer) {
+			level.setBlock(pos, state.setValue(POWERED, computer.machine().isPowered()), Block.UPDATE_CLIENTS);
+		}
 	}
 
 	@Override

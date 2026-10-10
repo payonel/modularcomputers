@@ -1,0 +1,6 @@
+{
+	"error_beep": {
+		"sounds": ["modularcomputers:error_beep"],
+		"subtitle": "subtitles.modularcomputers.error_beep"
+	}
+}

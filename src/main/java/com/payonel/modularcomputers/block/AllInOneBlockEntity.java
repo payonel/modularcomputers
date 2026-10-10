@@ -15,6 +15,7 @@ import com.payonel.modularcomputers.machine.HelloWorldProgram;
 import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.machine.Motherboard;
 import com.payonel.modularcomputers.menu.CaseMenu;
+import com.payonel.modularcomputers.sound.ModSounds;
 import java.util.List;
 import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
@@ -54,8 +55,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String BACKGROUND = "display_background";
 	private static final String CONSOLE = "console";
 	private static final float ERROR_BEEP_VOLUME = 0.6f;
-	/** Below the note block's default pitch: a low, unhappy beep. */
-	private static final float ERROR_BEEP_PITCH = 0.6f;
 
 	private final Display display = new Display(Resolution.DEFAULT);
 	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(),
@@ -95,6 +94,10 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			SoundSource.BLOCKS, 0.3f, on ? 0.6f : 0.5f);
 		if (result == Machine.PowerPress.NO_CPU) {
 			errorBeep();
+			// The light shows faded green for the moment the attempt lasts; the block's tick
+			// sets it back.
+			level.setBlock(worldPosition, getBlockState().setValue(AllInOneBlock.POWERED, true), Block.UPDATE_CLIENTS);
+			level.scheduleTick(worldPosition, getBlockState().getBlock(), AllInOneBlock.ATTEMPT_TICKS);
 		} else {
 			// Changing the block state also sends this block entity's update to clients.
 			level.setBlock(worldPosition, getBlockState().setValue(AllInOneBlock.POWERED, on), Block.UPDATE_CLIENTS);
@@ -102,9 +105,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return result;
 	}
 
-	/** One low beep: an error, not a confirmation. */
+	/** One short, low buzz: an error, not a confirmation. */
 	private void errorBeep() {
-		level.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_BIT.value(), SoundSource.BLOCKS, ERROR_BEEP_VOLUME, ERROR_BEEP_PITCH);
+		level.playSound(null, worldPosition, ModSounds.ERROR_BEEP, SoundSource.BLOCKS, ERROR_BEEP_VOLUME, 1.0f);
 	}
 
 	/** Puts the parts in the slots onto the motherboard. */

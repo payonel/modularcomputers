@@ -81,14 +81,18 @@ public class AllInOneGameTest {
 	}
 
 	@GameTest
-	public void withoutCpuPressingPowerIsRefused(GameTestHelper helper) {
+	public void withoutCpuPressingPowerIsRefusedWithABriefGreenFlash(GameTestHelper helper) {
 		AllInOneBlockEntity computer = install(place(helper), false, true);
 		helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.NO_CPU, "press result");
 		helper.assertTrue(!computer.machine().isPowered(), "a computer without a CPU stays off");
-		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
 		helper.assertBlockProperty(POS, AllInOneBlock.CPU, false);
+		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, true); // the attempt shows faded green
 		helper.assertTrue(computer.display().buffer().isBlank(), "nothing runs without a CPU");
-		helper.succeed();
+		helper.runAfterDelay(AllInOneBlock.ATTEMPT_TICKS + 1, () -> {
+			helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false); // back to faded red
+			helper.assertTrue(!computer.machine().isPowered(), "still off");
+			helper.succeed();
+		});
 	}
 
 	@GameTest

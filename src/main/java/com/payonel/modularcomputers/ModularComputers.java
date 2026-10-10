@@ -6,6 +6,7 @@ import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.ModMenus;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import com.payonel.modularcomputers.network.SwitchViewPayload;
+import com.payonel.modularcomputers.sound.ModSounds;
 import com.payonel.modularcomputers.network.PressPowerPayload;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
@@ -38,6 +39,7 @@ public final class ModularComputers implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		ModSounds.init();
 		ModItems.init();
 		ModBlocks.init();
 		ModMenus.init();

@@ -2,6 +2,8 @@ package com.payonel.modularcomputers.gametest;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.payonel.modularcomputers.ModCreativeTab;
+import com.payonel.modularcomputers.ModularComputers;
+import com.payonel.modularcomputers.block.AllInOneBlock;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
@@ -71,6 +73,11 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			.adjustSettings(settings -> settings.setAllowCommands(true)).create()) {
 			singleplayer.getConnection().waitForChunksRender();
 			checkCreativeInventory(context, singleplayer);
+			// The error beep's sounds.json entry and .ogg loaded (a missing file would only log a warning).
+			context.runOnClient(client -> {
+				var beep = client.getSoundManager().getSoundEvent(ModularComputers.id("error_beep"));
+				check(beep != null && beep.getWeight() > 0, "the error beep sound should be loaded");
+			});
 
 			// Computer at eye level two blocks north of the player, facing them.
 			BlockPos feet = singleplayer.getServer().computeOnServer(server ->
@@ -106,7 +113,9 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			DisplayShot held = displayShot(context, "all-in-one-display-no-cpu-held", 0);
 			check(FADED_GREEN.test(held.buttonCenter()), "held without a CPU the button should be faded green, got " + hex(held.buttonCenter()));
 			context.getInput().releaseMouse(InputConstants.MOUSE_BUTTON_RIGHT);
-			context.waitTicks(CLICK_PAUSE);
+			// The refused press also flashes faded green briefly (the block state); wait it out.
+			context.waitFor(client -> !client.level.getBlockState(computer).getValue(AllInOneBlock.POWERED));
+			context.waitTicks(2);
 			DisplayShot released = displayShot(context, "all-in-one-display-no-cpu-released", 0);
 			check(FADED_RED.test(released.buttonCenter()), "released, the button should be faded red again, got " + hex(released.buttonCenter()));
 			check(!context.computeOnClient(client -> machinePowered(client, computer)), "without a CPU the computer must stay off");
