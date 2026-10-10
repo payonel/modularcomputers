@@ -1,0 +1,21 @@
+{
+	"schemaVersion": 1,
+	"id": "modularcomputers",
+	"version": "${version}",
+	"name": "Modular Computers",
+	"description": "Programmable computers and components for Minecraft.",
+	"authors": ["payonel"],
+	"contact": {},
+	"license": "MIT",
+	"environment": "*",
+	"entrypoints": {
+		"main": ["com.payonel.modularcomputers.ModularComputers"],
+		"client": ["com.payonel.modularcomputers.client.ModularComputersClient"]
+	},
+	"depends": {
+		"fabricloader": ">=${loader_version}",
+		"minecraft": "${minecraft_version_range}",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

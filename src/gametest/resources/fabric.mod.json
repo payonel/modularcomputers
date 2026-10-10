@@ -1,0 +1,14 @@
+{
+	"schemaVersion": 1,
+	"id": "modularcomputers-gametest",
+	"version": "${version}",
+	"name": "Modular Computers Game Tests",
+	"environment": "*",
+	"entrypoints": {
+		"fabric-gametest": ["com.payonel.modularcomputers.gametest.ModularComputersGameTest"],
+		"fabric-client-gametest": ["com.payonel.modularcomputers.gametest.ModularComputersClientGameTest"]
+	},
+	"depends": {
+		"modularcomputers": "*"
+	}
+}
