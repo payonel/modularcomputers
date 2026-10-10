@@ -31,7 +31,7 @@ import net.minecraft.world.phys.Vec3;
  * <li>It's in the creative inventory.</li>
  * <li>Off, its face and display are black, and the display's power button is lit red.</li>
  * <li>Right-click opens the display at full size from its first frame.</li>
- * <li>Clicking the display's power button turns the computer on: the button goes green and
+ * <li>Left- or right-clicking the display's power button toggles power: the button goes green and
  * "hello world" shows in the display and on the block face.</li>
  * <li>The glowing button on the back toggles power with a plain right-click.</li>
  * <li>Breaking the computer closes its display.</li>
@@ -80,8 +80,12 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			check(off.whitePixels(0, 16) == 0, "an off display should be all black");
 			check(RED.test(off.buttonCenter()), "the power button should be lit red when off, got " + hex(off.buttonCenter()));
 
-			// Clicking the display's power button turns the computer on.
-			clickPowerButton(context);
+			// The display's power button toggles with right-click (on, off) and left-click (on).
+			clickPowerButton(context, 1);
+			context.waitFor(client -> machineRunning(client, computer));
+			clickPowerButton(context, 1);
+			context.waitFor(client -> !machineRunning(client, computer));
+			clickPowerButton(context, 0);
 			context.waitFor(client -> machineRunning(client, computer));
 			context.waitTicks(2);
 			DisplayShot on = displayShot(context, "all-in-one-display-on");
@@ -167,15 +171,15 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		});
 	}
 
-	/** Moves the real mouse cursor onto the display's power button and left-clicks. */
-	private static void clickPowerButton(ClientGameTestContext context) {
+	/** Moves the real mouse cursor onto the display's power button and clicks it (0 = left, 1 = right). */
+	private static void clickPowerButton(ClientGameTestContext context, int mouseButton) {
 		double[] cursor = context.computeOnClient(client -> {
 			Viewport button = ((DisplayScreen) client.gui.screen()).powerButton();
 			int scale = client.getWindow().getGuiScale();
 			return new double[] {(button.x() + button.width() / 2.0) * scale, (button.y() + button.height() / 2.0) * scale};
 		});
 		context.getInput().setCursorPos(cursor[0], cursor[1]);
-		context.getInput().pressMouse(0);
+		context.getInput().pressMouse(mouseButton);
 	}
 
 	/** Turns the player to look at the middle of the power button on the back of a south-facing computer. */

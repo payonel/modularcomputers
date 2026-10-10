@@ -67,7 +67,8 @@ public final class DisplayScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		if (event.button() == 0 && layout.powerButton().contains(event.x(), event.y())) {
+		// Left or right click both press it.
+		if ((event.button() == 0 || event.button() == 1) && layout.powerButton().contains(event.x(), event.y())) {
 			// The server toggles it and the button lights up when the new state syncs back.
 			ClientPlayNetworking.send(new TogglePowerPayload(pos));
 			return true;

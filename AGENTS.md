@@ -24,6 +24,10 @@ Last updated: 2026-10-09 (project bootstrap session; host notes revised).
 
 ## 2. Standing guidance from the user (follow always)
 
+**Vocabulary:** the user calls viewing a screen through the full-window display GUI
+(`DisplayScreen`, opened by right-clicking a screen) **"modal mode"**. "Screen GUI" means the
+same thing.
+
 1. **Git branching:**
    - Work on `master` (mainline). It always holds the latest dev work.
    - **Never create branches unless the user explicitly asks.** AI agents tend to spray
@@ -68,7 +72,7 @@ Last updated: 2026-10-09 (project bootstrap session; host notes revised).
       green when on. A plain right-click on the housing toggles power (`PowerButton.isHit`).
     - **In the display GUI:** to the right of the display, level with its top edge, never
       covering it. It's drawn from `textures/gui/power_button.png` with the same pixel colors.
-      Clicking it sends `TogglePowerPayload`, and the server checks reach before toggling.
+      A left or right click sends `TogglePowerPayload`, and the server checks reach before toggling.
     - **Sneak + right-click** anywhere also still toggles power.
     - The `running` block-state property mirrors the machine's power and picks the
       off/on model.
