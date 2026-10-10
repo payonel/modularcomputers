@@ -1,15 +1,21 @@
 package com.payonel.modularcomputers.machine;
 
 /**
- * A computer and its power switch, independent of Minecraft. Switching on hands control to the
- * CPU in the socket, if there is one; with no CPU the machine is powered but nothing runs.
- * Switching off cuts power to the {@link Motherboard}.
- * <p>
- * Parts aren't hot-plugged: installing a CPU in a powered machine does nothing until the next
- * power-on, and removing one leaves the devices as they were (a display keeps its last
- * picture).
+ * A computer and its power switch, independent of Minecraft. The machine is only ever on with
+ * a CPU in the socket: pressing power without one is refused (the caller reports the error),
+ * and pulling the CPU out of a running machine cuts its power. Switching on hands control to
+ * the CPU; switching off cuts power to the {@link Motherboard}. Installing a CPU never turns the
+ * machine on by itself.
  */
 public final class Machine {
+	/** What pressing the power button did. */
+	public enum PowerPress {
+		ON,
+		OFF,
+		/** Nothing: there's no CPU to power on. */
+		NO_CPU,
+	}
+
 	private final Motherboard board;
 	private boolean powered;
 
@@ -21,25 +27,37 @@ public final class Machine {
 		return board;
 	}
 
-	/** The power switch is on. */
+	/** The machine is on (and so has a CPU). */
 	public boolean isPowered() {
 		return powered;
 	}
 
-	public void setPowered(boolean powered) {
-		if (this.powered == powered) {
-			return;
-		}
-		this.powered = powered;
+	public PowerPress pressPower() {
 		if (powered) {
-			board.cpu().ifPresent(cpu -> cpu.powerOn(board));
-		} else {
+			powered = false;
 			board.powerOff();
+			return PowerPress.OFF;
 		}
+		var cpu = board.cpu();
+		if (cpu.isEmpty()) {
+			return PowerPress.NO_CPU;
+		}
+		powered = true;
+		cpu.get().powerOn(board);
+		return PowerPress.ON;
 	}
 
-	public void togglePower() {
-		setPowered(!powered);
+	/**
+	 * Call after the CPU socket was emptied. A running machine loses power. Returns whether it
+	 * was running.
+	 */
+	public boolean cpuRemoved() {
+		if (!powered || board.cpu().isPresent()) {
+			return false;
+		}
+		powered = false;
+		board.powerOff();
+		return true;
 	}
 
 	/**

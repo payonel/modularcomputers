@@ -37,6 +37,7 @@ public final class DisplayScreen extends Screen {
 	private final Resolution resolution;
 	private static final Viewport NONE = new Viewport(0, 0, 0, 0);
 	private DisplayLayout layout = new DisplayLayout(NONE, NONE, NONE, NONE);
+	private boolean powerHeld;
 
 	public DisplayScreen(BlockPos pos, Resolution resolution) {
 		super(Component.translatable("gui.modularcomputers.display"));
@@ -72,8 +73,15 @@ public final class DisplayScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		return ComputerButtons.click(event, layout.powerButton(), layout.viewToggle(), ComputerButtons.Target.CASE, pos)
-			|| super.mouseClicked(event, doubleClick);
+		var hit = ComputerButtons.click(event, layout.powerButton(), layout.viewToggle(), ComputerButtons.Target.CASE, pos);
+		powerHeld = hit == ComputerButtons.Hit.POWER;
+		return hit != ComputerButtons.Hit.NONE || super.mouseClicked(event, doubleClick);
+	}
+
+	@Override
+	public boolean mouseReleased(MouseButtonEvent event) {
+		powerHeld = false;
+		return super.mouseReleased(event);
 	}
 
 	@Override
@@ -89,7 +97,7 @@ public final class DisplayScreen extends Screen {
 		graphics.fill(display.x(), display.y(), display.right(), display.bottom(), BLACK);
 		if (minecraft.level != null && minecraft.level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer) {
 			extractText(graphics, computer.display().buffer());
-			ComputerButtons.extract(graphics, layout.powerButton(), layout.viewToggle(), ComputerButtons.Target.CASE, computer.getBlockState());
+			ComputerButtons.extract(graphics, layout.powerButton(), layout.viewToggle(), ComputerButtons.Target.CASE, computer.getBlockState(), powerHeld);
 		}
 		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 	}

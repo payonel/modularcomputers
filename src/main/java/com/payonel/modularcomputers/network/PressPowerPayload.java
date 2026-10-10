@@ -9,13 +9,13 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
-/** Client to server: the player pressed the power button in the display of the computer at {@code pos}. */
-public record TogglePowerPayload(BlockPos pos) implements CustomPacketPayload {
-	public static final Type<TogglePowerPayload> TYPE = new Type<>(ModularComputers.id("toggle_power"));
+/** Client to server: the player pressed the power button in a GUI view of the computer at {@code pos}. */
+public record PressPowerPayload(BlockPos pos) implements CustomPacketPayload {
+	public static final Type<PressPowerPayload> TYPE = new Type<>(ModularComputers.id("press_power"));
 
-	public static final StreamCodec<RegistryFriendlyByteBuf, TogglePowerPayload> CODEC = StreamCodec.composite(
-		BlockPos.STREAM_CODEC, TogglePowerPayload::pos,
-		TogglePowerPayload::new);
+	public static final StreamCodec<RegistryFriendlyByteBuf, PressPowerPayload> CODEC = StreamCodec.composite(
+		BlockPos.STREAM_CODEC, PressPowerPayload::pos,
+		PressPowerPayload::new);
 
 	public static void register() {
 		PayloadTypeRegistry.serverboundPlay().register(TYPE, CODEC);
@@ -24,13 +24,13 @@ public record TogglePowerPayload(BlockPos pos) implements CustomPacketPayload {
 			var player = context.player();
 			if (player.isWithinBlockInteractionRange(payload.pos(), 1.0)
 				&& player.level().getBlockEntity(payload.pos()) instanceof AllInOneBlockEntity computer) {
-				computer.togglePower();
+				computer.pressPower();
 			}
 		});
 	}
 
 	@Override
-	public Type<TogglePowerPayload> type() {
+	public Type<PressPowerPayload> type() {
 		return TYPE;
 	}
 }

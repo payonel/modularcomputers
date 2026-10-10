@@ -26,6 +26,8 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int SLOT_FACE = 0xFF8B8B8B;
 	private static final int LABEL = 0xFF404040;
 
+	private boolean powerHeld;
+
 	public CaseScreen(CaseMenu menu, Inventory inventory, Component title) {
 		super(menu, inventory, title, WIDTH, HEIGHT);
 		inventoryLabelY = CaseMenu.INVENTORY_Y - 11;
@@ -61,14 +63,21 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		extractCenteredLabel(graphics, "CPU", x + CaseMenu.CPU_X + 8, y + CaseMenu.PARTS_Y + 20);
 		extractCenteredLabel(graphics, "EEPROM", x + CaseMenu.EEPROM_X + 8, y + CaseMenu.PARTS_Y + 20);
 		if (minecraft.level != null && minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer) {
-			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.SCREEN, computer.getBlockState());
+			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.SCREEN, computer.getBlockState(), powerHeld);
 		}
 	}
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		return ComputerButtons.click(event, powerButton(), viewToggle(), ComputerButtons.Target.SCREEN, menu.pos())
-			|| super.mouseClicked(event, doubleClick);
+		var hit = ComputerButtons.click(event, powerButton(), viewToggle(), ComputerButtons.Target.SCREEN, menu.pos());
+		powerHeld = hit == ComputerButtons.Hit.POWER;
+		return hit != ComputerButtons.Hit.NONE || super.mouseClicked(event, doubleClick);
+	}
+
+	@Override
+	public boolean mouseReleased(MouseButtonEvent event) {
+		powerHeld = false;
+		return super.mouseReleased(event);
 	}
 
 	/** A vanilla-style slot: 18x18, shadowed top-left, lit bottom-right. */

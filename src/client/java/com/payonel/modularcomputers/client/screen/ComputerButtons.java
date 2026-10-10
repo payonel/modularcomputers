@@ -5,7 +5,7 @@ import com.payonel.modularcomputers.ModularComputers;
 import com.payonel.modularcomputers.block.AllInOneBlock;
 import com.payonel.modularcomputers.display.Viewport;
 import com.payonel.modularcomputers.network.SwitchViewPayload;
-import com.payonel.modularcomputers.network.TogglePowerPayload;
+import com.payonel.modularcomputers.network.PressPowerPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -16,7 +16,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * The button column shared by the screen view and the case view: the power button (it looks
- * like the one on the computer's back: red off, green on, faded and unlit without a CPU) and
+ * like the one on the computer's back: red off, green on; faded and unlit without a CPU) and
  * the toggle between the two views (a motherboard to open the case, a little screen to go
  * back). Left or right click presses either.
  */
@@ -39,33 +39,43 @@ final class ComputerButtons {
 		SCREEN,
 	}
 
+	/** What a click hit. */
+	enum Hit {
+		NONE,
+		POWER,
+		TOGGLE,
+	}
+
 	private ComputerButtons() {
 	}
 
-	static void extract(GuiGraphicsExtractor graphics, Viewport power, Viewport toggle, Target target, BlockState state) {
-		extractPower(graphics, power, state);
+	/** @param powerHeld the mouse is still down on the power button */
+	static void extract(GuiGraphicsExtractor graphics, Viewport power, Viewport toggle, Target target, BlockState state, boolean powerHeld) {
+		extractPower(graphics, power, state, powerHeld);
 		extractToggle(graphics, toggle, target);
 	}
 
-	/** Sends the button's action to the server if the click hit one. */
-	static boolean click(MouseButtonEvent event, Viewport power, Viewport toggle, Target target, BlockPos pos) {
+	/** Sends the button's action to the server if the click hit one, and says which it hit. */
+	static Hit click(MouseButtonEvent event, Viewport power, Viewport toggle, Target target, BlockPos pos) {
 		if (event.button() != InputConstants.MOUSE_BUTTON_LEFT && event.button() != InputConstants.MOUSE_BUTTON_RIGHT) {
-			return false;
+			return Hit.NONE;
 		}
 		if (power.contains(event.x(), event.y())) {
-			// The server toggles it; the button changes when the new state syncs back.
-			ClientPlayNetworking.send(new TogglePowerPayload(pos));
-			return true;
+			// The server decides (no CPU: it beeps instead); the button follows the synced state.
+			ClientPlayNetworking.send(new PressPowerPayload(pos));
+			return Hit.POWER;
 		}
 		if (toggle.contains(event.x(), event.y())) {
 			ClientPlayNetworking.send(new SwitchViewPayload(pos, target == Target.CASE));
-			return true;
+			return Hit.TOGGLE;
 		}
-		return false;
+		return Hit.NONE;
 	}
 
-	private static void extractPower(GuiGraphicsExtractor graphics, Viewport button, BlockState state) {
-		int frame = (state.getValue(AllInOneBlock.POWERED) ? 1 : 0) + (state.getValue(AllInOneBlock.CPU) ? 0 : 2);
+	private static void extractPower(GuiGraphicsExtractor graphics, Viewport button, BlockState state, boolean held) {
+		// With a CPU: lit red or green. Without one the machine can't be on: faded red, or faded
+		// green just while the button is held down.
+		int frame = state.getValue(AllInOneBlock.CPU) ? (state.getValue(AllInOneBlock.POWERED) ? 1 : 0) : (held ? 3 : 2);
 		var pose = graphics.pose();
 		pose.pushMatrix();
 		pose.translate(button.x(), button.y());

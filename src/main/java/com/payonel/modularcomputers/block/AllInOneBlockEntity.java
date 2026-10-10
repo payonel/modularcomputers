@@ -53,6 +53,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String FOREGROUND = "display_foreground";
 	private static final String BACKGROUND = "display_background";
 	private static final String CONSOLE = "console";
+	private static final float ERROR_BEEP_VOLUME = 0.6f;
+	/** Below the note block's default pitch: a low, unhappy beep. */
+	private static final float ERROR_BEEP_PITCH = 0.6f;
 
 	private final Display display = new Display(Resolution.DEFAULT);
 	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(),
@@ -77,18 +80,31 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return parts;
 	}
 
-	/** Server side: flips the power switch, updates the power button, clicks, and tells clients. */
-	public void togglePower() {
-		machine.togglePower();
+	/**
+	 * Server side: someone pressed the power button. It clicks either way; without a CPU the
+	 * machine stays off and beeps an error. Clients learn the new state from the block state.
+	 */
+	public Machine.PowerPress pressPower() {
+		Machine.PowerPress result = machine.pressPower();
 		setChanged();
 		if (level == null) {
-			return;
+			return result;
 		}
-		// Changing the block state also sends this block entity's update to clients.
-		level.setBlock(worldPosition, getBlockState().setValue(AllInOneBlock.POWERED, machine.isPowered()), Block.UPDATE_CLIENTS);
-		level.playSound(null, worldPosition,
-			machine.isPowered() ? SoundEvents.STONE_BUTTON_CLICK_ON : SoundEvents.STONE_BUTTON_CLICK_OFF,
-			SoundSource.BLOCKS, 0.3f, machine.isPowered() ? 0.6f : 0.5f);
+		boolean on = result == Machine.PowerPress.ON;
+		level.playSound(null, worldPosition, on ? SoundEvents.STONE_BUTTON_CLICK_ON : SoundEvents.STONE_BUTTON_CLICK_OFF,
+			SoundSource.BLOCKS, 0.3f, on ? 0.6f : 0.5f);
+		if (result == Machine.PowerPress.NO_CPU) {
+			errorBeep();
+		} else {
+			// Changing the block state also sends this block entity's update to clients.
+			level.setBlock(worldPosition, getBlockState().setValue(AllInOneBlock.POWERED, on), Block.UPDATE_CLIENTS);
+		}
+		return result;
+	}
+
+	/** One low beep: an error, not a confirmation. */
+	private void errorBeep() {
+		level.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_BIT.value(), SoundSource.BLOCKS, ERROR_BEEP_VOLUME, ERROR_BEEP_PITCH);
 	}
 
 	/** Puts the parts in the slots onto the motherboard. */
@@ -102,12 +118,19 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private void onPartsChanged() {
 		installParts();
 		setChanged();
-		if (level != null && !level.isClientSide()) {
-			// The power button looks different without a CPU; the block state carries that to clients.
-			boolean hasCpu = machine.board().cpu().isPresent();
-			if (getBlockState().getValue(AllInOneBlock.CPU) != hasCpu) {
-				level.setBlock(worldPosition, getBlockState().setValue(AllInOneBlock.CPU, hasCpu), Block.UPDATE_CLIENTS);
-			}
+		if (level == null || level.isClientSide()) {
+			return;
+		}
+		if (machine.cpuRemoved()) {
+			// Pulling the CPU out of a running machine kills it.
+			errorBeep();
+		}
+		// The power button shows both; the block state carries them to clients.
+		BlockState state = getBlockState()
+			.setValue(AllInOneBlock.CPU, machine.board().cpu().isPresent())
+			.setValue(AllInOneBlock.POWERED, machine.isPowered());
+		if (state != getBlockState()) {
+			level.setBlock(worldPosition, state, Block.UPDATE_CLIENTS);
 		}
 	}
 

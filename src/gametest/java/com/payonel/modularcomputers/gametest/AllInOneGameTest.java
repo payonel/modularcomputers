@@ -81,20 +81,43 @@ public class AllInOneGameTest {
 	}
 
 	@GameTest
-	public void withoutCpuPowerTogglesButNothingRuns(GameTestHelper helper) {
+	public void withoutCpuPressingPowerIsRefused(GameTestHelper helper) {
 		AllInOneBlockEntity computer = install(place(helper), false, true);
-		computer.togglePower();
-		helper.assertTrue(computer.machine().isPowered(), "the power switch works without a CPU");
-		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, true);
+		helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.NO_CPU, "press result");
+		helper.assertTrue(!computer.machine().isPowered(), "a computer without a CPU stays off");
+		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
 		helper.assertBlockProperty(POS, AllInOneBlock.CPU, false);
 		helper.assertTrue(computer.display().buffer().isBlank(), "nothing runs without a CPU");
 		helper.succeed();
 	}
 
 	@GameTest
+	public void pullingTheCpuFromARunningComputerTurnsItOff(GameTestHelper helper) {
+		AllInOneBlockEntity computer = install(place(helper), true, true);
+		computer.pressPower();
+		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, true);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, ItemStack.EMPTY);
+		helper.assertTrue(!computer.machine().isPowered(), "pulling the CPU should cut power");
+		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
+		helper.assertBlockProperty(POS, AllInOneBlock.CPU, false);
+		helper.assertTrue(computer.display().buffer().isBlank(), "the display goes dark");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void insertingACpuDoesNotTurnTheComputerOn(GameTestHelper helper) {
+		AllInOneBlockEntity computer = install(place(helper), false, true);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.CPU));
+		helper.assertTrue(!computer.machine().isPowered(), "a new CPU waits for the power button");
+		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
+		helper.assertBlockProperty(POS, AllInOneBlock.CPU, true);
+		helper.succeed();
+	}
+
+	@GameTest
 	public void cpuWithoutEepromShowsTheAbortScreen(GameTestHelper helper) {
 		AllInOneBlockEntity computer = install(place(helper), true, false);
-		computer.togglePower();
+		computer.pressPower();
 		TextBuffer screen = computer.display().buffer();
 		helper.assertValueEqual(screen.row(0).strip(), Cpu.ABORT + Cpu.NO_EEPROM, "abort message");
 		helper.assertValueEqual(screen.background(10, 10), Cpu.ABORT_BACKGROUND, "abort screen background");
@@ -185,7 +208,7 @@ public class AllInOneGameTest {
 	@GameTest
 	public void stateSurvivesSaveAndLoad(GameTestHelper helper) {
 		AllInOneBlockEntity computer = install(place(helper), true, false);
-		computer.togglePower(); // abort screen: colored cells and a moved cursor
+		computer.pressPower(); // abort screen: colored cells and a moved cursor
 		var registries = helper.getLevel().registryAccess();
 		BlockState state = computer.getBlockState();
 		BlockEntity loaded = BlockEntity.loadStatic(computer.getBlockPos(), state, computer.saveWithFullMetadata(registries), registries);

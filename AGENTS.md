@@ -96,26 +96,34 @@ same thing.
       button on top, the view toggle below. The toggle shows a motherboard
       (`textures/gui/case_button.png`, the same art as the back's window) for "case", and a
       tiny screen for "screen".
-  - **Power button** (a press button, not a toggle switch). It toggles the power **switch**
-    (`Machine.isPowered`, block state `powered`):
+  - **Power button** (a press button, not a toggle switch). A press (`Machine.pressPower`)
+    turns the machine on or off (`Machine.isPowered`, block state `powered`). Rules the user
+    chose:
+    - **The machine is only ever on with a CPU.**
+      - Pressing power without one is refused: a stone-button click plus one low **error beep**
+        (`NOTE_BLOCK_BIT` at pitch 0.6), and it stays off.
+      - Pulling the CPU out of a running machine beeps the same way and cuts power (the
+        display goes dark).
+      - Inserting a CPU never turns the machine on; the player presses power.
     - **On the back, bottom right:** a dark housing at texels 9..13, holding a 3x3 button that
-      sticks out half a texel. A plain right-click on the housing toggles it. `BackPanel.hit`
+      sticks out half a texel. A plain right-click on the housing presses it. `BackPanel.hit`
       maps back-face clicks to its regions: `POWER` and `CASE`.
-    - **In both GUI views:** left or right click sends `TogglePowerPayload`, and the server
+    - **In both GUI views:** left or right click sends `PressPowerPayload`, and the server
       checks reach.
-    - **Sneak + right-click** anywhere also still toggles it.
+    - **Sneak + right-click** anywhere also still presses it.
     - **Look:**
       - With a CPU (block state `cpu=true`), the button is lit (an emissive model element):
         red when off, green when on.
-      - With no CPU it's **faded and unlit**. The switch still works, but nothing runs.
+      - With no CPU it's **faded and unlit**, and red, since the machine can't be on.
+        - In the GUIs it shows faded green only while the mouse is held down on it.
+        - It's back to faded red on release (`ComputerButtons`, `powerHeld`).
       - There are four block models (`all_in_one[_on][_faded]`) on two base models (emissive,
         and plain), and four frames in `textures/gui/power_button.png`.
   - **Boot results:**
     - CPU and EEPROM: "hello world" (the stand-in program).
     - CPU, no EEPROM: the soft gray **ABRT** screen, `ABRT: no EEPROM installed`.
-    - No CPU: black.
-    - Parts aren't hot-plugged: changes take effect at the next power-on, and a removed CPU
-      leaves the display as it was.
+    - No CPU: the machine won't turn on.
+    - Part changes take effect at the next power-on, except that removing the CPU cuts power.
   - **Display:**
     - It shows on the block face's glass (`AllInOneRenderer`) and in the screen view.
     - Cells have foreground and background colors. In the world, backgrounds are drawn with
@@ -163,8 +171,10 @@ same thing.
     - The CPU and memory are not on it, as on a real PC.
   - **Virtual bus (`bus/VirtualBus`):** devices that always exist, found by fixed name, not by
     walking (like Linux's virtual devices or UEFI's `ConOut`). Today it holds only `console`.
-- **Machine (`Machine`):** the power switch. Switching on with a CPU runs it; switching on
-  without one runs nothing.
+- **Machine (`Machine`):** the power state.
+  - `pressPower()` returns `ON`, `OFF` or `NO_CPU`; `NO_CPU` means refused.
+  - `cpuRemoved()` cuts power if the CPU was pulled while running.
+  - On means a CPU is installed and was handed control.
 - **Console (`console/ConsoleSplitter`):** modeled on UEFI's console splitter.
   - It's never null. It writes to every display on the physical bus and drops output when
     there are none.
@@ -516,7 +526,7 @@ src/main/java/com/payonel/modularcomputers/
   block/                           AllInOneBlock, AllInOneBlockEntity, BackPanel (back-face hit regions), ModBlocks (registrations)
   command/ModCommands.java         /modularcomputers giveall (cheat: one of every mod item)
   network/OpenDisplayPayload.java  server->client "open this display"
-  network/TogglePowerPayload.java  client->server "power button clicked in a GUI"
+  network/PressPowerPayload.java  client->server "power button clicked in a GUI"
   network/SwitchViewPayload.java   client->server "view toggle clicked" (screen view <-> case view)
 src/client/java/com/payonel/modularcomputers/client/
   ModularComputersClient.java      registers renderer + packet receiver

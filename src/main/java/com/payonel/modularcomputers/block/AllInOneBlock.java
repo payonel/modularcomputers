@@ -59,7 +59,7 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 		}
 		var region = BackPanel.hit(state.getValue(FACING), hit.getDirection(), hit.getLocation().subtract(Vec3.atLowerCornerOf(pos)));
 		if (region.equals(Optional.of(BackPanel.Region.POWER)) || player.isSecondaryUseActive()) {
-			computer.togglePower();
+			computer.pressPower();
 		} else if (region.equals(Optional.of(BackPanel.Region.CASE))) {
 			// The window into the case opens the case view.
 			player.openMenu(computer);

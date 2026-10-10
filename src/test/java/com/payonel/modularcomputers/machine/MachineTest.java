@@ -42,24 +42,25 @@ class MachineTest {
 	}
 
 	@Test
-	void withoutCpuThePowerSwitchWorksButNothingRuns() {
+	void withoutCpuPressingPowerIsRefused() {
 		int[] runs = {0};
 		withParts(false, board -> runs[0]++);
-		machine.setPowered(true);
-		assertThat(machine.isPowered()).isTrue();
+		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.NO_CPU);
+		assertThat(machine.isPowered()).isFalse();
 		assertThat(runs[0]).isZero();
 		assertThat(screen().isBlank()).isTrue();
 	}
 
 	@Test
-	void powerOnRunsTheEepromProgramOnce() {
+	void pressingPowerTogglesAndEachPowerOnRunsTheProgram() {
 		int[] runs = {0};
 		withParts(true, board -> runs[0]++);
-		machine.setPowered(true);
-		machine.setPowered(true);
+		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
+		assertThat(machine.isPowered()).isTrue();
 		assertThat(runs[0]).isEqualTo(1);
-		machine.togglePower();
-		machine.togglePower();
+		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.OFF);
+		assertThat(machine.isPowered()).isFalse();
+		machine.pressPower();
 		assertThat(runs[0]).as("each power-on runs it again").isEqualTo(2);
 	}
 
@@ -67,27 +68,43 @@ class MachineTest {
 	void theProgramGetsTheMotherboard() {
 		Motherboard[] seen = {null};
 		withParts(true, board -> seen[0] = board);
-		machine.setPowered(true);
+		machine.pressPower();
 		assertThat(seen[0]).isSameAs(machine.board());
 		assertThat(seen[0].bus().devices()).hasSize(3);
 	}
 
 	@Test
-	void installingACpuWhilePoweredWaitsForTheNextPowerOn() {
+	void installingACpuDoesNotTurnTheMachineOn() {
 		int[] runs = {0};
 		withParts(false, board -> runs[0]++);
-		machine.setPowered(true);
 		machine.board().setCpu(new Cpu());
+		assertThat(machine.isPowered()).isFalse();
 		assertThat(runs[0]).isZero();
-		machine.togglePower();
-		machine.togglePower();
-		assertThat(runs[0]).isEqualTo(1);
+	}
+
+	@Test
+	void removingTheCpuFromARunningMachineCutsPower() {
+		withParts(true, new HelloWorldProgram());
+		machine.pressPower();
+		machine.board().setCpu(null);
+		assertThat(machine.cpuRemoved()).as("it was running").isTrue();
+		assertThat(machine.isPowered()).isFalse();
+		assertThat(screen().isBlank()).as("the display goes dark").isTrue();
+		assertThat(machine.cpuRemoved()).as("already off").isFalse();
+	}
+
+	@Test
+	void cpuRemovedIsANoOpWhileTheCpuIsStillThere() {
+		withParts(true, new HelloWorldProgram());
+		machine.pressPower();
+		assertThat(machine.cpuRemoved()).isFalse();
+		assertThat(machine.isPowered()).isTrue();
 	}
 
 	@Test
 	void noEepromShowsTheAbortScreen() {
 		withParts(true, null);
-		machine.setPowered(true);
+		machine.pressPower();
 		assertThat(machine.isPowered()).as("power stays on").isTrue();
 		assertThat(screen().row(0).strip()).isEqualTo(Cpu.ABORT + Cpu.NO_EEPROM);
 		assertThat(screen().foreground(0, 0)).isEqualTo(Cpu.ABORT_FOREGROUND);
@@ -106,7 +123,7 @@ class MachineTest {
 			board.virtualBus().console().print("booting");
 			throw new IllegalStateException("out of cheese");
 		});
-		machine.setPowered(true);
+		machine.pressPower();
 		assertThat(machine.isPowered()).as("power stays on").isTrue();
 		assertThat(screen().row(0).strip()).as("the abort screen replaces what was there")
 			.isEqualTo(Cpu.ABORT + Cpu.CRASHED + "out of cheese");
@@ -116,7 +133,7 @@ class MachineTest {
 	@Test
 	void helloWorldProgramPrintsThroughTheConsole() {
 		withParts(true, new HelloWorldProgram());
-		machine.setPowered(true);
+		machine.pressPower();
 		assertThat(screen().row(0).strip()).isEqualTo(HelloWorldProgram.GREETING);
 		assertThat(screen().background(0, 0)).isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
 		assertThat(machine.board().virtualBus().console().row()).as("cursor on the next line").isEqualTo(1);
@@ -125,14 +142,14 @@ class MachineTest {
 	@Test
 	void powerOffBlanksDisplaysAndResetsTheConsole() {
 		withParts(true, null);
-		machine.setPowered(true);
-		machine.setPowered(false);
+		machine.pressPower();
+		machine.pressPower();
 		assertThat(screen().isBlank()).isTrue();
 		var console = machine.board().virtualBus().console();
 		assertThat(console.row()).isZero();
 		assertThat(console.background()).isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
 		machine.board().setEeprom(new Eeprom(new HelloWorldProgram()));
-		machine.setPowered(true);
+		machine.pressPower();
 		assertThat(screen().row(0).strip()).as("prints at the top again").isEqualTo(HelloWorldProgram.GREETING);
 		assertThat(screen().background(0, 0)).isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
 	}

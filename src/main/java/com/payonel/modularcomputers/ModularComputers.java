@@ -6,7 +6,7 @@ import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.ModMenus;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import com.payonel.modularcomputers.network.SwitchViewPayload;
-import com.payonel.modularcomputers.network.TogglePowerPayload;
+import com.payonel.modularcomputers.network.PressPowerPayload;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.resources.Identifier;
@@ -44,7 +44,7 @@ public final class ModularComputers implements ModInitializer {
 		ModCommands.init();
 		ModCreativeTab.init();
 		OpenDisplayPayload.register();
-		TogglePowerPayload.register();
+		PressPowerPayload.register();
 		SwitchViewPayload.register();
 		initialized = true;
 		LOGGER.info("{} (version {})", INIT_MARKER, version());

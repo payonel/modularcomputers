@@ -38,7 +38,8 @@ import net.minecraft.world.phys.Vec3;
  * <ul>
  * <li>It's in the creative inventory.</li>
  * <li>Right-click opens the display at full size from its first frame.</li>
- * <li>A new computer has no CPU: its power button is faded, and power runs nothing.</li>
+ * <li>A new computer has no CPU: its power button is faded red; pressing it is refused (faded
+ * green only while held) and the computer stays off.</li>
  * <li>{@code /modularcomputers giveall}, sent from the player, gives every part.</li>
  * <li>The view toggle opens the case view, where the CPU and EEPROM go in with real mouse
  * clicks and a shift-click; the power button lights up.</li>
@@ -92,20 +93,24 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			check(whitePixelsOnFace(context.takeScreenshot("all-in-one-off")) == 0, "an off computer's face should show no text");
 
 			// A new computer has no CPU: right-click opens a black display at full size from the
-			// first frame, with a faded power button. The switch works, but nothing runs.
+			// first frame, with a faded red power button. Pressing it is refused (an error beep):
+			// faded green only while the mouse is held, then faded red again, and it stays off.
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(DisplayScreen.class);
 			checkDisplayLayout(context);
 			DisplayShot empty = displayShot(context, "all-in-one-display-no-cpu", 0);
 			check(FADED_RED.test(empty.buttonCenter()), "without a CPU the power button should be faded red, got " + hex(empty.buttonCenter()));
-			clickOnScreen(context, InputConstants.MOUSE_BUTTON_RIGHT, screen -> ((DisplayScreen) screen).powerButton());
-			context.waitFor(client -> machinePowered(client, computer));
-			context.waitTicks(2);
-			DisplayShot emptyOn = displayShot(context, "all-in-one-display-no-cpu-on", 0);
-			check(FADED_GREEN.test(emptyOn.buttonCenter()), "powered without a CPU the button should be faded green, got " + hex(emptyOn.buttonCenter()));
-			check(emptyOn.whitePixels(0, 16) == 0, "nothing runs without a CPU");
-			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((DisplayScreen) screen).powerButton());
-			context.waitFor(client -> !machinePowered(client, computer));
+			moveCursorTo(context, screen -> ((DisplayScreen) screen).powerButton());
+			context.getInput().holdMouse(InputConstants.MOUSE_BUTTON_RIGHT);
+			context.waitTicks(CLICK_PAUSE);
+			DisplayShot held = displayShot(context, "all-in-one-display-no-cpu-held", 0);
+			check(FADED_GREEN.test(held.buttonCenter()), "held without a CPU the button should be faded green, got " + hex(held.buttonCenter()));
+			context.getInput().releaseMouse(InputConstants.MOUSE_BUTTON_RIGHT);
+			context.waitTicks(CLICK_PAUSE);
+			DisplayShot released = displayShot(context, "all-in-one-display-no-cpu-released", 0);
+			check(FADED_RED.test(released.buttonCenter()), "released, the button should be faded red again, got " + hex(released.buttonCenter()));
+			check(!context.computeOnClient(client -> machinePowered(client, computer)), "without a CPU the computer must stay off");
+			check(released.whitePixels(0, 16) == 0, "nothing runs without a CPU");
 
 			// The player gets every part with the cheat command, typed as they would.
 			context.runOnClient(client -> client.player.connection.sendCommand("modularcomputers giveall"));
@@ -274,14 +279,19 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		});
 	}
 
-	/** Moves the real mouse cursor to the middle of an area of the open screen and clicks ({@code InputConstants.MOUSE_BUTTON_*}). */
-	private static void clickOnScreen(ClientGameTestContext context, int mouseButton, Function<Screen, Viewport> area) {
+	/** Moves the real mouse cursor to the middle of an area of the open screen. */
+	private static void moveCursorTo(ClientGameTestContext context, Function<Screen, Viewport> area) {
 		double[] cursor = context.computeOnClient(client -> {
 			Viewport target = area.apply(client.gui.screen());
 			int scale = client.getWindow().getGuiScale();
 			return new double[] {(target.x() + target.width() / 2.0) * scale, (target.y() + target.height() / 2.0) * scale};
 		});
 		context.getInput().setCursorPos(cursor[0], cursor[1]);
+	}
+
+	/** Moves the real mouse cursor to the middle of an area of the open screen and clicks ({@code InputConstants.MOUSE_BUTTON_*}). */
+	private static void clickOnScreen(ClientGameTestContext context, int mouseButton, Function<Screen, Viewport> area) {
+		moveCursorTo(context, area);
 		context.getInput().pressMouse(mouseButton);
 		// Pause like a person would; clicks closer together than 250 ms count as a double-click.
 		context.waitTicks(CLICK_PAUSE);
