@@ -4,7 +4,7 @@ This file is the full context for any agent session working on this repo. `CLAUD
 (Claude Code reads `CLAUDE.md`, not `AGENTS.md`; other agent tools read `AGENTS.md`). Keep it
 current: when a decision is made or a gotcha is found, record it here.
 
-Last updated: 2026-10-11 (screens, cables and cabled devices in the bus order).
+Last updated: 2026-10-11 (battery tiers: recipes, charging, drain, power).
 
 ---
 
@@ -74,7 +74,7 @@ same thing.
   - **Parts:**
     - The display and keyboard are built in. Everything else is an item (`ModItems`) in the
       **case view**'s 15 slots (`CaseMenu`):
-      - CPU, EEPROM (labeled ROM), UPS battery, 4 RAM, 4 SATA (hard disks) and 4 expansion
+      - CPU, EEPROM (labeled ROM), UPS (a battery), 4 RAM, 4 SATA (hard disks) and 4 expansion
         slots, which take any card (`ModItems.CARDS`, `device/CardKind`): WLAN, Bluetooth,
         Redstone, Audio, Motion Sensor, Audio Sensor, Weather Sensor. All cards are
         placeholders with no function.
@@ -84,7 +84,38 @@ same thing.
         hard disks (`Disk`) and cards (`Card`, typed by kind). The user asked for the EEPROM
         and UPS on the bus (2026-10-11). The CPU still loads from the EEPROM slot directly.
       - RAM is a placeholder: the machine still uses the soldered `Hardware` memory.
-      - UPS batteries carry a charge (`ModComponents.CHARGE`, 0..100); new ones come full.
+      - **Batteries** (user design, 2026-10-11; `item/BatteryItem`, plain-Java
+        `power/BatteryTier` and `power/BatteryCharge`). **The computer runs on its battery:**
+        - Charge is counted in ticks of running a CPU (`ModComponents.CHARGE`:
+          `BatteryCharge(ticks, settledAt)`). A day is 24000 ticks.
+        - **Tier 1** (`tier1_battery`): copper×3 / iron, redstone, iron / iron, redstone, iron.
+          Full, it runs a CPU for 10 days and nights, 10% a day.
+        - **Tier 2** (`tier2_battery`): gold×3 / iron, redstone, iron / iron, blaze rod, iron.
+          It holds twice as much. It recharges itself 1:1 (one tick of charge per tick) whenever
+          it isn't running a computer: out of the UPS slot, or in a case that's off.
+          - This is worked out lazily from `settledAt` (game time), so it charges in chests and
+            unloaded chunks too. It's settled every 20 ticks in a player's inventory or in a case.
+          - A new battery is `UNSETTLED`: it starts counting at the first look.
+        - **Tier 3** (`tier3_battery`): diamond×3 / netherite, nether star, netherite /
+          netherite, ender eye, netherite. It never runs out and has no charge component.
+        - **Charging** (`BatteryChargingRecipe`, a special crafting recipe, like repairing a
+          tool): put the battery and glowing materials in any grid (2x2 is enough). Each
+          material adds a share of a *tier 1's* capacity: sea lantern 100%, glowstone block and
+          shroomlight 25%, glow ink sac 10%, glow lichen 5%. They add up, to full.
+          - A tier 2 takes the same amounts, so a sea lantern fills half of one (my reading of
+            "charged the same, but double storage").
+          - A full battery, a tier 3, or anything else in the grid gives no result.
+        - Crafted batteries start empty (my default). The creative tab and `giveall` give
+          charged ones (`BatteryItem.charged()`).
+        - Items show a charge bar and a tooltip ("Charge: 73% (7.3 days)").
+        - Running: the computer drains its battery every 20 ticks while on
+          (`AllInOneBlockEntity.updateBattery`). Time its chunk wasn't loaded doesn't count.
+        - **No power** (no battery, or a flat one): pressing power does nothing at all
+          (`PowerPress.NO_POWER`): a click, no beep and no flash, since there's no power to
+          beep with. The power check comes before the CPU check.
+        - When the battery runs flat or is pulled out, a running computer just goes off
+          (`Machine.powerLost`). There's no beep, unlike pulling the CPU.
+        - The old `ups_battery` item is gone; its saves lose it (0.x).
     - A newly placed computer is empty. Get the parts from the creative tab, or with the
       cheat command **`/modularcomputers giveall`**.
       - It gives one of every item registered under the mod's namespace, so new items are
@@ -176,7 +207,7 @@ scripts/art/part_sounds.py`. The user wanted them soft, not
       tiny screen for "screen".
   - **Power button** (a press button, not a toggle switch). A press (`Machine.pressPower`)
     turns the machine on or off (`Machine.isPowered`, block state `powered`). Rules the user
-    chose:
+    chose (plus: it needs a charged battery first; see Batteries above):
     - **The machine is only ever on with a CPU.**
       - Pressing power without one is refused: a stone-button click, one **error beep**, and
         the power light **flashes faded green for `AllInOneBlock.ATTEMPT_TICKS` (4)**, then
@@ -565,8 +596,12 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
    - They run headless via `runGameTest`, which is part of `testAll` but **not** of `build`.
      Loom adds `runGameTest` to `check` by name; `build.gradle` removes it so `build` stays fast
      (the user wants `build` quick and iterative).
-   - The run reports "All 48 required tests passed": 47 are ours (`AllInOneGameTest`,
-     `CableGameTest`, `CardHolderGameTest`, `BluetoothGameTest`), and one is of unknown origin (not investigated).
+   - The run reports "All 56 required tests passed": 55 are ours (`AllInOneGameTest`,
+     `CableGameTest`, `CardHolderGameTest`, `BluetoothGameTest`, `BatteryGameTest`), and one is
+     of unknown origin (not investigated).
+   - Check recipes with `level.recipeAccess().getRecipeFor(RecipeType.CRAFTING,
+     CraftingInput.of(w, h, stacks), level)` (see `BatteryGameTest.craft`).
+   - Test computers need a charged battery to power on (`ModItems.TIER1_BATTERY.charged()`).
    - `helper.useBlock` always goes to the block, even when sneaking. The real game skips the
      block when sneaking with an item in hand, so test sneak-use of an item with
      `stack.useOn(new UseOnContext(...))`.
@@ -756,7 +791,10 @@ src/main/java/com/payonel/modularcomputers/
   display/                         plain Java: Display (bus device), Resolution, TextBuffer, Viewport, DisplayLayout (GUI layout math)
   cable/CableWalk.java             plain Java: follows cables out from a block to the devices at the ends
   ModCreativeTab.java              the "Modular Computers" creative tab
-  item/ModItems.java               CPU and EEPROM items
+  item/ModItems.java               the parts, cards and batteries
+  item/BatteryItem.java            a battery tier: charge bar, tooltip, tier 2's self-charging
+  item/BatteryChargingRecipe.java  charging a battery with glowing materials in the crafting grid
+  power/                           plain Java: BatteryTier, BatteryCharge (drain, rest, charge), ChargeMeter
   menu/                            CaseMenu (part slots + inventory), ModMenus
   block/                           AllInOneBlock, AllInOneBlockEntity, BackPanel (back-face hit regions), ModBlocks (registrations),
                                    ScreenBlock, ScreenBlockEntity, CableBlock, Cabling (ports, walking, change counter), DisplayHost,
@@ -777,7 +815,7 @@ src/client/java/com/payonel/modularcomputers/client/
   screen/ComputerButtons.java      power button + view toggle, shared by both views
 src/main/resources/                fabric.mod.json, assets (blockstates, models, items, textures, lang), data (loot table, pickaxe tag)
 src/test/java/...                  unit tests (ModularComputersTest, machine/, display/)
-src/gametest/java/.../gametest/    ModularComputersGameTest + AllInOneGameTest + CableGameTest (server),
+src/gametest/java/.../gametest/    ModularComputersGameTest + AllInOneGameTest + CableGameTest + BatteryGameTest (server),
                                    ModularComputersClientGameTest + AllInOneClientGameTest + CableClientGameTest (client),
                                    MouseGrabs + mixin/MouseGrabCounter (counts mouse grabs for the client test)
 src/gametest/resources/fabric.mod.json                                   test mod (entrypoints fabric-gametest, fabric-client-gametest)

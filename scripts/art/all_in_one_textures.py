@@ -279,14 +279,31 @@ def bluetooth_card_item():
 	rect(im, 14, 3, 14, 5, (40, 80, 200, 255))
 	return im
 
-def ups_battery_item():
-	"""A backup battery pack: dark block, two terminals, a charge stripe."""
+def battery_item(cap, cap_light, body, body_light, stripe):
+	"""A battery pack: a body, a metal cap with two terminals, a charge stripe."""
 	im = item_canvas()
-	rect(im, 2, 4, 13, 13, (54, 58, 66, 255))
-	rect(im, 2, 4, 13, 4, (84, 88, 98, 255))
+	rect(im, 2, 4, 13, 13, body)
+	rect(im, 2, 13, 13, 13, body_light)
+	rect(im, 2, 4, 13, 5, cap)
+	rect(im, 2, 4, 13, 4, cap_light)
 	rect(im, 4, 2, 5, 3, (196, 60, 50, 255))  # + terminal
 	rect(im, 10, 2, 11, 3, (40, 40, 46, 255))  # - terminal
-	rect(im, 4, 8, 11, 9, (90, 230, 110, 255))  # charge stripe
+	rect(im, 4, 8, 11, 9, stripe)
+	return im
+
+def tier1_battery_item():
+	"""Copper cap on a dark iron body."""
+	return battery_item((180, 100, 60, 255), (226, 150, 100, 255), (66, 70, 78, 255), (84, 88, 98, 255), (90, 230, 110, 255))
+
+def tier2_battery_item():
+	"""Gold cap, a blaze-orange stripe."""
+	return battery_item((214, 170, 40, 255), (250, 222, 100, 255), (66, 70, 78, 255), (84, 88, 98, 255), (255, 170, 40, 255))
+
+def tier3_battery_item():
+	"""Diamond cap on a netherite body, a star-white core with ender-green ends."""
+	im = battery_item((70, 200, 200, 255), (160, 240, 236, 255), (58, 50, 54, 255), (78, 68, 72, 255), (236, 240, 255, 255))
+	im.putpixel((4, 8), (60, 160, 120, 255))
+	im.putpixel((11, 9), (60, 160, 120, 255))
 	return im
 
 for name, fn in [("front", front), ("side", side), ("top", top), ("back", back), ("bottom", bottom)]:
@@ -296,7 +313,7 @@ for state in LIT:
 gui_button().save(f"{OUT}/../gui/power_button.png")
 case_button().save(f"{OUT}/../gui/case_button.png")
 for name, fn in [("cpu", cpu_item), ("eeprom", eeprom_item), ("ram", ram_item), ("hard_disk", hard_disk_item),
-		("wlan_card", wlan_card_item), ("ups_battery", ups_battery_item), ("redstone_card", redstone_card_item),
+		("wlan_card", wlan_card_item), ("tier1_battery", tier1_battery_item), ("tier2_battery", tier2_battery_item), ("tier3_battery", tier3_battery_item), ("redstone_card", redstone_card_item),
 		("audio_card", audio_card_item), ("motion_sensor_card", motion_sensor_card_item), ("audio_sensor_card", audio_sensor_card_item),
 		("weather_sensor_card", weather_sensor_card_item), ("bluetooth_card", bluetooth_card_item)]:
 	fn().save(f"{OUT}/../item/{name}.png")

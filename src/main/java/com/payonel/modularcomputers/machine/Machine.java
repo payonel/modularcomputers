@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.machine;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.display.Display;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 /**
  * A computer and its power switch, independent of Minecraft. The machine is only ever on with
@@ -10,6 +11,9 @@ import java.util.List;
  * and pulling the CPU out of a running machine cuts its power. Switching on hands control to
  * the CPU; switching off cuts power to the {@link Motherboard}. Installing a CPU never turns the
  * machine on by itself.
+ * <p>
+ * It also needs power (in a computer, a charged battery). Without it, pressing the button does
+ * nothing at all, and a running machine whose power gives out simply goes off.
  */
 public final class Machine {
 	/** What pressing the power button did. */
@@ -18,13 +22,23 @@ public final class Machine {
 		OFF,
 		/** Nothing: there's no CPU to power on. */
 		NO_CPU,
+		/** Nothing at all: there's no power to turn on with. */
+		NO_POWER,
 	}
 
 	private final Motherboard board;
+	private final BooleanSupplier power;
 	private boolean powered;
 
+	/** A machine on a bench supply: it always has power. */
 	public Machine(Motherboard board) {
+		this(board, () -> true);
+	}
+
+	/** {@code power} says whether there's power to run on right now. */
+	public Machine(Motherboard board, BooleanSupplier power) {
 		this.board = board;
+		this.power = power;
 	}
 
 	public Motherboard board() {
@@ -42,6 +56,9 @@ public final class Machine {
 			board.powerOff();
 			return PowerPress.OFF;
 		}
+		if (!power.getAsBoolean()) {
+			return PowerPress.NO_POWER;
+		}
 		var cpu = board.cpu();
 		if (cpu.isEmpty()) {
 			return PowerPress.NO_CPU;
@@ -57,6 +74,19 @@ public final class Machine {
 	 */
 	public boolean cpuRemoved() {
 		if (!powered || board.cpu().isPresent()) {
+			return false;
+		}
+		powered = false;
+		board.powerOff();
+		return true;
+	}
+
+	/**
+	 * Call after the power may have gone (the battery ran flat or was pulled out). A running
+	 * machine without power goes off. Returns whether it was running.
+	 */
+	public boolean powerLost() {
+		if (!powered || power.getAsBoolean()) {
 			return false;
 		}
 		powered = false;

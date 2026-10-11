@@ -6,7 +6,6 @@ import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.bus.DeviceType;
 import com.payonel.modularcomputers.command.ModCommands;
 import com.payonel.modularcomputers.display.TextBuffer;
-import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.machine.HelloWorldProgram;
@@ -36,10 +35,11 @@ public class AllInOneGameTest {
 		return helper.getBlockEntity(POS, AllInOneBlockEntity.class);
 	}
 
-	/** Puts parts into the case's slots, as the case view would. */
+	/** Puts parts into the case's slots, as the case view would, and a charged battery to run on. */
 	private static AllInOneBlockEntity install(AllInOneBlockEntity computer, boolean cpu, boolean eeprom) {
 		computer.parts().setItem(CaseMenu.CPU_SLOT, cpu ? new ItemStack(ModItems.CPU) : ItemStack.EMPTY);
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, eeprom ? new ItemStack(ModItems.EEPROM) : ItemStack.EMPTY);
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		return computer;
 	}
 
@@ -74,12 +74,14 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = place(helper);
 		Player player = helper.makeMockPlayer(GameType.SURVIVAL);
 		CaseMenu menu = (CaseMenu) computer.createMenu(0, player.getInventory(), player);
-		var parts = new java.util.ArrayList<>(List.of(ModItems.CPU, ModItems.EEPROM, ModItems.UPS_BATTERY, ModItems.RAM, ModItems.HARD_DISK));
+		var parts = new java.util.ArrayList<>(List.of(ModItems.CPU, ModItems.EEPROM, ModItems.RAM, ModItems.HARD_DISK));
 		parts.addAll(ModItems.CARDS.keySet());
+		parts.addAll(ModItems.BATTERIES);
 		for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
 			for (var part : parts) {
 				boolean placed = menu.slots.get(slot).mayPlace(new ItemStack(part));
-				helper.assertValueEqual(placed, takes(slot) == part || slot >= CaseMenu.EXP_SLOTS && ModItems.CARDS.containsKey(part),
+				helper.assertValueEqual(placed, takes(slot) == part || slot >= CaseMenu.EXP_SLOTS && ModItems.CARDS.containsKey(part)
+					|| slot == CaseMenu.UPS_SLOT && ModItems.BATTERIES.contains(part),
 					"slot " + slot + " taking " + part);
 			}
 			helper.assertValueEqual(menu.slots.get(slot).getMaxStackSize(), 1, "slot " + slot + " holds one");
@@ -94,7 +96,7 @@ public class AllInOneGameTest {
 		} else if (slot == CaseMenu.EEPROM_SLOT) {
 			return ModItems.EEPROM;
 		} else if (slot == CaseMenu.UPS_SLOT) {
-			return ModItems.UPS_BATTERY;
+			return null; // any battery
 		} else if (slot < CaseMenu.SATA_SLOTS) {
 			return ModItems.RAM;
 		}
@@ -104,7 +106,6 @@ public class AllInOneGameTest {
 	@GameTest
 	public void theEepromAndUpsBatteryAreOnTheBusAndEveryCardKindIsADevice(GameTestHelper helper) {
 		AllInOneBlockEntity computer = install(place(helper), true, true);
-		computer.parts().setItem(CaseMenu.UPS_SLOT, new ItemStack(ModItems.UPS_BATTERY));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.REDSTONE_CARD));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.BLUETOOTH_CARD));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 2, new ItemStack(ModItems.WEATHER_SENSOR_CARD));
@@ -176,12 +177,6 @@ public class AllInOneGameTest {
 			computer.saveWithFullMetadata(registries), registries);
 		helper.assertValueEqual(busKeys(loaded), List.of("sata:0", "display", "keyboard"), "bus order after reload");
 		helper.assertValueEqual(busTypes(loaded).getFirst(), DeviceType.STORAGE, "the machine's bus after reload");
-		helper.succeed();
-	}
-
-	@GameTest
-	public void upsBatteriesComeFullyCharged(GameTestHelper helper) {
-		helper.assertValueEqual(new ItemStack(ModItems.UPS_BATTERY).get(ModComponents.CHARGE), 100, "new battery charge");
 		helper.succeed();
 	}
 

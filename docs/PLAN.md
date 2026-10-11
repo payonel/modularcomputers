@@ -35,7 +35,11 @@ skip steps freely, never invent false steps (see `AGENTS.md` section 1).
   - RAM sizes the machine's memory (and none is a boot error).
   - Disks hold data.
   - WLAN cards network.
-  - The UPS battery charges and powers the machine when power drops.
+  - Batteries are built (three tiers; see AGENTS.md). Still open: mains power, with the
+    UPS as a real backup that takes over when it drops, and the battery's bus API.
+  - Battery ideas not decided: refusing overflow when charging (today extra material is
+    wasted), a range or rate for tier 2's self-charging, and whether the power light should
+    stay lit with no battery.
 - **CPU status dots:** the 4 lit dots left of the CPU socket are a good place for more
   status later. Today they just light when a CPU is in.
 - **Narrow windows:** the bus order panel is hidden below about 382 GUI units of width.
@@ -135,7 +139,7 @@ of letting the player order them:
 - **Cards** (all do nothing yet): WLAN, Bluetooth, Redstone, Audio, Motion Sensor, Audio
   Sensor, Weather Sensor. A card works where it's installed: in a computer, or in an
   expansion hub, where a redstone card emits and detects redstone at the hub.
-- **UPS battery:** on the bus. The user says it'll have an API.
+- **UPS battery:** on the bus. The user says it'll have an API (charge, tier, time left).
 - **Robotic piston:** one cable port; it will push blocks (pistons) on its other faces.
   Instead of a cable it can take a Bluetooth card in its one slot.
 - **Paint gun (user idea, 2026-10-11; placeholder block built):** a block that "shoots" paint

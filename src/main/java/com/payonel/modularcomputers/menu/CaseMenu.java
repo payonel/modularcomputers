@@ -1,6 +1,7 @@
 package com.payonel.modularcomputers.menu;
 
 import com.payonel.modularcomputers.block.ModBlocks;
+import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.item.ModItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.Container;
@@ -68,7 +69,7 @@ public final class CaseMenu extends AbstractContainerMenu {
 		} else if (slot == EEPROM_SLOT) {
 			return stack.is(ModItems.EEPROM);
 		} else if (slot == UPS_SLOT) {
-			return stack.is(ModItems.UPS_BATTERY);
+			return stack.getItem() instanceof BatteryItem;
 		} else if (slot < SATA_SLOTS) {
 			return stack.is(ModItems.RAM);
 		} else if (slot < EXP_SLOTS) {

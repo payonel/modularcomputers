@@ -52,6 +52,28 @@ class MachineTest {
 	}
 
 	@Test
+	void withoutPowerPressingPowerDoesNothingEvenWithoutACpu() {
+		boolean[] power = {false};
+		Machine unpowered = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of(display))), () -> power[0]);
+		assertThat(unpowered.pressPower()).isEqualTo(Machine.PowerPress.NO_POWER);
+		unpowered.board().setCpu(new Cpu());
+		unpowered.board().setEeprom(new Eeprom(new HelloWorldProgram()));
+		assertThat(unpowered.pressPower()).isEqualTo(Machine.PowerPress.NO_POWER);
+		assertThat(unpowered.isPowered()).isFalse();
+		assertThat(screen().isBlank()).isTrue();
+
+		power[0] = true;
+		assertThat(unpowered.powerLost()).as("off already").isFalse();
+		assertThat(unpowered.pressPower()).isEqualTo(Machine.PowerPress.ON);
+		assertThat(unpowered.powerLost()).as("still has power").isFalse();
+		assertThat(screen().isBlank()).isFalse();
+		power[0] = false;
+		assertThat(unpowered.powerLost()).as("it was running").isTrue();
+		assertThat(unpowered.isPowered()).isFalse();
+		assertThat(screen().isBlank()).as("the display goes dark").isTrue();
+	}
+
+	@Test
 	void pressingPowerTogglesAndEachPowerOnRunsTheProgram() {
 		int[] runs = {0};
 		withParts(true, board -> runs[0]++);

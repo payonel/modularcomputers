@@ -3,8 +3,10 @@ package com.payonel.modularcomputers.item;
 import static com.payonel.modularcomputers.ModularComputers.id;
 
 import com.payonel.modularcomputers.device.CardKind;
+import com.payonel.modularcomputers.power.BatteryTier;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -36,8 +38,11 @@ public final class ModItems {
 	public static final Item WEATHER_SENSOR_CARD = register("weather_sensor_card");
 	/** Each card item and the kind of card it is. */
 	public static final Map<Item, CardKind> CARDS = cards();
-	/** Backup power; carries its charge. New ones come fully charged. */
-	public static final Item UPS_BATTERY = register("ups_battery", properties -> properties.component(ModComponents.CHARGE, 100));
+	/** Batteries for the UPS slot: a computer runs on one. */
+	public static final BatteryItem TIER1_BATTERY = battery("tier1_battery", BatteryTier.TIER_1);
+	public static final BatteryItem TIER2_BATTERY = battery("tier2_battery", BatteryTier.TIER_2);
+	public static final BatteryItem TIER3_BATTERY = battery("tier3_battery", BatteryTier.TIER_3);
+	public static final List<BatteryItem> BATTERIES = List.of(TIER1_BATTERY, TIER2_BATTERY, TIER3_BATTERY);
 
 	private ModItems() {
 	}
@@ -61,6 +66,10 @@ public final class ModItems {
 
 	/** Forces the static registrations above. */
 	public static void init() {
+	}
+
+	private static BatteryItem battery(String name, BatteryTier tier) {
+		return (BatteryItem) register(name, properties -> new BatteryItem(properties, tier), UnaryOperator.identity());
 	}
 
 	private static Item register(String name) {

@@ -14,7 +14,10 @@ import com.payonel.modularcomputers.device.CardKind;
 import com.payonel.modularcomputers.device.UpsBattery;
 import com.payonel.modularcomputers.display.Display;
 import com.payonel.modularcomputers.display.Resolution;
+import com.payonel.modularcomputers.item.BatteryItem;
+import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
+import com.payonel.modularcomputers.power.BatteryCharge;
 import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.machine.Eeprom;
 import com.payonel.modularcomputers.machine.Hardware;
@@ -90,6 +93,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String CABLE_KEY = "cable:";
 	/** Looks for cabled devices this often, in ticks, even when no cable changed (chunks load and unload). */
 	private static final int RESCAN_TICKS = 20;
+	/** How often the battery is run down or recharged. */
+	private static final int BATTERY_TICKS = 20;
 	/** Icons for the built-in devices in textures/gui/case_icons.png. */
 	public static final int DISPLAY_ICON = 6;
 	public static final int KEYBOARD_ICON = 7;
@@ -104,7 +109,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private UpsBattery ups;
 	private final BusOrder busOrder = new BusOrder();
 	private final Bus bus = new Bus(List.of(display, keyboard));
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), bus));
+	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), bus), this::hasPower);
 	private final Parts parts = new Parts();
 	/** The cabled devices found last time, nearest first. Saved and synced, for the bus order panel. */
 	private List<Cabled> cabled = List.of();
@@ -298,6 +303,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	 */
 	void serverTick() {
 		ticks++;
+		if (ticks % BATTERY_TICKS == 0) {
+			updateBattery();
+		}
 		if (seenCableChanges != Cabling.changes() || ticks % RESCAN_TICKS == 0) {
 			seenCableChanges = Cabling.changes();
 			scanCables();
@@ -306,6 +314,50 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			syncedDisplay = display.buffer().changes();
 			setChanged();
 			syncToClients();
+		}
+	}
+
+	/** The computer runs on its battery. */
+	private boolean hasPower() {
+		return BatteryItem.hasPower(parts.getItem(CaseMenu.UPS_SLOT));
+	}
+
+	/**
+	 * Server side, now and then: the battery runs the computer down while it's on, and a
+	 * self-charging one recharges while it's off. A running computer whose battery runs flat goes
+	 * off. Time this chunk wasn't loaded doesn't count against a running computer.
+	 */
+	private void updateBattery() {
+		ItemStack stack = parts.getItem(CaseMenu.UPS_SLOT);
+		if (!(stack.getItem() instanceof BatteryItem battery)) {
+			return;
+		}
+		long now = level.getGameTime();
+		BatteryCharge charge = BatteryItem.charge(stack);
+		if (machine.isPowered()) {
+			long since = charge.settledAt() == BatteryCharge.UNSETTLED ? now : charge.settledAt();
+			charge = charge.run(battery.tier(), Math.clamp(now - since, 0, BATTERY_TICKS), now);
+		} else {
+			charge = charge.rest(battery.tier(), now);
+		}
+		if (!battery.tier().infinite()) {
+			stack.set(ModComponents.CHARGE, charge); // in place: not a part change
+			setChanged();
+		}
+		if (machine.powerLost()) {
+			updatePowerState();
+		}
+	}
+
+	/** The power button shows both; the block state carries them to clients. */
+	private void updatePowerState() {
+		BlockState state = getBlockState()
+			.setValue(AllInOneBlock.CPU, machine.board().cpu().isPresent())
+			.setValue(AllInOneBlock.POWERED, machine.isPowered());
+		if (state != getBlockState()) {
+			level.setBlock(worldPosition, state, Block.UPDATE_CLIENTS);
+		} else {
+			syncToClients(); // the bus order panel shows the parts
 		}
 	}
 
@@ -357,8 +409,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	}
 
 	/**
-	 * Server side: someone pressed the power button. It clicks either way; without a CPU the
-	 * machine stays off and beeps an error. Clients learn the new state from the block state.
+	 * Server side: someone pressed the power button. It clicks either way. Without power nothing
+	 * else happens; without a CPU the machine stays off and beeps an error. Clients learn the
+	 * new state from the block state.
 	 */
 	public Machine.PowerPress pressPower() {
 		Machine.PowerPress result = machine.pressPower();
@@ -375,7 +428,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			// sets it back.
 			level.setBlock(worldPosition, getBlockState().setValue(AllInOneBlock.POWERED, true), Block.UPDATE_CLIENTS);
 			level.scheduleTick(worldPosition, getBlockState().getBlock(), AllInOneBlock.ATTEMPT_TICKS);
-		} else {
+		} else if (result != Machine.PowerPress.NO_POWER) {
 			// Changing the block state also sends this block entity's update to clients.
 			level.setBlock(worldPosition, getBlockState().setValue(AllInOneBlock.POWERED, on), Block.UPDATE_CLIENTS);
 		}
@@ -395,7 +448,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		boolean hasEeprom = parts.getItem(CaseMenu.EEPROM_SLOT).is(ModItems.EEPROM);
 		eeprom = hasEeprom ? (eeprom != null ? eeprom : new Eeprom(new HelloWorldProgram())) : null;
 		board.setEeprom(eeprom);
-		boolean hasUps = parts.getItem(CaseMenu.UPS_SLOT).is(ModItems.UPS_BATTERY);
+		boolean hasUps = parts.getItem(CaseMenu.UPS_SLOT).getItem() instanceof BatteryItem;
 		ups = hasUps ? (ups != null ? ups : new UpsBattery()) : null;
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
 			boolean disk = parts.getItem(CaseMenu.SATA_SLOTS + lane).is(ModItems.HARD_DISK);
@@ -499,15 +552,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			// Pulling the CPU out of a running machine kills it.
 			errorBeep();
 		}
-		// The power button shows both; the block state carries them to clients.
-		BlockState state = getBlockState()
-			.setValue(AllInOneBlock.CPU, machine.board().cpu().isPresent())
-			.setValue(AllInOneBlock.POWERED, machine.isPowered());
-		if (state != getBlockState()) {
-			level.setBlock(worldPosition, state, Block.UPDATE_CLIENTS);
-		} else {
-			syncToClients(); // the bus order panel shows the parts
-		}
+		machine.powerLost(); // pulling the battery: it just goes off
+		updatePowerState();
 	}
 
 	@Override

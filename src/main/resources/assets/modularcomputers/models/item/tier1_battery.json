@@ -1,6 +1,6 @@
 {
 	"parent": "minecraft:item/generated",
 	"textures": {
-		"layer0": "modularcomputers:item/ups_battery"
+		"layer0": "modularcomputers:item/tier1_battery"
 	}
 }

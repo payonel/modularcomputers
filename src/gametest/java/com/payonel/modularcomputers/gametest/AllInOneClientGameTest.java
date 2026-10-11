@@ -9,6 +9,7 @@ import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
 import com.payonel.modularcomputers.display.Viewport;
+import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
@@ -110,6 +111,9 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			// A new computer has no CPU: right-click opens a black display at full size from the
 			// first frame, with a faded red power button. Pressing it is refused (an error beep):
 			// faded green only while the mouse is held, then faded red again, and it stays off.
+			// It has a battery for now, so the refusal is about the CPU, not power.
+			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
+				.setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged()));
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(DisplayScreen.class);
 			checkDisplayLayout(context);
@@ -128,6 +132,8 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			check(FADED_RED.test(released.buttonCenter()), "released, the button should be faded red again, got " + hex(released.buttonCenter()));
 			check(!context.computeOnClient(client -> machinePowered(client, computer)), "without a CPU the computer must stay off");
 			check(released.whitePixels(0, 16) == 0, "nothing runs without a CPU");
+			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
+				.setItem(CaseMenu.UPS_SLOT, ItemStack.EMPTY));
 
 			// The player gets every part with the cheat command, typed as they would.
 			context.runOnClient(client -> client.player.connection.sendCommand("modularcomputers giveall"));
@@ -160,7 +166,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 				parts.setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.HARD_DISK));
 				parts.setItem(CaseMenu.SATA_SLOTS + 2, new ItemStack(ModItems.HARD_DISK));
 				parts.setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.WLAN_CARD));
-				parts.setItem(CaseMenu.UPS_SLOT, new ItemStack(ModItems.UPS_BATTERY));
+				parts.setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 			});
 			context.waitFor(client -> ((CaseScreen) client.gui.screen()).getMenu().slots.get(CaseMenu.UPS_SLOT).hasItem());
 			context.getInput().setCursorPos(0, 0); // no slot tooltip over the board
@@ -177,16 +183,17 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			checkBoardPixel(context, full, 46, 115, 0x1A1A1E, "expansion slot 1 empty");
 			checkBoardPixel(context, full, 34, 121, 0x5AE66E, "full battery: sixth bar green");
 			singleplayer.getServer().runOnServer(server -> {
-				ItemStack drained = new ItemStack(ModItems.UPS_BATTERY);
-				drained.set(ModComponents.CHARGE, 0);
+				ItemStack drained = new ItemStack(ModItems.TIER1_BATTERY);
 				((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts().setItem(CaseMenu.UPS_SLOT, drained);
 			});
 			context.waitFor(client -> ((CaseScreen) client.gui.screen()).getMenu().slots.get(CaseMenu.UPS_SLOT).getItem()
-				.getOrDefault(ModComponents.CHARGE, 100) == 0);
+				.has(ModComponents.CHARGE) && BatteryItem.percent(((CaseScreen) client.gui.screen()).getMenu().slots.get(CaseMenu.UPS_SLOT).getItem()) == 0);
 			context.waitTicks(2);
 			BufferedImage drainedShot = read(context.takeScreenshot("all-in-one-case-battery-empty"));
 			checkBoardPixel(context, drainedShot, 14, 121, 0xDC3C32, "empty battery: one red bar");
 			checkBoardPixel(context, drainedShot, 18, 121, 0x1E2621, "empty battery: second bar off");
+			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
+				.setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged())); // charged again, to run on
 
 			// The bus order panel lists the devices; its arrows reorder them on the server.
 			check(context.computeOnClient(client -> ((CaseScreen) client.gui.screen()).busPanelShown()), "the bus order panel should show");

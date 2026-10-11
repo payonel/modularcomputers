@@ -3,18 +3,27 @@ package com.payonel.modularcomputers.item;
 import static com.payonel.modularcomputers.ModularComputers.id;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import com.payonel.modularcomputers.power.BatteryCharge;
 import java.util.UUID;
 import net.minecraft.core.Registry;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
 
 /** Item data components. */
 public final class ModComponents {
-	/** A battery's charge, 0..100 percent. */
-	public static final DataComponentType<Integer> CHARGE = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("charge"),
-		DataComponentType.<Integer>builder().persistent(Codec.intRange(0, 100)).networkSynchronized(ByteBufCodecs.VAR_INT).build());
+	/** A battery's charge: ticks of running a CPU, and when it was last worked out. */
+	public static final DataComponentType<BatteryCharge> CHARGE = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("battery_charge"),
+		DataComponentType.<BatteryCharge>builder()
+			.persistent(RecordCodecBuilder.create(charge -> charge.group(
+				Codec.intRange(0, Integer.MAX_VALUE).fieldOf("ticks").forGetter(BatteryCharge::ticks),
+				Codec.LONG.optionalFieldOf("settled_at", BatteryCharge.UNSETTLED).forGetter(BatteryCharge::settledAt)
+			).apply(charge, BatteryCharge::new)))
+			.networkSynchronized(StreamCodec.composite(ByteBufCodecs.VAR_INT, BatteryCharge::ticks, ByteBufCodecs.VAR_LONG, BatteryCharge::settledAt, BatteryCharge::new))
+			.build());
 
 	/** A Bluetooth card's own address: other cards link to it. Set when something first links to it, and by a reset. */
 	public static final DataComponentType<UUID> BLUETOOTH_ID = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("bluetooth_id"),

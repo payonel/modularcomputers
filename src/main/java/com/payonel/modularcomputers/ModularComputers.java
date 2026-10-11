@@ -3,6 +3,7 @@ package com.payonel.modularcomputers;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.command.ModCommands;
 import com.payonel.modularcomputers.item.ModComponents;
+import com.payonel.modularcomputers.item.BatteryChargingRecipe;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.ModMenus;
 import com.payonel.modularcomputers.network.ConnectDevicePayload;
@@ -45,6 +46,7 @@ public final class ModularComputers implements ModInitializer {
 		ModSounds.init();
 		ModComponents.init();
 		ModItems.init();
+		BatteryChargingRecipe.init();
 		ModBlocks.init();
 		ModMenus.init();
 		ModCommands.init();

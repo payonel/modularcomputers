@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"D": "minecraft:diamond",
+		"N": "minecraft:netherite_ingot",
+		"S": "minecraft:nether_star",
+		"E": "minecraft:ender_eye"
+	},
+	"pattern": [
+		"DDD",
+		"NSN",
+		"NEN"
+	],
+	"result": {
+		"id": "modularcomputers:tier3_battery"
+	}
+}

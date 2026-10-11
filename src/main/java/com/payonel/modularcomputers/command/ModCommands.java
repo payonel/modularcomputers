@@ -1,6 +1,7 @@
 package com.payonel.modularcomputers.command;
 
 import com.payonel.modularcomputers.ModularComputers;
+import com.payonel.modularcomputers.item.BatteryItem;
 import java.util.List;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.commands.Commands;
@@ -39,11 +40,15 @@ public final class ModCommands {
 			.toList();
 	}
 
-	/** Gives one of each mod item; what doesn't fit drops at the player's feet. Returns how many. */
+	/**
+	 * Gives one of each mod item (batteries fully charged); what doesn't fit drops at the
+	 * player's feet. Returns how many.
+	 */
 	public static int giveAll(ServerPlayer player) {
 		List<Item> items = modItems();
 		for (Item item : items) {
-			player.getInventory().placeItemBackInInventory(new ItemStack(item), Prediction.SERVER_ONLY);
+			ItemStack stack = item instanceof BatteryItem battery ? battery.charged() : new ItemStack(item);
+			player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
 		}
 		return items.size();
 	}

@@ -34,7 +34,7 @@ public final class ModCreativeTab {
 				output.accept(ModItems.RAM);
 				output.accept(ModItems.HARD_DISK);
 				ModItems.CARDS.keySet().forEach(output::accept);
-				output.accept(ModItems.UPS_BATTERY);
+				ModItems.BATTERIES.forEach(battery -> output.accept(battery.charged()));
 			})
 			.build());
 	}

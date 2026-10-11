@@ -1,0 +1,180 @@
+package com.payonel.modularcomputers.gametest;
+
+import com.payonel.modularcomputers.block.AllInOneBlock;
+import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.ModBlocks;
+import com.payonel.modularcomputers.item.BatteryItem;
+import com.payonel.modularcomputers.item.ModComponents;
+import com.payonel.modularcomputers.item.ModItems;
+import com.payonel.modularcomputers.machine.Machine;
+import com.payonel.modularcomputers.menu.CaseMenu;
+import com.payonel.modularcomputers.power.BatteryCharge;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import net.fabricmc.fabric.api.gametest.v1.GameTest;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.CraftingInput;
+import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.level.ItemLike;
+
+/** Server game tests for batteries: crafting, charging, and running a computer. */
+public class BatteryGameTest {
+	private static final BlockPos POS = new BlockPos(1, 1, 1);
+	private static final int DAY = BatteryCharge.DAY_TICKS;
+
+	private static AllInOneBlockEntity computer(GameTestHelper helper, ItemStack battery) {
+		helper.setBlock(POS, ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
+		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.CPU));
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
+		computer.parts().setItem(CaseMenu.UPS_SLOT, battery);
+		return computer;
+	}
+
+	private static ItemStack battery(BatteryItem item, int ticks, long settledAt) {
+		ItemStack stack = new ItemStack(item);
+		stack.set(ModComponents.CHARGE, new BatteryCharge(ticks, settledAt));
+		return stack;
+	}
+
+	/** What the crafting grid makes from these, read row by row; null is an empty cell. */
+	private static ItemStack craft(GameTestHelper helper, int width, Object... cells) {
+		List<ItemStack> stacks = new ArrayList<>();
+		for (Object cell : cells) {
+			stacks.add(cell == null ? ItemStack.EMPTY : cell instanceof ItemStack stack ? stack : new ItemStack((ItemLike) cell));
+		}
+		CraftingInput input = CraftingInput.of(width, cells.length / width, stacks);
+		return helper.getLevel().recipeAccess().getRecipeFor(RecipeType.CRAFTING, input, helper.getLevel())
+			.map(recipe -> recipe.value().assemble(input))
+			.orElse(ItemStack.EMPTY);
+	}
+
+	@GameTest
+	public void eachTierHasItsRecipeAndCraftedBatteriesStartEmpty(GameTestHelper helper) {
+		ItemStack tier1 = craft(helper, 3,
+			Items.COPPER_INGOT, Items.COPPER_INGOT, Items.COPPER_INGOT,
+			Items.IRON_INGOT, Items.REDSTONE, Items.IRON_INGOT,
+			Items.IRON_INGOT, Items.REDSTONE, Items.IRON_INGOT);
+		helper.assertTrue(tier1.is(ModItems.TIER1_BATTERY), "tier 1 recipe, got " + tier1);
+		helper.assertValueEqual(BatteryItem.percent(tier1), 0, "a crafted battery is empty");
+		ItemStack tier2 = craft(helper, 3,
+			Items.GOLD_INGOT, Items.GOLD_INGOT, Items.GOLD_INGOT,
+			Items.IRON_INGOT, Items.REDSTONE, Items.IRON_INGOT,
+			Items.IRON_INGOT, Items.BLAZE_ROD, Items.IRON_INGOT);
+		helper.assertTrue(tier2.is(ModItems.TIER2_BATTERY), "tier 2 recipe, got " + tier2);
+		ItemStack tier3 = craft(helper, 3,
+			Items.DIAMOND, Items.DIAMOND, Items.DIAMOND,
+			Items.NETHERITE_INGOT, Items.NETHER_STAR, Items.NETHERITE_INGOT,
+			Items.NETHERITE_INGOT, Items.ENDER_EYE, Items.NETHERITE_INGOT);
+		helper.assertTrue(tier3.is(ModItems.TIER3_BATTERY), "tier 3 recipe, got " + tier3);
+		helper.assertValueEqual(BatteryItem.percent(tier3), 100, "tier 3 is always full");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void glowingMaterialsChargeABatteryInA2x2Grid(GameTestHelper helper) {
+		ItemStack empty = new ItemStack(ModItems.TIER1_BATTERY);
+		helper.assertValueEqual(BatteryItem.percent(craft(helper, 2, empty, Items.GLOW_LICHEN, null, null)), 5, "glow lichen");
+		helper.assertValueEqual(BatteryItem.percent(craft(helper, 2, null, Items.GLOW_INK_SAC, empty, null)), 10, "glow ink sac");
+		helper.assertValueEqual(BatteryItem.percent(craft(helper, 2, empty, Items.GLOWSTONE, null, null)), 25, "glowstone block");
+		helper.assertValueEqual(BatteryItem.percent(craft(helper, 2, empty, Items.SHROOMLIGHT, null, null)), 25, "shroomlight");
+		helper.assertValueEqual(BatteryItem.percent(craft(helper, 2, empty, Items.SEA_LANTERN, null, null)), 100, "sea lantern");
+		helper.assertValueEqual(BatteryItem.percent(craft(helper, 2, empty, Items.GLOWSTONE, Items.SHROOMLIGHT, Items.GLOW_INK_SAC)), 60,
+			"materials add up");
+		helper.assertValueEqual(BatteryItem.percent(craft(helper, 2, battery(ModItems.TIER1_BATTERY, 9 * DAY, 0), Items.GLOWSTONE, null, null)), 100,
+			"up to full");
+		helper.assertValueEqual(BatteryItem.percent(craft(helper, 2, new ItemStack(ModItems.TIER2_BATTERY), Items.SEA_LANTERN, null, null)), 50,
+			"tier 2 holds twice as much");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void chargingTakesOnlyOneBatteryThatNeedsIt(GameTestHelper helper) {
+		helper.assertTrue(craft(helper, 2, ModItems.TIER1_BATTERY.charged(), Items.GLOWSTONE, null, null).isEmpty(), "a full battery");
+		helper.assertTrue(craft(helper, 2, new ItemStack(ModItems.TIER3_BATTERY), Items.GLOWSTONE, null, null).isEmpty(), "tier 3");
+		helper.assertTrue(craft(helper, 2, new ItemStack(ModItems.TIER1_BATTERY), null, null, null).isEmpty(), "no material");
+		helper.assertTrue(craft(helper, 2, new ItemStack(ModItems.TIER1_BATTERY), Items.GLOWSTONE, Items.DIRT, null).isEmpty(), "something else");
+		helper.assertTrue(craft(helper, 2, new ItemStack(ModItems.TIER1_BATTERY), new ItemStack(ModItems.TIER1_BATTERY), Items.GLOWSTONE, null)
+			.isEmpty(), "two batteries");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void withoutChargeThePowerButtonDoesNothing(GameTestHelper helper) {
+		for (ItemStack battery : Arrays.asList(ItemStack.EMPTY, new ItemStack(ModItems.TIER1_BATTERY))) {
+			AllInOneBlockEntity computer = computer(helper, battery);
+			helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.NO_POWER, "press result with " + battery);
+			helper.assertTrue(!computer.machine().isPowered(), "stays off");
+			helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false); // no flash: there's no power to light it
+			helper.assertTrue(computer.display().buffer().isBlank(), "nothing runs");
+		}
+		helper.succeed();
+	}
+
+	@GameTest(maxTicks = 100)
+	public void aRunningComputerGoesOffWhenItsBatteryRunsFlat(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper, battery(ModItems.TIER1_BATTERY, 30, BatteryCharge.UNSETTLED));
+		helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.ON, "press result");
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(!computer.machine().isPowered(), "ran flat"))
+			.thenExecute(() -> {
+				helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
+				helper.assertTrue(computer.display().buffer().isBlank(), "the display goes dark");
+				helper.assertValueEqual(BatteryItem.percent(computer.parts().getItem(CaseMenu.UPS_SLOT)), 0, "empty");
+				helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.NO_POWER, "won't start again");
+			})
+			.thenSucceed();
+	}
+
+	@GameTest
+	public void pullingTheBatteryTurnsARunningComputerOff(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper, ModItems.TIER1_BATTERY.charged());
+		computer.pressPower();
+		helper.assertTrue(computer.machine().isPowered(), "on");
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ItemStack.EMPTY);
+		helper.assertTrue(!computer.machine().isPowered(), "pulling the battery cuts power");
+		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
+		helper.assertTrue(computer.display().buffer().isBlank(), "the display goes dark");
+		helper.succeed();
+	}
+
+	@GameTest(maxTicks = 200)
+	public void aRunningBatteryDrainsAndATier1DoesNotRecharge(GameTestHelper helper) {
+		int start = 5 * DAY;
+		AllInOneBlockEntity computer = computer(helper, battery(ModItems.TIER1_BATTERY, start, BatteryCharge.UNSETTLED));
+		computer.pressPower();
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(BatteryItem.charge(computer.parts().getItem(CaseMenu.UPS_SLOT)).ticks() < start, "drains"))
+			.thenExecute(computer::pressPower)
+			.thenIdle(45)
+			.thenExecute(() -> helper.assertTrue(BatteryItem.charge(computer.parts().getItem(CaseMenu.UPS_SLOT)).ticks() <= start - 20,
+				"a tier 1 stays down while off"))
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 100)
+	public void aTier2RechargesWhileTheComputerIsOff(GameTestHelper helper) {
+		long now = helper.getLevel().getGameTime();
+		AllInOneBlockEntity computer = computer(helper, battery(ModItems.TIER2_BATTERY, 100, now - 1000));
+		helper.succeedWhen(() -> helper.assertTrue(BatteryItem.charge(computer.parts().getItem(CaseMenu.UPS_SLOT)).ticks() >= 1100,
+			"regains the time it rested, got " + BatteryItem.charge(computer.parts().getItem(CaseMenu.UPS_SLOT))));
+	}
+
+	@GameTest(maxTicks = 100)
+	public void aTier3NeverRunsOut(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper, new ItemStack(ModItems.TIER3_BATTERY));
+		helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.ON, "press result");
+		helper.startSequence()
+			.thenIdle(45)
+			.thenExecute(() -> {
+				helper.assertTrue(computer.machine().isPowered(), "still on");
+				helper.assertValueEqual(BatteryItem.percent(computer.parts().getItem(CaseMenu.UPS_SLOT)), 100, "still full");
+			})
+			.thenSucceed();
+	}
+}
