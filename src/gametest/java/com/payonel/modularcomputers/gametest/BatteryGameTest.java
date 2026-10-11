@@ -104,8 +104,12 @@ public class BatteryGameTest {
 		helper.succeed();
 	}
 
+	private static BatteryCharge charge(AllInOneBlockEntity computer) {
+		return BatteryItem.charge(computer.parts().getItem(CaseMenu.UPS_SLOT));
+	}
+
 	@GameTest
-	public void withoutChargeThePowerButtonDoesNothing(GameTestHelper helper) {
+	public void withoutPowerThePowerButtonDoesNothing(GameTestHelper helper) {
 		for (ItemStack battery : Arrays.asList(ItemStack.EMPTY, new ItemStack(ModItems.TIER1_BATTERY))) {
 			AllInOneBlockEntity computer = computer(helper, battery);
 			helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.NO_POWER, "press result with " + battery);
@@ -117,15 +121,34 @@ public class BatteryGameTest {
 	}
 
 	@GameTest
-	public void thePowerButtonIsFadedWithoutABatteryOrWithAFlatOne(GameTestHelper helper) {
+	public void aBatteryGoingInFillsTheCaseBufferWithADay(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper, ModItems.TIER1_BATTERY.charged());
+		helper.assertValueEqual(computer.power().level(), DAY, "the case takes a day's worth");
+		helper.assertValueEqual(charge(computer).ticks(), 9 * DAY, "out of the battery");
+		computer.parts().setItem(CaseMenu.UPS_SLOT, battery(ModItems.TIER1_BATTERY, DAY / 4, BatteryCharge.UNSETTLED));
+		helper.assertValueEqual(computer.power().level(), DAY, "already full: takes nothing");
+		helper.assertValueEqual(charge(computer).ticks(), DAY / 4, "the battery keeps its charge");
+
+		AllInOneBlockEntity other = computer(helper, ItemStack.EMPTY);
+		other.power().set(0);
+		other.parts().setItem(CaseMenu.UPS_SLOT, battery(ModItems.TIER1_BATTERY, DAY / 2, BatteryCharge.UNSETTLED));
+		helper.assertValueEqual(other.power().percent(), 50, "takes what the battery has");
+		helper.assertValueEqual(charge(other).ticks(), 0, "leaving it flat");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void thePowerButtonIsFadedWithoutCasePowerOrACpu(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper, ItemStack.EMPTY);
-		helper.assertBlockProperty(POS, AllInOneBlock.READY, false); // a CPU but no battery
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, false); // a CPU but no power
 		computer.parts().setItem(CaseMenu.UPS_SLOT, new ItemStack(ModItems.TIER1_BATTERY));
 		helper.assertBlockProperty(POS, AllInOneBlock.READY, false); // a flat battery
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		helper.assertBlockProperty(POS, AllInOneBlock.READY, true);
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ItemStack.EMPTY);
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, true); // the case holds a day
 		computer.parts().setItem(CaseMenu.CPU_SLOT, ItemStack.EMPTY);
-		helper.assertBlockProperty(POS, AllInOneBlock.READY, false); // charged, but no CPU
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, false); // powered, but no CPU
 		helper.succeed();
 	}
 
@@ -138,53 +161,55 @@ public class BatteryGameTest {
 	}
 
 	@GameTest(maxTicks = 100)
-	public void aRunningComputerGoesOffWhenItsBatteryRunsFlat(GameTestHelper helper) {
+	public void aRunningComputerDiesWhenTheCaseRunsOutOfPower(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper, battery(ModItems.TIER1_BATTERY, 30, BatteryCharge.UNSETTLED));
+		helper.assertValueEqual(computer.power().level(), 30, "the case took all the battery had");
 		helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.ON, "press result");
 		helper.startSequence()
-			.thenWaitUntil(() -> helper.assertTrue(!computer.machine().isPowered(), "ran flat"))
+			.thenWaitUntil(() -> helper.assertTrue(!computer.machine().isPowered(), "ran out"))
 			.thenExecute(() -> {
 				helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
 				helper.assertBlockProperty(POS, AllInOneBlock.READY, false); // faded
 				helper.assertTrue(computer.display().buffer().isBlank(), "the display goes dark");
-				helper.assertValueEqual(BatteryItem.percent(computer.parts().getItem(CaseMenu.UPS_SLOT)), 0, "empty");
+				helper.assertTrue(computer.power().isEmpty(), "the case is empty");
 				helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.NO_POWER, "won't start again");
 			})
 			.thenSucceed();
 	}
 
-	@GameTest
-	public void pullingTheBatteryTurnsARunningComputerOff(GameTestHelper helper) {
+	@GameTest(maxTicks = 100)
+	public void pullingTheBatteryLeavesARunningComputerOnTheCaseBuffer(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper, ModItems.TIER1_BATTERY.charged());
 		computer.pressPower();
-		helper.assertTrue(computer.machine().isPowered(), "on");
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ItemStack.EMPTY);
-		helper.assertTrue(!computer.machine().isPowered(), "pulling the battery cuts power");
-		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
-		helper.assertTrue(computer.display().buffer().isBlank(), "the display goes dark");
-		helper.succeed();
+		helper.assertTrue(computer.machine().isPowered(), "still running");
+		helper.succeedWhen(() -> {
+			helper.assertTrue(computer.power().level() < DAY, "the buffer runs down");
+			helper.assertTrue(computer.machine().isPowered(), "still running");
+		});
 	}
 
 	@GameTest(maxTicks = 200)
-	public void aRunningBatteryDrainsAndATier1DoesNotRecharge(GameTestHelper helper) {
+	public void aRunningComputerDrawsOnTheBatteryAndATier1DoesNotRecharge(GameTestHelper helper) {
 		int start = 5 * DAY;
 		AllInOneBlockEntity computer = computer(helper, battery(ModItems.TIER1_BATTERY, start, BatteryCharge.UNSETTLED));
+		int afterFill = start - DAY;
 		computer.pressPower();
 		helper.startSequence()
-			.thenWaitUntil(() -> helper.assertTrue(BatteryItem.charge(computer.parts().getItem(CaseMenu.UPS_SLOT)).ticks() < start, "drains"))
+			.thenWaitUntil(() -> helper.assertTrue(charge(computer).ticks() < afterFill, "the case tops up from the battery"))
+			.thenExecute(() -> helper.assertValueEqual(computer.power().level(), DAY, "keeping the buffer full"))
 			.thenExecute(computer::pressPower)
 			.thenIdle(45)
-			.thenExecute(() -> helper.assertTrue(BatteryItem.charge(computer.parts().getItem(CaseMenu.UPS_SLOT)).ticks() <= start - 20,
-				"a tier 1 stays down while off"))
+			.thenExecute(() -> helper.assertTrue(charge(computer).ticks() <= afterFill - 20, "a tier 1 stays down while off"))
 			.thenSucceed();
 	}
 
 	@GameTest(maxTicks = 100)
 	public void aTier2RechargesWhileTheComputerIsOff(GameTestHelper helper) {
 		long now = helper.getLevel().getGameTime();
-		AllInOneBlockEntity computer = computer(helper, battery(ModItems.TIER2_BATTERY, 100, now - 1000));
-		helper.succeedWhen(() -> helper.assertTrue(BatteryItem.charge(computer.parts().getItem(CaseMenu.UPS_SLOT)).ticks() >= 1100,
-			"regains the time it rested, got " + BatteryItem.charge(computer.parts().getItem(CaseMenu.UPS_SLOT))));
+		AllInOneBlockEntity computer = computer(helper, battery(ModItems.TIER2_BATTERY, DAY + 100, now - 1000));
+		helper.succeedWhen(() -> helper.assertTrue(charge(computer).ticks() >= 1100,
+			"regains the time it rested, got " + charge(computer)));
 	}
 
 	@GameTest(maxTicks = 100)
@@ -195,6 +220,7 @@ public class BatteryGameTest {
 			.thenIdle(45)
 			.thenExecute(() -> {
 				helper.assertTrue(computer.machine().isPowered(), "still on");
+				helper.assertValueEqual(computer.power().level(), DAY, "the case stays full");
 				helper.assertValueEqual(BatteryItem.percent(computer.parts().getItem(CaseMenu.UPS_SLOT)), 100, "still full");
 			})
 			.thenSucceed();

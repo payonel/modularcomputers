@@ -108,13 +108,23 @@ same thing.
         - Crafted batteries start empty (my default). The creative tab and `giveall` give
           charged ones (`BatteryItem.charged()`).
         - Items show a charge bar and a tooltip ("Charge: 73% (7.3 days)").
-        - Running: the computer drains its battery every 20 ticks while on
-          (`AllInOneBlockEntity.updateBattery`). Time its chunk wasn't loaded doesn't count.
-        - **No power** (no battery, or a flat one): pressing power does nothing at all
-          (`PowerPress.NO_POWER`): a click, no beep and no flash, since there's no power to
-          beep with. The power check comes before the CPU check.
-        - When the battery runs flat or is pulled out, a running computer just goes off
-          (`Machine.powerLost`). There's no beep, unlike pulling the CPU.
+        - **The case's power buffer** (user design, 2026-10-11; `power/PowerBuffer`, saved as
+          `power_buffer`): the computer runs on the case's own store, which holds **one day**.
+          - A battery going in fills it right away, up to a day's worth, out of the battery.
+            After that the buffer tops itself up from the battery every 20 ticks
+            (`AllInOneBlockEntity.updateBattery`), so the battery drains while the computer
+            runs. Time the chunk wasn't loaded doesn't count.
+          - With the battery out or flat, the buffer runs down while the computer runs. Pulling
+            the battery doesn't stop a running computer.
+          - **The charge meter under the UPS slot shows the buffer, not the battery.** Empty:
+            all bars off; any power: at least one red bar.
+          - When the buffer runs out, a running computer dies with the **error beep**, like
+            pulling the CPU (`Machine.powerLost`).
+        - **No power** (an empty buffer): pressing power does nothing at all
+          (`PowerPress.NO_POWER`): a click, no beep and no flash. The power check comes before
+          the CPU check.
+        - **The power button is faded unless the computer is ready** (block state `ready`): a
+          CPU is in and the case has power (user, 2026-10-11).
         - The old `ups_battery` item is gone; its saves lose it (0.x).
     - A newly placed computer is empty. Get the parts from the creative tab, or with the
       cheat command **`/modularcomputers giveall`**.
@@ -232,9 +242,9 @@ scripts/art/error_beep.py` into
       checks reach.
     - **Sneak + right-click** anywhere also still presses it.
     - **Look:**
-      - With a CPU (block state `cpu=true`), the button is lit (an emissive model element):
-        red when off, green when on.
-      - With no CPU it's **faded and unlit**, and red, since the machine can't be on.
+      - Ready, with a CPU and case power (block state `ready=true`), the button is lit (an
+        emissive model element): red when off, green when on.
+      - Otherwise it's **faded and unlit**, and red, since the machine can't be on.
         - In the GUIs it also shows faded green while the mouse is held down on it.
         - It's back to faded red on release (`ComputerButtons`, `powerHeld`).
       - There are four block models (`all_in_one[_on][_faded]`) on two base models (emissive,

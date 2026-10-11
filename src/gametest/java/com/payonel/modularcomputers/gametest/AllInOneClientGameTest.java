@@ -9,8 +9,7 @@ import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
 import com.payonel.modularcomputers.display.Viewport;
-import com.payonel.modularcomputers.item.BatteryItem;
-import com.payonel.modularcomputers.item.ModComponents;
+import com.payonel.modularcomputers.power.PowerBuffer;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.menu.CaseMenu;
@@ -171,7 +170,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			context.waitTicks(2);
 			BufferedImage caseShot = read(context.takeScreenshot("all-in-one-case-parts"));
 			int caseButton = pixelAt(context, caseShot, screen -> ((CaseScreen) screen).powerButton());
-			check(FADED_RED.test(caseButton), "with a CPU but no battery the power button should be faded red, got " + hex(caseButton));
+			check(RED.test(caseButton), "with a CPU, and power the case kept from the battery, the button should be lit red, got " + hex(caseButton));
 
 			// The board shows what's installed. Fill the rest of the case, then check each indicator.
 			singleplayer.getServer().runOnServer(server -> {
@@ -197,19 +196,21 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			checkBoardPixel(context, full, 154, 43, 0x1A1A1E, "SATA port 2 empty");
 			checkBoardPixel(context, full, 73, 115, 0xB0B4BC, "expansion slot 2 engaged");
 			checkBoardPixel(context, full, 46, 115, 0x1A1A1E, "expansion slot 1 empty");
-			checkBoardPixel(context, full, 34, 121, 0x5AE66E, "full battery: sixth bar green");
+			checkBoardPixel(context, full, 34, 121, 0x5AE66E, "full case power: sixth bar green");
 			int readyButton = pixelAt(context, full, screen -> ((CaseScreen) screen).powerButton());
 			check(RED.test(readyButton), "with a CPU and a charged battery the power button should be lit red, got " + hex(readyButton));
+			// The meter shows the case's own power, not the battery: nearly drained, with a flat
+			// battery in (swapping it in also syncs the case to the client), one red bar.
 			singleplayer.getServer().runOnServer(server -> {
-				ItemStack drained = new ItemStack(ModItems.TIER1_BATTERY);
-				((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts().setItem(CaseMenu.UPS_SLOT, drained);
+				AllInOneBlockEntity be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
+				be.power().set(PowerBuffer.CAPACITY / 20);
+				be.parts().setItem(CaseMenu.UPS_SLOT, new ItemStack(ModItems.TIER1_BATTERY));
 			});
-			context.waitFor(client -> ((CaseScreen) client.gui.screen()).getMenu().slots.get(CaseMenu.UPS_SLOT).getItem()
-				.has(ModComponents.CHARGE) && BatteryItem.percent(((CaseScreen) client.gui.screen()).getMenu().slots.get(CaseMenu.UPS_SLOT).getItem()) == 0);
+			context.waitFor(client -> client.level.getBlockEntity(computer) instanceof AllInOneBlockEntity be && be.power().percent() == 5);
 			context.waitTicks(2);
-			BufferedImage drainedShot = read(context.takeScreenshot("all-in-one-case-battery-empty"));
-			checkBoardPixel(context, drainedShot, 14, 121, 0xDC3C32, "empty battery: one red bar");
-			checkBoardPixel(context, drainedShot, 18, 121, 0x1E2621, "empty battery: second bar off");
+			BufferedImage drainedShot = read(context.takeScreenshot("all-in-one-case-power-low"));
+			checkBoardPixel(context, drainedShot, 14, 121, 0xDC3C32, "low case power: one red bar");
+			checkBoardPixel(context, drainedShot, 18, 121, 0x1E2621, "low case power: second bar off");
 			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
 				.setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged())); // charged again, to run on
 

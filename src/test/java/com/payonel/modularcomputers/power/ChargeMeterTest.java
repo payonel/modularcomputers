@@ -8,7 +8,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 class ChargeMeterTest {
 	@ParameterizedTest
 	@CsvSource({
-		"0, 1, LOW",      // an empty battery still shows one red bar
+		"0, 0, OFF",      // empty: all off
+		"1, 1, LOW",      // any charge shows one red bar
 		"10, 1, LOW",
 		"17, 2, MEDIUM",
 		"50, 3, MEDIUM",
@@ -16,7 +17,7 @@ class ChargeMeterTest {
 		"99, 6, HIGH",
 		"100, 6, HIGH",
 		"150, 6, HIGH",   // clamped
-		"-5, 1, LOW",
+		"-5, 0, OFF",
 	})
 	void barsFillLeftToRightRedThenYellowThenGreen(int charge, int bars, ChargeMeter.Level level) {
 		assertThat(ChargeMeter.litBars(charge)).isEqualTo(bars);

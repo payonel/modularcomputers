@@ -69,7 +69,7 @@ public final class BatteryItem extends Item {
 	@Override
 	public int getBarColor(ItemStack stack) {
 		return switch (ChargeMeter.level(ChargeMeter.litBars(percent(stack)))) {
-			case LOW -> 0xDC3C32;
+			case OFF, LOW -> 0xDC3C32;
 			case MEDIUM -> 0xE6C83C;
 			default -> 0x5AE66E;
 		};

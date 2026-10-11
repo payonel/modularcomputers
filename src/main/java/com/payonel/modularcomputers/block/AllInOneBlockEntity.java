@@ -18,6 +18,8 @@ import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.power.BatteryCharge;
+import com.payonel.modularcomputers.power.ChargeMeter;
+import com.payonel.modularcomputers.power.PowerBuffer;
 import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.machine.Eeprom;
 import com.payonel.modularcomputers.machine.Hardware;
@@ -91,6 +93,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String EXP_KEY = "exp:";
 	/** Cabled devices, by their own id: {@code cable:<uuid>}. */
 	private static final String CABLE_KEY = "cable:";
+	private static final String POWER_BUFFER = "power_buffer";
 	/** Looks for cabled devices this often, in ticks, even when no cable changed (chunks load and unload). */
 	private static final int RESCAN_TICKS = 20;
 	/** How often the battery is run down or recharged. */
@@ -109,6 +112,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private UpsBattery ups;
 	private final BusOrder busOrder = new BusOrder();
 	private final Bus bus = new Bus(List.of(display, keyboard));
+	private final PowerBuffer power = new PowerBuffer();
+	/** The charge meter's bars clients last saw. */
+	private int syncedMeterBars;
 	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), bus), this::hasPower);
 	private final Parts parts = new Parts();
 	/** The cabled devices found last time, nearest first. Saved and synced, for the bus order panel. */
@@ -317,35 +323,52 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		}
 	}
 
-	/** The computer runs on its battery. */
+	/** The computer runs on the case's power buffer. */
 	private boolean hasPower() {
-		return BatteryItem.hasPower(parts.getItem(CaseMenu.UPS_SLOT));
+		return !power.isEmpty();
+	}
+
+	/** The case's own store of power, which the charge meter shows. */
+	public PowerBuffer power() {
+		return power;
 	}
 
 	/**
-	 * Server side, now and then: the battery runs the computer down while it's on, and a
-	 * self-charging one recharges while it's off. A running computer whose battery runs flat goes
-	 * off. Time this chunk wasn't loaded doesn't count against a running computer.
+	 * Server side, now and then: a running computer draws from the case's buffer, and the buffer
+	 * tops itself up from the battery. A self-charging battery recharges while the computer is
+	 * off. With the battery out or flat, the buffer runs down; when it's empty a running computer
+	 * dies with an error beep. Time this chunk wasn't loaded doesn't count.
 	 */
 	private void updateBattery() {
+		if (machine.isPowered()) {
+			power.use(BATTERY_TICKS);
+		}
+		pullFromBattery();
+		if (machine.powerLost()) {
+			errorBeep();
+		}
+		setChanged();
+		if (!setPowerState() && ChargeMeter.litBars(power.percent()) != syncedMeterBars) {
+			syncToClients();
+		}
+	}
+
+	/** The buffer takes what it's missing from the battery, up to a day's worth. */
+	private void pullFromBattery() {
 		ItemStack stack = parts.getItem(CaseMenu.UPS_SLOT);
 		if (!(stack.getItem() instanceof BatteryItem battery)) {
 			return;
 		}
+		if (battery.tier().infinite()) {
+			power.fill(PowerBuffer.CAPACITY);
+			return;
+		}
 		long now = level.getGameTime();
 		BatteryCharge charge = BatteryItem.charge(stack);
-		if (machine.isPowered()) {
-			long since = charge.settledAt() == BatteryCharge.UNSETTLED ? now : charge.settledAt();
-			charge = charge.run(battery.tier(), Math.clamp(now - since, 0, BATTERY_TICKS), now);
-		} else {
-			charge = charge.rest(battery.tier(), now);
-		}
-		if (!battery.tier().infinite()) {
-			stack.set(ModComponents.CHARGE, charge); // in place: not a part change
-			setChanged();
-		}
-		machine.powerLost();
-		setPowerState(); // the battery may have run flat, or a tier 2 recharged from flat
+		// While the computer runs, the battery is in use: no self-charging.
+		charge = machine.isPowered() ? charge.run(battery.tier(), 0, now) : charge.rest(battery.tier(), now);
+		charge = charge.run(battery.tier(), power.fill(charge.ticks()), now);
+		stack.set(ModComponents.CHARGE, charge); // in place: not a part change
 	}
 
 	/**
@@ -353,6 +376,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	 * state carries both to clients. Returns whether it changed.
 	 */
 	private boolean setPowerState() {
+		syncedMeterBars = ChargeMeter.litBars(power.percent());
 		BlockState state = getBlockState()
 			.setValue(AllInOneBlock.READY, machine.board().cpu().isPresent() && hasPower())
 			.setValue(AllInOneBlock.POWERED, machine.isPowered());
@@ -554,7 +578,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			// Pulling the CPU out of a running machine kills it.
 			errorBeep();
 		}
-		machine.powerLost(); // pulling the battery: it just goes off
+		pullFromBattery(); // a battery going in fills the buffer right away
 		if (!setPowerState()) {
 			syncToClients(); // the bus order panel shows the parts
 		}
@@ -586,6 +610,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	protected void saveAdditional(ValueOutput output) {
 		super.saveAdditional(output);
 		output.putBoolean(POWERED, machine.isPowered());
+		output.putInt(POWER_BUFFER, power.level());
 		ContainerHelper.saveAllItems(output, parts.getItems());
 		output.store(BUS_ORDER, Codec.STRING.listOf(), busOrder.all());
 		output.store(BUS_DISCONNECTED, Codec.STRING.listOf(), busOrder.disconnected());
@@ -604,6 +629,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	protected void loadAdditional(ValueInput input) {
 		super.loadAdditional(input);
 		machine.restorePowered(input.getBooleanOr(POWERED, false));
+		power.set(input.getIntOr(POWER_BUFFER, 0));
 		parts.getItems().clear(); // not clearContent(): that would fire change handling mid-load
 		ContainerHelper.loadAllItems(input, parts.getItems());
 		input.read(BUS_ORDER, Codec.STRING.listOf()).ifPresent(order ->

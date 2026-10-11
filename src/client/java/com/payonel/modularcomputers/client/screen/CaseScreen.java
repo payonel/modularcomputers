@@ -6,7 +6,6 @@ import com.payonel.modularcomputers.block.AllInOneBlockEntity;
 import com.payonel.modularcomputers.client.Identify;
 import com.payonel.modularcomputers.display.ScrollWindow;
 import com.payonel.modularcomputers.display.Viewport;
-import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.network.ConnectDevicePayload;
 import com.payonel.modularcomputers.network.ReorderBusPayload;
@@ -263,10 +262,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 				graphics.fill(ex - 5, ey + 7, ex - 2, ey + 9, 0xFF6E727A);
 			}
 		}
-		// UPS battery: the charge meter. No battery: all bars off (the texture's own look).
-		ItemStack battery = menu.slots.get(CaseMenu.UPS_SLOT).getItem();
-		if (!battery.isEmpty()) {
-			int lit = ChargeMeter.litBars(BatteryItem.percent(battery));
+		// The charge meter under the battery shows the case's power buffer, not the battery.
+		// Empty: all bars off (the texture's own look).
+		if (minecraft.level != null && minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer) {
+			int lit = ChargeMeter.litBars(computer.power().percent());
 			int color = switch (ChargeMeter.level(lit)) {
 				case LOW -> METER_LOW;
 				case MEDIUM -> METER_MEDIUM;

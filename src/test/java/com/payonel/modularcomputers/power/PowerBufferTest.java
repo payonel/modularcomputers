@@ -1,0 +1,38 @@
+package com.payonel.modularcomputers.power;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import org.junit.jupiter.api.Test;
+
+class PowerBufferTest {
+	@Test
+	void holdsOneDayAndTakesOnlyWhatItsMissing() {
+		PowerBuffer buffer = new PowerBuffer();
+		assertThat(buffer.isEmpty()).isTrue();
+		assertThat(buffer.fill(10L * BatteryCharge.DAY_TICKS)).isEqualTo(BatteryCharge.DAY_TICKS);
+		assertThat(buffer.percent()).isEqualTo(100);
+		buffer.use(6000);
+		assertThat(buffer.percent()).isEqualTo(75);
+		assertThat(buffer.fill(10_000)).as("tops up").isEqualTo(6000);
+		assertThat(buffer.fill(10_000)).as("full").isZero();
+	}
+
+	@Test
+	void runsDownToEmptyAndNoFurther() {
+		PowerBuffer buffer = new PowerBuffer();
+		assertThat(buffer.fill(100)).isEqualTo(100);
+		buffer.use(150);
+		assertThat(buffer.level()).isZero();
+		assertThat(buffer.isEmpty()).isTrue();
+		assertThat(buffer.fill(-5)).isZero();
+	}
+
+	@Test
+	void anyPowerLeftShowsAsAtLeastOnePercent() {
+		PowerBuffer buffer = new PowerBuffer();
+		buffer.set(1);
+		assertThat(buffer.percent()).isEqualTo(1);
+		buffer.set(Integer.MAX_VALUE);
+		assertThat(buffer.level()).isEqualTo(PowerBuffer.CAPACITY);
+	}
+}
