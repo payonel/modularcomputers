@@ -58,6 +58,12 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 		return id;
 	}
 
+	/** Its board's id, which Bluetooth cards link to: the block's own id. */
+	@Override
+	public UUID boardId() {
+		return id;
+	}
+
 	public Container cards() {
 		return cards;
 	}
@@ -84,7 +90,7 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 	protected void cardsChanged() {
 	}
 
-	/** Its Bluetooth cards: the pairing card first (cards linking to this block link to it), then the rest by slot. */
+	/** Its Bluetooth cards (its radios): the pairing card first, then the rest by slot. */
 	@Override
 	public List<ItemStack> bluetoothCards() {
 		List<ItemStack> all = new ArrayList<>();
@@ -99,14 +105,9 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 		return all;
 	}
 
-	@Override
-	public void bluetoothChanged() {
-		cards.setChanged();
-	}
-
 	private void updateBluetooth() {
 		if (level != null) {
-			Bluetooth.update(level, worldPosition, bluetoothCards(), isPaired() ? pairingCard() : null, false);
+			Bluetooth.update(level, worldPosition, id, bluetoothCards(), isPaired() ? pairingCard() : null, false);
 		}
 	}
 

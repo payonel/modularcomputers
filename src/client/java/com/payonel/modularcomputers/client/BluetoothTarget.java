@@ -9,12 +9,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 
-/** While the player holds a linked Bluetooth card, the block holding the card it links to is outlined. */
+/** While the player holds a linked Bluetooth card, the block whose board it links to is outlined. */
 public final class BluetoothTarget {
 	private BluetoothTarget() {
 	}
 
-	/** The block at {@code pos} holds the card that the card in the player's hand links to. */
+	/** The block at {@code pos} is the board the card in the player's hand links to. */
 	public static boolean isTarget(BlockPos pos) {
 		Minecraft client = Minecraft.getInstance();
 		if (client.player == null || client.level == null) {
@@ -23,7 +23,7 @@ public final class BluetoothTarget {
 		for (InteractionHand hand : InteractionHand.values()) {
 			ItemStack held = client.player.getItemInHand(hand);
 			UUID link = held.is(ModItems.BLUETOOTH_CARD) ? held.get(ModComponents.BLUETOOTH_LINK) : null;
-			if (link != null && Bluetooth.holds(client.level, pos, link)) {
+			if (link != null && Bluetooth.board(client.level, link).filter(pos::equals).isPresent()) {
 				return true;
 			}
 		}

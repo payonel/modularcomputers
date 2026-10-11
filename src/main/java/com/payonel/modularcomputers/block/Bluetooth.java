@@ -2,7 +2,6 @@ package com.payonel.modularcomputers.block;
 
 import com.payonel.modularcomputers.cable.CableWalk;
 import com.payonel.modularcomputers.item.ModComponents;
-import com.payonel.modularcomputers.item.ModItems;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,43 +17,39 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
- * Bluetooth cards. Each has its own address ({@link ModComponents#BLUETOOTH_ID}) and can link
- * to one other card's address ({@link ModComponents#BLUETOOTH_LINK}). Many cards can link to
- * the same one, and a card linked to can itself link on, so cards can daisy-chain. A link joins
- * the blocks the two cards are in, like a cable.
+ * Bluetooth. A card links to a <em>board</em>, not to another card: each block that can hold
+ * Bluetooth cards (a computer, an expansion hub, a screen, a robotic piston, a paint gun) has its
+ * own board id, and a card's link ({@link ModComponents#BLUETOOTH_LINK}) names one. Many cards
+ * can link to the same board, and that board's own cards can link on, so links daisy-chain. A
+ * link joins the two blocks like a cable.
  * <p>
- * Linking: right-click a block holding a Bluetooth card (a computer, an expansion hub, a robotic
- * piston) with a card in hand, and the card in hand links to the block's first one (in bus order,
- * in a computer). Sneak + right-click resets the card in hand: a new address, so nothing links
- * to it any more, and no link of its own.
+ * A link only works while both blocks have a Bluetooth card in: the card is the radio. Moving
+ * the card a computer was linked through to another computer doesn't take its links along;
+ * they stay with the board, and work again once any Bluetooth card is back in.
  * <p>
- * Each side keeps a registry of the loaded blocks holding Bluetooth cards, which the cable walk
+ * Linking: right-click a block that has a Bluetooth card with a card in hand, and the card in
+ * hand links to that block's board. Sneak + right-click clears the card in hand's link.
+ * <p>
+ * Each side keeps a registry of the loaded blocks with Bluetooth cards, which the cable walk
  * uses to cross links and clients use to highlight a held card's target.
  * <p>
  * <b>Pairing:</b> a device with a Bluetooth card in its pairing slot belongs to one computer,
- * found by following its card's link (on through the pairing cards of whatever it links to, like
- * a hub) until a computer. That's saved in the cards themselves, so it doesn't depend on which
- * chunk loads first. Unpaired devices are shared by every computer that reaches them.
+ * found by following its card's link (on through the pairing cards of whatever board it links
+ * to, like a hub's) until a computer. That's saved in the cards themselves, so it doesn't depend
+ * on which chunk loads first. Unpaired devices are shared by every computer that reaches them.
  */
 public final class Bluetooth {
-	/** An installed card's address and link, either of which may not be set. */
-	public record Card(Optional<UUID> id, Optional<UUID> link) {
-		static Card of(ItemStack stack) {
-			return new Card(Optional.ofNullable(stack.get(ModComponents.BLUETOOTH_ID)), Optional.ofNullable(stack.get(ModComponents.BLUETOOTH_LINK)));
-		}
-	}
-
 	/** A block that holds Bluetooth cards. */
 	public interface Holder {
+		/** Its board's id: what cards link to. */
+		UUID boardId();
+
 		/** Its Bluetooth cards (the live stacks), in its order: bus order in a computer, slot order otherwise. */
 		List<ItemStack> bluetoothCards();
-
-		/** A card's components changed (it got an address): save it. */
-		void bluetoothChanged();
 	}
 
-	/** A block's Bluetooth cards, its pairing card (if any), and whether it's a computer. */
-	private record Entry(List<Card> cards, Optional<Card> pairing, boolean computer) {
+	/** A block with a radio: its board, the boards its cards link to, its pairing card's link, whether it's a computer. */
+	private record Entry(UUID board, List<UUID> links, Optional<UUID> pairing, boolean computer) {
 	}
 
 	/** How many links {@link #owner} follows before giving up (a loop, or a very long chain). */
@@ -65,43 +60,51 @@ public final class Bluetooth {
 	private Bluetooth() {
 	}
 
+	private static Optional<UUID> link(ItemStack card) {
+		return Optional.ofNullable(card.get(ModComponents.BLUETOOTH_LINK));
+	}
+
 	/**
-	 * Records which Bluetooth cards the block at {@code pos} holds now: all of them, the one in its
-	 * pairing slot (or null), and whether the block is a computer.
+	 * Records the Bluetooth cards the block at {@code pos} holds now: all of them, the one in its
+	 * pairing slot (or null), and whether the block is a computer. Without a card it has no radio.
 	 */
-	public static void update(Level level, BlockPos pos, List<ItemStack> cards, ItemStack pairing, boolean computer) {
+	public static void update(Level level, BlockPos pos, UUID board, List<ItemStack> cards, ItemStack pairing, boolean computer) {
 		Map<BlockPos, Entry> holders = HOLDERS.computeIfAbsent(level, key -> new HashMap<>());
 		if (cards.isEmpty()) {
 			holders.remove(pos);
 		} else {
-			holders.put(pos.immutable(), new Entry(cards.stream().map(Card::of).toList(), Optional.ofNullable(pairing).map(Card::of), computer));
+			List<UUID> links = cards.stream().map(Bluetooth::link).flatMap(Optional::stream).toList();
+			holders.put(pos.immutable(), new Entry(board, links, pairing == null ? Optional.empty() : link(pairing), computer));
 		}
 	}
 
+	/** The loaded block with a radio whose board is {@code board}. */
+	public static Optional<BlockPos> board(Level level, UUID board) {
+		return HOLDERS.getOrDefault(level, Map.of()).entrySet().stream()
+			.filter(holder -> holder.getValue().board().equals(board))
+			.map(Map.Entry::getKey)
+			.findFirst();
+	}
+
 	/**
-	 * The computer a paired device belongs to: follow its pairing card's link to the block holding
-	 * that address, and on through that block's pairing card, until a computer. Empty when the
-	 * device isn't paired, or the chain ends (no link, or a block that isn't loaded).
+	 * The computer a paired device belongs to: follow its pairing card's link to that board, and
+	 * on through that board's pairing card, until a computer. Empty when the device isn't paired,
+	 * or the chain ends (no link, or a board with no radio, or not loaded).
 	 */
 	public static Optional<BlockPos> owner(Level level, BlockPos device) {
 		Map<BlockPos, Entry> holders = HOLDERS.getOrDefault(level, Map.of());
 		Entry entry = holders.get(device);
-		Optional<Card> card = entry == null ? Optional.empty() : entry.pairing();
-		for (int step = 0; step < MAX_CHAIN && card.isPresent(); step++) {
-			Optional<UUID> link = card.get().link();
-			if (link.isEmpty()) {
-				return Optional.empty();
-			}
-			var next = holders.entrySet().stream()
-				.filter(holder -> holder.getValue().cards().stream().anyMatch(theirs -> theirs.id().equals(link)))
-				.findFirst();
+		Optional<UUID> link = entry == null ? Optional.empty() : entry.pairing();
+		for (int step = 0; step < MAX_CHAIN && link.isPresent(); step++) {
+			Optional<BlockPos> next = board(level, link.get());
 			if (next.isEmpty()) {
 				return Optional.empty();
 			}
-			if (next.get().getValue().computer()) {
-				return Optional.of(next.get().getKey());
+			Entry board = holders.get(next.get());
+			if (board.computer()) {
+				return next;
 			}
-			card = next.get().getValue().pairing();
+			link = board.pairing();
 		}
 		return Optional.empty();
 	}
@@ -115,12 +118,13 @@ public final class Bluetooth {
 	}
 
 	/**
-	 * The blocks the one at {@code pos} is linked with, either way: its cards link to theirs, or
-	 * theirs link to its. Distances are straight lines, in meters (at least 1).
+	 * The blocks the one at {@code pos} is linked with, either way: its cards link to their
+	 * board, or theirs link to its. Both need a radio. Distances are straight lines, in meters
+	 * (at least 1).
 	 */
 	public static List<CableWalk.Link> links(Level level, BlockPos pos) {
 		Map<BlockPos, Entry> holders = HOLDERS.getOrDefault(level, Map.of());
-		List<Card> mine = holders.containsKey(pos) ? holders.get(pos).cards() : null;
+		Entry mine = holders.get(pos);
 		if (mine == null) {
 			return List.of();
 		}
@@ -129,9 +133,7 @@ public final class Bluetooth {
 			if (other.getKey().equals(pos)) {
 				continue;
 			}
-			boolean linked = mine.stream().anyMatch(card -> other.getValue().cards().stream().anyMatch(theirs ->
-				card.link().isPresent() && card.link().equals(theirs.id()) || theirs.link().isPresent() && theirs.link().equals(card.id())));
-			if (linked) {
+			if (mine.links().contains(other.getValue().board()) || other.getValue().links().contains(mine.board())) {
 				int meters = Math.max(1, (int) Math.round(Math.sqrt(pos.distSqr(other.getKey()))));
 				links.add(new CableWalk.Link(other.getKey(), meters));
 			}
@@ -139,15 +141,10 @@ public final class Bluetooth {
 		return links;
 	}
 
-	/** Whether the block at {@code pos} holds the card with address {@code id}. */
-	public static boolean holds(Level level, BlockPos pos, UUID id) {
-		Entry entry = HOLDERS.getOrDefault(level, Map.of()).get(pos);
-		return entry != null && entry.cards().stream().anyMatch(card -> card.id().equals(Optional.of(id)));
-	}
-
 	/**
-	 * A player right-clicked {@code pos} holding a Bluetooth card: link it to the block's first
-	 * Bluetooth card. Without one, the click goes on to the block (to open its slots, say).
+	 * A player right-clicked {@code pos} holding a Bluetooth card: link it to the block's board,
+	 * if the block has a Bluetooth card to receive with. Without one, the click goes on to the
+	 * block (to open its slots, say).
 	 */
 	public static InteractionResult link(ItemStack held, Level level, BlockPos pos, Player player) {
 		if (player.isSecondaryUseActive()) {
@@ -159,22 +156,14 @@ public final class Bluetooth {
 		if (level.isClientSide()) {
 			return InteractionResult.SUCCESS;
 		}
-		ItemStack target = holder.bluetoothCards().getFirst();
-		UUID address = target.get(ModComponents.BLUETOOTH_ID);
-		if (address == null) {
-			address = UUID.randomUUID();
-			target.set(ModComponents.BLUETOOTH_ID, address);
-			holder.bluetoothChanged();
-		}
-		held.set(ModComponents.BLUETOOTH_LINK, address);
+		held.set(ModComponents.BLUETOOTH_LINK, holder.boardId());
 		player.sendOverlayMessage(Component.translatable("item.modularcomputers.bluetooth_card.linked", level.getBlockState(pos).getBlock().getName()));
 		return InteractionResult.SUCCESS;
 	}
 
-	/** Sneak + right-click: a new address, so nothing links to this card any more, and no link of its own. */
+	/** Sneak + right-click: the card links to nothing. */
 	public static InteractionResult reset(ItemStack held, Level level, Player player) {
 		if (!level.isClientSide()) {
-			held.set(ModComponents.BLUETOOTH_ID, UUID.randomUUID());
 			held.remove(ModComponents.BLUETOOTH_LINK);
 			player.sendOverlayMessage(Component.translatable("item.modularcomputers.bluetooth_card.reset"));
 		}

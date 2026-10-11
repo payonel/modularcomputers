@@ -384,15 +384,20 @@ scripts/art/error_beep.py` into
     and it takes a cable on every other face. It's a cabled device (`ACTUATOR`), with an id
     and no slots (`PaintGunBlockEntity`).
   - **Bluetooth** (`block/Bluetooth`, `item/BluetoothCardItem`; user design 2026-10-11):
-    - Each card has its own address (`ModComponents.BLUETOOTH_ID`), set when something first
-      links to it. It links to at most one other address (`BLUETOOTH_LINK`).
-    - Links are many-to-one: no need for more than one card per case, but nothing stops
-      it. A linked-to card can link on, so cards can daisy-chain.
-    - **Right-click** a computer, hub or piston holding a Bluetooth card, with a card in
-      hand: the card in hand links to the block's first card (bus order in a computer).
-      Without a card there, the click goes on to the block, which opens its slots.
-    - **Sneak + right-click** anywhere resets the card in hand: a new address (nothing links
-      to it any more) and no link.
+    - **A card links to a board, not to another card** (user, 2026-10-11): every block that
+      can hold cards has a board id (a computer's `board_id`, a holder's own id), and a card's
+      `BLUETOOTH_LINK` names one. Moving a card to another machine doesn't take its links along;
+      on real hardware you pair with the machine, and the card is just the radio.
+      - A link only works while **both** blocks have a Bluetooth card in (the radio). Any card
+        will do: take one out and the links drop, put any in and they're back.
+      - Links are many-to-one (many cards to one board), and any board can be the target, a
+        hub's included, so cards daisy-chain (piston → hub → computer).
+      - `BLUETOOTH_ID` (the old per-card address) is unused, kept registered only so old cards
+        still load. Remove before a release.
+    - **Right-click** a computer, hub, screen, piston or paint gun that has a Bluetooth card,
+      with a card in hand: the card in hand links to that block's board. Without a card there,
+      the click goes on to the block, which opens its slots.
+    - **Sneak + right-click** anywhere clears the card in hand's link.
     - A link joins the two blocks like a cable. The walk follows links both ways, from the
       start and from relays (hubs). A device at the end of a link doesn't pass it on.
       - Distance is the straight line in meters, and the row reads "bluetooth, 5m".
@@ -400,7 +405,7 @@ scripts/art/error_beep.py` into
         one block.
     - Each side keeps a registry of loaded blocks holding Bluetooth cards. Holders update it
       on `setLevel`, content changes and loads, and leave it on `setRemoved`.
-    - **While you hold a linked card**, the block holding its target gets a steady blue
+    - **While you hold a linked card**, the block with its target board gets a steady blue
       wireframe, seen through walls (`client/BluetoothTarget`, `Outline.BLUETOOTH`).
     - There's no range limit yet.
   - **Pairing** (user design, 2026-10-11): every network block has a slot GUI with a

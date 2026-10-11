@@ -214,20 +214,19 @@ public class CableClientGameTest implements FabricClientGameTest {
 			int after = count(read(context.takeScreenshot("screen-not-identified")), 0, 0, outlined.getWidth(), outlined.getHeight(), OUTLINE);
 			check(after < outline / 10, "the outline goes away when the bulb is turned off, found " + after);
 
-			// Holding a linked Bluetooth card outlines the block with the card it links to, in blue.
+			// Holding a linked Bluetooth card outlines the block whose board it links to, in blue.
 			BlockPos linked = screen.east(2);
 			setblock(singleplayer, linked, "robotic_piston");
-			UUID address = UUID.randomUUID();
-			singleplayer.getServer().runOnServer(server -> {
-				ItemStack target = new ItemStack(ModItems.BLUETOOTH_CARD);
-				target.set(ModComponents.BLUETOOTH_ID, address);
-				((RoboticPistonBlockEntity) server.overworld().getBlockEntity(linked)).cards().setItem(0, target);
+			UUID address = singleplayer.getServer().computeOnServer(server -> {
+				RoboticPistonBlockEntity piston = (RoboticPistonBlockEntity) server.overworld().getBlockEntity(linked);
+				piston.cards().setItem(0, new ItemStack(ModItems.BLUETOOTH_CARD)); // its radio
 				ItemStack held = new ItemStack(ModItems.BLUETOOTH_CARD);
-				held.set(ModComponents.BLUETOOTH_LINK, address);
+				held.set(ModComponents.BLUETOOTH_LINK, piston.boardId());
 				server.getPlayerList().getPlayers().getFirst().setItemInHand(InteractionHand.MAIN_HAND, held);
+				return piston.boardId();
 			});
 			context.waitFor(client -> client.player.getMainHandItem().has(ModComponents.BLUETOOTH_LINK)
-				&& Bluetooth.holds(client.level, linked, address));
+				&& Bluetooth.board(client.level, address).filter(linked::equals).isPresent());
 			context.waitTicks(3);
 			BufferedImage holding = read(context.takeScreenshot("bluetooth-target"));
 			int blue = count(holding, 0, 0, holding.getWidth(), holding.getHeight(), BLUE);

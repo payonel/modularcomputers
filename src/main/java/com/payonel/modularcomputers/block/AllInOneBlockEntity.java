@@ -35,9 +35,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -102,6 +104,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String CABLE_KEY = "cable:";
 	private static final String POWER_BUFFER = "power_buffer";
 	private static final String BUS_CAPACITY = "bus_capacity";
+	private static final String BOARD_ID = "board_id";
 	/** Looks for cabled devices this often, in ticks, even when no cable changed (chunks load and unload). */
 	private static final int RESCAN_TICKS = 20;
 	/** How often the battery is run down or recharged. */
@@ -121,6 +124,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final BusOrder busOrder = new BusOrder(Motherboard.DEFAULT_BUS_CAPACITY);
 	private final Bus bus = new Bus(List.of(display, keyboard));
 	private final PowerBuffer power = new PowerBuffer();
+	/** The motherboard's id: what Bluetooth cards link to. Made when the computer is placed, and saved. */
+	private UUID boardId = UUID.randomUUID();
 	/** The buffer's level for the case view, which sends it to the player as it changes. */
 	private final ContainerData powerData = new ContainerData() {
 		@Override
@@ -312,14 +317,15 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return cards;
 	}
 
+	/** Its board's id, which Bluetooth cards link to. */
 	@Override
-	public void bluetoothChanged() {
-		parts.setChanged();
+	public UUID boardId() {
+		return boardId;
 	}
 
 	private void updateBluetooth() {
 		if (level != null) {
-			Bluetooth.update(level, worldPosition, bluetoothCards(), null, true);
+			Bluetooth.update(level, worldPosition, boardId, bluetoothCards(), null, true);
 		}
 	}
 
@@ -678,6 +684,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		output.putBoolean(POWERED, machine.isPowered());
 		output.putInt(POWER_BUFFER, power.level());
 		output.putInt(BUS_CAPACITY, machine.board().busCapacity());
+		output.store(BOARD_ID, UUIDUtil.CODEC, boardId);
 		ContainerHelper.saveAllItems(output, parts.getItems());
 		output.store(BUS_EXTERNAL, ENTRY_CODEC.listOf(), busOrder.external());
 		output.store(BUS_DISCONNECTED, Codec.STRING.listOf(), busOrder.disconnected());
@@ -699,6 +706,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		machine.restorePowered(input.getBooleanOr(POWERED, false));
 		power.set(input.getIntOr(POWER_BUFFER, 0));
 		machine.board().setBusCapacity(input.getIntOr(BUS_CAPACITY, Motherboard.DEFAULT_BUS_CAPACITY));
+		input.read(BOARD_ID, UUIDUtil.CODEC).ifPresent(saved -> boardId = saved);
 		parts.getItems().clear(); // not clearContent(): that would fire change handling mid-load
 		ContainerHelper.loadAllItems(input, parts.getItems());
 		input.read(BUS_EXTERNAL, ENTRY_CODEC.listOf()).ifPresent(order ->
