@@ -436,7 +436,8 @@ scripts/art/error_beep.py` into
       if it's paired with that computer, or with a hub the computer sees, and so on through
       hubs (`AllInOneBlockEntity.visibleDevices`, `Bluetooth.pairedTo`). So hubs daisy-chain:
       hub 1's radio linked to hub 2 means a computer seeing either sees both, and what's past
-      them. Another computer's pairings never pass through.
+      them. Another computer's pairings never pass through. Both ways on purpose: the user
+      first meant one direction, but chose two-way as easier for players to understand.
       - Its row reads "paired" (or "hub 2, paired"). It still carries the cable for everything
         else.
       - This is deterministic: it's saved in the cards, so it doesn't depend on which chunk
