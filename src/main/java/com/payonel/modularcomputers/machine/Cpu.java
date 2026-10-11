@@ -9,14 +9,15 @@ import java.util.Optional;
  * motherboard's EEPROM slot (a fixed place, like a real CPU's reset vector, so no bus walk) and
  * starts executing it.
  * <p>
- * Its only behavior of its own is the abort screen, like a kernel panic: with no EEPROM, or
- * when the program crashes, it clears the console to a soft gray, writes {@code ABRT: <reason>}
- * and halts. Power stays on.
+ * Its only behavior of its own is the abort screen, like a kernel panic: with no EEPROM, when
+ * the program crashes, or when it returns instead of halting (Linux panics when init exits), it
+ * clears the console to a soft gray, writes {@code ABRT: <reason>} and halts. Power stays on.
  */
 public final class Cpu {
 	public static final String ABORT = "ABRT: ";
 	public static final String NO_EEPROM = "no EEPROM installed";
 	public static final String CRASHED = "EEPROM crashed: ";
+	public static final String RETURNED = "EEPROM returned without halting";
 	public static final int ABORT_FOREGROUND = 0x2E2E2E;
 	public static final int ABORT_BACKGROUND = 0xBDBDBD;
 
@@ -34,6 +35,11 @@ public final class Cpu {
 	/** The program threw: the abort screen. */
 	public void crashed(Motherboard board, Throwable error) {
 		abort(board, CRASHED + error.getMessage());
+	}
+
+	/** The program returned instead of halting: the abort screen. */
+	public void returned(Motherboard board) {
+		abort(board, RETURNED);
 	}
 
 	private static void abort(Motherboard board, String reason) {

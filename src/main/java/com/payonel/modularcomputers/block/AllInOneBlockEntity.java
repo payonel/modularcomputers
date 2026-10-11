@@ -34,7 +34,6 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -97,15 +96,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String CONSOLE_SCREEN = "console_screen";
 	private static final String CONSOLE_FOREGROUND = "console_foreground";
 	private static final String CONSOLE_BACKGROUND = "console_background";
-	/** The built-in display, by its connector: embedded DisplayPort, as a laptop's panel. */
-	private static final String DISPLAY_KEY = "edp";
-	private static final String KEYBOARD_KEY = "kbd";
-	private static final String EEPROM_KEY = "eeprom";
-	private static final String UPS_KEY = "ups";
-	private static final String SATA_KEY = "sata:";
-	private static final String EXP_KEY = "exp:";
-	/** Devices by their own id, however they're connected: {@code id:<uuid>}. */
-	private static final String ID_KEY = "id:";
 	private static final String POWER_BUFFER = "power_buffer";
 	private static final String BUS_CAPACITY = "bus_capacity";
 	private static final String BOARD_ID = "board_id";
@@ -125,7 +115,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final Card[] cards = new Card[CaseMenu.LANES];
 	private Eeprom eeprom;
 	private UpsBattery ups;
-	private final BusOrder busOrder = new BusOrder(Motherboard.DEFAULT_BUS_CAPACITY);
 	private final Bus bus = new Bus(List.of(display, keyboard));
 	private final PowerBuffer power = new PowerBuffer();
 	/** The motherboard's id: what Bluetooth cards link to. Made when the computer is placed, and saved. */
@@ -184,6 +173,14 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	public AllInOneBlockEntity(BlockPos pos, BlockState state) {
 		super(ModBlocks.ALL_IN_ONE_ENTITY, pos, state);
+		// The all-in-one's own display and keyboard, wired to its board's connectors.
+		machine.board().plug(Motherboard.EDP, display);
+		machine.board().plug(Motherboard.KBD, keyboard);
+	}
+
+	/** The motherboard's bus order. */
+	private BusOrder busOrder() {
+		return machine.board().order();
 	}
 
 	public Machine machine() {
@@ -223,17 +220,16 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	public List<BusEntry> busEntries() {
 		List<BusEntry> entries = new ArrayList<>();
 		Component builtIn = Component.translatable("gui.modularcomputers.bus.built_in");
-		List<String> keys = busOrder.keys();
-		for (int index = 0; index < keys.size(); index++) {
-			String key = keys.get(index);
-			int position = busPosition(key, index - (keys.size() - busOrder.external().size()));
-			if (key.equals(DISPLAY_KEY)) {
+		BusOrder busOrder = busOrder();
+		for (String key : busOrder.keys()) {
+			int position = machine.board().position(key);
+			if (key.equals(Motherboard.EDP)) {
 				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.display"), builtIn, ItemStack.EMPTY, -1, DISPLAY_ICON,
 					Optional.empty(), true, true, position));
-			} else if (key.equals(KEYBOARD_KEY)) {
+			} else if (key.equals(Motherboard.KBD)) {
 				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.keyboard"), builtIn, ItemStack.EMPTY, -1, KEYBOARD_ICON,
 					Optional.empty(), true, true, position));
-			} else if (key.startsWith(ID_KEY)) {
+			} else if (Motherboard.isId(key)) {
 				Optional.ofNullable(known.get(key)).ifPresent(device -> {
 					ItemStack item = new ItemStack(device.item());
 					boolean online = busOrder.isOnline(key);
@@ -259,57 +255,35 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return entries;
 	}
 
-	/**
-	 * A device's place on the bus, from 1, as the panel numbers it: fixed for the case's own (1
-	 * display, 2 keyboard, 3 ROM, 4 UPS, 5-8 SATA, 9-12 EXP; empty slots leave gaps, as PCI's
-	 * slot numbers do), then the external devices from 13 in their order.
-	 */
-	private static int busPosition(String key, int externalIndex) {
-		if (key.equals(DISPLAY_KEY)) {
-			return 1;
-		} else if (key.equals(KEYBOARD_KEY)) {
-			return 2;
-		} else if (key.equals(EEPROM_KEY)) {
-			return 3;
-		} else if (key.equals(UPS_KEY)) {
-			return 4;
-		} else if (key.startsWith(SATA_KEY) || key.startsWith(EXP_KEY)) {
-			int lane = Integer.parseInt(key.substring(key.indexOf(':') + 1));
-			return (key.startsWith(SATA_KEY) ? 5 : 9) + lane;
-		}
-		return BusOrder.INTERNAL_PLACES + 1 + externalIndex;
-	}
-
-	/** The case slot a part's bus key stands for. */
-	private static int partSlot(String key) {
-		if (key.equals(EEPROM_KEY)) {
+	/** The case slot holding the part on a motherboard connector. */
+	private static int partSlot(String connector) {
+		if (connector.equals(Motherboard.EEPROM)) {
 			return CaseMenu.EEPROM_SLOT;
-		} else if (key.equals(UPS_KEY)) {
+		} else if (connector.equals(Motherboard.UPS)) {
 			return CaseMenu.UPS_SLOT;
 		}
-		int lane = Integer.parseInt(key.substring(key.indexOf(':') + 1));
-		return (key.startsWith(SATA_KEY) ? CaseMenu.SATA_SLOTS : CaseMenu.EXP_SLOTS) + lane;
+		return (Motherboard.isSata(connector) ? CaseMenu.SATA_SLOTS : CaseMenu.EXP_SLOTS) + Motherboard.lane(connector);
 	}
 
 	/** Where a part sits, as the bus order panel says it: "ROM", "UPS", "SATA 1", "EXP 2". */
-	private static Component partLocation(String key) {
-		if (key.equals(EEPROM_KEY)) {
+	private static Component partLocation(String connector) {
+		if (connector.equals(Motherboard.EEPROM)) {
 			return Component.translatable("gui.modularcomputers.bus.rom");
-		} else if (key.equals(UPS_KEY)) {
+		} else if (connector.equals(Motherboard.UPS)) {
 			return Component.translatable("gui.modularcomputers.bus.ups");
 		}
-		int lane = Integer.parseInt(key.substring(key.indexOf(':') + 1));
-		return Component.translatable(key.startsWith(SATA_KEY) ? "gui.modularcomputers.bus.sata" : "gui.modularcomputers.bus.expansion", lane + 1);
+		return Component.translatable(Motherboard.isSata(connector) ? "gui.modularcomputers.bus.sata" : "gui.modularcomputers.bus.expansion",
+			Motherboard.lane(connector) + 1);
 	}
 
 	/** How full the bus is, and whether devices are waiting for room (works on clients too). */
 	public BusStatus busStatus() {
-		return busOrder.status();
+		return busOrder().status();
 	}
 
 	/** Server side: the player forgot an offline device in the bus order panel. */
 	public boolean forgetDevice(String key) {
-		if (!busOrder.forget(key)) {
+		if (!busOrder().forget(key)) {
 			return false;
 		}
 		known.remove(key);
@@ -321,7 +295,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	/** Server side: the player moved the device at {@code index} up or down the bus order. */
 	public boolean moveDevice(int index, boolean up) {
-		if (!busOrder.move(index, up)) {
+		if (!busOrder().move(index, up)) {
 			return false;
 		}
 		rebuildBus();
@@ -334,12 +308,10 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	@Override
 	public List<ItemStack> bluetoothCards() {
 		List<ItemStack> cards = new ArrayList<>();
-		for (String key : busOrder.keys()) {
-			if (key.startsWith(EXP_KEY)) {
-				ItemStack card = parts.getItem(partSlot(key));
-				if (card.is(ModItems.BLUETOOTH_CARD)) {
-					cards.add(card);
-				}
+		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+			ItemStack card = parts.getItem(CaseMenu.EXP_SLOTS + lane);
+			if (card.is(ModItems.BLUETOOTH_CARD)) {
+				cards.add(card);
 			}
 		}
 		return cards;
@@ -380,7 +352,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	/** The external devices on the bus now. */
 	private Set<String> externalOnBus() {
-		return busOrder.connected().stream().filter(key -> key.startsWith(ID_KEY)).collect(Collectors.toSet());
+		return busOrder().connected().stream().filter(Motherboard::isId).collect(Collectors.toSet());
 	}
 
 	/**
@@ -392,7 +364,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		if (level == null || level.isClientSide()) {
 			return;
 		}
-		if (busOrder.waiting() > waitingBefore) {
+		if (busOrder().waiting() > waitingBefore) {
 			level.playSound(null, worldPosition, ModSounds.BUS_OVERFLOW, SoundSource.BLOCKS, 1.0f, 1.0f);
 		}
 		if (!before.containsAll(externalOnBus())) {
@@ -403,11 +375,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** Server side: the player plugged a cabled device in or out in the bus order panel. */
 	public boolean setConnected(String key, boolean connected) {
 		Set<String> before = externalOnBus();
-		if (!key.startsWith(ID_KEY) || !busOrder.setConnected(key, connected)) {
+		if (!Motherboard.isId(key) || !busOrder().setConnected(key, connected)) {
 			return false;
 		}
 		rebuildBus();
-		busSounds(before, busOrder.waiting());
+		busSounds(before, busOrder().waiting());
 		setChanged();
 		syncToClients();
 		return true;
@@ -519,7 +491,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 				continue;
 			}
 			if (block instanceof ScreenBlockEntity screen) {
-				addCabled(found, devices, new Cabled(ID_KEY + screen.id(), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.SCREEN.asItem(), -1), screen.display());
+				addCabled(found, devices, new Cabled(Motherboard.id(screen.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.SCREEN.asItem(), -1), screen.display());
 			} else if (block instanceof ExpansionHubBlockEntity hub) {
 				for (int slot = 0; slot < ExpansionHubBlockEntity.SLOTS; slot++) {
 					int hubSlot = slot;
@@ -527,14 +499,14 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 					// order when it moves to another slot (the hub stamps one on as it goes in).
 					UUID serial = hub.cards().getItem(hubSlot).get(ModComponents.SERIAL);
 					if (serial != null) {
-						hub.card(slot).ifPresent(card -> addCabled(found, devices, new Cabled(ID_KEY + serial, at.pos(), at.meters(),
+						hub.card(slot).ifPresent(card -> addCabled(found, devices, new Cabled(Motherboard.id(serial), at.pos(), at.meters(),
 							at.wireless(), paired, hub.cards().getItem(hubSlot).getItem(), hubSlot), card));
 					}
 				}
 			} else if (block instanceof RoboticPistonBlockEntity piston) {
-				addCabled(found, devices, new Cabled(ID_KEY + piston.id(), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.ROBOTIC_PISTON.asItem(), -1), piston.device());
+				addCabled(found, devices, new Cabled(Motherboard.id(piston.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.ROBOTIC_PISTON.asItem(), -1), piston.device());
 			} else if (block instanceof PaintGunBlockEntity gun) {
-				addCabled(found, devices, new Cabled(ID_KEY + gun.id(), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
+				addCabled(found, devices, new Cabled(Motherboard.id(gun.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
 			}
 		}
 		boolean sameDevices = found.equals(cabled) && devices.keySet().equals(cabledDevices.keySet())
@@ -546,7 +518,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		cabledDevices.clear();
 		cabledDevices.putAll(devices);
 		Set<String> before = externalOnBus();
-		int waitingBefore = busOrder.waiting();
+		int waitingBefore = busOrder().waiting();
 		rebuildBus();
 		busSounds(before, waitingBefore);
 		setChanged();
@@ -628,74 +600,44 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		board.setEeprom(eeprom);
 		boolean hasUps = parts.getItem(CaseMenu.UPS_SLOT).getItem() instanceof BatteryItem;
 		ups = hasUps ? (ups != null ? ups : new UpsBattery()) : null;
+		board.plug(Motherboard.UPS, ups);
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
 			boolean disk = parts.getItem(CaseMenu.SATA_SLOTS + lane).is(ModItems.HARD_DISK);
 			disks[lane] = disk ? (disks[lane] != null ? disks[lane] : new Disk()) : null;
-			CardKind kind = ModItems.cardKind(parts.getItem(CaseMenu.EXP_SLOTS + lane)).orElse(null);
+			board.plug(Motherboard.sata(lane), disks[lane]);
+			ItemStack card = parts.getItem(CaseMenu.EXP_SLOTS + lane);
+			CardKind kind = ModItems.cardKind(card).orElse(null);
 			cards[lane] = kind == null ? null : cards[lane] != null && cards[lane].kind() == kind ? cards[lane] : new Card(kind);
+			// A card answers to its serial number too, so a program finds it here or in a hub.
+			board.plug(Motherboard.exp(lane), cards[lane], card.get(ModComponents.SERIAL));
 		}
 		rebuildBus();
 	}
 
 	/**
-	 * Puts the bus's devices in order: the case's own in their slots' order, then external ones
-	 * in the player's order (see {@link BusOrder}). External devices that went away keep their
-	 * place, offline, for when they come back, and disconnected ones stay off the bus.
+	 * Puts the bus's devices in order (the motherboard's job: see {@link Motherboard#layout}).
+	 * External devices that went away keep their place, offline, for when they come back, and
+	 * disconnected ones stay off the bus.
 	 */
 	private void rebuildBus() {
-		Map<String, Device> attached = new LinkedHashMap<>();
-		List<String> external = new ArrayList<>();
-		attached.put(DISPLAY_KEY, display);
-		attached.put(KEYBOARD_KEY, keyboard);
-		if (eeprom != null) {
-			attached.put(EEPROM_KEY, eeprom);
-		}
-		if (ups != null) {
-			attached.put(UPS_KEY, ups);
-		}
-		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
-			if (disks[lane] != null) {
-				attached.put(SATA_KEY + lane, disks[lane]);
-			}
-		}
-		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
-			if (cards[lane] != null) {
-				attached.put(EXP_KEY + lane, cards[lane]);
-			}
-		}
-		List<String> internal = List.copyOf(attached.keySet());
+		Map<String, Device> external = new LinkedHashMap<>();
 		for (Cabled device : cabled) {
 			// Server side, a device saved as cabled is only on the bus once a scan finds it again.
-			attached.put(device.key(), cabledDevices.get(device.key()));
-			external.add(device.key());
+			external.put(device.key(), cabledDevices.get(device.key()));
 		}
-		busOrder.setCapacity(machine.board().busCapacity());
-		busOrder.sync(internal, external, level != null ? level.getGameTime() : 0);
-		bus.setStatus(busOrder.status());
+		Motherboard board = machine.board();
+		board.setExternal(external);
+		long now = level != null ? level.getGameTime() : 0;
+		if (level != null && level.isClientSide()) {
+			board.rebuildBus(now); // clients show what the server sends; they don't run devices
+		} else {
+			machine.rebuildBus(now);
+		}
 		for (Cabled device : cabled) {
 			known.put(device.key(), device);
 		}
-		known.keySet().retainAll(busOrder.external().stream().map(BusOrder.Entry::key).toList());
-		updateBluetooth(); // its first Bluetooth card follows the bus order
-		Map<String, Device> devices = new LinkedHashMap<>();
-		for (String key : busOrder.connected()) {
-			if (attached.get(key) != null) {
-				devices.put(key, attached.get(key)); // the bus key is the device's address
-			}
-		}
-		// A card in the case answers to its id too, so a program finds it in the case or in a hub.
-		Map<String, String> aliases = new LinkedHashMap<>();
-		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
-			UUID serial = parts.getItem(CaseMenu.EXP_SLOTS + lane).get(ModComponents.SERIAL);
-			if (serial != null && devices.containsKey(EXP_KEY + lane)) {
-				aliases.put(ID_KEY + serial, EXP_KEY + lane);
-			}
-		}
-		if (level != null && level.isClientSide()) {
-			bus.setDevices(devices, aliases); // clients show what the server sends; they don't run devices
-		} else {
-			machine.setDevices(devices, aliases);
-		}
+		known.keySet().retainAll(busOrder().external().stream().map(BusOrder.Entry::key).toList());
+		updateBluetooth();
 	}
 
 	/** What each slot held last time, so a change can play the right insert or remove sound. */
@@ -797,8 +739,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		output.putInt(BUS_CAPACITY, machine.board().busCapacity());
 		output.store(BOARD_ID, UUIDUtil.CODEC, boardId);
 		ContainerHelper.saveAllItems(output, parts.getItems());
-		output.store(BUS_EXTERNAL, ENTRY_CODEC.listOf(), busOrder.external());
-		output.store(BUS_DISCONNECTED, Codec.STRING.listOf(), busOrder.disconnected());
+		output.store(BUS_EXTERNAL, ENTRY_CODEC.listOf(), busOrder().external());
+		output.store(BUS_DISCONNECTED, Codec.STRING.listOf(), busOrder().disconnected());
 		output.store(CABLED, Cabled.CODEC.listOf(), cabled);
 		output.store(KNOWN, Cabled.CODEC.listOf(), List.copyOf(known.values()));
 		output.store(DISPLAY, Codec.STRING.listOf(), display.buffer().rows());
@@ -821,7 +763,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		parts.getItems().clear(); // not clearContent(): that would fire change handling mid-load
 		ContainerHelper.loadAllItems(input, parts.getItems());
 		input.read(BUS_EXTERNAL, ENTRY_CODEC.listOf()).ifPresent(order ->
-			busOrder.restore(order, input.read(BUS_DISCONNECTED, Codec.STRING.listOf()).orElse(List.of())));
+			busOrder().restore(order, input.read(BUS_DISCONNECTED, Codec.STRING.listOf()).orElse(List.of())));
 		cabled = input.read(CABLED, Cabled.CODEC.listOf()).map(List::copyOf).orElse(List.of());
 		known.clear();
 		input.read(KNOWN, Cabled.CODEC.listOf()).orElse(List.of()).forEach(device -> known.put(device.key(), device));

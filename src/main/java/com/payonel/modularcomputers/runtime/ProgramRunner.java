@@ -32,8 +32,12 @@ public final class ProgramRunner {
 	public record Wait(long until) implements Request {
 	}
 
-	/** The program returned. */
-	private record Done() implements Request {
+	/** The program returned, without halting: a panic. */
+	private record Returned() implements Request {
+	}
+
+	/** The program halted the CPU. */
+	private record Halt() implements Request {
 	}
 
 	/** The program threw: the CPU's abort screen. */
@@ -53,8 +57,10 @@ public final class ProgramRunner {
 		RUNNING,
 		/** Waiting for an interrupt. */
 		WAITING,
-		/** The program returned; the CPU halts, power stays on. */
+		/** The program halted the CPU; power stays on. */
 		HALTED,
+		/** The program returned instead of halting: a panic, like Linux's init exiting. */
+		RETURNED,
 		/** The program threw; see {@link #crash()}. */
 		CRASHED,
 	}
@@ -74,7 +80,7 @@ public final class ProgramRunner {
 			try {
 				awaitHost();
 				program.accept(board);
-				last = new Done();
+				last = new Returned();
 			} catch (Stopped stopped) {
 				return;
 			} catch (Throwable error) {
@@ -103,7 +109,7 @@ public final class ProgramRunner {
 	 * pending interrupts, for a waiting program.
 	 */
 	public State tick(Board board, int calls, long now, java.util.function.Supplier<List<String>> interrupts) {
-		if (state == State.HALTED || state == State.CRASHED) {
+		if (state != State.RUNNING && state != State.WAITING) {
 			return state;
 		}
 		Object answer = null;
@@ -122,7 +128,11 @@ public final class ProgramRunner {
 		while (true) {
 			pending = exchange(answer);
 			switch (pending) {
-				case Done done -> {
+				case Returned returned -> {
+					return state = State.RETURNED;
+				}
+				case Halt halt -> {
+					thread.interrupt(); // its halt() never returns: the thread unwinds
 					return state = State.HALTED;
 				}
 				case Crashed crashed -> {
@@ -227,6 +237,12 @@ public final class ProgramRunner {
 		@Override
 		public long uptime() {
 			return call(Board::uptime);
+		}
+
+		@Override
+		public void halt() {
+			runner.request(new Halt());
+			throw new Stopped(); // not reached: the host stops the thread
 		}
 	}
 }

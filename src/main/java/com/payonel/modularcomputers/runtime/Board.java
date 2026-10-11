@@ -53,4 +53,11 @@ public interface Board {
 
 	/** Ticks since the machine was powered on. */
 	long uptime();
+
+	/**
+	 * Halts the CPU for good, like {@code cli; hlt} or Linux's {@code reboot(HALT)}: the program
+	 * ends here and never returns, and power stays on (the screens keep what they show). A
+	 * program must end this way: returning instead is a panic, as when Linux's init exits.
+	 */
+	void halt();
 }

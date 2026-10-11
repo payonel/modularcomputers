@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 class BusOrderTest {
 	private static final List<String> CASE = List.of("edp", "kbd", "sata:0");
-	private final BusOrder order = new BusOrder(32);
+	private final BusOrder order = new BusOrder(32, 12);
 
 	@Test
 	void internalDevicesComeFirstInTheirFixedOrderAndDontMove() {

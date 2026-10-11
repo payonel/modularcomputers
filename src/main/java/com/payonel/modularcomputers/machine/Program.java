@@ -10,7 +10,8 @@ import com.payonel.modularcomputers.runtime.Board;
 public interface Program {
 	/**
 	 * Runs on the CPU, using the motherboard API: the devices on the bus and the virtual ones.
-	 * A program may run for many ticks; returning halts the CPU (power stays on).
+	 * A program may run for many ticks. It ends with {@link Board#halt()} (power stays on);
+	 * returning instead is a panic, the CPU's abort screen.
 	 */
 	void run(Board board);
 }

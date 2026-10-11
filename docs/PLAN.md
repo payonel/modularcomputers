@@ -80,6 +80,10 @@ Decided by the user:
 
 Still to do:
 - Running machines off-thread, asynchronously, and how they share the server tick.
+- **Console input** (user, 2026-10-11): the console is the multicast device for input too.
+  Every keyboard on the bus feeds one key queue on `console`, with the console's interrupt,
+  like UEFI's `ConIn` splitter and Linux's `/dev/console`. Needs keyboards to take input first
+  (typing in modal mode reaching the server).
 - Device methods for the rest: the keyboard (and its key buffer and interrupt), disks, the
   UPS battery (charge, time left), cards, the EEPROM.
 - Opaque handles (Lua userdata) in the value model.

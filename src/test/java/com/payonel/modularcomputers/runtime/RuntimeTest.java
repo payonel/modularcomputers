@@ -87,6 +87,7 @@ class RuntimeTest {
 				board.invoke("edp", "getResolution");
 				calls.incrementAndGet();
 			}
+			board.halt();
 		});
 		assertThat(calls.get()).as("power-on runs the first turn").isEqualTo(20);
 		machine.tick();
@@ -108,6 +109,7 @@ class RuntimeTest {
 			seen.add(board.doc("id:sensor-1", "read").orElseThrow());
 			seen.add(board.invoke("edp", "getResolution").values());
 			seen.add(board.status().capacity());
+			board.halt();
 		});
 		assertThat(seen).containsExactly(List.of("edp", "id:sensor-1"), "display", "console",
 			List.of("fill", "get", "getResolution", "set"), "read(): the oldest reading, or nil", List.of(50L, 16L), 0);
@@ -123,6 +125,7 @@ class RuntimeTest {
 			seen.add(board.list());
 			seen.add(board.type("id:card-7").orElseThrow());
 			seen.add(board.invoke("id:card-7", "read").first());
+			board.halt();
 		});
 		assertThat((List<Object>) seen.get(0)).as("listed once, by its path").containsExactlyInAnyOrder("edp", "exp:0");
 		assertThat(seen.subList(1, 3)).containsExactly("sensor", 7L);
@@ -137,6 +140,7 @@ class RuntimeTest {
 			errors.add(board.invoke("edp", "set", "one", 1, "x").error());
 			errors.add(board.invoke("id:sensor-1", "explode").error());
 			errors.add(board.invoke("edp", "set", 1, 1, "hi").failed() ? "failed" : "ok");
+			board.halt();
 		});
 		assertThat(errors).containsExactly("no such device: nowhere", "no such method: fly",
 			"bad argument #1 (number expected, got string)", "device error: java.lang.IllegalStateException: boom", "ok");
@@ -152,6 +156,7 @@ class RuntimeTest {
 			seen.add(board.waitForInterrupt(60));
 			seen.add(board.invoke("id:sensor-1", "read").first());
 			seen.add(board.waitForInterrupt(0));
+			board.halt();
 		});
 		machine.tick();
 		machine.tick();
@@ -168,6 +173,7 @@ class RuntimeTest {
 			board.list();
 			seen.add(board.waitForInterrupt(0.5)); // 10 ticks
 			seen.add(board.uptime());
+			board.halt();
 		});
 		for (int i = 0; i < 9; i++) {
 			machine.tick();
@@ -184,6 +190,7 @@ class RuntimeTest {
 			board.list();
 			seen.add(board.waitForInterrupt(60));
 			seen.add(board.list());
+			board.halt();
 		});
 		machine.tick();
 		machine.setDevices(Map.of("edp", display)); // the sensor was unplugged
@@ -232,6 +239,29 @@ class RuntimeTest {
 		machine.tick();
 		assertThat(display.buffer().row(0).strip()).isEqualTo(Cpu.ABORT + Cpu.CRASHED + "out of cheese");
 		assertThat(machine.isPowered()).isTrue();
+	}
+
+	@Test
+	void haltingEndsTheProgramWithPowerOnAndTheScreenKept() {
+		List<String> after = new ArrayList<>();
+		run(board -> {
+			board.invoke("console", "print", "bye");
+			board.halt();
+			after.add("ran on"); // never: halt doesn't return
+		});
+		machine.tick();
+		assertThat(machine.runner()).as("the CPU is halted").isEmpty();
+		assertThat(machine.isPowered()).as("power stays on").isTrue();
+		assertThat(display.buffer().row(0).strip()).isEqualTo("bye");
+		assertThat(after).isEmpty();
+	}
+
+	@Test
+	void returningWithoutHaltingIsAPanic() {
+		run(board -> board.invoke("console", "print", "bye"));
+		assertThat(machine.runner()).isEmpty();
+		assertThat(machine.isPowered()).as("power stays on, as after any abort").isTrue();
+		assertThat(display.buffer().row(0).strip()).isEqualTo(Cpu.ABORT + Cpu.RETURNED);
 	}
 
 	@Test

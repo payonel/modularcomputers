@@ -44,7 +44,7 @@ class MachineTest {
 	@Test
 	void withoutCpuPressingPowerIsRefused() {
 		int[] runs = {0};
-		withParts(false, board -> runs[0]++);
+		withParts(false, board -> { runs[0]++; board.halt(); });
 		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.NO_CPU);
 		assertThat(machine.isPowered()).isFalse();
 		assertThat(runs[0]).isZero();
@@ -76,7 +76,7 @@ class MachineTest {
 	@Test
 	void pressingPowerTogglesAndEachPowerOnRunsTheProgram() {
 		int[] runs = {0};
-		withParts(true, board -> runs[0]++);
+		withParts(true, board -> { runs[0]++; board.halt(); });
 		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
 		assertThat(machine.isPowered()).isTrue();
 		assertThat(runs[0]).isEqualTo(1);
@@ -89,7 +89,7 @@ class MachineTest {
 	@Test
 	void theProgramGetsTheMotherboardApi() {
 		List<List<String>> seen = new java.util.ArrayList<>();
-		withParts(true, board -> seen.add(board.list()));
+		withParts(true, board -> { seen.add(board.list()); board.halt(); });
 		machine.pressPower();
 		assertThat(seen).containsExactly(List.of("device:0", "device:1", "device:2"));
 	}
@@ -97,7 +97,7 @@ class MachineTest {
 	@Test
 	void installingACpuDoesNotTurnTheMachineOn() {
 		int[] runs = {0};
-		withParts(false, board -> runs[0]++);
+		withParts(false, board -> { runs[0]++; board.halt(); });
 		machine.board().setCpu(new Cpu());
 		assertThat(machine.isPowered()).isFalse();
 		assertThat(runs[0]).isZero();
@@ -178,7 +178,7 @@ class MachineTest {
 	@Test
 	void restoringPowerStateDoesNotBoot() {
 		int[] runs = {0};
-		withParts(true, board -> runs[0]++);
+		withParts(true, board -> { runs[0]++; board.halt(); });
 		machine.restorePowered(true);
 		assertThat(machine.isPowered()).isTrue();
 		assertThat(runs[0]).isZero();

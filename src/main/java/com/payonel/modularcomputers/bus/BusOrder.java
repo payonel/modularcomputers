@@ -26,9 +26,6 @@ import java.util.Set;
  * on the bus.
  */
 public final class BusOrder {
-	/** Places kept for the case's own devices (2 built-ins, ROM, UPS, 4 SATA, 4 EXP), filled or not. */
-	public static final int INTERNAL_PLACES = 12;
-
 	/** An external device in the saved list, and the game time it was last seen on the bus. */
 	public record Entry(String key, long lastSeen) {
 	}
@@ -39,24 +36,30 @@ public final class BusOrder {
 	private final Set<String> disconnected = new LinkedHashSet<>();
 	private int waiting;
 	private int capacity;
+	private final int reserved;
 
-	/** {@code capacity}: how many devices the bus holds, internal and external together (the motherboard's setting). */
-	public BusOrder(int capacity) {
+	/**
+	 * {@code capacity}: how many devices the bus holds, internal and external together (the
+	 * motherboard's setting). {@code reserved}: the places kept for the motherboard's connectors,
+	 * filled or not.
+	 */
+	public BusOrder(int capacity, int reserved) {
+		this.reserved = reserved;
 		setCapacity(capacity);
 	}
 
 	/** Changes how many devices the bus holds; the saved list shrinks to fit at the next {@link #sync}. */
 	public void setCapacity(int capacity) {
-		this.capacity = Math.max(INTERNAL_PLACES, capacity);
+		this.capacity = Math.max(reserved, capacity);
 	}
 
 	public int capacity() {
 		return capacity;
 	}
 
-	/** Room for external devices: the capacity less the case's own places. */
+	/** Room for external devices: the capacity less the connectors' places. */
 	public int externalCapacity() {
-		return capacity - INTERNAL_PLACES;
+		return capacity - reserved;
 	}
 
 	/** How full the bus is (see {@link BusStatus}). */

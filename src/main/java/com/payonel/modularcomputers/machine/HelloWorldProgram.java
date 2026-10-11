@@ -6,7 +6,8 @@ import com.payonel.modularcomputers.runtime.Board;
 /**
  * Stand-in EEPROM contents until there's a Lua runtime: the smallest useful firmware, written
  * as a mock program against the motherboard API. It prints to the console on the virtual bus,
- * which always exists, so it needs no bus walk and no checks.
+ * which always exists, so it needs no bus walk and no checks, then halts the CPU. The greeting
+ * stays up: power stays on, and the console keeps it for screens plugged in later.
  */
 public final class HelloWorldProgram implements Program {
 	public static final String GREETING = "hello world";
@@ -14,5 +15,6 @@ public final class HelloWorldProgram implements Program {
 	@Override
 	public void run(Board board) {
 		board.invoke(VirtualBus.CONSOLE, "print", GREETING);
+		board.halt();
 	}
 }

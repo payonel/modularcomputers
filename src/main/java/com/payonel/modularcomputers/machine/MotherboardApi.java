@@ -87,6 +87,12 @@ final class MotherboardApi implements Board {
 		return uptime.getAsLong();
 	}
 
+	/** Halting is the program runner's: it stops the program's thread, so it never reaches the host as a call. */
+	@Override
+	public void halt() {
+		throw new UnsupportedOperationException("halt() is handled by the program runner");
+	}
+
 	/** The interrupts pending now: the bus's (it changed since last listed), then each device's, in bus order. */
 	List<String> interrupts() {
 		List<String> pending = new ArrayList<>();

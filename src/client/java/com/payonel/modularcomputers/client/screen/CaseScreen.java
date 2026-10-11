@@ -1,9 +1,9 @@
 package com.payonel.modularcomputers.client.screen;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.payonel.modularcomputers.machine.Motherboard;
 import com.payonel.modularcomputers.ModularComputers;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
-import com.payonel.modularcomputers.bus.BusOrder;
 import com.payonel.modularcomputers.bus.BusStatus;
 import com.payonel.modularcomputers.client.Identify;
 import com.payonel.modularcomputers.display.ScrollWindow;
@@ -242,7 +242,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	 * a missing one's place.
 	 */
 	public static Component busSummary(BusStatus status) {
-		int room = status.capacity() - BusOrder.INTERNAL_PLACES;
+		int room = status.capacity() - Motherboard.CONNECTORS.size();
 		if (status.overflow()) {
 			return Component.translatable("gui.modularcomputers.bus.summary_overflow", status.saved(), room, status.waiting());
 		}

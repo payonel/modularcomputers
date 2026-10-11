@@ -106,9 +106,11 @@ public final class Machine {
 		ProgramRunner.State state = runner.tick(api, callsPerTick, uptime, api::interrupts);
 		if (state == ProgramRunner.State.CRASHED) {
 			board.cpu().ifPresent(cpu -> cpu.crashed(board, runner.crash()));
+		} else if (state == ProgramRunner.State.RETURNED) {
+			board.cpu().ifPresent(cpu -> cpu.returned(board));
 		}
-		if (state == ProgramRunner.State.CRASHED || state == ProgramRunner.State.HALTED) {
-			runner = null;
+		if (state != ProgramRunner.State.RUNNING && state != ProgramRunner.State.WAITING) {
+			runner = null; // the CPU is halted; power stays on, and the screens keep what they show
 		}
 	}
 
@@ -194,6 +196,12 @@ public final class Machine {
 			numbered.put("device:" + i, devices.get(i));
 		}
 		setDevices(numbered);
+	}
+
+	/** Puts the motherboard's {@link Motherboard#layout} on the bus, with hot-plug. */
+	public void rebuildBus(long now) {
+		Motherboard.Layout layout = board.layout(now);
+		setDevices(layout.devices(), layout.aliases());
 	}
 
 	/** {@link #setDevices(List)}, with each device at its address. */

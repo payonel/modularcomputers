@@ -24,6 +24,10 @@ Last updated: 2026-10-11 (battery tiers: recipes, charging, drain, power).
     - Steps may be removed or skipped, but never invented ("no false steps").
     - When discussing a design, explain the real-world mechanism first, e.g. how UEFI or Linux
       does it.
+    - **Lean toward real Linux every time** (user, 2026-10-11). The user appreciates being told
+      when the code, or their own idea, drifts from how the real thing works (e.g. "a returned
+      init is a panic in Linux", "`/dev/console` reads keyboards too"). Call it out plainly,
+      then recommend the real-world behavior.
     - Use OC only as a source of feature and behavior ideas, when the user asks for more
       ideas or asks "how did OC do X?". Answer those from the local clone (section 7).
 - Java mod, **Fabric** loader, targeting the **latest Minecraft version**.
@@ -508,8 +512,17 @@ scripts/art/error_beep.py` into
       case's devices and ids for external ones.
     - **Virtual devices** are bare names, fixed by convention: `console` (the user: something as
       simple as `/dev/console` might as well be just `console`). The console is UEFI's
-      ConSplitter, so it already is the "virtual multicast text buffer"; what's missing is
-      choosing its outputs (UEFI's `ConOut`), still undecided.
+      ConSplitter, so it already is the "virtual multicast text buffer". **The console is the
+      group's multicast device for input and output both** (user, 2026-10-11): it writes to
+      every display, and (once keyboards take input) reads key presses from every keyboard, as
+      UEFI's ConSplitter does `ConOut` and `ConIn` and Linux's `/dev/console` reads every
+      keyboard. Each keyboard stays readable on its own too. Choosing its members (UEFI's
+      `ConOut`/`ConIn` variables) is still undecided.
+  - **A program ends with `Board.halt()`** (user, 2026-10-11), like `cli; hlt` or Linux's
+    `reboot(HALT)`: it never returns, the CPU stops, **power stays on** and the screens keep
+    what they show (and the console still redraws onto screens plugged in later). **Falling off
+    the end is a panic**, as when Linux's init exits ("Attempted to kill init!"): the CPU's ABRT
+    screen, `ABRT: EEPROM returned without halting`. Hello world prints once, then halts.
   - **Programs** (`Program.run(Board)`) are plain Java that reads like Lua. Each runs as a
     coroutine on a virtual thread (`ProgramRunner`); every board call is handed to the host and
     carried out on the server thread, so device code never runs off-thread.
@@ -541,8 +554,17 @@ scripts/art/error_beep.py` into
     displays (`getResolution`, `set`, `get`, `fill`; columns and rows from 1, as in Lua).
 - **Motherboard (`Motherboard`):** holds the soldered parts (`Hardware`/`Part`, memory), the
   CPU socket, the EEPROM slot, and two buses.
-  - **Physical bus (`bus/Bus`):** the real devices in the player's discovery order
-    (`BusOrder`; built-ins first by default). Each describes itself
+  - **The bus is the motherboard's firmware, not the case's** (user, 2026-10-11: "the all in one
+    HAS a motherboard"; new case types will come). `Motherboard` owns the connectors and their
+    addresses (`CONNECTORS`: `edp`, `kbd`, `eeprom`, `ups`, `sata:0-3`, `exp:0-3`, and their fixed
+    places 1-12), the `BusOrder`, `id:` aliases, bus positions, and building the bus
+    (`plug(connector, device, id)`, `setExternal(found)`, `layout(now)`; `Machine.rebuildBus`
+    applies it with hot-plug, `Motherboard.rebuildBus` without, for clients). A case only wires
+    things up: the all-in-one plugs its display into `edp` and keyboard into `kbd`, turns slot
+    items into devices, and finds cabled devices. Keep it that way: no bus logic in block
+    entities.
+  - **Physical bus (`bus/Bus`):** the real devices in bus order (`BusOrder`: the connectors'
+    devices first, in their fixed order, then external ones in the player's order). Each describes itself
     (`Device#type()`, the class code) and is used through its own Java type, the capability
     (like UEFI's GOP).
     - There are no drivers: plug and play.
