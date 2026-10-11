@@ -180,9 +180,10 @@ of letting the player order them:
 
 The user's answer to "a device can be on only one bus": deciding an owner at runtime (first
 wins, last wins) is a race that chunk loading reshuffles, especially when the owner's chunk
-isn't loaded. So ownership is explicit and saved. A Bluetooth card in a device's pairing slot
-gives it to the computer the card leads to, and nobody else. Unpaired devices stay shared, and
-racy (undefined behavior, accepted). Details are in AGENTS.md.
+isn't loaded. So ownership is explicit and saved. A device's radio (the Bluetooth card in its
+radio slot), when linked, pairs it with that board, a computer or a hub; hubs daisy-chain.
+Unpaired devices stay shared, and racy (undefined behavior, accepted). Details are in
+AGENTS.md.
 
 ## Bluetooth (built 2026-10-11)
 
