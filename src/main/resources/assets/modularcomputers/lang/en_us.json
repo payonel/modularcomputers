@@ -14,7 +14,10 @@
 	"gui.modularcomputers.bus.subtitle": "first found on top",
 	"gui.modularcomputers.bus.built_in": "built-in",
 	"gui.modularcomputers.bus.sata": "SATA %s",
-	"gui.modularcomputers.bus.expansion": "expansion slot %s",
+	"gui.modularcomputers.bus.expansion": "EXP %s",
 	"gui.modularcomputers.device.display": "Display",
-	"gui.modularcomputers.device.keyboard": "Keyboard"
+	"gui.modularcomputers.device.keyboard": "Keyboard",
+	"subtitles.modularcomputers.part_insert": "Computer part seats",
+	"subtitles.modularcomputers.part_remove": "Computer part comes out",
+	"subtitles.modularcomputers.battery_zap": "Battery zaps"
 }

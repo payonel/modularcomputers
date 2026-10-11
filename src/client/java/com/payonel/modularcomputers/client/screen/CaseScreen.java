@@ -65,9 +65,14 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int LIT = 0xFF6EF08C;
 	private static final int LIT_CORE = 0xFFC8FFD2;
 	private static final int SILVER = 0xFFB0B4BC;
-	private static final int SATA_RED = 0xFFC4342C;
-	private static final int RAM_BOARD = 0xFF287842;
-	private static final int CHIP = 0xFF1E1E22;
+	private static final int GOLD = 0xFFCCA64A;
+	/** Outlines a part slot and its bus order row together while either is hovered. */
+	private static final int HIGHLIGHT = 0xFFF2F2E6;
+	/** Closed latches: the open ones' white, pushed in against the module. */
+	private static final int LATCH_CLOSED = 0xFFE6E6E6;
+	private static final int BOARD_GREEN = 0xFF2A6C3C;
+	private static final int SATA_PLUG = 0xFF3CB45A;
+	private static final int SATA_PLUG_LIGHT = 0xFF6EDC82;
 	private static final int METER_LOW = 0xFFDC3C32;
 	private static final int METER_MEDIUM = 0xFFE6C83C;
 	private static final int METER_HIGH = 0xFF5AE66E;
@@ -168,6 +173,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		if (showBus) {
 			extractBusPanel(graphics);
 		}
+		extractLinkedHighlight(graphics, mouseX, mouseY);
 		if (minecraft.level != null && minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer) {
 			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.SCREEN, computer.getBlockState(), powerHeld);
 		}
@@ -203,24 +209,24 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			}
 		}
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
-			// RAM: a seated stick fills its connector, held by closed latches.
+			// RAM: the connector stays black; its contacts close (a thin gold line down the
+			// middle) and the latches swing shut against the module.
 			if (hasPart(CaseMenu.RAM_SLOTS + lane)) {
 				int rx = bx + 50 + 20 * lane;
 				int ry = by + 36;
-				graphics.fill(rx + 5, ry - 21, rx + 11, ry + 37, RAM_BOARD);
-				for (int chip = ry - 18; chip < ry + 34; chip += 8) {
-					graphics.fill(rx + 6, chip, rx + 10, chip + 4, CHIP);
-				}
-				graphics.fill(rx + 5, ry - 23, rx + 11, ry - 21, LIGHT);
-				graphics.fill(rx + 5, ry + 37, rx + 11, ry + 39, LIGHT);
+				graphics.fill(rx + 7, ry - 20, rx + 9, ry + 36, GOLD);
+				// Open latches stick out (8 wide); closed ones hug the connector (6 wide).
+				graphics.fill(rx + 4, ry - 25, rx + 12, ry - 22, BOARD_GREEN);
+				graphics.fill(rx + 4, ry + 38, rx + 12, ry + 41, BOARD_GREEN);
+				graphics.fill(rx + 5, ry - 24, rx + 11, ry - 21, LATCH_CLOSED);
+				graphics.fill(rx + 5, ry + 37, rx + 11, ry + 40, LATCH_CLOSED);
 			}
-			// SATA: a cable plugged in, with an activity light.
+			// SATA: a small green cable plug in the connector.
 			if (hasPart(CaseMenu.SATA_SLOTS + lane)) {
 				int sx = bx + 134;
 				int sy = by + 15 + 20 * lane;
-				graphics.fill(sx + 18, sy + 4, sx + 24, sy + 12, SATA_RED);
-				graphics.fill(sx + 18, sy + 4, sx + 24, sy + 5, 0xFFE05A50);
-				graphics.fill(sx + 25, sy + 1, sx + 27, sy + 3, LIT);
+				graphics.fill(sx + 19, sy + 6, sx + 23, sy + 11, SATA_PLUG);
+				graphics.fill(sx + 19, sy + 6, sx + 23, sy + 7, SATA_PLUG_LIGHT);
 			}
 			// Expansion: the card's retention clip engages.
 			if (hasPart(CaseMenu.EXP_SLOTS + lane)) {
@@ -275,6 +281,65 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		graphics.fill(x, y, x + 18, y + 18, LIGHT);
 		graphics.fill(x, y, x + 17, y + 17, SLOT_DARK);
 		graphics.fill(x + 1, y + 1, x + 17, y + 17, SLOT_FACE);
+	}
+
+	/** A visible bus order row (socket and display) on screen. */
+	public Viewport busRow(int row) {
+		Viewport panel = busPanel();
+		return new Viewport(panel.x() + BUS_ROW_X, panel.y() + BUS_ROW_Y + row * BUS_ROW_H, BUS_ROW_W, 18);
+	}
+
+	/** The visible bus row under the mouse, or -1. */
+	private int busRowAt(double mouseX, double mouseY, int devices) {
+		if (!showBus) {
+			return -1;
+		}
+		for (int row = 0; row < busWindow(devices).rowsShown(busScroll); row++) {
+			if (busRow(row).contains(mouseX, mouseY)) {
+				return row;
+			}
+		}
+		return -1;
+	}
+
+	/**
+	 * A part slot and its bus order row belong together: hovering either one outlines both.
+	 * Built-in devices have a row but no slot; RAM, the CPU and such have a slot but no row.
+	 */
+	private void extractLinkedHighlight(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+		List<AllInOneBlockEntity.BusEntry> entries = busEntries();
+		int row = busRowAt(mouseX, mouseY, entries.size());
+		int index = row >= 0 ? busScroll + row : -1;
+		if (index < 0 && hoveredSlot != null && hoveredSlot.index < CaseMenu.PART_SLOTS) {
+			for (int i = 0; i < entries.size(); i++) {
+				if (entries.get(i).slot() == hoveredSlot.index) {
+					index = i;
+				}
+			}
+		}
+		if (index < 0) {
+			return;
+		}
+		int shownRow = index - busScroll;
+		if (showBus && shownRow >= 0 && shownRow < busWindow(entries.size()).rowsShown(busScroll)) {
+			outline(graphics, busRow(shownRow), 1);
+		}
+		int slot = entries.get(index).slot();
+		if (slot >= 0) {
+			outline(graphics, slotArea(slot), 2);
+		}
+	}
+
+	/** A 1-pixel highlight around an area, {@code gap} pixels out. */
+	private static void outline(GuiGraphicsExtractor graphics, Viewport area, int gap) {
+		int x0 = area.x() - gap;
+		int y0 = area.y() - gap;
+		int x1 = area.right() + gap;
+		int y1 = area.bottom() + gap;
+		graphics.fill(x0, y0, x1, y0 + 1, HIGHLIGHT);
+		graphics.fill(x0, y1 - 1, x1, y1, HIGHLIGHT);
+		graphics.fill(x0, y0, x0 + 1, y1, HIGHLIGHT);
+		graphics.fill(x1 - 1, y0, x1, y1, HIGHLIGHT);
 	}
 
 	private void extractBusPanel(GuiGraphicsExtractor graphics) {

@@ -7,10 +7,24 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvent;
 
-/** Sound events. The files are in assets/modularcomputers/sounds; see scripts/art for how they're made. */
+/** Sound events. The files are in assets/modularcomputers/sounds; scripts/art makes them. */
 public final class ModSounds {
 	/** A short, low, buzzy beep: something went wrong (e.g. power pressed with no CPU). */
 	public static final SoundEvent ERROR_BEEP = register("error_beep");
+	/** Parts seating into and coming out of the motherboard (see scripts/art/part_sounds.py). */
+	public static final SoundEvent CPU_INSERT = register("cpu_insert");
+	public static final SoundEvent CPU_REMOVE = register("cpu_remove");
+	public static final SoundEvent EEPROM_INSERT = register("eeprom_insert");
+	public static final SoundEvent EEPROM_REMOVE = register("eeprom_remove");
+	public static final SoundEvent RAM_INSERT = register("ram_insert");
+	public static final SoundEvent RAM_REMOVE = register("ram_remove");
+	public static final SoundEvent DISK_INSERT = register("disk_insert");
+	public static final SoundEvent DISK_REMOVE = register("disk_remove");
+	public static final SoundEvent CARD_INSERT = register("card_insert");
+	public static final SoundEvent CARD_REMOVE = register("card_remove");
+	/** A tiny zap as a backup battery connects. */
+	public static final SoundEvent BATTERY_INSERT = register("battery_insert");
+	public static final SoundEvent BATTERY_REMOVE = register("battery_remove");
 
 	private ModSounds() {
 	}

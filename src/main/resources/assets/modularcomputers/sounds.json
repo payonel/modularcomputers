@@ -1,6 +1,80 @@
 {
 	"error_beep": {
-		"sounds": ["modularcomputers:error_beep"],
+		"sounds": [
+			"modularcomputers:error_beep"
+		],
 		"subtitle": "subtitles.modularcomputers.error_beep"
+	},
+	"cpu_insert": {
+		"sounds": [
+			"modularcomputers:cpu_insert"
+		],
+		"subtitle": "subtitles.modularcomputers.part_insert"
+	},
+	"cpu_remove": {
+		"sounds": [
+			"modularcomputers:cpu_remove"
+		],
+		"subtitle": "subtitles.modularcomputers.part_remove"
+	},
+	"eeprom_insert": {
+		"sounds": [
+			"modularcomputers:eeprom_insert"
+		],
+		"subtitle": "subtitles.modularcomputers.part_insert"
+	},
+	"eeprom_remove": {
+		"sounds": [
+			"modularcomputers:eeprom_remove"
+		],
+		"subtitle": "subtitles.modularcomputers.part_remove"
+	},
+	"ram_insert": {
+		"sounds": [
+			"modularcomputers:ram_insert"
+		],
+		"subtitle": "subtitles.modularcomputers.part_insert"
+	},
+	"ram_remove": {
+		"sounds": [
+			"modularcomputers:ram_remove"
+		],
+		"subtitle": "subtitles.modularcomputers.part_remove"
+	},
+	"disk_insert": {
+		"sounds": [
+			"modularcomputers:disk_insert"
+		],
+		"subtitle": "subtitles.modularcomputers.part_insert"
+	},
+	"disk_remove": {
+		"sounds": [
+			"modularcomputers:disk_remove"
+		],
+		"subtitle": "subtitles.modularcomputers.part_remove"
+	},
+	"card_insert": {
+		"sounds": [
+			"modularcomputers:card_insert"
+		],
+		"subtitle": "subtitles.modularcomputers.part_insert"
+	},
+	"card_remove": {
+		"sounds": [
+			"modularcomputers:card_remove"
+		],
+		"subtitle": "subtitles.modularcomputers.part_remove"
+	},
+	"battery_insert": {
+		"sounds": [
+			"modularcomputers:battery_insert"
+		],
+		"subtitle": "subtitles.modularcomputers.battery_zap"
+	},
+	"battery_remove": {
+		"sounds": [
+			"modularcomputers:battery_remove"
+		],
+		"subtitle": "subtitles.modularcomputers.part_remove"
 	}
 }

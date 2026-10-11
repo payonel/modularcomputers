@@ -77,10 +77,14 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			.adjustSettings(settings -> settings.setAllowCommands(true)).create()) {
 			singleplayer.getConnection().waitForChunksRender();
 			checkCreativeInventory(context, singleplayer);
-			// The error beep's sounds.json entry and .ogg loaded (a missing file would only log a warning).
+			// Our sounds.json entries and .ogg files loaded (a missing one would only log a warning).
 			context.runOnClient(client -> {
-				var beep = client.getSoundManager().getSoundEvent(ModularComputers.id("error_beep"));
-				check(beep != null && beep.getWeight() > 0, "the error beep sound should be loaded");
+				for (String sound : List.of("error_beep", "cpu_insert", "cpu_remove", "eeprom_insert", "eeprom_remove",
+						"ram_insert", "ram_remove", "disk_insert", "disk_remove", "card_insert", "card_remove",
+						"battery_insert", "battery_remove")) {
+					var event = client.getSoundManager().getSoundEvent(ModularComputers.id(sound));
+					check(event != null && event.getWeight() > 0, "sound " + sound + " should be loaded");
+				}
 			});
 
 			// Computer at eye level two blocks north of the player, facing them.
@@ -163,9 +167,11 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			context.waitTicks(2);
 			BufferedImage full = read(context.takeScreenshot("all-in-one-case-full"));
 			checkBoardPixel(context, full, 4, 20, 0xC8FFD2, "CPU dots lit");
-			checkBoardPixel(context, full, 55, 26, 0x287842, "RAM lane 1 seated");
-			checkBoardPixel(context, full, 115, 26, 0x1A1A1E, "RAM lane 4 empty");
-			checkBoardPixel(context, full, 154, 23, 0xC4342C, "SATA port 1 plugged");
+			checkBoardPixel(context, full, 57, 26, 0xCCA64A, "RAM lane 1 seated: gold contacts");
+			checkBoardPixel(context, full, 54, 12, 0x2A6C3C, "RAM lane 1 seated: latch closed in");
+			checkBoardPixel(context, full, 117, 26, 0x1A1A1E, "RAM lane 4 empty: plain black connector");
+			checkBoardPixel(context, full, 114, 12, 0xE6E6E6, "RAM lane 4 empty: latch open");
+			checkBoardPixel(context, full, 154, 23, 0x3CB45A, "SATA port 1 plugged: small green plug");
 			checkBoardPixel(context, full, 154, 43, 0x1A1A1E, "SATA port 2 empty");
 			checkBoardPixel(context, full, 73, 115, 0xB0B4BC, "expansion slot 2 engaged");
 			checkBoardPixel(context, full, 46, 115, 0x1A1A1E, "expansion slot 1 empty");
@@ -206,6 +212,22 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			check((fifthRow & 0xFFFFFF) == 0x1A1A1E, "the fifth device's display should show, got " + hex(fifthRow));
 			check(GREEN_BOARD.test(sixthRow), "no sixth row: bare board expected, got " + hex(sixthRow));
 			check(GREEN_BOARD.test(scrollbar), "no scrollbar when every device fits, got " + hex(scrollbar));
+
+			// A part slot and its bus order row light up together, whichever one is hovered.
+			// Order now: keyboard, display, sata:0, exp:1, sata:2.
+			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(CaseMenu.SATA_SLOTS));
+			context.waitTicks(2);
+			BufferedImage slotHover = read(context.takeScreenshot("all-in-one-case-hover-slot"));
+			int rowCorner = screenPixel(context, slotHover, screen -> corner(((CaseScreen) screen).busRow(2), 1));
+			check((rowCorner & 0xFFFFFF) == 0xF2F2E6, "hovering SATA 1 should outline its bus row, got " + hex(rowCorner));
+			moveCursorTo(context, screen -> ((CaseScreen) screen).busRow(3));
+			context.waitTicks(2);
+			BufferedImage rowHover = read(context.takeScreenshot("all-in-one-case-hover-row"));
+			int slotCorner = screenPixel(context, rowHover, screen -> corner(((CaseScreen) screen).slotArea(CaseMenu.EXP_SLOTS + 1), 2));
+			check((slotCorner & 0xFFFFFF) == 0xF2F2E6, "hovering the WLAN card's row should outline its slot, got " + hex(slotCorner));
+			int otherRow = screenPixel(context, rowHover, screen -> corner(((CaseScreen) screen).busRow(2), 1));
+			check((otherRow & 0xFFFFFF) != 0xF2F2E6, "other rows stay plain");
+			context.getInput().setCursorPos(0, 0);
 			check(context.computeOnClient(client -> client.player.containerMenu.getCarried().isEmpty()), "clicking the panel must not pick anything up");
 
 			// Back to the screen view; the power button turns the computer on.
@@ -335,6 +357,11 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	private static List<String> serverBusKeys(net.minecraft.server.MinecraftServer server, BlockPos computer) {
 		return ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).busEntries().stream()
 			.map(AllInOneBlockEntity.BusEntry::key).toList();
+	}
+
+	/** The 1x1 spot just outside an area's top-left corner, {@code gap} units out. */
+	private static Viewport corner(Viewport area, int gap) {
+		return new Viewport(area.x() - gap, area.y() - gap, 1, 1);
 	}
 
 	/** The screenshot pixel at the middle of an area of the open screen (GUI units). */

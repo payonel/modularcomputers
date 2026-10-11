@@ -109,9 +109,11 @@ same thing.
       - **Live indicators**, drawn over the art from the slots' contents:
         - CPU in: the 4 power-stage dots left of the socket light up. The user wants to use
           those dots for more status later.
-        - RAM in: a seated stick fills that lane's connector, with closed latches.
-        - Hard disk in: its SATA connector shows a red cable plug and a green activity
-          light.
+        - RAM in: the connector stays black. A thin gold contact line runs down it, and the
+          latches close in (6 wide instead of the open 8). The user rejected a green fill as
+          too thick and too much like the RAM itself.
+        - Hard disk in: a small green cable plug in its SATA connector. The user rejected red
+          and an activity light.
         - Card in: the expansion connector's left clip engages (silver).
         - UPS charge meter: 6 bars filling left to right (`power/ChargeMeter`). No battery:
           all off. An empty battery shows one red bar. 2–3 bars are yellow, 4–6 green.
@@ -125,14 +127,23 @@ same thing.
         - Each position number is etched into the board to the left of its row and stays
           with the position when devices move.
         - Each row has the device's icon in a socket, then a dark display with its name and
-          location ("built-in", "SATA 1", "expansion slot 2"; a cabled device will read
-          "cable, 5m").
+          location ("built-in", "SATA 1", "EXP 2"; a cabled device will read "cable, 5m").
+        - **Linked hover:** hovering a part slot outlines its bus row, and hovering a row
+          outlines its slot (`BusEntry.slot`). Built-ins have no slot.
         - The ↑/↓ arrows send `ReorderBusPayload`; they're greyed out at the ends.
         - Order lives in `bus/BusOrder`: devices keep their place, new ones go last,
           removed ones drop out. It's saved, and the machine's `Bus` follows it.
         - The panel is left out on windows narrower than about 382 GUI units.
         - The **light bulb** (highlight a cabled device in the world) waits for cabled
           devices.
+      - **Part sounds:** putting a part in or taking it out plays its own sound, server side,
+        from the slot changes (`AllInOneBlockEntity.playPartSounds`).
+        - RAM: a slide and latch clicks. CPU: a drop and the lever. EEPROM: a chip press.
+          Disk: a slide and a clunk. Card: a slide, a seat and a clip. UPS battery: a tiny
+          zap on insert.
+        - They're synthesized by `scripts/art/part_sounds.py`. The user wanted them soft, not
+          Minecraft's abrasive click.
+        - Loading a save plays nothing.
       - Clicking the bus panel or the buttons doesn't count as clicking outside the window,
         so it never drops the carried item (`hasClickedOutside`).
     - Switching sends `SwitchViewPayload`. The server either opens the menu, or closes it and
@@ -578,7 +589,9 @@ build.gradle, settings.gradle, gradle.properties, gradle/ (wrapper + daemon JVM 
 scripts/setup-headless-host.sh, scripts/headless.sh
 scripts/art/all_in_one_textures.py   draws the block, GUI and item textures (Pillow); PNGs are committed
 scripts/art/case_gui_textures.py     draws the case view's board, bus panel and icons (Pillow); PNGs are committed
-scripts/art/error_beep.py            synthesizes the error beep as Ogg Vorbis via libsndfile (ctypes); the .ogg is committed
+scripts/art/error_beep.py            synthesizes the error beep as Ogg Vorbis; the .ogg is committed
+scripts/art/part_sounds.py           synthesizes the part insert/remove sounds (slides, clicks, thumps, a zap)
+scripts/art/oggwrite.py              shared: writes mono Ogg Vorbis via the system's libsndfile (ctypes)
 src/main/java/.../sound/ModSounds.java   sound events (error_beep)
 .github/workflows/build.yml
 src/main/java/com/payonel/modularcomputers/

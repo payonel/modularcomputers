@@ -130,7 +130,7 @@ public class AllInOneGameTest {
 		helper.assertValueEqual(entries.get(0).location().getString(), "built-in", "built-in location");
 		helper.assertValueEqual(entries.get(2).name().getString(), "Hard Disk", "drive name");
 		helper.assertValueEqual(entries.get(2).location().getString(), "SATA 3", "drive location");
-		helper.assertValueEqual(entries.get(3).location().getString(), "expansion slot 4", "card location");
+		helper.assertValueEqual(entries.get(3).location().getString(), "EXP 4", "card location");
 		helper.succeed();
 	}
 

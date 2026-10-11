@@ -101,8 +101,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return parts;
 	}
 
-	/** One line of the bus order panel. {@code item} is the part's item, or empty for a built-in device. */
-	public record BusEntry(String key, Component name, Component location, ItemStack item, int builtInIcon) {
+	/**
+	 * One line of the bus order panel. {@code item} and {@code slot} are the part's item and
+	 * case slot, or empty and -1 for a built-in device.
+	 */
+	public record BusEntry(String key, Component name, Component location, ItemStack item, int slot, int builtInIcon) {
 	}
 
 	/** The devices on the bus, in order, as the bus order panel shows them. Works on clients too. */
@@ -111,15 +114,16 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		Component builtIn = Component.translatable("gui.modularcomputers.bus.built_in");
 		for (String key : busOrder.keys()) {
 			if (key.equals(DISPLAY_KEY)) {
-				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.display"), builtIn, ItemStack.EMPTY, DISPLAY_ICON));
+				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.display"), builtIn, ItemStack.EMPTY, -1, DISPLAY_ICON));
 			} else if (key.equals(KEYBOARD_KEY)) {
-				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.keyboard"), builtIn, ItemStack.EMPTY, KEYBOARD_ICON));
+				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.keyboard"), builtIn, ItemStack.EMPTY, -1, KEYBOARD_ICON));
 			} else {
 				boolean sata = key.startsWith(SATA_KEY);
 				int lane = Integer.parseInt(key.substring(key.indexOf(':') + 1));
-				ItemStack item = parts.getItem((sata ? CaseMenu.SATA_SLOTS : CaseMenu.EXP_SLOTS) + lane);
+				int slot = (sata ? CaseMenu.SATA_SLOTS : CaseMenu.EXP_SLOTS) + lane;
+				ItemStack item = parts.getItem(slot);
 				Component location = Component.translatable(sata ? "gui.modularcomputers.bus.sata" : "gui.modularcomputers.bus.expansion", lane + 1);
-				entries.add(new BusEntry(key, item.getHoverName(), location, item, -1));
+				entries.add(new BusEntry(key, item.getHoverName(), location, item, slot, -1));
 			}
 		}
 		return entries;
@@ -201,6 +205,41 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		bus.setDevices(busOrder.keys().stream().map(attached::get).toList());
 	}
 
+	/** What each slot held last time, so a change can play the right insert or remove sound. */
+	private final ItemStack[] lastParts = new ItemStack[CaseMenu.PART_SLOTS];
+
+	private void playPartSounds() {
+		for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
+			boolean had = lastParts[slot] != null && !lastParts[slot].isEmpty();
+			boolean has = !parts.getItem(slot).isEmpty();
+			if (has != had) {
+				level.playSound(null, worldPosition, partSound(slot, has), SoundSource.BLOCKS, 0.8f, 1.0f);
+			}
+		}
+		rememberParts();
+	}
+
+	private void rememberParts() {
+		for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
+			lastParts[slot] = parts.getItem(slot).copy();
+		}
+	}
+
+	private static net.minecraft.sounds.SoundEvent partSound(int slot, boolean inserted) {
+		if (slot == CaseMenu.CPU_SLOT) {
+			return inserted ? ModSounds.CPU_INSERT : ModSounds.CPU_REMOVE;
+		} else if (slot == CaseMenu.EEPROM_SLOT) {
+			return inserted ? ModSounds.EEPROM_INSERT : ModSounds.EEPROM_REMOVE;
+		} else if (slot == CaseMenu.UPS_SLOT) {
+			return inserted ? ModSounds.BATTERY_INSERT : ModSounds.BATTERY_REMOVE;
+		} else if (slot < CaseMenu.SATA_SLOTS) {
+			return inserted ? ModSounds.RAM_INSERT : ModSounds.RAM_REMOVE;
+		} else if (slot < CaseMenu.EXP_SLOTS) {
+			return inserted ? ModSounds.DISK_INSERT : ModSounds.DISK_REMOVE;
+		}
+		return inserted ? ModSounds.CARD_INSERT : ModSounds.CARD_REMOVE;
+	}
+
 	/** Sends this block entity's data (parts, bus order, display) to clients. */
 	private void syncToClients() {
 		if (level != null && !level.isClientSide()) {
@@ -214,6 +253,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		if (level == null || level.isClientSide()) {
 			return;
 		}
+		playPartSounds();
 		if (machine.cpuRemoved()) {
 			// Pulling the CPU out of a running machine kills it.
 			errorBeep();
@@ -272,6 +312,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		ContainerHelper.loadAllItems(input, parts.getItems());
 		input.read(BUS_ORDER, Codec.STRING.listOf()).ifPresent(busOrder::restore);
 		installParts();
+		rememberParts(); // loading isn't inserting: no sounds
 		input.read(DISPLAY, Codec.STRING.listOf()).ifPresent(display.buffer()::setRows);
 		input.getIntArray(FOREGROUND).ifPresent(foreground ->
 			input.getIntArray(BACKGROUND).ifPresent(background -> display.buffer().setColors(foreground, background)));
