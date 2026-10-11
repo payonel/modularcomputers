@@ -3,6 +3,8 @@ package com.payonel.modularcomputers.client;
 import com.payonel.modularcomputers.ModularComputers;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.client.render.DisplayRenderer;
+import com.payonel.modularcomputers.client.render.OutlineRenderer;
+import com.payonel.modularcomputers.client.screen.CardHolderScreen;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
 import com.payonel.modularcomputers.menu.CaseMenu;
@@ -27,7 +29,11 @@ public final class ModularComputersClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		BlockEntityRenderers.register(ModBlocks.ALL_IN_ONE_ENTITY, context -> new DisplayRenderer<>(context, DisplayRenderer.ALL_IN_ONE));
 		BlockEntityRenderers.register(ModBlocks.SCREEN_ENTITY, context -> new DisplayRenderer<>(context, DisplayRenderer.SCREEN));
+		BlockEntityRenderers.register(ModBlocks.EXPANSION_HUB_ENTITY, context -> new OutlineRenderer<>());
+		BlockEntityRenderers.register(ModBlocks.ROBOTIC_PISTON_ENTITY, context -> new OutlineRenderer<>());
 		MenuScreens.register(ModMenus.CASE, CaseScreen::new);
+		MenuScreens.register(ModMenus.EXPANSION_HUB, CardHolderScreen::new);
+		MenuScreens.register(ModMenus.ROBOTIC_PISTON, CardHolderScreen::new);
 		ClientPlayNetworking.registerGlobalReceiver(OpenDisplayPayload.TYPE, (payload, context) -> {
 			var client = context.client();
 			client.gui.setScreen(new DisplayScreen(payload));

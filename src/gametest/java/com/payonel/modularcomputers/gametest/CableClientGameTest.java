@@ -13,13 +13,16 @@ import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.telep
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CardHolderBlockEntity;
 import com.payonel.modularcomputers.block.ScreenBlockEntity;
 import com.payonel.modularcomputers.client.Identify;
+import com.payonel.modularcomputers.client.screen.CardHolderScreen;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import java.awt.image.BufferedImage;
+import java.util.List;
 import java.util.function.IntPredicate;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -154,6 +157,23 @@ public class CableClientGameTest implements FabricClientGameTest {
 			context.waitTicks(3);
 			int after = count(read(context.takeScreenshot("screen-not-identified")), 0, 0, outlined.getWidth(), outlined.getHeight(), OUTLINE);
 			check(after < outline / 10, "the outline goes away when the bulb is turned off, found " + after);
+
+			// An expansion hub's four card slots and a robotic piston's one.
+			BlockPos hub = feet.east(3);
+			BlockPos piston = feet.west(3);
+			setblock(singleplayer, hub, "expansion_hub");
+			setblock(singleplayer, piston, "robotic_piston");
+			for (BlockPos holder : List.of(hub, piston)) {
+				singleplayer.getServer().runOnServer(server -> server.getPlayerList().getPlayers().getFirst()
+					.openMenu((CardHolderBlockEntity) server.overworld().getBlockEntity(holder)));
+				context.waitForScreen(CardHolderScreen.class);
+				context.waitTicks(2);
+				int slots = context.computeOnClient(client -> ((CardHolderScreen) client.gui.screen()).getMenu().cardSlots());
+				check(slots == (holder == hub ? 4 : 1), "card slots: " + slots);
+				context.takeScreenshot(holder == hub ? "expansion-hub" : "robotic-piston");
+				context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+				context.waitFor(client -> client.gui.screen() == null);
+			}
 		}
 	}
 

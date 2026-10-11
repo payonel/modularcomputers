@@ -6,6 +6,8 @@ import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.DirectionalBlock;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -14,8 +16,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * block, and a counter that goes up whenever a cable or a cabled block is placed or removed,
  * so computers know to look again.
  * <p>
- * Screens carry the connection on like a cable (a row of screens, or a screen against a
- * computer's side, is connected). Computers don't: a computer isn't a hub.
+ * Screens and expansion hubs carry the connection on like a cable (a row of screens, or a
+ * screen against a computer's side, is connected). Computers and robotic pistons don't.
  */
 public final class Cabling {
 	private static long changes;
@@ -33,21 +35,21 @@ public final class Cabling {
 	}
 
 	/**
-	 * A block takes a cable on {@code side}: cables on every side, screens and computers on
-	 * every side but the front.
+	 * A block takes a cable on {@code side}: cables and expansion hubs on every side, screens
+	 * and computers on every side but the front, robotic pistons only on their port face.
 	 */
 	public static boolean hasPort(BlockState state, Direction side) {
-		if (state.getBlock() instanceof CableBlock) {
+		Block block = state.getBlock();
+		if (block instanceof CableBlock || block instanceof ExpansionHubBlock) {
 			return true;
 		}
-		if (isDevice(state)) {
+		if (block instanceof ScreenBlock || block instanceof AllInOneBlock) {
 			return side != state.getValue(HorizontalDirectionalBlock.FACING);
 		}
+		if (block instanceof RoboticPistonBlock) {
+			return side == state.getValue(DirectionalBlock.FACING);
+		}
 		return false;
-	}
-
-	private static boolean isDevice(BlockState state) {
-		return state.getBlock() instanceof ScreenBlock || state.getBlock() instanceof AllInOneBlock;
 	}
 
 	/** The blocks wired to the one at {@code start}, nearest first. Never looks into unloaded chunks. */
@@ -62,10 +64,11 @@ public final class Cabling {
 				if (state.getBlock() instanceof CableBlock) {
 					return CableWalk.Kind.CABLE;
 				}
-				if (state.getBlock() instanceof ScreenBlock) {
+				Block block = state.getBlock();
+				if (block instanceof ScreenBlock || block instanceof ExpansionHubBlock) {
 					return CableWalk.Kind.RELAY;
 				}
-				return isDevice(state) ? CableWalk.Kind.DEVICE : CableWalk.Kind.NONE;
+				return block instanceof AllInOneBlock || block instanceof RoboticPistonBlock ? CableWalk.Kind.DEVICE : CableWalk.Kind.NONE;
 			}
 
 			@Override

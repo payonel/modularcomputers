@@ -35,6 +35,20 @@ public final class ModBlocks {
 	public static final Block CABLE = registerWithItem("cable", CableBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(0.5f).sound(SoundType.WOOL).noOcclusion());
 
+	public static final Block EXPANSION_HUB = registerWithItem("expansion_hub", ExpansionHubBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(2.0f).sound(SoundType.METAL));
+
+	public static final BlockEntityType<ExpansionHubBlockEntity> EXPANSION_HUB_ENTITY = Registry.register(
+		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("expansion_hub"),
+		new BlockEntityType<>(ExpansionHubBlockEntity::new, Set.of(EXPANSION_HUB)));
+
+	public static final Block ROBOTIC_PISTON = registerWithItem("robotic_piston", RoboticPistonBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).sound(SoundType.METAL));
+
+	public static final BlockEntityType<RoboticPistonBlockEntity> ROBOTIC_PISTON_ENTITY = Registry.register(
+		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("robotic_piston"),
+		new BlockEntityType<>(RoboticPistonBlockEntity::new, Set.of(ROBOTIC_PISTON)));
+
 	private ModBlocks() {
 	}
 

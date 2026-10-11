@@ -131,6 +131,17 @@ of letting the player order them:
   computer that drives it. A real monitor shows one input at a time; consider an input
   selector.
 
+## Placeholder blocks and cards (built as placeholders, 2026-10-11; behavior to design)
+
+- **Cards** (all do nothing yet): WLAN, Bluetooth, Redstone, Audio, Motion Sensor, Audio
+  Sensor, Weather Sensor. A card works where it's installed: in a computer, or in an
+  expansion hub, where a redstone card emits and detects redstone at the hub.
+- **UPS battery:** on the bus. The user says it'll have an API.
+- **Robotic piston:** one cable port; it will push blocks (pistons) on its other faces.
+  Instead of a cable it can take a Bluetooth card in its one slot.
+- **Paint gun (user idea, 2026-10-11):** a block that "shoots" paint colors at nearby wool
+  blocks.
+
 ## Machine ideas discussed (not built)
 
 - **Hot-plug takeover:** built. The console keeps its own copy of what it shows and redraws

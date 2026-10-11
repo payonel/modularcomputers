@@ -155,7 +155,7 @@ same thing.
         - RAM: a slide and latch clicks. CPU: a drop and the lever. EEPROM: a chip press.
           Disk: a slide and a clunk. Card: a slide, a seat and a clip. UPS battery: a tiny
           zap on insert.
-        - They're synthesized by `scripts/art/screen_cable_textures.py draws the screen block's and the cable's textures (Pillow); PNGs are committed
+        - They're synthesized by `scripts/art/cabled_block_textures.py draws the screen, cable, expansion hub and robotic piston textures (Pillow); PNGs are committed
 scripts/art/part_sounds.py`. The user wanted them soft, not
           Minecraft's abrasive click.
         - Slides are sparse grains ringing a resonance (a plastic rasp). The first version's
@@ -261,6 +261,22 @@ scripts/art/error_beep.py` into
       loading and unloading.
     - It never looks into unloaded chunks.
     - Only screens are cabled devices so far. Another computer's built-in display is its own.
+  - **Expansion hub** (`ExpansionHubBlock`, `ExpansionHubBlockEntity`): 4 card slots on the
+    network, like an external expansion chassis. It takes a cable on every side and passes
+    the connection on.
+    - Each card in it is a cabled device of every computer wired to it. The key is
+      `cable:<hub id>:<slot>`, and the location reads "hub 2, 3m".
+    - Each card can be unplugged on its own.
+    - A card works where it's installed: a redstone card in a hub will emit and detect
+      redstone at the hub (user, 2026-10-11). Nothing works yet.
+  - **Robotic piston** (`RoboticPistonBlock`, a `DirectionalBlock`, placeholder): its `FACING`
+    is its one cable port. It will push on every other face.
+    - It's placed with the port toward the block it was put against.
+    - It has one slot inside, for a Bluetooth card instead of a cable. It's a cabled device
+      (`ACTUATOR`) and doesn't pass the connection on.
+  - Hub and piston share `CardHolderBlockEntity`: an id, card slots, save and sync, drops,
+    card sounds, and `Cabling.changed()` when their cards change. They also share
+    `CardHolderMenu` and `CardHolderScreen`, and `OutlineRenderer` for the bulb.
   - **One screen, many computers:** a screen can be wired to several computers, and each
     has it on its bus.
     - Each writes to it; the last write wins, and powering one off blanks it.
@@ -501,8 +517,10 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
    - They run headless via `runGameTest`, which is part of `testAll` but **not** of `build`.
      Loom adds `runGameTest` to `check` by name; `build.gradle` removes it so `build` stays fast
      (the user wants `build` quick and iterative).
-   - The run reports "All 33 required tests passed": 32 are ours (21 in `AllInOneGameTest`,
-     11 in `CableGameTest`), and one is of unknown origin (not investigated).
+   - The run reports "All 39 required tests passed": 38 are ours (`AllInOneGameTest`,
+     `CableGameTest`, `CardHolderGameTest`), and one is of unknown origin (not investigated).
+   - `helper.destroyBlock` doesn't drop the block itself (its contents do drop). Check a
+     block's own drop with `Block.getDrops`.
    - Cable and screen tests wait for the computer's tick to scan
      (`helper.succeedWhen`/`startSequence().thenWaitUntil`).
    - **A test times out after about 20 ticks by default.** A test that waits longer (for
@@ -690,7 +708,9 @@ src/main/java/com/payonel/modularcomputers/
   item/ModItems.java               CPU and EEPROM items
   menu/                            CaseMenu (part slots + inventory), ModMenus
   block/                           AllInOneBlock, AllInOneBlockEntity, BackPanel (back-face hit regions), ModBlocks (registrations),
-                                   ScreenBlock, ScreenBlockEntity, CableBlock, Cabling (ports, walking, change counter), DisplayHost
+                                   ScreenBlock, ScreenBlockEntity, CableBlock, Cabling (ports, walking, change counter), DisplayHost,
+                                   CardHolderBlockEntity, ExpansionHubBlock(Entity), RoboticPistonBlock(Entity)
+  menu/CardHolderMenu.java         a hub's or piston's card slots
   command/ModCommands.java         /modularcomputers giveall (cheat: one of every mod item)
   network/OpenDisplayPayload.java  server->client "open this display"
   network/PressPowerPayload.java  client->server "power button clicked in a GUI"

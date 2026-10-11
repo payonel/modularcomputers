@@ -1,6 +1,8 @@
 {
 	"values": [
 		"modularcomputers:all_in_one",
-		"modularcomputers:screen"
+		"modularcomputers:screen",
+		"modularcomputers:expansion_hub",
+		"modularcomputers:robotic_piston"
 	]
 }

@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.Optional;
 import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -49,6 +50,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -105,18 +107,24 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final Parts parts = new Parts();
 	/** The cabled devices found last time, nearest first. Saved and synced, for the bus order panel. */
 	private List<Cabled> cabled = List.of();
-	/** Server side: the cabled devices' displays, by key. */
-	private final Map<String, Display> cabledDisplays = new LinkedHashMap<>();
+	/** Server side: the cabled devices, by key. */
+	private final Map<String, Device> cabledDevices = new LinkedHashMap<>();
 	private long seenCableChanges = -1;
 	private int ticks;
 	private int syncedDisplay = -1;
 
-	/** A device wired to this computer: where it is, and how far the connection runs to it, in meters (blocks). */
-	public record Cabled(String key, BlockPos pos, int meters) {
+	/**
+	 * A device wired to this computer: where it is, how far the connection runs to it in meters
+	 * (blocks), the item it is (for its name and icon), and its slot when it's a card in an
+	 * expansion hub (else -1).
+	 */
+	public record Cabled(String key, BlockPos pos, int meters, Item item, int hubSlot) {
 		static final Codec<Cabled> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.STRING.fieldOf("key").forGetter(Cabled::key),
 			BlockPos.CODEC.fieldOf("pos").forGetter(Cabled::pos),
-			Codec.INT.fieldOf("meters").forGetter(Cabled::meters)
+			Codec.INT.fieldOf("meters").forGetter(Cabled::meters),
+			BuiltInRegistries.ITEM.byNameCodec().fieldOf("item").forGetter(Cabled::item),
+			Codec.INT.fieldOf("hub_slot").forGetter(Cabled::hubSlot)
 		).apply(instance, Cabled::new));
 	}
 
@@ -158,7 +166,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	/** Server side: whether this computer has the screen on its bus (wired and connected). */
 	public boolean drives(ScreenBlockEntity screen) {
-		return cabledDisplays.get(CABLE_KEY + screen.id()) == screen.display() && busOrder.connected().contains(CABLE_KEY + screen.id());
+		return cabledDevices.get(CABLE_KEY + screen.id()) == screen.display() && busOrder.connected().contains(CABLE_KEY + screen.id());
 	}
 
 	/** The devices on the bus, in order, as the bus order panel shows them. Works on clients too. */
@@ -174,8 +182,10 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 					Optional.empty(), true));
 			} else if (key.startsWith(CABLE_KEY)) {
 				cabled.stream().filter(device -> device.key().equals(key)).findFirst().ifPresent(device -> {
-					ItemStack item = new ItemStack(ModBlocks.SCREEN);
-					Component location = Component.translatable("gui.modularcomputers.bus.cable", device.meters());
+					ItemStack item = new ItemStack(device.item());
+					Component location = device.hubSlot() >= 0
+						? Component.translatable("gui.modularcomputers.bus.hub", device.hubSlot() + 1, device.meters())
+						: Component.translatable("gui.modularcomputers.bus.cable", device.meters());
 					entries.add(new BusEntry(key, item.getHoverName(), location, item, -1, -1, Optional.of(device.pos()), busOrder.isConnected(key)));
 				});
 			} else {
@@ -248,30 +258,44 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		}
 	}
 
-	/** Finds the screens wired to this computer and puts them on the bus. */
+	/**
+	 * Finds the devices wired to this computer (screens, the cards in expansion hubs, robotic
+	 * pistons) and puts them on the bus.
+	 */
 	private void scanCables() {
 		List<Cabled> found = new ArrayList<>();
-		Map<String, Display> displays = new LinkedHashMap<>();
-		for (CableWalk.Found device : Cabling.walk(level, worldPosition)) {
-			if (level.getBlockEntity(device.pos()) instanceof ScreenBlockEntity screen) {
-				String key = CABLE_KEY + screen.id();
-				if (!displays.containsKey(key)) {
-					found.add(new Cabled(key, device.pos(), device.meters()));
-					displays.put(key, screen.display());
+		Map<String, Device> devices = new LinkedHashMap<>();
+		for (CableWalk.Found at : Cabling.walk(level, worldPosition)) {
+			BlockEntity block = level.getBlockEntity(at.pos());
+			if (block instanceof ScreenBlockEntity screen) {
+				addCabled(found, devices, new Cabled(CABLE_KEY + screen.id(), at.pos(), at.meters(), ModBlocks.SCREEN.asItem(), -1), screen.display());
+			} else if (block instanceof ExpansionHubBlockEntity hub) {
+				for (int slot = 0; slot < ExpansionHubBlockEntity.SLOTS; slot++) {
+					int hubSlot = slot;
+					hub.card(slot).ifPresent(card -> addCabled(found, devices, new Cabled(CABLE_KEY + hub.id() + ":" + hubSlot, at.pos(), at.meters(),
+						hub.cards().getItem(hubSlot).getItem(), hubSlot), card));
 				}
+			} else if (block instanceof RoboticPistonBlockEntity piston) {
+				addCabled(found, devices, new Cabled(CABLE_KEY + piston.id(), at.pos(), at.meters(), ModBlocks.ROBOTIC_PISTON.asItem(), -1), piston.device());
 			}
 		}
-		boolean sameDevices = found.equals(cabled) && displays.keySet().equals(cabledDisplays.keySet())
-			&& displays.entrySet().stream().allMatch(entry -> cabledDisplays.get(entry.getKey()) == entry.getValue());
+		boolean sameDevices = found.equals(cabled) && devices.keySet().equals(cabledDevices.keySet())
+			&& devices.entrySet().stream().allMatch(entry -> cabledDevices.get(entry.getKey()) == entry.getValue());
 		if (sameDevices) {
 			return;
 		}
 		cabled = List.copyOf(found);
-		cabledDisplays.clear();
-		cabledDisplays.putAll(displays);
+		cabledDevices.clear();
+		cabledDevices.putAll(devices);
 		rebuildBus();
 		setChanged();
 		syncToClients();
+	}
+
+	private static void addCabled(List<Cabled> found, Map<String, Device> devices, Cabled cabled, Device device) {
+		if (devices.putIfAbsent(cabled.key(), device) == null) {
+			found.add(cabled);
+		}
 	}
 
 	/**
@@ -351,7 +375,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		}
 		for (Cabled device : cabled) {
 			// Server side, a device saved as cabled is only on the bus once a scan finds it again.
-			attached.put(device.key(), cabledDisplays.get(device.key()));
+			attached.put(device.key(), cabledDevices.get(device.key()));
 		}
 		busOrder.sync(List.copyOf(attached.keySet()), key -> key.startsWith(CABLE_KEY));
 		List<Device> devices = busOrder.connected().stream().map(attached::get).filter(Objects::nonNull).toList();

@@ -1,0 +1,7 @@
+{
+	"variants": {
+		"": {
+			"model": "modularcomputers:block/expansion_hub"
+		}
+	}
+}

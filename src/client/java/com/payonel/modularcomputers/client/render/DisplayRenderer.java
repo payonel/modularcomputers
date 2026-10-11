@@ -33,9 +33,6 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 	public static final Glass SCREEN = new Glass(1, 3, 14, 9);
 	/** How far the text floats in front of the face, in blocks. */
 	private static final float TEXT_OFFSET = 0.002f;
-	/** How far the identify outline sits outside the block, in blocks. */
-	private static final float OUTLINE_OFFSET = 0.02f;
-	private static final int OUTLINE = 0xE6C83C;
 
 	/** Where the glass is on the front texture, in texels. */
 	public record Glass(float x, float y, float width, float height) {
@@ -85,7 +82,7 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 	@Override
 	public void submit(State state, PoseStack pose, SubmitNodeCollector collector, CameraRenderState camera) {
 		if (state.identify > 0) {
-			submitOutline(state.identify, pose, collector);
+			Outline.submit(state.identify, pose, collector);
 		}
 		if (state.rows == null) {
 			return;
@@ -134,28 +131,5 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 			}
 		}
 		pose.popPose();
-	}
-
-	/** A frame along every edge of the block, seen through walls: the bulb's "this one". */
-	private static void submitOutline(float opacity, PoseStack pose, SubmitNodeCollector collector) {
-		int color = Math.round(opacity * 255) << 24 | OUTLINE;
-		float edge = 1f; // texels: just the casing's bevel, clear of the glass
-		for (int face = 0; face < 6; face++) {
-			pose.pushPose();
-			pose.translate(0.5f, 0.5f, 0.5f);
-			if (face < 4) {
-				pose.rotateDegrees(Axis.YP, 90 * face);
-			} else {
-				pose.rotateDegrees(Axis.XP, face == 4 ? 90 : -90);
-			}
-			pose.translate(-0.5f - OUTLINE_OFFSET, 0.5f + OUTLINE_OFFSET, 0.5f + OUTLINE_OFFSET);
-			float scale = (1 + 2 * OUTLINE_OFFSET) / 16f;
-			pose.scale(scale, -scale, scale);
-			collector.submitTextBackground(pose, 0, 0, 16, edge, color, Font.DisplayMode.SEE_THROUGH, LightCoordsUtil.FULL_BRIGHT);
-			collector.submitTextBackground(pose, 0, 16 - edge, 16, 16, color, Font.DisplayMode.SEE_THROUGH, LightCoordsUtil.FULL_BRIGHT);
-			collector.submitTextBackground(pose, 0, edge, edge, 16 - edge, color, Font.DisplayMode.SEE_THROUGH, LightCoordsUtil.FULL_BRIGHT);
-			collector.submitTextBackground(pose, 16 - edge, edge, 16, 16 - edge, color, Font.DisplayMode.SEE_THROUGH, LightCoordsUtil.FULL_BRIGHT);
-			pose.popPose();
-		}
 	}
 }

@@ -12,6 +12,12 @@ public final class ModMenus {
 	public static final ExtendedMenuType<CaseMenu, BlockPos> CASE = Registry.register(BuiltInRegistries.MENU, id("case"),
 		new ExtendedMenuType<>(CaseMenu::new, BlockPos.STREAM_CODEC));
 
+	public static final ExtendedMenuType<CardHolderMenu, BlockPos> EXPANSION_HUB = Registry.register(BuiltInRegistries.MENU, id("expansion_hub"),
+		new ExtendedMenuType<>(CardHolderMenu::hub, BlockPos.STREAM_CODEC));
+
+	public static final ExtendedMenuType<CardHolderMenu, BlockPos> ROBOTIC_PISTON = Registry.register(BuiltInRegistries.MENU, id("robotic_piston"),
+		new ExtendedMenuType<>(CardHolderMenu::piston, BlockPos.STREAM_CODEC));
+
 	private ModMenus() {
 	}
 
