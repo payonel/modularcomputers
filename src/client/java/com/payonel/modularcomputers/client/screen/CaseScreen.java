@@ -237,15 +237,18 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	}
 
 	/**
-	 * The line under the panel's title: "external devices: 13 of 20, missing 5", or with an
-	 * overflow, how many wait ("overflow 2"). Both can't happen at once: a waiting device takes
+	 * The line under the panel's title: "external devices: 13 of 20", then ", missing 5" when
+	 * some are offline, or with an overflow, how many wait (", overflow 2"). Both can't happen at once: a waiting device takes
 	 * a missing one's place.
 	 */
 	public static Component busSummary(BusStatus status) {
 		int room = status.capacity() - BusOrder.INTERNAL_PLACES;
-		return status.overflow()
-			? Component.translatable("gui.modularcomputers.bus.summary_overflow", status.saved(), room, status.waiting())
-			: Component.translatable("gui.modularcomputers.bus.summary", status.saved(), room, status.missing());
+		if (status.overflow()) {
+			return Component.translatable("gui.modularcomputers.bus.summary_overflow", status.saved(), room, status.waiting());
+		}
+		return status.missing() > 0
+			? Component.translatable("gui.modularcomputers.bus.summary_missing", status.saved(), room, status.missing())
+			: Component.translatable("gui.modularcomputers.bus.summary", status.saved(), room); // nothing missing: no need to say so
 	}
 
 	/** The bus overflow warning light, top right of the bus order panel. */

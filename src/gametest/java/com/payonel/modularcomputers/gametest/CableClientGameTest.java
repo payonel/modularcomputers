@@ -198,7 +198,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			// A full bus: with room for just one external device, a second screen has to wait.
 			// The warning light comes on.
 			int ledOff = screenPixel(context, bulbOn, s -> ((CaseScreen) s).busOverflowLed());
-			check(summary(context, computer).equals("external devices: 1 of 20, missing 0"), "the summary line, got " + summary(context, computer));
+			check(summary(context, computer).equals("external devices: 1 of 20"), "the summary line, got " + summary(context, computer));
 			check((ledOff & 0xFFFFFF) == 0x3A2E1A, "the overflow light is dark, got " + hex(ledOff));
 			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
 				.machine().board().setBusCapacity(BusOrder.INTERNAL_PLACES + 1));

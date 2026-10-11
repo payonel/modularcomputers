@@ -201,7 +201,7 @@ same thing.
           outlines its slot (`BusEntry.slot`). Built-ins have no slot.
         - The ↑/↓ arrows send `ReorderBusPayload`; they're greyed out at the ends.
         - **The line under the title** (user wording): "external devices: 13 of 20, missing 5"
-          (saved, room, offline), or "external devices: 20 of 20, overflow 2" while devices wait;
+          (saved, room, offline; ", missing 0" is left off), or "external devices: 20 of 20, overflow 2" while devices wait;
           the two can't happen at once, since a waiting device takes a missing one's place. It
           shrinks to fit the panel when the numbers get long (`CaseScreen.busSummary`).
         - Order lives in `bus/BusOrder` (user design, 2026-10-11, replacing "first found on top"):
