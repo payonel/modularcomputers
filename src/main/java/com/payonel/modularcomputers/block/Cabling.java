@@ -55,7 +55,7 @@ public final class Cabling {
 		return false;
 	}
 
-	/** The blocks wired to the one at {@code start}, nearest first. Never looks into unloaded chunks. */
+	/** The blocks connected to the one at {@code start}, by cable or Bluetooth, nearest first. Never looks into unloaded chunks. */
 	public static List<CableWalk.Found> walk(Level level, BlockPos start) {
 		return CableWalk.from(new CableWalk.World() {
 			@Override
@@ -78,6 +78,11 @@ public final class Cabling {
 			@Override
 			public boolean hasPort(BlockPos pos, Direction side) {
 				return Cabling.hasPort(level.getBlockState(pos), side);
+			}
+
+			@Override
+			public List<CableWalk.Link> wireless(BlockPos pos) {
+				return Bluetooth.links(level, pos);
 			}
 		}, start);
 	}

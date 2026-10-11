@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.payonel.modularcomputers.block.DisplayHost;
+import com.payonel.modularcomputers.client.BluetoothTarget;
 import com.payonel.modularcomputers.client.Identify;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.display.TextBuffer;
@@ -51,6 +52,8 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 		Resolution resolution = Resolution.DEFAULT;
 		/** The identify outline's opacity (0..1), or 0 when it's off. */
 		float identify;
+		/** The Bluetooth card in hand links to a card in here. */
+		boolean bluetooth;
 		/** Rows of the display, or null when there's nothing to draw. */
 		String[] rows;
 		int[] foregrounds;
@@ -68,6 +71,7 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 		BlockEntityRenderer.super.extractRenderState(host, state, partialTick, cameraPos, breakProgress);
 		state.facing = host.getBlockState().getValue(HorizontalDirectionalBlock.FACING);
 		state.identify = Identify.pulse(host.getBlockPos());
+		state.bluetooth = BluetoothTarget.isTarget(host.getBlockPos());
 		TextBuffer display = host.display().buffer();
 		state.resolution = display.resolution();
 		if (display.isBlank()) {
@@ -83,6 +87,8 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 	public void submit(State state, PoseStack pose, SubmitNodeCollector collector, CameraRenderState camera) {
 		if (state.identify > 0) {
 			Outline.submit(state.identify, pose, collector);
+		} else if (state.bluetooth) {
+			Outline.submit(0.9f, Outline.BLUETOOTH, pose, collector);
 		}
 		if (state.rows == null) {
 			return;

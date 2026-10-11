@@ -141,6 +141,12 @@ of letting the player order them:
 - **Paint gun (user idea, 2026-10-11; placeholder block built):** a block that "shoots" paint
   colors at nearby wool blocks, out of its nozzle face.
 
+## Bluetooth (built 2026-10-11)
+
+Linking, resetting, daisy-chaining, distances and the held-card highlight are built (see
+AGENTS.md). Open: range limits, whether links should show in the bus order differently, and
+what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` device).
+
 ## Machine ideas discussed (not built)
 
 - **Hot-plug takeover:** built. The console keeps its own copy of what it shows and redraws

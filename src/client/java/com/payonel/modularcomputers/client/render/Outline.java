@@ -10,6 +10,8 @@ import net.minecraft.util.LightCoordsUtil;
 final class Outline {
 	/** The bus order panel's bulb. */
 	static final int IDENTIFY = 0xE6C83C;
+	/** Where the Bluetooth card in hand links to. */
+	static final int BLUETOOTH = 0x4A8CFF;
 	/** How far the frame sits outside the block, in blocks. */
 	private static final float OFFSET = 0.02f;
 

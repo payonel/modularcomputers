@@ -9,7 +9,8 @@
 			"com.payonel.modularcomputers.gametest.ModularComputersGameTest",
 			"com.payonel.modularcomputers.gametest.AllInOneGameTest",
 			"com.payonel.modularcomputers.gametest.CableGameTest",
-			"com.payonel.modularcomputers.gametest.CardHolderGameTest"
+			"com.payonel.modularcomputers.gametest.CardHolderGameTest",
+			"com.payonel.modularcomputers.gametest.BluetoothGameTest"
 		],
 		"fabric-client-gametest": [
 			"com.payonel.modularcomputers.gametest.ModularComputersClientGameTest",

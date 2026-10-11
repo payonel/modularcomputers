@@ -13,22 +13,27 @@ import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.telep
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.Bluetooth;
 import com.payonel.modularcomputers.block.CardHolderBlockEntity;
+import com.payonel.modularcomputers.block.RoboticPistonBlockEntity;
 import com.payonel.modularcomputers.block.ScreenBlockEntity;
 import com.payonel.modularcomputers.client.Identify;
 import com.payonel.modularcomputers.client.screen.CardHolderScreen;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
+import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import java.awt.image.BufferedImage;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.IntPredicate;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.PipeBlock;
 
@@ -39,6 +44,9 @@ import net.minecraft.world.level.block.PipeBlock;
  * and the bulb outlines it in the world.
  */
 public class CableClientGameTest implements FabricClientGameTest {
+	/** The Bluetooth outline's color (DisplayRenderer, OutlineRenderer). */
+	private static final IntPredicate BLUE = rgb -> AllInOneClientGameTest.blue(rgb) > 200 && AllInOneClientGameTest.red(rgb) < 120
+		&& AllInOneClientGameTest.green(rgb) > 100 && AllInOneClientGameTest.green(rgb) < 190;
 	/** The bulb's outline color (DisplayRenderer). */
 	private static final IntPredicate OUTLINE = rgb -> AllInOneClientGameTest.red(rgb) > 170 && AllInOneClientGameTest.green(rgb) > 140
 		&& AllInOneClientGameTest.blue(rgb) < 110;
@@ -156,6 +164,32 @@ public class CableClientGameTest implements FabricClientGameTest {
 			context.waitTicks(3);
 			int after = count(read(context.takeScreenshot("screen-not-identified")), 0, 0, outlined.getWidth(), outlined.getHeight(), OUTLINE);
 			check(after < outline / 10, "the outline goes away when the bulb is turned off, found " + after);
+
+			// Holding a linked Bluetooth card outlines the block with the card it links to, in blue.
+			BlockPos linked = screen.east(2);
+			setblock(singleplayer, linked, "robotic_piston");
+			UUID address = UUID.randomUUID();
+			singleplayer.getServer().runOnServer(server -> {
+				ItemStack target = new ItemStack(ModItems.BLUETOOTH_CARD);
+				target.set(ModComponents.BLUETOOTH_ID, address);
+				((RoboticPistonBlockEntity) server.overworld().getBlockEntity(linked)).cards().setItem(0, target);
+				ItemStack held = new ItemStack(ModItems.BLUETOOTH_CARD);
+				held.set(ModComponents.BLUETOOTH_LINK, address);
+				server.getPlayerList().getPlayers().getFirst().setItemInHand(InteractionHand.MAIN_HAND, held);
+			});
+			context.waitFor(client -> client.player.getMainHandItem().has(ModComponents.BLUETOOTH_LINK)
+				&& Bluetooth.holds(client.level, linked, address));
+			context.waitTicks(3);
+			BufferedImage holding = read(context.takeScreenshot("bluetooth-target"));
+			int blue = count(holding, 0, 0, holding.getWidth(), holding.getHeight(), BLUE);
+			check(blue > 300, "the linked piston should be outlined in blue, found " + blue);
+			singleplayer.getServer().runOnServer(server -> server.getPlayerList().getPlayers().getFirst()
+				.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY));
+			context.waitFor(client -> client.player.getMainHandItem().isEmpty());
+			context.waitTicks(3);
+			BufferedImage notHolding = read(context.takeScreenshot("bluetooth-no-card"));
+			int none = count(notHolding, 0, 0, notHolding.getWidth(), notHolding.getHeight(), BLUE);
+			check(none < blue / 10, "no card in hand, no outline, found " + none);
 
 			// An expansion hub's four card slots and a robotic piston's one.
 			BlockPos hub = feet.east(3);

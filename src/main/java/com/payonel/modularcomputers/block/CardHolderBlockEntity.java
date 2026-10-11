@@ -1,6 +1,7 @@
 package com.payonel.modularcomputers.block;
 
 import com.payonel.modularcomputers.sound.ModSounds;
+import java.util.List;
 import java.util.UUID;
 import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
@@ -19,6 +20,7 @@ import net.minecraft.world.Containers;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -32,7 +34,7 @@ import net.minecraft.world.level.storage.ValueOutput;
  * are saved and synced to clients, drop when it's broken, and make the card sounds going in
  * and out. A change tells computers to look along their cables again.
  */
-public abstract class CardHolderBlockEntity extends BlockEntity implements ExtendedMenuProvider<BlockPos> {
+public abstract class CardHolderBlockEntity extends BlockEntity implements ExtendedMenuProvider<BlockPos>, Bluetooth.Holder {
 	private static final String ID = "holder_id"; // not "id": that is the block entity type
 
 	private final Slots cards;
@@ -62,6 +64,42 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 	}
 
 	@Override
+	public List<ItemStack> bluetoothCards() {
+		return Bluetooth.cardsAmong(cards.getItems());
+	}
+
+	@Override
+	public void bluetoothChanged() {
+		cards.setChanged();
+	}
+
+	private void updateBluetooth() {
+		if (level != null) {
+			Bluetooth.update(level, worldPosition, bluetoothCards());
+		}
+	}
+
+	@Override
+	public void setLevel(Level level) {
+		super.setLevel(level);
+		updateBluetooth();
+	}
+
+	@Override
+	public void setRemoved() {
+		super.setRemoved();
+		if (level != null) {
+			Bluetooth.remove(level, worldPosition);
+		}
+	}
+
+	@Override
+	public void clearRemoved() {
+		super.clearRemoved();
+		updateBluetooth();
+	}
+
+	@Override
 	public Component getDisplayName() {
 		return getBlockState().getBlock().getName();
 	}
@@ -73,6 +111,7 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 
 	private void onCardsChanged() {
 		cardsChanged();
+		updateBluetooth();
 		setChanged();
 		if (level == null || level.isClientSide()) {
 			return;
@@ -116,6 +155,7 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 		cards.getItems().clear(); // not clearContent(): that would fire change handling mid-load
 		ContainerHelper.loadAllItems(input, cards.getItems());
 		cardsChanged();
+		updateBluetooth(); // a client's copy after a sync; on the server the level isn't set yet
 		remember(); // loading isn't inserting: no sounds
 	}
 

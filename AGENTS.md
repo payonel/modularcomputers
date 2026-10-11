@@ -278,6 +278,26 @@ scripts/art/error_beep.py` into
     shoot paint colors at nearby wool. Its nozzle is its `FACING`, set where the player looks,
     and it takes a cable on every other face. It's a cabled device (`ACTUATOR`), with an id
     and no slots (`PaintGunBlockEntity`).
+  - **Bluetooth** (`block/Bluetooth`, `item/BluetoothCardItem`; user design 2026-10-11):
+    - Each card has its own address (`ModComponents.BLUETOOTH_ID`), set when something first
+      links to it. It links to at most one other address (`BLUETOOTH_LINK`).
+    - Links are many-to-one: no need for more than one card per case, but nothing stops
+      it. A linked-to card can link on, so cards can daisy-chain.
+    - **Right-click** a computer, hub or piston holding a Bluetooth card, with a card in
+      hand: the card in hand links to the block's first card (bus order in a computer).
+      Without a card there, the click goes on to the block, which opens its slots.
+    - **Sneak + right-click** anywhere resets the card in hand: a new address (nothing links
+      to it any more) and no link.
+    - A link joins the two blocks like a cable. The walk follows links both ways, from the
+      start and from relays (hubs). A device at the end of a link doesn't pass it on.
+      - Distance is the straight line in meters, and the row reads "bluetooth, 5m".
+      - `CableWalk` is a nearest-first shortest-path search now, since links weigh more than
+        one block.
+    - Each side keeps a registry of loaded blocks holding Bluetooth cards. Holders update it
+      on `setLevel`, content changes and loads, and leave it on `setRemoved`.
+    - **While you hold a linked card**, the block holding its target gets a steady blue
+      wireframe, seen through walls (`client/BluetoothTarget`, `Outline.BLUETOOTH`).
+    - There's no range limit yet.
   - Hub and piston share `CardHolderBlockEntity`: an id, card slots, save and sync, drops,
     card sounds, and `Cabling.changed()` when their cards change. They also share
     `CardHolderMenu` and `CardHolderScreen`, and `OutlineRenderer` for the bulb.
@@ -521,8 +541,11 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
    - They run headless via `runGameTest`, which is part of `testAll` but **not** of `build`.
      Loom adds `runGameTest` to `check` by name; `build.gradle` removes it so `build` stays fast
      (the user wants `build` quick and iterative).
-   - The run reports "All 40 required tests passed": 39 are ours (`AllInOneGameTest`,
-     `CableGameTest`, `CardHolderGameTest`), and one is of unknown origin (not investigated).
+   - The run reports "All 44 required tests passed": 43 are ours (`AllInOneGameTest`,
+     `CableGameTest`, `CardHolderGameTest`, `BluetoothGameTest`), and one is of unknown origin (not investigated).
+   - `helper.useBlock` always goes to the block, even when sneaking. The real game skips the
+     block when sneaking with an item in hand, so test sneak-use of an item with
+     `stack.useOn(new UseOnContext(...))`.
    - `helper.destroyBlock` doesn't drop the block itself (its contents do drop). Check a
      block's own drop with `Block.getDrops`.
    - Cable and screen tests wait for the computer's tick to scan

@@ -12,6 +12,13 @@ class CableWalkTest {
 	private final Map<BlockPos, CableWalk.Kind> blocks = new HashMap<>();
 	/** Devices whose front (no port) faces this way. */
 	private final Map<BlockPos, Direction> fronts = new HashMap<>();
+	/** Bluetooth links, both ways. */
+	private final Map<BlockPos, java.util.List<CableWalk.Link>> links = new HashMap<>();
+
+	private void link(BlockPos a, BlockPos b, int meters) {
+		links.computeIfAbsent(a, pos -> new java.util.ArrayList<>()).add(new CableWalk.Link(b, meters));
+		links.computeIfAbsent(b, pos -> new java.util.ArrayList<>()).add(new CableWalk.Link(a, meters));
+	}
 
 	private final CableWalk.World world = new CableWalk.World() {
 		@Override
@@ -22,6 +29,11 @@ class CableWalkTest {
 		@Override
 		public boolean hasPort(BlockPos pos, Direction side) {
 			return fronts.get(pos) != side;
+		}
+
+		@Override
+		public java.util.List<CableWalk.Link> wireless(BlockPos pos) {
+			return links.getOrDefault(pos, java.util.List.of());
 		}
 	};
 
@@ -121,5 +133,36 @@ class CableWalkTest {
 		BlockPos screen = relay(5, 0, 0, Direction.NORTH);
 		blocks.put(new BlockPos(6, 0, 0), CableWalk.Kind.DEVICE);
 		assertThat(CableWalk.from(world, screen)).containsExactly(new CableWalk.Found(new BlockPos(6, 0, 0), 1));
+	}
+
+	@Test
+	void bluetoothReachesADeviceWithoutACable() {
+		BlockPos piston = device(10, 0, 0, Direction.NORTH);
+		link(COMPUTER, piston, 10);
+		assertThat(CableWalk.from(world, COMPUTER)).containsExactly(new CableWalk.Found(piston, 10, true));
+	}
+
+	@Test
+	void devicesComeBackNearestFirstWhetherByCableOrBluetooth() {
+		cable(1, 0, 0);
+		cable(2, 0, 0);
+		BlockPos wired = device(3, 0, 0, Direction.NORTH); // 3m by cable
+		BlockPos linked = device(0, 2, 0, Direction.NORTH); // 2m by Bluetooth
+		link(COMPUTER, linked, 2);
+		assertThat(CableWalk.from(world, COMPUTER)).containsExactly(new CableWalk.Found(linked, 2, true), new CableWalk.Found(wired, 3, false));
+	}
+
+	@Test
+	void relaysPassBluetoothOnButDevicesDont() {
+		cable(1, 0, 0);
+		BlockPos hub = relay(2, 0, 0, Direction.NORTH);
+		BlockPos far = relay(20, 0, 0, Direction.NORTH);
+		link(hub, far, 18);
+		BlockPos piston = device(20, 0, 5, Direction.NORTH);
+		link(far, piston, 5); // daisy chain: hub -> far hub -> piston
+		BlockPos beyond = device(40, 0, 0, Direction.NORTH);
+		link(piston, beyond, 20); // a device doesn't pass it on
+		assertThat(CableWalk.from(world, COMPUTER)).containsExactly(
+			new CableWalk.Found(hub, 2, false), new CableWalk.Found(far, 20, true), new CableWalk.Found(piston, 25, true));
 	}
 }

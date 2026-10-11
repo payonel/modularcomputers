@@ -34,5 +34,8 @@
 	"gui.modularcomputers.bus.hub": "hub %s, %sm",
 	"block.modularcomputers.expansion_hub": "Expansion Hub",
 	"block.modularcomputers.robotic_piston": "Robotic Piston",
-	"block.modularcomputers.paint_gun": "Paint Gun"
+	"block.modularcomputers.paint_gun": "Paint Gun",
+	"item.modularcomputers.bluetooth_card.linked": "Linked to the Bluetooth card in the %s",
+	"item.modularcomputers.bluetooth_card.reset": "Bluetooth card reset: nothing links to it, and it links to nothing",
+	"gui.modularcomputers.bus.bluetooth": "bluetooth, %sm"
 }

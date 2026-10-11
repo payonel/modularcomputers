@@ -52,6 +52,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -67,7 +68,7 @@ import net.minecraft.world.level.storage.ValueOutput;
  * state are saved and synced to clients. Only the CPU and EEPROM affect the machine so far;
  * RAM and the UPS battery are placeholders.
  */
-public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMenuProvider<BlockPos>, DisplayHost {
+public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMenuProvider<BlockPos>, DisplayHost, Bluetooth.Holder {
 	private static final String POWERED = "powered";
 	private static final String DISPLAY = "display";
 	private static final String FOREGROUND = "display_foreground";
@@ -115,14 +116,15 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	/**
 	 * A device wired to this computer: where it is, how far the connection runs to it in meters
-	 * (blocks), the item it is (for its name and icon), and its slot when it's a card in an
-	 * expansion hub (else -1).
+	 * (blocks), whether the way crosses a Bluetooth link, the item it is (for its name and
+	 * icon), and its slot when it's a card in an expansion hub (else -1).
 	 */
-	public record Cabled(String key, BlockPos pos, int meters, Item item, int hubSlot) {
+	public record Cabled(String key, BlockPos pos, int meters, boolean wireless, Item item, int hubSlot) {
 		static final Codec<Cabled> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.STRING.fieldOf("key").forGetter(Cabled::key),
 			BlockPos.CODEC.fieldOf("pos").forGetter(Cabled::pos),
 			Codec.INT.fieldOf("meters").forGetter(Cabled::meters),
+			Codec.BOOL.fieldOf("wireless").forGetter(Cabled::wireless),
 			BuiltInRegistries.ITEM.byNameCodec().fieldOf("item").forGetter(Cabled::item),
 			Codec.INT.fieldOf("hub_slot").forGetter(Cabled::hubSlot)
 		).apply(instance, Cabled::new));
@@ -180,7 +182,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 					ItemStack item = new ItemStack(device.item());
 					Component location = device.hubSlot() >= 0
 						? Component.translatable("gui.modularcomputers.bus.hub", device.hubSlot() + 1, device.meters())
-						: Component.translatable("gui.modularcomputers.bus.cable", device.meters());
+						: Component.translatable(device.wireless() ? "gui.modularcomputers.bus.bluetooth" : "gui.modularcomputers.bus.cable", device.meters());
 					entries.add(new BusEntry(key, item.getHoverName(), location, item, -1, -1, Optional.of(device.pos()), busOrder.isConnected(key)));
 				});
 			} else {
@@ -225,6 +227,52 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return true;
 	}
 
+	/** Its Bluetooth cards (in the expansion slots), in bus order. */
+	@Override
+	public List<ItemStack> bluetoothCards() {
+		List<ItemStack> cards = new ArrayList<>();
+		for (String key : busOrder.keys()) {
+			if (key.startsWith(EXP_KEY)) {
+				ItemStack card = parts.getItem(partSlot(key));
+				if (card.is(ModItems.BLUETOOTH_CARD)) {
+					cards.add(card);
+				}
+			}
+		}
+		return cards;
+	}
+
+	@Override
+	public void bluetoothChanged() {
+		parts.setChanged();
+	}
+
+	private void updateBluetooth() {
+		if (level != null) {
+			Bluetooth.update(level, worldPosition, bluetoothCards());
+		}
+	}
+
+	@Override
+	public void setLevel(Level level) {
+		super.setLevel(level);
+		updateBluetooth();
+	}
+
+	@Override
+	public void setRemoved() {
+		super.setRemoved();
+		if (level != null) {
+			Bluetooth.remove(level, worldPosition);
+		}
+	}
+
+	@Override
+	public void clearRemoved() {
+		super.clearRemoved();
+		updateBluetooth();
+	}
+
 	/** Server side: the player plugged a cabled device in or out in the bus order panel. */
 	public boolean setConnected(String key, boolean connected) {
 		if (!key.startsWith(CABLE_KEY) || !busOrder.setConnected(key, connected)) {
@@ -263,17 +311,17 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		for (CableWalk.Found at : Cabling.walk(level, worldPosition)) {
 			BlockEntity block = level.getBlockEntity(at.pos());
 			if (block instanceof ScreenBlockEntity screen) {
-				addCabled(found, devices, new Cabled(CABLE_KEY + screen.id(), at.pos(), at.meters(), ModBlocks.SCREEN.asItem(), -1), screen.display());
+				addCabled(found, devices, new Cabled(CABLE_KEY + screen.id(), at.pos(), at.meters(), at.wireless(), ModBlocks.SCREEN.asItem(), -1), screen.display());
 			} else if (block instanceof ExpansionHubBlockEntity hub) {
 				for (int slot = 0; slot < ExpansionHubBlockEntity.SLOTS; slot++) {
 					int hubSlot = slot;
 					hub.card(slot).ifPresent(card -> addCabled(found, devices, new Cabled(CABLE_KEY + hub.id() + ":" + hubSlot, at.pos(), at.meters(),
-						hub.cards().getItem(hubSlot).getItem(), hubSlot), card));
+						at.wireless(), hub.cards().getItem(hubSlot).getItem(), hubSlot), card));
 				}
 			} else if (block instanceof RoboticPistonBlockEntity piston) {
-				addCabled(found, devices, new Cabled(CABLE_KEY + piston.id(), at.pos(), at.meters(), ModBlocks.ROBOTIC_PISTON.asItem(), -1), piston.device());
+				addCabled(found, devices, new Cabled(CABLE_KEY + piston.id(), at.pos(), at.meters(), at.wireless(), ModBlocks.ROBOTIC_PISTON.asItem(), -1), piston.device());
 			} else if (block instanceof PaintGunBlockEntity gun) {
-				addCabled(found, devices, new Cabled(CABLE_KEY + gun.id(), at.pos(), at.meters(), ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
+				addCabled(found, devices, new Cabled(CABLE_KEY + gun.id(), at.pos(), at.meters(), at.wireless(), ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
 			}
 		}
 		boolean sameDevices = found.equals(cabled) && devices.keySet().equals(cabledDevices.keySet())
@@ -375,6 +423,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			attached.put(device.key(), cabledDevices.get(device.key()));
 		}
 		busOrder.sync(List.copyOf(attached.keySet()), key -> key.startsWith(CABLE_KEY));
+		updateBluetooth(); // its first Bluetooth card follows the bus order
 		List<Device> devices = busOrder.connected().stream().map(attached::get).filter(Objects::nonNull).toList();
 		if (level != null && level.isClientSide()) {
 			bus.setDevices(devices); // clients show what the server sends; they don't run devices
@@ -432,6 +481,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			return;
 		}
 		playPartSounds();
+		Cabling.changed(); // a Bluetooth card may have come or gone
 		if (machine.cpuRemoved()) {
 			// Pulling the CPU out of a running machine kills it.
 			errorBeep();

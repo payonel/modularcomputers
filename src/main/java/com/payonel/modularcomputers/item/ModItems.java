@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -27,7 +28,7 @@ public final class ModItems {
 	public static final Item HARD_DISK = register("hard_disk");
 	/** Expansion cards, for a computer's expansion slots or an expansion hub. */
 	public static final Item WLAN_CARD = register("wlan_card");
-	public static final Item BLUETOOTH_CARD = register("bluetooth_card");
+	public static final Item BLUETOOTH_CARD = register("bluetooth_card", BluetoothCardItem::new, UnaryOperator.identity());
 	public static final Item REDSTONE_CARD = register("redstone_card");
 	public static final Item AUDIO_CARD = register("audio_card");
 	public static final Item MOTION_SENSOR_CARD = register("motion_sensor_card");
@@ -67,7 +68,11 @@ public final class ModItems {
 	}
 
 	private static Item register(String name, UnaryOperator<Item.Properties> extra) {
+		return register(name, Item::new, extra);
+	}
+
+	private static Item register(String name, Function<Item.Properties, Item> factory, UnaryOperator<Item.Properties> extra) {
 		ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id(name));
-		return Registry.register(BuiltInRegistries.ITEM, key, new Item(extra.apply(new Item.Properties().setId(key).stacksTo(1))));
+		return Registry.register(BuiltInRegistries.ITEM, key, factory.apply(extra.apply(new Item.Properties().setId(key).stacksTo(1))));
 	}
 }
