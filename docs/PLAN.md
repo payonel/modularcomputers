@@ -53,6 +53,29 @@ skip steps freely, never invent false steps (see `AGENTS.md` section 1).
   - The EEPROM item gets contents.
   - The CPU runs Lua from it instead of the Java stand-in.
 
+## Mock runtime: programs calling devices (design in discussion, 2026-10-11)
+
+The Lua runtime is the user's own project and will take time. A mock layer pretends to be it,
+so the machine can be built and tested as if Lua code were calling devices. Modeled on how OC
+did it (`machine.lua` kernel, `component.invoke`, `@Callback`, signals), but redesigned.
+
+Decided by the user:
+- **Names:** real hardware terms, `bus` and `device`. Never "component" in code or docs.
+- **Calls are immediate by default** (a two-way door): the device method runs right away.
+- **On the server tick** for now. Running machines off-thread, asynchronously, is a
+  documented follow-up (TODO), not built.
+- **Addressing:** the motherboard API looks devices up by stable id and by bus order.
+- **Not saveable:** a machine running a mock program doesn't survive a save; save/restore
+  waits for the real Lua runtime.
+- **Device methods never kill the machine.** Every device failure is soft, like a status bit
+  the driver reads and decides about. Only the motherboard's own supervision ends a run: the
+  CPU and power (it should check them on a schedule too, not only on events).
+- **External devices are hot-plugged by design.** A device that isn't online isn't on the bus;
+  calls to it fail softly. No deferring calls until a device "comes online" (OC's GUID race
+  and its timeout hacks).
+- **Interrupts per device, not a machine-wide queue:** a device raises "I have something";
+  its data stays in the device until the program reads it, which clears it.
+
 ## Separate blocks: cases, screens, keyboards, cables
 
 The all-in-one stays the test bed. Later there are separate blocks:
