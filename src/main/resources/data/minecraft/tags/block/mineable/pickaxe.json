@@ -3,6 +3,7 @@
 		"modularcomputers:all_in_one",
 		"modularcomputers:screen",
 		"modularcomputers:expansion_hub",
-		"modularcomputers:robotic_piston"
+		"modularcomputers:robotic_piston",
+		"modularcomputers:paint_gun"
 	]
 }

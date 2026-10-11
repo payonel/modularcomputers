@@ -155,7 +155,7 @@ same thing.
         - RAM: a slide and latch clicks. CPU: a drop and the lever. EEPROM: a chip press.
           Disk: a slide and a clunk. Card: a slide, a seat and a clip. UPS battery: a tiny
           zap on insert.
-        - They're synthesized by `scripts/art/cabled_block_textures.py draws the screen, cable, expansion hub and robotic piston textures (Pillow); PNGs are committed
+        - They're synthesized by `scripts/art/cabled_block_textures.py draws the screen, cable, expansion hub, robotic piston and paint gun textures (Pillow); PNGs are committed
 scripts/art/part_sounds.py`. The user wanted them soft, not
           Minecraft's abrasive click.
         - Slides are sparse grains ringing a resonance (a plastic rasp). The first version's
@@ -274,6 +274,10 @@ scripts/art/error_beep.py` into
     - It's placed with the port toward the block it was put against.
     - It has one slot inside, for a Bluetooth card instead of a cable. It's a cabled device
       (`ACTUATOR`) and doesn't pass the connection on.
+  - **Paint gun** (`PaintGunBlock`, a `DirectionalBlock`, placeholder; user idea): it will
+    shoot paint colors at nearby wool. Its nozzle is its `FACING`, set where the player looks,
+    and it takes a cable on every other face. It's a cabled device (`ACTUATOR`), with an id
+    and no slots (`PaintGunBlockEntity`).
   - Hub and piston share `CardHolderBlockEntity`: an id, card slots, save and sync, drops,
     card sounds, and `Cabling.changed()` when their cards change. They also share
     `CardHolderMenu` and `CardHolderScreen`, and `OutlineRenderer` for the bulb.
@@ -517,7 +521,7 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
    - They run headless via `runGameTest`, which is part of `testAll` but **not** of `build`.
      Loom adds `runGameTest` to `check` by name; `build.gradle` removes it so `build` stays fast
      (the user wants `build` quick and iterative).
-   - The run reports "All 39 required tests passed": 38 are ours (`AllInOneGameTest`,
+   - The run reports "All 40 required tests passed": 39 are ours (`AllInOneGameTest`,
      `CableGameTest`, `CardHolderGameTest`), and one is of unknown origin (not investigated).
    - `helper.destroyBlock` doesn't drop the block itself (its contents do drop). Check a
      block's own drop with `Block.getDrops`.
@@ -709,7 +713,7 @@ src/main/java/com/payonel/modularcomputers/
   menu/                            CaseMenu (part slots + inventory), ModMenus
   block/                           AllInOneBlock, AllInOneBlockEntity, BackPanel (back-face hit regions), ModBlocks (registrations),
                                    ScreenBlock, ScreenBlockEntity, CableBlock, Cabling (ports, walking, change counter), DisplayHost,
-                                   CardHolderBlockEntity, ExpansionHubBlock(Entity), RoboticPistonBlock(Entity)
+                                   CardHolderBlockEntity, ExpansionHubBlock(Entity), RoboticPistonBlock(Entity), PaintGunBlock(Entity)
   menu/CardHolderMenu.java         a hub's or piston's card slots
   command/ModCommands.java         /modularcomputers giveall (cheat: one of every mod item)
   network/OpenDisplayPayload.java  server->client "open this display"

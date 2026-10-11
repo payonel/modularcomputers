@@ -139,8 +139,8 @@ of letting the player order them:
 - **UPS battery:** on the bus. The user says it'll have an API.
 - **Robotic piston:** one cable port; it will push blocks (pistons) on its other faces.
   Instead of a cable it can take a Bluetooth card in its one slot.
-- **Paint gun (user idea, 2026-10-11):** a block that "shoots" paint colors at nearby wool
-  blocks.
+- **Paint gun (user idea, 2026-10-11; placeholder block built):** a block that "shoots" paint
+  colors at nearby wool blocks, out of its nozzle face.
 
 ## Machine ideas discussed (not built)
 

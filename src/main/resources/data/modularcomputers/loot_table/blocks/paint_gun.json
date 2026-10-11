@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:block",
+	"pools": [
+		{
+			"condition": {
+				"type": "minecraft:survives_explosion"
+			},
+			"entries": [
+				{
+					"type": "minecraft:item",
+					"name": "modularcomputers:paint_gun"
+				}
+			],
+			"rolls": 1
+		}
+	],
+	"random_sequence": "modularcomputers:blocks/paint_gun"
+}

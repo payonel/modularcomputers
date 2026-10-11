@@ -1,0 +1,12 @@
+{
+	"parent": "minecraft:block/cube",
+	"textures": {
+		"particle": "modularcomputers:block/paint_gun_side",
+		"north": "modularcomputers:block/paint_gun_nozzle",
+		"south": "modularcomputers:block/paint_gun_side",
+		"east": "modularcomputers:block/paint_gun_side",
+		"west": "modularcomputers:block/paint_gun_side",
+		"up": "modularcomputers:block/paint_gun_side",
+		"down": "modularcomputers:block/paint_gun_side"
+	}
+}

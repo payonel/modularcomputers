@@ -1,0 +1,27 @@
+{
+	"variants": {
+		"facing=north": {
+			"model": "modularcomputers:block/paint_gun"
+		},
+		"facing=south": {
+			"model": "modularcomputers:block/paint_gun",
+			"y": 180
+		},
+		"facing=east": {
+			"model": "modularcomputers:block/paint_gun",
+			"y": 90
+		},
+		"facing=west": {
+			"model": "modularcomputers:block/paint_gun",
+			"y": 270
+		},
+		"facing=up": {
+			"model": "modularcomputers:block/paint_gun",
+			"x": 270
+		},
+		"facing=down": {
+			"model": "modularcomputers:block/paint_gun",
+			"x": 90
+		}
+	}
+}

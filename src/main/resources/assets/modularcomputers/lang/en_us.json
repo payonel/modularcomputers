@@ -33,5 +33,6 @@
 	"item.modularcomputers.weather_sensor_card": "Weather Sensor Card",
 	"gui.modularcomputers.bus.hub": "hub %s, %sm",
 	"block.modularcomputers.expansion_hub": "Expansion Hub",
-	"block.modularcomputers.robotic_piston": "Robotic Piston"
+	"block.modularcomputers.robotic_piston": "Robotic Piston",
+	"block.modularcomputers.paint_gun": "Paint Gun"
 }

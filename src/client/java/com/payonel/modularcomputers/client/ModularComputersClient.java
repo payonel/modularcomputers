@@ -31,6 +31,7 @@ public final class ModularComputersClient implements ClientModInitializer {
 		BlockEntityRenderers.register(ModBlocks.SCREEN_ENTITY, context -> new DisplayRenderer<>(context, DisplayRenderer.SCREEN));
 		BlockEntityRenderers.register(ModBlocks.EXPANSION_HUB_ENTITY, context -> new OutlineRenderer<>());
 		BlockEntityRenderers.register(ModBlocks.ROBOTIC_PISTON_ENTITY, context -> new OutlineRenderer<>());
+		BlockEntityRenderers.register(ModBlocks.PAINT_GUN_ENTITY, context -> new OutlineRenderer<>());
 		MenuScreens.register(ModMenus.CASE, CaseScreen::new);
 		MenuScreens.register(ModMenus.EXPANSION_HUB, CardHolderScreen::new);
 		MenuScreens.register(ModMenus.ROBOTIC_PISTON, CardHolderScreen::new);

@@ -49,6 +49,13 @@ public final class ModBlocks {
 		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("robotic_piston"),
 		new BlockEntityType<>(RoboticPistonBlockEntity::new, Set.of(ROBOTIC_PISTON)));
 
+	public static final Block PAINT_GUN = registerWithItem("paint_gun", PaintGunBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).sound(SoundType.METAL));
+
+	public static final BlockEntityType<PaintGunBlockEntity> PAINT_GUN_ENTITY = Registry.register(
+		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("paint_gun"),
+		new BlockEntityType<>(PaintGunBlockEntity::new, Set.of(PAINT_GUN)));
+
 	private ModBlocks() {
 	}
 

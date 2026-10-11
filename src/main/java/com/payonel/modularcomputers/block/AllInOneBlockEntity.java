@@ -260,7 +260,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	/**
 	 * Finds the devices wired to this computer (screens, the cards in expansion hubs, robotic
-	 * pistons) and puts them on the bus.
+	 * pistons, paint guns) and puts them on the bus.
 	 */
 	private void scanCables() {
 		List<Cabled> found = new ArrayList<>();
@@ -277,6 +277,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 				}
 			} else if (block instanceof RoboticPistonBlockEntity piston) {
 				addCabled(found, devices, new Cabled(CABLE_KEY + piston.id(), at.pos(), at.meters(), ModBlocks.ROBOTIC_PISTON.asItem(), -1), piston.device());
+			} else if (block instanceof PaintGunBlockEntity gun) {
+				addCabled(found, devices, new Cabled(CABLE_KEY + gun.id(), at.pos(), at.meters(), ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
 			}
 		}
 		boolean sameDevices = found.equals(cabled) && devices.keySet().equals(cabledDevices.keySet())
