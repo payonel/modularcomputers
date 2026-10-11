@@ -70,8 +70,11 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int LIT_CORE = 0xFFC8FFD2;
 	private static final int SILVER = 0xFFB0B4BC;
 	private static final int GOLD = 0xFFCCA64A;
-	/** Outlines a part slot and its bus order row together while either is hovered. */
-	private static final int HIGHLIGHT = 0xFFF2F2E6;
+	/**
+	 * Outlines a part slot and its bus order row together while either is hovered, and the
+	 * slots an item would fit while it's carried or hovered in the inventory.
+	 */
+	private static final int HIGHLIGHT = SlotHints.COLOR;
 	/** Closed latches: the open ones' white, pushed in against the module. */
 	private static final int LATCH_CLOSED = 0xFFE6E6E6;
 	private static final int BOARD_GREEN = 0xFF2A6C3C;
@@ -195,6 +198,9 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			extractBusPanel(graphics);
 		}
 		extractLinkedHighlight(graphics, mouseX, mouseY);
+		for (Slot slot : SlotHints.fitting(menu, hoveredSlot, CaseMenu.PART_SLOTS)) {
+			SlotHints.outline(graphics, slotArea(slot.index), 2, HIGHLIGHT);
+		}
 		if (minecraft.level != null && minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer) {
 			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.SCREEN, computer.getBlockState(), powerHeld);
 		}
@@ -353,14 +359,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 
 	/** A 1-pixel highlight around an area, {@code gap} pixels out. */
 	private static void outline(GuiGraphicsExtractor graphics, Viewport area, int gap) {
-		int x0 = area.x() - gap;
-		int y0 = area.y() - gap;
-		int x1 = area.right() + gap;
-		int y1 = area.bottom() + gap;
-		graphics.fill(x0, y0, x1, y0 + 1, HIGHLIGHT);
-		graphics.fill(x0, y1 - 1, x1, y1, HIGHLIGHT);
-		graphics.fill(x0, y0, x0 + 1, y1, HIGHLIGHT);
-		graphics.fill(x1 - 1, y0, x1, y1, HIGHLIGHT);
+		SlotHints.outline(graphics, area, gap, HIGHLIGHT);
 	}
 
 	private void extractBusPanel(GuiGraphicsExtractor graphics) {

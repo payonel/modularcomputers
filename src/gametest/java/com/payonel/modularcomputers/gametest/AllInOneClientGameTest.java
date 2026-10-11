@@ -147,6 +147,22 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(CaseScreen.class);
 			context.takeScreenshot("all-in-one-case-empty");
 			int hotbar = CaseMenu.PART_SLOTS + 27; // the case menu's first hotbar slot
+
+			// Hovering an item in the inventory outlines the slots it fits.
+			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(hotbar + cpuHotbar));
+			context.waitTicks(2);
+			BufferedImage cpuHover = read(context.takeScreenshot("all-in-one-case-cpu-hover"));
+			check(slotOutlined(context, cpuHover, CaseMenu.CPU_SLOT), "hovering the CPU should outline its socket");
+			check(!slotOutlined(context, cpuHover, CaseMenu.EEPROM_SLOT), "but not the ROM slot");
+			int card = inventoryMenuSlotOf(context, ModItems.WLAN_CARD);
+			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(card));
+			context.waitTicks(2);
+			BufferedImage cardHover = read(context.takeScreenshot("all-in-one-case-card-hover"));
+			for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+				check(slotOutlined(context, cardHover, CaseMenu.EXP_SLOTS + lane), "hovering a card should outline expansion slot " + (lane + 1));
+			}
+			check(!slotOutlined(context, cardHover, CaseMenu.CPU_SLOT), "but not the CPU socket");
+			check(!slotOutlined(context, cardHover, CaseMenu.SATA_SLOTS), "nor a SATA port");
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(hotbar + cpuHotbar)); // pick up the CPU
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(CaseMenu.CPU_SLOT));
 			shiftClickOnScreen(context, screen -> ((CaseScreen) screen).slotArea(hotbar + eepromHotbar)); // the EEPROM finds its slot
@@ -390,6 +406,31 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	}
 
 	/** Which hotbar slot (0-8) holds the item. */
+	/** Whether a slot has the light fitting-item outline: sampled on its left edge, 2 pixels out. */
+	private static boolean slotOutlined(ClientGameTestContext context, BufferedImage image, int slot) {
+		int rgb = context.computeOnClient(client -> {
+			CaseScreen screen = (CaseScreen) client.gui.screen();
+			double scale = (double) image.getWidth() / screen.width;
+			Viewport area = screen.slotArea(slot);
+			return image.getRGB((int) ((area.x() - 2 + 0.5) * scale), (int) ((area.y() + 8 + 0.5) * scale)) & 0xFFFFFF;
+		});
+		return rgb == 0xF2F2E6;
+	}
+
+	/** The case menu's slot showing the first stack of this item in the player's inventory. */
+	private static int inventoryMenuSlotOf(ClientGameTestContext context, net.minecraft.world.item.Item item) {
+		int slot = context.computeOnClient(client -> {
+			for (int i = 0; i < 36; i++) {
+				if (client.player.getInventory().getItem(i).is(item)) {
+					return i < 9 ? CaseMenu.PART_SLOTS + 27 + i : CaseMenu.PART_SLOTS + i - 9;
+				}
+			}
+			return -1;
+		});
+		check(slot >= 0, item + " should be in the inventory");
+		return slot;
+	}
+
 	private static int hotbarSlotOf(ClientGameTestContext context, net.minecraft.world.item.Item item) {
 		int slot = context.computeOnClient(client -> {
 			for (int i = 0; i < 9; i++) {
