@@ -111,18 +111,21 @@ def zap(seconds=0.075, volume=0.32):
 		out.append(volume * env * (0.7 * saw + 0.5 * crackle))
 	return lowpass(out, 7000)
 
-def hum_beat(seconds=0.55, volume=0.4, freq=110, beat=4.0):
+def hum_beat(seconds=0.55, volume=0.4, freq=110, beat=4.0, sag=0.0, cutoff=900):
 	"""A soft hum that beats: two low tones a few hertz apart swell and fade against each other,
-	so it pulses gently (a warning, not an error)."""
+	so it pulses gently. {@code sag} lets the pitch fall by that fraction over the sound."""
 	n = int(RATE * seconds)
-	out = []
+	out, phase_a, phase_b = [], 0.0, 0.0
 	for i in range(n):
 		t = i / RATE
-		tone = sum(a * (math.sin(2 * math.pi * f * t) + math.sin(2 * math.pi * (f + beat) * t))
-			for f, a in ((freq, 1.0), (freq * 2, 0.35), (freq * 3, 0.12)))
+		f = freq * (1 - sag * t / seconds)
+		phase_a += f / RATE
+		phase_b += (f + beat) / RATE
+		tone = sum(a * (math.sin(2 * math.pi * k * phase_a) + math.sin(2 * math.pi * k * phase_b))
+			for k, a in ((1, 1.0), (2, 0.35), (3, 0.12)))
 		env = min(1, t / 0.06) * min(1, (seconds - t) / 0.18)
 		out.append(volume * env * tone / 3)
-	return lowpass(out, 900)
+	return lowpass(out, cutoff)
 
 def mix(*parts):
 	"""Each part is (start seconds, samples)."""
@@ -153,8 +156,10 @@ SOUNDS = {
 	# UPS battery: a tiny zap as it connects; a soft click when it's pulled.
 	"battery_insert": mix((0, click(0.3, 1400, 0.004)), (0.006, zap())),
 	"battery_remove": mix((0, click(0.35, 1300, 0.005, 3000))),
-	# The bus is full and a device is waiting: a soft hum beat.
-	"bus_overflow": mix((0, hum_beat())),
+	# A device joined the bus: a soft hum beat.
+	"device_connect": mix((0, hum_beat())),
+	# The bus is full and a device is waiting: deeper and rougher, sagging, an error.
+	"bus_overflow": mix((0, hum_beat(0.75, 0.5, 72, 7.0, sag=0.15, cutoff=700))),
 }
 
 only = set(sys.argv[2:])

@@ -215,8 +215,13 @@ same thing.
           - **Full:** a new external device bumps the one missing longest (each entry keeps
             `lastSeen`). With none missing it **waits**: not on the bus. The bus is then in its
             warning state: an amber LED top right of the panel, the subtitle "bus full: N
-            waiting", and a soft hum beat (`bus_overflow`, two detuned low tones) when a device
-            starts waiting. Programs will read it from `Bus.status()` (`BusStatus`: capacity,
+            waiting", and a deep, rough, sagging hum (`bus_overflow`) when a device starts
+            waiting.
+          - **A soft hum beat** (`device_connect`, two low tones 4 Hz apart, the user's
+            favorite) plays whenever an external device joins the bus: wired up, plugged back in
+            from the panel, or online after its chunk loads late. Leaving is silent. The full hum
+            is the same idea deeper (72 Hz, beating 7 Hz, sagging 15%), to sound like an error.
+            Both are made by `scripts/art/part_sounds.py`; neither is checked by a test. Programs will read it from `Bus.status()` (`BusStatus`: capacity,
             devices, saved, missing, waiting, overflow).
           - **Numbers are fixed places** (user, after looking at PCI/SATA/USB): 1 display, 2
             keyboard, 3 ROM, 4 UPS, 5-8 SATA, 9-12 EXP, then external devices from 13 in their

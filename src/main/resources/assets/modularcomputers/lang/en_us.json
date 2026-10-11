@@ -46,6 +46,7 @@
 	"gui.modularcomputers.bus.tip.down": "Down",
 	"gui.modularcomputers.bus.waiting": "bus full: %s waiting",
 	"subtitles.modularcomputers.bus_overflow": "Computer bus full",
+	"subtitles.modularcomputers.device_connect": "Device connected",
 	"gui.modularcomputers.power": "Case power: %s%% (%s)",
 	"gui.modularcomputers.power.battery": "Battery power: %s%% (%s)",
 	"gui.modularcomputers.power.battery_infinite": "Battery power: never runs out",

@@ -82,5 +82,11 @@
 			"modularcomputers:bus_overflow"
 		],
 		"subtitle": "subtitles.modularcomputers.bus_overflow"
+	},
+	"device_connect": {
+		"sounds": [
+			"modularcomputers:device_connect"
+		],
+		"subtitle": "subtitles.modularcomputers.device_connect"
 	}
 }

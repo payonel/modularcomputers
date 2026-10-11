@@ -11,7 +11,9 @@ import net.minecraft.sounds.SoundEvent;
 public final class ModSounds {
 	/** A short, low, buzzy beep: something went wrong (e.g. power pressed with no CPU). */
 	public static final SoundEvent ERROR_BEEP = register("error_beep");
-	/** A soft hum beat: a device was wired up but the bus is full. */
+	/** A soft hum beat: an external device joined the bus. */
+	public static final SoundEvent DEVICE_CONNECT = register("device_connect");
+	/** A deeper, rougher hum: a device was wired up but the bus is full. */
 	public static final SoundEvent BUS_OVERFLOW = register("bus_overflow");
 	/** Parts seating into and coming out of the motherboard (see scripts/art/part_sounds.py). */
 	public static final SoundEvent CPU_INSERT = register("cpu_insert");

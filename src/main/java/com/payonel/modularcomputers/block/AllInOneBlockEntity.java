@@ -38,6 +38,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -376,12 +377,36 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		updateBluetooth();
 	}
 
+	/** The external devices on the bus now. */
+	private Set<String> externalOnBus() {
+		return busOrder.connected().stream().filter(key -> key.startsWith(CABLE_KEY)).collect(Collectors.toSet());
+	}
+
+	/**
+	 * The bus's sounds after a change: a soft hum when an external device joined it (wired up,
+	 * plugged back in, or its chunk loaded), and a deeper, rougher one when one has to wait
+	 * because the bus is full. Leaving is silent.
+	 */
+	private void busSounds(Set<String> before, int waitingBefore) {
+		if (level == null || level.isClientSide()) {
+			return;
+		}
+		if (busOrder.waiting() > waitingBefore) {
+			level.playSound(null, worldPosition, ModSounds.BUS_OVERFLOW, SoundSource.BLOCKS, 0.8f, 1.0f);
+		}
+		if (!before.containsAll(externalOnBus())) {
+			level.playSound(null, worldPosition, ModSounds.DEVICE_CONNECT, SoundSource.BLOCKS, 0.7f, 1.0f);
+		}
+	}
+
 	/** Server side: the player plugged a cabled device in or out in the bus order panel. */
 	public boolean setConnected(String key, boolean connected) {
+		Set<String> before = externalOnBus();
 		if (!key.startsWith(CABLE_KEY) || !busOrder.setConnected(key, connected)) {
 			return false;
 		}
 		rebuildBus();
+		busSounds(before, busOrder.waiting());
 		setChanged();
 		syncToClients();
 		return true;
@@ -518,12 +543,10 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		cabled = List.copyOf(found);
 		cabledDevices.clear();
 		cabledDevices.putAll(devices);
+		Set<String> before = externalOnBus();
 		int waitingBefore = busOrder.waiting();
 		rebuildBus();
-		if (busOrder.waiting() > waitingBefore) {
-			// A device was wired up but can't join a full bus: a soft hum, a warning, not an error.
-			level.playSound(null, worldPosition, ModSounds.BUS_OVERFLOW, SoundSource.BLOCKS, 0.7f, 1.0f);
-		}
+		busSounds(before, waitingBefore);
 		setChanged();
 		syncToClients();
 	}
