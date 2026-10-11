@@ -1,8 +1,8 @@
 package com.payonel.modularcomputers.menu;
 
+import com.payonel.modularcomputers.block.CardHolderBlockEntity;
 import com.payonel.modularcomputers.block.ExpansionHubBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
-import com.payonel.modularcomputers.item.ModItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
@@ -49,7 +49,7 @@ public final class CardHolderMenu extends AbstractContainerMenu {
 			addSlot(new Slot(cards, slot, x, SLOT_Y) {
 				@Override
 				public boolean mayPlace(ItemStack stack) {
-					return index == radioSlot ? stack.is(ModItems.BLUETOOTH_CARD) : ModItems.cardKind(stack).isPresent();
+					return CardHolderBlockEntity.accepts(index, radioSlot, stack);
 				}
 
 				@Override

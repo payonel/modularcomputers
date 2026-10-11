@@ -76,8 +76,13 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 
 	/** Whether a slot takes this item: the radio slot only a Bluetooth card, the others any card but one. */
 	public boolean accepts(int slot, ItemStack stack) {
+		return accepts(slot, radioSlot(), stack);
+	}
+
+	/** The rule, for the block and its menu alike. */
+	public static boolean accepts(int slot, int radioSlot, ItemStack stack) {
 		boolean bluetooth = stack.is(ModItems.BLUETOOTH_CARD);
-		return slot == radioSlot() ? bluetooth : !bluetooth && ModItems.cardKind(stack).isPresent();
+		return slot == radioSlot ? bluetooth : !bluetooth && ModItems.cardKind(stack).isPresent();
 	}
 
 	/** The Bluetooth card in the radio slot, or empty: no radio. */

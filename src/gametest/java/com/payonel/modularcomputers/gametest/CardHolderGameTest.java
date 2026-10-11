@@ -121,6 +121,15 @@ public class CardHolderGameTest {
 			helper.assertValueEqual(piston.cards().canPlaceItem(0, new ItemStack(card)), card == ModItems.BLUETOOTH_CARD, "a piston taking " + card);
 		}
 		helper.assertTrue(!hub.cards().canPlaceItem(0, new ItemStack(ModItems.CPU)), "a hub takes only cards");
+		// The menu the player clicks in follows the same rule.
+		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+		var menu = hub.createMenu(0, player.getInventory(), player);
+		for (int slot = 0; slot <= ExpansionHubBlockEntity.SLOTS; slot++) {
+			for (var card : ModItems.CARDS.keySet()) {
+				helper.assertValueEqual(menu.slots.get(slot).mayPlace(new ItemStack(card)), hub.cards().canPlaceItem(slot, new ItemStack(card)),
+					"the menu's slot " + slot + " taking " + card);
+			}
+		}
 		helper.assertValueEqual(hub.cards().getContainerSize(), ExpansionHubBlockEntity.SLOTS + 1, "four slots and the radio slot");
 		helper.assertTrue(!hub.cards().canPlaceItem(ExpansionHubBlockEntity.RADIO_SLOT, new ItemStack(ModItems.AUDIO_CARD)), "the radio slot takes only Bluetooth");
 		helper.assertTrue(hub.cards().canPlaceItem(ExpansionHubBlockEntity.RADIO_SLOT, new ItemStack(ModItems.BLUETOOTH_CARD)), "the radio slot takes Bluetooth");
