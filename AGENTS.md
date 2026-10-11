@@ -48,7 +48,10 @@ same thing.
      down. This has been designed in from day one; keep it working.
 3. **Versioning** follows the ecosystem convention in section 4. Users must be able to see at a
    glance which Minecraft version a jar is for.
-4. **Commits:** commit **autonomously**, without asking, every time a new addition is done
+4. **No old-save compatibility** (user, 2026-10-11): this is local dev work. Change save
+   formats, rename items, components and keys freely, and never keep shims, legacy keys or
+   unused registrations so old worlds load. Old test worlds may simply break.
+5. **Commits:** commit **autonomously**, without asking, every time a new addition is done
    and `./gradlew testAll` passes.
    - Run `git add -A`, then commit on `master` with a message describing the addition.
    - Never commit with failing tests.
@@ -144,7 +147,6 @@ same thing.
           the CPU check.
         - **The power button is faded unless the computer is ready** (block state `ready`): a
           CPU is in and the case has power (user, 2026-10-11).
-        - The old `ups_battery` item is gone; its saves lose it (0.x).
     - A newly placed computer is empty. Get the parts from the creative tab, or with the
       cheat command **`/modularcomputers giveall`**.
       - It gives one of every item registered under the mod's namespace, so new items are
@@ -392,8 +394,6 @@ scripts/art/error_beep.py` into
         will do: take one out and the links drop, put any in and they're back.
       - Links are many-to-one (many cards to one board), and any board can be the target, a
         hub's included, so cards daisy-chain (piston → hub → computer).
-      - `BLUETOOTH_ID` (the old per-card address) is unused, kept registered only so old cards
-        still load. Remove before a release.
     - **Right-click** a computer, hub, screen, piston or paint gun that has a Bluetooth card,
       with a card in hand: the card in hand links to that block's board. Without a card there,
       the click goes on to the block, which opens its slots.

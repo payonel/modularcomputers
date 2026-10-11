@@ -82,7 +82,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String FOREGROUND = "display_foreground";
 	private static final String BACKGROUND = "display_background";
 	private static final String CONSOLE = "console";
-	/** The saved external bus order. ("bus_order", a plain key list, was the order before external devices kept theirs apart.) */
+	/** The saved external bus order. */
 	private static final String BUS_EXTERNAL = "bus_external";
 	private static final String KNOWN = "known";
 	private static final Codec<BusOrder.Entry> ENTRY_CODEC = RecordCodecBuilder.create(instance -> instance.group(

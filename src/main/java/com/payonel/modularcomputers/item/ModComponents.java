@@ -25,15 +25,6 @@ public final class ModComponents {
 			.networkSynchronized(StreamCodec.composite(ByteBufCodecs.VAR_INT, BatteryCharge::ticks, ByteBufCodecs.VAR_LONG, BatteryCharge::settledAt, BatteryCharge::new))
 			.build());
 
-	/**
-	 * Unused: cards once had their own address that other cards linked to; links now name a
-	 * board. Still registered so cards saved before that still load (an unknown component would
-	 * lose the item). Remove before a release.
-	 */
-	@Deprecated
-	public static final DataComponentType<UUID> BLUETOOTH_ID = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("bluetooth_id"),
-		DataComponentType.<UUID>builder().persistent(UUIDUtil.CODEC).networkSynchronized(UUIDUtil.STREAM_CODEC).build());
-
 	/** The board (a computer's, a hub's, ...) this Bluetooth card links to. */
 	public static final DataComponentType<UUID> BLUETOOTH_LINK = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("bluetooth_link"),
 		DataComponentType.<UUID>builder().persistent(UUIDUtil.CODEC).networkSynchronized(UUIDUtil.STREAM_CODEC).build());
