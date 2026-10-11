@@ -1,6 +1,8 @@
 package com.payonel.modularcomputers.block;
 
+import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.sound.ModSounds;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
@@ -29,10 +31,14 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
 /**
- * A cabled block with card slots inside (the expansion hub, the robotic piston). It has its
- * own id, so computers can tell which one it is (for the bus order) wherever it is. Its cards
- * are saved and synced to clients, drop when it's broken, and make the card sounds going in
- * and out. A change tells computers to look along their cables again.
+ * A block on the network with card slots inside: the screen, the expansion hub, the robotic
+ * piston, the paint gun. Each has a <em>pairing slot</em> that takes a Bluetooth card: with
+ * one there, the block belongs to the one computer that card links to (see
+ * {@link Bluetooth#owner}) and no other computer sees it, though it still passes the cable on.
+ * <p>
+ * It has its own id, so computers can tell which one it is (for the bus order) wherever it is.
+ * Its cards are saved and synced to clients, drop when it's broken, and make the card sounds
+ * going in and out. A change tells computers to look along their cables again.
  */
 public abstract class CardHolderBlockEntity extends BlockEntity implements ExtendedMenuProvider<BlockPos>, Bluetooth.Holder {
 	private static final String ID = "holder_id"; // not "id": that is the block entity type
@@ -56,16 +62,41 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 		return cards;
 	}
 
-	/** Whether a slot takes this card. */
-	public abstract boolean accepts(ItemStack stack);
+	/** The slot for the Bluetooth card that pairs this block with one computer. */
+	public abstract int pairingSlot();
+
+	/** Whether a slot takes this item: the pairing slot only a Bluetooth card. */
+	public boolean accepts(int slot, ItemStack stack) {
+		return slot == pairingSlot() ? stack.is(ModItems.BLUETOOTH_CARD) : ModItems.cardKind(stack).isPresent();
+	}
+
+	/** The Bluetooth card in the pairing slot, or empty: unpaired, shared by every computer that reaches it. */
+	public ItemStack pairingCard() {
+		ItemStack card = cards.getItem(pairingSlot());
+		return card.is(ModItems.BLUETOOTH_CARD) ? card : ItemStack.EMPTY;
+	}
+
+	public boolean isPaired() {
+		return !pairingCard().isEmpty();
+	}
 
 	/** The cards changed: rebuild whatever they make. Runs on both sides, and after loading. */
 	protected void cardsChanged() {
 	}
 
+	/** Its Bluetooth cards: the pairing card first (cards linking to this block link to it), then the rest by slot. */
 	@Override
 	public List<ItemStack> bluetoothCards() {
-		return Bluetooth.cardsAmong(cards.getItems());
+		List<ItemStack> all = new ArrayList<>();
+		if (isPaired()) {
+			all.add(pairingCard());
+		}
+		for (int slot = 0; slot < cards.getContainerSize(); slot++) {
+			if (slot != pairingSlot() && cards.getItem(slot).is(ModItems.BLUETOOTH_CARD)) {
+				all.add(cards.getItem(slot));
+			}
+		}
+		return all;
 	}
 
 	@Override
@@ -75,7 +106,7 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 
 	private void updateBluetooth() {
 		if (level != null) {
-			Bluetooth.update(level, worldPosition, bluetoothCards());
+			Bluetooth.update(level, worldPosition, bluetoothCards(), isPaired() ? pairingCard() : null, false);
 		}
 	}
 
@@ -188,7 +219,7 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 
 		@Override
 		public boolean canPlaceItem(int slot, ItemStack stack) {
-			return accepts(stack);
+			return accepts(slot, stack);
 		}
 
 		@Override

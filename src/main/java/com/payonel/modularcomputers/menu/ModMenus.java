@@ -18,6 +18,12 @@ public final class ModMenus {
 	public static final ExtendedMenuType<CardHolderMenu, BlockPos> ROBOTIC_PISTON = Registry.register(BuiltInRegistries.MENU, id("robotic_piston"),
 		new ExtendedMenuType<>(CardHolderMenu::piston, BlockPos.STREAM_CODEC));
 
+	public static final ExtendedMenuType<CardHolderMenu, BlockPos> SCREEN = Registry.register(BuiltInRegistries.MENU, id("screen"),
+		new ExtendedMenuType<>(CardHolderMenu::screen, BlockPos.STREAM_CODEC));
+
+	public static final ExtendedMenuType<CardHolderMenu, BlockPos> PAINT_GUN = Registry.register(BuiltInRegistries.MENU, id("paint_gun"),
+		new ExtendedMenuType<>(CardHolderMenu::paintGun, BlockPos.STREAM_CODEC));
+
 	private ModMenus() {
 	}
 

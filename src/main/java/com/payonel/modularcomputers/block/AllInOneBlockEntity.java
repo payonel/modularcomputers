@@ -116,15 +116,17 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	/**
 	 * A device wired to this computer: where it is, how far the connection runs to it in meters
-	 * (blocks), whether the way crosses a Bluetooth link, the item it is (for its name and
-	 * icon), and its slot when it's a card in an expansion hub (else -1).
+	 * (blocks), whether the way crosses a Bluetooth link, whether it's paired with this computer,
+	 * the item it is (for its name and icon), and its slot when it's a card in an expansion hub
+	 * (else -1).
 	 */
-	public record Cabled(String key, BlockPos pos, int meters, boolean wireless, Item item, int hubSlot) {
+	public record Cabled(String key, BlockPos pos, int meters, boolean wireless, boolean paired, Item item, int hubSlot) {
 		static final Codec<Cabled> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.STRING.fieldOf("key").forGetter(Cabled::key),
 			BlockPos.CODEC.fieldOf("pos").forGetter(Cabled::pos),
 			Codec.INT.fieldOf("meters").forGetter(Cabled::meters),
 			Codec.BOOL.fieldOf("wireless").forGetter(Cabled::wireless),
+			Codec.BOOL.fieldOf("paired").forGetter(Cabled::paired),
 			BuiltInRegistries.ITEM.byNameCodec().fieldOf("item").forGetter(Cabled::item),
 			Codec.INT.fieldOf("hub_slot").forGetter(Cabled::hubSlot)
 		).apply(instance, Cabled::new));
@@ -180,9 +182,15 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			} else if (key.startsWith(CABLE_KEY)) {
 				cabled.stream().filter(device -> device.key().equals(key)).findFirst().ifPresent(device -> {
 					ItemStack item = new ItemStack(device.item());
-					Component location = device.hubSlot() >= 0
-						? Component.translatable("gui.modularcomputers.bus.hub", device.hubSlot() + 1, device.meters())
-						: Component.translatable(device.wireless() ? "gui.modularcomputers.bus.bluetooth" : "gui.modularcomputers.bus.cable", device.meters());
+					Component location;
+					if (device.paired()) {
+						location = device.hubSlot() >= 0 ? Component.translatable("gui.modularcomputers.bus.hub_paired", device.hubSlot() + 1)
+							: Component.translatable("gui.modularcomputers.bus.paired");
+					} else {
+						location = device.hubSlot() >= 0
+							? Component.translatable("gui.modularcomputers.bus.hub", device.hubSlot() + 1, device.meters())
+							: Component.translatable(device.wireless() ? "gui.modularcomputers.bus.bluetooth" : "gui.modularcomputers.bus.cable", device.meters());
+					}
 					entries.add(new BusEntry(key, item.getHoverName(), location, item, -1, -1, Optional.of(device.pos()), busOrder.isConnected(key)));
 				});
 			} else {
@@ -249,7 +257,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	private void updateBluetooth() {
 		if (level != null) {
-			Bluetooth.update(level, worldPosition, bluetoothCards());
+			Bluetooth.update(level, worldPosition, bluetoothCards(), null, true);
 		}
 	}
 
@@ -310,18 +318,23 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		Map<String, Device> devices = new LinkedHashMap<>();
 		for (CableWalk.Found at : Cabling.walk(level, worldPosition)) {
 			BlockEntity block = level.getBlockEntity(at.pos());
+			// A paired device belongs to one computer only: the one its Bluetooth card leads to.
+			boolean paired = block instanceof CardHolderBlockEntity holder && holder.isPaired();
+			if (paired && !Bluetooth.owner(level, at.pos()).equals(Optional.of(worldPosition))) {
+				continue;
+			}
 			if (block instanceof ScreenBlockEntity screen) {
-				addCabled(found, devices, new Cabled(CABLE_KEY + screen.id(), at.pos(), at.meters(), at.wireless(), ModBlocks.SCREEN.asItem(), -1), screen.display());
+				addCabled(found, devices, new Cabled(CABLE_KEY + screen.id(), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.SCREEN.asItem(), -1), screen.display());
 			} else if (block instanceof ExpansionHubBlockEntity hub) {
 				for (int slot = 0; slot < ExpansionHubBlockEntity.SLOTS; slot++) {
 					int hubSlot = slot;
 					hub.card(slot).ifPresent(card -> addCabled(found, devices, new Cabled(CABLE_KEY + hub.id() + ":" + hubSlot, at.pos(), at.meters(),
-						at.wireless(), hub.cards().getItem(hubSlot).getItem(), hubSlot), card));
+						at.wireless(), paired, hub.cards().getItem(hubSlot).getItem(), hubSlot), card));
 				}
 			} else if (block instanceof RoboticPistonBlockEntity piston) {
-				addCabled(found, devices, new Cabled(CABLE_KEY + piston.id(), at.pos(), at.meters(), at.wireless(), ModBlocks.ROBOTIC_PISTON.asItem(), -1), piston.device());
+				addCabled(found, devices, new Cabled(CABLE_KEY + piston.id(), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.ROBOTIC_PISTON.asItem(), -1), piston.device());
 			} else if (block instanceof PaintGunBlockEntity gun) {
-				addCabled(found, devices, new Cabled(CABLE_KEY + gun.id(), at.pos(), at.meters(), at.wireless(), ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
+				addCabled(found, devices, new Cabled(CABLE_KEY + gun.id(), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
 			}
 		}
 		boolean sameDevices = found.equals(cabled) && devices.keySet().equals(cabledDevices.keySet())

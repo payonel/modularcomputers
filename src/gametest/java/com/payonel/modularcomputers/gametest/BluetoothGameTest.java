@@ -2,10 +2,13 @@ package com.payonel.modularcomputers.gametest;
 
 import com.payonel.modularcomputers.block.AllInOneBlock;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CableBlock;
 import com.payonel.modularcomputers.block.ExpansionHubBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.block.RoboticPistonBlock;
 import com.payonel.modularcomputers.block.RoboticPistonBlockEntity;
+import com.payonel.modularcomputers.block.ScreenBlock;
+import com.payonel.modularcomputers.block.ScreenBlockEntity;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.CaseMenu;
@@ -75,37 +78,109 @@ public class BluetoothGameTest {
 	}
 
 	@GameTest
-	public void aComputerReachesALinkedPistonWithoutACable(GameTestHelper helper) {
+	public void aPairedPistonBelongsToTheComputerItsCardLinksTo(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper);
-		UUID pistonCard = UUID.randomUUID();
-		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(UUID.randomUUID(), pistonCard));
-		piston(helper, new BlockPos(1, 1, 6)).cards().setItem(0, card(pistonCard, null)); // 5 blocks away
-		helper.succeedWhen(() -> helper.assertValueEqual(locations(computer), List.of("bluetooth, 5m"), "found over Bluetooth"));
+		UUID computerCard = UUID.randomUUID();
+		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(computerCard, null));
+		piston(helper, new BlockPos(1, 1, 6)).cards().setItem(0, card(UUID.randomUUID(), computerCard)); // 5 blocks away, no cable
+		helper.succeedWhen(() -> helper.assertValueEqual(locations(computer), List.of("paired"), "found over Bluetooth, paired"));
+	}
+
+	@GameTest
+	public void aPairedScreenIsOnlyOnItsOwnersBusButStillCarriesTheCable(GameTestHelper helper) {
+		// A - cable - screen - cable - B, and a second, unpaired screen on top of the first.
+		AllInOneBlockEntity owner = computer(helper);
+		UUID ownerCard = UUID.randomUUID();
+		owner.parts().setItem(CaseMenu.EXP_SLOTS, card(ownerCard, null));
+		cable(helper, new BlockPos(2, 1, 1));
+		ScreenBlockEntity paired = screen(helper, new BlockPos(3, 1, 1));
+		paired.cards().setItem(0, card(UUID.randomUUID(), ownerCard));
+		ScreenBlockEntity shared = screen(helper, new BlockPos(3, 2, 1));
+		cable(helper, new BlockPos(4, 1, 1));
+		helper.setBlock(new BlockPos(5, 1, 1), ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
+		AllInOneBlockEntity other = helper.getBlockEntity(new BlockPos(5, 1, 1), AllInOneBlockEntity.class);
+		helper.succeedWhen(() -> {
+			helper.assertTrue(onBus(owner, paired) && onBus(owner, shared), "the owner has both screens");
+			helper.assertTrue(!onBus(other, paired), "the other computer doesn't get the paired screen");
+			helper.assertTrue(onBus(other, shared), "but reaches the unpaired one through it: it still carries the cable");
+			helper.assertTrue(locations(owner).contains("paired"), "the owner's row says paired");
+		});
+	}
+
+	@GameTest
+	public void pairingFollowsTheChainThroughAHub(GameTestHelper helper) {
+		// The screen's card links to the hub's pairing card, and the hub's to the computer's: the
+		// computer owns both, with no cable anywhere.
+		AllInOneBlockEntity computer = computer(helper);
+		UUID computerCard = UUID.randomUUID();
+		UUID hubCard = UUID.randomUUID();
+		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(computerCard, null));
+		helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.EXPANSION_HUB);
+		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(4, 1, 1), ExpansionHubBlockEntity.class);
+		hub.cards().setItem(ExpansionHubBlockEntity.PAIRING_SLOT, card(hubCard, computerCard));
+		hub.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
+		ScreenBlockEntity screen = screen(helper, new BlockPos(4, 1, 5));
+		screen.cards().setItem(0, card(UUID.randomUUID(), hubCard));
+		helper.succeedWhen(() -> {
+			helper.assertValueEqual(locations(computer), List.of("hub 1, paired", "paired"), "the hub's card and the screen, both paired");
+			helper.assertTrue(onBus(computer, screen), "the screen is on the bus");
+		});
+	}
+
+	@GameTest(maxTicks = 100)
+	public void aDevicePairedToNothingIsOnNoBus(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper);
+		cable(helper, new BlockPos(2, 1, 1));
+		ScreenBlockEntity screen = screen(helper, new BlockPos(3, 1, 1));
+		screen.cards().setItem(0, card(UUID.randomUUID(), null)); // a card, but it links to nothing
+		helper.startSequence()
+			.thenIdle(25)
+			.thenExecute(() -> helper.assertTrue(!onBus(computer, screen) && locations(computer).isEmpty(), "paired to no one, on no bus"))
+			.thenExecute(() -> screen.cards().setItem(0, ItemStack.EMPTY))
+			.thenWaitUntil(() -> helper.assertTrue(onBus(computer, screen), "without the card it's shared on the cable again"))
+			.thenSucceed();
 	}
 
 	@GameTest
 	public void cardsDaisyChainThroughAHub(GameTestHelper helper) {
-		// The computer's card links to the hub's; the piston's card links to the hub's too (many
-		// to one). The hub passes the connection on, so the computer reaches the piston.
+		// Unpaired: the computer's card links to a Bluetooth card in one of the hub's expansion
+		// slots, which reaches the hub over Bluetooth; the hub passes it on by cable.
 		AllInOneBlockEntity computer = computer(helper);
 		UUID hubCard = UUID.randomUUID();
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(UUID.randomUUID(), hubCard));
 		helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.EXPANSION_HUB);
 		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(4, 1, 1), ExpansionHubBlockEntity.class);
 		hub.cards().setItem(0, card(hubCard, null));
-		piston(helper, new BlockPos(4, 1, 5)).cards().setItem(0, card(UUID.randomUUID(), hubCard));
-		helper.succeedWhen(() -> helper.assertValueEqual(locations(computer), List.of("hub 1, 3m", "bluetooth, 7m"),
-			"the hub's card 3m away, then the piston 4m past it"));
+		cable(helper, new BlockPos(4, 1, 2));
+		screen(helper, new BlockPos(4, 1, 3));
+		helper.succeedWhen(() -> helper.assertValueEqual(locations(computer), List.of("hub 1, 3m", "bluetooth, 5m"),
+			"the hub's card 3m away over Bluetooth, then the screen 2m past it by cable"));
 	}
 
 	@GameTest
 	public void anUnlinkedCardJoinsNothing(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(UUID.randomUUID(), UUID.randomUUID()));
-		piston(helper, new BlockPos(1, 1, 6)).cards().setItem(0, card(UUID.randomUUID(), null));
+		helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.EXPANSION_HUB);
+		helper.getBlockEntity(new BlockPos(4, 1, 1), ExpansionHubBlockEntity.class).cards().setItem(0, card(UUID.randomUUID(), null));
 		helper.startSequence()
 			.thenIdle(5)
 			.thenExecute(() -> helper.assertTrue(locations(computer).isEmpty(), "no link, no connection"))
 			.thenSucceed();
+	}
+
+	private static ScreenBlockEntity screen(GameTestHelper helper, BlockPos pos) {
+		helper.setBlock(pos, ModBlocks.SCREEN.defaultBlockState().setValue(ScreenBlock.FACING, Direction.SOUTH));
+		return helper.getBlockEntity(pos, ScreenBlockEntity.class);
+	}
+
+	private static void cable(GameTestHelper helper, BlockPos pos) {
+		BlockPos absolute = helper.absolutePos(pos);
+		helper.getLevel().setBlock(absolute, CableBlock.withConnections(helper.getLevel(), absolute, ModBlocks.CABLE.defaultBlockState()),
+			net.minecraft.world.level.block.Block.UPDATE_ALL);
+	}
+
+	private static boolean onBus(AllInOneBlockEntity computer, ScreenBlockEntity screen) {
+		return computer.machine().board().bus().devices().contains(screen.display());
 	}
 }

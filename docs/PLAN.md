@@ -141,6 +141,14 @@ of letting the player order them:
 - **Paint gun (user idea, 2026-10-11; placeholder block built):** a block that "shoots" paint
   colors at nearby wool blocks, out of its nozzle face.
 
+## Pairing: one owner per device (built 2026-10-11)
+
+The user's answer to "a device can be on only one bus": deciding an owner at runtime (first
+wins, last wins) is a race that chunk loading reshuffles, especially when the owner's chunk
+isn't loaded. So ownership is explicit and saved. A Bluetooth card in a device's pairing slot
+gives it to the computer the card leads to, and nobody else. Unpaired devices stay shared, and
+racy (undefined behavior, accepted). Details are in AGENTS.md.
+
 ## Bluetooth (built 2026-10-11)
 
 Linking, resetting, daisy-chaining, distances and the held-card highlight are built (see

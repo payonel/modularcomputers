@@ -35,6 +35,8 @@ public final class ModularComputersClient implements ClientModInitializer {
 		MenuScreens.register(ModMenus.CASE, CaseScreen::new);
 		MenuScreens.register(ModMenus.EXPANSION_HUB, CardHolderScreen::new);
 		MenuScreens.register(ModMenus.ROBOTIC_PISTON, CardHolderScreen::new);
+		MenuScreens.register(ModMenus.SCREEN, CardHolderScreen::new);
+		MenuScreens.register(ModMenus.PAINT_GUN, CardHolderScreen::new);
 		ClientPlayNetworking.registerGlobalReceiver(OpenDisplayPayload.TYPE, (payload, context) -> {
 			var client = context.client();
 			client.gui.setScreen(new DisplayScreen(payload));

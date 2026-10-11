@@ -1,27 +1,20 @@
 package com.payonel.modularcomputers.block;
 
 import com.payonel.modularcomputers.device.PaintGun;
-import java.util.UUID;
+import com.payonel.modularcomputers.menu.CardHolderMenu;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
 
-/** A paint gun's id (for the bus order of the computers wired to it) and its bus device. */
-public final class PaintGunBlockEntity extends BlockEntity {
-	private static final String ID = "device_id"; // not "id": that is the block entity type
-
+/** A paint gun: its bus device, and one pairing slot for a Bluetooth card. */
+public final class PaintGunBlockEntity extends CardHolderBlockEntity {
 	private final PaintGun device = new PaintGun();
-	private UUID id = UUID.randomUUID();
 
 	public PaintGunBlockEntity(BlockPos pos, BlockState state) {
-		super(ModBlocks.PAINT_GUN_ENTITY, pos, state);
-	}
-
-	public UUID id() {
-		return id;
+		super(ModBlocks.PAINT_GUN_ENTITY, pos, state, 1);
 	}
 
 	public PaintGun device() {
@@ -29,14 +22,12 @@ public final class PaintGunBlockEntity extends BlockEntity {
 	}
 
 	@Override
-	protected void saveAdditional(ValueOutput output) {
-		super.saveAdditional(output);
-		output.store(ID, UUIDUtil.CODEC, id);
+	public int pairingSlot() {
+		return 0;
 	}
 
 	@Override
-	protected void loadAdditional(ValueInput input) {
-		super.loadAdditional(input);
-		input.read(ID, UUIDUtil.CODEC).ifPresent(saved -> id = saved);
+	public AbstractContainerMenu createMenu(int id, Inventory inventory, Player player) {
+		return CardHolderMenu.paintGun(id, inventory, cards(), worldPosition, ContainerLevelAccess.create(level, worldPosition));
 	}
 }

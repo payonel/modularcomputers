@@ -95,7 +95,9 @@ public class CardHolderGameTest {
 			helper.assertValueEqual(piston.cards().canPlaceItem(0, new ItemStack(card)), card == ModItems.BLUETOOTH_CARD, "a piston taking " + card);
 		}
 		helper.assertTrue(!hub.cards().canPlaceItem(0, new ItemStack(ModItems.CPU)), "a hub takes only cards");
-		helper.assertValueEqual(hub.cards().getContainerSize(), ExpansionHubBlockEntity.SLOTS, "four slots");
+		helper.assertValueEqual(hub.cards().getContainerSize(), ExpansionHubBlockEntity.SLOTS + 1, "four slots and the pairing slot");
+		helper.assertTrue(!hub.cards().canPlaceItem(ExpansionHubBlockEntity.PAIRING_SLOT, new ItemStack(ModItems.AUDIO_CARD)), "pairing takes only Bluetooth");
+		helper.assertTrue(hub.cards().canPlaceItem(ExpansionHubBlockEntity.PAIRING_SLOT, new ItemStack(ModItems.BLUETOOTH_CARD)), "pairing takes Bluetooth");
 		helper.assertValueEqual(piston.cards().getContainerSize(), 1, "one slot");
 		helper.succeed();
 	}
@@ -155,5 +157,21 @@ public class CardHolderGameTest {
 			helper.assertValueEqual(entries.stream().map(entry -> entry.name().getString()).toList(), List.of("Paint Gun"), "the paint gun is listed");
 			helper.assertTrue(computer.machine().board().bus().devices().stream().anyMatch(device -> device.type() == DeviceType.ACTUATOR), "on the bus");
 		});
+	}
+
+	@GameTest
+	public void aScreensBackOpensItsPairingSlotAndItsFrontTheDisplay(GameTestHelper helper) {
+		helper.setBlock(new BlockPos(1, 1, 1), ModBlocks.SCREEN.defaultBlockState().setValue(ScreenBlock.FACING, Direction.SOUTH));
+		var player = helper.makeMockServerPlayerInLevel();
+		BlockPos screen = helper.absolutePos(new BlockPos(1, 1, 1));
+		helper.useBlock(new BlockPos(1, 1, 1), player, new net.minecraft.world.phys.BlockHitResult(
+			net.minecraft.world.phys.Vec3.atCenterOf(screen).add(0, 0, -0.5), Direction.NORTH, screen, false));
+		helper.assertTrue(player.containerMenu instanceof com.payonel.modularcomputers.menu.CardHolderMenu menu && menu.cardSlots() == 1,
+			"the back opens the pairing slot, got " + player.containerMenu);
+		player.closeContainer();
+		helper.useBlock(new BlockPos(1, 1, 1), player, new net.minecraft.world.phys.BlockHitResult(
+			net.minecraft.world.phys.Vec3.atCenterOf(screen).add(0, 0, 0.5), Direction.SOUTH, screen, false));
+		helper.assertTrue(player.containerMenu == player.inventoryMenu, "the glass opens the display, not the slot");
+		helper.succeed();
 	}
 }

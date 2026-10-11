@@ -30,6 +30,11 @@ import net.minecraft.world.level.Level;
  * <p>
  * Each side keeps a registry of the loaded blocks holding Bluetooth cards, which the cable walk
  * uses to cross links and clients use to highlight a held card's target.
+ * <p>
+ * <b>Pairing:</b> a device with a Bluetooth card in its pairing slot belongs to one computer,
+ * found by following its card's link (on through the pairing cards of whatever it links to, like
+ * a hub) until a computer. That's saved in the cards themselves, so it doesn't depend on which
+ * chunk loads first. Unpaired devices are shared by every computer that reaches them.
  */
 public final class Bluetooth {
 	/** An installed card's address and link, either of which may not be set. */
@@ -48,24 +53,62 @@ public final class Bluetooth {
 		void bluetoothChanged();
 	}
 
-	private static final Map<Level, Map<BlockPos, List<Card>>> HOLDERS = new WeakHashMap<>();
+	/** A block's Bluetooth cards, its pairing card (if any), and whether it's a computer. */
+	private record Entry(List<Card> cards, Optional<Card> pairing, boolean computer) {
+	}
+
+	/** How many links {@link #owner} follows before giving up (a loop, or a very long chain). */
+	private static final int MAX_CHAIN = 16;
+
+	private static final Map<Level, Map<BlockPos, Entry>> HOLDERS = new WeakHashMap<>();
 
 	private Bluetooth() {
 	}
 
-	/** Records which Bluetooth cards the block at {@code pos} holds now. */
-	public static void update(Level level, BlockPos pos, List<ItemStack> cards) {
-		Map<BlockPos, List<Card>> holders = HOLDERS.computeIfAbsent(level, key -> new HashMap<>());
+	/**
+	 * Records which Bluetooth cards the block at {@code pos} holds now: all of them, the one in its
+	 * pairing slot (or null), and whether the block is a computer.
+	 */
+	public static void update(Level level, BlockPos pos, List<ItemStack> cards, ItemStack pairing, boolean computer) {
+		Map<BlockPos, Entry> holders = HOLDERS.computeIfAbsent(level, key -> new HashMap<>());
 		if (cards.isEmpty()) {
 			holders.remove(pos);
 		} else {
-			holders.put(pos.immutable(), cards.stream().map(Card::of).toList());
+			holders.put(pos.immutable(), new Entry(cards.stream().map(Card::of).toList(), Optional.ofNullable(pairing).map(Card::of), computer));
 		}
+	}
+
+	/**
+	 * The computer a paired device belongs to: follow its pairing card's link to the block holding
+	 * that address, and on through that block's pairing card, until a computer. Empty when the
+	 * device isn't paired, or the chain ends (no link, or a block that isn't loaded).
+	 */
+	public static Optional<BlockPos> owner(Level level, BlockPos device) {
+		Map<BlockPos, Entry> holders = HOLDERS.getOrDefault(level, Map.of());
+		Entry entry = holders.get(device);
+		Optional<Card> card = entry == null ? Optional.empty() : entry.pairing();
+		for (int step = 0; step < MAX_CHAIN && card.isPresent(); step++) {
+			Optional<UUID> link = card.get().link();
+			if (link.isEmpty()) {
+				return Optional.empty();
+			}
+			var next = holders.entrySet().stream()
+				.filter(holder -> holder.getValue().cards().stream().anyMatch(theirs -> theirs.id().equals(link)))
+				.findFirst();
+			if (next.isEmpty()) {
+				return Optional.empty();
+			}
+			if (next.get().getValue().computer()) {
+				return Optional.of(next.get().getKey());
+			}
+			card = next.get().getValue().pairing();
+		}
+		return Optional.empty();
 	}
 
 	/** The block at {@code pos} is gone, or its chunk unloaded. */
 	public static void remove(Level level, BlockPos pos) {
-		Map<BlockPos, List<Card>> holders = HOLDERS.get(level);
+		Map<BlockPos, Entry> holders = HOLDERS.get(level);
 		if (holders != null) {
 			holders.remove(pos);
 		}
@@ -76,8 +119,8 @@ public final class Bluetooth {
 	 * theirs link to its. Distances are straight lines, in meters (at least 1).
 	 */
 	public static List<CableWalk.Link> links(Level level, BlockPos pos) {
-		Map<BlockPos, List<Card>> holders = HOLDERS.getOrDefault(level, Map.of());
-		List<Card> mine = holders.get(pos);
+		Map<BlockPos, Entry> holders = HOLDERS.getOrDefault(level, Map.of());
+		List<Card> mine = holders.containsKey(pos) ? holders.get(pos).cards() : null;
 		if (mine == null) {
 			return List.of();
 		}
@@ -86,7 +129,7 @@ public final class Bluetooth {
 			if (other.getKey().equals(pos)) {
 				continue;
 			}
-			boolean linked = mine.stream().anyMatch(card -> other.getValue().stream().anyMatch(theirs ->
+			boolean linked = mine.stream().anyMatch(card -> other.getValue().cards().stream().anyMatch(theirs ->
 				card.link().isPresent() && card.link().equals(theirs.id()) || theirs.link().isPresent() && theirs.link().equals(card.id())));
 			if (linked) {
 				int meters = Math.max(1, (int) Math.round(Math.sqrt(pos.distSqr(other.getKey()))));
@@ -98,8 +141,8 @@ public final class Bluetooth {
 
 	/** Whether the block at {@code pos} holds the card with address {@code id}. */
 	public static boolean holds(Level level, BlockPos pos, UUID id) {
-		List<Card> cards = HOLDERS.getOrDefault(level, Map.of()).get(pos);
-		return cards != null && cards.stream().anyMatch(card -> card.id().equals(Optional.of(id)));
+		Entry entry = HOLDERS.getOrDefault(level, Map.of()).get(pos);
+		return entry != null && entry.cards().stream().anyMatch(card -> card.id().equals(Optional.of(id)));
 	}
 
 	/**
@@ -136,10 +179,5 @@ public final class Bluetooth {
 			player.sendOverlayMessage(Component.translatable("item.modularcomputers.bluetooth_card.reset"));
 		}
 		return InteractionResult.SUCCESS;
-	}
-
-	/** The Bluetooth cards among some stacks, in order. */
-	public static List<ItemStack> cardsAmong(List<ItemStack> stacks) {
-		return stacks.stream().filter(stack -> stack.is(ModItems.BLUETOOTH_CARD)).toList();
 	}
 }

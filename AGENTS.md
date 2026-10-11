@@ -298,9 +298,30 @@ scripts/art/error_beep.py` into
     - **While you hold a linked card**, the block holding its target gets a steady blue
       wireframe, seen through walls (`client/BluetoothTarget`, `Outline.BLUETOOTH`).
     - There's no range limit yet.
-  - Hub and piston share `CardHolderBlockEntity`: an id, card slots, save and sync, drops,
-    card sounds, and `Cabling.changed()` when their cards change. They also share
-    `CardHolderMenu` and `CardHolderScreen`, and `OutlineRenderer` for the bulb.
+  - **Pairing** (user design, 2026-10-11): every network block has a slot GUI with a
+    **pairing slot** for a Bluetooth card.
+    - Where the slot is:
+      - the screen: its only slot, opened by right-clicking its back;
+      - the hub: a fifth slot, apart from its four expansion slots, drawn blue;
+      - the robotic piston: its one slot;
+      - the paint gun: its one slot, opened by right-click.
+    - **A paired device belongs to exactly one computer** (`Bluetooth.owner`). Its pairing
+      card's link is followed, on through the pairing cards of what it links to (a hub, say),
+      until a computer.
+      - Only that computer has it on its bus, and its row reads "paired" (or "hub 2, paired").
+        A device paired to nothing is on no bus.
+      - It still carries the cable for everything else.
+      - A hub's pairing card pairs the whole hub, cards and all.
+      - This is deterministic: the ownership is saved in the cards, so it doesn't depend on
+        which chunk loads first. The user found first-wins and last-wins hopeless for that
+        reason.
+    - **Unpaired devices are shared** by every computer that reaches them. That's racy by
+      nature; the user calls it undefined behavior and accepts it.
+    - Holding a card and right-clicking a holder links to its **pairing card first**.
+  - The screen, hub, piston and paint gun share `CardHolderBlockEntity`: an id, card slots
+    with a pairing slot, save and sync, drops, card sounds, Bluetooth registration, and
+    `Cabling.changed()` when their cards change. They also share `CardHolderMenu` and
+    `CardHolderScreen`. Hubs, pistons and paint guns use `OutlineRenderer` for the outlines.
   - **One screen, many computers:** a screen can be wired to several computers, and each
     has it on its bus.
     - Each writes to it; the last write wins, and powering one off blanks it.
@@ -541,7 +562,7 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
    - They run headless via `runGameTest`, which is part of `testAll` but **not** of `build`.
      Loom adds `runGameTest` to `check` by name; `build.gradle` removes it so `build` stays fast
      (the user wants `build` quick and iterative).
-   - The run reports "All 44 required tests passed": 43 are ours (`AllInOneGameTest`,
+   - The run reports "All 48 required tests passed": 47 are ours (`AllInOneGameTest`,
      `CableGameTest`, `CardHolderGameTest`, `BluetoothGameTest`), and one is of unknown origin (not investigated).
    - `helper.useBlock` always goes to the block, even when sneaking. The real game skips the
      block when sneaking with an item in hand, so test sneak-use of an item with

@@ -3,7 +3,6 @@ package com.payonel.modularcomputers.menu;
 import com.payonel.modularcomputers.block.ExpansionHubBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.item.ModItems;
-import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
@@ -17,32 +16,40 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 
 /**
- * The card slots of an expansion hub (four, any card) or a robotic piston (one, a Bluetooth
- * card), above the player's inventory.
+ * The card slots of a block on the network, above the player's inventory: an expansion hub's
+ * four expansion slots, and every holder's pairing slot (a Bluetooth card, which pairs the block
+ * with one computer). Screens, robotic pistons and paint guns have just the pairing slot.
  */
 public final class CardHolderMenu extends AbstractContainerMenu {
 	public static final int SLOT_Y = 35;
 	public static final int INVENTORY_Y = 84;
 	private static final int SLOT_SPACING = 22;
+	/** Where the pairing slot sits when there are expansion slots too: on its own, at the right. */
+	private static final int PAIRING_X = 141;
 
 	private final int cardSlots;
+	private final int pairingSlot;
 	private final BlockPos pos;
 	private final ContainerLevelAccess access;
 	private final Block block;
 
-	private CardHolderMenu(MenuType<?> type, int id, Inventory inventory, Container cards, BlockPos pos, ContainerLevelAccess access,
-		Block block, Predicate<ItemStack> accepts) {
+	private CardHolderMenu(MenuType<?> type, int id, Inventory inventory, Container cards, int pairingSlot, BlockPos pos,
+		ContainerLevelAccess access, Block block) {
 		super(type, id);
 		this.cardSlots = cards.getContainerSize();
+		this.pairingSlot = pairingSlot;
 		this.pos = pos;
 		this.access = access;
 		this.block = block;
-		int left = 88 - (cardSlots * SLOT_SPACING - 4) / 2;
-		for (int slot = 0; slot < cardSlots; slot++) {
-			addSlot(new Slot(cards, slot, left + slot * SLOT_SPACING + 1, SLOT_Y) {
+		int expansion = cardSlots - 1;
+		int left = (expansion > 0 ? 76 : 88) - (expansion * SLOT_SPACING - 4) / 2;
+		for (int slot = 0, column = 0; slot < cardSlots; slot++) {
+			int x = slot == pairingSlot ? (expansion > 0 ? PAIRING_X : 80) : left + column++ * SLOT_SPACING + 1;
+			int index = slot;
+			addSlot(new Slot(cards, slot, x, SLOT_Y) {
 				@Override
 				public boolean mayPlace(ItemStack stack) {
-					return accepts.test(stack);
+					return index == pairingSlot ? stack.is(ModItems.BLUETOOTH_CARD) : ModItems.cardKind(stack).isPresent();
 				}
 
 				@Override
@@ -55,23 +62,40 @@ public final class CardHolderMenu extends AbstractContainerMenu {
 	}
 
 	public static CardHolderMenu hub(int id, Inventory inventory, Container cards, BlockPos pos, ContainerLevelAccess access) {
-		return new CardHolderMenu(ModMenus.EXPANSION_HUB, id, inventory, cards, pos, access, ModBlocks.EXPANSION_HUB,
-			stack -> ModItems.cardKind(stack).isPresent());
+		return new CardHolderMenu(ModMenus.EXPANSION_HUB, id, inventory, cards, ExpansionHubBlockEntity.PAIRING_SLOT, pos, access, ModBlocks.EXPANSION_HUB);
 	}
 
 	/** Client side: the slots are filled in by the server's sync. */
 	public static CardHolderMenu hub(int id, Inventory inventory, BlockPos pos) {
-		return hub(id, inventory, new SimpleContainer(ExpansionHubBlockEntity.SLOTS), pos, ContainerLevelAccess.NULL);
+		return hub(id, inventory, new SimpleContainer(ExpansionHubBlockEntity.SLOTS + 1), pos, ContainerLevelAccess.NULL);
 	}
 
 	public static CardHolderMenu piston(int id, Inventory inventory, Container cards, BlockPos pos, ContainerLevelAccess access) {
-		return new CardHolderMenu(ModMenus.ROBOTIC_PISTON, id, inventory, cards, pos, access, ModBlocks.ROBOTIC_PISTON,
-			stack -> stack.is(ModItems.BLUETOOTH_CARD));
+		return new CardHolderMenu(ModMenus.ROBOTIC_PISTON, id, inventory, cards, 0, pos, access, ModBlocks.ROBOTIC_PISTON);
 	}
 
-	/** Client side: the slot is filled in by the server's sync. */
 	public static CardHolderMenu piston(int id, Inventory inventory, BlockPos pos) {
 		return piston(id, inventory, new SimpleContainer(1), pos, ContainerLevelAccess.NULL);
+	}
+
+	public static CardHolderMenu screen(int id, Inventory inventory, Container cards, BlockPos pos, ContainerLevelAccess access) {
+		return new CardHolderMenu(ModMenus.SCREEN, id, inventory, cards, 0, pos, access, ModBlocks.SCREEN);
+	}
+
+	public static CardHolderMenu screen(int id, Inventory inventory, BlockPos pos) {
+		return screen(id, inventory, new SimpleContainer(1), pos, ContainerLevelAccess.NULL);
+	}
+
+	public static CardHolderMenu paintGun(int id, Inventory inventory, Container cards, BlockPos pos, ContainerLevelAccess access) {
+		return new CardHolderMenu(ModMenus.PAINT_GUN, id, inventory, cards, 0, pos, access, ModBlocks.PAINT_GUN);
+	}
+
+	public static CardHolderMenu paintGun(int id, Inventory inventory, BlockPos pos) {
+		return paintGun(id, inventory, new SimpleContainer(1), pos, ContainerLevelAccess.NULL);
+	}
+
+	public int pairingSlot() {
+		return pairingSlot;
 	}
 
 	public BlockPos pos() {

@@ -202,7 +202,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 				context.waitForScreen(CardHolderScreen.class);
 				context.waitTicks(2);
 				int slots = context.computeOnClient(client -> ((CardHolderScreen) client.gui.screen()).getMenu().cardSlots());
-				check(slots == (holder == hub ? 4 : 1), "card slots: " + slots);
+				check(slots == (holder == hub ? 5 : 1), "card slots: " + slots);
 				context.takeScreenshot(holder == hub ? "expansion-hub" : "robotic-piston");
 				context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 				context.waitFor(client -> client.gui.screen() == null);

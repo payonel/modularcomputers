@@ -10,27 +10,29 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * An expansion hub: a box of expansion card slots on the cable network, like an external
- * expansion chassis. Every computer wired to it has its cards on its bus. A card works where
- * it's installed: a redstone card in a hub will emit and detect redstone at the hub.
+ * expansion chassis. Every computer wired to it has its cards on its bus, unless a Bluetooth
+ * card in its pairing slot pairs the whole hub with one computer. A card works where it's
+ * installed: a redstone card in a hub will emit and detect redstone at the hub.
  */
 public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
+	/** Expansion card slots; the pairing slot comes after them. */
 	public static final int SLOTS = 4;
+	public static final int PAIRING_SLOT = SLOTS;
 
 	/** The devices made from the cards, by slot; null when empty. */
 	private final Card[] devices = new Card[SLOTS];
 
 	public ExpansionHubBlockEntity(BlockPos pos, BlockState state) {
-		super(ModBlocks.EXPANSION_HUB_ENTITY, pos, state, SLOTS);
+		super(ModBlocks.EXPANSION_HUB_ENTITY, pos, state, SLOTS + 1);
 	}
 
 	@Override
-	public boolean accepts(ItemStack stack) {
-		return ModItems.cardKind(stack).isPresent();
+	public int pairingSlot() {
+		return PAIRING_SLOT;
 	}
 
 	/** The card in a slot, as a bus device. */

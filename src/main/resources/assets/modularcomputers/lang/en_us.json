@@ -37,5 +37,8 @@
 	"block.modularcomputers.paint_gun": "Paint Gun",
 	"item.modularcomputers.bluetooth_card.linked": "Linked to the Bluetooth card in the %s",
 	"item.modularcomputers.bluetooth_card.reset": "Bluetooth card reset: nothing links to it, and it links to nothing",
-	"gui.modularcomputers.bus.bluetooth": "bluetooth, %sm"
+	"gui.modularcomputers.bus.bluetooth": "bluetooth, %sm",
+	"gui.modularcomputers.bus.paired": "paired",
+	"gui.modularcomputers.bus.hub_paired": "hub %s, paired",
+	"gui.modularcomputers.pairing": "Pairing"
 }

@@ -1,14 +1,12 @@
 package com.payonel.modularcomputers.block;
 
 import com.payonel.modularcomputers.device.RoboticPiston;
-import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.CardHolderMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -23,9 +21,10 @@ public final class RoboticPistonBlockEntity extends CardHolderBlockEntity {
 		super(ModBlocks.ROBOTIC_PISTON_ENTITY, pos, state, 1);
 	}
 
+	/** Its one slot is the pairing slot: a Bluetooth card there links it to its computer instead of a cable. */
 	@Override
-	public boolean accepts(ItemStack stack) {
-		return stack.is(ModItems.BLUETOOTH_CARD);
+	public int pairingSlot() {
+		return 0;
 	}
 
 	/** The piston as a bus device. */
