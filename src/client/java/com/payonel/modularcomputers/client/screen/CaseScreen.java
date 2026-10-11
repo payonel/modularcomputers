@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.client.screen;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.payonel.modularcomputers.ModularComputers;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.bus.BusOrder;
 import com.payonel.modularcomputers.bus.BusStatus;
 import com.payonel.modularcomputers.client.Identify;
 import com.payonel.modularcomputers.display.ScrollWindow;
@@ -233,6 +234,18 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	public Viewport busBulb(int row) {
 		Viewport up = busArrow(row, true);
 		return new Viewport(up.x() - 26, up.y(), 11, 11);
+	}
+
+	/**
+	 * The line under the panel's title: "external devices: 13 of 20, missing 5", or with an
+	 * overflow, how many wait ("overflow 2"). Both can't happen at once: a waiting device takes
+	 * a missing one's place.
+	 */
+	public static Component busSummary(BusStatus status) {
+		int room = status.capacity() - BusOrder.INTERNAL_PLACES;
+		return status.overflow()
+			? Component.translatable("gui.modularcomputers.bus.summary_overflow", status.saved(), room, status.waiting())
+			: Component.translatable("gui.modularcomputers.bus.summary", status.saved(), room, status.missing());
 	}
 
 	/** The bus overflow warning light, top right of the bus order panel. */
@@ -470,10 +483,17 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		graphics.blit(RenderPipelines.GUI_TEXTURED, BUS_PANEL, panel.x(), panel.y(), 0, 0, BUS_W, BUS_H, BUS_W, BUS_H);
 		graphics.text(font, Component.translatable("gui.modularcomputers.bus.title"), panel.x() + 10, panel.y() + 6, SILK, false);
 		BusStatus status = computer().map(AllInOneBlockEntity::busStatus).orElse(BusStatus.EMPTY);
-		// A wired device that can't join a full bus would otherwise look broken: the warning
-		// light comes on, and the subtitle says how many wait.
-		graphics.text(font, status.overflow() ? Component.translatable("gui.modularcomputers.bus.waiting", status.waiting())
-			: Component.translatable("gui.modularcomputers.bus.subtitle"), panel.x() + 10, panel.y() + 17, status.overflow() ? METER_MEDIUM : SILK_DIM, false);
+		// How full the external part of the bus is. A wired device that can't join a full bus
+		// would otherwise look broken: the warning light comes on, and the line says so.
+		Component summary = busSummary(status);
+		int room = BUS_W - 10 - 6;
+		float scale = Math.min(1f, (float) room / font.width(summary)); // a long line shrinks to fit
+		var pose = graphics.pose();
+		pose.pushMatrix();
+		pose.translate(panel.x() + 10, panel.y() + 17 + (1 - scale) * 4);
+		pose.scale(scale, scale);
+		graphics.text(font, summary, 0, 0, status.overflow() ? METER_MEDIUM : SILK_DIM, false);
+		pose.popMatrix();
 		extractLed(graphics, busOverflowLed(), status.overflow());
 		List<AllInOneBlockEntity.BusEntry> entries = busEntries();
 		int firstExternal = firstExternal(entries);

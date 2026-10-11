@@ -200,6 +200,10 @@ same thing.
         - **Linked hover:** hovering a part slot outlines its bus row, and hovering a row
           outlines its slot (`BusEntry.slot`). Built-ins have no slot.
         - The ↑/↓ arrows send `ReorderBusPayload`; they're greyed out at the ends.
+        - **The line under the title** (user wording): "external devices: 13 of 20, missing 5"
+          (saved, room, offline), or "external devices: 20 of 20, overflow 2" while devices wait;
+          the two can't happen at once, since a waiting device takes a missing one's place. It
+          shrinks to fit the panel when the numbers get long (`CaseScreen.busSummary`).
         - Order lives in `bus/BusOrder` (user design, 2026-10-11, replacing "first found on top"):
           - **The case's devices come first, fixed in their slots' order:** built-ins, ROM, UPS,
             SATA 1-4, EXP 1-4. No arrows: a slot's position is its address, like real hardware.
@@ -214,8 +218,8 @@ same thing.
             so external devices get the rest (20).
           - **Full:** a new external device bumps the one missing longest (each entry keeps
             `lastSeen`). With none missing it **waits**: not on the bus. The bus is then in its
-            warning state: an amber LED top right of the panel, the subtitle "bus full: N
-            waiting", and a deep, rough, sagging hum (`bus_overflow`) when a device starts
+            warning state: an amber LED top right of the panel, the summary line saying
+            "overflow N", and a deep, rough, sagging hum (`bus_overflow`) when a device starts
             waiting.
           - **A soft hum beat** (`device_connect`, two low tones 4 Hz apart, the user's
             favorite) plays whenever an external device joins the bus: wired up, plugged back in
