@@ -76,5 +76,11 @@
 			"modularcomputers:battery_remove"
 		],
 		"subtitle": "subtitles.modularcomputers.part_remove"
+	},
+	"bus_overflow": {
+		"sounds": [
+			"modularcomputers:bus_overflow"
+		],
+		"subtitle": "subtitles.modularcomputers.bus_overflow"
 	}
 }

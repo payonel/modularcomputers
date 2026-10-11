@@ -82,7 +82,7 @@ public class CardHolderGameTest {
 				helper.assertTrue(!types.contains(DeviceType.AUDIO) && types.contains(DeviceType.NETWORK), "only the audio card leaves the bus");
 				hub.cards().setItem(1, ItemStack.EMPTY);
 			})
-			.thenWaitUntil(() -> helper.assertValueEqual(locations(computer), List.of("hub 1, 1m"), "a card taken out of the hub drops out"))
+			.thenWaitUntil(() -> helper.assertValueEqual(locations(computer), List.of("hub 1, 1m", "offline"), "a card taken out of the hub goes offline"))
 			.thenSucceed();
 	}
 

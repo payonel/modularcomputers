@@ -198,9 +198,25 @@ same thing.
         - **Linked hover:** hovering a part slot outlines its bus row, and hovering a row
           outlines its slot (`BusEntry.slot`). Built-ins have no slot.
         - The ↑/↓ arrows send `ReorderBusPayload`; they're greyed out at the ends.
-        - Order lives in `bus/BusOrder`: devices keep their place, new ones go last
-          ("first found on top"), removed parts drop out. It's saved, and the machine's `Bus`
-          follows it.
+        - Order lives in `bus/BusOrder` (user design, 2026-10-11, replacing "first found on top"):
+          - **The case's devices come first, fixed in their slots' order:** built-ins, ROM, UPS,
+            SATA 1-4, EXP 1-4. No arrows: a slot's position is its address, like real hardware.
+            Removed parts drop out.
+          - **External devices (cabled and Bluetooth, mixed) follow, in a saved list the player
+            reorders**, like UEFI's BootOrder: kept by id, so a device late to load (its chunk)
+            keeps its place. Absent ones stay listed, dimmed, reading "offline", with a red X
+            **forget** button where the plug was (`ForgetDevicePayload`). New ones go last.
+            Offline rows keep their last-known name, icon and position (`known`, saved).
+          - **Bus capacity** is a motherboard setting (`Motherboard.busCapacity`, default 32,
+            saved as `bus_capacity`; settings UI later). The 12 case places are always reserved,
+            so external devices get the rest (20).
+          - **Full:** a new external device bumps the one missing longest (each entry keeps
+            `lastSeen`). With none missing it **waits**: not on the bus. The bus is then in its
+            warning state: an amber LED top right of the panel, the subtitle "bus full: N
+            waiting", and a soft hum beat (`bus_overflow`, two detuned low tones) when a device
+            starts waiting. Programs will read it from `Bus.status()` (`BusStatus`: capacity,
+            devices, saved, missing, waiting, overflow).
+          - It's saved (`bus_external`, `bus_disconnected`), and the machine's `Bus` follows it.
         - **Cabled devices** (screens) get two more buttons left of the arrows:
           - The **bulb** outlines the device in the world for 10 seconds, pulsing yellow and
             seen through walls (`client/Identify`, drawn by `DisplayRenderer`). It's
@@ -421,13 +437,9 @@ scripts/art/error_beep.py` into
   - **Every connected screen shows hello world (user's hard-coded choice for now):** the
     console writes to every display on the bus. The user wants this replaced later by a
     "virtual multicast text buffer" on the motherboard's virtual bus, so the EEPROM chooses.
-- **Bus order memory and gaps (defaults picked when building cables; the user can change
-  them):**
-  - Order is set the first time a device is seen.
-  - A cabled device that goes away (cable cut, chunk unloaded, broken) is **remembered** in
-    its place. At most `BusOrder.MAX_REMEMBERED` (32) absent devices are remembered;
-    the earliest-listed go first.
-  - Disconnected devices are remembered too, and saved.
+- **Bus order and gaps:**
+  - See the bus order panel above for the rules (case fixed, external saved by id, capacity,
+    bumping, waiting, forget).
   - The bus walk the machine sees is **gapless**: disconnected and absent devices are left out
     of `Bus.devices()`. Whether firmware should see gaps is still open (`docs/PLAN.md`).
 - **Roadmap and ideas: `docs/PLAN.md`.** Record new plans and decided-but-unbuilt ideas there.

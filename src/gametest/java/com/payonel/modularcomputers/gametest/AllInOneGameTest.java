@@ -130,7 +130,7 @@ public class AllInOneGameTest {
 	}
 
 	@GameTest
-	public void drivesAndCardsJoinTheBusAndThePlayerSetsTheOrder(GameTestHelper helper) {
+	public void drivesAndCardsJoinTheBusInTheirSlotsOrder(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
 		computer.parts().setItem(CaseMenu.SATA_SLOTS + 1, new ItemStack(ModItems.HARD_DISK));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.WLAN_CARD));
@@ -138,17 +138,12 @@ public class AllInOneGameTest {
 		helper.assertValueEqual(busKeys(computer), List.of("display", "keyboard", "sata:1", "exp:0"), "attached in default order");
 		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.DISPLAY, DeviceType.KEYBOARD, DeviceType.STORAGE, DeviceType.NETWORK), "bus");
 
-		helper.assertTrue(computer.moveDevice(3, true), "the card moves up");
-		helper.assertTrue(computer.moveDevice(2, true), "and up again");
-		helper.assertValueEqual(busKeys(computer), List.of("display", "exp:0", "keyboard", "sata:1"), "player's order");
-		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.DISPLAY, DeviceType.NETWORK, DeviceType.KEYBOARD, DeviceType.STORAGE),
-			"the machine's bus follows the player's order");
-		helper.assertTrue(!computer.moveDevice(0, true), "the first device can't move up");
+		helper.assertTrue(!computer.moveDevice(3, true) && !computer.moveDevice(2, false), "the case's devices don't move");
 
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.HARD_DISK));
-		helper.assertValueEqual(busKeys(computer), List.of("display", "exp:0", "keyboard", "sata:1", "sata:0"), "a new drive goes last");
+		helper.assertValueEqual(busKeys(computer), List.of("display", "keyboard", "sata:0", "sata:1", "exp:0"), "a new drive goes in its slot's place");
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, ItemStack.EMPTY);
-		helper.assertValueEqual(busKeys(computer), List.of("display", "keyboard", "sata:1", "sata:0"), "a removed card drops out");
+		helper.assertValueEqual(busKeys(computer), List.of("display", "keyboard", "sata:0", "sata:1"), "a removed card drops out");
 		helper.succeed();
 	}
 
@@ -167,16 +162,15 @@ public class AllInOneGameTest {
 	}
 
 	@GameTest
-	public void busOrderSurvivesSaveAndLoad(GameTestHelper helper) {
+	public void theCaseOrderIsItsSlotsOrderAfterAReloadToo(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
+		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.WLAN_CARD));
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.HARD_DISK));
-		computer.moveDevice(2, true);
-		computer.moveDevice(1, true);
 		var registries = helper.getLevel().registryAccess();
 		var loaded = (AllInOneBlockEntity) BlockEntity.loadStatic(computer.getBlockPos(), computer.getBlockState(),
 			computer.saveWithFullMetadata(registries), registries);
-		helper.assertValueEqual(busKeys(loaded), List.of("sata:0", "display", "keyboard"), "bus order after reload");
-		helper.assertValueEqual(busTypes(loaded).getFirst(), DeviceType.STORAGE, "the machine's bus after reload");
+		helper.assertValueEqual(busKeys(loaded), List.of("display", "keyboard", "sata:0", "exp:0"), "bus order after reload");
+		helper.assertValueEqual(busTypes(loaded).get(2), DeviceType.STORAGE, "the machine's bus after reload");
 		helper.succeed();
 	}
 

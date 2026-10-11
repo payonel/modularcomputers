@@ -6,6 +6,8 @@ import com.payonel.modularcomputers.block.CableBlock;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.block.ScreenBlock;
 import com.payonel.modularcomputers.block.ScreenBlockEntity;
+import com.payonel.modularcomputers.bus.BusOrder;
+import com.payonel.modularcomputers.bus.BusStatus;
 import com.payonel.modularcomputers.display.Display;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.CaseMenu;
@@ -138,25 +140,55 @@ public class CableGameTest {
 	}
 
 	@GameTest
-	public void aScreenThatGoesAwayKeepsItsPlaceInTheBusOrder(GameTestHelper helper) {
+	public void aScreenThatGoesAwayStaysListedOfflineInItsPlaceUntilForgotten(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper, COMPUTER, false);
 		ScreenBlockEntity screen = wiredScreen(helper);
 		String key = "cable:" + screen.id();
 		helper.startSequence()
-			.thenWaitUntil(() -> helper.assertTrue(entryFor(computer, screen).isPresent(), "found"))
+			.thenWaitUntil(() -> helper.assertTrue(entryFor(computer, screen).filter(AllInOneBlockEntity.BusEntry::online).isPresent(), "found"))
 			.thenExecute(() -> {
-				computer.moveDevice(2, true);
-				computer.moveDevice(1, true);
-				helper.assertValueEqual(computer.busEntries().getFirst().key(), key, "moved to the top");
+				helper.assertTrue(!computer.forgetDevice(key), "an online device can't be forgotten");
 				helper.destroyBlock(new BlockPos(3, 1, 1)); // cut the cable
 			})
-			.thenWaitUntil(() -> helper.assertTrue(entryFor(computer, screen).isEmpty(), "gone with the cable"))
-			.thenExecute(() -> cable(helper, new BlockPos(3, 1, 1)))
-			.thenWaitUntil(() -> helper.assertValueEqual(computer.busEntries().getFirst().key(), key, "back at the top"))
+			.thenWaitUntil(() -> helper.assertTrue(entryFor(computer, screen).filter(entry -> !entry.online()).isPresent(), "offline, still listed"))
+			.thenExecute(() -> {
+				helper.assertValueEqual(entryFor(computer, screen).get().location().getString(), "offline", "its row says so");
+				helper.assertTrue(!onBus(computer, screen), "not on the bus");
+				cable(helper, new BlockPos(3, 1, 1));
+			})
+			.thenWaitUntil(() -> helper.assertTrue(entryFor(computer, screen).filter(AllInOneBlockEntity.BusEntry::online).isPresent(), "back online"))
+			.thenExecute(() -> helper.destroyBlock(new BlockPos(3, 1, 1)))
+			.thenWaitUntil(() -> helper.assertTrue(entryFor(computer, screen).filter(entry -> !entry.online()).isPresent(), "offline again"))
+			.thenExecute(() -> {
+				helper.assertTrue(computer.forgetDevice(key), "forgotten");
+				helper.assertTrue(entryFor(computer, screen).isEmpty(), "no longer listed");
+			})
 			.thenSucceed();
 	}
 
-	@GameTest
+	@GameTest(maxTicks = 100)
+	public void aFullBusMakesNewDevicesWaitAndSaysSo(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper, COMPUTER, false);
+		computer.machine().board().setBusCapacity(BusOrder.INTERNAL_PLACES + 1); // room for one external device
+		ScreenBlockEntity first = wiredScreen(helper);
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(onBus(computer, first), "the first screen joins"))
+			.thenExecute(() -> screen(helper, COMPUTER.above(), Direction.SOUTH)) // on top of the computer: its own way in
+			.thenWaitUntil(() -> helper.assertTrue(computer.busStatus().overflow(), "the bus overflows"))
+			.thenExecute(() -> {
+				BusStatus status = computer.machine().board().bus().status();
+				helper.assertValueEqual(status, new BusStatus(BusOrder.INTERNAL_PLACES + 1, 3, 1, 0, 1), "the bus reports it to programs too");
+				helper.destroyBlock(new BlockPos(3, 1, 1)); // cut the cable: the first screen goes missing
+			})
+			.thenWaitUntil(() -> helper.assertTrue(!computer.busStatus().overflow(), "no longer full"))
+			.thenExecute(() -> {
+				helper.assertTrue(!onBus(computer, first), "the first screen is gone");
+				helper.assertTrue(entryFor(computer, first).isEmpty(), "and, missing, it made room");
+			})
+			.thenSucceed();
+	}
+
+		@GameTest
 	public void oneScreenCanBeWiredToTwoComputers(GameTestHelper helper) {
 		AllInOneBlockEntity first = computer(helper, COMPUTER, true);
 		cable(helper, new BlockPos(2, 1, 1));

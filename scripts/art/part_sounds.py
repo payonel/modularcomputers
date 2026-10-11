@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-# Synthesizes the sounds of putting parts into the motherboard and taking them out, as Ogg
-# Vorbis (see oggwrite.py). The .ogg files are committed; rerun after changing a sound.
-#   scripts/art/part_sounds.py src/main/resources/assets/modularcomputers/sounds
+# Synthesizes the sounds of putting parts into the motherboard and taking them out, and the
+# bus's overflow hum, as Ogg Vorbis (see oggwrite.py). The .ogg files are committed; rerun after
+# changing a sound. Name sounds to write only those (re-encoding changes a file's bytes even
+# when the sound is the same):
+#   scripts/art/part_sounds.py src/main/resources/assets/modularcomputers/sounds [name...]
 #
 # Everything is soft and low-passed: plastic and metal seating into sockets, not a UI click.
 # Building blocks: a slide (sparse grains ringing a resonance, a rasp), a click (a short, damped knock), a
@@ -109,6 +111,19 @@ def zap(seconds=0.075, volume=0.32):
 		out.append(volume * env * (0.7 * saw + 0.5 * crackle))
 	return lowpass(out, 7000)
 
+def hum_beat(seconds=0.55, volume=0.4, freq=110, beat=4.0):
+	"""A soft hum that beats: two low tones a few hertz apart swell and fade against each other,
+	so it pulses gently (a warning, not an error)."""
+	n = int(RATE * seconds)
+	out = []
+	for i in range(n):
+		t = i / RATE
+		tone = sum(a * (math.sin(2 * math.pi * f * t) + math.sin(2 * math.pi * (f + beat) * t))
+			for f, a in ((freq, 1.0), (freq * 2, 0.35), (freq * 3, 0.12)))
+		env = min(1, t / 0.06) * min(1, (seconds - t) / 0.18)
+		out.append(volume * env * tone / 3)
+	return lowpass(out, 900)
+
 def mix(*parts):
 	"""Each part is (start seconds, samples)."""
 	length = max(int(start * RATE) + len(s) for start, s in parts)
@@ -138,9 +153,14 @@ SOUNDS = {
 	# UPS battery: a tiny zap as it connects; a soft click when it's pulled.
 	"battery_insert": mix((0, click(0.3, 1400, 0.004)), (0.006, zap())),
 	"battery_remove": mix((0, click(0.35, 1300, 0.005, 3000))),
+	# The bus is full and a device is waiting: a soft hum beat.
+	"bus_overflow": mix((0, hum_beat())),
 }
 
+only = set(sys.argv[2:])
 for name, samples in SOUNDS.items():
+	if only and name not in only:
+		continue
 	peak = max(abs(x) for x in samples)
 	if peak > 0.95:
 		samples = [x * 0.95 / peak for x in samples]

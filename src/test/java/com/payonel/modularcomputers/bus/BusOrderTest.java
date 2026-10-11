@@ -2,109 +2,116 @@ package com.payonel.modularcomputers.bus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 class BusOrderTest {
-	private final BusOrder order = new BusOrder();
+	private static final List<String> CASE = List.of("display", "keyboard", "sata:0");
+	private final BusOrder order = new BusOrder(32);
 
 	@Test
-	void startsInTheDefaultOrder() {
-		order.sync(List.of("display", "keyboard", "sata:0"));
-		assertThat(order.keys()).containsExactly("display", "keyboard", "sata:0");
+	void internalDevicesComeFirstInTheirFixedOrderAndDontMove() {
+		order.sync(CASE, List.of("cable:a"), 0);
+		assertThat(order.keys()).containsExactly("display", "keyboard", "sata:0", "cable:a");
+		assertThat(order.move(1, false)).as("internal").isFalse();
+		assertThat(order.move(3, true)).as("not past the internal ones").isFalse();
+		order.sync(List.of("display", "keyboard"), List.of("cable:a"), 1);
+		assertThat(order.keys()).as("a part taken out drops out").containsExactly("display", "keyboard", "cable:a");
 	}
 
 	@Test
-	void keepsThePlayersOrderAndAppendsNewDevices() {
-		order.sync(List.of("display", "keyboard", "sata:0"));
-		order.move(2, true); // sata:0 above keyboard
-		order.sync(List.of("display", "keyboard", "sata:0", "exp:1"));
-		assertThat(order.keys()).containsExactly("display", "sata:0", "keyboard", "exp:1");
+	void externalDevicesKeepThePlayersOrderAndNewOnesGoLast() {
+		order.sync(CASE, List.of("cable:a", "cable:b"), 0);
+		assertThat(order.move(4, true)).isTrue(); // b above a
+		order.sync(CASE, List.of("cable:a", "cable:b", "cable:c"), 1);
+		assertThat(order.keys()).containsExactly("display", "keyboard", "sata:0", "cable:b", "cable:a", "cable:c");
 	}
 
 	@Test
-	void removedDevicesDropOut() {
-		order.sync(List.of("display", "keyboard", "sata:0", "sata:1"));
-		order.sync(List.of("display", "keyboard", "sata:1"));
-		assertThat(order.keys()).containsExactly("display", "keyboard", "sata:1");
+	void aLateDeviceComesBackToItsOwnPlace() {
+		order.sync(CASE, List.of("cable:a", "cable:b", "cable:c"), 0);
+		order.sync(CASE, List.of("cable:a", "cable:c"), 1); // b's chunk isn't loaded yet
+		assertThat(order.keys()).as("listed, offline").containsExactly("display", "keyboard", "sata:0", "cable:a", "cable:b", "cable:c");
+		assertThat(order.isOnline("cable:b")).isFalse();
+		assertThat(order.connected()).containsExactly("display", "keyboard", "sata:0", "cable:a", "cable:c");
+		order.sync(CASE, List.of("cable:c", "cable:a", "cable:b"), 2);
+		assertThat(order.connected()).containsExactly("display", "keyboard", "sata:0", "cable:a", "cable:b", "cable:c");
 	}
 
 	@Test
-	void movesStayInBounds() {
-		order.sync(List.of("a", "b", "c"));
-		assertThat(order.move(0, true)).isFalse();
-		assertThat(order.move(2, false)).isFalse();
-		assertThat(order.move(5, true)).isFalse();
-		assertThat(order.move(0, false)).isTrue();
-		assertThat(order.keys()).containsExactly("b", "a", "c");
+	void aFullListBumpsTheDeviceMissingLongestElseTheNewOneWaits() {
+		List<String> all = new ArrayList<>(IntStream.range(0, order.externalCapacity()).mapToObj(i -> "cable:" + i).toList());
+		order.sync(CASE, all, 0);
+		order.sync(CASE, concat(all, "cable:new"), 1);
+		assertThat(order.keys()).doesNotContain("cable:new");
+		assertThat(order.waiting()).isEqualTo(1);
+		assertThat(order.status()).isEqualTo(new BusStatus(32, 3 + 20, 20, 0, 1));
+		assertThat(order.status().overflow()).isTrue();
+
+		List<String> missingTwo = new ArrayList<>(all);
+		missingTwo.remove("cable:3");
+		order.sync(CASE, missingTwo, 5); // 3 last seen at 1
+		missingTwo.remove("cable:7");
+		order.sync(CASE, missingTwo, 9); // 7 last seen at 5
+		order.sync(CASE, concat(missingTwo, "cable:new"), 10);
+		assertThat(order.keys()).as("3 was missing longest").contains("cable:7", "cable:new").doesNotContain("cable:3");
+		assertThat(order.keys().getLast()).isEqualTo("cable:new");
+		assertThat(order.waiting()).isZero();
+		assertThat(order.status()).isEqualTo(new BusStatus(32, 3 + 20 - 1, 20, 1, 0));
 	}
 
 	@Test
-	void restoreThenSyncDropsDevicesThatAreGone() {
-		order.restore(List.of("sata:0", "display", "gone", "keyboard"), List.of());
-		order.sync(List.of("display", "keyboard", "sata:0"));
-		assertThat(order.keys()).containsExactly("sata:0", "display", "keyboard");
-	}
-
-	private static boolean cabled(String key) {
-		return key.startsWith("cable:");
-	}
-
-	@Test
-	void absentCabledDevicesKeepTheirPlace() {
-		order.sync(List.of("display", "cable:a", "cable:b"), BusOrderTest::cabled);
-		order.sync(List.of("display", "cable:b"), BusOrderTest::cabled); // a's chunk unloaded
-		assertThat(order.keys()).containsExactly("display", "cable:b");
-		order.sync(List.of("display", "cable:b", "cable:a"), BusOrderTest::cabled);
-		assertThat(order.keys()).containsExactly("display", "cable:a", "cable:b");
+	void theCapacityIsTheBoardsSettingAndShrinkingItDropsMissingDevicesFirst() {
+		order.setCapacity(14); // room for 2 external devices
+		order.sync(CASE, List.of("cable:a", "cable:b", "cable:c"), 0);
+		assertThat(order.keys()).containsExactly("display", "keyboard", "sata:0", "cable:a", "cable:b");
+		assertThat(order.waiting()).isEqualTo(1);
+		order.setCapacity(32);
+		order.sync(CASE, List.of("cable:a", "cable:b", "cable:c"), 1);
+		assertThat(order.waiting()).isZero();
+		order.sync(CASE, List.of("cable:a", "cable:c"), 2); // b missing
+		order.setCapacity(14);
+		order.sync(CASE, List.of("cable:a", "cable:c"), 3);
+		assertThat(order.keys()).as("b, missing, made room").containsExactly("display", "keyboard", "sata:0", "cable:a", "cable:c");
 	}
 
 	@Test
-	void movesSkipOverAbsentDevices() {
-		order.sync(List.of("display", "cable:a", "cable:b"), BusOrderTest::cabled);
-		order.sync(List.of("display", "cable:b"), BusOrderTest::cabled);
-		assertThat(order.move(1, true)).isTrue(); // b above display, past the absent a
-		assertThat(order.keys()).containsExactly("cable:b", "display");
-		assertThat(order.all()).containsExactly("cable:b", "cable:a", "display");
-	}
-
-	@Test
-	void onlyTheNewestAbsentDevicesAreRemembered() {
-		List<String> many = new java.util.ArrayList<>();
-		for (int i = 0; i < BusOrder.MAX_REMEMBERED + 3; i++) {
-			many.add("cable:" + i);
-		}
-		order.sync(many, BusOrderTest::cabled);
-		order.sync(List.of(), BusOrderTest::cabled);
-		assertThat(order.all()).hasSize(BusOrder.MAX_REMEMBERED).doesNotContain("cable:0", "cable:1", "cable:2").contains("cable:3");
-	}
-
-	@Test
-	void disconnectedDevicesStayListedButLeaveTheBus() {
-		order.sync(List.of("display", "cable:a", "cable:b"), BusOrderTest::cabled);
-		assertThat(order.setConnected("cable:a", false)).isTrue();
-		assertThat(order.setConnected("cable:a", false)).isFalse();
-		assertThat(order.keys()).containsExactly("display", "cable:a", "cable:b");
-		assertThat(order.connected()).containsExactly("display", "cable:b");
-		assertThat(order.isConnected("cable:a")).isFalse();
-		assertThat(order.setConnected("cable:a", true)).isTrue();
-		assertThat(order.connected()).containsExactly("display", "cable:a", "cable:b");
-	}
-
-	@Test
-	void disconnectionsAreRememberedWhileTheDeviceIsAway() {
-		order.sync(List.of("display", "cable:a"), BusOrderTest::cabled);
+	void anOfflineDeviceCanBeForgottenButNotAnOnlineOne() {
+		order.sync(CASE, List.of("cable:a", "cable:b"), 0);
 		order.setConnected("cable:a", false);
-		order.sync(List.of("display"), BusOrderTest::cabled);
-		order.sync(List.of("display", "cable:a"), BusOrderTest::cabled);
+		order.sync(CASE, List.of("cable:b"), 1);
+		assertThat(order.forget("cable:b")).as("online").isFalse();
+		assertThat(order.forget("display")).as("internal").isFalse();
+		assertThat(order.forget("cable:a")).isTrue();
+		assertThat(order.keys()).containsExactly("display", "keyboard", "sata:0", "cable:b");
+		assertThat(order.disconnected()).isEmpty();
+	}
+
+	@Test
+	void disconnectedDevicesStayListedButOffTheBus() {
+		order.sync(CASE, List.of("cable:a", "cable:b"), 0);
+		assertThat(order.setConnected("display", false)).as("internal").isFalse();
+		assertThat(order.setConnected("cable:a", false)).isTrue();
+		assertThat(order.setConnected("cable:a", false)).as("no change").isFalse();
+		assertThat(order.keys()).contains("cable:a");
+		assertThat(order.connected()).containsExactly("display", "keyboard", "sata:0", "cable:b");
 		assertThat(order.isConnected("cable:a")).isFalse();
 	}
 
 	@Test
-	void restoresDisconnections() {
-		order.restore(List.of("display", "cable:a"), List.of("cable:a", "unknown"));
-		order.sync(List.of("display", "cable:a"), BusOrderTest::cabled);
-		assertThat(order.connected()).containsExactly("display");
+	void restoresTheSavedListAndDisconnections() {
+		order.restore(List.of(new BusOrder.Entry("cable:b", 4), new BusOrder.Entry("cable:a", 3)), List.of("cable:a", "cable:gone"));
+		order.sync(CASE, List.of("cable:a"), 5);
+		assertThat(order.keys()).containsExactly("display", "keyboard", "sata:0", "cable:b", "cable:a");
 		assertThat(order.disconnected()).containsExactly("cable:a");
+		assertThat(order.external()).containsExactly(new BusOrder.Entry("cable:b", 4), new BusOrder.Entry("cable:a", 5));
+	}
+
+	private static List<String> concat(List<String> keys, String key) {
+		List<String> all = new ArrayList<>(keys);
+		all.add(key);
+		return all;
 	}
 }

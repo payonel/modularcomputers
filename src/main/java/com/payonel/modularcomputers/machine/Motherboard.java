@@ -12,11 +12,15 @@ import java.util.Optional;
  * console).
  */
 public final class Motherboard {
+	/** How many devices a bus holds unless the board is set otherwise. */
+	public static final int DEFAULT_BUS_CAPACITY = 32;
+
 	private final Hardware parts;
 	private final Bus bus;
 	private final VirtualBus virtualBus;
 	private Cpu cpu;
 	private Eeprom eeprom;
+	private int busCapacity = DEFAULT_BUS_CAPACITY;
 
 	public Motherboard(Hardware parts, Bus bus) {
 		this.parts = parts;
@@ -34,6 +38,15 @@ public final class Motherboard {
 
 	public VirtualBus virtualBus() {
 		return virtualBus;
+	}
+
+	/** How many devices its bus holds, internal and external together: a board setting. */
+	public int busCapacity() {
+		return busCapacity;
+	}
+
+	public void setBusCapacity(int busCapacity) {
+		this.busCapacity = busCapacity;
 	}
 
 	public Optional<Cpu> cpu() {

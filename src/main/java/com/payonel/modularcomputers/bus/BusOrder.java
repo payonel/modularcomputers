@@ -1,122 +1,205 @@
 package com.payonel.modularcomputers.bus;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
-import java.util.function.Predicate;
 
 /**
- * The order the player has put a computer's devices in, by key (like {@code "display"},
- * {@code "sata:0"} or a cabled device's {@code "cable:<id>"}). The order is set the first time
- * a device is seen: it goes to the end. Devices keep their place while they stay attached.
+ * The order of a computer's devices on its bus, by key (like {@code "display"}, {@code "sata:0"}
+ * or a cabled device's {@code "cable:<id>"}).
  * <p>
- * A device that goes away either drops out (parts in the case: the slot is what matters) or is
- * <em>remembered</em> (cabled devices: unplugged, or in a chunk that isn't loaded), keeping its
- * place for when it's seen again. At most {@link #MAX_REMEMBERED} absent devices are
- * remembered; the earliest-listed are forgotten first.
+ * <b>Internal devices</b> (built-ins and parts in the case's slots) come first, in a fixed
+ * order: the slots' own. A slot's position is its address, as on real hardware.
  * <p>
- * The player can also disconnect a device: it stays listed, in its place, but isn't on the bus.
+ * <b>External devices</b> (by cable or Bluetooth) follow, in a saved list the player can
+ * reorder, like UEFI's boot order: devices are kept by id, so one that's late to load (its
+ * chunk) or briefly gone keeps its place, and shows as offline meanwhile. A device seen for the
+ * first time goes to the end. The list holds at most {@link #externalCapacity()}: when it's full, a
+ * new device takes the place of the one missing longest; with none missing, it waits (it isn't
+ * on the bus). The player can forget an offline device.
+ * <p>
+ * The player can also disconnect an external device: it stays listed, in its place, but isn't
+ * on the bus.
  */
 public final class BusOrder {
-	/** How many absent devices are remembered. */
-	public static final int MAX_REMEMBERED = 32;
+	/** Places kept for the case's own devices (2 built-ins, ROM, UPS, 4 SATA, 4 EXP), filled or not. */
+	public static final int INTERNAL_PLACES = 12;
 
-	/** Every device in order: present and remembered. */
-	private final List<String> keys = new ArrayList<>();
+	/** An external device in the saved list, and the game time it was last seen on the bus. */
+	public record Entry(String key, long lastSeen) {
+	}
+
+	private List<String> internal = List.of();
+	private final List<Entry> external = new ArrayList<>();
 	private final Set<String> present = new HashSet<>();
 	private final Set<String> disconnected = new LinkedHashSet<>();
+	private int waiting;
+	private int capacity;
 
-	/** The devices attached now, in order, connected or not: what the bus order panel lists. */
+	/** {@code capacity}: how many devices the bus holds, internal and external together (the motherboard's setting). */
+	public BusOrder(int capacity) {
+		setCapacity(capacity);
+	}
+
+	/** Changes how many devices the bus holds; the saved list shrinks to fit at the next {@link #sync}. */
+	public void setCapacity(int capacity) {
+		this.capacity = Math.max(INTERNAL_PLACES, capacity);
+	}
+
+	public int capacity() {
+		return capacity;
+	}
+
+	/** Room for external devices: the capacity less the case's own places. */
+	public int externalCapacity() {
+		return capacity - INTERNAL_PLACES;
+	}
+
+	/** How full the bus is (see {@link BusStatus}). */
+	public BusStatus status() {
+		long missing = external.stream().filter(entry -> !present.contains(entry.key())).count();
+		return new BusStatus(capacity, connected().size(), external.size(), (int) missing, waiting);
+	}
+
+	/** Every listed device in order: internal ones, then the saved external ones, online or not. */
 	public List<String> keys() {
-		return keys.stream().filter(present::contains).toList();
+		List<String> keys = new ArrayList<>(internal);
+		external.forEach(entry -> keys.add(entry.key()));
+		return keys;
 	}
 
-	/** The devices on the bus: attached and connected, in order. */
+	/** The devices on the bus: internal, then external ones that are online and connected. */
 	public List<String> connected() {
-		return keys.stream().filter(key -> present.contains(key) && !disconnected.contains(key)).toList();
+		List<String> keys = new ArrayList<>(internal);
+		external.stream().map(Entry::key).filter(key -> present.contains(key) && !disconnected.contains(key)).forEach(keys::add);
+		return keys;
 	}
 
-	/** Every device, absent ones included, e.g. for saving. */
-	public List<String> all() {
-		return List.copyOf(keys);
+	/** The saved external list, e.g. for saving. */
+	public List<Entry> external() {
+		return List.copyOf(external);
+	}
+
+	public boolean isInternal(String key) {
+		return internal.contains(key);
+	}
+
+	/** Online: internal, or an external device that's there now. */
+	public boolean isOnline(String key) {
+		return internal.contains(key) || present.contains(key);
 	}
 
 	public boolean isConnected(String key) {
 		return !disconnected.contains(key);
 	}
 
-	/** The disconnected devices, absent ones included, e.g. for saving. */
+	/** The disconnected devices, offline ones included, e.g. for saving. */
 	public List<String> disconnected() {
 		return List.copyOf(disconnected);
 	}
 
-	/** Connects or disconnects a listed device. Returns false if it isn't listed or nothing changed. */
+	/** How many external devices are there but not on the bus, because it's full. */
+	public int waiting() {
+		return waiting;
+	}
+
+	/** Connects or disconnects a listed external device. Returns false if it isn't one or nothing changed. */
 	public boolean setConnected(String key, boolean connected) {
-		if (!keys.contains(key)) {
+		if (index(key).isEmpty()) {
 			return false;
 		}
 		return connected ? disconnected.remove(key) : disconnected.add(key);
 	}
 
-	/** Matches the order to the devices now attached. Absent devices drop out. */
-	public void sync(List<String> attached) {
-		sync(attached, key -> false);
-	}
-
-	/**
-	 * Matches the order to the devices now attached. {@code attached} lists them in their
-	 * default order, which is also the order new devices are appended in. Absent devices that
-	 * {@code remember} accepts keep their place.
-	 */
-	public void sync(List<String> attached, Predicate<String> remember) {
-		present.clear();
-		present.addAll(attached);
-		keys.removeIf(key -> !present.contains(key) && !remember.test(key));
-		for (String key : attached) {
-			if (!keys.contains(key)) {
-				keys.add(key);
-			}
-		}
-		List<String> absent = keys.stream().filter(key -> !present.contains(key)).toList();
-		for (int i = 0; i < absent.size() - MAX_REMEMBERED; i++) {
-			keys.remove(absent.get(i));
-		}
-		disconnected.retainAll(keys);
-	}
-
-	/**
-	 * Moves the attached device at {@code index} (in {@link #keys()}) one place up or down, past
-	 * any remembered absent devices in between. Returns false if it can't move.
-	 */
-	public boolean move(int index, boolean up) {
-		List<String> shown = keys();
-		int target = up ? index - 1 : index + 1;
-		if (index < 0 || index >= shown.size() || target < 0 || target >= shown.size()) {
+	/** Drops an offline external device from the list. Returns false if it isn't one. */
+	public boolean forget(String key) {
+		if (present.contains(key) || index(key).isEmpty()) {
 			return false;
 		}
-		int from = keys.indexOf(shown.get(index));
-		int to = keys.indexOf(shown.get(target));
-		keys.set(to, keys.set(from, keys.get(to)));
+		external.remove((int) index(key).get());
+		disconnected.remove(key);
 		return true;
 	}
 
 	/**
-	 * Restores a saved order and disconnections; {@link #sync} afterwards sorts out which are
-	 * attached.
+	 * Matches the order to the devices attached now, at game time {@code now}. {@code internal}
+	 * lists the case's devices in their fixed order; {@code attached} lists the external ones,
+	 * in the order new ones should be added (nearest first).
 	 */
-	public void restore(List<String> saved, List<String> savedDisconnected) {
-		keys.clear();
-		for (String key : saved) {
-			if (!keys.contains(key)) {
-				keys.add(key);
+	public void sync(List<String> internal, List<String> attached, long now) {
+		this.internal = List.copyOf(internal);
+		present.clear();
+		present.addAll(attached);
+		for (int i = 0; i < external.size(); i++) {
+			if (present.contains(external.get(i).key())) {
+				external.set(i, new Entry(external.get(i).key(), now));
 			}
 		}
-		present.clear();
-		present.addAll(keys);
+		while (external.size() > externalCapacity() && bumpMissing()) {
+			// the capacity went down: missing devices make room first
+		}
+		waiting = 0;
+		for (String key : attached) {
+			if (index(key).isPresent()) {
+				continue;
+			}
+			if (external.size() >= externalCapacity() && !bumpMissing()) {
+				waiting++;
+				continue;
+			}
+			external.add(new Entry(key, now));
+		}
+		present.retainAll(external.stream().map(Entry::key).toList());
+	}
+
+	/** Drops the device that's been missing longest. Returns false if none is missing. */
+	private boolean bumpMissing() {
+		Optional<Entry> oldest = external.stream().filter(entry -> !present.contains(entry.key()))
+			.min(Comparator.comparingLong(Entry::lastSeen));
+		oldest.ifPresent(entry -> {
+			external.remove(entry);
+			disconnected.remove(entry.key());
+		});
+		return oldest.isPresent();
+	}
+
+	/**
+	 * Moves the device at {@code index} (in {@link #keys()}) one place up or down. Only external
+	 * devices move, and only among themselves. Returns false if it can't move.
+	 */
+	public boolean move(int index, boolean up) {
+		int from = index - internal.size();
+		int to = up ? from - 1 : from + 1;
+		if (from < 0 || from >= external.size() || to < 0 || to >= external.size()) {
+			return false;
+		}
+		external.set(to, external.set(from, external.get(to)));
+		return true;
+	}
+
+	/** Restores a saved external list and disconnections; {@link #sync} sorts out the rest. */
+	public void restore(List<Entry> saved, List<String> savedDisconnected) {
+		external.clear();
+		for (Entry entry : saved) {
+			if (index(entry.key()).isEmpty()) {
+				external.add(entry);
+			}
+		}
 		disconnected.clear();
 		disconnected.addAll(savedDisconnected);
-		disconnected.retainAll(keys);
+		disconnected.removeIf(key -> index(key).isEmpty());
+	}
+
+	private Optional<Integer> index(String key) {
+		for (int i = 0; i < external.size(); i++) {
+			if (external.get(i).key().equals(key)) {
+				return Optional.of(i);
+			}
+		}
+		return Optional.empty();
 	}
 }

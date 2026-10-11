@@ -8,6 +8,7 @@ import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.ModMenus;
 import com.payonel.modularcomputers.network.ConnectDevicePayload;
+import com.payonel.modularcomputers.network.ForgetDevicePayload;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import com.payonel.modularcomputers.network.PressPowerPayload;
 import com.payonel.modularcomputers.network.ReorderBusPayload;
@@ -63,6 +64,7 @@ public final class ModularComputers implements ModInitializer {
 		SwitchViewPayload.register();
 		ReorderBusPayload.register();
 		ConnectDevicePayload.register();
+		ForgetDevicePayload.register();
 		SettingsPayload.register();
 		initialized = true;
 		LOGGER.info("{} (version {})", INIT_MARKER, version());

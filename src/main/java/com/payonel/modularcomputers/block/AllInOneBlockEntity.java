@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.bus.BusOrder;
+import com.payonel.modularcomputers.bus.BusStatus;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.cable.CableWalk;
 import com.payonel.modularcomputers.console.ConsoleSplitter;
@@ -79,7 +80,13 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String FOREGROUND = "display_foreground";
 	private static final String BACKGROUND = "display_background";
 	private static final String CONSOLE = "console";
-	private static final String BUS_ORDER = "bus_order";
+	/** The saved external bus order. ("bus_order", a plain key list, was the order before external devices kept theirs apart.) */
+	private static final String BUS_EXTERNAL = "bus_external";
+	private static final String KNOWN = "known";
+	private static final Codec<BusOrder.Entry> ENTRY_CODEC = RecordCodecBuilder.create(instance -> instance.group(
+		Codec.STRING.fieldOf("key").forGetter(BusOrder.Entry::key),
+		Codec.LONG.fieldOf("last_seen").forGetter(BusOrder.Entry::lastSeen)
+	).apply(instance, BusOrder.Entry::new));
 	private static final String BUS_DISCONNECTED = "bus_disconnected";
 	private static final String CABLED = "cabled";
 	private static final String CONSOLE_SCREEN = "console_screen";
@@ -94,6 +101,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** Cabled devices, by their own id: {@code cable:<uuid>}. */
 	private static final String CABLE_KEY = "cable:";
 	private static final String POWER_BUFFER = "power_buffer";
+	private static final String BUS_CAPACITY = "bus_capacity";
 	/** Looks for cabled devices this often, in ticks, even when no cable changed (chunks load and unload). */
 	private static final int RESCAN_TICKS = 20;
 	/** How often the battery is run down or recharged. */
@@ -110,7 +118,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final Card[] cards = new Card[CaseMenu.LANES];
 	private Eeprom eeprom;
 	private UpsBattery ups;
-	private final BusOrder busOrder = new BusOrder();
+	private final BusOrder busOrder = new BusOrder(Motherboard.DEFAULT_BUS_CAPACITY);
 	private final Bus bus = new Bus(List.of(display, keyboard));
 	private final PowerBuffer power = new PowerBuffer();
 	/** The buffer's level for the case view, which sends it to the player as it changes. */
@@ -136,6 +144,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final Parts parts = new Parts();
 	/** The cabled devices found last time, nearest first. Saved and synced, for the bus order panel. */
 	private List<Cabled> cabled = List.of();
+	/**
+	 * What was last seen of each external device in the saved bus order, online or not: an
+	 * offline one's row still shows its name, icon and where it was.
+	 */
+	private final Map<String, Cabled> known = new LinkedHashMap<>();
 	/** Server side: the cabled devices, by key. */
 	private final Map<String, Device> cabledDevices = new LinkedHashMap<>();
 	private long seenCableChanges = -1;
@@ -190,7 +203,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	 * position (the bulb finds them in the world) and can be disconnected.
 	 */
 	public record BusEntry(String key, Component name, Component location, ItemStack item, int slot, int builtInIcon,
-		Optional<BlockPos> device, boolean connected) {
+		Optional<BlockPos> device, boolean connected, boolean online) {
+		/** An external device: it can be reordered, identified, unplugged, and forgotten while offline. */
 		public boolean cabled() {
 			return device.isPresent();
 		}
@@ -203,15 +217,18 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		for (String key : busOrder.keys()) {
 			if (key.equals(DISPLAY_KEY)) {
 				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.display"), builtIn, ItemStack.EMPTY, -1, DISPLAY_ICON,
-					Optional.empty(), true));
+					Optional.empty(), true, true));
 			} else if (key.equals(KEYBOARD_KEY)) {
 				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.keyboard"), builtIn, ItemStack.EMPTY, -1, KEYBOARD_ICON,
-					Optional.empty(), true));
+					Optional.empty(), true, true));
 			} else if (key.startsWith(CABLE_KEY)) {
-				cabled.stream().filter(device -> device.key().equals(key)).findFirst().ifPresent(device -> {
+				Optional.ofNullable(known.get(key)).ifPresent(device -> {
 					ItemStack item = new ItemStack(device.item());
+					boolean online = busOrder.isOnline(key);
 					Component location;
-					if (device.paired()) {
+					if (!online) {
+						location = Component.translatable("gui.modularcomputers.bus.offline");
+					} else if (device.paired()) {
 						location = device.hubSlot() >= 0 ? Component.translatable("gui.modularcomputers.bus.hub_paired", device.hubSlot() + 1)
 							: Component.translatable("gui.modularcomputers.bus.paired");
 					} else {
@@ -219,12 +236,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 							? Component.translatable("gui.modularcomputers.bus.hub", device.hubSlot() + 1, device.meters())
 							: Component.translatable(device.wireless() ? "gui.modularcomputers.bus.bluetooth" : "gui.modularcomputers.bus.cable", device.meters());
 					}
-					entries.add(new BusEntry(key, item.getHoverName(), location, item, -1, -1, Optional.of(device.pos()), busOrder.isConnected(key)));
+					entries.add(new BusEntry(key, item.getHoverName(), location, item, -1, -1, Optional.of(device.pos()), busOrder.isConnected(key), online));
 				});
 			} else {
 				int slot = partSlot(key);
 				ItemStack item = parts.getItem(slot);
-				entries.add(new BusEntry(key, item.getHoverName(), partLocation(key), item, slot, -1, Optional.empty(), true));
+				entries.add(new BusEntry(key, item.getHoverName(), partLocation(key), item, slot, -1, Optional.empty(), true, true));
 			}
 		}
 		return entries;
@@ -250,6 +267,23 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		}
 		int lane = Integer.parseInt(key.substring(key.indexOf(':') + 1));
 		return Component.translatable(key.startsWith(SATA_KEY) ? "gui.modularcomputers.bus.sata" : "gui.modularcomputers.bus.expansion", lane + 1);
+	}
+
+	/** How full the bus is, and whether devices are waiting for room (works on clients too). */
+	public BusStatus busStatus() {
+		return busOrder.status();
+	}
+
+	/** Server side: the player forgot an offline device in the bus order panel. */
+	public boolean forgetDevice(String key) {
+		if (!busOrder.forget(key)) {
+			return false;
+		}
+		known.remove(key);
+		rebuildBus();
+		setChanged();
+		syncToClients();
+		return true;
 	}
 
 	/** Server side: the player moved the device at {@code index} up or down the bus order. */
@@ -440,7 +474,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		cabled = List.copyOf(found);
 		cabledDevices.clear();
 		cabledDevices.putAll(devices);
+		int waitingBefore = busOrder.waiting();
 		rebuildBus();
+		if (busOrder.waiting() > waitingBefore) {
+			// A device was wired up but can't join a full bus: a soft hum, a warning, not an error.
+			level.playSound(null, worldPosition, ModSounds.BUS_OVERFLOW, SoundSource.BLOCKS, 0.7f, 1.0f);
+		}
 		setChanged();
 		syncToClients();
 	}
@@ -503,12 +542,13 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	}
 
 	/**
-	 * Puts the bus's devices in the player's order; newly attached ones go last. Cabled devices
-	 * that went away keep their place for when they come back, and disconnected ones stay off
-	 * the bus.
+	 * Puts the bus's devices in order: the case's own in their slots' order, then external ones
+	 * in the player's order (see {@link BusOrder}). External devices that went away keep their
+	 * place, offline, for when they come back, and disconnected ones stay off the bus.
 	 */
 	private void rebuildBus() {
 		Map<String, Device> attached = new LinkedHashMap<>();
+		List<String> external = new ArrayList<>();
 		attached.put(DISPLAY_KEY, display);
 		attached.put(KEYBOARD_KEY, keyboard);
 		if (eeprom != null) {
@@ -527,11 +567,19 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 				attached.put(EXP_KEY + lane, cards[lane]);
 			}
 		}
+		List<String> internal = List.copyOf(attached.keySet());
 		for (Cabled device : cabled) {
 			// Server side, a device saved as cabled is only on the bus once a scan finds it again.
 			attached.put(device.key(), cabledDevices.get(device.key()));
+			external.add(device.key());
 		}
-		busOrder.sync(List.copyOf(attached.keySet()), key -> key.startsWith(CABLE_KEY));
+		busOrder.setCapacity(machine.board().busCapacity());
+		busOrder.sync(internal, external, level != null ? level.getGameTime() : 0);
+		bus.setStatus(busOrder.status());
+		for (Cabled device : cabled) {
+			known.put(device.key(), device);
+		}
+		known.keySet().retainAll(busOrder.external().stream().map(BusOrder.Entry::key).toList());
 		updateBluetooth(); // its first Bluetooth card follows the bus order
 		List<Device> devices = busOrder.connected().stream().map(attached::get).filter(Objects::nonNull).toList();
 		if (level != null && level.isClientSide()) {
@@ -629,10 +677,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		super.saveAdditional(output);
 		output.putBoolean(POWERED, machine.isPowered());
 		output.putInt(POWER_BUFFER, power.level());
+		output.putInt(BUS_CAPACITY, machine.board().busCapacity());
 		ContainerHelper.saveAllItems(output, parts.getItems());
-		output.store(BUS_ORDER, Codec.STRING.listOf(), busOrder.all());
+		output.store(BUS_EXTERNAL, ENTRY_CODEC.listOf(), busOrder.external());
 		output.store(BUS_DISCONNECTED, Codec.STRING.listOf(), busOrder.disconnected());
 		output.store(CABLED, Cabled.CODEC.listOf(), cabled);
+		output.store(KNOWN, Cabled.CODEC.listOf(), List.copyOf(known.values()));
 		output.store(DISPLAY, Codec.STRING.listOf(), display.buffer().rows());
 		output.putIntArray(FOREGROUND, display.buffer().foregrounds());
 		output.putIntArray(BACKGROUND, display.buffer().backgrounds());
@@ -648,11 +698,14 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		super.loadAdditional(input);
 		machine.restorePowered(input.getBooleanOr(POWERED, false));
 		power.set(input.getIntOr(POWER_BUFFER, 0));
+		machine.board().setBusCapacity(input.getIntOr(BUS_CAPACITY, Motherboard.DEFAULT_BUS_CAPACITY));
 		parts.getItems().clear(); // not clearContent(): that would fire change handling mid-load
 		ContainerHelper.loadAllItems(input, parts.getItems());
-		input.read(BUS_ORDER, Codec.STRING.listOf()).ifPresent(order ->
+		input.read(BUS_EXTERNAL, ENTRY_CODEC.listOf()).ifPresent(order ->
 			busOrder.restore(order, input.read(BUS_DISCONNECTED, Codec.STRING.listOf()).orElse(List.of())));
 		cabled = input.read(CABLED, Cabled.CODEC.listOf()).map(List::copyOf).orElse(List.of());
+		known.clear();
+		input.read(KNOWN, Cabled.CODEC.listOf()).orElse(List.of()).forEach(device -> known.put(device.key(), device));
 		installParts();
 		rememberParts(); // loading isn't inserting: no sounds
 		input.read(DISPLAY, Codec.STRING.listOf()).ifPresent(display.buffer()::setRows);

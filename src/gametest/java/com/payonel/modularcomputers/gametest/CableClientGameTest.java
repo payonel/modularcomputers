@@ -17,12 +17,14 @@ import com.payonel.modularcomputers.block.Bluetooth;
 import com.payonel.modularcomputers.block.CardHolderBlockEntity;
 import com.payonel.modularcomputers.block.RoboticPistonBlockEntity;
 import com.payonel.modularcomputers.block.ScreenBlockEntity;
+import com.payonel.modularcomputers.bus.BusOrder;
 import com.payonel.modularcomputers.client.Identify;
 import com.payonel.modularcomputers.client.screen.CardHolderScreen;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
+import com.payonel.modularcomputers.machine.Motherboard;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.power.PowerBuffer;
 import java.awt.image.BufferedImage;
@@ -181,6 +183,26 @@ public class CableClientGameTest implements FabricClientGameTest {
 			BufferedImage bulbOn = read(context.takeScreenshot("case-bulb-on"));
 			int bulb = screenPixel(context, bulbOn, s -> ((CaseScreen) s).busBulb(row));
 			check((bulb & 0xFFFFFF) == 0xFFE066, "the bulb is lit, got " + hex(bulb));
+
+			// A full bus: with room for just one external device, a second screen has to wait.
+			// The warning light comes on.
+			int ledOff = screenPixel(context, bulbOn, s -> ((CaseScreen) s).busOverflowLed());
+			check((ledOff & 0xFFFFFF) == 0x3A2E1A, "the overflow light is dark, got " + hex(ledOff));
+			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
+				.machine().board().setBusCapacity(BusOrder.INTERNAL_PLACES + 1));
+			BlockPos second = screen.east();
+			setblock(singleplayer, second, "screen[facing=south]");
+			context.waitFor(client -> client.level.getBlockEntity(computer) instanceof AllInOneBlockEntity be && be.busStatus().overflow());
+			context.waitTicks(2);
+			BufferedImage full = read(context.takeScreenshot("case-bus-full"));
+			int ledOn = screenPixel(context, full, s -> ((CaseScreen) s).busOverflowLed());
+			check((ledOn & 0xFFFFFF) == 0xF0A020, "the overflow light is lit, got " + hex(ledOn));
+			check(context.computeOnClient(client -> ((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busStatus().waiting()) == 1,
+				"one screen waits");
+			setblock(singleplayer, second, "air");
+			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
+				.machine().board().setBusCapacity(Motherboard.DEFAULT_BUS_CAPACITY));
+			context.waitFor(client -> !((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busStatus().overflow());
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitFor(client -> client.gui.screen() == null);
 			context.waitTicks(3);

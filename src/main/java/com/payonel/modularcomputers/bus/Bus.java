@@ -9,6 +9,7 @@ import java.util.List;
  */
 public final class Bus {
 	private List<Device> devices;
+	private BusStatus status = BusStatus.EMPTY;
 
 	public Bus(List<Device> devices) {
 		this.devices = List.copyOf(devices);
@@ -16,6 +17,15 @@ public final class Bus {
 
 	public List<Device> devices() {
 		return devices;
+	}
+
+	/** How full the bus is, and whether devices are waiting for room. */
+	public BusStatus status() {
+		return status;
+	}
+
+	public void setStatus(BusStatus status) {
+		this.status = status;
 	}
 
 	/** Replaces the devices, e.g. after a part was inserted or the player reordered them. */

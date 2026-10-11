@@ -3,18 +3,21 @@ package com.payonel.modularcomputers.client.screen;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.payonel.modularcomputers.ModularComputers;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.bus.BusStatus;
 import com.payonel.modularcomputers.client.Identify;
 import com.payonel.modularcomputers.display.ScrollWindow;
 import com.payonel.modularcomputers.display.Viewport;
 import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.network.ConnectDevicePayload;
+import com.payonel.modularcomputers.network.ForgetDevicePayload;
 import com.payonel.modularcomputers.network.ReorderBusPayload;
 import com.payonel.modularcomputers.power.ChargeMeter;
 import com.payonel.modularcomputers.power.Durations;
 import com.payonel.modularcomputers.power.PowerBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -91,6 +94,9 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int BULB_BASE = 0xFF505058;
 	private static final int PLUG_IN = 0xFF3CB45A;
 	private static final int PLUG_OUT = 0xFF8C8C8C;
+	private static final int LED_WARNING = 0xFFF0A020;
+	private static final int LED_GLINT = 0xFFFFE8A0;
+	private static final int LED_OFF = 0xFF3A2E1A;
 
 	private boolean powerHeld;
 	private boolean showBus;
@@ -191,6 +197,17 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		return new Viewport(up.x() - 26, up.y(), 11, 11);
 	}
 
+	/** The bus overflow warning light, top right of the bus order panel. */
+	public Viewport busOverflowLed() {
+		Viewport panel = busPanel();
+		return new Viewport(panel.right() - 16, panel.y() + 7, 6, 6);
+	}
+
+	/** The forget button of an offline device's row, where its plug would be. */
+	public Viewport busForget(int row) {
+		return busPlug(row);
+	}
+
 	/** The plug of a cabled device's row: connects or disconnects it. */
 	public Viewport busPlug(int row) {
 		Viewport up = busArrow(row, true);
@@ -205,6 +222,11 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 
 	private ScrollWindow busWindow(int devices) {
 		return new ScrollWindow(devices, BUS_VISIBLE_ROWS);
+	}
+
+	private Optional<AllInOneBlockEntity> computer() {
+		return minecraft.level != null && minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer
+			? Optional.of(computer) : Optional.empty();
 	}
 
 	private List<AllInOneBlockEntity.BusEntry> busEntries() {
@@ -405,8 +427,14 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		Viewport panel = busPanel();
 		graphics.blit(RenderPipelines.GUI_TEXTURED, BUS_PANEL, panel.x(), panel.y(), 0, 0, BUS_W, BUS_H, BUS_W, BUS_H);
 		graphics.text(font, Component.translatable("gui.modularcomputers.bus.title"), panel.x() + 10, panel.y() + 6, SILK, false);
-		graphics.text(font, Component.translatable("gui.modularcomputers.bus.subtitle"), panel.x() + 10, panel.y() + 17, SILK_DIM, false);
+		BusStatus status = computer().map(AllInOneBlockEntity::busStatus).orElse(BusStatus.EMPTY);
+		// A wired device that can't join a full bus would otherwise look broken: the warning
+		// light comes on, and the subtitle says how many wait.
+		graphics.text(font, status.overflow() ? Component.translatable("gui.modularcomputers.bus.waiting", status.waiting())
+			: Component.translatable("gui.modularcomputers.bus.subtitle"), panel.x() + 10, panel.y() + 17, status.overflow() ? METER_MEDIUM : SILK_DIM, false);
+		extractLed(graphics, busOverflowLed(), status.overflow());
 		List<AllInOneBlockEntity.BusEntry> entries = busEntries();
+		int firstExternal = firstExternal(entries);
 		ScrollWindow window = busWindow(entries.size());
 		busScroll = window.clamp(busScroll);
 		// One row per device on the bus, however many there are.
@@ -424,14 +452,19 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			} else {
 				graphics.item(entry.item(), panel.x() + BUS_ROW_X + 1, ry + 1);
 			}
-			graphics.text(font, entry.name(), panel.x() + 41, ry + 1, entry.connected() ? LIGHT : SILK_DIM, false);
+			graphics.text(font, entry.name(), panel.x() + 41, ry + 1, entry.connected() && entry.online() ? LIGHT : SILK_DIM, false);
 			graphics.text(font, entry.location(), panel.x() + 41, ry + 10, SILK_DIM, false);
 			if (entry.cabled()) {
 				extractBulb(graphics, busBulb(row), Identify.isOn(entry.device().get()));
-				extractPlug(graphics, busPlug(row), entry.connected());
+				if (entry.online()) {
+					extractPlug(graphics, busPlug(row), entry.connected());
+				} else {
+					extractForget(graphics, busForget(row));
+				}
+				// Only external devices move, and only among themselves; the case's are fixed.
+				extractArrow(graphics, busArrow(row, true), true, index > firstExternal);
+				extractArrow(graphics, busArrow(row, false), false, index < entries.size() - 1);
 			}
-			extractArrow(graphics, busArrow(row, true), true, index > 0);
-			extractArrow(graphics, busArrow(row, false), false, index < entries.size() - 1);
 		}
 		if (window.scrolls()) {
 			Viewport track = busScrollbar();
@@ -480,6 +513,35 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		graphics.fill(x + 6, top + 3, x + 7, top + 5, BULB_BASE);
 	}
 
+	/** A small round LED: lit amber for a warning, else dark. */
+	private static void extractLed(GuiGraphicsExtractor graphics, Viewport led, boolean lit) {
+		int color = lit ? LED_WARNING : LED_OFF;
+		graphics.fill(led.x() + 1, led.y(), led.right() - 1, led.bottom(), color);
+		graphics.fill(led.x(), led.y() + 1, led.right(), led.bottom() - 1, color);
+		if (lit) {
+			graphics.fill(led.x() + 1, led.y() + 1, led.x() + 3, led.y() + 3, LED_GLINT);
+		}
+	}
+
+	/** An 11x11 button with an X: forget an offline device. */
+	private static void extractForget(GuiGraphicsExtractor graphics, Viewport b) {
+		extractButton(graphics, b, true);
+		for (int i = 0; i < 5; i++) {
+			graphics.fill(b.x() + 3 + i, b.y() + 3 + i, b.x() + 4 + i, b.y() + 4 + i, METER_LOW);
+			graphics.fill(b.x() + 7 - i, b.y() + 3 + i, b.x() + 8 - i, b.y() + 4 + i, METER_LOW);
+		}
+	}
+
+	/** The index of the first external (movable) device, or the size when there's none. */
+	private static int firstExternal(List<AllInOneBlockEntity.BusEntry> entries) {
+		for (int i = 0; i < entries.size(); i++) {
+			if (entries.get(i).cabled()) {
+				return i;
+			}
+		}
+		return entries.size();
+	}
+
 	/** An 11x11 button with a triangle; greyed out when the device can't move that way. */
 	private static void extractArrow(GuiGraphicsExtractor graphics, Viewport b, boolean up, boolean enabled) {
 		extractButton(graphics, b, enabled);
@@ -511,12 +573,16 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 					Identify.toggle(entry.device().get());
 					return true;
 				}
+				if (entry.cabled() && !entry.online() && busForget(row).contains(event.x(), event.y())) {
+					ClientPlayNetworking.send(new ForgetDevicePayload(menu.pos(), entry.key()));
+					return true;
+				}
 				if (entry.cabled() && busPlug(row).contains(event.x(), event.y())) {
 					ClientPlayNetworking.send(new ConnectDevicePayload(menu.pos(), entry.key(), !entry.connected()));
 					return true;
 				}
 				for (boolean up : new boolean[] {true, false}) {
-					boolean enabled = up ? index > 0 : index < devices - 1;
+					boolean enabled = entry.cabled() && (up ? index > firstExternal(entries) : index < devices - 1);
 					if (enabled && busArrow(row, up).contains(event.x(), event.y())) {
 						ClientPlayNetworking.send(new ReorderBusPayload(menu.pos(), index, up));
 						return true;
