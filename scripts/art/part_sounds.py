@@ -157,9 +157,9 @@ SOUNDS = {
 	"battery_insert": mix((0, click(0.3, 1400, 0.004)), (0.006, zap())),
 	"battery_remove": mix((0, click(0.35, 1300, 0.005, 3000))),
 	# A device joined the bus: a soft hum beat.
-	"device_connect": mix((0, hum_beat())),
+	"device_connect": mix((0, hum_beat(volume=1.1))),
 	# The bus is full and a device is waiting: deeper and rougher, sagging, an error.
-	"bus_overflow": mix((0, hum_beat(0.75, 0.5, 72, 7.0, sag=0.15, cutoff=700))),
+	"bus_overflow": mix((0, hum_beat(0.75, 1.15, 72, 7.0, sag=0.15, cutoff=700))),
 }
 
 only = set(sys.argv[2:])

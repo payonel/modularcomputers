@@ -392,10 +392,10 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			return;
 		}
 		if (busOrder.waiting() > waitingBefore) {
-			level.playSound(null, worldPosition, ModSounds.BUS_OVERFLOW, SoundSource.BLOCKS, 0.8f, 1.0f);
+			level.playSound(null, worldPosition, ModSounds.BUS_OVERFLOW, SoundSource.BLOCKS, 1.0f, 1.0f);
 		}
 		if (!before.containsAll(externalOnBus())) {
-			level.playSound(null, worldPosition, ModSounds.DEVICE_CONNECT, SoundSource.BLOCKS, 0.7f, 1.0f);
+			level.playSound(null, worldPosition, ModSounds.DEVICE_CONNECT, SoundSource.BLOCKS, 1.0f, 1.0f);
 		}
 	}
 
