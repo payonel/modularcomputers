@@ -11,10 +11,11 @@ class PowerBufferTest {
 		assertThat(buffer.isEmpty()).isTrue();
 		assertThat(buffer.fill(10L * BatteryCharge.DAY_TICKS)).isEqualTo(BatteryCharge.DAY_TICKS);
 		assertThat(buffer.percent()).isEqualTo(100);
-		buffer.use(6000);
+		int quarter = PowerBuffer.CAPACITY / 4;
+		buffer.use(quarter);
 		assertThat(buffer.percent()).isEqualTo(75);
-		assertThat(buffer.fill(10_000)).as("tops up").isEqualTo(6000);
-		assertThat(buffer.fill(10_000)).as("full").isZero();
+		assertThat(buffer.fill(PowerBuffer.CAPACITY)).as("tops up").isEqualTo(quarter);
+		assertThat(buffer.fill(PowerBuffer.CAPACITY)).as("full").isZero();
 	}
 
 	@Test

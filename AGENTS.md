@@ -88,6 +88,9 @@ same thing.
         `power/BatteryTier` and `power/BatteryCharge`). **The computer runs on its battery:**
         - Charge is counted in ticks of running a CPU (`ModComponents.CHARGE`:
           `BatteryCharge(ticks, settledAt)`). A day is 24000 ticks.
+        - **PLAY TESTING (2026-10-11):** `BatteryCharge.DAY_TICKS` is temporarily 1200 (one
+          real minute instead of 20), so every battery and buffer time is 20x shorter. The
+          user will say when to restore 24000.
         - **Tier 1** (`tier1_battery`): copper×3 / iron, redstone, iron / iron, redstone, iron.
           Full, it runs a CPU for 10 days and nights, 10% a day.
         - **Tier 2** (`tier2_battery`): gold×3 / iron, redstone, iron / iron, blaze rod, iron.
