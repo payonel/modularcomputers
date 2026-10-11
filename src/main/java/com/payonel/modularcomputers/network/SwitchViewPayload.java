@@ -33,7 +33,10 @@ public record SwitchViewPayload(BlockPos pos, boolean toCase) implements CustomP
 			if (payload.toCase()) {
 				player.openMenu(computer);
 			} else {
-				player.closeContainer();
+				// Close the menu without telling the client: it swaps the case view straight for the
+				// screen view. Closing it there first would pass through "no screen", which grabs the
+				// mouse and recenters the cursor.
+				player.doCloseContainer();
 				ServerPlayNetworking.send(player, new OpenDisplayPayload(payload.pos(), computer.display().buffer().resolution()));
 			}
 		});

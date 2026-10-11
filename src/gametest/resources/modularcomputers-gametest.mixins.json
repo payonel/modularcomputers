@@ -1,0 +1,11 @@
+{
+	"required": true,
+	"package": "com.payonel.modularcomputers.gametest.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"MouseGrabCounter"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

@@ -231,8 +231,16 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			check(context.computeOnClient(client -> client.player.containerMenu.getCarried().isEmpty()), "clicking the panel must not pick anything up");
 
 			// Back to the screen view; the power button turns the computer on.
+			// Straight from one view to the other: never through "no screen", which grabs the
+			// mouse and so recenters the cursor.
+			int grabs = context.computeOnClient(client -> MouseGrabs.count);
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).viewToggle());
 			context.waitForScreen(DisplayScreen.class);
+			context.waitTicks(2);
+			context.runOnClient(client -> {
+				check(MouseGrabs.count == grabs, "switching to the screen view should not grab the mouse (it recenters the cursor)");
+				check(client.player.containerMenu == client.player.inventoryMenu, "the case menu should be closed");
+			});
 			checkDisplayLayout(context);
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_RIGHT, screen -> ((DisplayScreen) screen).powerButton());
 			context.waitFor(client -> machinePowered(client, computer));

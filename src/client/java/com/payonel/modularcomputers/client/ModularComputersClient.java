@@ -5,6 +5,7 @@ import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.client.render.AllInOneRenderer;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
+import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.menu.ModMenus;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import net.fabricmc.api.ClientModInitializer;
@@ -25,8 +26,14 @@ public final class ModularComputersClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		BlockEntityRenderers.register(ModBlocks.ALL_IN_ONE_ENTITY, AllInOneRenderer::new);
 		MenuScreens.register(ModMenus.CASE, CaseScreen::new);
-		ClientPlayNetworking.registerGlobalReceiver(OpenDisplayPayload.TYPE, (payload, context) ->
-			context.client().gui.setScreen(new DisplayScreen(payload.pos(), payload.resolution())));
+		ClientPlayNetworking.registerGlobalReceiver(OpenDisplayPayload.TYPE, (payload, context) -> {
+			var client = context.client();
+			client.gui.setScreen(new DisplayScreen(payload.pos(), payload.resolution()));
+			if (client.player.containerMenu instanceof CaseMenu) {
+				// Coming from the case view: the server has already closed the menu.
+				client.player.containerMenu = client.player.inventoryMenu;
+			}
+		});
 		initialized = true;
 		ModularComputers.LOGGER.info(CLIENT_INIT_MARKER);
 	}

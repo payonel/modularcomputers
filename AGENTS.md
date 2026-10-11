@@ -151,6 +151,10 @@ same thing.
         so it never drops the carried item (`hasClickedOutside`).
     - Switching sends `SwitchViewPayload`. The server either opens the menu, or closes it and
       sends `OpenDisplayPayload`.
+      - Going back to the screen view, the server closes the menu quietly (`doCloseContainer`)
+        and the client swaps one screen for the other. Closing it on the client first would
+        pass through "no screen", which grabs the mouse and recenters the cursor (the user
+        noticed).
     - Both views show the same button column to the right (`ComputerButtons`): the power
       button on top, the view toggle below. The toggle shows a motherboard
       (`textures/gui/case_button.png`, the same art as the back's window) for "case", and a
@@ -502,6 +506,11 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
   double-click, which, for example, swallows "place the carried item".
 - `lookAt(yaw, pitch)` aims at an exact point. Compute yaw as `atan2(-dx, dz)` and pitch as
   `-atan2(dy, horizontal)`.
+
+- **The test input can't move the system pointer under Xvfb**, and every `setScreen`
+  re-reads it (`resyncMousePosition`). So a test can't watch the real cursor. To catch an
+  accidental recenter, check that no mouse grab happened: `MouseGrabs.count`, counted by the
+  gametest-only mixin `gametest/mixin/MouseGrabCounter`.
 
 ### Pixel assertions in client tests
 
