@@ -483,9 +483,9 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		for (int row = 0; row < window.rowsShown(busScroll); row++) {
 			int index = busScroll + row;
 			int ry = panel.y() + BUS_ROW_Y + row * BUS_ROW_H;
-			// The position number is etched into the board beside the row; it stays with the
-			// position, not the device.
-			String number = String.valueOf(index + 1);
+			// The position number is etched into the board beside the row: the device's fixed place
+			// on the bus, so empty case slots leave gaps (see AllInOneBlockEntity.busPosition).
+			String number = String.valueOf(entries.get(index).position());
 			graphics.text(font, number, panel.x() + 11 - font.width(number) / 2, ry + 5, SILK, false);
 			graphics.blit(RenderPipelines.GUI_TEXTURED, BUS_ROW, panel.x() + BUS_ROW_X, ry, 0, 0, BUS_ROW_W, 18, BUS_ROW_W, 18);
 			AllInOneBlockEntity.BusEntry entry = entries.get(index);

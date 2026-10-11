@@ -23,7 +23,7 @@ import net.minecraft.network.chat.Component;
  * The display sits in a bezel like the screen surround on the computer's front. Right of the
  * bezel, from its top edge down: the power button, which looks like the one on the computer's
  * back, and the toggle to the case view (see {@link ComputerButtons}). A screen block has no
- * power button (that belongs to the computer's case); its toggle opens its pairing slot.
+ * power button (that belongs to the computer's case); its toggle opens its radio slot.
  */
 public final class DisplayScreen extends Screen {
 	/** Share of the window, in each direction, that the display may fill. */

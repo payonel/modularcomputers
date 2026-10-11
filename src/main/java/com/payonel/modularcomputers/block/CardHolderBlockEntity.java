@@ -33,9 +33,11 @@ import net.minecraft.world.level.storage.ValueOutput;
 
 /**
  * A block on the network with card slots inside: the screen, the expansion hub, the robotic
- * piston, the paint gun. Each has a <em>pairing slot</em> that takes a Bluetooth card: with
- * one there, the block belongs to the one computer that card links to (see
- * {@link Bluetooth#owner}) and no other computer sees it, though it still passes the cable on.
+ * piston, the paint gun. Each has a <em>radio slot</em>, the only slot that takes a Bluetooth
+ * card. The card is its radio: other cards can link to this block's board. When the card itself
+ * links somewhere, the block is paired with that board (a computer, or a hub): only the
+ * computers that have that board see it (see {@link Bluetooth#pairedTo}), though it still
+ * passes the cable on. An unlinked radio leaves it shared.
  * <p>
  * It has its own id, so computers can tell which one it is (for the bus order) wherever it is.
  * Its cards are saved and synced to clients, drop when it's broken, and make the card sounds
@@ -69,46 +71,39 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 		return cards;
 	}
 
-	/** The slot for the Bluetooth card that pairs this block with one computer. */
-	public abstract int pairingSlot();
+	/** The slot for its Bluetooth card: its radio. */
+	public abstract int radioSlot();
 
-	/** Whether a slot takes this item: the pairing slot only a Bluetooth card. */
+	/** Whether a slot takes this item: the radio slot only a Bluetooth card, the others any card but one. */
 	public boolean accepts(int slot, ItemStack stack) {
-		return slot == pairingSlot() ? stack.is(ModItems.BLUETOOTH_CARD) : ModItems.cardKind(stack).isPresent();
+		boolean bluetooth = stack.is(ModItems.BLUETOOTH_CARD);
+		return slot == radioSlot() ? bluetooth : !bluetooth && ModItems.cardKind(stack).isPresent();
 	}
 
-	/** The Bluetooth card in the pairing slot, or empty: unpaired, shared by every computer that reaches it. */
-	public ItemStack pairingCard() {
-		ItemStack card = cards.getItem(pairingSlot());
+	/** The Bluetooth card in the radio slot, or empty: no radio. */
+	public ItemStack radioCard() {
+		ItemStack card = cards.getItem(radioSlot());
 		return card.is(ModItems.BLUETOOTH_CARD) ? card : ItemStack.EMPTY;
 	}
 
+	/** Paired: its radio links to a board. Unpaired, it's shared by every computer that reaches it. */
 	public boolean isPaired() {
-		return !pairingCard().isEmpty();
+		return radioCard().has(ModComponents.BLUETOOTH_LINK);
 	}
 
 	/** The cards changed: rebuild whatever they make. Runs on both sides, and after loading. */
 	protected void cardsChanged() {
 	}
 
-	/** Its Bluetooth cards (its radios): the pairing card first, then the rest by slot. */
+	/** Its radio, if it has one. */
 	@Override
 	public List<ItemStack> bluetoothCards() {
-		List<ItemStack> all = new ArrayList<>();
-		if (isPaired()) {
-			all.add(pairingCard());
-		}
-		for (int slot = 0; slot < cards.getContainerSize(); slot++) {
-			if (slot != pairingSlot() && cards.getItem(slot).is(ModItems.BLUETOOTH_CARD)) {
-				all.add(cards.getItem(slot));
-			}
-		}
-		return all;
+		return radioCard().isEmpty() ? List.of() : List.of(radioCard());
 	}
 
 	private void updateBluetooth() {
 		if (level != null) {
-			Bluetooth.update(level, worldPosition, id, bluetoothCards(), isPaired() ? pairingCard() : null, false);
+			Bluetooth.update(level, worldPosition, id, bluetoothCards(), isPaired() ? radioCard() : null);
 		}
 	}
 
@@ -151,7 +146,7 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 		}
 		for (int slot = 0; slot < cards.getContainerSize(); slot++) {
 			ItemStack card = cards.getItem(slot);
-			if (slot != pairingSlot() && !card.isEmpty() && !card.has(ModComponents.SERIAL)) {
+			if (slot != radioSlot() && !card.isEmpty() && !card.has(ModComponents.SERIAL)) {
 				card.set(ModComponents.SERIAL, UUID.randomUUID()); // its identity from now on, whatever slot it's in
 			}
 		}

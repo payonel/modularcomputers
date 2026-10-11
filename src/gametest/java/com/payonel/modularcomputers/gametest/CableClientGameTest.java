@@ -132,7 +132,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			pressPower(singleplayer, computer);
 			context.waitFor(client -> machinePowered(client, computer) && showsHello(client, screen));
 
-			// The toggle opens the screen's pairing slot, and back, straight from view to view.
+			// The toggle opens the screen's radio slot, and back, straight from view to view.
 			int grabs = context.computeOnClient(client -> MouseGrabs.count);
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, s -> ((DisplayScreen) s).viewToggle());
 			context.waitForScreen(CardHolderScreen.class);

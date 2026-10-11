@@ -17,39 +17,39 @@ import net.minecraft.world.level.block.Block;
 
 /**
  * The card slots of a block on the network, above the player's inventory: an expansion hub's
- * four expansion slots, and every holder's pairing slot (a Bluetooth card, which pairs the block
- * with one computer). Screens, robotic pistons and paint guns have just the pairing slot.
+ * four expansion slots, and every holder's radio slot (a Bluetooth card, which pairs the block
+ * with one computer). Screens, robotic pistons and paint guns have just the radio slot.
  */
 public final class CardHolderMenu extends AbstractContainerMenu {
 	public static final int SLOT_Y = 35;
 	public static final int INVENTORY_Y = 84;
 	private static final int SLOT_SPACING = 22;
-	/** Where the pairing slot sits when there are expansion slots too: on its own, at the right. */
-	private static final int PAIRING_X = 141;
+	/** Where the radio slot sits when there are expansion slots too: on its own, at the right. */
+	private static final int RADIO_X = 141;
 
 	private final int cardSlots;
-	private final int pairingSlot;
+	private final int radioSlot;
 	private final BlockPos pos;
 	private final ContainerLevelAccess access;
 	private final Block block;
 
-	private CardHolderMenu(MenuType<?> type, int id, Inventory inventory, Container cards, int pairingSlot, BlockPos pos,
+	private CardHolderMenu(MenuType<?> type, int id, Inventory inventory, Container cards, int radioSlot, BlockPos pos,
 		ContainerLevelAccess access, Block block) {
 		super(type, id);
 		this.cardSlots = cards.getContainerSize();
-		this.pairingSlot = pairingSlot;
+		this.radioSlot = radioSlot;
 		this.pos = pos;
 		this.access = access;
 		this.block = block;
 		int expansion = cardSlots - 1;
 		int left = (expansion > 0 ? 76 : 88) - (expansion * SLOT_SPACING - 4) / 2;
 		for (int slot = 0, column = 0; slot < cardSlots; slot++) {
-			int x = slot == pairingSlot ? (expansion > 0 ? PAIRING_X : 80) : left + column++ * SLOT_SPACING + 1;
+			int x = slot == radioSlot ? (expansion > 0 ? RADIO_X : 80) : left + column++ * SLOT_SPACING + 1;
 			int index = slot;
 			addSlot(new Slot(cards, slot, x, SLOT_Y) {
 				@Override
 				public boolean mayPlace(ItemStack stack) {
-					return index == pairingSlot ? stack.is(ModItems.BLUETOOTH_CARD) : ModItems.cardKind(stack).isPresent();
+					return index == radioSlot ? stack.is(ModItems.BLUETOOTH_CARD) : ModItems.cardKind(stack).isPresent();
 				}
 
 				@Override
@@ -62,7 +62,7 @@ public final class CardHolderMenu extends AbstractContainerMenu {
 	}
 
 	public static CardHolderMenu hub(int id, Inventory inventory, Container cards, BlockPos pos, ContainerLevelAccess access) {
-		return new CardHolderMenu(ModMenus.EXPANSION_HUB, id, inventory, cards, ExpansionHubBlockEntity.PAIRING_SLOT, pos, access, ModBlocks.EXPANSION_HUB);
+		return new CardHolderMenu(ModMenus.EXPANSION_HUB, id, inventory, cards, ExpansionHubBlockEntity.RADIO_SLOT, pos, access, ModBlocks.EXPANSION_HUB);
 	}
 
 	/** Client side: the slots are filled in by the server's sync. */
@@ -94,8 +94,8 @@ public final class CardHolderMenu extends AbstractContainerMenu {
 		return paintGun(id, inventory, new SimpleContainer(1), pos, ContainerLevelAccess.NULL);
 	}
 
-	public int pairingSlot() {
-		return pairingSlot;
+	public int radioSlot() {
+		return radioSlot;
 	}
 
 	public BlockPos pos() {

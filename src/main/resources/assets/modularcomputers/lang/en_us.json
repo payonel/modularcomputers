@@ -64,5 +64,5 @@
 	"gui.modularcomputers.bus.bluetooth": "bluetooth, %sm",
 	"gui.modularcomputers.bus.paired": "paired",
 	"gui.modularcomputers.bus.hub_paired": "hub %s, paired",
-	"gui.modularcomputers.pairing": "Pairing"
+	"gui.modularcomputers.radio": "Radio"
 }

@@ -139,6 +139,8 @@ public class AllInOneGameTest {
 		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.DISPLAY, DeviceType.KEYBOARD, DeviceType.STORAGE, DeviceType.NETWORK), "bus");
 
 		helper.assertTrue(!computer.moveDevice(3, true) && !computer.moveDevice(2, false), "the case's devices don't move");
+		helper.assertValueEqual(computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::position).toList(), List.of(1, 2, 6, 9),
+			"numbered by fixed place, with gaps for empty slots");
 
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.HARD_DISK));
 		helper.assertValueEqual(busKeys(computer), List.of("display", "keyboard", "sata:0", "sata:1", "exp:0"), "a new drive goes in its slot's place");

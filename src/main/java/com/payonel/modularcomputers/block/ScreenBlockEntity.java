@@ -16,7 +16,7 @@ import net.minecraft.world.level.storage.ValueOutput;
 
 /**
  * A screen block's display. Computers it's wired to write to it; it saves what it shows and
- * sends changes to clients. Its one slot (opened from the back) is the pairing slot: a
+ * sends changes to clients. Its one slot (opened from the back) is the radio slot: a
  * Bluetooth card there gives the screen to one computer.
  */
 public final class ScreenBlockEntity extends CardHolderBlockEntity implements DisplayHost {
@@ -38,7 +38,7 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 	}
 
 	@Override
-	public int pairingSlot() {
+	public int radioSlot() {
 		return 0;
 	}
 

@@ -27,7 +27,7 @@ import net.minecraft.world.phys.BlockHitResult;
 /**
  * A screen on its own: a monitor for computers to show their console on, joined to them by
  * cable (it takes one on any side but the glass). Right-click opens its screen view: just the
- * display and a toggle to its pairing slot (a Bluetooth card there gives it to one computer),
+ * display and a toggle to its radio slot (a Bluetooth card there can pair it with a computer or hub),
  * which right-clicking its back opens directly. The power button is on the computer's case,
  * not on every screen.
  */
@@ -73,7 +73,7 @@ public final class ScreenBlock extends HorizontalDirectionalBlock implements Ent
 			return InteractionResult.SUCCESS;
 		}
 		if (hit.getDirection() == state.getValue(FACING).getOpposite()) {
-			player.openMenu(screen); // the back: its pairing slot
+			player.openMenu(screen); // the back: its radio slot
 		} else if (player instanceof ServerPlayer serverPlayer) {
 			ServerPlayNetworking.send(serverPlayer, openDisplayPayload(screen));
 		}

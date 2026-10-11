@@ -33,10 +33,11 @@ import net.minecraft.world.level.Level;
  * Each side keeps a registry of the loaded blocks with Bluetooth cards, which the cable walk
  * uses to cross links and clients use to highlight a held card's target.
  * <p>
- * <b>Pairing:</b> a device with a Bluetooth card in its pairing slot belongs to one computer,
- * found by following its card's link (on through the pairing cards of whatever board it links
- * to, like a hub's) until a computer. That's saved in the cards themselves, so it doesn't depend
- * on which chunk loads first. Unpaired devices are shared by every computer that reaches them.
+ * <b>Pairing:</b> a device whose radio (the card in its radio slot) links to a board is paired
+ * with that board: a computer, or a hub. A computer sees a device paired with it, or with a hub
+ * it sees (so with a shared hub, every computer that reaches the hub). That's saved in the cards
+ * themselves, so it doesn't depend on which chunk loads first. Devices with no radio, or an
+ * unlinked one, are shared by every computer that reaches them.
  */
 public final class Bluetooth {
 	/** A block that holds Bluetooth cards. */
@@ -48,12 +49,9 @@ public final class Bluetooth {
 		List<ItemStack> bluetoothCards();
 	}
 
-	/** A block with a radio: its board, the boards its cards link to, its pairing card's link, whether it's a computer. */
-	private record Entry(UUID board, List<UUID> links, Optional<UUID> pairing, boolean computer) {
+	/** A block with a radio: its board, the boards its cards link to, and the board it's paired with. */
+	private record Entry(UUID board, List<UUID> links, Optional<UUID> paired) {
 	}
-
-	/** How many links {@link #owner} follows before giving up (a loop, or a very long chain). */
-	private static final int MAX_CHAIN = 16;
 
 	private static final Map<Level, Map<BlockPos, Entry>> HOLDERS = new WeakHashMap<>();
 
@@ -65,16 +63,16 @@ public final class Bluetooth {
 	}
 
 	/**
-	 * Records the Bluetooth cards the block at {@code pos} holds now: all of them, the one in its
-	 * pairing slot (or null), and whether the block is a computer. Without a card it has no radio.
+	 * Records the Bluetooth cards the block at {@code pos} holds now, and the radio that pairs it
+	 * (or null: computers aren't paired). Without a card it has no radio.
 	 */
-	public static void update(Level level, BlockPos pos, UUID board, List<ItemStack> cards, ItemStack pairing, boolean computer) {
+	public static void update(Level level, BlockPos pos, UUID board, List<ItemStack> cards, ItemStack pairing) {
 		Map<BlockPos, Entry> holders = HOLDERS.computeIfAbsent(level, key -> new HashMap<>());
 		if (cards.isEmpty()) {
 			holders.remove(pos);
 		} else {
 			List<UUID> links = cards.stream().map(Bluetooth::link).flatMap(Optional::stream).toList();
-			holders.put(pos.immutable(), new Entry(board, links, pairing == null ? Optional.empty() : link(pairing), computer));
+			holders.put(pos.immutable(), new Entry(board, links, pairing == null ? Optional.empty() : link(pairing)));
 		}
 	}
 
@@ -87,26 +85,12 @@ public final class Bluetooth {
 	}
 
 	/**
-	 * The computer a paired device belongs to: follow its pairing card's link to that board, and
-	 * on through that board's pairing card, until a computer. Empty when the device isn't paired,
-	 * or the chain ends (no link, or a board with no radio, or not loaded).
+	 * Where the board a paired device is paired with is: a computer, or a hub. Empty when it isn't
+	 * paired, or that board isn't loaded or has no radio (then nobody sees the device).
 	 */
-	public static Optional<BlockPos> owner(Level level, BlockPos device) {
-		Map<BlockPos, Entry> holders = HOLDERS.getOrDefault(level, Map.of());
-		Entry entry = holders.get(device);
-		Optional<UUID> link = entry == null ? Optional.empty() : entry.pairing();
-		for (int step = 0; step < MAX_CHAIN && link.isPresent(); step++) {
-			Optional<BlockPos> next = board(level, link.get());
-			if (next.isEmpty()) {
-				return Optional.empty();
-			}
-			Entry board = holders.get(next.get());
-			if (board.computer()) {
-				return next;
-			}
-			link = board.pairing();
-		}
-		return Optional.empty();
+	public static Optional<BlockPos> pairedTo(Level level, BlockPos device) {
+		Entry entry = HOLDERS.getOrDefault(level, Map.of()).get(device);
+		return entry == null ? Optional.empty() : entry.paired().flatMap(board -> board(level, board));
 	}
 
 	/** The block at {@code pos} is gone, or its chunk unloaded. */

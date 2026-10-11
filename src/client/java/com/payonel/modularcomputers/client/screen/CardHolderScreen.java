@@ -15,7 +15,7 @@ import net.minecraft.world.inventory.Slot;
 
 /**
  * The card slots of a block on the network: a strip of circuit board with a socket per slot,
- * above the player's inventory. The pairing slot (for a Bluetooth card) has a blue socket and
+ * above the player's inventory. The radio slot (for a Bluetooth card) has a blue socket and
  * its own label; an expansion hub's four expansion slots sit left of it. A screen's slot view
  * also has the toggle back to its screen view, where the case view has it.
  */
@@ -33,8 +33,8 @@ public final class CardHolderScreen extends AbstractContainerScreen<CardHolderMe
 	private static final int SOCKET = 0xFF1A1A1E;
 	private static final int SOCKET_FACE = 0xFF34343A;
 	private static final int LABEL = 0xFF404040;
-	private static final int PAIRING_SOCKET = 0xFF28468C;
-	private static final int PAIRING_FACE = 0xFF3A5AA8;
+	private static final int RADIO_SOCKET = 0xFF28468C;
+	private static final int RADIO_FACE = 0xFF3A5AA8;
 	private static final int SILK = 0xFFEAEADE;
 
 	public CardHolderScreen(CardHolderMenu menu, Inventory inventory, Component title) {
@@ -88,11 +88,11 @@ public final class CardHolderScreen extends AbstractContainerScreen<CardHolderMe
 		graphics.fill(x + 8, y + 18, x + imageWidth - 8, y + 62, BOARD);
 		for (int slot = 0; slot < menu.cardSlots(); slot++) {
 			Viewport area = slotArea(slot);
-			boolean pairing = slot == menu.pairingSlot();
-			graphics.fill(area.x() - 2, area.y() - 2, area.right() + 2, area.bottom() + 2, pairing ? PAIRING_SOCKET : SOCKET);
-			graphics.fill(area.x() - 1, area.y() - 1, area.right() + 1, area.bottom() + 1, pairing ? PAIRING_FACE : SOCKET_FACE);
+			boolean pairing = slot == menu.radioSlot();
+			graphics.fill(area.x() - 2, area.y() - 2, area.right() + 2, area.bottom() + 2, pairing ? RADIO_SOCKET : SOCKET);
+			graphics.fill(area.x() - 1, area.y() - 1, area.right() + 1, area.bottom() + 1, pairing ? RADIO_FACE : SOCKET_FACE);
 			if (pairing) {
-				Component label = Component.translatable("gui.modularcomputers.pairing");
+				Component label = Component.translatable("gui.modularcomputers.radio");
 				graphics.text(font, label, area.x() + 8 - font.width(label) / 2, area.y() - 12, SILK, false);
 			}
 			if (!menu.slots.get(slot).hasItem()) {

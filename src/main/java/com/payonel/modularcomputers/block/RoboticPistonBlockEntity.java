@@ -21,9 +21,9 @@ public final class RoboticPistonBlockEntity extends CardHolderBlockEntity {
 		super(ModBlocks.ROBOTIC_PISTON_ENTITY, pos, state, 1);
 	}
 
-	/** Its one slot is the pairing slot: a Bluetooth card there links it to its computer instead of a cable. */
+	/** Its one slot is the radio slot: a Bluetooth card there links it to its computer instead of a cable. */
 	@Override
-	public int pairingSlot() {
+	public int radioSlot() {
 		return 0;
 	}
 

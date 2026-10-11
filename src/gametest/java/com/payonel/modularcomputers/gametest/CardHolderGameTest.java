@@ -116,13 +116,14 @@ public class CardHolderGameTest {
 		ExpansionHubBlockEntity hub = hub(helper, new BlockPos(1, 1, 1));
 		RoboticPistonBlockEntity piston = piston(helper, new BlockPos(3, 1, 1), Direction.DOWN);
 		for (var card : ModItems.CARDS.keySet()) {
-			helper.assertTrue(hub.cards().canPlaceItem(0, new ItemStack(card)), "a hub takes " + card);
+			helper.assertValueEqual(hub.cards().canPlaceItem(0, new ItemStack(card)), card != ModItems.BLUETOOTH_CARD,
+				"a hub's expansion slot taking " + card + " (Bluetooth goes in the radio slot)");
 			helper.assertValueEqual(piston.cards().canPlaceItem(0, new ItemStack(card)), card == ModItems.BLUETOOTH_CARD, "a piston taking " + card);
 		}
 		helper.assertTrue(!hub.cards().canPlaceItem(0, new ItemStack(ModItems.CPU)), "a hub takes only cards");
-		helper.assertValueEqual(hub.cards().getContainerSize(), ExpansionHubBlockEntity.SLOTS + 1, "four slots and the pairing slot");
-		helper.assertTrue(!hub.cards().canPlaceItem(ExpansionHubBlockEntity.PAIRING_SLOT, new ItemStack(ModItems.AUDIO_CARD)), "pairing takes only Bluetooth");
-		helper.assertTrue(hub.cards().canPlaceItem(ExpansionHubBlockEntity.PAIRING_SLOT, new ItemStack(ModItems.BLUETOOTH_CARD)), "pairing takes Bluetooth");
+		helper.assertValueEqual(hub.cards().getContainerSize(), ExpansionHubBlockEntity.SLOTS + 1, "four slots and the radio slot");
+		helper.assertTrue(!hub.cards().canPlaceItem(ExpansionHubBlockEntity.RADIO_SLOT, new ItemStack(ModItems.AUDIO_CARD)), "the radio slot takes only Bluetooth");
+		helper.assertTrue(hub.cards().canPlaceItem(ExpansionHubBlockEntity.RADIO_SLOT, new ItemStack(ModItems.BLUETOOTH_CARD)), "the radio slot takes Bluetooth");
 		helper.assertValueEqual(piston.cards().getContainerSize(), 1, "one slot");
 		helper.succeed();
 	}
@@ -185,14 +186,14 @@ public class CardHolderGameTest {
 	}
 
 	@GameTest
-	public void aScreensBackOpensItsPairingSlotAndItsFrontTheDisplay(GameTestHelper helper) {
+	public void aScreensBackOpensItsRadioSlotAndItsFrontTheDisplay(GameTestHelper helper) {
 		helper.setBlock(new BlockPos(1, 1, 1), ModBlocks.SCREEN.defaultBlockState().setValue(ScreenBlock.FACING, Direction.SOUTH));
 		var player = helper.makeMockServerPlayerInLevel();
 		BlockPos screen = helper.absolutePos(new BlockPos(1, 1, 1));
 		helper.useBlock(new BlockPos(1, 1, 1), player, new net.minecraft.world.phys.BlockHitResult(
 			net.minecraft.world.phys.Vec3.atCenterOf(screen).add(0, 0, -0.5), Direction.NORTH, screen, false));
 		helper.assertTrue(player.containerMenu instanceof com.payonel.modularcomputers.menu.CardHolderMenu menu && menu.cardSlots() == 1,
-			"the back opens the pairing slot, got " + player.containerMenu);
+			"the back opens the radio slot, got " + player.containerMenu);
 		player.closeContainer();
 		helper.useBlock(new BlockPos(1, 1, 1), player, new net.minecraft.world.phys.BlockHitResult(
 			net.minecraft.world.phys.Vec3.atCenterOf(screen).add(0, 0, 0.5), Direction.SOUTH, screen, false));

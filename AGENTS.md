@@ -218,6 +218,11 @@ same thing.
             waiting", and a soft hum beat (`bus_overflow`, two detuned low tones) when a device
             starts waiting. Programs will read it from `Bus.status()` (`BusStatus`: capacity,
             devices, saved, missing, waiting, overflow).
+          - **Numbers are fixed places** (user, after looking at PCI/SATA/USB): 1 display, 2
+            keyboard, 3 ROM, 4 UPS, 5-8 SATA, 9-12 EXP, then external devices from 13 in their
+            order. Empty case slots leave gaps (like `lspci`); only present devices get rows.
+          - Hub cards are known by a serial number (`ModComponents.SERIAL`, stamped when a card
+            first goes into a hub), so moving one to another slot keeps its place.
           - It's saved (`bus_external`, `bus_disconnected`), and the machine's `Bus` follows it.
         - **Cabled devices** (screens) get two more buttons left of the arrows:
           - The **bulb** outlines the device in the world for 10 seconds, pulsing yellow and
@@ -411,31 +416,35 @@ scripts/art/error_beep.py` into
     - **While you hold a linked card**, the block with its target board gets a steady blue
       wireframe, seen through walls (`client/BluetoothTarget`, `Outline.BLUETOOTH`).
     - There's no range limit yet.
-  - **Pairing** (user design, 2026-10-11): every network block has a slot GUI with a
-    **pairing slot** for a Bluetooth card.
+  - **The radio slot** (user design, 2026-10-11; first called the "pairing slot", renamed by the
+    user since it's just a radio): every network block has a slot GUI with one slot for a
+    Bluetooth card, its **radio**, and it's the only place such a block takes one (a hub's
+    expansion slots refuse Bluetooth cards). Computers keep theirs in an expansion slot.
     - Where the slot is:
       - the screen: its only slot, opened by right-clicking its back, or with the view
         toggle in its screen view. The slot view has the toggle back, as the all-in-one's
         case view does; the user asked for it for convenience. With no power button, the
         toggle sits at the top.
-      - the hub: a fifth slot, apart from its four expansion slots, drawn blue;
+      - the hub: a fifth slot, apart from its four expansion slots, drawn blue, labeled
+        "Radio";
       - the robotic piston: its one slot;
       - the paint gun: its one slot, opened by right-click.
-    - **A paired device belongs to exactly one computer** (`Bluetooth.owner`). Its pairing
-      card's link is followed, on through the pairing cards of what it links to (a hub, say),
-      until a computer.
-      - Only that computer has it on its bus, and its row reads "paired" (or "hub 2, paired").
-        A device paired to nothing is on no bus.
-      - It still carries the cable for everything else.
-      - A hub's pairing card pairs the whole hub, cards and all.
-      - This is deterministic: the ownership is saved in the cards, so it doesn't depend on
-        which chunk loads first. The user found first-wins and last-wins hopeless for that
-        reason.
+    - **An unlinked radio just receives:** other cards can link to the block's board, and the
+      block stays shared.
+    - **A linked radio pairs the block with that board** (a computer or a hub; the user likes
+      devices pairing to the hub, not to the computer using it). A computer sees a paired block
+      if it's paired with that computer, or with a hub the computer sees, and so on through
+      hubs (`AllInOneBlockEntity.visibleDevices`, `Bluetooth.pairedTo`). So hubs daisy-chain:
+      hub 1's radio linked to hub 2 means a computer seeing either sees both, and what's past
+      them. Another computer's pairings never pass through.
+      - Its row reads "paired" (or "hub 2, paired"). It still carries the cable for everything
+        else.
+      - This is deterministic: it's saved in the cards, so it doesn't depend on which chunk
+        loads first. The user found first-wins and last-wins hopeless for that reason.
     - **Unpaired devices are shared** by every computer that reaches them. That's racy by
       nature; the user calls it undefined behavior and accepts it.
-    - Holding a card and right-clicking a holder links to its **pairing card first**.
   - The screen, hub, piston and paint gun share `CardHolderBlockEntity`: an id, card slots
-    with a pairing slot, save and sync, drops, card sounds, Bluetooth registration, and
+    with a radio slot, save and sync, drops, card sounds, Bluetooth registration, and
     `Cabling.changed()` when their cards change. They also share `CardHolderMenu` and
     `CardHolderScreen`. Hubs, pistons and paint guns use `OutlineRenderer` for the outlines.
   - **One screen, many computers:** a screen can be wired to several computers, and each

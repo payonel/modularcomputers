@@ -15,13 +15,13 @@ import net.minecraft.world.level.block.state.BlockState;
 /**
  * An expansion hub: a box of expansion card slots on the cable network, like an external
  * expansion chassis. Every computer wired to it has its cards on its bus, unless a Bluetooth
- * card in its pairing slot pairs the whole hub with one computer. A card works where it's
+ * card in its radio slot pairs the whole hub with one computer. A card works where it's
  * installed: a redstone card in a hub will emit and detect redstone at the hub.
  */
 public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
-	/** Expansion card slots; the pairing slot comes after them. */
+	/** Expansion card slots; the radio slot comes after them. */
 	public static final int SLOTS = 4;
-	public static final int PAIRING_SLOT = SLOTS;
+	public static final int RADIO_SLOT = SLOTS;
 
 	/** The devices made from the cards, by slot; null when empty. */
 	private final Card[] devices = new Card[SLOTS];
@@ -31,8 +31,8 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 	}
 
 	@Override
-	public int pairingSlot() {
-		return PAIRING_SLOT;
+	public int radioSlot() {
+		return RADIO_SLOT;
 	}
 
 	/** The card in a slot, as a bus device. */

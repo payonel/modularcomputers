@@ -9,7 +9,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** A paint gun: its bus device, and one pairing slot for a Bluetooth card. */
+/** A paint gun: its bus device, and one radio slot for a Bluetooth card. */
 public final class PaintGunBlockEntity extends CardHolderBlockEntity {
 	private final PaintGun device = new PaintGun();
 
@@ -22,7 +22,7 @@ public final class PaintGunBlockEntity extends CardHolderBlockEntity {
 	}
 
 	@Override
-	public int pairingSlot() {
+	public int radioSlot() {
 		return 0;
 	}
 

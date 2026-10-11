@@ -16,7 +16,7 @@ import net.minecraft.world.MenuProvider;
 /**
  * Client to server: the player pressed the view toggle on the all-in-one or screen block at
  * {@code pos}. The server opens the case view (a menu, since it has item slots: a screen's is
- * its pairing slot) or goes back to the screen view.
+ * its radio slot) or goes back to the screen view.
  */
 public record SwitchViewPayload(BlockPos pos, boolean toCase) implements CustomPacketPayload {
 	public static final Type<SwitchViewPayload> TYPE = new Type<>(ModularComputers.id("switch_view"));

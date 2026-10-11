@@ -123,14 +123,14 @@ public class BluetoothGameTest {
 	}
 
 	@GameTest
-	public void pairingFollowsTheChainThroughAHub(GameTestHelper helper) {
-		// The screen's card links to the hub's board, and the hub's pairing card to the computer's:
+	public void pairingChainsThroughAHub(GameTestHelper helper) {
+		// The screen's card links to the hub's board, and the hub's radio card to the computer's:
 		// the computer owns both, with no cable anywhere.
 		AllInOneBlockEntity computer = computer(helper);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(null));
 		helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.EXPANSION_HUB);
 		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(4, 1, 1), ExpansionHubBlockEntity.class);
-		hub.cards().setItem(ExpansionHubBlockEntity.PAIRING_SLOT, card(computer.boardId()));
+		hub.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(computer.boardId()));
 		hub.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
 		ScreenBlockEntity screen = screen(helper, new BlockPos(4, 1, 5));
 		screen.cards().setItem(0, card(hub.boardId()));
@@ -141,28 +141,27 @@ public class BluetoothGameTest {
 	}
 
 	@GameTest(maxTicks = 100)
-	public void aDevicePairedToNothingIsOnNoBus(GameTestHelper helper) {
+	public void anUnlinkedRadioLeavesADeviceShared(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper);
 		cable(helper, new BlockPos(2, 1, 1));
 		ScreenBlockEntity screen = screen(helper, new BlockPos(3, 1, 1));
-		screen.cards().setItem(0, card(null)); // a card, but it links to nothing
-		helper.startSequence()
-			.thenIdle(25)
-			.thenExecute(() -> helper.assertTrue(!onBus(computer, screen) && locations(computer).isEmpty(), "paired to no one, on no bus"))
-			.thenExecute(() -> screen.cards().setItem(0, ItemStack.EMPTY))
-			.thenWaitUntil(() -> helper.assertTrue(onBus(computer, screen), "without the card it's shared on the cable again"))
-			.thenSucceed();
+		screen.cards().setItem(0, card(null)); // a radio, linked nowhere: not paired
+		helper.succeedWhen(() -> {
+			helper.assertTrue(onBus(computer, screen), "shared on the cable");
+			helper.assertValueEqual(locations(computer), List.of("cable, 2m"), "not paired");
+		});
 	}
 
 	@GameTest
 	public void cardsDaisyChainThroughAHub(GameTestHelper helper) {
-		// Unpaired: the computer's card links to the hub's board (the hub has a Bluetooth card in
-		// an expansion slot to receive with); the hub passes it on by cable.
+		// Unpaired: the computer's card links to the hub's board (the hub's radio receives); the
+		// hub passes it on by cable.
 		AllInOneBlockEntity computer = computer(helper);
 		helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.EXPANSION_HUB);
 		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(4, 1, 1), ExpansionHubBlockEntity.class);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(hub.boardId()));
-		hub.cards().setItem(0, card(null));
+		hub.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(null));
+		hub.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
 		cable(helper, new BlockPos(4, 1, 2));
 		screen(helper, new BlockPos(4, 1, 3));
 		helper.succeedWhen(() -> helper.assertValueEqual(locations(computer), List.of("hub 1, 3m", "bluetooth, 5m"),
@@ -174,10 +173,59 @@ public class BluetoothGameTest {
 		AllInOneBlockEntity computer = computer(helper);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(UUID.randomUUID())); // a board that isn't there
 		helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.EXPANSION_HUB);
-		helper.getBlockEntity(new BlockPos(4, 1, 1), ExpansionHubBlockEntity.class).cards().setItem(0, card(null));
+		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(4, 1, 1), ExpansionHubBlockEntity.class);
+		hub.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(null));
+		hub.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
 		helper.startSequence()
 			.thenIdle(5)
 			.thenExecute(() -> helper.assertTrue(locations(computer).isEmpty(), "no link, no connection"))
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 100)
+	public void hubsDaisyChain(GameTestHelper helper) {
+		// The user's case: hub 1's radio links to hub 2, and a computer wired to hub 1 sees hub 2's
+		// devices too, out past it by cable.
+		AllInOneBlockEntity computer = computer(helper);
+		helper.setBlock(new BlockPos(2, 1, 1), ModBlocks.EXPANSION_HUB);
+		ExpansionHubBlockEntity hub1 = helper.getBlockEntity(new BlockPos(2, 1, 1), ExpansionHubBlockEntity.class);
+		helper.setBlock(new BlockPos(2, 1, 6), ModBlocks.EXPANSION_HUB);
+		ExpansionHubBlockEntity hub2 = helper.getBlockEntity(new BlockPos(2, 1, 6), ExpansionHubBlockEntity.class);
+		hub2.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(null)); // hub 2's radio, to link to
+		hub2.cards().setItem(0, new ItemStack(ModItems.WLAN_CARD));
+		cable(helper, new BlockPos(3, 1, 6));
+		ScreenBlockEntity screen = screen(helper, new BlockPos(4, 1, 6));
+		hub1.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
+		hub1.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(hub2.boardId()));
+		helper.succeedWhen(() -> {
+			helper.assertTrue(onBus(computer, screen), "the screen past hub 2");
+			helper.assertValueEqual(computer.busEntries().stream().filter(AllInOneBlockEntity.BusEntry::cabled)
+				.map(entry -> entry.name().getString()).toList(), List.of("Audio Card", "WLAN Card", "Screen"), "hub 1's card, hub 2's, the screen");
+		});
+	}
+
+		@GameTest(maxTicks = 100)
+	public void aDevicePairedWithAHubGoesWithTheHub(GameTestHelper helper) {
+		// Two computers share a hub by cable; a piston, far off, is paired with the hub.
+		AllInOneBlockEntity first = computer(helper);
+		helper.setBlock(new BlockPos(2, 1, 1), ModBlocks.EXPANSION_HUB);
+		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(2, 1, 1), ExpansionHubBlockEntity.class);
+		helper.setBlock(new BlockPos(3, 1, 1), ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
+		AllInOneBlockEntity second = helper.getBlockEntity(new BlockPos(3, 1, 1), AllInOneBlockEntity.class);
+		first.parts().setItem(CaseMenu.EXP_SLOTS, card(null)); // the first computer's radio, for later
+		hub.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(null)); // a radio, linked nowhere: the hub is shared
+		hub.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
+		piston(helper, new BlockPos(2, 1, 6)).cards().setItem(0, card(hub.boardId()));
+		helper.startSequence()
+			.thenWaitUntil(() -> {
+				helper.assertValueEqual(locations(first), List.of("hub 1, 1m", "paired"), "the first computer has the hub and its piston");
+				helper.assertValueEqual(locations(second), List.of("hub 1, 1m", "paired"), "and so does the second");
+			})
+			.thenExecute(() -> hub.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(first.boardId()))) // the hub pairs with the first
+			.thenWaitUntil(() -> {
+				helper.assertValueEqual(locations(first), List.of("hub 1, paired", "paired"), "the first keeps both");
+				helper.assertValueEqual(locations(second), List.of("offline", "offline"), "the second loses both");
+			})
 			.thenSucceed();
 	}
 

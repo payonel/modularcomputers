@@ -30,11 +30,13 @@ import com.payonel.modularcomputers.power.BatteryCharge;
 import com.payonel.modularcomputers.power.PowerBuffer;
 import com.payonel.modularcomputers.sound.ModSounds;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
@@ -208,7 +210,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	 * position (the bulb finds them in the world) and can be disconnected.
 	 */
 	public record BusEntry(String key, Component name, Component location, ItemStack item, int slot, int builtInIcon,
-		Optional<BlockPos> device, boolean connected, boolean online) {
+		Optional<BlockPos> device, boolean connected, boolean online, int position) {
 		/** An external device: it can be reordered, identified, unplugged, and forgotten while offline. */
 		public boolean cabled() {
 			return device.isPresent();
@@ -219,13 +221,16 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	public List<BusEntry> busEntries() {
 		List<BusEntry> entries = new ArrayList<>();
 		Component builtIn = Component.translatable("gui.modularcomputers.bus.built_in");
-		for (String key : busOrder.keys()) {
+		List<String> keys = busOrder.keys();
+		for (int index = 0; index < keys.size(); index++) {
+			String key = keys.get(index);
+			int position = busPosition(key, index - (keys.size() - busOrder.external().size()));
 			if (key.equals(DISPLAY_KEY)) {
 				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.display"), builtIn, ItemStack.EMPTY, -1, DISPLAY_ICON,
-					Optional.empty(), true, true));
+					Optional.empty(), true, true, position));
 			} else if (key.equals(KEYBOARD_KEY)) {
 				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.keyboard"), builtIn, ItemStack.EMPTY, -1, KEYBOARD_ICON,
-					Optional.empty(), true, true));
+					Optional.empty(), true, true, position));
 			} else if (key.startsWith(CABLE_KEY)) {
 				Optional.ofNullable(known.get(key)).ifPresent(device -> {
 					ItemStack item = new ItemStack(device.item());
@@ -241,15 +246,36 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 							? Component.translatable("gui.modularcomputers.bus.hub", device.hubSlot() + 1, device.meters())
 							: Component.translatable(device.wireless() ? "gui.modularcomputers.bus.bluetooth" : "gui.modularcomputers.bus.cable", device.meters());
 					}
-					entries.add(new BusEntry(key, item.getHoverName(), location, item, -1, -1, Optional.of(device.pos()), busOrder.isConnected(key), online));
+					entries.add(new BusEntry(key, item.getHoverName(), location, item, -1, -1, Optional.of(device.pos()), busOrder.isConnected(key), online, position));
 				});
 			} else {
 				int slot = partSlot(key);
 				ItemStack item = parts.getItem(slot);
-				entries.add(new BusEntry(key, item.getHoverName(), partLocation(key), item, slot, -1, Optional.empty(), true, true));
+				entries.add(new BusEntry(key, item.getHoverName(), partLocation(key), item, slot, -1, Optional.empty(), true, true, position));
 			}
 		}
 		return entries;
+	}
+
+	/**
+	 * A device's place on the bus, from 1, as the panel numbers it: fixed for the case's own (1
+	 * display, 2 keyboard, 3 ROM, 4 UPS, 5-8 SATA, 9-12 EXP; empty slots leave gaps, as PCI's
+	 * slot numbers do), then the external devices from 13 in their order.
+	 */
+	private static int busPosition(String key, int externalIndex) {
+		if (key.equals(DISPLAY_KEY)) {
+			return 1;
+		} else if (key.equals(KEYBOARD_KEY)) {
+			return 2;
+		} else if (key.equals(EEPROM_KEY)) {
+			return 3;
+		} else if (key.equals(UPS_KEY)) {
+			return 4;
+		} else if (key.startsWith(SATA_KEY) || key.startsWith(EXP_KEY)) {
+			int lane = Integer.parseInt(key.substring(key.indexOf(':') + 1));
+			return (key.startsWith(SATA_KEY) ? 5 : 9) + lane;
+		}
+		return BusOrder.INTERNAL_PLACES + 1 + externalIndex;
 	}
 
 	/** The case slot a part's bus key stands for. */
@@ -325,7 +351,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	private void updateBluetooth() {
 		if (level != null) {
-			Bluetooth.update(level, worldPosition, boardId, bluetoothCards(), null, true);
+			Bluetooth.update(level, worldPosition, boardId, bluetoothCards(), null);
 		}
 	}
 
@@ -458,11 +484,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private void scanCables() {
 		List<Cabled> found = new ArrayList<>();
 		Map<String, Device> devices = new LinkedHashMap<>();
-		for (CableWalk.Found at : Cabling.walk(level, worldPosition)) {
+		List<CableWalk.Found> reached = Cabling.walk(level, worldPosition);
+		Set<BlockPos> visible = visibleDevices(reached);
+		for (CableWalk.Found at : reached) {
 			BlockEntity block = level.getBlockEntity(at.pos());
-			// A paired device belongs to one computer only: the one its Bluetooth card leads to.
 			boolean paired = block instanceof CardHolderBlockEntity holder && holder.isPaired();
-			if (paired && !Bluetooth.owner(level, at.pos()).equals(Optional.of(worldPosition))) {
+			if (!visible.contains(at.pos())) {
 				continue;
 			}
 			if (block instanceof ScreenBlockEntity screen) {
@@ -501,7 +528,34 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		syncToClients();
 	}
 
-	private static void addCabled(List<Cabled> found, Map<String, Device> devices, Cabled cabled, Device device) {
+	/**
+	 * Which of the blocks the walk reached this computer sees: the unpaired ones (shared), those
+	 * paired with this computer, and those paired with a hub this computer sees, and so on
+	 * through hubs paired with hubs.
+	 */
+	private Set<BlockPos> visibleDevices(List<CableWalk.Found> reached) {
+		Set<BlockPos> visible = new HashSet<>();
+		boolean grew = true;
+		while (grew) {
+			grew = false;
+			for (CableWalk.Found at : reached) {
+				if (visible.contains(at.pos())) {
+					continue;
+				}
+				boolean paired = level.getBlockEntity(at.pos()) instanceof CardHolderBlockEntity holder && holder.isPaired();
+				Optional<BlockPos> board = paired ? Bluetooth.pairedTo(level, at.pos()) : Optional.empty();
+				// Paired with this computer, or with a hub it sees; another computer's pairings are its own.
+				boolean mine = board.filter(pos -> pos.equals(worldPosition)
+					|| visible.contains(pos) && level.getBlockEntity(pos) instanceof ExpansionHubBlockEntity).isPresent();
+				if (!paired || mine) {
+					grew |= visible.add(at.pos());
+				}
+			}
+		}
+		return visible;
+	}
+
+		private static void addCabled(List<Cabled> found, Map<String, Device> devices, Cabled cabled, Device device) {
 		if (devices.putIfAbsent(cabled.key(), device) == null) {
 			found.add(cabled);
 		}

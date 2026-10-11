@@ -21,7 +21,7 @@ import net.minecraft.world.phys.BlockHitResult;
 /**
  * A paint gun (a placeholder: it doesn't shoot yet). It will shoot paint colors at nearby wool
  * blocks, out of its nozzle ({@link #FACING}); it takes a cable on every other face.
- * Right-click opens its pairing slot.
+ * Right-click opens its radio slot.
  */
 public final class PaintGunBlock extends DirectionalBlock implements EntityBlock {
 	public PaintGunBlock(Properties properties) {
@@ -55,7 +55,7 @@ public final class PaintGunBlock extends DirectionalBlock implements EntityBlock
 	@Override
 	protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
 		if (!level.isClientSide() && level.getBlockEntity(pos) instanceof PaintGunBlockEntity gun) {
-			player.openMenu(gun); // its pairing slot
+			player.openMenu(gun); // its radio slot
 		}
 		return InteractionResult.SUCCESS;
 	}
