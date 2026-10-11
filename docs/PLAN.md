@@ -53,7 +53,7 @@ skip steps freely, never invent false steps (see `AGENTS.md` section 1).
   - The EEPROM item gets contents.
   - The CPU runs Lua from it instead of the Java stand-in.
 
-## Mock runtime: programs calling devices (design in discussion, 2026-10-11)
+## Mock runtime: programs calling devices (built 2026-10-11; see AGENTS.md)
 
 The Lua runtime is the user's own project and will take time. A mock layer pretends to be it,
 so the machine can be built and tested as if Lua code were calling devices. Modeled on how OC
@@ -75,6 +75,14 @@ Decided by the user:
   and its timeout hacks).
 - **Interrupts per device, not a machine-wide queue:** a device raises "I have something";
   its data stays in the device until the program reads it, which clears it.
+- **20 calls a tick** per machine, then it's paused until the next tick (the host's choice,
+  not the machine's).
+
+Still to do:
+- Running machines off-thread, asynchronously, and how they share the server tick.
+- Device methods for the rest: the keyboard (and its key buffer and interrupt), disks, the
+  UPS battery (charge, time left), cards, the EEPROM.
+- Opaque handles (Lua userdata) in the value model.
 
 ## Separate blocks: cases, screens, keyboards, cables
 

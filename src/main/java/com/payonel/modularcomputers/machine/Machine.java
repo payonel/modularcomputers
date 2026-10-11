@@ -2,7 +2,11 @@ package com.payonel.modularcomputers.machine;
 
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.display.Display;
+import com.payonel.modularcomputers.runtime.ProgramRunner;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
 
 /**
@@ -26,9 +30,26 @@ public final class Machine {
 		NO_POWER,
 	}
 
+	/** How many motherboard calls a machine's program gets each tick, before it's paused until the next. */
+	public static final int DEFAULT_CALLS_PER_TICK = 20;
+
+	/** What a tick's supervision found. */
+	public enum Supervision {
+		/** All well (or off). */
+		OK,
+		/** The CPU is gone: the machine died (an error beep). */
+		LOST_CPU,
+		/** Power is gone: the machine died (an error beep). */
+		LOST_POWER,
+	}
+
 	private final Motherboard board;
 	private final BooleanSupplier power;
+	private final MotherboardApi api;
 	private boolean powered;
+	private ProgramRunner runner;
+	private long uptime;
+	private int callsPerTick = DEFAULT_CALLS_PER_TICK;
 
 	/** A machine on a bench supply: it always has power. */
 	public Machine(Motherboard board) {
@@ -39,6 +60,74 @@ public final class Machine {
 	public Machine(Motherboard board, BooleanSupplier power) {
 		this.board = board;
 		this.power = power;
+		this.api = new MotherboardApi(board, () -> uptime);
+	}
+
+	/** The program on the CPU, while one runs (or waits). */
+	public Optional<ProgramRunner> runner() {
+		return Optional.ofNullable(runner);
+	}
+
+	public void setCallsPerTick(int callsPerTick) {
+		this.callsPerTick = callsPerTick;
+	}
+
+	/** Ticks since power-on. */
+	public long uptime() {
+		return uptime;
+	}
+
+	/**
+	 * Every tick: the motherboard checks its CPU and power (like a socket's "CPU present" pin and
+	 * a power supply's "power good" line), and a running program gets its turn.
+	 */
+	public Supervision tick() {
+		if (!powered) {
+			return Supervision.OK;
+		}
+		if (board.cpu().isEmpty()) {
+			cutPower();
+			return Supervision.LOST_CPU;
+		}
+		if (!power.getAsBoolean()) {
+			cutPower();
+			return Supervision.LOST_POWER;
+		}
+		uptime++;
+		run();
+		return Supervision.OK;
+	}
+
+	/** The program's turn: up to {@link #callsPerTick} calls. */
+	private void run() {
+		if (runner == null) {
+			return;
+		}
+		ProgramRunner.State state = runner.tick(api, callsPerTick, uptime, api::interrupts);
+		if (state == ProgramRunner.State.CRASHED) {
+			board.cpu().ifPresent(cpu -> cpu.crashed(board, runner.crash()));
+		}
+		if (state == ProgramRunner.State.CRASHED || state == ProgramRunner.State.HALTED) {
+			runner = null;
+		}
+	}
+
+	private void cutPower() {
+		powered = false;
+		stopProgram();
+		board.powerOff();
+	}
+
+	private void stopProgram() {
+		if (runner != null) {
+			runner.stop();
+			runner = null;
+		}
+	}
+
+	/** The machine is unloading (its chunk, or the world): the program stops. It isn't saved. */
+	public void unload() {
+		stopProgram();
 	}
 
 	public Motherboard board() {
@@ -52,8 +141,7 @@ public final class Machine {
 
 	public PowerPress pressPower() {
 		if (powered) {
-			powered = false;
-			board.powerOff();
+			cutPower();
 			return PowerPress.OFF;
 		}
 		if (!power.getAsBoolean()) {
@@ -64,7 +152,9 @@ public final class Machine {
 			return PowerPress.NO_CPU;
 		}
 		powered = true;
-		cpu.get().powerOn(board);
+		uptime = 0;
+		runner = cpu.get().powerOn(board).orElse(null);
+		run(); // the CPU starts executing right away
 		return PowerPress.ON;
 	}
 
@@ -76,8 +166,7 @@ public final class Machine {
 		if (!powered || board.cpu().isPresent()) {
 			return false;
 		}
-		powered = false;
-		board.powerOff();
+		cutPower();
 		return true;
 	}
 
@@ -89,8 +178,7 @@ public final class Machine {
 		if (!powered || power.getAsBoolean()) {
 			return false;
 		}
-		powered = false;
-		board.powerOff();
+		cutPower();
 		return true;
 	}
 
@@ -101,8 +189,18 @@ public final class Machine {
 	 * onto them (hot-plug, like fbcon taking over a new framebuffer).
 	 */
 	public void setDevices(List<Device> devices) {
+		Map<String, Device> numbered = new LinkedHashMap<>();
+		for (int i = 0; i < devices.size(); i++) {
+			numbered.put("device:" + i, devices.get(i));
+		}
+		setDevices(numbered);
+	}
+
+	/** {@link #setDevices(List)}, with each device at its address. */
+	public void setDevices(Map<String, Device> addressed) {
+		List<Device> devices = List.copyOf(addressed.values());
 		List<Device> before = board.bus().devices();
-		board.bus().setDevices(devices);
+		board.bus().setDevices(addressed);
 		if (!powered) {
 			return;
 		}
@@ -120,7 +218,8 @@ public final class Machine {
 
 	/**
 	 * Sets the switch from a save or a sync, without booting or cutting power: the devices
-	 * restore their own state.
+	 * restore their own state. A program that was running isn't saved (the mock runtime isn't
+	 * saveable): the CPU comes back halted.
 	 */
 	public void restorePowered(boolean powered) {
 		this.powered = powered;

@@ -5,6 +5,9 @@ import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.display.Display;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.display.TextBuffer;
+import com.payonel.modularcomputers.runtime.Arguments;
+import com.payonel.modularcomputers.runtime.Method;
+import com.payonel.modularcomputers.runtime.Result;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -123,6 +126,38 @@ public final class ConsoleSplitter {
 	/** Writes a line of text and moves to the start of the next line. */
 	public void print(String line) {
 		write(line + "\n");
+	}
+
+	// ---- device methods: the console as programs use it, by name on the virtual bus ----------
+
+	@Method(doc = "print(text): writes a line of text and moves to the next line")
+	public Result print(Arguments args) {
+		print(args.checkString(0));
+		return Result.ok();
+	}
+
+	@Method(doc = "write(text): writes text at the cursor; \\n starts a new line")
+	public Result write(Arguments args) {
+		write(args.checkString(0));
+		return Result.ok();
+	}
+
+	@Method(doc = "clear(): fills the console with the current background, cursor to the top left")
+	public Result clear(Arguments args) {
+		clear();
+		return Result.ok();
+	}
+
+	@Method(doc = "setColors(foreground, background): colors as 0xRRGGBB, for what's written next")
+	public Result setColors(Arguments args) {
+		setColors((int) args.checkInteger(0), (int) args.checkInteger(1));
+		return Result.ok();
+	}
+
+	@Method(doc = "getSize(): columns, rows; the smallest of the displays on the bus")
+	public Result getSize(Arguments args) {
+		Resolution size = size();
+		return Result.ok(size.columns(), size.rows());
 	}
 
 	/** Back to the top-left corner and default colors, e.g. after power loss (the displays clear themselves). */

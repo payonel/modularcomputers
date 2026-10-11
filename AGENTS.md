@@ -465,9 +465,45 @@ scripts/art/error_beep.py` into
        user doesn't want blue);
     2. clears the console;
     3. prints `ABRT: <reason>` (`Cpu.NO_EEPROM`, or `Cpu.CRASHED` plus the message).
-- **EEPROM (`Eeprom`):** holds a `Program`. Today that's Java (`HelloWorldProgram`, a
-  stand-in). Later it's Lua code run by the user's Lua runtime. The CPU's side doesn't
-  change.
+- **EEPROM (`Eeprom`):** holds a `Program`. Today that's a Java mock program
+  (`HelloWorldProgram`). Later it's Lua code run by the user's Lua runtime. The CPU's side
+  doesn't change.
+- **Mock runtime** (`runtime/`, built 2026-10-11 after a design discussion with the user, modeled
+  on OC's `machine.lua` + `component.invoke` but redesigned; OC is never named in code):
+  - **Names:** `bus` and `device`, never "component" (user rule, code and docs).
+  - **The motherboard API (`runtime/Board`)** is everything a program can do: `list()` (bus
+    addresses in bus order), `status()` (`BusStatus`), `type`, `methods`, `doc`,
+    `invoke(address, method, args...)`, `waitForInterrupt(seconds)`, `uptime()`. Addresses are
+    the bus keys (`display`, `sata:0`, `cable:<id>`); virtual devices by name (`console`).
+  - **Programs** (`Program.run(Board)`) are plain Java that reads like Lua. Each runs as a
+    coroutine on a virtual thread (`ProgramRunner`); every board call is handed to the host and
+    carried out on the server thread, so device code never runs off-thread.
+  - **Scheduling is the host's** (user): calls are immediate, but a machine gets
+    `Machine.DEFAULT_CALLS_PER_TICK` (20) calls a tick, then is paused inside its next call until
+    the next tick. Power-on runs the first turn at once. Pure-Java loops that never call can't
+    be preempted (accepted for mocks). **TODO:** running machines off-thread, asynchronously,
+    and sharing the tick; not built.
+  - **Device methods** are public `Result name(Arguments)` methods annotated `@Method(doc)`
+    (`DeviceMethods` finds them). **Nothing a device does can stop the machine** (user rule,
+    like a status bit a driver reads): unknown device or method, bad arguments ("bad argument #1
+    (number expected, got string)") and device exceptions all come back as `Result.fail`.
+    Only the program's own uncaught error stops it (the CPU's ABRT screen).
+  - **Values** (`Values`) are Lua's: nil, boolean, Long and Double kept apart, String, List
+    (sequence), Map (table). `Arguments.check*` converts like Lua (2.0 is an integer; numbers
+    are strings).
+  - **Interrupts** are per device and level-triggered (user design): `Device.interruptPending()`
+    is on while the device has data for the program; the data stays in the device until read.
+    The bus itself raises `Board.BUS` when its devices changed since the program last listed
+    them. `waitForInterrupt` returns the pending addresses (bus first, then bus order), or none
+    on a timeout.
+  - **Motherboard supervision** (`Machine.tick`, every tick): CPU gone or power gone, and the
+    machine dies with the error beep, like a socket's CPU-present pin or a PSU's power-good.
+    The event-driven checks (pulling a part) still act at once.
+  - **Not saveable** (user): a running program lives in its thread. Unloading stops it
+    (`Machine.unload`); after a load a powered machine's CPU is halted. Save/restore waits for
+    the real Lua runtime.
+  - Device methods so far: the console (`print`, `write`, `clear`, `setColors`, `getSize`) and
+    displays (`getResolution`, `set`, `get`, `fill`; columns and rows from 1, as in Lua).
 - **Motherboard (`Motherboard`):** holds the soldered parts (`Hardware`/`Part`, memory), the
   CPU socket, the EEPROM slot, and two buses.
   - **Physical bus (`bus/Bus`):** the real devices in the player's discovery order

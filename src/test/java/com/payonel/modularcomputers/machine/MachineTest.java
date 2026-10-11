@@ -87,12 +87,11 @@ class MachineTest {
 	}
 
 	@Test
-	void theProgramGetsTheMotherboard() {
-		Motherboard[] seen = {null};
-		withParts(true, board -> seen[0] = board);
+	void theProgramGetsTheMotherboardApi() {
+		List<List<String>> seen = new java.util.ArrayList<>();
+		withParts(true, board -> seen.add(board.list()));
 		machine.pressPower();
-		assertThat(seen[0]).isSameAs(machine.board());
-		assertThat(seen[0].bus().devices()).hasSize(3);
+		assertThat(seen).containsExactly(List.of("device:0", "device:1", "device:2"));
 	}
 
 	@Test
@@ -142,7 +141,7 @@ class MachineTest {
 	@Test
 	void aCrashingProgramShowsTheAbortScreen() {
 		withParts(true, board -> {
-			board.virtualBus().console().print("booting");
+			board.invoke("console", "print", "booting");
 			throw new IllegalStateException("out of cheese");
 		});
 		machine.pressPower();

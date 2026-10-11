@@ -338,6 +338,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	@Override
 	public void setRemoved() {
 		super.setRemoved();
+		machine.unload(); // a running program isn't saved: it stops
 		if (level != null) {
 			Bluetooth.remove(level, worldPosition);
 		}
@@ -368,6 +369,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		ticks++;
 		if (ticks % BATTERY_TICKS == 0) {
 			updateBattery();
+		}
+		// The motherboard checks its CPU and power every tick, and the program gets its turn.
+		Machine.Supervision supervision = machine.tick();
+		if (supervision != Machine.Supervision.OK) {
+			errorBeep();
+			setPowerState();
 		}
 		if (seenCableChanges != Cabling.changes() || ticks % RESCAN_TICKS == 0) {
 			seenCableChanges = Cabling.changes();
@@ -587,7 +594,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		}
 		known.keySet().retainAll(busOrder.external().stream().map(BusOrder.Entry::key).toList());
 		updateBluetooth(); // its first Bluetooth card follows the bus order
-		List<Device> devices = busOrder.connected().stream().map(attached::get).filter(Objects::nonNull).toList();
+		Map<String, Device> devices = new LinkedHashMap<>();
+		for (String key : busOrder.connected()) {
+			if (attached.get(key) != null) {
+				devices.put(key, attached.get(key)); // the bus key is the device's address
+			}
+		}
 		if (level != null && level.isClientSide()) {
 			bus.setDevices(devices); // clients show what the server sends; they don't run devices
 		} else {
