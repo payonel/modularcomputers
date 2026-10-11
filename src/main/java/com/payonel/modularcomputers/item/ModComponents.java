@@ -12,6 +12,7 @@ import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.world.item.ItemStack;
 
 /** Item data components. */
 public final class ModComponents {
@@ -26,8 +27,9 @@ public final class ModComponents {
 			.build());
 
 	/**
-	 * A card's serial number, stamped the first time it goes into an expansion hub: the hub's
-	 * computers know it by this, whichever slot it's in.
+	 * A card's serial number, stamped the first time it goes into a computer or an expansion hub.
+	 * Programs can address it as {@code id:<serial>} wherever it is (like Linux's
+	 * {@code /dev/disk/by-id}), and a hub's computers keep its place by it, whichever slot it's in.
 	 */
 	public static final DataComponentType<UUID> SERIAL = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("serial"),
 		DataComponentType.<UUID>builder().persistent(UUIDUtil.CODEC).networkSynchronized(UUIDUtil.STREAM_CODEC).build());
@@ -41,5 +43,15 @@ public final class ModComponents {
 
 	/** Forces the static registration above. */
 	public static void init() {
+	}
+
+	/** The card's serial number, stamping a new one on if it has none yet. Server side only. */
+	public static UUID serial(ItemStack card) {
+		UUID serial = card.get(SERIAL);
+		if (serial == null) {
+			serial = UUID.randomUUID();
+			card.set(SERIAL, serial);
+		}
+		return serial;
 	}
 }

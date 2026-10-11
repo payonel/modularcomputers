@@ -8,9 +8,17 @@ import java.util.Optional;
  * The motherboard API: everything a program on the CPU can do. A Lua runtime exposes these as
  * Lua functions; mock programs (plain Java) call them directly.
  * <p>
- * Devices are addressed by stable address: a slot's path in the case ({@code "sata:0"}), a
- * wired block's id ({@code "cable:<id>"}), or a virtual device's name ({@code "console"}).
- * {@link #list()} gives the physical bus's addresses in bus order.
+ * Devices are addressed three ways, as on a real system:
+ * <ul>
+ * <li>a case slot's path, fixed by the slot: {@code "edp"} (the built-in display, by its
+ * embedded DisplayPort connector), {@code "kbd"}, {@code "eeprom"}, {@code "ups"},
+ * {@code "sata:0"}, {@code "exp:2"};</li>
+ * <li>a device's id, fixed once known, however it's connected (cable, Bluetooth, a hub, or a
+ * case slot): {@code "id:<uuid>"};</li>
+ * <li>a virtual device's name, fixed by convention: {@code "console"}.</li>
+ * </ul>
+ * {@link #list()} gives the physical bus's addresses in bus order: paths for the case's devices,
+ * ids for external ones. A card in a case slot answers to its id as well.
  * <p>
  * Every call can be a point where the machine is paused until a later tick (each machine gets a
  * fixed number of calls a tick); the program never notices, except as time passing.

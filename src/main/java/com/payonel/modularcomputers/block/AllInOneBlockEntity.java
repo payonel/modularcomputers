@@ -97,14 +97,15 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String CONSOLE_SCREEN = "console_screen";
 	private static final String CONSOLE_FOREGROUND = "console_foreground";
 	private static final String CONSOLE_BACKGROUND = "console_background";
-	private static final String DISPLAY_KEY = "display";
-	private static final String KEYBOARD_KEY = "keyboard";
+	/** The built-in display, by its connector: embedded DisplayPort, as a laptop's panel. */
+	private static final String DISPLAY_KEY = "edp";
+	private static final String KEYBOARD_KEY = "kbd";
 	private static final String EEPROM_KEY = "eeprom";
 	private static final String UPS_KEY = "ups";
 	private static final String SATA_KEY = "sata:";
 	private static final String EXP_KEY = "exp:";
-	/** Cabled devices, by their own id: {@code cable:<uuid>}. */
-	private static final String CABLE_KEY = "cable:";
+	/** Devices by their own id, however they're connected: {@code id:<uuid>}. */
+	private static final String ID_KEY = "id:";
 	private static final String POWER_BUFFER = "power_buffer";
 	private static final String BUS_CAPACITY = "bus_capacity";
 	private static final String BOARD_ID = "board_id";
@@ -232,7 +233,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			} else if (key.equals(KEYBOARD_KEY)) {
 				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.keyboard"), builtIn, ItemStack.EMPTY, -1, KEYBOARD_ICON,
 					Optional.empty(), true, true, position));
-			} else if (key.startsWith(CABLE_KEY)) {
+			} else if (key.startsWith(ID_KEY)) {
 				Optional.ofNullable(known.get(key)).ifPresent(device -> {
 					ItemStack item = new ItemStack(device.item());
 					boolean online = busOrder.isOnline(key);
@@ -379,7 +380,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	/** The external devices on the bus now. */
 	private Set<String> externalOnBus() {
-		return busOrder.connected().stream().filter(key -> key.startsWith(CABLE_KEY)).collect(Collectors.toSet());
+		return busOrder.connected().stream().filter(key -> key.startsWith(ID_KEY)).collect(Collectors.toSet());
 	}
 
 	/**
@@ -402,7 +403,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** Server side: the player plugged a cabled device in or out in the bus order panel. */
 	public boolean setConnected(String key, boolean connected) {
 		Set<String> before = externalOnBus();
-		if (!key.startsWith(CABLE_KEY) || !busOrder.setConnected(key, connected)) {
+		if (!key.startsWith(ID_KEY) || !busOrder.setConnected(key, connected)) {
 			return false;
 		}
 		rebuildBus();
@@ -518,21 +519,22 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 				continue;
 			}
 			if (block instanceof ScreenBlockEntity screen) {
-				addCabled(found, devices, new Cabled(CABLE_KEY + screen.id(), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.SCREEN.asItem(), -1), screen.display());
+				addCabled(found, devices, new Cabled(ID_KEY + screen.id(), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.SCREEN.asItem(), -1), screen.display());
 			} else if (block instanceof ExpansionHubBlockEntity hub) {
 				for (int slot = 0; slot < ExpansionHubBlockEntity.SLOTS; slot++) {
 					int hubSlot = slot;
 					// A hub's card is known by its serial number, so it keeps its place in the bus
-					// order when it moves to another slot.
+					// order when it moves to another slot (the hub stamps one on as it goes in).
 					UUID serial = hub.cards().getItem(hubSlot).get(ModComponents.SERIAL);
-					String key = CABLE_KEY + (serial != null ? serial : hub.id() + ":" + hubSlot);
-					hub.card(slot).ifPresent(card -> addCabled(found, devices, new Cabled(key, at.pos(), at.meters(),
-						at.wireless(), paired, hub.cards().getItem(hubSlot).getItem(), hubSlot), card));
+					if (serial != null) {
+						hub.card(slot).ifPresent(card -> addCabled(found, devices, new Cabled(ID_KEY + serial, at.pos(), at.meters(),
+							at.wireless(), paired, hub.cards().getItem(hubSlot).getItem(), hubSlot), card));
+					}
 				}
 			} else if (block instanceof RoboticPistonBlockEntity piston) {
-				addCabled(found, devices, new Cabled(CABLE_KEY + piston.id(), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.ROBOTIC_PISTON.asItem(), -1), piston.device());
+				addCabled(found, devices, new Cabled(ID_KEY + piston.id(), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.ROBOTIC_PISTON.asItem(), -1), piston.device());
 			} else if (block instanceof PaintGunBlockEntity gun) {
-				addCabled(found, devices, new Cabled(CABLE_KEY + gun.id(), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
+				addCabled(found, devices, new Cabled(ID_KEY + gun.id(), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
 			}
 		}
 		boolean sameDevices = found.equals(cabled) && devices.keySet().equals(cabledDevices.keySet())
@@ -681,10 +683,18 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 				devices.put(key, attached.get(key)); // the bus key is the device's address
 			}
 		}
+		// A card in the case answers to its id too, so a program finds it in the case or in a hub.
+		Map<String, String> aliases = new LinkedHashMap<>();
+		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+			UUID serial = parts.getItem(CaseMenu.EXP_SLOTS + lane).get(ModComponents.SERIAL);
+			if (serial != null && devices.containsKey(EXP_KEY + lane)) {
+				aliases.put(ID_KEY + serial, EXP_KEY + lane);
+			}
+		}
 		if (level != null && level.isClientSide()) {
-			bus.setDevices(devices); // clients show what the server sends; they don't run devices
+			bus.setDevices(devices, aliases); // clients show what the server sends; they don't run devices
 		} else {
-			machine.setDevices(devices);
+			machine.setDevices(devices, aliases);
 		}
 	}
 
@@ -732,6 +742,14 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	}
 
 	private void onPartsChanged() {
+		if (level != null && !level.isClientSide()) {
+			for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+				ItemStack card = parts.getItem(CaseMenu.EXP_SLOTS + lane);
+				if (!card.isEmpty()) {
+					ModComponents.serial(card); // its id, wherever it goes next
+				}
+			}
+		}
 		installParts();
 		setChanged();
 		if (level == null || level.isClientSide()) {

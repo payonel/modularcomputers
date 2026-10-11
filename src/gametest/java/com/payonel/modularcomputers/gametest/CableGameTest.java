@@ -61,7 +61,7 @@ public class CableGameTest {
 	}
 
 	private static Optional<AllInOneBlockEntity.BusEntry> entryFor(AllInOneBlockEntity computer, ScreenBlockEntity screen) {
-		return computer.busEntries().stream().filter(entry -> entry.key().equals("cable:" + screen.id())).findFirst();
+		return computer.busEntries().stream().filter(entry -> entry.key().equals("id:" + screen.id())).findFirst();
 	}
 
 	private static boolean onBus(AllInOneBlockEntity computer, ScreenBlockEntity screen) {
@@ -123,7 +123,7 @@ public class CableGameTest {
 		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
 		computer.pressPower();
 		ScreenBlockEntity screen = wiredScreen(helper);
-		String key = "cable:" + screen.id();
+		String key = "id:" + screen.id();
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertTrue(showsText(screen.display()), "connected first"))
 			.thenExecute(() -> {
@@ -132,7 +132,7 @@ public class CableGameTest {
 				helper.assertTrue(screen.display().buffer().isBlank(), "and goes blank");
 				var entry = entryFor(computer, screen).orElseThrow(() -> helper.assertionException("still listed"));
 				helper.assertTrue(!entry.connected(), "listed as disconnected");
-				helper.assertTrue(!computer.setConnected("display", false), "built-ins can't be unplugged");
+				helper.assertTrue(!computer.setConnected("edp", false), "built-ins can't be unplugged");
 				helper.assertTrue(computer.setConnected(key, true), "plugged back in");
 				helper.assertTrue(showsText(screen.display()), "shows the console again");
 			})
@@ -143,7 +143,7 @@ public class CableGameTest {
 	public void aScreenThatGoesAwayStaysListedOfflineInItsPlaceUntilForgotten(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper, COMPUTER, false);
 		ScreenBlockEntity screen = wiredScreen(helper);
-		String key = "cable:" + screen.id();
+		String key = "id:" + screen.id();
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertTrue(entryFor(computer, screen).filter(AllInOneBlockEntity.BusEntry::online).isPresent(), "found"))
 			.thenExecute(() -> {
@@ -235,7 +235,7 @@ public class CableGameTest {
 		ScreenBlockEntity far = screen(helper, new BlockPos(3, 1, 1), Direction.SOUTH);
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertTrue(onBus(computer, far), "found through the near screen"))
-			.thenExecute(() -> computer.setConnected("cable:" + near.id(), false))
+			.thenExecute(() -> computer.setConnected("id:" + near.id(), false))
 			.thenIdle(25) // a scan
 			.thenExecute(() -> {
 				helper.assertTrue(!onBus(computer, near), "the near screen is unplugged");
@@ -258,7 +258,7 @@ public class CableGameTest {
 	public void cabledDevicesAndDisconnectionsSurviveSaveAndLoad(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
 		ScreenBlockEntity screen = wiredScreen(helper);
-		String key = "cable:" + screen.id();
+		String key = "id:" + screen.id();
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertTrue(entryFor(computer, screen).isPresent(), "found"))
 			.thenExecute(() -> {

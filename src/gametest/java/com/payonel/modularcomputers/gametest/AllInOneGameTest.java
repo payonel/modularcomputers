@@ -109,7 +109,7 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.REDSTONE_CARD));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.BLUETOOTH_CARD));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 2, new ItemStack(ModItems.WEATHER_SENSOR_CARD));
-		helper.assertValueEqual(busKeys(computer), List.of("display", "keyboard", "eeprom", "ups", "exp:0", "exp:1", "exp:2"), "default order");
+		helper.assertValueEqual(busKeys(computer), List.of("edp", "kbd", "eeprom", "ups", "exp:0", "exp:1", "exp:2"), "default order");
 		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.DISPLAY, DeviceType.KEYBOARD, DeviceType.FIRMWARE, DeviceType.POWER,
 			DeviceType.REDSTONE, DeviceType.NETWORK, DeviceType.SENSOR), "each reports its class");
 		var entries = computer.busEntries();
@@ -135,17 +135,22 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.SATA_SLOTS + 1, new ItemStack(ModItems.HARD_DISK));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.WLAN_CARD));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.RAM)); // RAM is not a bus device
-		helper.assertValueEqual(busKeys(computer), List.of("display", "keyboard", "sata:1", "exp:0"), "attached in default order");
+		helper.assertValueEqual(busKeys(computer), List.of("edp", "kbd", "sata:1", "exp:0"), "attached in default order");
 		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.DISPLAY, DeviceType.KEYBOARD, DeviceType.STORAGE, DeviceType.NETWORK), "bus");
 
 		helper.assertTrue(!computer.moveDevice(3, true) && !computer.moveDevice(2, false), "the case's devices don't move");
 		helper.assertValueEqual(computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::position).toList(), List.of(1, 2, 6, 9),
 			"numbered by fixed place, with gaps for empty slots");
 
+		java.util.UUID serial = computer.parts().getItem(CaseMenu.EXP_SLOTS).get(com.payonel.modularcomputers.item.ModComponents.SERIAL);
+		helper.assertTrue(serial != null, "a card gets a serial number in a computer");
+		helper.assertValueEqual(computer.machine().board().bus().device("id:" + serial), computer.machine().board().bus().device("exp:0"),
+			"a card answers to its id as well as its slot's path");
+
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.HARD_DISK));
-		helper.assertValueEqual(busKeys(computer), List.of("display", "keyboard", "sata:0", "sata:1", "exp:0"), "a new drive goes in its slot's place");
+		helper.assertValueEqual(busKeys(computer), List.of("edp", "kbd", "sata:0", "sata:1", "exp:0"), "a new drive goes in its slot's place");
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, ItemStack.EMPTY);
-		helper.assertValueEqual(busKeys(computer), List.of("display", "keyboard", "sata:0", "sata:1"), "a removed card drops out");
+		helper.assertValueEqual(busKeys(computer), List.of("edp", "kbd", "sata:0", "sata:1"), "a removed card drops out");
 		helper.succeed();
 	}
 
@@ -171,7 +176,7 @@ public class AllInOneGameTest {
 		var registries = helper.getLevel().registryAccess();
 		var loaded = (AllInOneBlockEntity) BlockEntity.loadStatic(computer.getBlockPos(), computer.getBlockState(),
 			computer.saveWithFullMetadata(registries), registries);
-		helper.assertValueEqual(busKeys(loaded), List.of("display", "keyboard", "sata:0", "exp:0"), "bus order after reload");
+		helper.assertValueEqual(busKeys(loaded), List.of("edp", "kbd", "sata:0", "exp:0"), "bus order after reload");
 		helper.assertValueEqual(busTypes(loaded).get(2), DeviceType.STORAGE, "the machine's bus after reload");
 		helper.succeed();
 	}

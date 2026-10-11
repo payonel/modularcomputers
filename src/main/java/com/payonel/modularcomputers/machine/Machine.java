@@ -198,9 +198,14 @@ public final class Machine {
 
 	/** {@link #setDevices(List)}, with each device at its address. */
 	public void setDevices(Map<String, Device> addressed) {
+		setDevices(addressed, Map.of());
+	}
+
+	/** {@link #setDevices(Map)}, with other names for some devices (see {@link com.payonel.modularcomputers.bus.Bus#setDevices(Map, Map)}). */
+	public void setDevices(Map<String, Device> addressed, Map<String, String> aliases) {
 		List<Device> devices = List.copyOf(addressed.values());
 		List<Device> before = board.bus().devices();
-		board.bus().setDevices(addressed);
+		board.bus().setDevices(addressed, aliases);
 		if (!powered) {
 			return;
 		}

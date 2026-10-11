@@ -9,8 +9,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The order of a computer's devices on its bus, by key (like {@code "display"}, {@code "sata:0"}
- * or a cabled device's {@code "cable:<id>"}).
+ * The order of a computer's devices on its bus, by key: a case slot's path (like {@code "edp"}
+ * or {@code "sata:0"}), or an external device's {@code "id:<uuid>"}.
  * <p>
  * <b>Internal devices</b> (built-ins and parts in the case's slots) come first, in a fixed
  * order: the slots' own. A slot's position is its address, as on real hardware.

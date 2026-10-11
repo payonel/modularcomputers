@@ -142,8 +142,8 @@ stable (like a GUID).
   - Chunk unloads make "lost" ambiguous: the device still exists, the case just can't see it.
   - How long to remember a lost device, and whether an unloaded chunk counts as lost, is
     unsolved.
-- **Keys:** parts by slot (`sata:1`, `exp:0`; a removed part's position drops), screens by
-  their own id (`cable:<uuid>`).
+- **Keys:** parts by slot (`sata:1`, `exp:0`; a removed part's position drops), external
+  devices by their own id (`id:<uuid>`), however they're connected.
 
 ### Ordering the devices a case sees (user idea, not decided)
 

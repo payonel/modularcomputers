@@ -363,7 +363,7 @@ scripts/art/error_beep.py` into
     - Right-click opens its screen view: just the display, with no power button and no view
       toggle. The user wants the power button **only on the case**, not on every screen on
       the network (2026-10-11).
-    - Each screen has a UUID (`screen_id`, saved), its bus order key `cable:<uuid>`. A
+    - Each screen has a UUID (`screen_id`, saved), its bus order key `id:<uuid>`. A
       re-placed screen is a new screen.
     - It saves its display and sends changes to clients from its own tick (`TextBuffer.changes`).
   - **Cable** (`CableBlock`, a vanilla `PipeBlock`, 4 pixels thick): joins any neighbor that
@@ -389,7 +389,7 @@ scripts/art/error_beep.py` into
     network, like an external expansion chassis. It takes a cable on every side and passes
     the connection on.
     - Each card in it is a cabled device of every computer wired to it. The key is
-      `cable:<hub id>:<slot>`, and the location reads "hub 2, 3m".
+      `id:<card serial>`, and the location reads "hub 2, 3m".
     - Each card can be unplugged on its own.
     - A card works where it's installed: a redstone card in a hub will emit and detect
       redstone at the hub (user, 2026-10-11). Nothing works yet.
@@ -496,7 +496,20 @@ scripts/art/error_beep.py` into
   - **The motherboard API (`runtime/Board`)** is everything a program can do: `list()` (bus
     addresses in bus order), `status()` (`BusStatus`), `type`, `methods`, `doc`,
     `invoke(address, method, args...)`, `waitForInterrupt(seconds)`, `uptime()`. Addresses are
-    the bus keys (`display`, `sata:0`, `cable:<id>`); virtual devices by name (`console`).
+    the bus keys, three kinds as on a real system (user design, 2026-10-11):
+    - **Paths** name case slots, fixed by the slot: `edp` (the built-in display, named for its
+      embedded DisplayPort connector, so it can't be confused with `console`), `kbd` (the
+      built-in keyboard), `eeprom`, `ups`, `sata:0`, `exp:2`.
+    - **Ids** name a device however it's connected: `id:<uuid>` (a screen's or block's id, a
+      card's `SERIAL`). The user rejected `cable:`: a program shouldn't care whether a device is
+      cabled or Bluetooth, or in a hub. Cards get a serial when they first go into a computer
+      or hub, and a card in a case slot answers to both `exp:N` and `id:<serial>` (like Linux's
+      `by-path` and `by-id`; `Bus.setDevices(devices, aliases)`). `list()` gives paths for the
+      case's devices and ids for external ones.
+    - **Virtual devices** are bare names, fixed by convention: `console` (the user: something as
+      simple as `/dev/console` might as well be just `console`). The console is UEFI's
+      ConSplitter, so it already is the "virtual multicast text buffer"; what's missing is
+      choosing its outputs (UEFI's `ConOut`), still undecided.
   - **Programs** (`Program.run(Board)`) are plain Java that reads like Lua. Each runs as a
     coroutine on a virtual thread (`ProgramRunner`); every board call is handed to the host and
     carried out on the server thread, so device code never runs off-thread.

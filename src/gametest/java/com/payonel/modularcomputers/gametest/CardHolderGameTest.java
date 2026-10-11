@@ -78,7 +78,7 @@ public class CardHolderGameTest {
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertValueEqual(locations(computer), List.of("hub 1, 1m", "hub 2, 1m"), "both cards"))
 			.thenExecute(() -> {
-				helper.assertTrue(computer.setConnected("cable:" + hub.cards().getItem(0).get(ModComponents.SERIAL), false), "unplug the audio card");
+				helper.assertTrue(computer.setConnected("id:" + hub.cards().getItem(0).get(ModComponents.SERIAL), false), "unplug the audio card");
 				var types = computer.machine().board().bus().devices().stream().map(device -> device.type()).toList();
 				helper.assertTrue(!types.contains(DeviceType.AUDIO) && types.contains(DeviceType.NETWORK), "only the audio card leaves the bus");
 				hub.cards().setItem(1, ItemStack.EMPTY);

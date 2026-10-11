@@ -7,12 +7,16 @@ import java.util.Optional;
 
 /**
  * The physical bus: the real devices wired to a computer, in bus order, each at a stable
- * address (a slot's path like {@code "sata:0"}, or a wired block's {@code "cable:<id>"}). Walking
- * the bus means going through this list. The CPU and memory aren't on it: they're the machine
+ * address: a case slot's path ({@code "sata:0"}, {@code "edp"}), or an external device's id
+ * ({@code "id:<uuid>"}), however it's connected. A device with an id in a case slot answers to
+ * both, like Linux's {@code by-path} and {@code by-id} names for one disk. Walking the bus means
+ * going through this list. The CPU and memory aren't on it: they're the machine
  * itself, as on a real PC. The order is set by {@link BusOrder}.
  */
 public final class Bus {
 	private Map<String, Device> devices;
+	/** Other names for devices on the bus (a card's id), each to its address. */
+	private Map<String, String> aliases = Map.of();
 	private BusStatus status = BusStatus.EMPTY;
 	private int changes;
 
@@ -30,8 +34,9 @@ public final class Bus {
 		return List.copyOf(devices.keySet());
 	}
 
+	/** The device at an address, or at another name for one (a card's id). */
 	public Optional<Device> device(String address) {
-		return Optional.ofNullable(devices.get(address));
+		return Optional.ofNullable(devices.get(aliases.getOrDefault(address, address)));
 	}
 
 	/** Counts changes to which devices are on the bus: hot-plug, for the bus's interrupt. */
@@ -50,6 +55,12 @@ public final class Bus {
 
 	/** Replaces the devices, by address, in bus order: a part went in or out, a cable was plugged, a reorder. */
 	public void setDevices(Map<String, Device> devices) {
+		setDevices(devices, Map.of());
+	}
+
+	/** {@link #setDevices(Map)}, with other names for some of them: {@code aliases} maps each to an address. */
+	public void setDevices(Map<String, Device> devices, Map<String, String> aliases) {
+		this.aliases = Map.copyOf(aliases);
 		Map<String, Device> next = new LinkedHashMap<>(devices);
 		if (!next.equals(this.devices)) {
 			changes++;

@@ -151,8 +151,8 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 		}
 		for (int slot = 0; slot < cards.getContainerSize(); slot++) {
 			ItemStack card = cards.getItem(slot);
-			if (slot != radioSlot() && !card.isEmpty() && !card.has(ModComponents.SERIAL)) {
-				card.set(ModComponents.SERIAL, UUID.randomUUID()); // its identity from now on, whatever slot it's in
+			if (slot != radioSlot() && !card.isEmpty()) {
+				ModComponents.serial(card); // its identity from now on, whatever slot it's in
 			}
 		}
 		for (int slot = 0; slot < last.length; slot++) {

@@ -256,7 +256,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			// The bus order panel lists the devices; its arrows reorder them on the server.
 			check(context.computeOnClient(client -> ((CaseScreen) client.gui.screen()).busPanelShown()), "the bus order panel should show");
 			// The case's devices are in their slots' order, fixed: their rows have no arrows.
-			List<String> slotOrder = List.of("display", "keyboard", "eeprom", "ups", "sata:0", "sata:2", "exp:1");
+			List<String> slotOrder = List.of("edp", "kbd", "eeprom", "ups", "sata:0", "sata:2", "exp:1");
 			check(serverBusKeys(singleplayer, computer).equals(slotOrder), "the case's order, got " + serverBusKeys(singleplayer, computer));
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).busArrow(0, false));
 			context.waitTicks(4);
