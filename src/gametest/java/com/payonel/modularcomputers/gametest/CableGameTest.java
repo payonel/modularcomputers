@@ -177,6 +177,55 @@ public class CableGameTest {
 	}
 
 	@GameTest
+	public void screensPassTheConnectionOnLikeACable(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
+		ScreenBlockEntity near = screen(helper, new BlockPos(2, 1, 1), Direction.SOUTH); // against the computer's side
+		ScreenBlockEntity next = screen(helper, new BlockPos(3, 1, 1), Direction.SOUTH);
+		cable(helper, new BlockPos(4, 1, 1));
+		ScreenBlockEntity far = screen(helper, new BlockPos(5, 1, 1), Direction.SOUTH);
+		helper.assertBlockProperty(new BlockPos(4, 1, 1), PipeBlock.WEST, true);
+		helper.succeedWhen(() -> {
+			for (ScreenBlockEntity screen : List.of(near, next, far)) {
+				helper.assertTrue(onBus(computer, screen), "every screen in the row is on the bus");
+			}
+			helper.assertValueEqual(entryFor(computer, near).orElseThrow().location().getString(), "adjacent", "no cable at all");
+			helper.assertValueEqual(entryFor(computer, next).orElseThrow().location().getString(), "cable, 1m", "one screen between");
+			helper.assertValueEqual(entryFor(computer, far).orElseThrow().location().getString(), "cable, 3m", "two screens and a cable");
+			if (!computer.machine().isPowered()) {
+				computer.pressPower();
+			}
+			helper.assertTrue(showsText(far.display()), "the console reaches the end of the row");
+		});
+	}
+
+	@GameTest(maxTicks = 100)
+	public void aDisconnectedScreenStillPassesTheConnectionOn(GameTestHelper helper) {
+		// Disconnecting is one computer's choice; the screen is still physically there for others.
+		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
+		ScreenBlockEntity near = screen(helper, new BlockPos(2, 1, 1), Direction.SOUTH);
+		ScreenBlockEntity far = screen(helper, new BlockPos(3, 1, 1), Direction.SOUTH);
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(onBus(computer, far), "found through the near screen"))
+			.thenExecute(() -> computer.setConnected("cable:" + near.id(), false))
+			.thenIdle(25) // a scan
+			.thenExecute(() -> {
+				helper.assertTrue(!onBus(computer, near), "the near screen is unplugged");
+				helper.assertTrue(onBus(computer, far), "but still carries the connection to the far one");
+			})
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 100)
+	public void aScreensGlassDoesNotConnect(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper, COMPUTER, false);
+		ScreenBlockEntity facing = screen(helper, new BlockPos(2, 1, 1), Direction.WEST); // glass against the computer
+		helper.startSequence()
+			.thenIdle(45) // a couple of scans
+			.thenExecute(() -> helper.assertTrue(entryFor(computer, facing).isEmpty(), "a screen's glass has no port"))
+			.thenSucceed();
+	}
+
+	@GameTest
 	public void cabledDevicesAndDisconnectionsSurviveSaveAndLoad(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
 		ScreenBlockEntity screen = wiredScreen(helper);

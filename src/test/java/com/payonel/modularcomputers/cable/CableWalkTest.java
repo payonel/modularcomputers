@@ -32,8 +32,17 @@ class CableWalkTest {
 	}
 
 	private BlockPos device(int x, int y, int z, Direction front) {
+		return block(x, y, z, front, CableWalk.Kind.DEVICE);
+	}
+
+	/** A device that carries the connection on, like a screen. */
+	private BlockPos relay(int x, int y, int z, Direction front) {
+		return block(x, y, z, front, CableWalk.Kind.RELAY);
+	}
+
+	private BlockPos block(int x, int y, int z, Direction front, CableWalk.Kind kind) {
 		BlockPos pos = new BlockPos(x, y, z);
-		blocks.put(pos, CableWalk.Kind.DEVICE);
+		blocks.put(pos, kind);
 		fronts.put(pos, front);
 		return pos;
 	}
@@ -69,7 +78,7 @@ class CableWalkTest {
 	}
 
 	@Test
-	void devicesComeBackNearestFirstAndDontPassTheCableOn() {
+	void devicesComeBackNearestFirstAndOnlyRelaysPassTheConnectionOn() {
 		cable(1, 0, 0);
 		cable(2, 0, 0);
 		cable(3, 0, 0);
@@ -87,5 +96,30 @@ class CableWalkTest {
 		cable(0, 0, 1);
 		BlockPos screen = device(2, 0, 1, Direction.NORTH);
 		assertThat(CableWalk.from(world, COMPUTER)).containsExactly(new CableWalk.Found(screen, 2));
+	}
+
+	@Test
+	void relaysConnectLikeCablesAndAreFoundThemselves() {
+		BlockPos first = relay(1, 0, 0, Direction.NORTH); // right next to the computer
+		BlockPos second = relay(2, 0, 0, Direction.NORTH);
+		cable(3, 0, 0);
+		BlockPos third = relay(4, 0, 0, Direction.NORTH);
+		assertThat(CableWalk.from(world, COMPUTER)).containsExactly(
+			new CableWalk.Found(first, 0), new CableWalk.Found(second, 1), new CableWalk.Found(third, 3));
+	}
+
+	@Test
+	void relaysDontConnectThroughTheirFront() {
+		cable(1, 0, 0);
+		relay(2, 0, 0, Direction.EAST); // its glass faces away from the cable: the back connects
+		BlockPos behind = relay(3, 0, 0, Direction.NORTH);
+		assertThat(CableWalk.from(world, COMPUTER)).hasSize(1).doesNotContain(new CableWalk.Found(behind, 2));
+	}
+
+	@Test
+	void fromARelayAnAdjacentDeviceIsConnected() {
+		BlockPos screen = relay(5, 0, 0, Direction.NORTH);
+		blocks.put(new BlockPos(6, 0, 0), CableWalk.Kind.DEVICE);
+		assertThat(CableWalk.from(world, screen)).containsExactly(new CableWalk.Found(new BlockPos(6, 0, 0), 0));
 	}
 }

@@ -22,5 +22,6 @@
 	"subtitles.modularcomputers.battery_zap": "Battery zaps",
 	"block.modularcomputers.screen": "Screen",
 	"block.modularcomputers.cable": "Cable",
-	"gui.modularcomputers.bus.cable": "cable, %sm"
+	"gui.modularcomputers.bus.cable": "cable, %sm",
+	"gui.modularcomputers.bus.adjacent": "adjacent"
 }

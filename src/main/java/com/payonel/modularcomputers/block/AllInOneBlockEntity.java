@@ -105,7 +105,10 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private int ticks;
 	private int syncedDisplay = -1;
 
-	/** A device wired to this computer: where it is, and how many cable blocks lead to it. */
+	/**
+	 * A device wired to this computer: where it is, and how many blocks carry the connection
+	 * between (cables, and screens passing it on); 0 when it's right against the computer.
+	 */
 	public record Cabled(String key, BlockPos pos, int cables) {
 		static final Codec<Cabled> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.STRING.fieldOf("key").forGetter(Cabled::key),
@@ -169,7 +172,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			} else if (key.startsWith(CABLE_KEY)) {
 				cabled.stream().filter(device -> device.key().equals(key)).findFirst().ifPresent(device -> {
 					ItemStack item = new ItemStack(ModBlocks.SCREEN);
-					Component location = Component.translatable("gui.modularcomputers.bus.cable", device.cables());
+					Component location = device.cables() == 0 ? Component.translatable("gui.modularcomputers.bus.adjacent")
+						: Component.translatable("gui.modularcomputers.bus.cable", device.cables());
 					entries.add(new BusEntry(key, item.getHoverName(), location, item, -1, -1, Optional.of(device.pos()), busOrder.isConnected(key)));
 				});
 			} else {

@@ -9,6 +9,7 @@ import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.menu.ModMenus;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderers;
@@ -35,6 +36,8 @@ public final class ModularComputersClient implements ClientModInitializer {
 				client.player.containerMenu = client.player.inventoryMenu;
 			}
 		});
+		// The bulb's outlines belong to this visit to a world.
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> Identify.clear());
 		initialized = true;
 		ModularComputers.LOGGER.info(CLIENT_INIT_MARKER);
 	}

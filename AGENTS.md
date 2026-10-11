@@ -138,7 +138,8 @@ same thing.
         - **Cabled devices** (screens) get two more buttons left of the arrows:
           - The **bulb** outlines the device in the world for 10 seconds, pulsing yellow and
             seen through walls (`client/Identify`, drawn by `DisplayRenderer`). It's
-            client-side: only that player sees it. Clicking it again stops it.
+            client-side: only that player sees it. Clicking it again stops it. It's never
+            saved, and leaving the world clears it.
           - The **plug** connects or disconnects it (`ConnectDevicePayload`). Plugged in it's
             green; pulled out it's grey, and the row's name dims. A disconnected device stays
             listed in its place but is off the bus. Built-ins and parts can't be unplugged.
@@ -152,8 +153,8 @@ same thing.
 scripts/art/part_sounds.py`. The user wanted them soft, not
           Minecraft's abrasive click.
         - Slides are sparse grains ringing a resonance (a plastic rasp). The first version's
-          noise slides sounded like breathing into a mic; the user asked to keep them as a
-          backup: `scripts/art/sound_backups/breathy_slides/` (copy over the assets to restore).
+          noise slides sounded like breathing into a mic. The user called the current set
+          "perfect" (2026-10-11).
         - Loading a save plays nothing.
       - Clicking the bus panel or the buttons doesn't count as clicking outside the window,
         so it never drops the carried item (`hasClickedOutside`).
@@ -236,13 +237,20 @@ scripts/art/error_beep.py` into
     takes a cable on that side, and its multipart model shows each join.
     - Cables join other cables, and screens and computers on **any side but the front**
       (`Cabling.hasPort`; the front is glass or keyboard).
-    - A screen or computer right next to another without a cable is **not** connected.
-  - **Discovery** (`cable/CableWalk`, plain Java, breadth-first, nearest first):
+    - **Screens connect like a cable** (user, 2026-10-11; future blocks may too). A row of
+      screens is one network, and a screen against a computer's side is connected
+      ("adjacent" in the bus order). Each step still needs a port on both sides: never
+      through glass or a computer's front.
+      - A screen another computer has **disconnected** still passes the connection on (user):
+        the plug is per computer, and other computers see the screen as connected.
+    - Computers don't pass it on (a computer isn't a hub), and two non-relaying blocks
+      touching aren't connected.
+  - **Discovery** (`cable/CableWalk`, plain Java, breadth-first, nearest first; `Kind.RELAY`
+    blocks are found as devices and carry the walk on; "cable, Nm" counts every block between):
     - A computer walks its cables in its server tick when any cable, screen or computer was
       placed or removed anywhere (`Cabling.changes()`), and every 20 ticks anyway, for chunks
       loading and unloading.
-    - A device ends the walk: screens don't pass the cable on. It never looks into unloaded
-      chunks.
+    - It never looks into unloaded chunks.
     - Only screens are cabled devices so far. Another computer's built-in display is its own.
   - **One screen, many computers:** a screen can be wired to several computers, and each
     has it on its bus.
@@ -484,10 +492,12 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
    - They run headless via `runGameTest`, which is part of `testAll` but **not** of `build`.
      Loom adds `runGameTest` to `check` by name; `build.gradle` removes it so `build` stays fast
      (the user wants `build` quick and iterative).
-   - The run reports "All 30 required tests passed": 29 are ours (21 in `AllInOneGameTest`,
-     8 in `CableGameTest`), and one is of unknown origin (not investigated).
+   - The run reports "All 33 required tests passed": 32 are ours (21 in `AllInOneGameTest`,
+     11 in `CableGameTest`), and one is of unknown origin (not investigated).
    - Cable and screen tests wait for the computer's tick to scan
      (`helper.succeedWhen`/`startSequence().thenWaitUntil`).
+   - **A test times out after about 20 ticks by default.** A test that waits longer (for
+     example `thenIdle` past a 20-tick rescan) needs `@GameTest(maxTicks = ...)`.
    - `helper.makeMockPlayer(GameType)` and `helper.useBlock(pos, player)` exercise real
      right-click handling. Call `player.setShiftKeyDown(true)` for sneak-use.
 3. **Client game tests** in `src/gametest/java`, implementing `FabricClientGameTest`.
@@ -656,7 +666,6 @@ scripts/art/all_in_one_textures.py   draws the block, GUI and item textures (Pil
 scripts/art/case_gui_textures.py     draws the case view's board, bus panel and icons (Pillow); PNGs are committed
 scripts/art/error_beep.py            synthesizes the error beep as Ogg Vorbis; the .ogg is committed
 scripts/art/part_sounds.py           synthesizes the part insert/remove sounds (slides, clicks, thumps, a zap)
-scripts/art/sound_backups/            earlier versions of sounds the user asked to keep
 scripts/art/oggwrite.py              shared: writes mono Ogg Vorbis via the system's libsndfile (ctypes)
 src/main/java/.../sound/ModSounds.java   sound events (error_beep)
 .github/workflows/build.yml

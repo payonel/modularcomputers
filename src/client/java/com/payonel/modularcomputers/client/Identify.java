@@ -8,7 +8,7 @@ import net.minecraft.util.Util;
 /**
  * The bus order panel's bulb: makes a device stand out in the world for a while (an outline
  * that pulses, seen through walls), like the identify light on a server. Only the player who
- * pressed it sees it.
+ * pressed it sees it. It's never saved: it times out, and leaving the world forgets it.
  */
 public final class Identify {
 	/** How long a device stays outlined. */

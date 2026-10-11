@@ -13,6 +13,9 @@ import net.minecraft.world.level.block.state.BlockState;
  * Cables in the world: which blocks take a cable on which side, walking the cables out from a
  * block, and a counter that goes up whenever a cable or a cabled block is placed or removed,
  * so computers know to look again.
+ * <p>
+ * Screens carry the connection on like a cable (a row of screens, or a screen against a
+ * computer's side, is connected). Computers don't: a computer isn't a hub.
  */
 public final class Cabling {
 	private static long changes;
@@ -58,6 +61,9 @@ public final class Cabling {
 				BlockState state = level.getBlockState(pos);
 				if (state.getBlock() instanceof CableBlock) {
 					return CableWalk.Kind.CABLE;
+				}
+				if (state.getBlock() instanceof ScreenBlock) {
+					return CableWalk.Kind.RELAY;
 				}
 				return isDevice(state) ? CableWalk.Kind.DEVICE : CableWalk.Kind.NONE;
 			}
