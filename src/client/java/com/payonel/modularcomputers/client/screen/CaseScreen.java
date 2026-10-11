@@ -261,9 +261,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			extractBusPanel(graphics);
 		}
 		extractLinkedHighlight(graphics, mouseX, mouseY);
-		for (Slot slot : SlotHints.fitting(menu, hoveredSlot, CaseMenu.PART_SLOTS)) {
-			SlotHints.outline(graphics, slotArea(slot.index), 2, HIGHLIGHT);
-		}
+		SlotHints.extract(graphics, menu, hoveredSlot, CaseMenu.PART_SLOTS, this::slotArea);
 		if (minecraft.level != null && minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer) {
 			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.SCREEN, computer.getBlockState(), powerHeld);
 		}

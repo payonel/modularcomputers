@@ -165,6 +165,17 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			}
 			check(!slotOutlined(context, cardHover, CaseMenu.CPU_SLOT), "but not the CPU socket");
 			check(!slotOutlined(context, cardHover, CaseMenu.SATA_SLOTS), "nor a SATA port");
+			// And the other way: hovering a slot outlines the items in the inventory that fit it.
+			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(CaseMenu.CPU_SLOT));
+			context.waitTicks(2);
+			BufferedImage socketHover = read(context.takeScreenshot("all-in-one-case-socket-hover"));
+			check(slotOutlined(context, socketHover, hotbar + cpuHotbar, 1), "hovering the CPU socket should outline the CPU in the hotbar");
+			check(!slotOutlined(context, socketHover, hotbar + eepromHotbar, 1), "but not the EEPROM");
+			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(CaseMenu.EXP_SLOTS));
+			context.waitTicks(2);
+			BufferedImage expHover = read(context.takeScreenshot("all-in-one-case-exp-hover"));
+			check(slotOutlined(context, expHover, card, 1), "hovering an expansion slot should outline a card");
+			check(!slotOutlined(context, expHover, hotbar + cpuHotbar, 1), "but not the CPU");
 
 			// Tooltips: data first, details with Shift. The test can't hold the real Shift key.
 			int battery = inventoryMenuSlotOf(context, ModItems.TIER2_BATTERY);
@@ -438,11 +449,16 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	/** Which hotbar slot (0-8) holds the item. */
 	/** Whether a slot has the light fitting-item outline: sampled on its left edge, 2 pixels out. */
 	private static boolean slotOutlined(ClientGameTestContext context, BufferedImage image, int slot) {
+		return slotOutlined(context, image, slot, 2);
+	}
+
+	/** Whether a slot has the light fitting-item outline: sampled on its left edge, {@code gap} pixels out. */
+	private static boolean slotOutlined(ClientGameTestContext context, BufferedImage image, int slot, int gap) {
 		int rgb = context.computeOnClient(client -> {
 			CaseScreen screen = (CaseScreen) client.gui.screen();
 			double scale = (double) image.getWidth() / screen.width;
 			Viewport area = screen.slotArea(slot);
-			return image.getRGB((int) ((area.x() - 2 + 0.5) * scale), (int) ((area.y() + 8 + 0.5) * scale)) & 0xFFFFFF;
+			return image.getRGB((int) ((area.x() - gap + 0.5) * scale), (int) ((area.y() + 8 + 0.5) * scale)) & 0xFFFFFF;
 		});
 		return rgb == 0xF2F2E6;
 	}

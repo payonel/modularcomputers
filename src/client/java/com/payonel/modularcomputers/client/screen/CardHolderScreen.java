@@ -107,9 +107,7 @@ public final class CardHolderScreen extends AbstractContainerScreen<CardHolderMe
 			graphics.fill(sx, sy, sx + 17, sy + 17, 0xFF373737);
 			graphics.fill(sx + 1, sy + 1, sx + 17, sy + 17, 0xFF8B8B8B);
 		}
-		for (Slot slot : SlotHints.fitting(menu, hoveredSlot, menu.cardSlots())) {
-			SlotHints.outline(graphics, slotArea(slot.index), 2, SlotHints.COLOR);
-		}
+		SlotHints.extract(graphics, menu, hoveredSlot, menu.cardSlots(), this::slotArea);
 	}
 
 	@Override

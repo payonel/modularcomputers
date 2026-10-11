@@ -240,6 +240,9 @@ scripts/art/part_sounds.py`. The user wanted them soft, not
           noise slides sounded like breathing into a mic. The user called the current set
           "perfect" (2026-10-11).
         - Loading a save plays nothing.
+      - **Fitting hints** (`SlotHints`, case view and card holder views): carrying an item, or
+        hovering one in the inventory, outlines the slots it fits; hovering a slot outlines the
+        inventory items that fit it (user requests, 2026-10-11).
       - Clicking the bus panel or the buttons doesn't count as clicking outside the window,
         so it never drops the carried item (`hasClickedOutside`).
     - Switching sends `SwitchViewPayload`. The server either opens the menu, or closes it and
