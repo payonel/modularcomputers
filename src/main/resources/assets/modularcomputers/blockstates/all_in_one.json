@@ -1,20 +1,20 @@
 {
 	"variants": {
-		"cpu=false,facing=north,powered=false": { "model": "modularcomputers:block/all_in_one_faded" },
-		"cpu=true,facing=north,powered=false": { "model": "modularcomputers:block/all_in_one" },
-		"cpu=false,facing=north,powered=true": { "model": "modularcomputers:block/all_in_one_on_faded" },
-		"cpu=true,facing=north,powered=true": { "model": "modularcomputers:block/all_in_one_on" },
-		"cpu=false,facing=east,powered=false": { "model": "modularcomputers:block/all_in_one_faded", "y": 90 },
-		"cpu=true,facing=east,powered=false": { "model": "modularcomputers:block/all_in_one", "y": 90 },
-		"cpu=false,facing=east,powered=true": { "model": "modularcomputers:block/all_in_one_on_faded", "y": 90 },
-		"cpu=true,facing=east,powered=true": { "model": "modularcomputers:block/all_in_one_on", "y": 90 },
-		"cpu=false,facing=south,powered=false": { "model": "modularcomputers:block/all_in_one_faded", "y": 180 },
-		"cpu=true,facing=south,powered=false": { "model": "modularcomputers:block/all_in_one", "y": 180 },
-		"cpu=false,facing=south,powered=true": { "model": "modularcomputers:block/all_in_one_on_faded", "y": 180 },
-		"cpu=true,facing=south,powered=true": { "model": "modularcomputers:block/all_in_one_on", "y": 180 },
-		"cpu=false,facing=west,powered=false": { "model": "modularcomputers:block/all_in_one_faded", "y": 270 },
-		"cpu=true,facing=west,powered=false": { "model": "modularcomputers:block/all_in_one", "y": 270 },
-		"cpu=false,facing=west,powered=true": { "model": "modularcomputers:block/all_in_one_on_faded", "y": 270 },
-		"cpu=true,facing=west,powered=true": { "model": "modularcomputers:block/all_in_one_on", "y": 270 }
+		"ready=false,facing=north,powered=false": { "model": "modularcomputers:block/all_in_one_faded" },
+		"ready=true,facing=north,powered=false": { "model": "modularcomputers:block/all_in_one" },
+		"ready=false,facing=north,powered=true": { "model": "modularcomputers:block/all_in_one_on_faded" },
+		"ready=true,facing=north,powered=true": { "model": "modularcomputers:block/all_in_one_on" },
+		"ready=false,facing=east,powered=false": { "model": "modularcomputers:block/all_in_one_faded", "y": 90 },
+		"ready=true,facing=east,powered=false": { "model": "modularcomputers:block/all_in_one", "y": 90 },
+		"ready=false,facing=east,powered=true": { "model": "modularcomputers:block/all_in_one_on_faded", "y": 90 },
+		"ready=true,facing=east,powered=true": { "model": "modularcomputers:block/all_in_one_on", "y": 90 },
+		"ready=false,facing=south,powered=false": { "model": "modularcomputers:block/all_in_one_faded", "y": 180 },
+		"ready=true,facing=south,powered=false": { "model": "modularcomputers:block/all_in_one", "y": 180 },
+		"ready=false,facing=south,powered=true": { "model": "modularcomputers:block/all_in_one_on_faded", "y": 180 },
+		"ready=true,facing=south,powered=true": { "model": "modularcomputers:block/all_in_one_on", "y": 180 },
+		"ready=false,facing=west,powered=false": { "model": "modularcomputers:block/all_in_one_faded", "y": 270 },
+		"ready=true,facing=west,powered=false": { "model": "modularcomputers:block/all_in_one", "y": 270 },
+		"ready=false,facing=west,powered=true": { "model": "modularcomputers:block/all_in_one_on_faded", "y": 270 },
+		"ready=true,facing=west,powered=true": { "model": "modularcomputers:block/all_in_one_on", "y": 270 }
 	}
 }

@@ -344,21 +344,23 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			stack.set(ModComponents.CHARGE, charge); // in place: not a part change
 			setChanged();
 		}
-		if (machine.powerLost()) {
-			updatePowerState();
-		}
+		machine.powerLost();
+		setPowerState(); // the battery may have run flat, or a tier 2 recharged from flat
 	}
 
-	/** The power button shows both; the block state carries them to clients. */
-	private void updatePowerState() {
+	/**
+	 * The power button shows whether the machine could run and whether it is on; the block
+	 * state carries both to clients. Returns whether it changed.
+	 */
+	private boolean setPowerState() {
 		BlockState state = getBlockState()
-			.setValue(AllInOneBlock.CPU, machine.board().cpu().isPresent())
+			.setValue(AllInOneBlock.READY, machine.board().cpu().isPresent() && hasPower())
 			.setValue(AllInOneBlock.POWERED, machine.isPowered());
-		if (state != getBlockState()) {
-			level.setBlock(worldPosition, state, Block.UPDATE_CLIENTS);
-		} else {
-			syncToClients(); // the bus order panel shows the parts
+		if (state == getBlockState()) {
+			return false;
 		}
+		level.setBlock(worldPosition, state, Block.UPDATE_CLIENTS);
+		return true;
 	}
 
 	/**
@@ -553,7 +555,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			errorBeep();
 		}
 		machine.powerLost(); // pulling the battery: it just goes off
-		updatePowerState();
+		if (!setPowerState()) {
+			syncToClients(); // the bus order panel shows the parts
+		}
 	}
 
 	@Override

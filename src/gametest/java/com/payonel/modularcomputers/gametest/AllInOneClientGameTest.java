@@ -171,7 +171,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			context.waitTicks(2);
 			BufferedImage caseShot = read(context.takeScreenshot("all-in-one-case-parts"));
 			int caseButton = pixelAt(context, caseShot, screen -> ((CaseScreen) screen).powerButton());
-			check(RED.test(caseButton), "with a CPU the power button should be lit red, got " + hex(caseButton));
+			check(FADED_RED.test(caseButton), "with a CPU but no battery the power button should be faded red, got " + hex(caseButton));
 
 			// The board shows what's installed. Fill the rest of the case, then check each indicator.
 			singleplayer.getServer().runOnServer(server -> {
@@ -198,6 +198,8 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			checkBoardPixel(context, full, 73, 115, 0xB0B4BC, "expansion slot 2 engaged");
 			checkBoardPixel(context, full, 46, 115, 0x1A1A1E, "expansion slot 1 empty");
 			checkBoardPixel(context, full, 34, 121, 0x5AE66E, "full battery: sixth bar green");
+			int readyButton = pixelAt(context, full, screen -> ((CaseScreen) screen).powerButton());
+			check(RED.test(readyButton), "with a CPU and a charged battery the power button should be lit red, got " + hex(readyButton));
 			singleplayer.getServer().runOnServer(server -> {
 				ItemStack drained = new ItemStack(ModItems.TIER1_BATTERY);
 				((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts().setItem(CaseMenu.UPS_SLOT, drained);

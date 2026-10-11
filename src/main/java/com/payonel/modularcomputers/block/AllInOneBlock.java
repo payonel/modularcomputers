@@ -33,23 +33,26 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class AllInOneBlock extends HorizontalDirectionalBlock implements EntityBlock {
 	/**
-	 * The power light shows green. With a CPU that means the machine is on; without one it only
-	 * flashes, for {@link #ATTEMPT_TICKS}, when someone presses power and the press is refused.
+	 * The power light shows green. When {@link #READY} that means the machine is on; otherwise it
+	 * only flashes, for {@link #ATTEMPT_TICKS}, when someone presses power and the press is refused.
 	 */
 	public static final BooleanProperty POWERED = BooleanProperty.create("powered");
 	/** How long a refused power press shows (faded) green: about as long as the error beep. */
 	public static final int ATTEMPT_TICKS = 4;
-	/** A CPU is installed. Without one the power button is faded and doesn't glow. */
-	public static final BooleanProperty CPU = BooleanProperty.create("cpu");
+	/**
+	 * The machine could run: a CPU is installed and the battery has charge. Otherwise the power
+	 * button is faded and doesn't glow.
+	 */
+	public static final BooleanProperty READY = BooleanProperty.create("ready");
 
 	public AllInOneBlock(Properties properties) {
 		super(properties);
-		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false).setValue(CPU, false));
+		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false).setValue(READY, false));
 	}
 
 	@Override
 	protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-		builder.add(FACING, POWERED, CPU);
+		builder.add(FACING, POWERED, READY);
 	}
 
 	@Override

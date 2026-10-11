@@ -51,7 +51,7 @@ public class AllInOneGameTest {
 		helper.assertTrue(computer.display().buffer().isBlank(), "an off computer's display should be blank");
 		helper.assertTrue(computer.parts().isEmpty(), "a new computer has no CPU or EEPROM");
 		helper.assertTrue(machine.board().cpu().isEmpty() && machine.board().eeprom().isEmpty(), "nothing installed");
-		helper.assertBlockProperty(POS, AllInOneBlock.CPU, false);
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, false);
 		helper.assertValueEqual(machine.board().bus().devices().stream().map(device -> device.type()).toList(),
 			List.of(DeviceType.DISPLAY, DeviceType.KEYBOARD), "physical bus: just the built-ins");
 		helper.succeed();
@@ -62,10 +62,10 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = install(place(helper), true, true);
 		helper.assertTrue(computer.machine().board().cpu().isPresent(), "CPU slot should install a CPU");
 		helper.assertTrue(computer.machine().board().eeprom().isPresent(), "EEPROM slot should install an EEPROM");
-		helper.assertBlockProperty(POS, AllInOneBlock.CPU, true);
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, true);
 		install(computer, false, true);
 		helper.assertTrue(computer.machine().board().cpu().isEmpty(), "emptying the slot removes the CPU");
-		helper.assertBlockProperty(POS, AllInOneBlock.CPU, false);
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, false);
 		helper.succeed();
 	}
 
@@ -185,7 +185,7 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = install(place(helper), false, true);
 		helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.NO_CPU, "press result");
 		helper.assertTrue(!computer.machine().isPowered(), "a computer without a CPU stays off");
-		helper.assertBlockProperty(POS, AllInOneBlock.CPU, false);
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, false);
 		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, true); // the attempt shows faded green
 		helper.assertTrue(computer.display().buffer().isBlank(), "nothing runs without a CPU");
 		helper.runAfterDelay(AllInOneBlock.ATTEMPT_TICKS + 1, () -> {
@@ -203,7 +203,7 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.CPU_SLOT, ItemStack.EMPTY);
 		helper.assertTrue(!computer.machine().isPowered(), "pulling the CPU should cut power");
 		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
-		helper.assertBlockProperty(POS, AllInOneBlock.CPU, false);
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, false);
 		helper.assertTrue(computer.display().buffer().isBlank(), "the display goes dark");
 		helper.succeed();
 	}
@@ -214,7 +214,7 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.CPU));
 		helper.assertTrue(!computer.machine().isPowered(), "a new CPU waits for the power button");
 		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
-		helper.assertBlockProperty(POS, AllInOneBlock.CPU, true);
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, true);
 		helper.succeed();
 	}
 

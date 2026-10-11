@@ -116,6 +116,27 @@ public class BatteryGameTest {
 		helper.succeed();
 	}
 
+	@GameTest
+	public void thePowerButtonIsFadedWithoutABatteryOrWithAFlatOne(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper, ItemStack.EMPTY);
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, false); // a CPU but no battery
+		computer.parts().setItem(CaseMenu.UPS_SLOT, new ItemStack(ModItems.TIER1_BATTERY));
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, false); // a flat battery
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, true);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, ItemStack.EMPTY);
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, false); // charged, but no CPU
+		helper.succeed();
+	}
+
+	@GameTest(maxTicks = 100)
+	public void aTier2RechargingFromFlatLightsThePowerButton(GameTestHelper helper) {
+		long now = helper.getLevel().getGameTime();
+		computer(helper, battery(ModItems.TIER2_BATTERY, 0, now));
+		helper.assertBlockProperty(POS, AllInOneBlock.READY, false);
+		helper.succeedWhen(() -> helper.assertBlockProperty(POS, AllInOneBlock.READY, true));
+	}
+
 	@GameTest(maxTicks = 100)
 	public void aRunningComputerGoesOffWhenItsBatteryRunsFlat(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper, battery(ModItems.TIER1_BATTERY, 30, BatteryCharge.UNSETTLED));
@@ -124,6 +145,7 @@ public class BatteryGameTest {
 			.thenWaitUntil(() -> helper.assertTrue(!computer.machine().isPowered(), "ran flat"))
 			.thenExecute(() -> {
 				helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
+				helper.assertBlockProperty(POS, AllInOneBlock.READY, false); // faded
 				helper.assertTrue(computer.display().buffer().isBlank(), "the display goes dark");
 				helper.assertValueEqual(BatteryItem.percent(computer.parts().getItem(CaseMenu.UPS_SLOT)), 0, "empty");
 				helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.NO_POWER, "won't start again");
