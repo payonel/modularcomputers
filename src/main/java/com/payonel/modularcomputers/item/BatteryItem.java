@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.item;
 import com.payonel.modularcomputers.power.BatteryCharge;
 import com.payonel.modularcomputers.power.BatteryTier;
 import com.payonel.modularcomputers.power.ChargeMeter;
+import com.payonel.modularcomputers.power.Durations;
 import java.util.function.Consumer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -92,8 +93,8 @@ public final class BatteryItem extends Item {
 			return;
 		}
 		BatteryCharge charge = charge(stack);
-		String days = String.format("%.1f", charge.ticks() / (double) BatteryCharge.DAY_TICKS);
-		builder.accept(Component.translatable("item.modularcomputers.battery.charge", percent(stack), days).withStyle(ChatFormatting.GRAY));
+		builder.accept(Component.translatable("item.modularcomputers.battery.charge", percent(stack), Durations.clock(charge.ticks()))
+			.withStyle(ChatFormatting.GRAY));
 		if (tier.selfCharging()) {
 			builder.accept(Component.translatable("item.modularcomputers.battery.self_charging").withStyle(ChatFormatting.GRAY));
 		}

@@ -16,7 +16,10 @@ import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.RecipeType;
@@ -73,6 +76,22 @@ public class BatteryGameTest {
 			Items.NETHERITE_INGOT, Items.ENDER_EYE, Items.NETHERITE_INGOT);
 		helper.assertTrue(tier3.is(ModItems.TIER3_BATTERY), "tier 3 recipe, got " + tier3);
 		helper.assertValueEqual(BatteryItem.percent(tier3), 100, "tier 3 is always full");
+		helper.succeed();
+	}
+
+	/** The lines a battery adds to its tooltip. */
+	private static List<String> hint(ItemStack stack) {
+		List<String> lines = new ArrayList<>();
+		stack.getItem().appendHoverText(stack, Item.TooltipContext.EMPTY, TooltipDisplay.DEFAULT, line -> lines.add(line.getString()), TooltipFlag.NORMAL);
+		return lines;
+	}
+
+	@GameTest
+	public void aBatteryShowsItsChargeAndTimeLeft(GameTestHelper helper) {
+		helper.assertValueEqual(hint(ModItems.TIER1_BATTERY.charged()), List.of("Charge: 100% (10:00:00)"), "a full tier 1");
+		helper.assertValueEqual(hint(battery(ModItems.TIER2_BATTERY, 5 * DAY + DAY / 2 + 20 * 7, 0)),
+			List.of("Charge: 28% (05:10:07)", "Recharges itself while not in use"), "a tier 2");
+		helper.assertValueEqual(hint(new ItemStack(ModItems.TIER3_BATTERY)), List.of("Never runs out"), "tier 3");
 		helper.succeed();
 	}
 

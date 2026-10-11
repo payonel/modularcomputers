@@ -8,16 +8,18 @@ import org.junit.jupiter.params.provider.CsvSource;
 class DurationsTest {
 	@ParameterizedTest
 	@CsvSource({
-		"0, 0s",
-		"39, 1s",
-		"800, 40s",
-		"1200, 1m",
-		"24000, 20m",      // one day
-		"72000, 1h 0m",
-		"240000, 3h 20m",  // a full tier 1
-		"-5, 0s",
+		"0, 00:00:00",
+		"39, 00:00:01",
+		"800, 00:00:40",
+		"1200, 00:01:00",
+		"12000, 00:10:00",    // half a day
+		"23999, 00:19:59",
+		"24000, 01:00:00",    // one day: 20 real minutes
+		"240000, 10:00:00",   // a full tier 1
+		"2400000, 100:00:00",
+		"-5, 00:00:00",
 	})
-	void showsHoursAndMinutesOrSeconds(long ticks, String text) {
-		assertThat(Durations.realTime(ticks)).isEqualTo(text);
+	void showsDaysThenMinutesAndSecondsIntoTheDay(long ticks, String text) {
+		assertThat(Durations.clock(ticks)).isEqualTo(text);
 	}
 }

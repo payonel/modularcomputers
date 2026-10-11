@@ -112,7 +112,8 @@ same thing.
           - A full battery, a tier 3, or anything else in the grid gives no result.
         - Crafted batteries start empty (my default). The creative tab and `giveall` give
           charged ones (`BatteryItem.charged()`).
-        - Items show a charge bar and a tooltip ("Charge: 73% (7.3 days)").
+        - Items show a charge bar and a tooltip: "Charge: 73% (07:06:00)", plus "Recharges
+          itself while not in use" on a tier 2, or "Never runs out".
         - **The case's power buffer** (user design, 2026-10-11; `power/PowerBuffer`, saved as
           `power_buffer`): the computer runs on the case's own store, which holds **one day**.
           - A battery going in fills it right away, up to a day's worth, out of the battery.
@@ -123,11 +124,12 @@ same thing.
             the battery doesn't stop a running computer.
           - **The charge meter under the UPS slot shows the buffer, not the battery.** Empty:
             all bars off; any power: at least one red bar.
-          - Hovering the meter shows a hint (`CaseScreen.powerTooltip`, user request): "Case
-            power: 75%", "Runs the computer 15m more", and "Battery: 3h 20m more" (or "No
-            battery", or that it keeps the case full forever). Times are real time at 20 ticks a
-            second (`power/Durations`). Clients get the buffer level whenever its percentage
-            changes.
+          - Hovering the meter shows a hint (`CaseScreen.powerTooltip`, user's wording): "Case
+            power: 75% (00:15:00)" and, with a battery in, "Battery power: 90% (09:00:00)" (or
+            "Battery power: never runs out"). Clients get the buffer level whenever its
+            percentage changes.
+        - **Times read DD:MM:SS** (`power/Durations.clock`, user's format): Minecraft days, then
+          the real minutes (00..19, 20 to a day) and seconds into the day.
           - When the buffer runs out, a running computer dies with the **error beep**, like
             pulling the CPU (`Machine.powerLost`).
         - **No power** (an empty buffer): pressing power does nothing at all

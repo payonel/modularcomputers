@@ -203,7 +203,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("all-in-one-case-power-hint");
 			List<String> hint = context.computeOnClient(client -> ((CaseScreen) client.gui.screen()).powerTooltip().stream()
 				.map(line -> line.getString()).toList());
-			check(hint.equals(List.of("Case power: 100%", "Runs the computer 20m more", "Battery: 3h 20m more")), "power hint, got " + hint);
+			check(hint.equals(List.of("Case power: 100% (01:00:00)", "Battery power: 100% (10:00:00)")), "power hint, got " + hint);
 			context.getInput().setCursorPos(0, 0);
 			int readyButton = pixelAt(context, full, screen -> ((CaseScreen) screen).powerButton());
 			check(RED.test(readyButton), "with a CPU and a charged battery the power button should be lit red, got " + hex(readyButton));

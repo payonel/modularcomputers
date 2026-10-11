@@ -1,16 +1,17 @@
 package com.payonel.modularcomputers.power;
 
-/** Ticks of running, as the real time they take at the normal 20 ticks a second. */
+/** Ticks of running, shown as time. */
 public final class Durations {
 	private Durations() {
 	}
 
-	/** Like "3h 20m", "18m" or "40s". */
-	public static String realTime(long ticks) {
-		long seconds = Math.max(0, ticks) / 20;
-		if (seconds >= 3600) {
-			return seconds / 3600 + "h " + seconds % 3600 / 60 + "m";
-		}
-		return seconds >= 60 ? seconds / 60 + "m" : seconds + "s";
+	/**
+	 * As DD:MM:SS: Minecraft days (20 real minutes each), then the real minutes (00..19) and
+	 * seconds into that day, at the normal 20 ticks a second.
+	 */
+	public static String clock(long ticks) {
+		long clamped = Math.max(0, ticks);
+		long seconds = clamped % BatteryCharge.DAY_TICKS / 20;
+		return String.format("%02d:%02d:%02d", clamped / BatteryCharge.DAY_TICKS, seconds / 60, seconds % 60);
 	}
 }

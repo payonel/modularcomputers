@@ -16,7 +16,6 @@ import com.payonel.modularcomputers.power.PowerBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -141,8 +140,8 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	}
 
 	/**
-	 * The meter's hover hint: the case's power, how long it runs the computer, and what the
-	 * battery adds.
+	 * The meter's hover hint: the case's power and the battery's, each with how long it runs
+	 * the computer (DD:MM:SS).
 	 */
 	public List<Component> powerTooltip() {
 		if (minecraft.level == null || !(minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer)) {
@@ -150,18 +149,12 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		}
 		PowerBuffer power = computer.power();
 		List<Component> lines = new ArrayList<>();
-		lines.add(Component.translatable("gui.modularcomputers.power", power.percent()));
-		lines.add(power.isEmpty()
-			? Component.translatable("gui.modularcomputers.power.empty").withStyle(ChatFormatting.GRAY)
-			: Component.translatable("gui.modularcomputers.power.left", Durations.realTime(power.level())).withStyle(ChatFormatting.GRAY));
+		lines.add(Component.translatable("gui.modularcomputers.power", power.percent(), Durations.clock(power.level())));
 		ItemStack stack = menu.slots.get(CaseMenu.UPS_SLOT).getItem();
 		if (stack.getItem() instanceof BatteryItem battery) {
 			lines.add(battery.tier().infinite()
-				? Component.translatable("gui.modularcomputers.power.battery_infinite").withStyle(ChatFormatting.GRAY)
-				: Component.translatable("gui.modularcomputers.power.battery", Durations.realTime(BatteryItem.charge(stack).ticks()))
-					.withStyle(ChatFormatting.GRAY));
-		} else {
-			lines.add(Component.translatable("gui.modularcomputers.power.no_battery").withStyle(ChatFormatting.GRAY));
+				? Component.translatable("gui.modularcomputers.power.battery_infinite")
+				: Component.translatable("gui.modularcomputers.power.battery", BatteryItem.percent(stack), Durations.clock(BatteryItem.charge(stack).ticks())));
 		}
 		return lines;
 	}
