@@ -4,6 +4,7 @@ import static com.payonel.modularcomputers.ModularComputers.id;
 
 import com.mojang.serialization.MapCodec;
 import com.payonel.modularcomputers.power.BatteryCharge;
+import com.payonel.modularcomputers.power.BatteryTier;
 import java.util.Map;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -19,18 +20,23 @@ import net.minecraft.world.level.Level;
 /**
  * Charging a battery in the crafting grid, the way tools are combined to repair them: the battery
  * and some glowing material, in any arrangement (a 2x2 is enough). Each material adds a share of
- * a full tier 1 battery; a tier 2 holds twice as much, so the same material fills half as much of
- * it. A full battery takes nothing. Tier 3 never needs charging.
+ * a full tier 1 battery; a tier 2 holds twice as much (by default), so the same material fills
+ * half as much of it. A full battery takes nothing. Tier 3 never needs charging.
  */
 public final class BatteryChargingRecipe extends CustomRecipe {
-	private static final int TIER1_FULL = 10 * BatteryCharge.DAY_TICKS;
-	/** What each glowing material adds, in ticks of running a CPU. */
+	/** What each glowing material adds, as a percentage of a full tier 1 battery. */
 	public static final Map<Item, Integer> MATERIALS = Map.of(
-		Items.SEA_LANTERN, TIER1_FULL,
-		Items.GLOWSTONE, TIER1_FULL / 4,
-		Items.SHROOMLIGHT, TIER1_FULL / 4,
-		Items.GLOW_INK_SAC, TIER1_FULL / 10,
-		Items.GLOW_LICHEN, TIER1_FULL / 20);
+		Items.SEA_LANTERN, 100,
+		Items.GLOWSTONE, 25,
+		Items.SHROOMLIGHT, 25,
+		Items.GLOW_INK_SAC, 10,
+		Items.GLOW_LICHEN, 5);
+
+	/** A full tier 1's charge; its default size if tier 1 is configured never to run out. */
+	private static long tier1Full() {
+		BatteryTier tier1 = BatteryTier.TIER_1;
+		return tier1.infinite() ? Math.round(tier1.defaultDays() * BatteryCharge.DAY_TICKS) : tier1.capacity();
+	}
 
 	public static final BatteryChargingRecipe INSTANCE = new BatteryChargingRecipe();
 	public static final RecipeSerializer<BatteryChargingRecipe> SERIALIZER = Registry.register(BuiltInRegistries.RECIPE_SERIALIZER,
@@ -51,7 +57,7 @@ public final class BatteryChargingRecipe extends CustomRecipe {
 	@Override
 	public ItemStack assemble(CraftingInput input) {
 		ItemStack battery = ItemStack.EMPTY;
-		long added = 0;
+		long percent = 0;
 		for (ItemStack stack : input.items()) {
 			if (stack.isEmpty()) {
 				continue;
@@ -59,12 +65,12 @@ public final class BatteryChargingRecipe extends CustomRecipe {
 			if (stack.getItem() instanceof BatteryItem item && !item.tier().infinite() && battery.isEmpty()) {
 				battery = stack;
 			} else if (MATERIALS.containsKey(stack.getItem())) {
-				added += MATERIALS.get(stack.getItem());
+				percent += MATERIALS.get(stack.getItem());
 			} else {
 				return ItemStack.EMPTY;
 			}
 		}
-		if (battery.isEmpty() || added == 0) {
+		if (battery.isEmpty() || percent == 0) {
 			return ItemStack.EMPTY;
 		}
 		BatteryItem item = (BatteryItem) battery.getItem();
@@ -73,6 +79,7 @@ public final class BatteryChargingRecipe extends CustomRecipe {
 			return ItemStack.EMPTY;
 		}
 		ItemStack charged = battery.copyWithCount(1);
+		long added = tier1Full() * percent / 100;
 		charged.set(ModComponents.CHARGE, charge.charge(item.tier(), (int) Math.min(Integer.MAX_VALUE, added)));
 		return charged;
 	}

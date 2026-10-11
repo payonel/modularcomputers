@@ -2,16 +2,18 @@ package com.payonel.modularcomputers;
 
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.command.ModCommands;
-import com.payonel.modularcomputers.item.ModComponents;
+import com.payonel.modularcomputers.config.ModConfig;
 import com.payonel.modularcomputers.item.BatteryChargingRecipe;
+import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.ModMenus;
 import com.payonel.modularcomputers.network.ConnectDevicePayload;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
+import com.payonel.modularcomputers.network.PressPowerPayload;
 import com.payonel.modularcomputers.network.ReorderBusPayload;
+import com.payonel.modularcomputers.network.SettingsPayload;
 import com.payonel.modularcomputers.network.SwitchViewPayload;
 import com.payonel.modularcomputers.sound.ModSounds;
-import com.payonel.modularcomputers.network.PressPowerPayload;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.resources.Identifier;
@@ -43,6 +45,7 @@ public final class ModularComputers implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		ModConfig.load();
 		ModSounds.init();
 		ModComponents.init();
 		ModItems.init();
@@ -56,6 +59,7 @@ public final class ModularComputers implements ModInitializer {
 		SwitchViewPayload.register();
 		ReorderBusPayload.register();
 		ConnectDevicePayload.register();
+		SettingsPayload.register();
 		initialized = true;
 		LOGGER.info("{} (version {})", INIT_MARKER, version());
 	}

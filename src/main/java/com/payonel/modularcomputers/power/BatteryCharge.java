@@ -8,11 +8,8 @@ package com.payonel.modularcomputers.power;
  * the first look.
  */
 public record BatteryCharge(int ticks, long settledAt) {
-	/**
-	 * One Minecraft day and night: 24000 ticks. PLAY TESTING: shortened 20x to 1200 ticks (one
-	 * real minute) at the user's request, 2026-10-11. Put it back to 24000 when they're done.
-	 */
-	public static final int DAY_TICKS = 1200;
+	/** One Minecraft day and night. */
+	public static final int DAY_TICKS = 24000;
 	public static final long UNSETTLED = -1;
 	public static final BatteryCharge EMPTY = new BatteryCharge(0, UNSETTLED);
 

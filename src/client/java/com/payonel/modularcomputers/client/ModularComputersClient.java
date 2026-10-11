@@ -7,8 +7,10 @@ import com.payonel.modularcomputers.client.render.OutlineRenderer;
 import com.payonel.modularcomputers.client.screen.CardHolderScreen;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
+import com.payonel.modularcomputers.config.ModConfig;
 import com.payonel.modularcomputers.menu.ModMenus;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
+import com.payonel.modularcomputers.network.SettingsPayload;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -45,7 +47,11 @@ public final class ModularComputersClient implements ClientModInitializer {
 			}
 		});
 		// The bulb's outlines belong to this visit to a world.
-		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> Identify.clear());
+		ClientPlayNetworking.registerGlobalReceiver(SettingsPayload.TYPE, (payload, context) -> payload.apply());
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			Identify.clear();
+			ModConfig.load(); // back to this game's own settings, after a server's
+		});
 		initialized = true;
 		ModularComputers.LOGGER.info(CLIENT_INIT_MARKER);
 	}

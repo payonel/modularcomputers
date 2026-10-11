@@ -15,8 +15,9 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.TooltipDisplay;
 
 /**
- * A battery for a computer's UPS slot. Tiers 1 and 2 carry their charge
- * ({@link ModComponents#CHARGE}); a crafted one starts empty. Tier 3 never runs out.
+ * A battery for a computer's UPS slot. It carries its charge ({@link ModComponents#CHARGE}); a
+ * crafted one starts empty. How long each tier lasts is configurable, and one set to 0 days
+ * (tier 3, by default) never runs out.
  */
 public final class BatteryItem extends Item {
 	/** How often a battery in a player's inventory works out its self-charging. */
@@ -25,7 +26,8 @@ public final class BatteryItem extends Item {
 	private final BatteryTier tier;
 
 	public BatteryItem(Properties properties, BatteryTier tier) {
-		super(tier.infinite() ? properties : properties.component(ModComponents.CHARGE, BatteryCharge.EMPTY));
+		// Every tier carries a charge: which ones never run out is configurable.
+		super(properties.component(ModComponents.CHARGE, BatteryCharge.EMPTY));
 		this.tier = tier;
 	}
 

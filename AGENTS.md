@@ -88,9 +88,11 @@ same thing.
         `power/BatteryTier` and `power/BatteryCharge`). **The computer runs on its battery:**
         - Charge is counted in ticks of running a CPU (`ModComponents.CHARGE`:
           `BatteryCharge(ticks, settledAt)`). A day is 24000 ticks.
-        - **PLAY TESTING (2026-10-11):** `BatteryCharge.DAY_TICKS` is temporarily 1200 (one
-          real minute instead of 20), so every battery and buffer time is 20x shorter. The
-          user will say when to restore 24000.
+        - **How long each tier lasts is a setting** (see "Settings" below):
+          `battery_tier1_duration` 10, `battery_tier2_duration` 20, `battery_tier3_duration` 0, in
+          days; 0 means it never runs out (`BatteryTier.setDays`, `infinite()`). Any tier can be
+          infinite, so every battery item carries a charge component.
+          - Charging materials are percentages of a full tier 1, so they follow its setting.
         - **Tier 1** (`tier1_battery`): copper×3 / iron, redstone, iron / iron, redstone, iron.
           Full, it runs a CPU for 10 days and nights, 10% a day.
         - **Tier 2** (`tier2_battery`): gold×3 / iron, redstone, iron / iron, blaze rod, iron.
@@ -271,6 +273,16 @@ scripts/art/error_beep.py` into
       future work.
   - Power, parts, display contents and colors, and the console state are saved and synced.
     Toggling plays a stone-button click.
+- **Settings** (`config/ModConfig`, user request 2026-10-11): `config/modularcomputers.properties`
+  in the game folder, `key: value` lines (Java properties).
+  - The file is written with commented defaults the first time the game starts. Missing or
+    bad values fall back to the defaults, with a warning in the log.
+  - `/modularcomputers reload` rereads it (operator permission). A server sends its settings
+    to joining players and after a reload (`SettingsPayload`), and a client goes back to its
+    own file on disconnect.
+  - Where it is: a launcher install's `.minecraft/config/`, the dev client's `run/config/`
+    (`./gradlew runClient`), or `build/run/productionClientGameTest/config/` for the tests.
+    The tests run with the defaults.
 - **Lua runtime:** the user is building their own Lua runtime as a separate project, and it
   isn't ready. Leave VM/runtime work alone and keep building the computer's other features.
   Machine behavior stays a stand-in (like the "hello world" greeting) until the runtime lands.

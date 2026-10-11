@@ -1,7 +1,9 @@
 package com.payonel.modularcomputers.command;
 
 import com.payonel.modularcomputers.ModularComputers;
+import com.payonel.modularcomputers.config.ModConfig;
 import com.payonel.modularcomputers.item.BatteryItem;
+import com.payonel.modularcomputers.network.SettingsPayload;
 import java.util.List;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.commands.Commands;
@@ -14,8 +16,9 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * {@code /modularcomputers giveall}: a cheat for testing that gives the player one of every
- * item this mod adds (it finds them in the registry, so new items are included). Needs the
- * same permission as {@code /give}.
+ * item this mod adds (it finds them in the registry, so new items are included).
+ * {@code /modularcomputers reload}: rereads the settings file and sends it to the players.
+ * Both need the same permission as {@code /give}.
  */
 public final class ModCommands {
 	private ModCommands() {
@@ -30,6 +33,12 @@ public final class ModCommands {
 					int count = giveAll(player);
 					command.getSource().sendSuccess(() -> Component.translatable("commands.modularcomputers.giveall", count), true);
 					return count;
+				}))
+				.then(Commands.literal("reload").executes(command -> {
+					ModConfig.load();
+					SettingsPayload.sendToAll(command.getSource().getServer());
+					command.getSource().sendSuccess(() -> Component.translatable("commands.modularcomputers.reload", ModConfig.FILE_NAME), true);
+					return 1;
 				}))));
 	}
 
