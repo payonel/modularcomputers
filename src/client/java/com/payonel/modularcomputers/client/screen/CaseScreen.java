@@ -102,6 +102,8 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int LED_GLINT = 0xFFFFE8A0;
 	private static final int LED_OFF = 0xFF3A2E1A;
 
+	/** The left button went down on the bus order scrollbar and is still held. */
+	private boolean draggingScrollbar;
 	private boolean powerHeld;
 	private boolean showBus;
 	/** The first device shown in the bus order panel. */
@@ -607,6 +609,13 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			return true;
 		}
 		boolean leftOrRight = event.button() == InputConstants.MOUSE_BUTTON_LEFT || event.button() == InputConstants.MOUSE_BUTTON_RIGHT;
+		if (showBus && event.button() == InputConstants.MOUSE_BUTTON_LEFT && busWindow(busEntries().size()).scrolls()
+			&& busScrollbar().contains(event.x(), event.y())) {
+			// Clicking the track jumps the thumb there; holding the button drags it.
+			draggingScrollbar = true;
+			scrollTo(event.y());
+			return true;
+		}
 		if (showBus && leftOrRight) {
 			List<AllInOneBlockEntity.BusEntry> entries = busEntries();
 			int devices = entries.size();
@@ -648,8 +657,24 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	}
 
 	@Override
+	public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+		if (draggingScrollbar) {
+			scrollTo(event.y());
+			return true;
+		}
+		return super.mouseDragged(event, dragX, dragY);
+	}
+
+	/** Moves the bus order panel's scrollbar so its thumb is centered at {@code y}. */
+	private void scrollTo(double y) {
+		Viewport track = busScrollbar();
+		busScroll = busWindow(busEntries().size()).offsetAt((int) y - (track.y() + 1), track.height() - 2);
+	}
+
+	@Override
 	public boolean mouseReleased(MouseButtonEvent event) {
 		powerHeld = false;
+		draggingScrollbar = false;
 		return super.mouseReleased(event);
 	}
 

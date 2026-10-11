@@ -470,7 +470,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			} else if (block instanceof ExpansionHubBlockEntity hub) {
 				for (int slot = 0; slot < ExpansionHubBlockEntity.SLOTS; slot++) {
 					int hubSlot = slot;
-					hub.card(slot).ifPresent(card -> addCabled(found, devices, new Cabled(CABLE_KEY + hub.id() + ":" + hubSlot, at.pos(), at.meters(),
+					// A hub's card is known by its serial number, so it keeps its place in the bus
+					// order when it moves to another slot.
+					UUID serial = hub.cards().getItem(hubSlot).get(ModComponents.SERIAL);
+					String key = CABLE_KEY + (serial != null ? serial : hub.id() + ":" + hubSlot);
+					hub.card(slot).ifPresent(card -> addCabled(found, devices, new Cabled(key, at.pos(), at.meters(),
 						at.wireless(), paired, hub.cards().getItem(hubSlot).getItem(), hubSlot), card));
 				}
 			} else if (block instanceof RoboticPistonBlockEntity piston) {

@@ -25,6 +25,13 @@ public final class ModComponents {
 			.networkSynchronized(StreamCodec.composite(ByteBufCodecs.VAR_INT, BatteryCharge::ticks, ByteBufCodecs.VAR_LONG, BatteryCharge::settledAt, BatteryCharge::new))
 			.build());
 
+	/**
+	 * A card's serial number, stamped the first time it goes into an expansion hub: the hub's
+	 * computers know it by this, whichever slot it's in.
+	 */
+	public static final DataComponentType<UUID> SERIAL = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("serial"),
+		DataComponentType.<UUID>builder().persistent(UUIDUtil.CODEC).networkSynchronized(UUIDUtil.STREAM_CODEC).build());
+
 	/** The board (a computer's, a hub's, ...) this Bluetooth card links to. */
 	public static final DataComponentType<UUID> BLUETOOTH_LINK = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("bluetooth_link"),
 		DataComponentType.<UUID>builder().persistent(UUIDUtil.CODEC).networkSynchronized(UUIDUtil.STREAM_CODEC).build());

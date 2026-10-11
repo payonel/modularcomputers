@@ -1,5 +1,6 @@
 package com.payonel.modularcomputers.block;
 
+import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.sound.ModSounds;
 import java.util.ArrayList;
@@ -147,6 +148,12 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 		setChanged();
 		if (level == null || level.isClientSide()) {
 			return;
+		}
+		for (int slot = 0; slot < cards.getContainerSize(); slot++) {
+			ItemStack card = cards.getItem(slot);
+			if (slot != pairingSlot() && !card.isEmpty() && !card.has(ModComponents.SERIAL)) {
+				card.set(ModComponents.SERIAL, UUID.randomUUID()); // its identity from now on, whatever slot it's in
+			}
 		}
 		for (int slot = 0; slot < last.length; slot++) {
 			boolean had = last[slot] != null && !last[slot].isEmpty();

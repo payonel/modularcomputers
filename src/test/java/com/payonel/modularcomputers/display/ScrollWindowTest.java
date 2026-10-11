@@ -39,4 +39,17 @@ class ScrollWindowTest {
 	void theThumbNeverGetsTooSmallToGrab() {
 		assertThat(new ScrollWindow(1000, 10).thumbLength(100)).isEqualTo(6);
 	}
+
+	@Test
+	void clickingTheTrackPutsTheThumbsMiddleThere() {
+		ScrollWindow window = new ScrollWindow(30, 10); // offsets 0..20
+		int track = 100;
+		int thumb = window.thumbLength(track); // 33
+		assertThat(window.offsetAt(0, track)).as("the top").isZero();
+		assertThat(window.offsetAt(track, track)).as("the bottom").isEqualTo(20);
+		assertThat(window.offsetAt(track / 2, track)).as("the middle").isEqualTo(10);
+		int offset = window.offsetAt(70, track);
+		assertThat(window.thumbStart(offset, track) + thumb / 2).as("the thumb lands under the click").isBetween(67, 73);
+		assertThat(new ScrollWindow(5, 10).offsetAt(50, track)).as("no scrolling, no offset").isZero();
+	}
 }

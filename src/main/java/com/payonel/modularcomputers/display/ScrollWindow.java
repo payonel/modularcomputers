@@ -32,6 +32,19 @@ public record ScrollWindow(int total, int visible) {
 		return Math.max(MIN_THUMB, track * visible / total);
 	}
 
+	/**
+	 * The offset that puts the thumb's middle at {@code position} along a track of {@code track}
+	 * pixels: clicking or dragging on the track moves it there.
+	 */
+	public int offsetAt(int position, int track) {
+		if (!scrolls()) {
+			return 0;
+		}
+		int room = track - thumbLength(track);
+		int start = position - thumbLength(track) / 2;
+		return clamp(room <= 0 ? 0 : Math.round((float) start * maxOffset() / room));
+	}
+
 	/** The thumb's start within a track of {@code track} pixels. */
 	public int thumbStart(int offset, int track) {
 		if (!scrolls()) {

@@ -10,6 +10,7 @@ import com.payonel.modularcomputers.block.RoboticPistonBlockEntity;
 import com.payonel.modularcomputers.block.ScreenBlock;
 import com.payonel.modularcomputers.block.ScreenBlockEntity;
 import com.payonel.modularcomputers.bus.DeviceType;
+import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import java.util.List;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
@@ -77,7 +78,7 @@ public class CardHolderGameTest {
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertValueEqual(locations(computer), List.of("hub 1, 1m", "hub 2, 1m"), "both cards"))
 			.thenExecute(() -> {
-				helper.assertTrue(computer.setConnected("cable:" + hub.id() + ":0", false), "unplug the audio card");
+				helper.assertTrue(computer.setConnected("cable:" + hub.cards().getItem(0).get(ModComponents.SERIAL), false), "unplug the audio card");
 				var types = computer.machine().board().bus().devices().stream().map(device -> device.type()).toList();
 				helper.assertTrue(!types.contains(DeviceType.AUDIO) && types.contains(DeviceType.NETWORK), "only the audio card leaves the bus");
 				hub.cards().setItem(1, ItemStack.EMPTY);
@@ -86,7 +87,31 @@ public class CardHolderGameTest {
 			.thenSucceed();
 	}
 
-	@GameTest
+	@GameTest(maxTicks = 100)
+	public void aHubCardKeepsItsPlaceWhenItMovesToAnotherSlot(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper);
+		ExpansionHubBlockEntity hub = hub(helper, new BlockPos(2, 1, 1));
+		hub.cards().setItem(0, new ItemStack(ModItems.WLAN_CARD));
+		hub.cards().setItem(1, new ItemStack(ModItems.BLUETOOTH_CARD));
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertValueEqual(names(computer), List.of("WLAN Card", "Bluetooth Card"), "both cards"))
+			.thenExecute(() -> {
+				helper.assertTrue(hub.cards().getItem(0).has(ModComponents.SERIAL), "a card gets a serial number in a hub");
+				hub.cards().removeItem(1, 1); // the Bluetooth card comes out: missing
+			})
+			.thenWaitUntil(() -> helper.assertValueEqual(locations(computer), List.of("hub 1, 1m", "offline"), "the Bluetooth card is offline"))
+			.thenExecute(() -> hub.cards().setItem(1, hub.cards().removeItem(0, 1))) // the WLAN card moves into its slot
+			.thenWaitUntil(() -> helper.assertValueEqual(locations(computer), List.of("hub 2, 1m", "offline"), "the WLAN card moved"))
+			.thenExecute(() -> helper.assertValueEqual(names(computer), List.of("WLAN Card", "Bluetooth Card"),
+				"one WLAN row, in its place, and the Bluetooth card still offline"))
+			.thenSucceed();
+	}
+
+	private static List<String> names(AllInOneBlockEntity computer) {
+		return computer.busEntries().stream().filter(AllInOneBlockEntity.BusEntry::cabled).map(entry -> entry.name().getString()).toList();
+	}
+
+		@GameTest
 	public void aHubTakesCardsAndAPistonOnlyABluetoothCard(GameTestHelper helper) {
 		ExpansionHubBlockEntity hub = hub(helper, new BlockPos(1, 1, 1));
 		RoboticPistonBlockEntity piston = piston(helper, new BlockPos(3, 1, 1), Direction.DOWN);
