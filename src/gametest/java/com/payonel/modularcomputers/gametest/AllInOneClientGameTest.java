@@ -190,42 +190,42 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 
 			// The bus order panel lists the devices; its arrows reorder them on the server.
 			check(context.computeOnClient(client -> ((CaseScreen) client.gui.screen()).busPanelShown()), "the bus order panel should show");
-			check(serverBusKeys(singleplayer, computer).equals(List.of("display", "keyboard", "sata:0", "sata:2", "exp:1")),
+			check(serverBusKeys(singleplayer, computer).equals(List.of("display", "keyboard", "eeprom", "sata:0", "sata:2", "exp:1", "ups")),
 				"default bus order, got " + serverBusKeys(singleplayer, computer));
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).busArrow(0, false));
 			singleplayer.getServer().waitFor(server -> serverBusKeys(server, computer).getFirst().equals("keyboard"));
-			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).busArrow(4, true));
-			singleplayer.getServer().waitFor(server -> serverBusKeys(server, computer).get(3).equals("exp:1"));
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).busArrow(5, true));
+			singleplayer.getServer().waitFor(server -> serverBusKeys(server, computer).get(4).equals("exp:1"));
 			context.waitTicks(2);
 			BufferedImage reordered = read(context.takeScreenshot("all-in-one-case-reordered"));
-			// One row per device: five devices, five rows; the sixth position is bare board. No
+			// One row per device: seven devices, seven rows; the eighth position is bare board. No
 			// scrollbar, since they all fit.
 			int fifthRow = screenPixel(context, reordered, screen -> {
-				Viewport arrow = ((CaseScreen) screen).busArrow(4, true);
+				Viewport arrow = ((CaseScreen) screen).busArrow(6, true);
 				return new Viewport(arrow.x() - 60, arrow.y() + 3, 1, 1);
 			});
 			int sixthRow = screenPixel(context, reordered, screen -> {
-				Viewport arrow = ((CaseScreen) screen).busArrow(5, true);
+				Viewport arrow = ((CaseScreen) screen).busArrow(7, true);
 				return new Viewport(arrow.x() - 60, arrow.y() + 3, 1, 1);
 			});
 			int scrollbar = screenPixel(context, reordered, screen -> ((CaseScreen) screen).busScrollbar());
-			check((fifthRow & 0xFFFFFF) == 0x1A1A1E, "the fifth device's display should show, got " + hex(fifthRow));
-			check(GREEN_BOARD.test(sixthRow), "no sixth row: bare board expected, got " + hex(sixthRow));
+			check((fifthRow & 0xFFFFFF) == 0x1A1A1E, "the seventh device's display should show, got " + hex(fifthRow));
+			check(GREEN_BOARD.test(sixthRow), "no eighth row: bare board expected, got " + hex(sixthRow));
 			check(GREEN_BOARD.test(scrollbar), "no scrollbar when every device fits, got " + hex(scrollbar));
 
 			// A part slot and its bus order row light up together, whichever one is hovered.
-			// Order now: keyboard, display, sata:0, exp:1, sata:2.
+			// Order now: keyboard, display, eeprom, sata:0, exp:1, sata:2, ups (inserted last).
 			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(CaseMenu.SATA_SLOTS));
 			context.waitTicks(2);
 			BufferedImage slotHover = read(context.takeScreenshot("all-in-one-case-hover-slot"));
-			int rowCorner = screenPixel(context, slotHover, screen -> corner(((CaseScreen) screen).busRow(2), 1));
+			int rowCorner = screenPixel(context, slotHover, screen -> corner(((CaseScreen) screen).busRow(3), 1));
 			check((rowCorner & 0xFFFFFF) == 0xF2F2E6, "hovering SATA 1 should outline its bus row, got " + hex(rowCorner));
-			moveCursorTo(context, screen -> ((CaseScreen) screen).busRow(3));
+			moveCursorTo(context, screen -> ((CaseScreen) screen).busRow(4));
 			context.waitTicks(2);
 			BufferedImage rowHover = read(context.takeScreenshot("all-in-one-case-hover-row"));
 			int slotCorner = screenPixel(context, rowHover, screen -> corner(((CaseScreen) screen).slotArea(CaseMenu.EXP_SLOTS + 1), 2));
 			check((slotCorner & 0xFFFFFF) == 0xF2F2E6, "hovering the WLAN card's row should outline its slot, got " + hex(slotCorner));
-			int otherRow = screenPixel(context, rowHover, screen -> corner(((CaseScreen) screen).busRow(2), 1));
+			int otherRow = screenPixel(context, rowHover, screen -> corner(((CaseScreen) screen).busRow(3), 1));
 			check((otherRow & 0xFFFFFF) != 0xF2F2E6, "other rows stay plain");
 			context.getInput().setCursorPos(0, 0);
 			check(context.computeOnClient(client -> client.player.containerMenu.getCarried().isEmpty()), "clicking the panel must not pick anything up");

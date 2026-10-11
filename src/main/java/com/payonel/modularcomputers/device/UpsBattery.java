@@ -3,10 +3,10 @@ package com.payonel.modularcomputers.device;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.bus.DeviceType;
 
-/** A wireless network card in an expansion slot. It doesn't network yet; it's on the bus. */
-public final class NetworkCard implements Device {
+/** The UPS battery, on the bus so programs can ask about power. It has no API yet. */
+public final class UpsBattery implements Device {
 	@Override
 	public DeviceType type() {
-		return DeviceType.NETWORK;
+		return DeviceType.POWER;
 	}
 }

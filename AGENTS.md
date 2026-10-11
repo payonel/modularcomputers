@@ -75,11 +75,15 @@ same thing.
     - The display and keyboard are built in. Everything else is an item (`ModItems`) in the
       **case view**'s 15 slots (`CaseMenu`):
       - CPU, EEPROM (labeled ROM), UPS battery, 4 RAM, 4 SATA (hard disks) and 4 expansion
-        (WLAN cards).
+        slots, which take any card (`ModItems.CARDS`, `device/CardKind`): WLAN, Bluetooth,
+        Redstone, Audio, Motion Sensor, Audio Sensor, Weather Sensor. All cards are
+        placeholders with no function.
       - Only the CPU and EEPROM affect the machine so far.
-      - Hard disks and WLAN cards become bus devices (`Disk`, `NetworkCard`).
-      - RAM and the UPS battery are placeholders: the machine still uses the soldered
-        `Hardware` memory.
+      - On the bus: the **EEPROM** (`Eeprom` is a `Device`, `FIRMWARE`, row "ROM"), the
+        **UPS battery** (`UpsBattery`, `POWER`, row "UPS"; the user says it'll get an API),
+        hard disks (`Disk`) and cards (`Card`, typed by kind). The user asked for the EEPROM
+        and UPS on the bus (2026-10-11). The CPU still loads from the EEPROM slot directly.
+      - RAM is a placeholder: the machine still uses the soldered `Hardware` memory.
       - UPS batteries carry a charge (`ModComponents.CHARGE`, 0..100); new ones come full.
     - A newly placed computer is empty. Get the parts from the creative tab, or with the
       cheat command **`/modularcomputers giveall`**.
@@ -128,7 +132,9 @@ same thing.
         - Each position number is etched into the board to the left of its row and stays
           with the position when devices move.
         - Each row has the device's icon in a socket, then a dark display with its name and
-          location ("built-in", "SATA 1", "EXP 2", or "cable, 5m": cable blocks to it).
+          location ("built-in", "ROM", "UPS", "SATA 1", "EXP 2", or "cable, 5m": meters along
+          the connection, so a screen right against the computer is 1m; the user rejected
+          "adjacent").
         - **Linked hover:** hovering a part slot outlines its bus row, and hovering a row
           outlines its slot (`BusEntry.slot`). Built-ins have no slot.
         - The ↑/↓ arrows send `ReorderBusPayload`; they're greyed out at the ends.

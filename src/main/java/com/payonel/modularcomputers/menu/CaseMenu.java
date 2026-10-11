@@ -10,7 +10,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 /**
@@ -57,25 +56,25 @@ public final class CaseMenu extends AbstractContainerMenu {
 		this.pos = pos;
 		this.access = access;
 		for (int slot = 0; slot < PART_SLOTS; slot++) {
-			addSlot(new PartSlot(parts, slot, SLOT_POSITIONS[slot][0], SLOT_POSITIONS[slot][1], accepts(slot)));
+			addSlot(new PartSlot(parts, slot, SLOT_POSITIONS[slot][0], SLOT_POSITIONS[slot][1]));
 		}
 		addStandardInventorySlots(inventory, 8, INVENTORY_Y);
 	}
 
-	/** Which part a slot takes. */
-	public static Item accepts(int slot) {
+	/** Whether a slot takes this item: each takes its own part, and expansion slots take any card. */
+	public static boolean accepts(int slot, ItemStack stack) {
 		if (slot == CPU_SLOT) {
-			return ModItems.CPU;
+			return stack.is(ModItems.CPU);
 		} else if (slot == EEPROM_SLOT) {
-			return ModItems.EEPROM;
+			return stack.is(ModItems.EEPROM);
 		} else if (slot == UPS_SLOT) {
-			return ModItems.UPS_BATTERY;
+			return stack.is(ModItems.UPS_BATTERY);
 		} else if (slot < SATA_SLOTS) {
-			return ModItems.RAM;
+			return stack.is(ModItems.RAM);
 		} else if (slot < EXP_SLOTS) {
-			return ModItems.HARD_DISK;
+			return stack.is(ModItems.HARD_DISK);
 		}
-		return ModItems.WLAN_CARD;
+		return ModItems.cardKind(stack).isPresent();
 	}
 
 	public BlockPos pos() {
@@ -111,16 +110,13 @@ public final class CaseMenu extends AbstractContainerMenu {
 
 	/** A slot for one kind of part, holding one item. */
 	private static final class PartSlot extends Slot {
-		private final Item accepts;
-
-		PartSlot(Container container, int index, int x, int y, Item accepts) {
+		PartSlot(Container container, int index, int x, int y) {
 			super(container, index, x, y);
-			this.accepts = accepts;
 		}
 
 		@Override
 		public boolean mayPlace(ItemStack stack) {
-			return stack.is(accepts);
+			return accepts(getContainerSlot(), stack);
 		}
 
 		@Override

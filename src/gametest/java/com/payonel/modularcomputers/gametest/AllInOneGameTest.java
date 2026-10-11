@@ -74,18 +74,49 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = place(helper);
 		Player player = helper.makeMockPlayer(GameType.SURVIVAL);
 		CaseMenu menu = (CaseMenu) computer.createMenu(0, player.getInventory(), player);
-		var parts = List.of(ModItems.CPU, ModItems.EEPROM, ModItems.UPS_BATTERY, ModItems.RAM, ModItems.HARD_DISK, ModItems.WLAN_CARD);
+		var parts = new java.util.ArrayList<>(List.of(ModItems.CPU, ModItems.EEPROM, ModItems.UPS_BATTERY, ModItems.RAM, ModItems.HARD_DISK));
+		parts.addAll(ModItems.CARDS.keySet());
 		for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
-			var accepts = CaseMenu.accepts(slot);
 			for (var part : parts) {
 				boolean placed = menu.slots.get(slot).mayPlace(new ItemStack(part));
-				helper.assertValueEqual(placed, part == accepts, "slot " + slot + " taking " + part);
+				helper.assertValueEqual(placed, takes(slot) == part || slot >= CaseMenu.EXP_SLOTS && ModItems.CARDS.containsKey(part),
+					"slot " + slot + " taking " + part);
 			}
 			helper.assertValueEqual(menu.slots.get(slot).getMaxStackSize(), 1, "slot " + slot + " holds one");
 		}
-		helper.assertValueEqual(CaseMenu.accepts(CaseMenu.RAM_SLOTS + 3), ModItems.RAM, "last RAM lane");
-		helper.assertValueEqual(CaseMenu.accepts(CaseMenu.SATA_SLOTS), ModItems.HARD_DISK, "first SATA port");
-		helper.assertValueEqual(CaseMenu.accepts(CaseMenu.EXP_SLOTS + 3), ModItems.WLAN_CARD, "last expansion slot");
+		helper.succeed();
+	}
+
+	/** The one part each non-expansion slot takes. */
+	private static net.minecraft.world.item.Item takes(int slot) {
+		if (slot == CaseMenu.CPU_SLOT) {
+			return ModItems.CPU;
+		} else if (slot == CaseMenu.EEPROM_SLOT) {
+			return ModItems.EEPROM;
+		} else if (slot == CaseMenu.UPS_SLOT) {
+			return ModItems.UPS_BATTERY;
+		} else if (slot < CaseMenu.SATA_SLOTS) {
+			return ModItems.RAM;
+		}
+		return slot < CaseMenu.EXP_SLOTS ? ModItems.HARD_DISK : null;
+	}
+
+	@GameTest
+	public void theEepromAndUpsBatteryAreOnTheBusAndEveryCardKindIsADevice(GameTestHelper helper) {
+		AllInOneBlockEntity computer = install(place(helper), true, true);
+		computer.parts().setItem(CaseMenu.UPS_SLOT, new ItemStack(ModItems.UPS_BATTERY));
+		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.REDSTONE_CARD));
+		computer.parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.BLUETOOTH_CARD));
+		computer.parts().setItem(CaseMenu.EXP_SLOTS + 2, new ItemStack(ModItems.WEATHER_SENSOR_CARD));
+		helper.assertValueEqual(busKeys(computer), List.of("display", "keyboard", "eeprom", "ups", "exp:0", "exp:1", "exp:2"), "default order");
+		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.DISPLAY, DeviceType.KEYBOARD, DeviceType.FIRMWARE, DeviceType.POWER,
+			DeviceType.REDSTONE, DeviceType.NETWORK, DeviceType.SENSOR), "each reports its class");
+		var entries = computer.busEntries();
+		helper.assertValueEqual(entries.get(2).location().getString(), "ROM", "the EEPROM sits in the ROM socket");
+		helper.assertValueEqual(entries.get(2).slot(), CaseMenu.EEPROM_SLOT, "its row goes with its slot");
+		helper.assertValueEqual(entries.get(3).location().getString(), "UPS", "the battery's place");
+		helper.assertValueEqual(entries.get(4).name().getString(), "Redstone Card", "card names");
+		helper.assertTrue(computer.machine().board().eeprom().isPresent(), "the CPU still finds the EEPROM in its slot");
 		helper.succeed();
 	}
 

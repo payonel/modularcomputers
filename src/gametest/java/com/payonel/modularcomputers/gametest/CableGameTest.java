@@ -96,7 +96,7 @@ public class CableGameTest {
 		helper.succeedWhen(() -> {
 			var entry = entryFor(computer, screen).orElseThrow(() -> helper.assertionException("the screen should be in the bus order"));
 			helper.assertValueEqual(entry.name().getString(), "Screen", "cabled device name");
-			helper.assertValueEqual(entry.location().getString(), "cable, 2m", "cabled device location");
+			helper.assertValueEqual(entry.location().getString(), "cable, 3m", "cabled device location");
 			helper.assertValueEqual(entry.device(), Optional.of(helper.absolutePos(new BlockPos(4, 1, 1))), "where the bulb points");
 			helper.assertTrue(entry.connected(), "new cabled devices start connected");
 			helper.assertTrue(onBus(computer, screen), "the screen should be on the machine's bus");
@@ -188,9 +188,9 @@ public class CableGameTest {
 			for (ScreenBlockEntity screen : List.of(near, next, far)) {
 				helper.assertTrue(onBus(computer, screen), "every screen in the row is on the bus");
 			}
-			helper.assertValueEqual(entryFor(computer, near).orElseThrow().location().getString(), "adjacent", "no cable at all");
-			helper.assertValueEqual(entryFor(computer, next).orElseThrow().location().getString(), "cable, 1m", "one screen between");
-			helper.assertValueEqual(entryFor(computer, far).orElseThrow().location().getString(), "cable, 3m", "two screens and a cable");
+			helper.assertValueEqual(entryFor(computer, near).orElseThrow().location().getString(), "cable, 1m", "right against the computer");
+			helper.assertValueEqual(entryFor(computer, next).orElseThrow().location().getString(), "cable, 2m", "one screen between");
+			helper.assertValueEqual(entryFor(computer, far).orElseThrow().location().getString(), "cable, 4m", "two screens and a cable");
 			if (!computer.machine().isPowered()) {
 				computer.pressPower();
 			}

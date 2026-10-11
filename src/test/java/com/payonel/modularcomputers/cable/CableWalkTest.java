@@ -58,7 +58,7 @@ class CableWalkTest {
 		cable(2, 0, 0);
 		cable(3, 0, 0);
 		BlockPos screen = device(4, 0, 0, Direction.NORTH);
-		assertThat(CableWalk.from(world, COMPUTER)).containsExactly(new CableWalk.Found(screen, 3));
+		assertThat(CableWalk.from(world, COMPUTER)).containsExactly(new CableWalk.Found(screen, 4));
 	}
 
 	@Test
@@ -86,7 +86,7 @@ class CableWalkTest {
 		BlockPos near = device(1, 1, 0, Direction.NORTH);
 		cable(1, 2, 0); // behind the near device: not reachable through it
 		device(1, 3, 0, Direction.NORTH);
-		assertThat(CableWalk.from(world, COMPUTER)).containsExactly(new CableWalk.Found(near, 1), new CableWalk.Found(far, 3));
+		assertThat(CableWalk.from(world, COMPUTER)).containsExactly(new CableWalk.Found(near, 2), new CableWalk.Found(far, 4));
 	}
 
 	@Test
@@ -95,7 +95,7 @@ class CableWalkTest {
 		cable(1, 0, 1);
 		cable(0, 0, 1);
 		BlockPos screen = device(2, 0, 1, Direction.NORTH);
-		assertThat(CableWalk.from(world, COMPUTER)).containsExactly(new CableWalk.Found(screen, 2));
+		assertThat(CableWalk.from(world, COMPUTER)).containsExactly(new CableWalk.Found(screen, 3));
 	}
 
 	@Test
@@ -105,7 +105,7 @@ class CableWalkTest {
 		cable(3, 0, 0);
 		BlockPos third = relay(4, 0, 0, Direction.NORTH);
 		assertThat(CableWalk.from(world, COMPUTER)).containsExactly(
-			new CableWalk.Found(first, 0), new CableWalk.Found(second, 1), new CableWalk.Found(third, 3));
+			new CableWalk.Found(first, 1), new CableWalk.Found(second, 2), new CableWalk.Found(third, 4));
 	}
 
 	@Test
@@ -113,13 +113,13 @@ class CableWalkTest {
 		cable(1, 0, 0);
 		relay(2, 0, 0, Direction.EAST); // its glass faces away from the cable: the back connects
 		BlockPos behind = relay(3, 0, 0, Direction.NORTH);
-		assertThat(CableWalk.from(world, COMPUTER)).hasSize(1).doesNotContain(new CableWalk.Found(behind, 2));
+		assertThat(CableWalk.from(world, COMPUTER)).hasSize(1).doesNotContain(new CableWalk.Found(behind, 3));
 	}
 
 	@Test
 	void fromARelayAnAdjacentDeviceIsConnected() {
 		BlockPos screen = relay(5, 0, 0, Direction.NORTH);
 		blocks.put(new BlockPos(6, 0, 0), CableWalk.Kind.DEVICE);
-		assertThat(CableWalk.from(world, screen)).containsExactly(new CableWalk.Found(new BlockPos(6, 0, 0), 0));
+		assertThat(CableWalk.from(world, screen)).containsExactly(new CableWalk.Found(new BlockPos(6, 0, 0), 1));
 	}
 }

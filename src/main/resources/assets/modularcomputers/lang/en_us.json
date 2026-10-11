@@ -23,5 +23,12 @@
 	"block.modularcomputers.screen": "Screen",
 	"block.modularcomputers.cable": "Cable",
 	"gui.modularcomputers.bus.cable": "cable, %sm",
-	"gui.modularcomputers.bus.adjacent": "adjacent"
+	"gui.modularcomputers.bus.rom": "ROM",
+	"gui.modularcomputers.bus.ups": "UPS",
+	"item.modularcomputers.bluetooth_card": "Bluetooth Card",
+	"item.modularcomputers.redstone_card": "Redstone Card",
+	"item.modularcomputers.audio_card": "Audio Card",
+	"item.modularcomputers.motion_sensor_card": "Motion Sensor Card",
+	"item.modularcomputers.audio_sensor_card": "Audio Sensor Card",
+	"item.modularcomputers.weather_sensor_card": "Weather Sensor Card"
 }

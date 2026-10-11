@@ -18,8 +18,9 @@ import net.minecraft.core.Direction;
  * ({@link Kind#DEVICE}). Each step needs a port on both sides ({@link World#hasPort}): cables
  * have them everywhere, while a screen's front, for example, is glass.
  * <p>
- * Devices come back nearest first (by how many blocks lie between), so a new device's default
- * bus position follows the wiring.
+ * Devices come back nearest first, by how far the connection runs to them in meters (blocks):
+ * a device right against the start is 1m away. A new device's default bus position follows
+ * the wiring.
  */
 public final class CableWalk {
 	/** Gives up past this many blocks carrying the connection, so a huge network can't stall the server. */
@@ -43,8 +44,8 @@ public final class CableWalk {
 		RELAY,
 	}
 
-	/** A device found with {@code cables} blocks carrying the connection between. */
-	public record Found(BlockPos pos, int cables) {
+	/** A device found {@code meters} blocks along the connection. */
+	public record Found(BlockPos pos, int meters) {
 	}
 
 	private CableWalk() {
@@ -62,8 +63,7 @@ public final class CableWalk {
 		boolean startCarries = world.kind(start) == Kind.RELAY;
 		while (!carriers.isEmpty() && visited.size() <= MAX_CABLES) {
 			Found carrier = carriers.remove();
-			// The start doesn't count toward the distance; every block carrying it on does.
-			int between = carrier.pos().equals(start) ? 0 : carrier.cables() + 1;
+			int between = carrier.meters() + 1;
 			for (Direction side : Direction.values()) {
 				BlockPos next = carrier.pos().relative(side);
 				if (visited.contains(next) || !world.hasPort(carrier.pos(), side) || !world.hasPort(next, side.getOpposite())) {

@@ -30,7 +30,7 @@ public final class ModCreativeTab {
 				output.accept(ModItems.EEPROM);
 				output.accept(ModItems.RAM);
 				output.accept(ModItems.HARD_DISK);
-				output.accept(ModItems.WLAN_CARD);
+				ModItems.CARDS.keySet().forEach(output::accept);
 				output.accept(ModItems.UPS_BATTERY);
 			})
 			.build());

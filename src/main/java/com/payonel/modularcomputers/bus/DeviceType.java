@@ -6,4 +6,13 @@ public enum DeviceType {
 	KEYBOARD,
 	STORAGE,
 	NETWORK,
+	/** Firmware (the EEPROM), listed so programs can read or reflash it. */
+	FIRMWARE,
+	/** Backup power (the UPS battery). */
+	POWER,
+	REDSTONE,
+	AUDIO,
+	SENSOR,
+	/** Something that moves things in the world (the robotic piston). */
+	ACTUATOR,
 }

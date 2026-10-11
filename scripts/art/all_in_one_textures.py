@@ -218,6 +218,67 @@ def wlan_card_item():
 		im.putpixel((x, 12), (222, 182, 70, 255))
 	return im
 
+def card_base():
+	"""What every expansion card shares: green board, metal bracket, gold fingers."""
+	im = item_canvas()
+	rect(im, 2, 6, 12, 11, (46, 116, 64, 255))
+	rect(im, 13, 4, 13, 13, (190, 194, 202, 255))  # bracket
+	for x in range(3, 12, 2):
+		im.putpixel((x, 12), (222, 182, 70, 255))
+	return im
+
+def redstone_card_item():
+	"""Red: a redstone chip and a little torch on the bracket."""
+	im = card_base()
+	rect(im, 4, 7, 7, 9, (150, 20, 16, 255))
+	im.putpixel((5, 8), (255, 70, 50, 255))
+	rect(im, 14, 5, 14, 8, (120, 84, 50, 255))  # torch stick
+	im.putpixel((14, 4), (255, 60, 40, 255))
+	return im
+
+def audio_card_item():
+	"""Three colored jacks on the bracket, like a sound card."""
+	im = card_base()
+	rect(im, 4, 7, 7, 9, (30, 30, 34, 255))
+	for y, c in ((5, (90, 200, 90, 255)), (8, (230, 120, 170, 255)), (11, (90, 140, 230, 255))):
+		im.putpixel((14, y), c)
+		im.putpixel((15, y), (30, 30, 34, 255))
+	return im
+
+def motion_sensor_card_item():
+	"""A white dome (a PIR sensor) on the board."""
+	im = card_base()
+	rect(im, 5, 6, 8, 9, (238, 238, 232, 255))
+	rect(im, 6, 5, 7, 5, (238, 238, 232, 255))
+	im.putpixel((6, 6), (255, 255, 255, 255))
+	rect(im, 5, 9, 8, 9, (200, 200, 194, 255))
+	return im
+
+def audio_sensor_card_item():
+	"""A microphone grille: a dark disc with holes."""
+	im = card_base()
+	rect(im, 4, 6, 8, 10, (60, 62, 68, 255))
+	for x, y in ((5, 7), (7, 7), (6, 8), (5, 9), (7, 9)):
+		im.putpixel((x, y), (20, 20, 22, 255))
+	return im
+
+def weather_sensor_card_item():
+	"""A thermometer and a sky-blue sensor on the board."""
+	im = card_base()
+	rect(im, 4, 5, 4, 10, (230, 230, 230, 255))
+	rect(im, 4, 8, 4, 10, (220, 50, 40, 255))
+	rect(im, 7, 7, 10, 9, (120, 190, 240, 255))
+	im.putpixel((8, 7), (240, 250, 255, 255))
+	return im
+
+def bluetooth_card_item():
+	"""A blue radio chip and a short antenna stub."""
+	im = card_base()
+	rect(im, 4, 7, 7, 9, (40, 80, 200, 255))
+	im.putpixel((5, 8), (150, 190, 255, 255))
+	rect(im, 14, 3, 14, 5, (40, 80, 200, 255))
+	return im
+
 def ups_battery_item():
 	"""A backup battery pack: dark block, two terminals, a charge stripe."""
 	im = item_canvas()
@@ -235,7 +296,9 @@ for state in LIT:
 gui_button().save(f"{OUT}/../gui/power_button.png")
 case_button().save(f"{OUT}/../gui/case_button.png")
 for name, fn in [("cpu", cpu_item), ("eeprom", eeprom_item), ("ram", ram_item), ("hard_disk", hard_disk_item),
-		("wlan_card", wlan_card_item), ("ups_battery", ups_battery_item)]:
+		("wlan_card", wlan_card_item), ("ups_battery", ups_battery_item), ("redstone_card", redstone_card_item),
+		("audio_card", audio_card_item), ("motion_sensor_card", motion_sensor_card_item), ("audio_sensor_card", audio_sensor_card_item),
+		("weather_sensor_card", weather_sensor_card_item), ("bluetooth_card", bluetooth_card_item)]:
 	fn().save(f"{OUT}/../item/{name}.png")
 
 # Preview sheet, scaled up, for review.

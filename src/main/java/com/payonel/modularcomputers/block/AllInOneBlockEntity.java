@@ -9,7 +9,9 @@ import com.payonel.modularcomputers.cable.CableWalk;
 import com.payonel.modularcomputers.console.ConsoleSplitter;
 import com.payonel.modularcomputers.device.Disk;
 import com.payonel.modularcomputers.device.Keyboard;
-import com.payonel.modularcomputers.device.NetworkCard;
+import com.payonel.modularcomputers.device.Card;
+import com.payonel.modularcomputers.device.CardKind;
+import com.payonel.modularcomputers.device.UpsBattery;
 import com.payonel.modularcomputers.display.Display;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.item.ModItems;
@@ -77,6 +79,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String CONSOLE_BACKGROUND = "console_background";
 	private static final String DISPLAY_KEY = "display";
 	private static final String KEYBOARD_KEY = "keyboard";
+	private static final String EEPROM_KEY = "eeprom";
+	private static final String UPS_KEY = "ups";
 	private static final String SATA_KEY = "sata:";
 	private static final String EXP_KEY = "exp:";
 	/** Cabled devices, by their own id: {@code cable:<uuid>}. */
@@ -90,9 +94,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	private final Display display = new Display(Resolution.DEFAULT);
 	private final Keyboard keyboard = new Keyboard();
-	/** Devices made from the parts in the SATA and expansion slots, by lane; null when empty. */
+	/** Devices made from the parts in the slots (by lane for drives and cards); null when empty. */
 	private final Disk[] disks = new Disk[CaseMenu.LANES];
-	private final NetworkCard[] cards = new NetworkCard[CaseMenu.LANES];
+	private final Card[] cards = new Card[CaseMenu.LANES];
+	private Eeprom eeprom;
+	private UpsBattery ups;
 	private final BusOrder busOrder = new BusOrder();
 	private final Bus bus = new Bus(List.of(display, keyboard));
 	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), bus));
@@ -105,15 +111,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private int ticks;
 	private int syncedDisplay = -1;
 
-	/**
-	 * A device wired to this computer: where it is, and how many blocks carry the connection
-	 * between (cables, and screens passing it on); 0 when it's right against the computer.
-	 */
-	public record Cabled(String key, BlockPos pos, int cables) {
+	/** A device wired to this computer: where it is, and how far the connection runs to it, in meters (blocks). */
+	public record Cabled(String key, BlockPos pos, int meters) {
 		static final Codec<Cabled> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.STRING.fieldOf("key").forGetter(Cabled::key),
 			BlockPos.CODEC.fieldOf("pos").forGetter(Cabled::pos),
-			Codec.INT.fieldOf("cables").forGetter(Cabled::cables)
+			Codec.INT.fieldOf("meters").forGetter(Cabled::meters)
 		).apply(instance, Cabled::new));
 	}
 
@@ -172,20 +175,38 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			} else if (key.startsWith(CABLE_KEY)) {
 				cabled.stream().filter(device -> device.key().equals(key)).findFirst().ifPresent(device -> {
 					ItemStack item = new ItemStack(ModBlocks.SCREEN);
-					Component location = device.cables() == 0 ? Component.translatable("gui.modularcomputers.bus.adjacent")
-						: Component.translatable("gui.modularcomputers.bus.cable", device.cables());
+					Component location = Component.translatable("gui.modularcomputers.bus.cable", device.meters());
 					entries.add(new BusEntry(key, item.getHoverName(), location, item, -1, -1, Optional.of(device.pos()), busOrder.isConnected(key)));
 				});
 			} else {
-				boolean sata = key.startsWith(SATA_KEY);
-				int lane = Integer.parseInt(key.substring(key.indexOf(':') + 1));
-				int slot = (sata ? CaseMenu.SATA_SLOTS : CaseMenu.EXP_SLOTS) + lane;
+				int slot = partSlot(key);
 				ItemStack item = parts.getItem(slot);
-				Component location = Component.translatable(sata ? "gui.modularcomputers.bus.sata" : "gui.modularcomputers.bus.expansion", lane + 1);
-				entries.add(new BusEntry(key, item.getHoverName(), location, item, slot, -1, Optional.empty(), true));
+				entries.add(new BusEntry(key, item.getHoverName(), partLocation(key), item, slot, -1, Optional.empty(), true));
 			}
 		}
 		return entries;
+	}
+
+	/** The case slot a part's bus key stands for. */
+	private static int partSlot(String key) {
+		if (key.equals(EEPROM_KEY)) {
+			return CaseMenu.EEPROM_SLOT;
+		} else if (key.equals(UPS_KEY)) {
+			return CaseMenu.UPS_SLOT;
+		}
+		int lane = Integer.parseInt(key.substring(key.indexOf(':') + 1));
+		return (key.startsWith(SATA_KEY) ? CaseMenu.SATA_SLOTS : CaseMenu.EXP_SLOTS) + lane;
+	}
+
+	/** Where a part sits, as the bus order panel says it: "ROM", "UPS", "SATA 1", "EXP 2". */
+	private static Component partLocation(String key) {
+		if (key.equals(EEPROM_KEY)) {
+			return Component.translatable("gui.modularcomputers.bus.rom");
+		} else if (key.equals(UPS_KEY)) {
+			return Component.translatable("gui.modularcomputers.bus.ups");
+		}
+		int lane = Integer.parseInt(key.substring(key.indexOf(':') + 1));
+		return Component.translatable(key.startsWith(SATA_KEY) ? "gui.modularcomputers.bus.sata" : "gui.modularcomputers.bus.expansion", lane + 1);
 	}
 
 	/** Server side: the player moved the device at {@code index} up or down the bus order. */
@@ -235,7 +256,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			if (level.getBlockEntity(device.pos()) instanceof ScreenBlockEntity screen) {
 				String key = CABLE_KEY + screen.id();
 				if (!displays.containsKey(key)) {
-					found.add(new Cabled(key, device.pos(), device.cables()));
+					found.add(new Cabled(key, device.pos(), device.meters()));
 					displays.put(key, screen.display());
 				}
 			}
@@ -289,12 +310,16 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		Motherboard board = machine.board();
 		board.setCpu(parts.getItem(CaseMenu.CPU_SLOT).is(ModItems.CPU) ? new Cpu() : null);
 		// Every EEPROM holds the stand-in program until EEPROM contents are programmable.
-		board.setEeprom(parts.getItem(CaseMenu.EEPROM_SLOT).is(ModItems.EEPROM) ? new Eeprom(new HelloWorldProgram()) : null);
+		boolean hasEeprom = parts.getItem(CaseMenu.EEPROM_SLOT).is(ModItems.EEPROM);
+		eeprom = hasEeprom ? (eeprom != null ? eeprom : new Eeprom(new HelloWorldProgram())) : null;
+		board.setEeprom(eeprom);
+		boolean hasUps = parts.getItem(CaseMenu.UPS_SLOT).is(ModItems.UPS_BATTERY);
+		ups = hasUps ? (ups != null ? ups : new UpsBattery()) : null;
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
 			boolean disk = parts.getItem(CaseMenu.SATA_SLOTS + lane).is(ModItems.HARD_DISK);
 			disks[lane] = disk ? (disks[lane] != null ? disks[lane] : new Disk()) : null;
-			boolean card = parts.getItem(CaseMenu.EXP_SLOTS + lane).is(ModItems.WLAN_CARD);
-			cards[lane] = card ? (cards[lane] != null ? cards[lane] : new NetworkCard()) : null;
+			CardKind kind = ModItems.cardKind(parts.getItem(CaseMenu.EXP_SLOTS + lane)).orElse(null);
+			cards[lane] = kind == null ? null : cards[lane] != null && cards[lane].kind() == kind ? cards[lane] : new Card(kind);
 		}
 		rebuildBus();
 	}
@@ -308,6 +333,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		Map<String, Device> attached = new LinkedHashMap<>();
 		attached.put(DISPLAY_KEY, display);
 		attached.put(KEYBOARD_KEY, keyboard);
+		if (eeprom != null) {
+			attached.put(EEPROM_KEY, eeprom);
+		}
+		if (ups != null) {
+			attached.put(UPS_KEY, ups);
+		}
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
 			if (disks[lane] != null) {
 				attached.put(SATA_KEY + lane, disks[lane]);

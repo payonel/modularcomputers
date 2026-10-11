@@ -118,7 +118,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 				for (int i = 0; i < entries.size(); i++) {
 					if (entries.get(i).cabled()) {
 						check(entries.get(i).name().getString().equals("Screen"), "the cabled row names the screen");
-						check(entries.get(i).location().getString().equals("cable, 1m"), "and how far: " + entries.get(i).location().getString());
+						check(entries.get(i).location().getString().equals("cable, 2m"), "and how far: " + entries.get(i).location().getString());
 						return i;
 					}
 				}
