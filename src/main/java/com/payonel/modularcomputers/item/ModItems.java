@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.item;
 import static com.payonel.modularcomputers.ModularComputers.id;
 
 import com.payonel.modularcomputers.device.CardKind;
+import com.payonel.modularcomputers.hint.HintedItem;
 import com.payonel.modularcomputers.power.BatteryTier;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -77,7 +78,7 @@ public final class ModItems {
 	}
 
 	private static Item register(String name, UnaryOperator<Item.Properties> extra) {
-		return register(name, Item::new, extra);
+		return register(name, HintedItem::new, extra);
 	}
 
 	private static Item register(String name, Function<Item.Properties, Item> factory, UnaryOperator<Item.Properties> extra) {

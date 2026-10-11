@@ -115,8 +115,9 @@ same thing.
           - A full battery, a tier 3, or anything else in the grid gives no result.
         - Crafted batteries start empty (my default). The creative tab and `giveall` give
           charged ones (`BatteryItem.charged()`).
-        - Items show a charge bar and a tooltip: "Charge: 73% (07:06:00)", plus "Recharges
-          itself while not in use" on a tier 2, or "Never runs out".
+        - Items show a charge bar. Their hint (see "Item hints" below) shows "Charge: 73%
+          (07:06:00)" (or "Never runs out"); with Shift, tier 2's self-recharge and rate, and
+          for tiers 1 and 2 the glowing items with what each adds to *this* tier ("+50%").
         - **The case's power buffer** (user design, 2026-10-11; `power/PowerBuffer`, saved as
           `power_buffer`): the computer runs on the case's own store, which holds **one day**.
           - A battery going in fills it right away, up to a day's worth, out of the battery.
@@ -286,6 +287,22 @@ scripts/art/error_beep.py` into
       future work.
   - Power, parts, display contents and colors, and the console state are saved and synced.
     Toggling plays a stone-button click.
+- **Item hints** (user design, 2026-10-11; `hint/`, `client/hint/`): every mod item's tooltip
+  shows, under its name, short data (a summary), then "Hold [Shift] for details". With Shift:
+  how it works, then "Crafting:" and a 3x3 crafting grid, an arrow, and the result.
+  - Built on Fabric and vanilla, after checking what exists: an item's `getTooltipImage` returns
+    a `HintTooltip`, and Fabric's `ClientTooltipComponentCallback` turns it into
+    `HintComponent`, which draws text, icon rows (`Hint.Icons`) and the grid. Vanilla puts a
+    tooltip image right under the name, so the hint draws its own text lines too, and mod
+    items add no `appendHoverText` lines.
+  - Every mod item is a `HintedItem` or `HintedBlockItem` (`Hinted.summary` / `details`). The
+    hint content is plain data (`Hint.of(stack, details)`), testable on the server.
+  - **Grids come from the real recipes:** the mod asks Fabric to synchronize shaped recipes to
+    clients (`RecipeSynchronization.synchronizeRecipeSerializer(ShapedRecipe.SERIALIZER)`), and
+    `ClientRecipes` keeps the ones that make mod items. A tag cell cycles its items each
+    second. Items without a recipe (most, for now) show an empty grid and "No recipe yet".
+  - The Shift check reads the real key (`Minecraft.hasShiftDown`), which client tests can't
+    press; tests set `HintComponent.detailsOverride`.
 - **Settings** (`config/ModConfig`, user request 2026-10-11): `config/modularcomputers.properties`
   in the game folder, `key: value` lines (Java properties).
   - The file is written with commented defaults the first time the game starts. Settings a

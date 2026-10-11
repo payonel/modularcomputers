@@ -5,6 +5,8 @@ import static com.payonel.modularcomputers.ModularComputers.id;
 import com.mojang.serialization.MapCodec;
 import com.payonel.modularcomputers.power.BatteryCharge;
 import com.payonel.modularcomputers.power.BatteryTier;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -25,12 +27,22 @@ import net.minecraft.world.level.Level;
  */
 public final class BatteryChargingRecipe extends CustomRecipe {
 	/** What each glowing material adds, as a percentage of a full tier 1 battery. */
-	public static final Map<Item, Integer> MATERIALS = Map.of(
-		Items.SEA_LANTERN, 100,
-		Items.GLOWSTONE, 25,
-		Items.SHROOMLIGHT, 25,
-		Items.GLOW_INK_SAC, 10,
-		Items.GLOW_LICHEN, 5);
+	public static final Map<Item, Integer> MATERIALS = materials();
+
+	private static Map<Item, Integer> materials() {
+		Map<Item, Integer> materials = new LinkedHashMap<>(); // most first, as the hint lists them
+		materials.put(Items.SEA_LANTERN, 100);
+		materials.put(Items.GLOWSTONE, 25);
+		materials.put(Items.SHROOMLIGHT, 25);
+		materials.put(Items.GLOW_INK_SAC, 10);
+		materials.put(Items.GLOW_LICHEN, 5);
+		return Collections.unmodifiableMap(materials);
+	}
+
+	/** The charge, in ticks, that this percentage of a full tier 1 adds. */
+	public static long added(long percent) {
+		return tier1Full() * percent / 100;
+	}
 
 	/** A full tier 1's charge; its default size if tier 1 is configured never to run out. */
 	private static long tier1Full() {
@@ -79,7 +91,7 @@ public final class BatteryChargingRecipe extends CustomRecipe {
 			return ItemStack.EMPTY;
 		}
 		ItemStack charged = battery.copyWithCount(1);
-		long added = tier1Full() * percent / 100;
+		long added = added(percent);
 		charged.set(ModComponents.CHARGE, charge.charge(item.tier(), (int) Math.min(Integer.MAX_VALUE, added)));
 		return charged;
 	}

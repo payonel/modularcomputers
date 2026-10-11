@@ -6,6 +6,8 @@ import com.payonel.modularcomputers.ModularComputers;
 import com.payonel.modularcomputers.block.AllInOneBlock;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
+import com.payonel.modularcomputers.client.hint.ClientRecipes;
+import com.payonel.modularcomputers.client.hint.HintComponent;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
 import com.payonel.modularcomputers.display.Viewport;
@@ -27,14 +29,15 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.MouseButtonInfo;
-import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -162,6 +165,23 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			}
 			check(!slotOutlined(context, cardHover, CaseMenu.CPU_SLOT), "but not the CPU socket");
 			check(!slotOutlined(context, cardHover, CaseMenu.SATA_SLOTS), "nor a SATA port");
+
+			// Tooltips: data first, details with Shift. The test can't hold the real Shift key.
+			int battery = inventoryMenuSlotOf(context, ModItems.TIER2_BATTERY);
+			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(battery));
+			context.waitTicks(2);
+			context.takeScreenshot("all-in-one-battery-hint");
+			HintComponent.detailsOverride = true;
+			context.waitTicks(2);
+			context.takeScreenshot("all-in-one-battery-hint-details");
+			HintComponent.detailsOverride = null;
+			// The shaped recipes reach the client, so the grid shows the real recipe.
+			context.runOnClient(client -> {
+				ClientRecipes.Grid grid = ClientRecipes.of(ModItems.TIER2_BATTERY).orElseThrow(() -> new AssertionError("no tier 2 recipe on the client"));
+				check(grid.cell(0, 0).getFirst().is(Items.GOLD_INGOT) && grid.cell(1, 2).getFirst().is(Items.BLAZE_ROD)
+					&& grid.cell(0, 2).getFirst().is(Items.SEA_LANTERN), "the tier 2 grid");
+				check(ClientRecipes.of(ModBlocks.SCREEN.asItem()).isEmpty(), "a screen has no recipe yet");
+			});
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(hotbar + cpuHotbar)); // pick up the CPU
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(CaseMenu.CPU_SLOT));
 			shiftClickOnScreen(context, screen -> ((CaseScreen) screen).slotArea(hotbar + eepromHotbar)); // the EEPROM finds its slot

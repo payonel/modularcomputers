@@ -3,6 +3,9 @@ package com.payonel.modularcomputers.gametest;
 import com.payonel.modularcomputers.block.AllInOneBlock;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
+import com.payonel.modularcomputers.command.ModCommands;
+import com.payonel.modularcomputers.hint.Hint;
+import com.payonel.modularcomputers.hint.HintTooltip;
 import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
@@ -17,11 +20,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.GameType;
@@ -81,19 +81,32 @@ public class BatteryGameTest {
 		helper.succeed();
 	}
 
-	/** The lines a battery adds to its tooltip. */
-	private static List<String> hint(ItemStack stack) {
-		List<String> lines = new ArrayList<>();
-		stack.getItem().appendHoverText(stack, Item.TooltipContext.EMPTY, TooltipDisplay.DEFAULT, line -> lines.add(line.getString()), TooltipFlag.NORMAL);
-		return lines;
+	@GameTest
+	public void aBatteryHintShowsItsChargeAndWithShiftHowToChargeIt(GameTestHelper helper) {
+		helper.assertValueEqual(Hint.lines(Hint.of(ModItems.TIER1_BATTERY.charged(), false)),
+			List.of("Charge: 100% (10:00:00)", "Hold [Shift] for details"), "a full tier 1");
+		ItemStack tier2 = battery(ModItems.TIER2_BATTERY, 5 * DAY + DAY / 2 + 20 * 7, 0);
+		helper.assertValueEqual(Hint.lines(Hint.of(tier2, false)), List.of("Charge: 28% (05:10:07)", "Hold [Shift] for details"), "a tier 2");
+		List<Hint.Element> details = Hint.of(tier2, true);
+		helper.assertValueEqual(Hint.lines(details), List.of("Charge: 28% (05:10:07)", "Recharges itself while not in use",
+			"Every 2s of rest adds 1s of charge", "Charge it in a crafting grid with a glowing item:", "Crafting:"), "tier 2 details");
+		Hint.Icons icons = (Hint.Icons) details.stream().filter(Hint.Icons.class::isInstance).findFirst().orElseThrow();
+		helper.assertValueEqual(icons.icons().stream().map(icon -> icon.stack().getItem()).toList(),
+			List.of(Items.SEA_LANTERN, Items.GLOWSTONE, Items.SHROOMLIGHT, Items.GLOW_INK_SAC, Items.GLOW_LICHEN), "the glowing items");
+		helper.assertValueEqual(icons.icons().stream().map(icon -> icon.label().getString()).toList(),
+			List.of("+50%", "+13%", "+13%", "+5%", "+3%"), "what each adds to a tier 2");
+		helper.assertTrue(details.getLast() instanceof Hint.Crafting crafting && crafting.item() == ModItems.TIER2_BATTERY, "ends with its crafting grid");
+		helper.assertValueEqual(Hint.lines(Hint.of(new ItemStack(ModItems.TIER3_BATTERY), true)), List.of("Never runs out", "Crafting:"), "tier 3");
+		helper.succeed();
 	}
 
 	@GameTest
-	public void aBatteryShowsItsChargeAndTimeLeft(GameTestHelper helper) {
-		helper.assertValueEqual(hint(ModItems.TIER1_BATTERY.charged()), List.of("Charge: 100% (10:00:00)"), "a full tier 1");
-		helper.assertValueEqual(hint(battery(ModItems.TIER2_BATTERY, 5 * DAY + DAY / 2 + 20 * 7, 0)),
-			List.of("Charge: 28% (05:10:07)", "Recharges itself while not in use"), "a tier 2");
-		helper.assertValueEqual(hint(new ItemStack(ModItems.TIER3_BATTERY)), List.of("Never runs out"), "tier 3");
+	public void everyModItemHasAHintWithItsCraftingGrid(GameTestHelper helper) {
+		for (var item : ModCommands.modItems()) {
+			ItemStack stack = new ItemStack(item);
+			helper.assertTrue(item.getTooltipImage(stack).orElse(null) instanceof HintTooltip, item + " shows a hint");
+			helper.assertTrue(Hint.of(stack, true).getLast() instanceof Hint.Crafting crafting && crafting.item() == item, item + " shows how it's crafted");
+		}
 		helper.succeed();
 	}
 

@@ -2,13 +2,13 @@ package com.payonel.modularcomputers.block;
 
 import static com.payonel.modularcomputers.ModularComputers.id;
 
+import com.payonel.modularcomputers.hint.HintedBlockItem;
 import java.util.Set;
 import java.util.function.Function;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
@@ -68,7 +68,7 @@ public final class ModBlocks {
 		Block block = Registry.register(BuiltInRegistries.BLOCK, blockKey, factory.apply(properties.setId(blockKey)));
 		ResourceKey<Item> itemKey = ResourceKey.create(Registries.ITEM, id(name));
 		Registry.register(BuiltInRegistries.ITEM, itemKey,
-			new BlockItem(block, new Item.Properties().setId(itemKey).useBlockDescriptionPrefix()));
+			new HintedBlockItem(block, new Item.Properties().setId(itemKey).useBlockDescriptionPrefix()));
 		return block;
 	}
 }

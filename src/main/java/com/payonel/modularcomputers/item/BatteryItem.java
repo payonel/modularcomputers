@@ -1,26 +1,29 @@
 package com.payonel.modularcomputers.item;
 
+import com.payonel.modularcomputers.hint.Hint;
+import com.payonel.modularcomputers.hint.HintedItem;
 import com.payonel.modularcomputers.power.BatteryCharge;
 import com.payonel.modularcomputers.power.BatteryTier;
 import com.payonel.modularcomputers.power.ChargeMeter;
 import com.payonel.modularcomputers.power.Durations;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
-import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.item.component.TooltipDisplay;
 
 /**
  * A battery for a computer's UPS slot. It carries its charge ({@link ModComponents#CHARGE}); a
  * crafted one starts empty. How long each tier lasts is configurable, and one set to 0 days
  * (tier 3, by default) never runs out.
  */
-public final class BatteryItem extends Item {
+public final class BatteryItem extends HintedItem {
 	/** How often a battery in a player's inventory works out its self-charging. */
 	private static final int REST_INTERVAL = 20;
 
@@ -86,17 +89,32 @@ public final class BatteryItem extends Item {
 	}
 
 	@Override
-	@SuppressWarnings("deprecation") // still how vanilla's own items add tooltip lines
-	public void appendHoverText(ItemStack stack, TooltipContext context, TooltipDisplay display, Consumer<Component> builder, TooltipFlag flag) {
+	public void summary(ItemStack stack, Consumer<Hint.Element> hint) {
 		if (tier.infinite()) {
-			builder.accept(Component.translatable("item.modularcomputers.battery.infinite").withStyle(ChatFormatting.GRAY));
+			hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.infinite")));
 			return;
 		}
-		BatteryCharge charge = charge(stack);
-		builder.accept(Component.translatable("item.modularcomputers.battery.charge", percent(stack), Durations.clock(charge.ticks()))
-			.withStyle(ChatFormatting.GRAY));
+		hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.charge", percent(stack), Durations.clock(charge(stack).ticks()))));
+	}
+
+	@Override
+	public void details(ItemStack stack, Consumer<Hint.Element> hint) {
 		if (tier.selfCharging()) {
-			builder.accept(Component.translatable("item.modularcomputers.battery.self_charging").withStyle(ChatFormatting.GRAY));
+			hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.self_charging")));
+			hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.self_charging_rate", seconds(1 / tier.rechargeRate()))));
 		}
+		if (tier.infinite()) {
+			return;
+		}
+		hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.charging")));
+		List<Hint.Icon> icons = new ArrayList<>();
+		BatteryChargingRecipe.MATERIALS.forEach((item, percent) -> icons.add(new Hint.Icon(new ItemStack(item),
+			Component.literal("+" + Math.round(BatteryChargingRecipe.added(percent) * 100.0 / tier.capacity()) + "%"))));
+		hint.accept(new Hint.Icons(icons));
+	}
+
+	/** Seconds, without a needless ".0": "2", "1.5", "3.33". */
+	private static String seconds(double seconds) {
+		return new DecimalFormat("0.##", DecimalFormatSymbols.getInstance(Locale.ROOT)).format(seconds);
 	}
 }

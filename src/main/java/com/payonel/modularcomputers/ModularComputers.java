@@ -15,8 +15,10 @@ import com.payonel.modularcomputers.network.SettingsPayload;
 import com.payonel.modularcomputers.network.SwitchViewPayload;
 import com.payonel.modularcomputers.sound.ModSounds;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.recipe.v1.sync.RecipeSynchronization;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.crafting.ShapedRecipe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +52,8 @@ public final class ModularComputers implements ModInitializer {
 		ModComponents.init();
 		ModItems.init();
 		BatteryChargingRecipe.init();
+		// Clients get the shaped recipes, so tooltips can show how to craft each item.
+		RecipeSynchronization.synchronizeRecipeSerializer(ShapedRecipe.SERIALIZER);
 		ModBlocks.init();
 		ModMenus.init();
 		ModCommands.init();
