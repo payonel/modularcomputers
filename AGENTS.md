@@ -143,6 +143,9 @@ same thing.
           zap on insert.
         - They're synthesized by `scripts/art/part_sounds.py`. The user wanted them soft, not
           Minecraft's abrasive click.
+        - Slides are sparse grains ringing a resonance (a plastic rasp). The first version's
+          noise slides sounded like breathing into a mic; the user asked to keep them as a
+          backup: `scripts/art/sound_backups/breathy_slides/` (copy over the assets to restore).
         - Loading a save plays nothing.
       - Clicking the bus panel or the buttons doesn't count as clicking outside the window,
         so it never drops the carried item (`hasClickedOutside`).
@@ -591,6 +594,7 @@ scripts/art/all_in_one_textures.py   draws the block, GUI and item textures (Pil
 scripts/art/case_gui_textures.py     draws the case view's board, bus panel and icons (Pillow); PNGs are committed
 scripts/art/error_beep.py            synthesizes the error beep as Ogg Vorbis; the .ogg is committed
 scripts/art/part_sounds.py           synthesizes the part insert/remove sounds (slides, clicks, thumps, a zap)
+scripts/art/sound_backups/            earlier versions of sounds the user asked to keep
 scripts/art/oggwrite.py              shared: writes mono Ogg Vorbis via the system's libsndfile (ctypes)
 src/main/java/.../sound/ModSounds.java   sound events (error_beep)
 .github/workflows/build.yml
