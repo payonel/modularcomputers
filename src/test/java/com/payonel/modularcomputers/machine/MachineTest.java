@@ -15,6 +15,13 @@ class MachineTest {
 	private final Display display = new Display(Resolution.DEFAULT);
 	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of(new Keyboard(), display, new Disk()))));
 
+	/** The tests' own program, not the mod's stand-in firmware (which changes). */
+	private static final String GREETING = "hello world";
+	private static final Program HELLO = board -> {
+		board.invoke("console", "print", GREETING);
+		board.halt();
+	};
+
 	private Machine withParts(boolean cpu, Program program) {
 		machine.board().setCpu(cpu ? new Cpu() : null);
 		machine.board().setEeprom(program == null ? null : new Eeprom(program));
@@ -36,7 +43,7 @@ class MachineTest {
 
 	@Test
 	void startsOffWithBlankDisplay() {
-		withParts(true, new HelloWorldProgram());
+		withParts(true, HELLO);
 		assertThat(machine.isPowered()).isFalse();
 		assertThat(screen().isBlank()).isTrue();
 	}
@@ -57,7 +64,7 @@ class MachineTest {
 		Machine unpowered = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of(display))), () -> power[0]);
 		assertThat(unpowered.pressPower()).isEqualTo(Machine.PowerPress.NO_POWER);
 		unpowered.board().setCpu(new Cpu());
-		unpowered.board().setEeprom(new Eeprom(new HelloWorldProgram()));
+		unpowered.board().setEeprom(new Eeprom(HELLO));
 		assertThat(unpowered.pressPower()).isEqualTo(Machine.PowerPress.NO_POWER);
 		assertThat(unpowered.isPowered()).isFalse();
 		assertThat(screen().isBlank()).isTrue();
@@ -105,7 +112,7 @@ class MachineTest {
 
 	@Test
 	void removingTheCpuFromARunningMachineCutsPower() {
-		withParts(true, new HelloWorldProgram());
+		withParts(true, HELLO);
 		machine.pressPower();
 		machine.board().setCpu(null);
 		assertThat(machine.cpuRemoved()).as("it was running").isTrue();
@@ -116,7 +123,7 @@ class MachineTest {
 
 	@Test
 	void cpuRemovedIsANoOpWhileTheCpuIsStillThere() {
-		withParts(true, new HelloWorldProgram());
+		withParts(true, HELLO);
 		machine.pressPower();
 		assertThat(machine.cpuRemoved()).isFalse();
 		assertThat(machine.isPowered()).isTrue();
@@ -152,10 +159,10 @@ class MachineTest {
 	}
 
 	@Test
-	void helloWorldProgramPrintsThroughTheConsole() {
-		withParts(true, new HelloWorldProgram());
+	void aProgramPrintsThroughTheConsole() {
+		withParts(true, HELLO);
 		machine.pressPower();
-		assertThat(screen().row(0).strip()).isEqualTo(HelloWorldProgram.GREETING);
+		assertThat(screen().row(0).strip()).isEqualTo(GREETING);
 		assertThat(screen().background(0, 0)).isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
 		assertThat(machine.board().virtualBus().console().row()).as("cursor on the next line").isEqualTo(1);
 	}
@@ -169,9 +176,9 @@ class MachineTest {
 		var console = machine.board().virtualBus().console();
 		assertThat(console.row()).isZero();
 		assertThat(console.background()).isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
-		machine.board().setEeprom(new Eeprom(new HelloWorldProgram()));
+		machine.board().setEeprom(new Eeprom(HELLO));
 		machine.pressPower();
-		assertThat(screen().row(0).strip()).as("prints at the top again").isEqualTo(HelloWorldProgram.GREETING);
+		assertThat(screen().row(0).strip()).as("prints at the top again").isEqualTo(GREETING);
 		assertThat(screen().background(0, 0)).isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
 	}
 
@@ -186,7 +193,7 @@ class MachineTest {
 
 	@Test
 	void aScreenPluggedIntoARunningMachineShowsTheConsole() {
-		withParts(true, new HelloWorldProgram());
+		withParts(true, HELLO);
 		machine.pressPower();
 		Display plugged = new Display(Resolution.DEFAULT);
 		List<com.payonel.modularcomputers.bus.Device> devices = new java.util.ArrayList<>(machine.board().bus().devices());
@@ -198,7 +205,7 @@ class MachineTest {
 
 	@Test
 	void aScreenPluggedIntoAnOffMachineStaysAsItWas() {
-		withParts(true, new HelloWorldProgram());
+		withParts(true, HELLO);
 		Display plugged = new Display(Resolution.DEFAULT);
 		plugged.buffer().write(0, 0, "other");
 		machine.setDevices(List.of(display, plugged));
@@ -207,7 +214,7 @@ class MachineTest {
 
 	@Test
 	void unpluggingAScreenFromARunningMachineBlanksIt() {
-		withParts(true, new HelloWorldProgram());
+		withParts(true, HELLO);
 		machine.pressPower();
 		Display plugged = new Display(Resolution.DEFAULT);
 		machine.setDevices(List.of(display, plugged));
@@ -219,7 +226,7 @@ class MachineTest {
 
 	@Test
 	void theConsoleRemembersWhatItShowedWhileHeadless() {
-		withParts(true, new HelloWorldProgram());
+		withParts(true, HELLO);
 		machine.setDevices(List.of());
 		machine.pressPower();
 		machine.setDevices(List.of(display));

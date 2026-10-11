@@ -308,7 +308,11 @@ scripts/art/error_beep.py` into
       - There are four block models (`all_in_one[_on][_faded]`) on two base models (emissive,
         and plain), and four frames in `textures/gui/power_button.png`.
   - **Boot results:**
-    - CPU and EEPROM: "hello world" (the stand-in program).
+    - CPU and EEPROM: the stand-in program (`HelloWorldProgram`, which the user keeps changing
+      to try things out): today it prints "hello world" to the console, unbinds every display
+      from the console and labels each "screen 0", "screen 1", ... in bus order, then halts.
+      Unplug a screen and plug it back in (or add a new one) and it shows "hello world": the
+      console's copy.
     - CPU, no EEPROM: the soft gray **ABRT** screen, `ABRT: no EEPROM installed`.
     - No CPU: the machine won't turn on.
     - Part changes take effect at the next power-on, except that removing the CPU cuts power.
@@ -465,9 +469,8 @@ scripts/art/error_beep.py` into
     has it on its bus.
     - Each writes to it; the last write wins, and powering one off blanks it.
     - Proper sharing waits for the "virtual multicast text buffer" design (below).
-  - **Every connected screen shows hello world (user's hard-coded choice for now):** the
-    console writes to every display on the bus. The user wants this replaced later by a
-    "virtual multicast text buffer" on the motherboard's virtual bus, so the EEPROM chooses.
+  - **The console writes to every display in its group** (see the console's group under
+    "Mock runtime"); the EEPROM chooses by unbinding displays.
 - **Bus order and gaps:**
   - See the bus order panel above for the rules (case fixed, external saved by id, capacity,
     bumping, waiting, forget).
@@ -516,13 +519,26 @@ scripts/art/error_beep.py` into
       group's multicast device for input and output both** (user, 2026-10-11): it writes to
       every display, and (once keyboards take input) reads key presses from every keyboard, as
       UEFI's ConSplitter does `ConOut` and `ConIn` and Linux's `/dev/console` reads every
-      keyboard. Each keyboard stays readable on its own too. Choosing its members (UEFI's
-      `ConOut`/`ConIn` variables) is still undecided.
+      keyboard. Each keyboard stays readable on its own too.
+    - **The console's group** (user design, 2026-10-11; built for displays, keyboards listed):
+      `console.outputs()` / `inputs()` list the bound displays / keyboards by address in bus
+      order; `console.unbind(address)` takes one out (the console stops drawing on it, what's on
+      it stays, the program owns it through its address); `console.bind(address)` puts it back
+      and redraws the console on it. Names from Linux's vtconsole `bind`; the user rejected
+      "graphics mode" and numbered VTs. Not a display or keyboard on the bus: a soft failure.
+      Every display and keyboard is bound by default. The console's size is the smallest bound
+      display.
+    - **No graphics card, one console buffer** (user, 2026-10-11, real-world "example 2", like a
+      USB display adapter, not a GPU with a monitor on a cable): a screen that leaves the bus
+      loses what it showed, and one that joins, new or plugged back in, is a new arrival, bound,
+      and gets the console's copy drawn on it. Unbinding lasts only while the device stays on
+      the bus (`ConsoleSplitter.busChanged`); power-off rebinds everything. GPUs may come later
+      (then a screen's picture would live on the board and survive a replug).
   - **A program ends with `Board.halt()`** (user, 2026-10-11), like `cli; hlt` or Linux's
     `reboot(HALT)`: it never returns, the CPU stops, **power stays on** and the screens keep
     what they show (and the console still redraws onto screens plugged in later). **Falling off
     the end is a panic**, as when Linux's init exits ("Attempted to kill init!"): the CPU's ABRT
-    screen, `ABRT: EEPROM returned without halting`. Hello world prints once, then halts.
+    screen, `ABRT: EEPROM returned without halting`. A program that wants its text to stay up prints once, then halts.
   - **Programs** (`Program.run(Board)`) are plain Java that reads like Lua. Each runs as a
     coroutine on a virtual thread (`ProgramRunner`); every board call is handed to the host and
     carried out on the server thread, so device code never runs off-thread.
@@ -550,7 +566,11 @@ scripts/art/error_beep.py` into
   - **Not saveable** (user): a running program lives in its thread. Unloading stops it
     (`Machine.unload`); after a load a powered machine's CPU is halted. Save/restore waits for
     the real Lua runtime.
-  - Device methods so far: the console (`print`, `write`, `clear`, `setColors`, `getSize`) and
+  - **Tests bring their own programs** (user, 2026-10-11): never assert on `HelloWorldProgram`,
+    which changes. Unit tests build their own `Program`s; game tests flash one onto the EEPROM
+    after inserting it (`Eeprom.flash`, like reflashing firmware; `gametest/TestPrograms`).
+  - Device methods so far: the console (`print`, `write`, `clear`, `setColors`, `getSize`,
+    `outputs`, `inputs`, `bind`, `unbind`) and
     displays (`getResolution`, `set`, `get`, `fill`; columns and rows from 1, as in Lua).
 - **Motherboard (`Motherboard`):** holds the soldered parts (`Hardware`/`Part`, memory), the
   CPU socket, the EEPROM slot, and two buses.

@@ -37,6 +37,7 @@ public class CableGameTest {
 			computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.CPU));
 			computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 			computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+			TestPrograms.flash(computer, TestPrograms.HELLO);
 		}
 		return computer;
 	}

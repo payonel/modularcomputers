@@ -39,6 +39,12 @@ public final class Bus {
 		return Optional.ofNullable(devices.get(aliases.getOrDefault(address, address)));
 	}
 
+	/** The address of the device at an address or another name for one, if it's on the bus. */
+	public Optional<String> address(String name) {
+		String address = aliases.getOrDefault(name, name);
+		return devices.containsKey(address) ? Optional.of(address) : Optional.empty();
+	}
+
 	/** Counts changes to which devices are on the bus: hot-plug, for the bus's interrupt. */
 	public int changes() {
 		return changes;

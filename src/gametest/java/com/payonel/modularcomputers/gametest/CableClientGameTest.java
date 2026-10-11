@@ -72,10 +72,12 @@ public class CableClientGameTest implements FabricClientGameTest {
 			setblock(singleplayer, screen, "screen[facing=south]");
 			setblock(singleplayer, cable, "cable");
 			singleplayer.getServer().runOnServer(server -> {
-				var parts = ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts();
+				var be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
+				var parts = be.parts();
 				parts.setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.CPU));
 				parts.setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 				parts.setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+				TestPrograms.flash(be, TestPrograms.HELLO);
 			});
 			teleport(singleplayer, feet, 180);
 			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof ScreenBlockEntity);

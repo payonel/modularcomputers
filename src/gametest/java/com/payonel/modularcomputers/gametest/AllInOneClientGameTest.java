@@ -242,6 +242,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			// battery in, one red bar. The case view's menu sends the case's power as it changes.
 			singleplayer.getServer().runOnServer(server -> {
 				AllInOneBlockEntity be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
+				TestPrograms.flash(be, TestPrograms.HELLO); // the test's own program, not the mod's stand-in
 				be.power().set(PowerBuffer.CAPACITY / 20);
 				be.parts().setItem(CaseMenu.UPS_SLOT, new ItemStack(ModItems.TIER1_BATTERY));
 			});

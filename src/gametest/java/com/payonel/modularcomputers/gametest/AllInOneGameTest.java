@@ -8,7 +8,6 @@ import com.payonel.modularcomputers.command.ModCommands;
 import com.payonel.modularcomputers.display.TextBuffer;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
-import com.payonel.modularcomputers.machine.HelloWorldProgram;
 import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import java.util.List;
@@ -40,6 +39,9 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.CPU_SLOT, cpu ? new ItemStack(ModItems.CPU) : ItemStack.EMPTY);
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, eeprom ? new ItemStack(ModItems.EEPROM) : ItemStack.EMPTY);
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		if (eeprom) {
+			TestPrograms.flash(computer, TestPrograms.HELLO);
+		}
 		return computer;
 	}
 
@@ -239,7 +241,7 @@ public class AllInOneGameTest {
 		helper.useBlock(POS, player);
 		helper.assertTrue(machine.isPowered(), "sneak + right-click should turn the computer on");
 		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, true);
-		helper.assertValueEqual(computer.display().buffer().row(0).strip(), HelloWorldProgram.GREETING, "first display row");
+		helper.assertValueEqual(computer.display().buffer().row(0).strip(), TestPrograms.GREETING, "first display row");
 
 		helper.useBlock(POS, player);
 		helper.assertTrue(!machine.isPowered(), "a second sneak + right-click should turn it off");
@@ -263,7 +265,7 @@ public class AllInOneGameTest {
 		helper.useBlock(POS, player, backClick(helper, 11.5, 11.5));
 		helper.assertTrue(computer.machine().isPowered(), "the back power button should turn the computer on");
 		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, true);
-		helper.assertValueEqual(computer.display().buffer().row(0).strip(), HelloWorldProgram.GREETING, "first display row");
+		helper.assertValueEqual(computer.display().buffer().row(0).strip(), TestPrograms.GREETING, "first display row");
 
 		helper.useBlock(POS, player, backClick(helper, 11.5, 11.5));
 		helper.assertTrue(!computer.machine().isPowered(), "pressing it again should turn the computer off");

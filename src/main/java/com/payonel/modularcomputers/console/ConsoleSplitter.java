@@ -2,6 +2,7 @@ package com.payonel.modularcomputers.console;
 
 import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.bus.Device;
+import com.payonel.modularcomputers.device.Keyboard;
 import com.payonel.modularcomputers.display.Display;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.display.TextBuffer;
@@ -9,7 +10,10 @@ import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * The console on the virtual bus: always there, so firmware can just print. Like UEFI's
@@ -23,6 +27,14 @@ import java.util.List;
  * <p>
  * Like a Linux virtual console, it keeps its own copy of what it shows (its {@link #screen()}),
  * so it can {@link #redraw} that onto a display that joins later.
+ * <p>
+ * <b>Its group:</b> it's the multicast device for output and input both, like UEFI's splitter
+ * for {@code ConOut} and {@code ConIn}. Every display and keyboard on the bus is in it (bound) by
+ * default, as fbcon binds every framebuffer. A program can {@link #unbind} one to use it on its
+ * own: the console stops drawing on it (what's on it stays), and takes it back with
+ * {@link #bind}, redrawing itself onto it. An unbound device stays unbound while it's on the
+ * bus; one that leaves and comes back is a new arrival and joins the group again, as a
+ * replugged framebuffer does in Linux.
  */
 public final class ConsoleSplitter {
 	/** The size reported when no display is attached; never 0x0, so callers need no special case. */
@@ -35,6 +47,8 @@ public final class ConsoleSplitter {
 	private int row;
 	private int foreground = TextBuffer.DEFAULT_FOREGROUND;
 	private int background = TextBuffer.DEFAULT_BACKGROUND;
+	/** The bus addresses of displays and keyboards taken out of the group. */
+	private final Set<String> unbound = new HashSet<>();
 
 	public ConsoleSplitter(Bus bus) {
 		this.bus = bus;
@@ -154,7 +168,48 @@ public final class ConsoleSplitter {
 		return Result.ok();
 	}
 
-	@Method(doc = "getSize(): columns, rows; the smallest of the displays on the bus")
+	@Method(doc = "outputs(): the displays in the console's group, by address, in bus order")
+	public Result outputs(Arguments args) {
+		return Result.ok(members(Display.class));
+	}
+
+	@Method(doc = "inputs(): the keyboards in the console's group, by address, in bus order")
+	public Result inputs(Arguments args) {
+		return Result.ok(members(Keyboard.class));
+	}
+
+	@Method(doc = "unbind(address): takes a display or keyboard out of the console's group; what's on a display stays")
+	public Result unbind(Arguments args) {
+		return member(args.checkString(0)).map(address -> {
+			unbound.add(address);
+			return Result.ok(true);
+		}).orElseGet(() -> Result.fail("not a display or keyboard on the bus: " + args.checkString(0)));
+	}
+
+	@Method(doc = "bind(address): puts a display or keyboard back in the console's group; a display gets the console drawn on it")
+	public Result bind(Arguments args) {
+		return member(args.checkString(0)).map(address -> {
+			if (unbound.remove(address) && bus.device(address).orElse(null) instanceof Display display) {
+				redraw(display);
+			}
+			return Result.ok(true);
+		}).orElseGet(() -> Result.fail("not a display or keyboard on the bus: " + args.checkString(0)));
+	}
+
+	/** Whether the device at {@code address} is in the group (displays and keyboards are, unless unbound). */
+	public boolean isBound(String address) {
+		return !unbound.contains(address);
+	}
+
+	/**
+	 * The bus changed: devices that left are forgotten, so if they come back they're new
+	 * arrivals, in the group again.
+	 */
+	public void busChanged() {
+		unbound.retainAll(bus.addresses());
+	}
+
+	@Method(doc = "getSize(): columns, rows; the smallest of the displays in the console's group")
 	public Result getSize(Arguments args) {
 		Resolution size = size();
 		return Result.ok(size.columns(), size.rows());
@@ -162,6 +217,7 @@ public final class ConsoleSplitter {
 
 	/** Back to the top-left corner and default colors, e.g. after power loss (the displays clear themselves). */
 	public void reset() {
+		unbound.clear();
 		screen.clear();
 		column = 0;
 		row = 0;
@@ -189,13 +245,27 @@ public final class ConsoleSplitter {
 		}
 	}
 
+	/** The displays in the group, in bus order. */
 	private List<Display> displays() {
 		List<Display> displays = new ArrayList<>();
-		for (Device device : bus.devices()) {
-			if (device instanceof Display display) {
-				displays.add(display);
-			}
+		for (String address : members(Display.class)) {
+			bus.device(address).ifPresent(device -> displays.add((Display) device));
 		}
 		return displays;
+	}
+
+	/** The addresses of the group's devices of one kind, in bus order. */
+	private List<String> members(Class<? extends Device> kind) {
+		return bus.addresses().stream()
+			.filter(address -> isBound(address) && kind.isInstance(bus.device(address).orElse(null)))
+			.toList();
+	}
+
+	/** The address of a display or keyboard on the bus, by any of its names. */
+	private Optional<String> member(String name) {
+		return bus.address(name).filter(address -> {
+			Device device = bus.device(address).orElse(null);
+			return device instanceof Display || device instanceof Keyboard;
+		});
 	}
 }

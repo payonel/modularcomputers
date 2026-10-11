@@ -214,6 +214,8 @@ public final class Machine {
 		List<Device> devices = List.copyOf(addressed.values());
 		List<Device> before = board.bus().devices();
 		board.bus().setDevices(addressed, aliases);
+		var console = board.virtualBus().console();
+		console.busChanged();
 		if (!powered) {
 			return;
 		}
@@ -222,9 +224,10 @@ public final class Machine {
 				device.powerOff();
 			}
 		}
-		for (Device device : devices) {
-			if (!before.contains(device) && device instanceof Display display) {
-				board.virtualBus().console().redraw(display);
+		for (var entry : addressed.entrySet()) {
+			// A display that joined is in the console's group: it gets the console drawn on it.
+			if (!before.contains(entry.getValue()) && entry.getValue() instanceof Display display && console.isBound(entry.getKey())) {
+				console.redraw(display);
 			}
 		}
 	}
