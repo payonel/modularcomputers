@@ -175,6 +175,38 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		if (menu.getCarried().isEmpty() && chargeMeter().contains(mouseX, mouseY)) {
 			graphics.setComponentTooltipForNextFrame(font, powerTooltip(), mouseX, mouseY);
 		}
+		busButtonTip(mouseX, mouseY).ifPresent(tip -> graphics.setTooltipForNextFrame(font, tip, mouseX, mouseY));
+	}
+
+	/** The one-word tip for the bus order panel's button under the mouse: View, Disconnect, Up, ... */
+	public Optional<Component> busButtonTip(double mouseX, double mouseY) {
+		if (!showBus) {
+			return Optional.empty();
+		}
+		List<AllInOneBlockEntity.BusEntry> entries = busEntries();
+		int firstExternal = firstExternal(entries);
+		ScrollWindow window = busWindow(entries.size());
+		for (int row = 0; row < window.rowsShown(busScroll); row++) {
+			int index = busScroll + row;
+			AllInOneBlockEntity.BusEntry entry = entries.get(index);
+			if (!entry.cabled()) {
+				continue; // the case's rows have no buttons
+			}
+			String tip = null;
+			if (busBulb(row).contains(mouseX, mouseY)) {
+				tip = "view";
+			} else if (busPlug(row).contains(mouseX, mouseY)) {
+				tip = !entry.online() ? "forget" : entry.connected() ? "disconnect" : "connect";
+			} else if (busArrow(row, true).contains(mouseX, mouseY) && index > firstExternal) {
+				tip = "up";
+			} else if (busArrow(row, false).contains(mouseX, mouseY) && index < entries.size() - 1) {
+				tip = "down";
+			}
+			if (tip != null) {
+				return Optional.of(Component.translatable("gui.modularcomputers.bus.tip." + tip));
+			}
+		}
+		return Optional.empty();
 	}
 
 	public boolean busPanelShown() {

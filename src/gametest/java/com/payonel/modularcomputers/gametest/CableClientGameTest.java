@@ -7,6 +7,7 @@ import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.count
 import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.hex;
 import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.isWhite;
 import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.machinePowered;
+import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.moveCursorTo;
 import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.read;
 import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.screenPixel;
 import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.teleport;
@@ -22,6 +23,7 @@ import com.payonel.modularcomputers.client.Identify;
 import com.payonel.modularcomputers.client.screen.CardHolderScreen;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
+import com.payonel.modularcomputers.display.Viewport;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Motherboard;
@@ -163,7 +165,16 @@ public class CableClientGameTest implements FabricClientGameTest {
 				}
 				throw new AssertionError("the screen should be in the bus order panel");
 			});
-			BufferedImage plugged = read(context.takeScreenshot("case-screen-plugged"));
+			// Each button names itself in one word when hovered.
+			check(tipAt(context, s -> ((CaseScreen) s).busBulb(row)).equals("View"), "the bulb's tip");
+			check(tipAt(context, s -> ((CaseScreen) s).busPlug(row)).equals("Disconnect"), "the plug's tip");
+			check(tipAt(context, s -> ((CaseScreen) s).busArrow(row, true)).isEmpty(), "no tip on an arrow that can't move");
+			check(tipAt(context, s -> ((CaseScreen) s).busArrow(0, true)).isEmpty(), "nor on the case's rows");
+			moveCursorTo(context, s -> ((CaseScreen) s).busPlug(row));
+			context.waitTicks(2);
+			context.takeScreenshot("case-plug-tip");
+			context.getInput().setCursorPos(0, 0);
+						BufferedImage plugged = read(context.takeScreenshot("case-screen-plugged"));
 			int plugIn = screenPixel(context, plugged, s -> plugBody(((CaseScreen) s).busPlug(row), true));
 			check((plugIn & 0xFFFFFF) == 0x3CB45A, "a connected screen's plug is in (green), got " + hex(plugIn));
 
@@ -262,7 +273,16 @@ public class CableClientGameTest implements FabricClientGameTest {
 		singleplayer.getServer().runCommand("setblock %d %d %d modularcomputers:%s".formatted(pos.getX(), pos.getY(), pos.getZ(), block));
 	}
 
-	private static int casePercent(Minecraft client, BlockPos computer) {
+	/** The bus order panel's tip for the middle of an area, or "" for none. */
+	private static String tipAt(ClientGameTestContext context, java.util.function.Function<net.minecraft.client.gui.screens.Screen, Viewport> area) {
+		return context.computeOnClient(client -> {
+			Viewport target = area.apply(client.gui.screen());
+			return ((CaseScreen) client.gui.screen()).busButtonTip(target.x() + target.width() / 2.0, target.y() + target.height() / 2.0)
+				.map(tip -> tip.getString()).orElse("");
+		});
+	}
+
+		private static int casePercent(Minecraft client, BlockPos computer) {
 		return client.level.getBlockEntity(computer) instanceof AllInOneBlockEntity be ? be.power().percent() : -1;
 	}
 
