@@ -197,6 +197,14 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			checkBoardPixel(context, full, 73, 115, 0xB0B4BC, "expansion slot 2 engaged");
 			checkBoardPixel(context, full, 46, 115, 0x1A1A1E, "expansion slot 1 empty");
 			checkBoardPixel(context, full, 34, 121, 0x5AE66E, "full case power: sixth bar green");
+			// Hovering the meter tells the time left: the case's day, then the battery's ten (the case was full already).
+			moveCursorTo(context, screen -> ((CaseScreen) screen).chargeMeter());
+			context.waitTicks(2);
+			context.takeScreenshot("all-in-one-case-power-hint");
+			List<String> hint = context.computeOnClient(client -> ((CaseScreen) client.gui.screen()).powerTooltip().stream()
+				.map(line -> line.getString()).toList());
+			check(hint.equals(List.of("Case power: 100%", "Runs the computer 20m more", "Battery: 3h 20m more")), "power hint, got " + hint);
+			context.getInput().setCursorPos(0, 0);
 			int readyButton = pixelAt(context, full, screen -> ((CaseScreen) screen).powerButton());
 			check(RED.test(readyButton), "with a CPU and a charged battery the power button should be lit red, got " + hex(readyButton));
 			// The meter shows the case's own power, not the battery: nearly drained, with a flat

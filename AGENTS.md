@@ -123,6 +123,11 @@ same thing.
             the battery doesn't stop a running computer.
           - **The charge meter under the UPS slot shows the buffer, not the battery.** Empty:
             all bars off; any power: at least one red bar.
+          - Hovering the meter shows a hint (`CaseScreen.powerTooltip`, user request): "Case
+            power: 75%", "Runs the computer 15m more", and "Battery: 3h 20m more" (or "No
+            battery", or that it keeps the case full forever). Times are real time at 20 ticks a
+            second (`power/Durations`). Clients get the buffer level whenever its percentage
+            changes.
           - When the buffer runs out, a running computer dies with the **error beep**, like
             pulling the CPU (`Machine.powerLost`).
         - **No power** (an empty buffer): pressing power does nothing at all

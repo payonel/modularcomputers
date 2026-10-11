@@ -18,7 +18,6 @@ import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.power.BatteryCharge;
-import com.payonel.modularcomputers.power.ChargeMeter;
 import com.payonel.modularcomputers.power.PowerBuffer;
 import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.machine.Eeprom;
@@ -113,8 +112,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final BusOrder busOrder = new BusOrder();
 	private final Bus bus = new Bus(List.of(display, keyboard));
 	private final PowerBuffer power = new PowerBuffer();
-	/** The charge meter's bars clients last saw. */
-	private int syncedMeterBars;
+	/** The case power clients last saw, in percent: the meter and its time left. */
+	private int syncedPowerPercent;
 	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), bus), this::hasPower);
 	private final Parts parts = new Parts();
 	/** The cabled devices found last time, nearest first. Saved and synced, for the bus order panel. */
@@ -348,7 +347,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			errorBeep();
 		}
 		setChanged();
-		if (!setPowerState() && ChargeMeter.litBars(power.percent()) != syncedMeterBars) {
+		if (!setPowerState() && power.percent() != syncedPowerPercent) {
 			syncToClients();
 		}
 	}
@@ -376,7 +375,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	 * state carries both to clients. Returns whether it changed.
 	 */
 	private boolean setPowerState() {
-		syncedMeterBars = ChargeMeter.litBars(power.percent());
+		syncedPowerPercent = power.percent();
 		BlockState state = getBlockState()
 			.setValue(AllInOneBlock.READY, machine.board().cpu().isPresent() && hasPower())
 			.setValue(AllInOneBlock.POWERED, machine.isPowered());
@@ -562,6 +561,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** Sends this block entity's data (parts, bus order, display) to clients. */
 	private void syncToClients() {
 		if (level != null && !level.isClientSide()) {
+			syncedPowerPercent = power.percent();
 			level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
 		}
 	}

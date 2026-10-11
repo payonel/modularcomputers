@@ -6,12 +6,17 @@ import com.payonel.modularcomputers.block.AllInOneBlockEntity;
 import com.payonel.modularcomputers.client.Identify;
 import com.payonel.modularcomputers.display.ScrollWindow;
 import com.payonel.modularcomputers.display.Viewport;
+import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.network.ConnectDevicePayload;
 import com.payonel.modularcomputers.network.ReorderBusPayload;
 import com.payonel.modularcomputers.power.ChargeMeter;
+import com.payonel.modularcomputers.power.Durations;
+import com.payonel.modularcomputers.power.PowerBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -127,6 +132,46 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	/** Where the board texture is drawn; indicator positions are relative to it. */
 	public Viewport board() {
 		return new Viewport(leftPos + CaseMenu.BOARD_X, topPos + CaseMenu.BOARD_Y, BOARD_W, BOARD_H);
+	}
+
+	/** The case power meter under the battery slot. */
+	public Viewport chargeMeter() {
+		Viewport board = board();
+		return new Viewport(board.x() + 12, board.y() + 119, 4 * ChargeMeter.SEGMENTS + 1, 6);
+	}
+
+	/**
+	 * The meter's hover hint: the case's power, how long it runs the computer, and what the
+	 * battery adds.
+	 */
+	public List<Component> powerTooltip() {
+		if (minecraft.level == null || !(minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer)) {
+			return List.of();
+		}
+		PowerBuffer power = computer.power();
+		List<Component> lines = new ArrayList<>();
+		lines.add(Component.translatable("gui.modularcomputers.power", power.percent()));
+		lines.add(power.isEmpty()
+			? Component.translatable("gui.modularcomputers.power.empty").withStyle(ChatFormatting.GRAY)
+			: Component.translatable("gui.modularcomputers.power.left", Durations.realTime(power.level())).withStyle(ChatFormatting.GRAY));
+		ItemStack stack = menu.slots.get(CaseMenu.UPS_SLOT).getItem();
+		if (stack.getItem() instanceof BatteryItem battery) {
+			lines.add(battery.tier().infinite()
+				? Component.translatable("gui.modularcomputers.power.battery_infinite").withStyle(ChatFormatting.GRAY)
+				: Component.translatable("gui.modularcomputers.power.battery", Durations.realTime(BatteryItem.charge(stack).ticks()))
+					.withStyle(ChatFormatting.GRAY));
+		} else {
+			lines.add(Component.translatable("gui.modularcomputers.power.no_battery").withStyle(ChatFormatting.GRAY));
+		}
+		return lines;
+	}
+
+	@Override
+	protected void extractTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+		super.extractTooltip(graphics, mouseX, mouseY);
+		if (menu.getCarried().isEmpty() && chargeMeter().contains(mouseX, mouseY)) {
+			graphics.setComponentTooltipForNextFrame(font, powerTooltip(), mouseX, mouseY);
+		}
 	}
 
 	public boolean busPanelShown() {
@@ -271,8 +316,8 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 				case MEDIUM -> METER_MEDIUM;
 				default -> METER_HIGH;
 			};
-			int mx = bx + 12;
-			int my = by + 119;
+			int mx = chargeMeter().x();
+			int my = chargeMeter().y();
 			for (int i = 0; i < lit; i++) {
 				graphics.fill(mx + 1 + 4 * i, my + 1, mx + 4 + 4 * i, my + 5, color);
 			}
