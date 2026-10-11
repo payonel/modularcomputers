@@ -1,6 +1,5 @@
 package com.payonel.modularcomputers.block;
 
-import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import java.util.Optional;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
@@ -16,6 +15,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
@@ -68,6 +69,25 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 	}
 
 	@Override
+	@SuppressWarnings("unchecked")
+	public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+		return level.isClientSide() || type != ModBlocks.ALL_IN_ONE_ENTITY ? null
+			: (BlockEntityTicker<T>) (BlockEntityTicker<AllInOneBlockEntity>) (tickLevel, pos, tickState, computer) -> computer.serverTick();
+	}
+
+	@Override
+	protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
+		if (!oldState.is(this)) {
+			Cabling.changed();
+		}
+	}
+
+	@Override
+	protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos, boolean movedByPiston) {
+		Cabling.changed();
+	}
+
+	@Override
 	protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
 		if (level.isClientSide() || !(level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer)) {
 			return InteractionResult.SUCCESS;
@@ -80,7 +100,7 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 			player.openMenu(computer);
 		} else if (player instanceof ServerPlayer serverPlayer) {
 			// Anywhere else: the screen wins. The client opens the display when this arrives.
-			ServerPlayNetworking.send(serverPlayer, new OpenDisplayPayload(pos, computer.display().buffer().resolution()));
+			ServerPlayNetworking.send(serverPlayer, computer.openDisplayPayload());
 		}
 		return InteractionResult.SUCCESS;
 	}

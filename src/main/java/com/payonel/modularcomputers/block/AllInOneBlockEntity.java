@@ -1,9 +1,11 @@
 package com.payonel.modularcomputers.block;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.bus.BusOrder;
 import com.payonel.modularcomputers.bus.Device;
+import com.payonel.modularcomputers.cable.CableWalk;
 import com.payonel.modularcomputers.console.ConsoleSplitter;
 import com.payonel.modularcomputers.device.Disk;
 import com.payonel.modularcomputers.device.Keyboard;
@@ -18,11 +20,14 @@ import com.payonel.modularcomputers.machine.HelloWorldProgram;
 import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.machine.Motherboard;
 import com.payonel.modularcomputers.menu.CaseMenu;
+import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import com.payonel.modularcomputers.sound.ModSounds;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -52,22 +57,32 @@ import net.minecraft.world.level.storage.ValueOutput;
 /**
  * The all-in-one computer: its built-in display and keyboard, and a motherboard whose part
  * slots (CPU, EEPROM, UPS battery, RAM, SATA drives, expansion cards) are filled from the case
- * view. Drives and cards join the physical bus after the built-ins, in an order the player
- * can change (the bus order panel). Power, the parts, the bus order, display contents and the
- * console state are saved and synced to clients. Only the CPU and EEPROM affect the machine so
- * far; RAM and the UPS battery are placeholders.
+ * view. Drives and cards join the physical bus after the built-ins, then the screens wired to
+ * it by cable, in an order the player can change (the bus order panel), where cabled devices
+ * can also be disconnected. Power, the parts, the bus order, display contents and the console
+ * state are saved and synced to clients. Only the CPU and EEPROM affect the machine so far;
+ * RAM and the UPS battery are placeholders.
  */
-public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMenuProvider<BlockPos> {
+public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMenuProvider<BlockPos>, DisplayHost {
 	private static final String POWERED = "powered";
 	private static final String DISPLAY = "display";
 	private static final String FOREGROUND = "display_foreground";
 	private static final String BACKGROUND = "display_background";
 	private static final String CONSOLE = "console";
 	private static final String BUS_ORDER = "bus_order";
+	private static final String BUS_DISCONNECTED = "bus_disconnected";
+	private static final String CABLED = "cabled";
+	private static final String CONSOLE_SCREEN = "console_screen";
+	private static final String CONSOLE_FOREGROUND = "console_foreground";
+	private static final String CONSOLE_BACKGROUND = "console_background";
 	private static final String DISPLAY_KEY = "display";
 	private static final String KEYBOARD_KEY = "keyboard";
 	private static final String SATA_KEY = "sata:";
 	private static final String EXP_KEY = "exp:";
+	/** Cabled devices, by their own id: {@code cable:<uuid>}. */
+	private static final String CABLE_KEY = "cable:";
+	/** Looks for cabled devices this often, in ticks, even when no cable changed (chunks load and unload). */
+	private static final int RESCAN_TICKS = 20;
 	/** Icons for the built-in devices in textures/gui/case_icons.png. */
 	public static final int DISPLAY_ICON = 6;
 	public static final int KEYBOARD_ICON = 7;
@@ -82,6 +97,22 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final Bus bus = new Bus(List.of(display, keyboard));
 	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), bus));
 	private final Parts parts = new Parts();
+	/** The cabled devices found last time, nearest first. Saved and synced, for the bus order panel. */
+	private List<Cabled> cabled = List.of();
+	/** Server side: the cabled devices' displays, by key. */
+	private final Map<String, Display> cabledDisplays = new LinkedHashMap<>();
+	private long seenCableChanges = -1;
+	private int ticks;
+	private int syncedDisplay = -1;
+
+	/** A device wired to this computer: where it is, and how many cable blocks lead to it. */
+	public record Cabled(String key, BlockPos pos, int cables) {
+		static final Codec<Cabled> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+			Codec.STRING.fieldOf("key").forGetter(Cabled::key),
+			BlockPos.CODEC.fieldOf("pos").forGetter(Cabled::pos),
+			Codec.INT.fieldOf("cables").forGetter(Cabled::cables)
+		).apply(instance, Cabled::new));
+	}
 
 	public AllInOneBlockEntity(BlockPos pos, BlockState state) {
 		super(ModBlocks.ALL_IN_ONE_ENTITY, pos, state);
@@ -92,6 +123,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	}
 
 	/** The built-in screen's display. */
+	@Override
 	public Display display() {
 		return display;
 	}
@@ -101,11 +133,26 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return parts;
 	}
 
+	/** What the server sends to open this computer's screen view. */
+	public OpenDisplayPayload openDisplayPayload() {
+		return new OpenDisplayPayload(worldPosition, display.buffer().resolution(), Optional.of(worldPosition), true);
+	}
+
 	/**
 	 * One line of the bus order panel. {@code item} and {@code slot} are the part's item and
-	 * case slot, or empty and -1 for a built-in device.
+	 * case slot, or empty and -1 for a built-in device. Cabled devices have a {@code device}
+	 * position (the bulb finds them in the world) and can be disconnected.
 	 */
-	public record BusEntry(String key, Component name, Component location, ItemStack item, int slot, int builtInIcon) {
+	public record BusEntry(String key, Component name, Component location, ItemStack item, int slot, int builtInIcon,
+		Optional<BlockPos> device, boolean connected) {
+		public boolean cabled() {
+			return device.isPresent();
+		}
+	}
+
+	/** Server side: whether this computer has the screen on its bus (wired and connected). */
+	public boolean drives(ScreenBlockEntity screen) {
+		return cabledDisplays.get(CABLE_KEY + screen.id()) == screen.display() && busOrder.connected().contains(CABLE_KEY + screen.id());
 	}
 
 	/** The devices on the bus, in order, as the bus order panel shows them. Works on clients too. */
@@ -114,16 +161,24 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		Component builtIn = Component.translatable("gui.modularcomputers.bus.built_in");
 		for (String key : busOrder.keys()) {
 			if (key.equals(DISPLAY_KEY)) {
-				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.display"), builtIn, ItemStack.EMPTY, -1, DISPLAY_ICON));
+				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.display"), builtIn, ItemStack.EMPTY, -1, DISPLAY_ICON,
+					Optional.empty(), true));
 			} else if (key.equals(KEYBOARD_KEY)) {
-				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.keyboard"), builtIn, ItemStack.EMPTY, -1, KEYBOARD_ICON));
+				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.keyboard"), builtIn, ItemStack.EMPTY, -1, KEYBOARD_ICON,
+					Optional.empty(), true));
+			} else if (key.startsWith(CABLE_KEY)) {
+				cabled.stream().filter(device -> device.key().equals(key)).findFirst().ifPresent(device -> {
+					ItemStack item = new ItemStack(ModBlocks.SCREEN);
+					Component location = Component.translatable("gui.modularcomputers.bus.cable", device.cables());
+					entries.add(new BusEntry(key, item.getHoverName(), location, item, -1, -1, Optional.of(device.pos()), busOrder.isConnected(key)));
+				});
 			} else {
 				boolean sata = key.startsWith(SATA_KEY);
 				int lane = Integer.parseInt(key.substring(key.indexOf(':') + 1));
 				int slot = (sata ? CaseMenu.SATA_SLOTS : CaseMenu.EXP_SLOTS) + lane;
 				ItemStack item = parts.getItem(slot);
 				Component location = Component.translatable(sata ? "gui.modularcomputers.bus.sata" : "gui.modularcomputers.bus.expansion", lane + 1);
-				entries.add(new BusEntry(key, item.getHoverName(), location, item, slot, -1));
+				entries.add(new BusEntry(key, item.getHoverName(), location, item, slot, -1, Optional.empty(), true));
 			}
 		}
 		return entries;
@@ -138,6 +193,60 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		setChanged();
 		syncToClients();
 		return true;
+	}
+
+	/** Server side: the player plugged a cabled device in or out in the bus order panel. */
+	public boolean setConnected(String key, boolean connected) {
+		if (!key.startsWith(CABLE_KEY) || !busOrder.setConnected(key, connected)) {
+			return false;
+		}
+		rebuildBus();
+		setChanged();
+		syncToClients();
+		return true;
+	}
+
+	/**
+	 * Server side, every tick: looks along the cables again when one changed (or now and then,
+	 * for chunks loading and unloading), and sends the display to clients when it changed.
+	 */
+	void serverTick() {
+		ticks++;
+		if (seenCableChanges != Cabling.changes() || ticks % RESCAN_TICKS == 0) {
+			seenCableChanges = Cabling.changes();
+			scanCables();
+		}
+		if (display.buffer().changes() != syncedDisplay) {
+			syncedDisplay = display.buffer().changes();
+			setChanged();
+			syncToClients();
+		}
+	}
+
+	/** Finds the screens wired to this computer and puts them on the bus. */
+	private void scanCables() {
+		List<Cabled> found = new ArrayList<>();
+		Map<String, Display> displays = new LinkedHashMap<>();
+		for (CableWalk.Found device : Cabling.walk(level, worldPosition)) {
+			if (level.getBlockEntity(device.pos()) instanceof ScreenBlockEntity screen) {
+				String key = CABLE_KEY + screen.id();
+				if (!displays.containsKey(key)) {
+					found.add(new Cabled(key, device.pos(), device.cables()));
+					displays.put(key, screen.display());
+				}
+			}
+		}
+		boolean sameDevices = found.equals(cabled) && displays.keySet().equals(cabledDisplays.keySet())
+			&& displays.entrySet().stream().allMatch(entry -> cabledDisplays.get(entry.getKey()) == entry.getValue());
+		if (sameDevices) {
+			return;
+		}
+		cabled = List.copyOf(found);
+		cabledDisplays.clear();
+		cabledDisplays.putAll(displays);
+		rebuildBus();
+		setChanged();
+		syncToClients();
 	}
 
 	/**
@@ -186,7 +295,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		rebuildBus();
 	}
 
-	/** Puts the bus's devices in the player's order; newly attached ones go last. */
+	/**
+	 * Puts the bus's devices in the player's order; newly attached ones go last. Cabled devices
+	 * that went away keep their place for when they come back, and disconnected ones stay off
+	 * the bus.
+	 */
 	private void rebuildBus() {
 		Map<String, Device> attached = new LinkedHashMap<>();
 		attached.put(DISPLAY_KEY, display);
@@ -201,8 +314,17 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 				attached.put(EXP_KEY + lane, cards[lane]);
 			}
 		}
-		busOrder.sync(List.copyOf(attached.keySet()));
-		bus.setDevices(busOrder.keys().stream().map(attached::get).toList());
+		for (Cabled device : cabled) {
+			// Server side, a device saved as cabled is only on the bus once a scan finds it again.
+			attached.put(device.key(), cabledDisplays.get(device.key()));
+		}
+		busOrder.sync(List.copyOf(attached.keySet()), key -> key.startsWith(CABLE_KEY));
+		List<Device> devices = busOrder.connected().stream().map(attached::get).filter(Objects::nonNull).toList();
+		if (level != null && level.isClientSide()) {
+			bus.setDevices(devices); // clients show what the server sends; they don't run devices
+		} else {
+			machine.setDevices(devices);
+		}
 	}
 
 	/** What each slot held last time, so a change can play the right insert or remove sound. */
@@ -296,12 +418,17 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		super.saveAdditional(output);
 		output.putBoolean(POWERED, machine.isPowered());
 		ContainerHelper.saveAllItems(output, parts.getItems());
-		output.store(BUS_ORDER, Codec.STRING.listOf(), busOrder.keys());
+		output.store(BUS_ORDER, Codec.STRING.listOf(), busOrder.all());
+		output.store(BUS_DISCONNECTED, Codec.STRING.listOf(), busOrder.disconnected());
+		output.store(CABLED, Cabled.CODEC.listOf(), cabled);
 		output.store(DISPLAY, Codec.STRING.listOf(), display.buffer().rows());
 		output.putIntArray(FOREGROUND, display.buffer().foregrounds());
 		output.putIntArray(BACKGROUND, display.buffer().backgrounds());
 		ConsoleSplitter console = machine.board().virtualBus().console();
 		output.putIntArray(CONSOLE, new int[] {console.column(), console.row(), console.foreground(), console.background()});
+		output.store(CONSOLE_SCREEN, Codec.STRING.listOf(), console.screen().rows());
+		output.putIntArray(CONSOLE_FOREGROUND, console.screen().foregrounds());
+		output.putIntArray(CONSOLE_BACKGROUND, console.screen().backgrounds());
 	}
 
 	@Override
@@ -310,14 +437,20 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		machine.restorePowered(input.getBooleanOr(POWERED, false));
 		parts.getItems().clear(); // not clearContent(): that would fire change handling mid-load
 		ContainerHelper.loadAllItems(input, parts.getItems());
-		input.read(BUS_ORDER, Codec.STRING.listOf()).ifPresent(busOrder::restore);
+		input.read(BUS_ORDER, Codec.STRING.listOf()).ifPresent(order ->
+			busOrder.restore(order, input.read(BUS_DISCONNECTED, Codec.STRING.listOf()).orElse(List.of())));
+		cabled = input.read(CABLED, Cabled.CODEC.listOf()).map(List::copyOf).orElse(List.of());
 		installParts();
 		rememberParts(); // loading isn't inserting: no sounds
 		input.read(DISPLAY, Codec.STRING.listOf()).ifPresent(display.buffer()::setRows);
 		input.getIntArray(FOREGROUND).ifPresent(foreground ->
 			input.getIntArray(BACKGROUND).ifPresent(background -> display.buffer().setColors(foreground, background)));
+		ConsoleSplitter console = machine.board().virtualBus().console();
 		input.getIntArray(CONSOLE).filter(state -> state.length == 4).ifPresent(state ->
-			machine.board().virtualBus().console().restore(state[0], state[1], state[2], state[3]));
+			console.restore(state[0], state[1], state[2], state[3]));
+		input.read(CONSOLE_SCREEN, Codec.STRING.listOf()).ifPresent(console.screen()::setRows);
+		input.getIntArray(CONSOLE_FOREGROUND).ifPresent(foreground ->
+			input.getIntArray(CONSOLE_BACKGROUND).ifPresent(background -> console.screen().setColors(foreground, background)));
 	}
 
 	@Override

@@ -50,9 +50,14 @@ final class ComputerButtons {
 	}
 
 	/** @param powerHeld the mouse is still down on the power button */
+	/** An empty area (no width) leaves its button out. */
 	static void extract(GuiGraphicsExtractor graphics, Viewport power, Viewport toggle, Target target, BlockState state, boolean powerHeld) {
-		extractPower(graphics, power, state, powerHeld);
-		extractToggle(graphics, toggle, target);
+		if (power.width() > 0) {
+			extractPower(graphics, power, state, powerHeld);
+		}
+		if (toggle.width() > 0) {
+			extractToggle(graphics, toggle, target);
+		}
 	}
 
 	/** Sends the button's action to the server if the click hit one, and says which it hit. */

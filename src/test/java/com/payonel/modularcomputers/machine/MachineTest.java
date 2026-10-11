@@ -162,4 +162,46 @@ class MachineTest {
 		assertThat(machine.isPowered()).isTrue();
 		assertThat(runs[0]).isZero();
 	}
+
+	@Test
+	void aScreenPluggedIntoARunningMachineShowsTheConsole() {
+		withParts(true, new HelloWorldProgram());
+		machine.pressPower();
+		Display plugged = new Display(Resolution.DEFAULT);
+		List<com.payonel.modularcomputers.bus.Device> devices = new java.util.ArrayList<>(machine.board().bus().devices());
+		devices.add(plugged);
+		machine.setDevices(devices);
+		assertThat(plugged.buffer().rows()).isEqualTo(screen().rows());
+		assertThat(plugged.buffer().isBlank()).isFalse();
+	}
+
+	@Test
+	void aScreenPluggedIntoAnOffMachineStaysAsItWas() {
+		withParts(true, new HelloWorldProgram());
+		Display plugged = new Display(Resolution.DEFAULT);
+		plugged.buffer().write(0, 0, "other");
+		machine.setDevices(List.of(display, plugged));
+		assertThat(plugged.buffer().row(0)).startsWith("other");
+	}
+
+	@Test
+	void unpluggingAScreenFromARunningMachineBlanksIt() {
+		withParts(true, new HelloWorldProgram());
+		machine.pressPower();
+		Display plugged = new Display(Resolution.DEFAULT);
+		machine.setDevices(List.of(display, plugged));
+		assertThat(plugged.buffer().isBlank()).isFalse();
+		machine.setDevices(List.of(display));
+		assertThat(plugged.buffer().isBlank()).isTrue();
+		assertThat(screen().isBlank()).isFalse();
+	}
+
+	@Test
+	void theConsoleRemembersWhatItShowedWhileHeadless() {
+		withParts(true, new HelloWorldProgram());
+		machine.setDevices(List.of());
+		machine.pressPower();
+		machine.setDevices(List.of(display));
+		assertThat(screen().isBlank()).isFalse();
+	}
 }

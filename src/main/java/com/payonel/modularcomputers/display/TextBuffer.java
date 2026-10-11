@@ -16,6 +16,8 @@ public final class TextBuffer {
 	private final char[][] chars;
 	private final int[][] foregrounds;
 	private final int[][] backgrounds;
+	/** Counts changes, so whoever shows the buffer can tell when it needs sending again. */
+	private int changes;
 
 	public TextBuffer(Resolution resolution) {
 		this.resolution = resolution;
@@ -27,6 +29,11 @@ public final class TextBuffer {
 
 	public Resolution resolution() {
 		return resolution;
+	}
+
+	/** Goes up whenever a cell changes (or might have). */
+	public int changes() {
+		return changes;
 	}
 
 	public void clear() {
@@ -69,6 +76,7 @@ public final class TextBuffer {
 	/** Sets one cell. Cells outside the buffer are ignored. */
 	public void set(int column, int row, char c, int foreground, int background) {
 		if (row >= 0 && row < resolution.rows() && column >= 0 && column < resolution.columns()) {
+			changes++;
 			chars[row][column] = c;
 			foregrounds[row][column] = foreground;
 			backgrounds[row][column] = background;
@@ -84,6 +92,7 @@ public final class TextBuffer {
 		if (last < 0) {
 			return;
 		}
+		changes++;
 		for (int row = 0; row < last; row++) {
 			System.arraycopy(chars[row + 1], 0, chars[row], 0, resolution.columns());
 			System.arraycopy(foregrounds[row + 1], 0, foregrounds[row], 0, resolution.columns());
@@ -106,6 +115,7 @@ public final class TextBuffer {
 
 	/** Replaces the characters, e.g. from a save. Rows and text that don't fit are dropped. */
 	public void setRows(List<String> contents) {
+		changes++;
 		for (int row = 0; row < resolution.rows(); row++) {
 			Arrays.fill(chars[row], ' ');
 			if (row < contents.size()) {
@@ -133,6 +143,7 @@ public final class TextBuffer {
 		if (foreground.length != cells || background.length != cells) {
 			return;
 		}
+		changes++;
 		for (int row = 0; row < resolution.rows(); row++) {
 			System.arraycopy(foreground, row * resolution.columns(), foregrounds[row], 0, resolution.columns());
 			System.arraycopy(background, row * resolution.columns(), backgrounds[row], 0, resolution.columns());

@@ -19,5 +19,8 @@
 	"gui.modularcomputers.device.keyboard": "Keyboard",
 	"subtitles.modularcomputers.part_insert": "Computer part seats",
 	"subtitles.modularcomputers.part_remove": "Computer part comes out",
-	"subtitles.modularcomputers.battery_zap": "Battery zaps"
+	"subtitles.modularcomputers.battery_zap": "Battery zaps",
+	"block.modularcomputers.screen": "Screen",
+	"block.modularcomputers.cable": "Cable",
+	"gui.modularcomputers.bus.cable": "cable, %sm"
 }

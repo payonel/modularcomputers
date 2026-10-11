@@ -2,7 +2,7 @@ package com.payonel.modularcomputers.client;
 
 import com.payonel.modularcomputers.ModularComputers;
 import com.payonel.modularcomputers.block.ModBlocks;
-import com.payonel.modularcomputers.client.render.AllInOneRenderer;
+import com.payonel.modularcomputers.client.render.DisplayRenderer;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
 import com.payonel.modularcomputers.menu.CaseMenu;
@@ -24,11 +24,12 @@ public final class ModularComputersClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		BlockEntityRenderers.register(ModBlocks.ALL_IN_ONE_ENTITY, AllInOneRenderer::new);
+		BlockEntityRenderers.register(ModBlocks.ALL_IN_ONE_ENTITY, context -> new DisplayRenderer<>(context, DisplayRenderer.ALL_IN_ONE));
+		BlockEntityRenderers.register(ModBlocks.SCREEN_ENTITY, context -> new DisplayRenderer<>(context, DisplayRenderer.SCREEN));
 		MenuScreens.register(ModMenus.CASE, CaseScreen::new);
 		ClientPlayNetworking.registerGlobalReceiver(OpenDisplayPayload.TYPE, (payload, context) -> {
 			var client = context.client();
-			client.gui.setScreen(new DisplayScreen(payload.pos(), payload.resolution()));
+			client.gui.setScreen(new DisplayScreen(payload));
 			if (client.player.containerMenu instanceof CaseMenu) {
 				// Coming from the case view: the server has already closed the menu.
 				client.player.containerMenu = client.player.inventoryMenu;

@@ -58,9 +58,9 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	/** Near-white: the display's text color. Nothing else in the checked areas is this bright. */
 	private static final int WHITE_THRESHOLD = 220;
 	/** Ticks between right-clicks; the client ignores use clicks closer together than 4 ticks. */
-	private static final int USE_COOLDOWN = 5;
+	static final int USE_COOLDOWN = 5;
 	/** Ticks between mouse clicks: 300 ms, past the double-click window. */
-	private static final int CLICK_PAUSE = 6;
+	static final int CLICK_PAUSE = 6;
 	private static final IntPredicate RED = rgb -> red(rgb) > 150 && green(rgb) < 100 && blue(rgb) < 100;
 	private static final IntPredicate GREEN = rgb -> green(rgb) > 150 && red(rgb) < 130 && blue(rgb) < 130;
 	/** The circuit board's green. */
@@ -319,7 +319,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	}
 
 	/** Stands the player in the middle of {@code feet}, looking toward {@code yaw}. */
-	private static void teleport(TestSingleplayerContext singleplayer, BlockPos feet, int yaw) {
+	static void teleport(TestSingleplayerContext singleplayer, BlockPos feet, int yaw) {
 		// Block centers are +0.5 even for negative coordinates (block -4 spans -4.0..-3.0).
 		singleplayer.getServer().runCommand("tp @p %s %d %s %d 0".formatted(
 			feet.getX() + 0.5, feet.getY(), feet.getZ() + 0.5, yaw));
@@ -368,12 +368,12 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	}
 
 	/** The 1x1 spot just outside an area's top-left corner, {@code gap} units out. */
-	private static Viewport corner(Viewport area, int gap) {
+	static Viewport corner(Viewport area, int gap) {
 		return new Viewport(area.x() - gap, area.y() - gap, 1, 1);
 	}
 
 	/** The screenshot pixel at the middle of an area of the open screen (GUI units). */
-	private static int screenPixel(ClientGameTestContext context, BufferedImage image, Function<Screen, Viewport> area) {
+	static int screenPixel(ClientGameTestContext context, BufferedImage image, Function<Screen, Viewport> area) {
 		return context.computeOnClient(client -> {
 			Screen screen = client.gui.screen();
 			double scale = (double) image.getWidth() / screen.width;
@@ -396,7 +396,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		return slot;
 	}
 
-	private static boolean machinePowered(Minecraft client, BlockPos pos) {
+	static boolean machinePowered(Minecraft client, BlockPos pos) {
 		return client.level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer && computer.machine().isPowered();
 	}
 
@@ -419,7 +419,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	}
 
 	/** Moves the real mouse cursor to the middle of an area of the open screen. */
-	private static void moveCursorTo(ClientGameTestContext context, Function<Screen, Viewport> area) {
+	static void moveCursorTo(ClientGameTestContext context, Function<Screen, Viewport> area) {
 		double[] cursor = context.computeOnClient(client -> {
 			Viewport target = area.apply(client.gui.screen());
 			int scale = client.getWindow().getGuiScale();
@@ -429,7 +429,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	}
 
 	/** Moves the real mouse cursor to the middle of an area of the open screen and clicks ({@code InputConstants.MOUSE_BUTTON_*}). */
-	private static void clickOnScreen(ClientGameTestContext context, int mouseButton, Function<Screen, Viewport> area) {
+	static void clickOnScreen(ClientGameTestContext context, int mouseButton, Function<Screen, Viewport> area) {
 		moveCursorTo(context, area);
 		context.getInput().pressMouse(mouseButton);
 		// Pause like a person would; clicks closer together than 250 ms count as a double-click.
@@ -529,7 +529,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		return new Viewport((int) (v.x() * scale), (int) (v.y() * scale), (int) (v.width() * scale), (int) (v.height() * scale));
 	}
 
-	private static int count(BufferedImage image, int x0, int y0, int x1, int y1, IntPredicate color) {
+	static int count(BufferedImage image, int x0, int y0, int x1, int y1, IntPredicate color) {
 		int count = 0;
 		for (int y = Math.max(0, y0); y < Math.min(image.getHeight(), y1); y++) {
 			for (int x = Math.max(0, x0); x < Math.min(image.getWidth(), x1); x++) {
@@ -542,32 +542,32 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	}
 
 	/** Each channel within {@code tolerance} of {@code expected} (0xRRGGBB). */
-	private static boolean near(int rgb, int expected, int tolerance) {
+	static boolean near(int rgb, int expected, int tolerance) {
 		return Math.abs(red(rgb) - red(expected)) <= tolerance && Math.abs(green(rgb) - green(expected)) <= tolerance
 			&& Math.abs(blue(rgb) - blue(expected)) <= tolerance;
 	}
 
-	private static boolean isWhite(int rgb) {
+	static boolean isWhite(int rgb) {
 		return red(rgb) >= WHITE_THRESHOLD && green(rgb) >= WHITE_THRESHOLD && blue(rgb) >= WHITE_THRESHOLD;
 	}
 
-	private static int red(int rgb) {
+	static int red(int rgb) {
 		return rgb >> 16 & 0xFF;
 	}
 
-	private static int green(int rgb) {
+	static int green(int rgb) {
 		return rgb >> 8 & 0xFF;
 	}
 
-	private static int blue(int rgb) {
+	static int blue(int rgb) {
 		return rgb & 0xFF;
 	}
 
-	private static String hex(int rgb) {
+	static String hex(int rgb) {
 		return "#%06x".formatted(rgb & 0xFFFFFF);
 	}
 
-	private static BufferedImage read(Path screenshot) {
+	static BufferedImage read(Path screenshot) {
 		try {
 			return ImageIO.read(screenshot.toFile());
 		} catch (IOException e) {
@@ -575,7 +575,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		}
 	}
 
-	private static void check(boolean condition, String message) {
+	static void check(boolean condition, String message) {
 		if (!condition) {
 			throw new AssertionError(message);
 		}

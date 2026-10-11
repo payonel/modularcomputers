@@ -3,10 +3,12 @@ package com.payonel.modularcomputers.client.screen;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.payonel.modularcomputers.ModularComputers;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.client.Identify;
 import com.payonel.modularcomputers.display.ScrollWindow;
 import com.payonel.modularcomputers.display.Viewport;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.menu.CaseMenu;
+import com.payonel.modularcomputers.network.ConnectDevicePayload;
 import com.payonel.modularcomputers.network.ReorderBusPayload;
 import com.payonel.modularcomputers.power.ChargeMeter;
 import java.util.List;
@@ -24,7 +26,9 @@ import net.minecraft.world.item.ItemStack;
 /**
  * The case view: the computer's motherboard with its part slots, above the player's inventory.
  * Left of it, the bus order panel lists every device on the bus in discovery order, one row
- * each; its arrows move a device up or down, and it scrolls when the devices don't all fit. Right of it, the power button and the toggle back to the screen
+ * each; its arrows move a device up or down, and it scrolls when the devices don't all fit.
+ * Cabled devices also get a bulb (outline the device in the world for a while) and a plug
+ * (connect or disconnect it). Right of it, the power button and the toggle back to the screen
  * view, as in the screen view.
  * <p>
  * The board, the bus panel's backing and the icons are textures (scripts/art/case_gui_textures.py);
@@ -76,6 +80,11 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int METER_LOW = 0xFFDC3C32;
 	private static final int METER_MEDIUM = 0xFFE6C83C;
 	private static final int METER_HIGH = 0xFF5AE66E;
+	private static final int BULB_LIT = 0xFFFFE066;
+	private static final int BULB_OFF = 0xFFE8E8E0;
+	private static final int BULB_BASE = 0xFF505058;
+	private static final int PLUG_IN = 0xFF3CB45A;
+	private static final int PLUG_OUT = 0xFF8C8C8C;
 
 	private boolean powerHeld;
 	private boolean showBus;
@@ -130,6 +139,18 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	public Viewport busArrow(int row, boolean up) {
 		Viewport panel = busPanel();
 		return new Viewport(panel.x() + BUS_ROW_X + BUS_ROW_W - 26 + (up ? 0 : 12), panel.y() + BUS_ROW_Y + row * BUS_ROW_H + 4, 11, 11);
+	}
+
+	/** The bulb of a cabled device's row: outlines the device in the world. */
+	public Viewport busBulb(int row) {
+		Viewport up = busArrow(row, true);
+		return new Viewport(up.x() - 26, up.y(), 11, 11);
+	}
+
+	/** The plug of a cabled device's row: connects or disconnects it. */
+	public Viewport busPlug(int row) {
+		Viewport up = busArrow(row, true);
+		return new Viewport(up.x() - 14, up.y(), 11, 11);
 	}
 
 	/** The scrollbar's track, shown only when the devices don't all fit. */
@@ -365,8 +386,12 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			} else {
 				graphics.item(entry.item(), panel.x() + BUS_ROW_X + 1, ry + 1);
 			}
-			graphics.text(font, entry.name(), panel.x() + 41, ry + 1, LIGHT, false);
+			graphics.text(font, entry.name(), panel.x() + 41, ry + 1, entry.connected() ? LIGHT : SILK_DIM, false);
 			graphics.text(font, entry.location(), panel.x() + 41, ry + 10, SILK_DIM, false);
+			if (entry.cabled()) {
+				extractBulb(graphics, busBulb(row), Identify.isOn(entry.device().get()));
+				extractPlug(graphics, busPlug(row), entry.connected());
+			}
 			extractArrow(graphics, busArrow(row, true), true, index > 0);
 			extractArrow(graphics, busArrow(row, false), false, index < entries.size() - 1);
 		}
@@ -379,14 +404,47 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		}
 	}
 
-	/** An 11x11 button with a triangle; greyed out when the device can't move that way. */
-	private static void extractArrow(GuiGraphicsExtractor graphics, Viewport b, boolean up, boolean enabled) {
+	/** The face of an 11x11 button; greyed out when disabled. */
+	private static void extractButton(GuiGraphicsExtractor graphics, Viewport b, boolean enabled) {
 		graphics.fill(b.x(), b.y(), b.right(), b.bottom(), OUTLINE);
 		graphics.fill(b.x() + 1, b.y() + 1, b.right() - 1, b.bottom() - 1, enabled ? 0xFFAAAAAA : 0xFF6E6E6E);
 		if (enabled) {
 			graphics.fill(b.x() + 1, b.bottom() - 2, b.right() - 1, b.bottom() - 1, 0xFF646464);
 			graphics.fill(b.x() + 1, b.y() + 1, b.x() + 2, b.bottom() - 1, 0xFFDCDCDC);
 		}
+	}
+
+	/** A light bulb: lit yellow while the device is outlined in the world. */
+	private static void extractBulb(GuiGraphicsExtractor graphics, Viewport b, boolean lit) {
+		extractButton(graphics, b, true);
+		int glass = lit ? BULB_LIT : BULB_OFF;
+		int x = b.x();
+		int y = b.y();
+		graphics.fill(x + 4, y + 2, x + 7, y + 3, glass);
+		graphics.fill(x + 3, y + 3, x + 8, y + 6, glass);
+		graphics.fill(x + 4, y + 6, x + 7, y + 7, glass);
+		graphics.fill(x + 4, y + 7, x + 7, y + 9, BULB_BASE);
+	}
+
+	/**
+	 * A plug over its socket: pushed in (green) while the device is connected, pulled out (grey,
+	 * with a gap) when it isn't.
+	 */
+	private static void extractPlug(GuiGraphicsExtractor graphics, Viewport b, boolean connected) {
+		extractButton(graphics, b, true);
+		int x = b.x();
+		int y = b.y();
+		graphics.fill(x + 2, y + 8, x + 9, y + 9, OUTLINE); // the socket
+		int body = connected ? PLUG_IN : PLUG_OUT;
+		int top = connected ? y + 3 : y + 1;
+		graphics.fill(x + 3, top, x + 8, top + 3, body);
+		graphics.fill(x + 4, top + 3, x + 5, top + 5, BULB_BASE);
+		graphics.fill(x + 6, top + 3, x + 7, top + 5, BULB_BASE);
+	}
+
+	/** An 11x11 button with a triangle; greyed out when the device can't move that way. */
+	private static void extractArrow(GuiGraphicsExtractor graphics, Viewport b, boolean up, boolean enabled) {
+		extractButton(graphics, b, enabled);
 		int ink = enabled ? LIGHT : 0xFF969696;
 		for (int i = 0; i < 3; i++) {
 			int row = b.y() + (up ? 3 + i : 7 - i);
@@ -405,10 +463,20 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		}
 		boolean leftOrRight = event.button() == InputConstants.MOUSE_BUTTON_LEFT || event.button() == InputConstants.MOUSE_BUTTON_RIGHT;
 		if (showBus && leftOrRight) {
-			int devices = busEntries().size();
+			List<AllInOneBlockEntity.BusEntry> entries = busEntries();
+			int devices = entries.size();
 			ScrollWindow window = busWindow(devices);
 			for (int row = 0; row < window.rowsShown(busScroll); row++) {
 				int index = busScroll + row;
+				AllInOneBlockEntity.BusEntry entry = entries.get(index);
+				if (entry.cabled() && busBulb(row).contains(event.x(), event.y())) {
+					Identify.toggle(entry.device().get());
+					return true;
+				}
+				if (entry.cabled() && busPlug(row).contains(event.x(), event.y())) {
+					ClientPlayNetworking.send(new ConnectDevicePayload(menu.pos(), entry.key(), !entry.connected()));
+					return true;
+				}
 				for (boolean up : new boolean[] {true, false}) {
 					boolean enabled = up ? index > 0 : index < devices - 1;
 					if (enabled && busArrow(row, up).contains(event.x(), event.y())) {

@@ -4,7 +4,7 @@ This file is the full context for any agent session working on this repo. `CLAUD
 (Claude Code reads `CLAUDE.md`, not `AGENTS.md`; other agent tools read `AGENTS.md`). Keep it
 current: when a decision is made or a gotcha is found, record it here.
 
-Last updated: 2026-10-09 (project bootstrap session; host notes revised).
+Last updated: 2026-10-11 (screens, cables and cabled devices in the bus order).
 
 ---
 
@@ -64,7 +64,8 @@ same thing.
   - unit tests
   - server game tests
   - client game tests against the release jar, on Xvfb
-- Gameplay so far: one block, the **all-in-one computer** (`modularcomputers:all_in_one`).
+- Gameplay so far: the **all-in-one computer** (`modularcomputers:all_in_one`), plus a
+  **screen** block and a **cable** (see "Screens and cables" below).
   - It's a full cube in beige retro style, with a screen above a keyboard on the front face.
     It faces the player who places it.
   - It's listed in the mod's own creative tab, "Modular Computers" (`ModCreativeTab`). Fabric
@@ -127,21 +128,28 @@ same thing.
         - Each position number is etched into the board to the left of its row and stays
           with the position when devices move.
         - Each row has the device's icon in a socket, then a dark display with its name and
-          location ("built-in", "SATA 1", "EXP 2"; a cabled device will read "cable, 5m").
+          location ("built-in", "SATA 1", "EXP 2", or "cable, 5m": cable blocks to it).
         - **Linked hover:** hovering a part slot outlines its bus row, and hovering a row
           outlines its slot (`BusEntry.slot`). Built-ins have no slot.
         - The ↑/↓ arrows send `ReorderBusPayload`; they're greyed out at the ends.
-        - Order lives in `bus/BusOrder`: devices keep their place, new ones go last,
-          removed ones drop out. It's saved, and the machine's `Bus` follows it.
+        - Order lives in `bus/BusOrder`: devices keep their place, new ones go last
+          ("first found on top"), removed parts drop out. It's saved, and the machine's `Bus`
+          follows it.
+        - **Cabled devices** (screens) get two more buttons left of the arrows:
+          - The **bulb** outlines the device in the world for 10 seconds, pulsing yellow and
+            seen through walls (`client/Identify`, drawn by `DisplayRenderer`). It's
+            client-side: only that player sees it. Clicking it again stops it.
+          - The **plug** connects or disconnects it (`ConnectDevicePayload`). Plugged in it's
+            green; pulled out it's grey, and the row's name dims. A disconnected device stays
+            listed in its place but is off the bus. Built-ins and parts can't be unplugged.
         - The panel is left out on windows narrower than about 382 GUI units.
-        - The **light bulb** (highlight a cabled device in the world) waits for cabled
-          devices.
       - **Part sounds:** putting a part in or taking it out plays its own sound, server side,
         from the slot changes (`AllInOneBlockEntity.playPartSounds`).
         - RAM: a slide and latch clicks. CPU: a drop and the lever. EEPROM: a chip press.
           Disk: a slide and a clunk. Card: a slide, a seat and a clip. UPS battery: a tiny
           zap on insert.
-        - They're synthesized by `scripts/art/part_sounds.py`. The user wanted them soft, not
+        - They're synthesized by `scripts/art/screen_cable_textures.py draws the screen block's and the cable's textures (Pillow); PNGs are committed
+scripts/art/part_sounds.py`. The user wanted them soft, not
           Minecraft's abrasive click.
         - Slides are sparse grains ringing a resonance (a plastic rasp). The first version's
           noise slides sounded like breathing into a mic; the user asked to keep them as a
@@ -215,9 +223,43 @@ scripts/art/error_beep.py` into
 - **Lua runtime:** the user is building their own Lua runtime as a separate project, and it
   isn't ready. Leave VM/runtime work alone and keep building the computer's other features.
   Machine behavior stays a stand-in (like the "hello world" greeting) until the runtime lands.
-- **Cabled devices and bus-order memory** (connect/disconnect toggle, gaps in the bus walk,
-  remembering positions per case, chunk unloads) are designed in `docs/PLAN.md`, and parts
-  are **undecided: a documented gap**. Ask the user before building cabled devices.
+- **Screens and cables** (built 2026-10-11, the user's request):
+  - **Screen** (`ScreenBlock`, `ScreenBlockEntity`): a monitor block, full glass above a chin,
+    50x16 like the built-in display. It faces the player who places it.
+    - Right-click opens its screen view. That view has the power button of the computer it
+      shows (`Cabling.computerFor`: the nearest one with it connected), and no view toggle.
+      It has no power button when no computer drives it.
+    - Each screen has a UUID (`screen_id`, saved), its bus order key `cable:<uuid>`. A
+      re-placed screen is a new screen.
+    - It saves its display and sends changes to clients from its own tick (`TextBuffer.changes`).
+  - **Cable** (`CableBlock`, a vanilla `PipeBlock`, 4 pixels thick): joins any neighbor that
+    takes a cable on that side, and its multipart model shows each join.
+    - Cables join other cables, and screens and computers on **any side but the front**
+      (`Cabling.hasPort`; the front is glass or keyboard).
+    - A screen or computer right next to another without a cable is **not** connected.
+  - **Discovery** (`cable/CableWalk`, plain Java, breadth-first, nearest first):
+    - A computer walks its cables in its server tick when any cable, screen or computer was
+      placed or removed anywhere (`Cabling.changes()`), and every 20 ticks anyway, for chunks
+      loading and unloading.
+    - A device ends the walk: screens don't pass the cable on. It never looks into unloaded
+      chunks.
+    - Only screens are cabled devices so far. Another computer's built-in display is its own.
+  - **One screen, many computers:** a screen can be wired to several computers, and each
+    has it on its bus.
+    - Each writes to it; the last write wins, and powering one off blanks it.
+    - Proper sharing waits for the "virtual multicast text buffer" design (below).
+  - **Every connected screen shows hello world (user's hard-coded choice for now):** the
+    console writes to every display on the bus. The user wants this replaced later by a
+    "virtual multicast text buffer" on the motherboard's virtual bus, so the EEPROM chooses.
+- **Bus order memory and gaps (defaults picked when building cables; the user can change
+  them):**
+  - Order is set the first time a device is seen.
+  - A cabled device that goes away (cable cut, chunk unloaded, broken) is **remembered** in
+    its place. At most `BusOrder.MAX_REMEMBERED` (32) absent devices are remembered;
+    the earliest-listed go first.
+  - Disconnected devices are remembered too, and saved.
+  - The bus walk the machine sees is **gapless**: disconnected and absent devices are left out
+    of `Bus.devices()`. Whether firmware should see gaps is still open (`docs/PLAN.md`).
 - **Roadmap and ideas: `docs/PLAN.md`.** Record new plans and decided-but-unbuilt ideas there.
   Move items into this section as they're built.
 - Design rule: machine logic stays in plain Java (`machine/`, `bus/`, `console/`, `device/`,
@@ -260,6 +302,15 @@ scripts/art/error_beep.py` into
     `HEADLESS` (a real size, never 0×0, like Linux's dummycon).
   - It owns the cursor and the current colors. It wraps text at the right edge, `clear()`
     fills its area, and it scrolls only its own area.
+  - Like a Linux virtual console, it keeps **its own copy of what it shows**
+    (`ConsoleSplitter.screen()`, saved with the computer). `redraw(display)` paints it onto a
+    display that joins later.
+- **Hot-plug (`Machine.setDevices`):** the bus changes when a part goes in or out, a cable is
+  plugged or unplugged, or the player reorders. While the machine runs:
+  - devices that left get `powerOff()` (an unplugged screen goes blank);
+  - displays that joined get the console redrawn onto them (like fbcon taking over a new
+    framebuffer).
+  - Clients only replace their `Bus` list; they never run devices.
   - A minimal EEPROM just prints to it. Advanced code can walk the physical bus instead.
 - **Power-off:** every device gets `powerOff()` (displays blank), and the console resets.
 - **Saved and synced:** the block entity saves and syncs the switch, the parts, the display
@@ -433,8 +484,10 @@ scripts/setup-headless-host.sh      # one-time: install Xvfb (sudo or ~/.local) 
    - They run headless via `runGameTest`, which is part of `testAll` but **not** of `build`.
      Loom adds `runGameTest` to `check` by name; `build.gradle` removes it so `build` stays fast
      (the user wants `build` quick and iterative).
-   - The run reports "All 22 required tests passed": 21 are ours, and one is of unknown origin
-     (not investigated).
+   - The run reports "All 30 required tests passed": 29 are ours (21 in `AllInOneGameTest`,
+     8 in `CableGameTest`), and one is of unknown origin (not investigated).
+   - Cable and screen tests wait for the computer's tick to scan
+     (`helper.succeedWhen`/`startSequence().thenWaitUntil`).
    - `helper.makeMockPlayer(GameType)` and `helper.useBlock(pos, player)` exercise real
      right-click handling. Call `player.setShiftKeyDown(true)` for sneak-use.
 3. **Client game tests** in `src/gametest/java`, implementing `FabricClientGameTest`.
@@ -614,24 +667,30 @@ src/main/java/com/payonel/modularcomputers/
   console/ConsoleSplitter.java     the always-present console on the virtual bus
   device/                          Keyboard, Disk (bus devices; no behavior yet)
   display/                         plain Java: Display (bus device), Resolution, TextBuffer, Viewport, DisplayLayout (GUI layout math)
+  cable/CableWalk.java             plain Java: follows cables out from a block to the devices at the ends
   ModCreativeTab.java              the "Modular Computers" creative tab
   item/ModItems.java               CPU and EEPROM items
   menu/                            CaseMenu (part slots + inventory), ModMenus
-  block/                           AllInOneBlock, AllInOneBlockEntity, BackPanel (back-face hit regions), ModBlocks (registrations)
+  block/                           AllInOneBlock, AllInOneBlockEntity, BackPanel (back-face hit regions), ModBlocks (registrations),
+                                   ScreenBlock, ScreenBlockEntity, CableBlock, Cabling (ports, walking, change counter), DisplayHost
   command/ModCommands.java         /modularcomputers giveall (cheat: one of every mod item)
   network/OpenDisplayPayload.java  server->client "open this display"
   network/PressPowerPayload.java  client->server "power button clicked in a GUI"
   network/SwitchViewPayload.java   client->server "view toggle clicked" (screen view <-> case view)
+  network/ReorderBusPayload.java   client->server "move this bus device up/down"
+  network/ConnectDevicePayload.java client->server "plug this cabled device in / out"
 src/client/java/com/payonel/modularcomputers/client/
   ModularComputersClient.java      registers renderer + packet receiver
-  render/                          AllInOneRenderer (text on the block face), TextGrid (cell layout)
+  render/                          DisplayRenderer (text on a screen's glass, both blocks; the bulb's outline), TextGrid (cell layout)
+  Identify.java                    the bulb: which devices are outlined, until when
   screen/DisplayScreen.java        the screen view (right-click; "modal mode")
   screen/CaseScreen.java           the case view (slots)
   screen/ComputerButtons.java      power button + view toggle, shared by both views
 src/main/resources/                fabric.mod.json, assets (blockstates, models, items, textures, lang), data (loot table, pickaxe tag)
 src/test/java/...                  unit tests (ModularComputersTest, machine/, display/)
-src/gametest/java/.../gametest/    ModularComputersGameTest + AllInOneGameTest (server),
-                                   ModularComputersClientGameTest + AllInOneClientGameTest (client)
+src/gametest/java/.../gametest/    ModularComputersGameTest + AllInOneGameTest + CableGameTest (server),
+                                   ModularComputersClientGameTest + AllInOneClientGameTest + CableClientGameTest (client),
+                                   MouseGrabs + mixin/MouseGrabCounter (counts mouse grabs for the client test)
 src/gametest/resources/fabric.mod.json                                   test mod (entrypoints fabric-gametest, fabric-client-gametest)
 ```
 

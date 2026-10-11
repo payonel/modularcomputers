@@ -1,3 +1,6 @@
 {
-	"values": ["modularcomputers:all_in_one"]
+	"values": [
+		"modularcomputers:all_in_one",
+		"modularcomputers:screen"
+	]
 }

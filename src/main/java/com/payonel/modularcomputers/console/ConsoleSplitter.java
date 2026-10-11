@@ -17,12 +17,17 @@ import java.util.List;
  * of them; with no displays it reports {@link #HEADLESS}. It keeps the cursor and the current
  * colors: text wraps at the right edge, and a new line at the bottom scrolls the console area
  * up.
+ * <p>
+ * Like a Linux virtual console, it keeps its own copy of what it shows (its {@link #screen()}),
+ * so it can {@link #redraw} that onto a display that joins later.
  */
 public final class ConsoleSplitter {
 	/** The size reported when no display is attached; never 0x0, so callers need no special case. */
 	public static final Resolution HEADLESS = Resolution.DEFAULT;
 
 	private final Bus bus;
+	/** What the console shows, in the top-left corner of its (largest possible) size. */
+	private final TextBuffer screen = new TextBuffer(HEADLESS);
 	private int column;
 	private int row;
 	private int foreground = TextBuffer.DEFAULT_FOREGROUND;
@@ -37,13 +42,28 @@ public final class ConsoleSplitter {
 		if (displays.isEmpty()) {
 			return HEADLESS;
 		}
-		int columns = Integer.MAX_VALUE;
-		int rows = Integer.MAX_VALUE;
+		int columns = screen.resolution().columns();
+		int rows = screen.resolution().rows();
 		for (Display display : displays) {
 			columns = Math.min(columns, display.buffer().resolution().columns());
 			rows = Math.min(rows, display.buffer().resolution().rows());
 		}
 		return new Resolution(columns, rows);
+	}
+
+	/** The console's own copy of what it shows; save it with the cursor. */
+	public TextBuffer screen() {
+		return screen;
+	}
+
+	/** Draws the console onto a display that just joined, e.g. a screen plugged into a running machine. */
+	public void redraw(Display display) {
+		Resolution size = size();
+		for (int y = 0; y < size.rows(); y++) {
+			for (int x = 0; x < size.columns(); x++) {
+				display.buffer().set(x, y, screen.get(x, y), screen.foreground(x, y), screen.background(x, y));
+			}
+		}
 	}
 
 	public int column() {
@@ -71,6 +91,7 @@ public final class ConsoleSplitter {
 	/** Blanks the console area in the current colors and moves the cursor to the top left. */
 	public void clear() {
 		Resolution size = size();
+		screen.fill(0, 0, size.columns(), size.rows(), foreground, background);
 		for (Display display : displays()) {
 			display.buffer().fill(0, 0, size.columns(), size.rows(), foreground, background);
 		}
@@ -91,6 +112,7 @@ public final class ConsoleSplitter {
 			if (column >= size.columns()) {
 				newLine(size, displays);
 			}
+			screen.set(column, row, c, foreground, background);
 			for (Display display : displays) {
 				display.buffer().set(column, row, c, foreground, background);
 			}
@@ -105,6 +127,7 @@ public final class ConsoleSplitter {
 
 	/** Back to the top-left corner and default colors, e.g. after power loss (the displays clear themselves). */
 	public void reset() {
+		screen.clear();
 		column = 0;
 		row = 0;
 		foreground = TextBuffer.DEFAULT_FOREGROUND;
@@ -123,6 +146,7 @@ public final class ConsoleSplitter {
 		column = 0;
 		row++;
 		if (row >= size.rows()) {
+			screen.scrollUp(size.rows(), foreground, background);
 			for (Display display : displays) {
 				display.buffer().scrollUp(size.rows(), foreground, background);
 			}

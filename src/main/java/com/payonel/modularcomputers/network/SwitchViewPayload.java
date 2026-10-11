@@ -37,7 +37,7 @@ public record SwitchViewPayload(BlockPos pos, boolean toCase) implements CustomP
 				// screen view. Closing it there first would pass through "no screen", which grabs the
 				// mouse and recenters the cursor.
 				player.doCloseContainer();
-				ServerPlayNetworking.send(player, new OpenDisplayPayload(payload.pos(), computer.display().buffer().resolution()));
+				ServerPlayNetworking.send(player, computer.openDisplayPayload());
 			}
 		});
 	}

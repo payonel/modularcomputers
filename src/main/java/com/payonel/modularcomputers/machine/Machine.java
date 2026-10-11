@@ -1,5 +1,9 @@
 package com.payonel.modularcomputers.machine;
 
+import com.payonel.modularcomputers.bus.Device;
+import com.payonel.modularcomputers.display.Display;
+import java.util.List;
+
 /**
  * A computer and its power switch, independent of Minecraft. The machine is only ever on with
  * a CPU in the socket: pressing power without one is refused (the caller reports the error),
@@ -58,6 +62,30 @@ public final class Machine {
 		powered = false;
 		board.powerOff();
 		return true;
+	}
+
+	/**
+	 * Puts these devices on the bus, in order: a part went in or out, a cable was plugged or
+	 * unplugged, or the player reordered them. While the machine runs, devices that left lose
+	 * power (an unplugged screen goes blank), and displays that joined get the console drawn
+	 * onto them (hot-plug, like fbcon taking over a new framebuffer).
+	 */
+	public void setDevices(List<Device> devices) {
+		List<Device> before = board.bus().devices();
+		board.bus().setDevices(devices);
+		if (!powered) {
+			return;
+		}
+		for (Device device : before) {
+			if (!devices.contains(device)) {
+				device.powerOff();
+			}
+		}
+		for (Device device : devices) {
+			if (!before.contains(device) && device instanceof Display display) {
+				board.virtualBus().console().redraw(display);
+			}
+		}
 	}
 
 	/**

@@ -25,6 +25,16 @@ public final class ModBlocks {
 		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("all_in_one"),
 		new BlockEntityType<>(AllInOneBlockEntity::new, Set.of(ALL_IN_ONE)));
 
+	public static final Block SCREEN = registerWithItem("screen", ScreenBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(2.0f).sound(SoundType.METAL));
+
+	public static final BlockEntityType<ScreenBlockEntity> SCREEN_ENTITY = Registry.register(
+		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("screen"),
+		new BlockEntityType<>(ScreenBlockEntity::new, Set.of(SCREEN)));
+
+	public static final Block CABLE = registerWithItem("cable", CableBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(0.5f).sound(SoundType.WOOL).noOcclusion());
+
 	private ModBlocks() {
 	}
 

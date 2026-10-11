@@ -7,11 +7,13 @@
 	"entrypoints": {
 		"fabric-gametest": [
 			"com.payonel.modularcomputers.gametest.ModularComputersGameTest",
-			"com.payonel.modularcomputers.gametest.AllInOneGameTest"
+			"com.payonel.modularcomputers.gametest.AllInOneGameTest",
+			"com.payonel.modularcomputers.gametest.CableGameTest"
 		],
 		"fabric-client-gametest": [
 			"com.payonel.modularcomputers.gametest.ModularComputersClientGameTest",
-			"com.payonel.modularcomputers.gametest.AllInOneClientGameTest"
+			"com.payonel.modularcomputers.gametest.AllInOneClientGameTest",
+			"com.payonel.modularcomputers.gametest.CableClientGameTest"
 		]
 	},
 	"mixins": [

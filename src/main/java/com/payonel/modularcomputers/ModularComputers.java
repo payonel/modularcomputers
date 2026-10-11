@@ -5,6 +5,7 @@ import com.payonel.modularcomputers.command.ModCommands;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.ModMenus;
+import com.payonel.modularcomputers.network.ConnectDevicePayload;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import com.payonel.modularcomputers.network.ReorderBusPayload;
 import com.payonel.modularcomputers.network.SwitchViewPayload;
@@ -52,6 +53,7 @@ public final class ModularComputers implements ModInitializer {
 		PressPowerPayload.register();
 		SwitchViewPayload.register();
 		ReorderBusPayload.register();
+		ConnectDevicePayload.register();
 		initialized = true;
 		LOGGER.info("{} (version {})", INIT_MARKER, version());
 	}

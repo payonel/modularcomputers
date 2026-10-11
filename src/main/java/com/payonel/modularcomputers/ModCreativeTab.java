@@ -24,6 +24,8 @@ public final class ModCreativeTab {
 			.icon(() -> new ItemStack(ModBlocks.ALL_IN_ONE))
 			.displayItems((parameters, output) -> {
 				output.accept(ModBlocks.ALL_IN_ONE);
+				output.accept(ModBlocks.SCREEN);
+				output.accept(ModBlocks.CABLE);
 				output.accept(ModItems.CPU);
 				output.accept(ModItems.EEPROM);
 				output.accept(ModItems.RAM);

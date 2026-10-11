@@ -1,11 +1,14 @@
 package com.payonel.modularcomputers.client.screen;
 
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.DisplayHost;
 import com.payonel.modularcomputers.client.render.TextGrid;
 import com.payonel.modularcomputers.display.DisplayLayout;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.display.TextBuffer;
 import com.payonel.modularcomputers.display.Viewport;
+import com.payonel.modularcomputers.network.OpenDisplayPayload;
+import java.util.Optional;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -13,14 +16,14 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 
 /**
- * Shows a screen block's display in the player's view. It is sized from the screen's resolution
- * as soon as it opens (no placeholder box) and fills most of the window. It shows the same
- * text as the screen block's face; an off computer shows black.
+ * Shows a screen's display in the player's view: the all-in-one's or a screen block's. It is
+ * sized from the screen's resolution as soon as it opens (no placeholder box) and fills most of
+ * the window. It shows the same text as the block's face; an off computer shows black.
  * <p>
  * The display sits in a bezel like the screen surround on the computer's front. Right of the
- * bezel, from its top edge down: the power button, which looks like the one on
- * the computer's back, and the toggle to the case view (see {@link ComputerButtons}). Once
- * screens are separate blocks, these show only when the screen is connected to a case.
+ * bezel, from its top edge down: the power button, which looks like the one on the computer's
+ * back, and the toggle to the case view (see {@link ComputerButtons}). A screen block shows the
+ * power button only when it's connected to a computer, and has no case view.
  */
 public final class DisplayScreen extends Screen {
 	/** Share of the window, in each direction, that the display may fill. */
@@ -35,14 +38,19 @@ public final class DisplayScreen extends Screen {
 
 	private final BlockPos pos;
 	private final Resolution resolution;
+	/** The computer whose power button shows, if any. */
+	private final Optional<BlockPos> computer;
+	private final boolean caseView;
 	private static final Viewport NONE = new Viewport(0, 0, 0, 0);
 	private DisplayLayout layout = new DisplayLayout(NONE, NONE, NONE, NONE);
 	private boolean powerHeld;
 
-	public DisplayScreen(BlockPos pos, Resolution resolution) {
+	public DisplayScreen(OpenDisplayPayload payload) {
 		super(Component.translatable("gui.modularcomputers.display"));
-		this.pos = pos;
-		this.resolution = resolution;
+		this.pos = payload.pos();
+		this.resolution = payload.resolution();
+		this.computer = payload.computer();
+		this.caseView = payload.caseView();
 	}
 
 	public BlockPos pos() {
@@ -58,12 +66,14 @@ public final class DisplayScreen extends Screen {
 		return layout.bezel();
 	}
 
+	/** The power button, or an empty area when there's no computer to power. */
 	public Viewport powerButton() {
-		return layout.powerButton();
+		return computer.isPresent() ? layout.powerButton() : NONE;
 	}
 
+	/** The toggle to the case view, or an empty area when there's no case. */
 	public Viewport viewToggle() {
-		return layout.viewToggle();
+		return caseView ? layout.viewToggle() : NONE;
 	}
 
 	@Override
@@ -73,7 +83,7 @@ public final class DisplayScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		var hit = ComputerButtons.click(event, layout.powerButton(), layout.viewToggle(), ComputerButtons.Target.CASE, pos);
+		var hit = ComputerButtons.click(event, powerButton(), viewToggle(), ComputerButtons.Target.CASE, pos);
 		powerHeld = hit == ComputerButtons.Hit.POWER;
 		return hit != ComputerButtons.Hit.NONE || super.mouseClicked(event, doubleClick);
 	}
@@ -95,9 +105,11 @@ public final class DisplayScreen extends Screen {
 		extractBezel(graphics);
 		Viewport display = layout.display();
 		graphics.fill(display.x(), display.y(), display.right(), display.bottom(), BLACK);
-		if (minecraft.level != null && minecraft.level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer) {
-			extractText(graphics, computer.display().buffer());
-			ComputerButtons.extract(graphics, layout.powerButton(), layout.viewToggle(), ComputerButtons.Target.CASE, computer.getBlockState(), powerHeld);
+		if (minecraft.level != null && minecraft.level.getBlockEntity(pos) instanceof DisplayHost host) {
+			extractText(graphics, host.display().buffer());
+		}
+		if (minecraft.level != null && computer.isPresent() && minecraft.level.getBlockEntity(computer.get()) instanceof AllInOneBlockEntity machine) {
+			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.CASE, machine.getBlockState(), powerHeld);
 		}
 		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 	}
@@ -158,7 +170,7 @@ public final class DisplayScreen extends Screen {
 	public void tick() {
 		// Close when the screen block is gone or the player walked away.
 		var player = minecraft.player;
-		if (player == null || !(player.level().getBlockEntity(pos) instanceof AllInOneBlockEntity)
+		if (player == null || !(player.level().getBlockEntity(pos) instanceof DisplayHost)
 			|| !player.isWithinBlockInteractionRange(pos, 1.0)) {
 			onClose();
 		}

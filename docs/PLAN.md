@@ -19,6 +19,10 @@ skip steps freely, never invent false steps (see `AGENTS.md` section 1).
   runs. The EEPROM holds the stand-in "hello world" program; without one the CPU shows the
   soft gray **ABRT** screen.
 - **`/modularcomputers giveall`:** a cheat command that gives one of every mod item.
+- **Screen block and cable** (2026-10-11): single-block screens joined to computers by
+  cables that visibly join their neighbors. Computers discover wired screens and list them
+  in the bus order panel ("cable, Nm"), with the **light bulb** (outline in the world) and
+  the **connect/disconnect plug**. Every connected screen shows hello world (hard-coded).
 - **Machine model:**
   - The CPU loads its program from the fixed EEPROM slot.
   - A physical bus of self-describing devices, and a virtual bus with the always-present
@@ -34,8 +38,6 @@ skip steps freely, never invent false steps (see `AGENTS.md` section 1).
   - The UPS battery charges and powers the machine when power drops.
 - **CPU status dots:** the 4 lit dots left of the CPU socket are a good place for more
   status later. Today they just light when a CPU is in.
-- **Bus order light bulb:** highlight a cabled device in the world. It waits for cabled
-  devices to exist.
 - **Narrow windows:** the bus order panel is hidden below about 382 GUI units of width.
   Consider a toggle or a smaller layout.
 - **Tiers and power:** components with tiers. Real power supply and distribution.
@@ -57,9 +59,12 @@ The all-in-one stays the test bed. Later there are separate blocks:
   button shows only when the screen is connected to a case.
 - **The all-in-one is both.** Right-click on it opens the screen (the screen wins). The view
   toggle button switches between the case view and the screen view. Built.
-- **Keyboards and cables:** external devices joined by cables.
+- **Keyboards:** external keyboards, joined by cable like screens. Cables and screens are
+  built.
+- **Multiblock screens that auto-grow (user idea, 2026-10-11, undecided):** neighboring screen
+  blocks merging into one bigger display. For now screens are single blocks.
 
-### Cabled devices and the bus (user decisions, 2026-10-10; not built)
+### Cabled devices and the bus (user decisions, 2026-10-10; built 2026-10-11)
 
 - **One device, many computers.** A cabled device (screen, keyboard, ...) may be connected to
   several computers at once.
@@ -70,7 +75,8 @@ The all-in-one stays the test bed. Later there are separate blocks:
   - Built-in devices and expansion cards can't be disconnected; only cabled ones can.
   - A disconnected device leaves a **gap** in the bus walk.
 - **Open question: how gaps look to firmware.** Today the bus walk is
-  `machine.board().bus().devices()`, an ordered list with no gaps. Options:
+  `machine.board().bus().devices()`, an ordered list with no gaps (disconnected and absent
+  devices are simply left out). Options:
   - **Position and device pairs, with numbers skipping over gaps.** This is the real-world
     model: PCI addresses skip empty slots, and software just enumerates what's present.
   - **A gapless list.** Programs never see the gap. Simplest for minimal EEPROM code.
@@ -78,7 +84,12 @@ The all-in-one stays the test bed. Later there are separate blocks:
     back where it was.
   - Decide this before the Lua runtime defines the bus walk API.
 
-### KNOWN GAP: where a device's bus position is remembered (undecided)
+### Where a device's bus position is remembered (default built; still open)
+
+**Built default (2026-10-11):** first-seen order. A cabled device that goes away (cable cut,
+chunk unloaded, broken) keeps its place, as does its disconnected state. At most 32 absent
+devices are remembered, earliest-listed forgotten first (`BusOrder.MAX_REMEMBERED`). The
+user hadn't decided, so revisit with them. The notes below are the original discussion.
 
 The bus order belongs to the **case**, not the device: the same cabled screen can be 2nd on
 one computer and 3rd on another. So the case must remember devices by something unique and
@@ -96,9 +107,8 @@ stable (like a GUID).
   - Chunk unloads make "lost" ambiguous: the device still exists, the case just can't see it.
   - How long to remember a lost device, and whether an unloaded chunk counts as lost, is
     unsolved.
-- **Today:** only built-in devices, drives and cards exist. `BusOrder` keys them by slot
-  (`sata:1`, `exp:0`) and drops a removed device's position. That's fine for in-case parts,
-  but cabled devices need the design above.
+- **Keys:** parts by slot (`sata:1`, `exp:0`; a removed part's position drops), screens by
+  their own id (`cable:<uuid>`).
 
 ### Ordering the devices a case sees (user idea, not decided)
 
@@ -111,12 +121,22 @@ of letting the player order them:
 - A **light bulb** button next to each entry **highlights that device in the world**, so the
   player can tell which screen is which.
 
+### Sharing a screen between computers (not designed yet)
+
+- **Virtual multicast text buffer (user, 2026-10-11):** today every connected screen gets the
+  console (hard-coded hello world). The plan is a virtual device from the motherboard
+  (virtual bus) that the EEPROM uses to choose where the console goes.
+- **Several computers on one screen:** today each writes to it and the last write wins;
+  powering any of them off blanks it. A screen's view shows the power button of the nearest
+  computer that drives it. A real monitor shows one input at a time; consider an input
+  selector.
+
 ## Machine ideas discussed (not built)
 
+- **Hot-plug takeover:** built. The console keeps its own copy of what it shows and redraws
+  it onto a screen that joins a running machine.
 - **Console log:** a ring buffer in the console. Each console keeps its own read position,
   and a `messages dropped` line replaces silent loss (like Linux printk and `/dev/kmsg`).
-- **Hot-plug takeover:** a screen attached to a running machine joins the console splitter,
-  which redraws onto it (like fbcon taking over from dummycon).
 - **Stored console preference:** which display(s) the console uses, kept in an NVRAM-like
   store (like UEFI's `ConOut` variable). Today it's every display at the smallest common
   size.
