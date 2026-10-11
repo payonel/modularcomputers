@@ -6,6 +6,7 @@ import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.bus.DeviceType;
 import com.payonel.modularcomputers.command.ModCommands;
 import com.payonel.modularcomputers.display.TextBuffer;
+import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.machine.HelloWorldProgram;
@@ -52,7 +53,7 @@ public class AllInOneGameTest {
 		helper.assertTrue(machine.board().cpu().isEmpty() && machine.board().eeprom().isEmpty(), "nothing installed");
 		helper.assertBlockProperty(POS, AllInOneBlock.CPU, false);
 		helper.assertValueEqual(machine.board().bus().devices().stream().map(device -> device.type()).toList(),
-			List.of(DeviceType.DISPLAY, DeviceType.KEYBOARD, DeviceType.STORAGE), "physical bus");
+			List.of(DeviceType.DISPLAY, DeviceType.KEYBOARD), "physical bus: just the built-ins");
 		helper.succeed();
 	}
 
@@ -71,12 +72,85 @@ public class AllInOneGameTest {
 	@GameTest
 	public void slotsOnlyTakeTheirOwnPart(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
-		CaseMenu menu = (CaseMenu) computer.createMenu(0, helper.makeMockPlayer(GameType.SURVIVAL).getInventory(), helper.makeMockPlayer(GameType.SURVIVAL));
-		var cpuSlot = menu.slots.get(CaseMenu.CPU_SLOT);
-		var eepromSlot = menu.slots.get(CaseMenu.EEPROM_SLOT);
-		helper.assertTrue(cpuSlot.mayPlace(new ItemStack(ModItems.CPU)) && !cpuSlot.mayPlace(new ItemStack(ModItems.EEPROM)), "CPU slot");
-		helper.assertTrue(eepromSlot.mayPlace(new ItemStack(ModItems.EEPROM)) && !eepromSlot.mayPlace(new ItemStack(ModItems.CPU)), "EEPROM slot");
-		helper.assertValueEqual(cpuSlot.getMaxStackSize(), 1, "CPU slot holds one");
+		Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+		CaseMenu menu = (CaseMenu) computer.createMenu(0, player.getInventory(), player);
+		var parts = List.of(ModItems.CPU, ModItems.EEPROM, ModItems.UPS_BATTERY, ModItems.RAM, ModItems.HARD_DISK, ModItems.WLAN_CARD);
+		for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
+			var accepts = CaseMenu.accepts(slot);
+			for (var part : parts) {
+				boolean placed = menu.slots.get(slot).mayPlace(new ItemStack(part));
+				helper.assertValueEqual(placed, part == accepts, "slot " + slot + " taking " + part);
+			}
+			helper.assertValueEqual(menu.slots.get(slot).getMaxStackSize(), 1, "slot " + slot + " holds one");
+		}
+		helper.assertValueEqual(CaseMenu.accepts(CaseMenu.RAM_SLOTS + 3), ModItems.RAM, "last RAM lane");
+		helper.assertValueEqual(CaseMenu.accepts(CaseMenu.SATA_SLOTS), ModItems.HARD_DISK, "first SATA port");
+		helper.assertValueEqual(CaseMenu.accepts(CaseMenu.EXP_SLOTS + 3), ModItems.WLAN_CARD, "last expansion slot");
+		helper.succeed();
+	}
+
+	private static List<DeviceType> busTypes(AllInOneBlockEntity computer) {
+		return computer.machine().board().bus().devices().stream().map(device -> device.type()).toList();
+	}
+
+	private static List<String> busKeys(AllInOneBlockEntity computer) {
+		return computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::key).toList();
+	}
+
+	@GameTest
+	public void drivesAndCardsJoinTheBusAndThePlayerSetsTheOrder(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper);
+		computer.parts().setItem(CaseMenu.SATA_SLOTS + 1, new ItemStack(ModItems.HARD_DISK));
+		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.WLAN_CARD));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.RAM)); // RAM is not a bus device
+		helper.assertValueEqual(busKeys(computer), List.of("display", "keyboard", "sata:1", "exp:0"), "attached in default order");
+		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.DISPLAY, DeviceType.KEYBOARD, DeviceType.STORAGE, DeviceType.NETWORK), "bus");
+
+		helper.assertTrue(computer.moveDevice(3, true), "the card moves up");
+		helper.assertTrue(computer.moveDevice(2, true), "and up again");
+		helper.assertValueEqual(busKeys(computer), List.of("display", "exp:0", "keyboard", "sata:1"), "player's order");
+		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.DISPLAY, DeviceType.NETWORK, DeviceType.KEYBOARD, DeviceType.STORAGE),
+			"the machine's bus follows the player's order");
+		helper.assertTrue(!computer.moveDevice(0, true), "the first device can't move up");
+
+		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.HARD_DISK));
+		helper.assertValueEqual(busKeys(computer), List.of("display", "exp:0", "keyboard", "sata:1", "sata:0"), "a new drive goes last");
+		computer.parts().setItem(CaseMenu.EXP_SLOTS, ItemStack.EMPTY);
+		helper.assertValueEqual(busKeys(computer), List.of("display", "keyboard", "sata:1", "sata:0"), "a removed card drops out");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void busEntriesNameEachDeviceAndWhereItIs(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper);
+		computer.parts().setItem(CaseMenu.SATA_SLOTS + 2, new ItemStack(ModItems.HARD_DISK));
+		computer.parts().setItem(CaseMenu.EXP_SLOTS + 3, new ItemStack(ModItems.WLAN_CARD));
+		var entries = computer.busEntries();
+		helper.assertValueEqual(entries.get(0).name().getString(), "Display", "built-in name");
+		helper.assertValueEqual(entries.get(0).location().getString(), "built-in", "built-in location");
+		helper.assertValueEqual(entries.get(2).name().getString(), "Hard Disk", "drive name");
+		helper.assertValueEqual(entries.get(2).location().getString(), "SATA 3", "drive location");
+		helper.assertValueEqual(entries.get(3).location().getString(), "expansion slot 4", "card location");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void busOrderSurvivesSaveAndLoad(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper);
+		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.HARD_DISK));
+		computer.moveDevice(2, true);
+		computer.moveDevice(1, true);
+		var registries = helper.getLevel().registryAccess();
+		var loaded = (AllInOneBlockEntity) BlockEntity.loadStatic(computer.getBlockPos(), computer.getBlockState(),
+			computer.saveWithFullMetadata(registries), registries);
+		helper.assertValueEqual(busKeys(loaded), List.of("sata:0", "display", "keyboard"), "bus order after reload");
+		helper.assertValueEqual(busTypes(loaded).getFirst(), DeviceType.STORAGE, "the machine's bus after reload");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void upsBatteriesComeFullyCharged(GameTestHelper helper) {
+		helper.assertValueEqual(new ItemStack(ModItems.UPS_BATTERY).get(ModComponents.CHARGE), 100, "new battery charge");
 		helper.succeed();
 	}
 

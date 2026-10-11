@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+# Draws the case view's static art (needs Pillow): the motherboard, the bus order panel, and the
+# small icons. Text (labels, the etched bus order numbers) is drawn by the game with its own
+# font, so none is baked in here. The PNGs are committed; rerun after editing this.
+#   scripts/art/case_gui_textures.py src/main/resources/assets/modularcomputers/textures/gui
+#
+# Slot positions below must match CaseMenu / CaseScreen; CaseArtTest checks that each slot in
+# the code sits on a socket cavity in case_board.png.
+import random, sys
+from PIL import Image
+
+OUT = sys.argv[1]
+rnd = random.Random(7)
+
+GREEN = [(40, 104, 58), (42, 108, 60), (44, 112, 62), (41, 106, 59)]
+TRACE = (66, 146, 84)
+TRACE_DARK = (34, 88, 49)
+GOLD = (204, 166, 74)
+COPPER = (214, 150, 74)
+BLACK = (26, 26, 30)
+SOCKET_IN = (20, 34, 24)
+SOCKET_RIM_DARK = (12, 20, 14)
+SOCKET_RIM_LIGHT = (90, 150, 104)
+SILVER = (176, 180, 188)
+LATCH = (230, 230, 230)
+PIN = (60, 60, 66)
+CHOKE = (96, 96, 104)
+CHOKE_CORE = (60, 60, 66)
+SILK = (234, 234, 222)
+METER_OFF = (30, 38, 33)
+
+BOARD_W, BOARD_H = 168, 132
+
+class Pic:
+	def __init__(self, w, h, background=None):
+		self.im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+		if background:
+			self.fill(0, 0, w, h, background)
+	def fill(self, x0, y0, x1, y1, c):
+		"""Fills [x0, x1) x [y0, y1)."""
+		for y in range(max(0, y0), min(self.im.height, y1)):
+			for x in range(max(0, x0), min(self.im.width, x1)):
+				self.im.putpixel((x, y), tuple(c) + (255,))
+	def px(self, x, y, c):
+		self.fill(x, y, x + 1, y + 1, c)
+
+def board(p, x0, y0, x1, y1):
+	for y in range(y0, y1):
+		for x in range(x0, x1):
+			p.px(x, y, rnd.choice(GREEN))
+	p.fill(x0, y0, x1, y0 + 1, TRACE_DARK); p.fill(x0, y1 - 1, x1, y1, TRACE_DARK)
+	p.fill(x0, y0, x0 + 1, y1, TRACE_DARK); p.fill(x1 - 1, y0, x1, y1, TRACE_DARK)
+	for hx, hy in [(x0 + 3, y0 + 3), (x1 - 8, y0 + 3), (x0 + 3, y1 - 8), (x1 - 8, y1 - 8)]:
+		hole(p, hx, hy)
+
+def hole(p, x, y):  # a mounting hole: gold ring, dark center
+	p.fill(x, y + 1, x + 5, y + 4, GOLD); p.fill(x + 1, y, x + 4, y + 5, GOLD)
+	p.fill(x + 1, y + 1, x + 4, y + 4, BLACK)
+
+def via(p, x, y):
+	p.fill(x, y, x + 3, y + 3, GOLD); p.px(x + 1, y + 1, BLACK)
+
+def route(p, points, col=TRACE, dotted=False, phase=0):
+	"""Runs through points: straight, or 45-degree diagonals. Dotted draws every other pixel."""
+	n = phase
+	for (ax, ay), (bx, by) in zip(points, points[1:]):
+		steps = max(abs(bx - ax), abs(by - ay))
+		for i in range(steps + 1):
+			x = ax + (0 if bx == ax else (i if bx > ax else -i))
+			y = ay + (0 if by == ay else (i if by > ay else -i))
+			if not dotted or n % 2 == 0:
+				p.px(x, y, col)
+			n += 1
+
+def bus(p, points, n=3, spacing=2, horizontal_first=True):
+	for k in range(n):
+		off = k * spacing
+		route(p, [(x + (0 if horizontal_first else off), y + (off if horizontal_first else 0)) for x, y in points])
+
+def gold_dots(p, points, phase=0):
+	route(p, points, GOLD, dotted=True, phase=phase)
+
+def corners(p, x0, y0, x1, y1):
+	for cx, cy, dx, dy in [(x0, y0, 1, 1), (x1, y0, -1, 1), (x0, y1, 1, -1), (x1, y1, -1, -1)]:
+		p.fill(min(cx, cx + 3 * dx), cy, max(cx, cx + 3 * dx) + 1, cy + 1, SILK)
+		p.fill(cx, min(cy, cy + 3 * dy), cx + 1, max(cy, cy + 3 * dy) + 1, SILK)
+
+def cavity(p, x, y):
+	"""An item slot as a socket cavity; (x, y) is the item's top-left, like a vanilla slot."""
+	p.fill(x - 1, y - 1, x + 17, y + 17, SOCKET_RIM_LIGHT)
+	p.fill(x - 1, y - 1, x + 16, y + 16, SOCKET_RIM_DARK)
+	p.fill(x, y, x + 16, y + 16, SOCKET_IN)
+
+def cpu_socket(p, x, y):
+	p.fill(x - 6, y - 6, x + 22, y + 22, BLACK)
+	for i in range(-4, 20, 2):
+		for qx, qy in [(x + i, y - 4), (x + i, y + 19), (x - 4, y + i), (x + 19, y + i)]:
+			p.px(qx, qy, (110, 110, 118))
+	p.fill(x + 23, y - 6, x + 25, y + 22, SILVER)  # retention lever
+	p.fill(x + 23, y - 8, x + 28, y - 6, SILVER)
+	cavity(p, x, y)
+
+def choke(p, x, y):
+	p.fill(x, y, x + 5, y + 5, CHOKE); p.fill(x + 1, y + 1, x + 4, y + 4, CHOKE_CORE)
+
+def resistor_array(p, x, y):
+	p.fill(x, y, x + 6, y + 2, BLACK)
+	for qx in range(x, x + 6, 2):
+		p.px(qx, y - 1, SILVER); p.px(qx, y + 2, SILVER)
+
+def crystal(p, x, y):
+	p.fill(x + 1, y, x + 7, y + 4, SILVER); p.fill(x, y + 1, x + 8, y + 3, SILVER)
+	p.fill(x + 2, y + 1, x + 6, y + 3, (140, 144, 152))
+
+def dip_socket(p, x, y):
+	p.fill(x - 4, y - 2, x + 20, y + 18, BLACK)
+	for qy in range(y, y + 16, 3):
+		p.fill(x - 3, qy, x - 1, qy + 1, SILVER); p.fill(x + 17, qy, x + 19, qy + 1, SILVER)
+	p.fill(x + 7, y - 2, x + 9, y - 1, PIN)
+	cavity(p, x, y)
+
+def dimm(p, x, y):  # an upright memory connector, latches open
+	p.fill(x + 5, y - 22, x + 11, y + 38, BLACK)
+	p.fill(x + 4, y - 25, x + 12, y - 22, LATCH); p.fill(x + 4, y + 38, x + 12, y + 41, LATCH)
+	for qy in range(y - 20, y + 37, 3):
+		p.fill(x + 7, qy, x + 9, qy + 1, PIN)
+	cavity(p, x, y)
+
+def sata(p, x, y):
+	p.fill(x + 18, y + 3, x + 24, y + 13, BLACK); p.fill(x + 18, y + 3, x + 21, y + 6, PIN)
+	cavity(p, x, y)
+
+def exp(p, x, y):
+	p.fill(x - 6, y + 5, x + 22, y + 11, BLACK)
+	p.fill(x + 17, y + 5, x + 18, y + 11, PIN)
+	for qx in range(x - 5, x + 22, 2):
+		p.fill(qx, y + 7, qx + 1, y + 9, (54, 54, 60))
+	cavity(p, x, y)
+
+def heatsink(p, x, y, w, h):
+	p.fill(x, y, x + w, y + h, (150, 156, 166))
+	for fx in range(x + 1, x + w, 2):
+		p.fill(fx, y, fx + 1, y + h, (110, 116, 126))
+	p.fill(x, y, x + w, y + 1, (196, 200, 208))
+
+def fan_header(p, x, y):
+	p.fill(x, y, x + 7, y + 4, (236, 236, 236))
+	for qx in (x + 1, x + 3, x + 5):
+		p.px(qx, y + 1, GOLD)
+
+def charge_meter(p, x, y, segments=6):
+	p.fill(x, y, x + segments * 4 + 1, y + 6, BLACK)
+	for i in range(segments):
+		p.fill(x + 1 + i * 4, y + 1, x + 4 + i * 4, y + 5, METER_OFF)
+
+# Board coordinates (the board texture's own pixels). The game draws the board at panel (4, 4).
+CPU = (14, 22)
+CHOKES = [(2, 18 + 7 * i) for i in range(4)]
+ROM = (16, 64)
+UPS = (16, 99)
+METER = (12, 119)
+RAM = [(50 + 20 * i, 36) for i in range(4)]
+SATA = [(134, 15 + 20 * i) for i in range(4)]
+EXP = [(52 + 27 * i, 110) for i in range(4)]
+
+def case_board():
+	p = Pic(BOARD_W, BOARD_H)
+	board(p, 0, 0, BOARD_W, BOARD_H)
+	# copper buses and gold dotted runs, under the parts
+	bus(p, [(37, 26), (42, 26), (46, 28), (50, 28)], n=4)
+	for k in range(4):
+		route(p, [(46, 28 + 2 * k), (128, 28 + 2 * k)])
+	bus(p, [(18, 47), (18, 60)], n=3, horizontal_first=False)
+	bus(p, [(30, 47), (30, 54), (40, 64), (40, 92)], n=3, horizontal_first=False)
+	for k in range(3):
+		route(p, [(40, 92 + 2 * k), (150, 92 + 2 * k)])
+	for k in range(2):
+		route(p, [(131 + 2 * k, 34), (131 + 2 * k, 92)])
+	gold_dots(p, [(44, 50), (44, 84), (126, 84)])
+	gold_dots(p, [(36, 42), (46, 42), (46, 82)], phase=1)
+	gold_dots(p, [(10, 70), (6, 66), (6, 50)])
+	gold_dots(p, [(126, 18), (130, 22), (130, 30)])
+	gold_dots(p, [(66, 9), (72, 13), (72, 14)], phase=1)
+	gold_dots(p, [(36, 110), (42, 104), (42, 100)])
+	for v in [(42, 25), (17, 59), (39, 89), (130, 91), (44, 49), (126, 83), (41, 99)]:
+		via(p, *v)
+	for tx, ty in [(26, 56), (100, 88), (150, 98)]:
+		p.fill(tx, ty, tx + 2, ty + 2, COPPER)
+	# CPU and its power stage
+	for c in CHOKES:
+		choke(p, *c)
+	cpu_socket(p, *CPU)
+	resistor_array(p, CPU[0] + 19, CPU[1] + 26)
+	p.fill(CPU[0] + 27, CPU[1] - 8, CPU[0] + 29, CPU[1] - 7, (90, 230, 110))  # power LED
+	corners(p, CPU[0] - 8, CPU[1] - 8, CPU[0] + 28, CPU[1] + 24)
+	crystal(p, 36, 50)
+	# firmware, UPS battery
+	dip_socket(p, *ROM)
+	corners(p, 10, 60, 38, 84)
+	cavity(p, *UPS)
+	charge_meter(p, *METER)
+	# memory, chipset, drives, expansion
+	for r in RAM:
+		dimm(p, *r)
+	corners(p, 52, 9, 124, 79)
+	heatsink(p, 46, 3, 18, 7)
+	resistor_array(p, 104, 4); resistor_array(p, 112, 4)
+	fan_header(p, 98, 82)
+	p.fill(110, 82, 112, 83, (240, 180, 60)); p.fill(114, 82, 116, 83, (90, 230, 110))
+	for s in SATA:
+		sata(p, *s)
+	for e in EXP:
+		exp(p, *e)
+	corners(p, 44, 97, 157, 129)
+	return p.im
+
+BUS_W, BUS_H = 176, 230
+BUS_ROWS = 10
+BUS_ROW_Y, BUS_ROW_H = 30, 19
+
+def bus_panel():
+	"""The bus order panel: board, an empty socket and an empty display for each position."""
+	p = Pic(BUS_W, BUS_H)
+	p.fill(0, 0, BUS_W, BUS_H, (0, 0, 0))
+	board(p, 1, 1, BUS_W - 1, BUS_H - 1)
+	for i in range(BUS_ROWS):
+		y = BUS_ROW_Y + i * BUS_ROW_H
+		cavity(p, 19, y + 1)
+		p.fill(38, y, BUS_W - 8, y + 18, BLACK)
+		for x in range(40, BUS_W - 10, 3):  # header pins along each display's top edge
+			p.px(x, y, GOLD)
+	gold_dots(p, [(BUS_W - 5, 30), (BUS_W - 5, BUS_H - 12)])
+	return p.im
+
+def ghost(draw):
+	p = Pic(16, 16)
+	g, d = (70, 104, 80), (52, 80, 60)
+	draw(p, g, d)
+	return p.im
+
+def cpu_ghost(p, g, d):
+	p.fill(3, 3, 13, 13, g)
+	for i in range(4, 12, 2):
+		for x, y in [(i, 1), (i, 2), (i, 13), (i, 14), (1, i), (2, i), (13, i), (14, i)]:
+			p.px(x, y, g)
+	p.fill(5, 5, 11, 11, d)
+def rom_ghost(p, g, d):
+	p.fill(2, 5, 14, 11, g)
+	for x in range(4, 12, 2):
+		p.px(x, 4, g); p.px(x, 11, g)
+	p.fill(4, 7, 12, 9, d)
+def ram_ghost(p, g, d):
+	p.fill(1, 5, 15, 11, g)
+	for x in (2, 5, 8, 11):
+		p.fill(x, 6, x + 2, 9, d)
+	for x in range(2, 14, 2):
+		p.px(x, 11, g)
+def disk_ghost(p, g, d):
+	p.fill(1, 4, 15, 12, g); p.fill(3, 6, 13, 7, d); p.px(12, 9, d)
+def card_ghost(p, g, d):
+	p.fill(2, 4, 13, 11, g); p.fill(13, 2, 14, 13, g)
+	for x in range(3, 11, 2):
+		p.px(x, 11, g)
+	p.fill(4, 6, 7, 9, d)
+def ups_ghost(p, g, d):
+	p.fill(2, 5, 14, 14, g); p.fill(4, 3, 6, 5, g); p.fill(10, 3, 12, 5, g)
+	p.fill(6, 8, 10, 10, d); p.fill(7, 7, 9, 11, d)
+
+def bus_icon(kind):
+	p = Pic(16, 16)
+	if kind == "display":
+		p.fill(1, 2, 15, 12, (206, 197, 168)); p.fill(3, 4, 13, 10, (10, 10, 12)); p.fill(5, 12, 11, 14, (172, 163, 135))
+	elif kind == "keyboard":
+		p.fill(0, 5, 16, 12, (66, 64, 59))
+		for x in range(1, 15, 2):
+			p.px(x, 7, (196, 191, 176)); p.px(x, 9, (196, 191, 176))
+	return p.im
+
+def icons():
+	"""One row of 16x16 icons: slot ghosts (cpu, rom, ram, disk, card, ups), then built-in bus devices (display, keyboard)."""
+	sheet = Image.new("RGBA", (16 * 8, 16), (0, 0, 0, 0))
+	for i, im in enumerate([ghost(cpu_ghost), ghost(rom_ghost), ghost(ram_ghost), ghost(disk_ghost),
+			ghost(card_ghost), ghost(ups_ghost), bus_icon("display"), bus_icon("keyboard")]):
+		sheet.paste(im, (16 * i, 0))
+	return sheet
+
+case_board().save(f"{OUT}/case_board.png")
+bus_panel().save(f"{OUT}/bus_panel.png")
+icons().save(f"{OUT}/case_icons.png")

@@ -5,4 +5,5 @@ public enum DeviceType {
 	DISPLAY,
 	KEYBOARD,
 	STORAGE,
+	NETWORK,
 }

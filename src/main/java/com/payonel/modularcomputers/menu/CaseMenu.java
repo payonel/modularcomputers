@@ -13,16 +13,33 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-/** The case view: the computer's part slots above the player's inventory. */
+/**
+ * The case view: the motherboard's part slots above the player's inventory. Slot positions
+ * match the sockets in textures/gui/case_board.png (drawn at panel offset {@link #BOARD_X},
+ * {@link #BOARD_Y}); CaseArtTest checks that they line up.
+ */
 public final class CaseMenu extends AbstractContainerMenu {
 	public static final int CPU_SLOT = 0;
 	public static final int EEPROM_SLOT = 1;
-	public static final int PART_SLOTS = 2;
-	/** Slot positions inside the case view, in GUI units (top-left of the 16x16 item). */
-	public static final int CPU_X = 53;
-	public static final int EEPROM_X = 107;
-	public static final int PARTS_Y = 26;
-	public static final int INVENTORY_Y = 84;
+	public static final int UPS_SLOT = 2;
+	public static final int RAM_SLOTS = 3;
+	public static final int SATA_SLOTS = 7;
+	public static final int EXP_SLOTS = 11;
+	public static final int LANES = 4;
+	public static final int PART_SLOTS = 15;
+
+	/** Where the board texture is drawn inside the panel. */
+	public static final int BOARD_X = 4;
+	public static final int BOARD_Y = 4;
+	public static final int INVENTORY_Y = 150;
+
+	/** Slot positions in the panel, in GUI units (the item's top-left), by slot index. */
+	public static final int[][] SLOT_POSITIONS = {
+		{18, 26}, {20, 68}, {20, 103},
+		{54, 40}, {74, 40}, {94, 40}, {114, 40},
+		{138, 19}, {138, 39}, {138, 59}, {138, 79},
+		{56, 114}, {83, 114}, {110, 114}, {137, 114},
+	};
 
 	private final Container parts;
 	private final BlockPos pos;
@@ -39,9 +56,26 @@ public final class CaseMenu extends AbstractContainerMenu {
 		this.parts = parts;
 		this.pos = pos;
 		this.access = access;
-		addSlot(new PartSlot(parts, CPU_SLOT, CPU_X, PARTS_Y, ModItems.CPU));
-		addSlot(new PartSlot(parts, EEPROM_SLOT, EEPROM_X, PARTS_Y, ModItems.EEPROM));
+		for (int slot = 0; slot < PART_SLOTS; slot++) {
+			addSlot(new PartSlot(parts, slot, SLOT_POSITIONS[slot][0], SLOT_POSITIONS[slot][1], accepts(slot)));
+		}
 		addStandardInventorySlots(inventory, 8, INVENTORY_Y);
+	}
+
+	/** Which part a slot takes. */
+	public static Item accepts(int slot) {
+		if (slot == CPU_SLOT) {
+			return ModItems.CPU;
+		} else if (slot == EEPROM_SLOT) {
+			return ModItems.EEPROM;
+		} else if (slot == UPS_SLOT) {
+			return ModItems.UPS_BATTERY;
+		} else if (slot < SATA_SLOTS) {
+			return ModItems.RAM;
+		} else if (slot < EXP_SLOTS) {
+			return ModItems.HARD_DISK;
+		}
+		return ModItems.WLAN_CARD;
 	}
 
 	public BlockPos pos() {

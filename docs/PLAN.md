@@ -8,6 +8,11 @@ skip steps freely, never invent false steps (see `AGENTS.md` section 1).
 
 - **All-in-one computer:** screen + keyboard on the front, power button on the back, built-in
   display, keyboard and disk on its bus, soldered memory.
+- **Motherboard case view** (the user's chosen design: mockup "E+ round 3"):
+  - slots for CPU, ROM, UPS battery, 4 RAM, 4 SATA and 4 expansion;
+  - live indicators;
+  - a charge meter;
+  - a bus order panel with etched numbers and working ↑/↓ reordering.
 - **Case view** in the all-in-one, opened from the GUI's motherboard toggle or from the
   window into the case on the block's back, with **CPU** and **EEPROM** slots. The CPU is optional:
   without one the power switch still works, but the button is faded and unlit, and nothing
@@ -22,9 +27,17 @@ skip steps freely, never invent false steps (see `AGENTS.md` section 1).
 
 ## Next: parts and slots
 
-- **RAM and disk slots** in the case view, with RAM and disk items. Today memory and the disk
-  are soldered into the all-in-one.
-  - The case view should have four slot boxes: CPU, RAM, EEPROM, disk.
+- **Make the placeholder parts do something:**
+  - RAM sizes the machine's memory (and none is a boot error).
+  - Disks hold data.
+  - WLAN cards network.
+  - The UPS battery charges and powers the machine when power drops.
+- **CPU status dots:** the 4 lit dots left of the CPU socket are a good place for more
+  status later. Today they just light when a CPU is in.
+- **Bus order light bulb:** highlight a cabled device in the world. It waits for cabled
+  devices to exist.
+- **Narrow windows:** the bus order panel is hidden below about 382 GUI units of width.
+  Consider a toggle or a smaller layout.
 - **Tiers and power:** components with tiers. Real power supply and distribution.
   - The power button's look follows available power: faded red/green when unpowered, lit
     when powered.

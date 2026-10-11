@@ -182,13 +182,60 @@ def eeprom_item():
 	rect(im, 5, 8, 7, 8, (90, 110, 170, 255))
 	return im
 
+def ram_item():
+	"""A memory stick: green board, black chips, gold contacts along the bottom."""
+	im = item_canvas()
+	rect(im, 0, 5, 15, 11, (40, 120, 66, 255))
+	rect(im, 0, 5, 15, 5, (60, 150, 86, 255))
+	for x in (1, 5, 9, 13):
+		rect(im, x, 6, x + 2, 9, (30, 30, 34, 255))
+	for x in range(1, 15, 2):
+		im.putpixel((x, 11), (222, 182, 70, 255))
+	im.putpixel((7, 11), (40, 120, 66, 255))  # key notch
+	return im
+
+def hard_disk_item():
+	"""A drive: metal case, label, connector, activity light."""
+	im = item_canvas()
+	rect(im, 1, 3, 14, 12, (150, 154, 162, 255))
+	rect(im, 1, 3, 14, 3, (196, 200, 208, 255))
+	rect(im, 1, 12, 14, 12, (100, 104, 112, 255))
+	rect(im, 3, 5, 9, 9, (236, 232, 214, 255))  # label
+	rect(im, 4, 6, 8, 6, (90, 110, 170, 255))
+	rect(im, 11, 10, 13, 11, (40, 40, 46, 255))  # connector
+	im.putpixel((12, 5), (90, 230, 110, 255))
+	return im
+
+def wlan_card_item():
+	"""An expansion card: green board, metal bracket, antenna, gold fingers."""
+	im = item_canvas()
+	rect(im, 2, 6, 12, 11, (46, 116, 64, 255))
+	rect(im, 13, 4, 13, 13, (190, 194, 202, 255))  # bracket
+	rect(im, 14, 1, 14, 6, (40, 40, 46, 255))  # antenna
+	im.putpixel((14, 0), (40, 40, 46, 255))
+	rect(im, 4, 7, 7, 9, (30, 30, 34, 255))  # chip
+	for x in range(3, 12, 2):
+		im.putpixel((x, 12), (222, 182, 70, 255))
+	return im
+
+def ups_battery_item():
+	"""A backup battery pack: dark block, two terminals, a charge stripe."""
+	im = item_canvas()
+	rect(im, 2, 4, 13, 13, (54, 58, 66, 255))
+	rect(im, 2, 4, 13, 4, (84, 88, 98, 255))
+	rect(im, 4, 2, 5, 3, (196, 60, 50, 255))  # + terminal
+	rect(im, 10, 2, 11, 3, (40, 40, 46, 255))  # - terminal
+	rect(im, 4, 8, 11, 9, (90, 230, 110, 255))  # charge stripe
+	return im
+
 for name, fn in [("front", front), ("side", side), ("top", top), ("back", back), ("bottom", bottom)]:
 	fn().save(f"{OUT}/all_in_one_{name}.png")
 for state in LIT:
 	power(state).save(f"{OUT}/all_in_one_power_{state}.png")
 gui_button().save(f"{OUT}/../gui/power_button.png")
 case_button().save(f"{OUT}/../gui/case_button.png")
-for name, fn in [("cpu", cpu_item), ("eeprom", eeprom_item)]:
+for name, fn in [("cpu", cpu_item), ("eeprom", eeprom_item), ("ram", ram_item), ("hard_disk", hard_disk_item),
+		("wlan_card", wlan_card_item), ("ups_battery", ups_battery_item)]:
 	fn().save(f"{OUT}/../item/{name}.png")
 
 # Preview sheet, scaled up, for review.

@@ -26,6 +26,10 @@ public final class ModCreativeTab {
 				output.accept(ModBlocks.ALL_IN_ONE);
 				output.accept(ModItems.CPU);
 				output.accept(ModItems.EEPROM);
+				output.accept(ModItems.RAM);
+				output.accept(ModItems.HARD_DISK);
+				output.accept(ModItems.WLAN_CARD);
+				output.accept(ModItems.UPS_BATTERY);
 			})
 			.build());
 	}

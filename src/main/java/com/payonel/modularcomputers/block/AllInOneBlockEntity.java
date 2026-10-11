@@ -2,9 +2,12 @@ package com.payonel.modularcomputers.block;
 
 import com.mojang.serialization.Codec;
 import com.payonel.modularcomputers.bus.Bus;
+import com.payonel.modularcomputers.bus.BusOrder;
+import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.console.ConsoleSplitter;
 import com.payonel.modularcomputers.device.Disk;
 import com.payonel.modularcomputers.device.Keyboard;
+import com.payonel.modularcomputers.device.NetworkCard;
 import com.payonel.modularcomputers.display.Display;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.item.ModItems;
@@ -16,7 +19,10 @@ import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.machine.Motherboard;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.sound.ModSounds;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -36,6 +42,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -43,10 +50,12 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
 /**
- * The all-in-one computer: a motherboard with soldered memory, a CPU socket and an EEPROM slot
- * (both filled from the case view's item slots), and its built-in display, keyboard and disk
- * wired to the physical bus. Power, display contents, the console state and the parts are
- * saved and synced to clients.
+ * The all-in-one computer: its built-in display and keyboard, and a motherboard whose part
+ * slots (CPU, EEPROM, UPS battery, RAM, SATA drives, expansion cards) are filled from the case
+ * view. Drives and cards join the physical bus after the built-ins, in an order the player
+ * can change (the bus order panel). Power, the parts, the bus order, display contents and the
+ * console state are saved and synced to clients. Only the CPU and EEPROM affect the machine so
+ * far; RAM and the UPS battery are placeholders.
  */
 public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMenuProvider<BlockPos> {
 	private static final String POWERED = "powered";
@@ -54,11 +63,24 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String FOREGROUND = "display_foreground";
 	private static final String BACKGROUND = "display_background";
 	private static final String CONSOLE = "console";
+	private static final String BUS_ORDER = "bus_order";
+	private static final String DISPLAY_KEY = "display";
+	private static final String KEYBOARD_KEY = "keyboard";
+	private static final String SATA_KEY = "sata:";
+	private static final String EXP_KEY = "exp:";
+	/** Icons for the built-in devices in textures/gui/case_icons.png. */
+	public static final int DISPLAY_ICON = 6;
+	public static final int KEYBOARD_ICON = 7;
 	private static final float ERROR_BEEP_VOLUME = 0.6f;
 
 	private final Display display = new Display(Resolution.DEFAULT);
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(),
-		new Bus(List.of(display, new Keyboard(), new Disk()))));
+	private final Keyboard keyboard = new Keyboard();
+	/** Devices made from the parts in the SATA and expansion slots, by lane; null when empty. */
+	private final Disk[] disks = new Disk[CaseMenu.LANES];
+	private final NetworkCard[] cards = new NetworkCard[CaseMenu.LANES];
+	private final BusOrder busOrder = new BusOrder();
+	private final Bus bus = new Bus(List.of(display, keyboard));
+	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), bus));
 	private final Parts parts = new Parts();
 
 	public AllInOneBlockEntity(BlockPos pos, BlockState state) {
@@ -74,9 +96,44 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return display;
 	}
 
-	/** The CPU and EEPROM slots. */
+	/** The part slots (see {@link CaseMenu} for which is which). */
 	public Container parts() {
 		return parts;
+	}
+
+	/** One line of the bus order panel. {@code item} is the part's item, or empty for a built-in device. */
+	public record BusEntry(String key, Component name, Component location, ItemStack item, int builtInIcon) {
+	}
+
+	/** The devices on the bus, in order, as the bus order panel shows them. Works on clients too. */
+	public List<BusEntry> busEntries() {
+		List<BusEntry> entries = new ArrayList<>();
+		Component builtIn = Component.translatable("gui.modularcomputers.bus.built_in");
+		for (String key : busOrder.keys()) {
+			if (key.equals(DISPLAY_KEY)) {
+				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.display"), builtIn, ItemStack.EMPTY, DISPLAY_ICON));
+			} else if (key.equals(KEYBOARD_KEY)) {
+				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.keyboard"), builtIn, ItemStack.EMPTY, KEYBOARD_ICON));
+			} else {
+				boolean sata = key.startsWith(SATA_KEY);
+				int lane = Integer.parseInt(key.substring(key.indexOf(':') + 1));
+				ItemStack item = parts.getItem((sata ? CaseMenu.SATA_SLOTS : CaseMenu.EXP_SLOTS) + lane);
+				Component location = Component.translatable(sata ? "gui.modularcomputers.bus.sata" : "gui.modularcomputers.bus.expansion", lane + 1);
+				entries.add(new BusEntry(key, item.getHoverName(), location, item, -1));
+			}
+		}
+		return entries;
+	}
+
+	/** Server side: the player moved the device at {@code index} up or down the bus order. */
+	public boolean moveDevice(int index, boolean up) {
+		if (!busOrder.move(index, up)) {
+			return false;
+		}
+		rebuildBus();
+		setChanged();
+		syncToClients();
+		return true;
 	}
 
 	/**
@@ -110,12 +167,45 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		level.playSound(null, worldPosition, ModSounds.ERROR_BEEP, SoundSource.BLOCKS, ERROR_BEEP_VOLUME, 1.0f);
 	}
 
-	/** Puts the parts in the slots onto the motherboard. */
+	/** Puts the parts in the slots onto the motherboard, and drives and cards onto the bus. */
 	private void installParts() {
 		Motherboard board = machine.board();
 		board.setCpu(parts.getItem(CaseMenu.CPU_SLOT).is(ModItems.CPU) ? new Cpu() : null);
 		// Every EEPROM holds the stand-in program until EEPROM contents are programmable.
 		board.setEeprom(parts.getItem(CaseMenu.EEPROM_SLOT).is(ModItems.EEPROM) ? new Eeprom(new HelloWorldProgram()) : null);
+		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+			boolean disk = parts.getItem(CaseMenu.SATA_SLOTS + lane).is(ModItems.HARD_DISK);
+			disks[lane] = disk ? (disks[lane] != null ? disks[lane] : new Disk()) : null;
+			boolean card = parts.getItem(CaseMenu.EXP_SLOTS + lane).is(ModItems.WLAN_CARD);
+			cards[lane] = card ? (cards[lane] != null ? cards[lane] : new NetworkCard()) : null;
+		}
+		rebuildBus();
+	}
+
+	/** Puts the bus's devices in the player's order; newly attached ones go last. */
+	private void rebuildBus() {
+		Map<String, Device> attached = new LinkedHashMap<>();
+		attached.put(DISPLAY_KEY, display);
+		attached.put(KEYBOARD_KEY, keyboard);
+		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+			if (disks[lane] != null) {
+				attached.put(SATA_KEY + lane, disks[lane]);
+			}
+		}
+		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+			if (cards[lane] != null) {
+				attached.put(EXP_KEY + lane, cards[lane]);
+			}
+		}
+		busOrder.sync(List.copyOf(attached.keySet()));
+		bus.setDevices(busOrder.keys().stream().map(attached::get).toList());
+	}
+
+	/** Sends this block entity's data (parts, bus order, display) to clients. */
+	private void syncToClients() {
+		if (level != null && !level.isClientSide()) {
+			level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+		}
 	}
 
 	private void onPartsChanged() {
@@ -134,6 +224,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			.setValue(AllInOneBlock.POWERED, machine.isPowered());
 		if (state != getBlockState()) {
 			level.setBlock(worldPosition, state, Block.UPDATE_CLIENTS);
+		} else {
+			syncToClients(); // the bus order panel shows the parts
 		}
 	}
 
@@ -164,6 +256,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		super.saveAdditional(output);
 		output.putBoolean(POWERED, machine.isPowered());
 		ContainerHelper.saveAllItems(output, parts.getItems());
+		output.store(BUS_ORDER, Codec.STRING.listOf(), busOrder.keys());
 		output.store(DISPLAY, Codec.STRING.listOf(), display.buffer().rows());
 		output.putIntArray(FOREGROUND, display.buffer().foregrounds());
 		output.putIntArray(BACKGROUND, display.buffer().backgrounds());
@@ -177,6 +270,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		machine.restorePowered(input.getBooleanOr(POWERED, false));
 		parts.getItems().clear(); // not clearContent(): that would fire change handling mid-load
 		ContainerHelper.loadAllItems(input, parts.getItems());
+		input.read(BUS_ORDER, Codec.STRING.listOf()).ifPresent(busOrder::restore);
 		installParts();
 		input.read(DISPLAY, Codec.STRING.listOf()).ifPresent(display.buffer()::setRows);
 		input.getIntArray(FOREGROUND).ifPresent(foreground ->

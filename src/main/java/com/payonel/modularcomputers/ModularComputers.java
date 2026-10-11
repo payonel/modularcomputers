@@ -2,9 +2,11 @@ package com.payonel.modularcomputers;
 
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.command.ModCommands;
+import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.ModMenus;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
+import com.payonel.modularcomputers.network.ReorderBusPayload;
 import com.payonel.modularcomputers.network.SwitchViewPayload;
 import com.payonel.modularcomputers.sound.ModSounds;
 import com.payonel.modularcomputers.network.PressPowerPayload;
@@ -40,6 +42,7 @@ public final class ModularComputers implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		ModSounds.init();
+		ModComponents.init();
 		ModItems.init();
 		ModBlocks.init();
 		ModMenus.init();
@@ -48,6 +51,7 @@ public final class ModularComputers implements ModInitializer {
 		OpenDisplayPayload.register();
 		PressPowerPayload.register();
 		SwitchViewPayload.register();
+		ReorderBusPayload.register();
 		initialized = true;
 		LOGGER.info("{} (version {})", INIT_MARKER, version());
 	}

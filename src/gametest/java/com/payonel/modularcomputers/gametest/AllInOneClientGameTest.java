@@ -9,6 +9,7 @@ import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
 import com.payonel.modularcomputers.display.Viewport;
+import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.menu.CaseMenu;
@@ -16,6 +17,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
 import javax.imageio.ImageIO;
@@ -143,6 +145,53 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			int caseButton = pixelAt(context, caseShot, screen -> ((CaseScreen) screen).powerButton());
 			check(RED.test(caseButton), "with a CPU the power button should be lit red, got " + hex(caseButton));
 
+			// The board shows what's installed. Fill the rest of the case, then check each indicator.
+			singleplayer.getServer().runOnServer(server -> {
+				var parts = ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts();
+				for (int lane = 0; lane < 3; lane++) {
+					parts.setItem(CaseMenu.RAM_SLOTS + lane, new ItemStack(ModItems.RAM));
+				}
+				parts.setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.HARD_DISK));
+				parts.setItem(CaseMenu.SATA_SLOTS + 2, new ItemStack(ModItems.HARD_DISK));
+				parts.setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.WLAN_CARD));
+				parts.setItem(CaseMenu.UPS_SLOT, new ItemStack(ModItems.UPS_BATTERY));
+			});
+			context.waitFor(client -> ((CaseScreen) client.gui.screen()).getMenu().slots.get(CaseMenu.UPS_SLOT).hasItem());
+			context.getInput().setCursorPos(0, 0); // no slot tooltip over the board
+			context.waitTicks(2);
+			BufferedImage full = read(context.takeScreenshot("all-in-one-case-full"));
+			checkBoardPixel(context, full, 4, 20, 0xC8FFD2, "CPU dots lit");
+			checkBoardPixel(context, full, 55, 26, 0x287842, "RAM lane 1 seated");
+			checkBoardPixel(context, full, 115, 26, 0x1A1A1E, "RAM lane 4 empty");
+			checkBoardPixel(context, full, 154, 23, 0xC4342C, "SATA port 1 plugged");
+			checkBoardPixel(context, full, 154, 43, 0x1A1A1E, "SATA port 2 empty");
+			checkBoardPixel(context, full, 73, 115, 0xB0B4BC, "expansion slot 2 engaged");
+			checkBoardPixel(context, full, 46, 115, 0x1A1A1E, "expansion slot 1 empty");
+			checkBoardPixel(context, full, 34, 121, 0x5AE66E, "full battery: sixth bar green");
+			singleplayer.getServer().runOnServer(server -> {
+				ItemStack drained = new ItemStack(ModItems.UPS_BATTERY);
+				drained.set(ModComponents.CHARGE, 0);
+				((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts().setItem(CaseMenu.UPS_SLOT, drained);
+			});
+			context.waitFor(client -> ((CaseScreen) client.gui.screen()).getMenu().slots.get(CaseMenu.UPS_SLOT).getItem()
+				.getOrDefault(ModComponents.CHARGE, 100) == 0);
+			context.waitTicks(2);
+			BufferedImage drainedShot = read(context.takeScreenshot("all-in-one-case-battery-empty"));
+			checkBoardPixel(context, drainedShot, 14, 121, 0xDC3C32, "empty battery: one red bar");
+			checkBoardPixel(context, drainedShot, 18, 121, 0x1E2621, "empty battery: second bar off");
+
+			// The bus order panel lists the devices; its arrows reorder them on the server.
+			check(context.computeOnClient(client -> ((CaseScreen) client.gui.screen()).busPanelShown()), "the bus order panel should show");
+			check(serverBusKeys(singleplayer, computer).equals(List.of("display", "keyboard", "sata:0", "sata:2", "exp:1")),
+				"default bus order, got " + serverBusKeys(singleplayer, computer));
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).busArrow(0, false));
+			singleplayer.getServer().waitFor(server -> serverBusKeys(server, computer).getFirst().equals("keyboard"));
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).busArrow(4, true));
+			singleplayer.getServer().waitFor(server -> serverBusKeys(server, computer).get(3).equals("exp:1"));
+			context.waitTicks(2);
+			context.takeScreenshot("all-in-one-case-reordered");
+			check(context.computeOnClient(client -> client.player.containerMenu.getCarried().isEmpty()), "clicking the panel must not pick anything up");
+
 			// Back to the screen view; the power button turns the computer on.
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).viewToggle());
 			context.waitForScreen(DisplayScreen.class);
@@ -250,6 +299,26 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		context.takeScreenshot("creative-tab");
 		context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 		context.waitFor(client -> client.gui.screen() == null);
+	}
+
+	/** The board pixel at (bx, by) in the case view's screenshot must be {@code rgb}. */
+	private static void checkBoardPixel(ClientGameTestContext context, BufferedImage image, int bx, int by, int rgb, String what) {
+		int actual = context.computeOnClient(client -> {
+			CaseScreen screen = (CaseScreen) client.gui.screen();
+			double scale = (double) image.getWidth() / screen.width;
+			Viewport board = screen.board();
+			return image.getRGB((int) ((board.x() + bx + 0.5) * scale), (int) ((board.y() + by + 0.5) * scale)) & 0xFFFFFF;
+		});
+		check(actual == rgb, what + ": expected " + hex(rgb) + ", got " + hex(actual));
+	}
+
+	private static List<String> serverBusKeys(TestSingleplayerContext singleplayer, BlockPos computer) {
+		return singleplayer.getServer().computeOnServer(server -> serverBusKeys(server, computer));
+	}
+
+	private static List<String> serverBusKeys(net.minecraft.server.MinecraftServer server, BlockPos computer) {
+		return ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).busEntries().stream()
+			.map(AllInOneBlockEntity.BusEntry::key).toList();
 	}
 
 	/** Which hotbar slot (0-8) holds the item. */

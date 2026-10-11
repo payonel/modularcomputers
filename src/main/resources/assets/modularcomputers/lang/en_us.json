@@ -5,5 +5,16 @@
 	"item.modularcomputers.cpu": "CPU",
 	"item.modularcomputers.eeprom": "EEPROM",
 	"commands.modularcomputers.giveall": "Gave %s Modular Computers items",
-	"subtitles.modularcomputers.error_beep": "Computer beeps an error"
+	"subtitles.modularcomputers.error_beep": "Computer beeps an error",
+	"item.modularcomputers.ram": "RAM",
+	"item.modularcomputers.hard_disk": "Hard Disk",
+	"item.modularcomputers.wlan_card": "WLAN Card",
+	"item.modularcomputers.ups_battery": "UPS Battery",
+	"gui.modularcomputers.bus.title": "BUS ORDER",
+	"gui.modularcomputers.bus.subtitle": "first found on top",
+	"gui.modularcomputers.bus.built_in": "built-in",
+	"gui.modularcomputers.bus.sata": "SATA %s",
+	"gui.modularcomputers.bus.expansion": "expansion slot %s",
+	"gui.modularcomputers.device.display": "Display",
+	"gui.modularcomputers.device.keyboard": "Keyboard"
 }
