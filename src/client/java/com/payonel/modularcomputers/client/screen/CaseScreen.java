@@ -95,6 +95,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int PLUG_IN = 0xFF3CB45A;
 	private static final int PLUG_OUT = 0xFF8C8C8C;
 	private static final int LED_WARNING = 0xFFF0A020;
+	/** An offline device's row: a gray display, with its name and "offline" in lighter grays. */
+	private static final int OFFLINE_DISPLAY = 0xFF4E4E52;
+	private static final int OFFLINE_NAME = 0xFFC4C4C4;
+	private static final int OFFLINE_LOCATION = 0xFF96969A;
 	private static final int LED_GLINT = 0xFFFFE8A0;
 	private static final int LED_OFF = 0xFF3A2E1A;
 
@@ -233,6 +237,12 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	public Viewport busOverflowLed() {
 		Viewport panel = busPanel();
 		return new Viewport(panel.right() - 16, panel.y() + 7, 6, 6);
+	}
+
+	/** The display part of a bus order row, right of its icon. */
+	public Viewport busRowDisplay(int row) {
+		Viewport panel = busPanel();
+		return new Viewport(panel.x() + BUS_ROW_X + 19, panel.y() + BUS_ROW_Y + row * BUS_ROW_H + 1, BUS_ROW_W - 19, 17);
 	}
 
 	/** The forget button of an offline device's row, where its plug would be. */
@@ -482,8 +492,13 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			} else {
 				graphics.item(entry.item(), panel.x() + BUS_ROW_X + 1, ry + 1);
 			}
-			graphics.text(font, entry.name(), panel.x() + 41, ry + 1, entry.connected() && entry.online() ? LIGHT : SILK_DIM, false);
-			graphics.text(font, entry.location(), panel.x() + 41, ry + 10, SILK_DIM, false);
+			boolean offline = entry.cabled() && !entry.online();
+			if (offline) {
+				// An offline device's display is gray, not black: plainly not there right now.
+				graphics.fill(panel.x() + BUS_ROW_X + 19, ry + 1, panel.x() + BUS_ROW_X + BUS_ROW_W, ry + 18, OFFLINE_DISPLAY);
+			}
+			graphics.text(font, entry.name(), panel.x() + 41, ry + 1, offline ? OFFLINE_NAME : entry.connected() ? LIGHT : SILK_DIM, false);
+			graphics.text(font, entry.location(), panel.x() + 41, ry + 10, offline ? OFFLINE_LOCATION : SILK_DIM, false);
 			if (entry.cabled()) {
 				extractBulb(graphics, busBulb(row), Identify.isOn(entry.device().get()));
 				if (entry.online()) {

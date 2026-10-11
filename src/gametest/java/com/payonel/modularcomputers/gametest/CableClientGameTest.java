@@ -210,10 +210,24 @@ public class CableClientGameTest implements FabricClientGameTest {
 			check((ledOn & 0xFFFFFF) == 0xF0A020, "the overflow light is lit, got " + hex(ledOn));
 			check(context.computeOnClient(client -> ((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busStatus().waiting()) == 1,
 				"one screen waits");
-			setblock(singleplayer, second, "air");
+			setblock(singleplayer, second, "minecraft:air");
 			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
 				.machine().board().setBusCapacity(Motherboard.DEFAULT_BUS_CAPACITY));
 			context.waitFor(client -> !((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busStatus().overflow());
+
+			// Cut the cable: the screen stays listed, offline, its row's display gray.
+			setblock(singleplayer, cable, "minecraft:air");
+			context.waitFor(client -> ((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busEntries().get(row).online() == false);
+			context.waitTicks(2);
+			BufferedImage offline = read(context.takeScreenshot("case-screen-offline"));
+			int gray = screenPixel(context, offline, s -> {
+				Viewport display = ((CaseScreen) s).busRowDisplay(row);
+				return new Viewport(display.x() + 50, display.y() + 4, 1, 1);
+			});
+			check((gray & 0xFFFFFF) == 0x4E4E52, "an offline row's display is gray, got " + hex(gray));
+			check(tipAt(context, s -> ((CaseScreen) s).busPlug(row)).equals("Forget"), "and its plug is a forget button");
+			setblock(singleplayer, cable, "cable");
+			context.waitFor(client -> ((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busEntries().get(row).online());
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitFor(client -> client.gui.screen() == null);
 			context.waitTicks(3);
@@ -269,8 +283,10 @@ public class CableClientGameTest implements FabricClientGameTest {
 		}
 	}
 
+	/** Sets a block by command: a mod block by its path ("screen[facing=south]"), anything else by its full id. */
 	private static void setblock(TestSingleplayerContext singleplayer, BlockPos pos, String block) {
-		singleplayer.getServer().runCommand("setblock %d %d %d modularcomputers:%s".formatted(pos.getX(), pos.getY(), pos.getZ(), block));
+		String id = block.contains(":") ? block : "modularcomputers:" + block;
+		singleplayer.getServer().runCommand("setblock %d %d %d %s".formatted(pos.getX(), pos.getY(), pos.getZ(), id));
 	}
 
 	/** The bus order panel's tip for the middle of an area, or "" for none. */
