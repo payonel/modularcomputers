@@ -5,21 +5,40 @@ package com.payonel.modularcomputers.power;
  * running a CPU. How many Minecraft days each tier lasts is configurable ({@link #setDays}; 0
  * means it never runs out). By default a full tier 1 runs a CPU for ten days (10% a day), tier 2
  * holds twice that and recharges itself while it isn't running anything, and tier 3 never runs
- * out.
+ * out. Tier 2 recharges itself at a configurable rate ({@link #setRechargeRate}): by default half a
+ * tick of charge for every tick it rests, so it takes two seconds to charge one.
  */
 public enum BatteryTier {
-	TIER_1(10, false),
-	TIER_2(20, true),
-	TIER_3(0, false);
+	TIER_1(10, 0),
+	TIER_2(20, 0.5),
+	TIER_3(0, 0);
 
 	private final double defaultDays;
-	private final boolean selfCharging;
+	private final double defaultRechargeRate;
 	private volatile double days;
+	private volatile double rechargeRate;
 
-	BatteryTier(double defaultDays, boolean selfCharging) {
+	BatteryTier(double defaultDays, double defaultRechargeRate) {
 		this.defaultDays = defaultDays;
-		this.selfCharging = selfCharging;
+		this.defaultRechargeRate = defaultRechargeRate;
 		this.days = defaultDays;
+		this.rechargeRate = defaultRechargeRate;
+	}
+
+	public double defaultRechargeRate() {
+		return defaultRechargeRate;
+	}
+
+	/** Ticks of charge it regains for each tick it rests; 0 means it doesn't recharge itself. */
+	public double rechargeRate() {
+		return rechargeRate;
+	}
+
+	/** Sets how fast it recharges itself while resting. Negative values are ignored. */
+	public void setRechargeRate(double rate) {
+		if (rate >= 0 && Double.isFinite(rate)) {
+			this.rechargeRate = rate;
+		}
 	}
 
 	public double defaultDays() {
@@ -48,8 +67,8 @@ public enum BatteryTier {
 		return days == 0;
 	}
 
-	/** It regains one tick of charge for every tick it isn't running a computer (tier 2). */
+	/** It regains charge while it isn't running a computer (tier 2). */
 	public boolean selfCharging() {
-		return selfCharging;
+		return rechargeRate > 0;
 	}
 }

@@ -19,6 +19,7 @@ class ModConfigTest {
 	void restoreDefaults() {
 		for (BatteryTier tier : BatteryTier.values()) {
 			tier.setDays(tier.defaultDays());
+			tier.setRechargeRate(tier.defaultRechargeRate());
 		}
 	}
 
@@ -26,7 +27,9 @@ class ModConfigTest {
 	void writesTheDefaultsTheFirstTime() throws IOException {
 		Path file = dir.resolve("config").resolve(ModConfig.FILE_NAME);
 		ModConfig.load(file);
-		assertThat(Files.readString(file)).contains("battery_tier1_duration: 10", "battery_tier2_duration: 20", "battery_tier3_duration: 0");
+		assertThat(Files.readString(file)).contains("battery_tier1_duration: 10", "battery_tier2_duration: 20", "battery_tier3_duration: 0",
+			"battery_tier2_recharge_rate: 0.5");
+		assertThat(BatteryTier.TIER_2.rechargeRate()).isEqualTo(0.5);
 		assertThat(BatteryTier.TIER_1.days()).isEqualTo(10);
 		assertThat(BatteryTier.TIER_3.infinite()).isTrue();
 	}
@@ -45,6 +48,33 @@ class ModConfigTest {
 		assertThat(BatteryTier.TIER_2.days()).as("missing: back to the default").isEqualTo(20);
 		assertThat(BatteryTier.TIER_3.infinite()).isFalse();
 		assertThat(BatteryTier.TIER_3.capacity()).isEqualTo(3 * BatteryCharge.DAY_TICKS);
+	}
+
+	@Test
+	void anOlderFileGetsTheNewSettingsAddedAndKeepsItsOwn() throws IOException {
+		Path file = dir.resolve(ModConfig.FILE_NAME);
+		Files.writeString(file, "# mine\nbattery_tier1_duration: 0.5\nbattery_tier2_duration: 1\nbattery_tier3_duration: 0\n");
+		ModConfig.load(file);
+		String text = Files.readString(file);
+		assertThat(text).startsWith("# mine\nbattery_tier1_duration: 0.5\n").contains("battery_tier2_recharge_rate: 0.5");
+		assertThat(text).containsOnlyOnce("battery_tier1_duration");
+		assertThat(BatteryTier.TIER_1.days()).isEqualTo(0.5);
+		ModConfig.load(file);
+		assertThat(Files.readString(file)).as("nothing more to add").isEqualTo(text);
+	}
+
+		@Test
+	void tier2RechargeRateCanBeChangedOrTurnedOff() throws IOException {
+		Path file = dir.resolve(ModConfig.FILE_NAME);
+		Files.writeString(file, "battery_tier2_recharge_rate: 1\n");
+		ModConfig.load(file);
+		assertThat(BatteryTier.TIER_2.rechargeRate()).isEqualTo(1);
+		Files.writeString(file, "battery_tier2_recharge_rate: 0\n");
+		ModConfig.load(file);
+		assertThat(BatteryTier.TIER_2.selfCharging()).isFalse();
+		Files.writeString(file, "battery_tier2_recharge_rate: fast\n");
+		ModConfig.load(file);
+		assertThat(BatteryTier.TIER_2.rechargeRate()).as("bad: the default").isEqualTo(0.5);
 	}
 
 	@Test

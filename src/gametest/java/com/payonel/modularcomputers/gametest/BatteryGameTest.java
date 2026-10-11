@@ -70,7 +70,7 @@ public class BatteryGameTest {
 		ItemStack tier2 = craft(helper, 3,
 			Items.GOLD_INGOT, Items.GOLD_INGOT, Items.GOLD_INGOT,
 			Items.IRON_INGOT, Items.REDSTONE, Items.IRON_INGOT,
-			Items.IRON_INGOT, Items.BLAZE_ROD, Items.IRON_INGOT);
+			Items.SEA_LANTERN, Items.BLAZE_ROD, Items.SEA_LANTERN);
 		helper.assertTrue(tier2.is(ModItems.TIER2_BATTERY), "tier 2 recipe, got " + tier2);
 		ItemStack tier3 = craft(helper, 3,
 			Items.DIAMOND, Items.DIAMOND, Items.DIAMOND,
@@ -243,8 +243,8 @@ public class BatteryGameTest {
 	public void aTier2RechargesWhileTheComputerIsOff(GameTestHelper helper) {
 		long now = helper.getLevel().getGameTime();
 		AllInOneBlockEntity computer = computer(helper, battery(ModItems.TIER2_BATTERY, DAY + 100, now - 1000));
-		helper.succeedWhen(() -> helper.assertTrue(charge(computer).ticks() >= 1100,
-			"regains the time it rested, got " + charge(computer)));
+		helper.succeedWhen(() -> helper.assertTrue(charge(computer).ticks() >= 600,
+			"regains half the time it rested, got " + charge(computer)));
 	}
 
 	@GameTest(maxTicks = 100)

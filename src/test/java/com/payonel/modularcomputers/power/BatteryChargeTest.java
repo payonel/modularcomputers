@@ -39,13 +39,28 @@ class BatteryChargeTest {
 	}
 
 	@Test
-	void tier2RegainsOneTickForEveryTickItRests() {
+	void tier2RegainsHalfATickForEveryTickItRests() {
+		assertThat(BatteryTier.TIER_2.rechargeRate()).isEqualTo(0.5);
 		BatteryCharge charge = new BatteryCharge(1000, 500).rest(BatteryTier.TIER_2, 800);
-		assertThat(charge).isEqualTo(new BatteryCharge(1300, 800));
+		assertThat(charge).isEqualTo(new BatteryCharge(1150, 800));
 		assertThat(charge.rest(BatteryTier.TIER_2, 800L + 100 * DAY).ticks()).as("up to full").isEqualTo(BatteryTier.TIER_2.capacity());
-		// Run a day, rest a day: back where it started.
-		BatteryCharge cycled = new BatteryCharge(5 * DAY, 0).run(BatteryTier.TIER_2, DAY, DAY).rest(BatteryTier.TIER_2, 2L * DAY);
+		// Run a day, rest two: back where it started.
+		BatteryCharge cycled = new BatteryCharge(5 * DAY, 0).run(BatteryTier.TIER_2, DAY, DAY).rest(BatteryTier.TIER_2, 3L * DAY);
 		assertThat(cycled.ticks()).isEqualTo(5 * DAY);
+	}
+
+	@Test
+	void restTooShortForAWholeTickCarriesOver() {
+		try {
+			BatteryTier.TIER_2.setRechargeRate(0.3);
+			BatteryCharge charge = new BatteryCharge(0, 0);
+			for (long now = 20; now <= 1000; now += 20) {
+				charge = charge.rest(BatteryTier.TIER_2, now);
+			}
+			assertThat(charge.ticks()).as("settled every 20 ticks, nothing lost").isEqualTo(300);
+		} finally {
+			BatteryTier.TIER_2.setRechargeRate(BatteryTier.TIER_2.defaultRechargeRate());
+		}
 	}
 
 	@Test

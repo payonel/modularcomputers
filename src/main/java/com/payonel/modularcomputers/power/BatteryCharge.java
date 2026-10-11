@@ -41,12 +41,22 @@ public record BatteryCharge(int ticks, long settledAt) {
 		return new BatteryCharge((int) Math.min(tier.capacity(), (long) ticks + amount), settledAt);
 	}
 
-	/** The battery spent the time until {@code now} resting: a self-charging one gains that much. */
+	/**
+	 * The battery spent the time until {@code now} resting: a self-charging one gains its
+	 * recharge rate times that. Rest too short to earn a whole tick carries over to next time.
+	 */
 	public BatteryCharge rest(BatteryTier tier, long now) {
-		if (tier.selfCharging() && settledAt != UNSETTLED && now > settledAt) {
-			return new BatteryCharge((int) Math.min(tier.capacity(), ticks + (now - settledAt)), now);
+		if (!tier.selfCharging() || settledAt == UNSETTLED || now <= settledAt) {
+			return new BatteryCharge(ticks, now);
 		}
-		return new BatteryCharge(ticks, now);
+		double rate = tier.rechargeRate();
+		long gained = (long) Math.floor((now - settledAt) * rate);
+		long total = ticks + gained;
+		if (total >= tier.capacity()) {
+			return new BatteryCharge(tier.capacity(), now);
+		}
+		long spent = Math.min(now - settledAt, (long) Math.ceil(gained / rate));
+		return new BatteryCharge((int) total, settledAt + spent);
 	}
 
 	/** The battery ran a computer for {@code used} ticks, until {@code now}. */

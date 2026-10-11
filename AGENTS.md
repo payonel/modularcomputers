@@ -95,9 +95,12 @@ same thing.
           - Charging materials are percentages of a full tier 1, so they follow its setting.
         - **Tier 1** (`tier1_battery`): copper×3 / iron, redstone, iron / iron, redstone, iron.
           Full, it runs a CPU for 10 days and nights, 10% a day.
-        - **Tier 2** (`tier2_battery`): gold×3 / iron, redstone, iron / iron, blaze rod, iron.
-          It holds twice as much. It recharges itself 1:1 (one tick of charge per tick) whenever
-          it isn't running a computer: out of the UPS slot, or in a case that's off.
+        - **Tier 2** (`tier2_battery`): gold×3 / iron, redstone, iron / sea lantern, blaze rod,
+          sea lantern (user changed it, 2026-10-11: self-recharge "might be op"). It holds twice
+          as much. It recharges itself whenever it isn't running a computer (out of the UPS slot,
+          or in a case that's off) at `battery_tier2_recharge_rate` ticks of charge per tick:
+          0.5 by default, so two seconds of rest charge one. Rest too short to earn a whole tick
+          carries over (`BatteryCharge.rest` advances `settledAt` only by what it paid for).
           - This is worked out lazily from `settledAt` (game time), so it charges in chests and
             unloaded chunks too. It's settled every 20 ticks in a player's inventory or in a case.
           - A new battery is `UNSETTLED`: it starts counting at the first look.
@@ -285,8 +288,11 @@ scripts/art/error_beep.py` into
     Toggling plays a stone-button click.
 - **Settings** (`config/ModConfig`, user request 2026-10-11): `config/modularcomputers.properties`
   in the game folder, `key: value` lines (Java properties).
-  - The file is written with commented defaults the first time the game starts. Missing or
-    bad values fall back to the defaults, with a warning in the log.
+  - The file is written with commented defaults the first time the game starts. Settings a
+    file doesn't have yet (it's from an older version) are appended to it, so they show up to
+    edit. Bad values fall back to the defaults, with a warning in the log.
+  - Settings: `battery_tier1_duration`, `battery_tier2_duration`, `battery_tier3_duration`
+    (days, 0 = never runs out), `battery_tier2_recharge_rate` (0.5).
   - `/modularcomputers reload` rereads it (operator permission). A server sends its settings
     to joining players and after a reload (`SettingsPayload`), and a client goes back to its
     own file on disconnect.

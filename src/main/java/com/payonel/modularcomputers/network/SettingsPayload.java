@@ -15,14 +15,15 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * Server to client: the server's settings that clients show (how long each battery tier lasts,
- * for charge bars and tooltips). Sent when a player joins and after a reload.
+ * Server to client: the server's settings that clients show (how long each battery tier lasts
+ * and how fast it recharges itself, for charge bars and tooltips). Sent when a player joins and after a reload.
  */
-public record SettingsPayload(List<Double> batteryDays) implements CustomPacketPayload {
+public record SettingsPayload(List<Double> batteryDays, List<Double> rechargeRates) implements CustomPacketPayload {
 	public static final Type<SettingsPayload> TYPE = new Type<>(ModularComputers.id("settings"));
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, SettingsPayload> CODEC = StreamCodec.composite(
 		ByteBufCodecs.DOUBLE.apply(ByteBufCodecs.list()), SettingsPayload::batteryDays,
+		ByteBufCodecs.DOUBLE.apply(ByteBufCodecs.list()), SettingsPayload::rechargeRates,
 		SettingsPayload::new);
 
 	@Override
@@ -31,7 +32,8 @@ public record SettingsPayload(List<Double> batteryDays) implements CustomPacketP
 	}
 
 	public static SettingsPayload current() {
-		return new SettingsPayload(Arrays.stream(BatteryTier.values()).map(BatteryTier::days).toList());
+		return new SettingsPayload(Arrays.stream(BatteryTier.values()).map(BatteryTier::days).toList(),
+			Arrays.stream(BatteryTier.values()).map(BatteryTier::rechargeRate).toList());
 	}
 
 	/** Client side: use the server's settings. */
@@ -39,6 +41,9 @@ public record SettingsPayload(List<Double> batteryDays) implements CustomPacketP
 		BatteryTier[] tiers = BatteryTier.values();
 		for (int i = 0; i < Math.min(tiers.length, batteryDays.size()); i++) {
 			tiers[i].setDays(batteryDays.get(i));
+		}
+		for (int i = 0; i < Math.min(tiers.length, rechargeRates.size()); i++) {
+			tiers[i].setRechargeRate(rechargeRates.get(i));
 		}
 	}
 
