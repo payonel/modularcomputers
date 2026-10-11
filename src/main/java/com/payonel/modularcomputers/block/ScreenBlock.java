@@ -23,8 +23,8 @@ import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * A screen on its own: a monitor for computers to show their console on, joined to them by
- * cable (it takes one on any side but the glass). Right-click opens its screen view, with the
- * power button of the computer it shows, if it's connected to one.
+ * cable (it takes one on any side but the glass). Right-click opens its screen view: just the
+ * display. The power button is on the computer's case, not on every screen.
  */
 public final class ScreenBlock extends HorizontalDirectionalBlock implements EntityBlock {
 	public ScreenBlock(Properties properties) {
@@ -61,8 +61,8 @@ public final class ScreenBlock extends HorizontalDirectionalBlock implements Ent
 			return InteractionResult.SUCCESS;
 		}
 		if (player instanceof ServerPlayer serverPlayer) {
-			Optional<BlockPos> computer = Cabling.computerFor(level, pos).map(BlockEntity::getBlockPos);
-			ServerPlayNetworking.send(serverPlayer, new OpenDisplayPayload(pos, screen.display().buffer().resolution(), computer, false));
+			// Just the display: the power button belongs to the computer's case.
+			ServerPlayNetworking.send(serverPlayer, new OpenDisplayPayload(pos, screen.display().buffer().resolution(), Optional.empty(), false));
 		}
 		return InteractionResult.SUCCESS;
 	}

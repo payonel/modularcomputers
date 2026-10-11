@@ -127,9 +127,8 @@ of letting the player order them:
   console (hard-coded hello world). The plan is a virtual device from the motherboard
   (virtual bus) that the EEPROM uses to choose where the console goes.
 - **Several computers on one screen:** today each writes to it and the last write wins;
-  powering any of them off blanks it. A screen's view shows the power button of the nearest
-  computer that drives it. A real monitor shows one input at a time; consider an input
-  selector.
+  powering any of them off blanks it. A real monitor shows one input at a time; consider an
+  input selector. Screens have no power button: only the case does (user).
 
 ## Placeholder blocks and cards (built as placeholders, 2026-10-11; behavior to design)
 

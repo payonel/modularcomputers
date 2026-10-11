@@ -85,13 +85,13 @@ public class CableClientGameTest implements FabricClientGameTest {
 			int lit = whiteOnScreen(read(context.takeScreenshot("screen-hello")));
 			check(lit > 30, "the wired screen should show hello world on its face, found " + lit + " white pixels");
 
-			// Its screen view: the computer's power button, no case view.
+			// Its screen view: just the display. The power button is the computer case's.
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(DisplayScreen.class);
 			context.waitTicks(2);
 			context.runOnClient(client -> {
 				DisplayScreen view = (DisplayScreen) client.gui.screen();
-				check(view.powerButton().width() > 0, "a connected screen shows its computer's power button");
+				check(view.powerButton().width() == 0, "a screen block has no power button");
 				check(view.viewToggle().width() == 0, "a screen block has no case view");
 			});
 			BufferedImage view = read(context.takeScreenshot("screen-view"));
@@ -103,10 +103,9 @@ public class CableClientGameTest implements FabricClientGameTest {
 					(int) ((area.y() + area.height() / 16.0) * scale), AllInOneClientGameTest::isWhite);
 			});
 			check(viewText > 50, "the screen view shows hello world, found " + viewText);
-			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, s -> ((DisplayScreen) s).powerButton());
-			context.waitFor(client -> !machinePowered(client, computer));
-			context.waitFor(client -> !showsHello(client, screen));
-			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, s -> ((DisplayScreen) s).powerButton());
+			pressPower(singleplayer, computer);
+			context.waitFor(client -> !machinePowered(client, computer) && !showsHello(client, screen));
+			pressPower(singleplayer, computer);
 			context.waitFor(client -> machinePowered(client, computer) && showsHello(client, screen));
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitFor(client -> client.gui.screen() == null);

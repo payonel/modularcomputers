@@ -2,7 +2,6 @@ package com.payonel.modularcomputers.block;
 
 import com.payonel.modularcomputers.cable.CableWalk;
 import java.util.List;
-import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
@@ -81,21 +80,5 @@ public final class Cabling {
 				return Cabling.hasPort(level.getBlockState(pos), side);
 			}
 		}, start);
-	}
-
-	/**
-	 * The computer a screen shows, for its power button: the nearest one that has the screen
-	 * connected.
-	 */
-	public static Optional<AllInOneBlockEntity> computerFor(Level level, BlockPos screen) {
-		if (!(level.getBlockEntity(screen) instanceof ScreenBlockEntity display)) {
-			return Optional.empty();
-		}
-		for (CableWalk.Found found : walk(level, screen)) {
-			if (level.getBlockEntity(found.pos()) instanceof AllInOneBlockEntity computer && computer.drives(display)) {
-				return Optional.of(computer);
-			}
-		}
-		return Optional.empty();
 	}
 }

@@ -3,7 +3,6 @@ package com.payonel.modularcomputers.gametest;
 import com.payonel.modularcomputers.block.AllInOneBlock;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
 import com.payonel.modularcomputers.block.CableBlock;
-import com.payonel.modularcomputers.block.Cabling;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.block.ScreenBlock;
 import com.payonel.modularcomputers.block.ScreenBlockEntity;
@@ -105,8 +104,6 @@ public class CableGameTest {
 			}
 			helper.assertTrue(showsText(computer.display()), "the built-in display shows hello world");
 			helper.assertTrue(showsText(screen.display()), "so does the wired screen");
-			helper.assertTrue(Cabling.computerFor(helper.getLevel(), screen.getBlockPos()).orElse(null) == computer,
-				"the screen's power button presses this computer");
 		});
 	}
 
@@ -132,7 +129,6 @@ public class CableGameTest {
 				helper.assertTrue(screen.display().buffer().isBlank(), "and goes blank");
 				var entry = entryFor(computer, screen).orElseThrow(() -> helper.assertionException("still listed"));
 				helper.assertTrue(!entry.connected(), "listed as disconnected");
-				helper.assertTrue(Cabling.computerFor(helper.getLevel(), screen.getBlockPos()).isEmpty(), "no power button on it now");
 				helper.assertTrue(!computer.setConnected("display", false), "built-ins can't be unplugged");
 				helper.assertTrue(computer.setConnected(key, true), "plugged back in");
 				helper.assertTrue(showsText(screen.display()), "shows the console again");

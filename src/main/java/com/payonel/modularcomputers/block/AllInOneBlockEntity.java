@@ -164,11 +164,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		}
 	}
 
-	/** Server side: whether this computer has the screen on its bus (wired and connected). */
-	public boolean drives(ScreenBlockEntity screen) {
-		return cabledDevices.get(CABLE_KEY + screen.id()) == screen.display() && busOrder.connected().contains(CABLE_KEY + screen.id());
-	}
-
 	/** The devices on the bus, in order, as the bus order panel shows them. Works on clients too. */
 	public List<BusEntry> busEntries() {
 		List<BusEntry> entries = new ArrayList<>();

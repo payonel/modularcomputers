@@ -236,9 +236,9 @@ scripts/art/error_beep.py` into
     - The face is one plain pane of glass, 14x9 texels across the middle: the same shape as
       the screen view. It sits in an even beige frame. The user rejected a chin with a badge
       and light under the glass: it looked like a blurry keyboard.
-    - Right-click opens its screen view. That view has the power button of the computer it
-      shows (`Cabling.computerFor`: the nearest one with it connected), and no view toggle.
-      It has no power button when no computer drives it.
+    - Right-click opens its screen view: just the display, with no power button and no view
+      toggle. The user wants the power button **only on the case**, not on every screen on
+      the network (2026-10-11).
     - Each screen has a UUID (`screen_id`, saved), its bus order key `cable:<uuid>`. A
       re-placed screen is a new screen.
     - It saves its display and sends changes to clients from its own tick (`TextBuffer.changes`).
