@@ -29,19 +29,17 @@ def rect(im, x0, y0, x1, y1, c):
 			im.putpixel((x, y), c)
 
 def screen_front():
+	"""A plain monitor face: one pane of glass, the same shape as the screen view (about 14:9),
+	set into an even beige frame with a recessed edge. Nothing below it to read as a keyboard."""
 	im = casing(11)
-	# Glass: x 1..14, y 1..9; the display is drawn over it (DisplayRenderer.SCREEN).
-	rect(im, 1, 1, 14, 9, GLASS)
-	# The chin: a seam under the glass, a badge and the power light (off).
-	rect(im, 1, 10, 14, 10, DARK)
-	rect(im, 6, 12, 9, 12, SHADE)
-	im.putpixel((13, 12), (74, 44, 40))
+	# Glass: x 1..14, y 3..11; the display is drawn over it (DisplayRenderer.SCREEN).
+	rect(im, 1, 3, 14, 11, GLASS)
+	rect(im, 1, 2, 14, 2, DARK)    # recess: shadow above
+	rect(im, 1, 12, 14, 12, LIGHT)  # and light below
 	return im
 
 def screen_side():
-	im = casing(12)
-	rect(im, 1, 10, 14, 10, SHADE)  # the chin's seam, continued
-	return im
+	return casing(12)
 
 def screen_back():
 	im = casing(13)

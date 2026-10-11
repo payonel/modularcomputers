@@ -231,8 +231,11 @@ scripts/art/error_beep.py` into
   isn't ready. Leave VM/runtime work alone and keep building the computer's other features.
   Machine behavior stays a stand-in (like the "hello world" greeting) until the runtime lands.
 - **Screens and cables** (built 2026-10-11, the user's request):
-  - **Screen** (`ScreenBlock`, `ScreenBlockEntity`): a monitor block, full glass above a chin,
-    50x16 like the built-in display. It faces the player who places it.
+  - **Screen** (`ScreenBlock`, `ScreenBlockEntity`): a monitor block, 50x16 like the built-in
+    display. It faces the player who places it.
+    - The face is one plain pane of glass, 14x9 texels across the middle: the same shape as
+      the screen view. It sits in an even beige frame. The user rejected a chin with a badge
+      and light under the glass: it looked like a blurry keyboard.
     - Right-click opens its screen view. That view has the power button of the computer it
       shows (`Cabling.computerFor`: the nearest one with it connected), and no view toggle.
       It has no power button when no computer drives it.

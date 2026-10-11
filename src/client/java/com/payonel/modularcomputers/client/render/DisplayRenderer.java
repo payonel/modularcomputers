@@ -29,8 +29,8 @@ import net.minecraft.world.phys.Vec3;
 public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implements BlockEntityRenderer<T, DisplayRenderer.State> {
 	/** The all-in-one's glass, above its keyboard, in texels from the face's top-left corner. */
 	public static final Glass ALL_IN_ONE = new Glass(2, 2, 12, 8);
-	/** The screen block's glass: nearly the whole face, above a chin. */
-	public static final Glass SCREEN = new Glass(1, 1, 14, 9);
+	/** The screen block's glass: a 14x9 pane across the middle of the face. */
+	public static final Glass SCREEN = new Glass(1, 3, 14, 9);
 	/** How far the text floats in front of the face, in blocks. */
 	private static final float TEXT_OFFSET = 0.002f;
 	/** How far the identify outline sits outside the block, in blocks. */
