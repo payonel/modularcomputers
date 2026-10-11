@@ -133,6 +133,13 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		return new Viewport(leftPos + CaseMenu.BOARD_X, topPos + CaseMenu.BOARD_Y, BOARD_W, BOARD_H);
 	}
 
+	/** The case's power, as the menu last sent it: up to date every tick. */
+	private PowerBuffer casePower() {
+		PowerBuffer power = new PowerBuffer();
+		power.set(menu.powerLevel());
+		return power;
+	}
+
 	/** The case power meter under the battery slot. */
 	public Viewport chargeMeter() {
 		Viewport board = board();
@@ -144,10 +151,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	 * the computer (DD:MM:SS).
 	 */
 	public List<Component> powerTooltip() {
-		if (minecraft.level == null || !(minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer)) {
-			return List.of();
-		}
-		PowerBuffer power = computer.power();
+		PowerBuffer power = casePower();
 		List<Component> lines = new ArrayList<>();
 		lines.add(Component.translatable("gui.modularcomputers.power", power.percent(), Durations.clock(power.level())));
 		ItemStack stack = menu.slots.get(CaseMenu.UPS_SLOT).getItem();
@@ -302,18 +306,16 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		}
 		// The charge meter under the battery shows the case's power buffer, not the battery.
 		// Empty: all bars off (the texture's own look).
-		if (minecraft.level != null && minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer) {
-			int lit = ChargeMeter.litBars(computer.power().percent());
-			int color = switch (ChargeMeter.level(lit)) {
-				case LOW -> METER_LOW;
-				case MEDIUM -> METER_MEDIUM;
-				default -> METER_HIGH;
-			};
-			int mx = chargeMeter().x();
-			int my = chargeMeter().y();
-			for (int i = 0; i < lit; i++) {
-				graphics.fill(mx + 1 + 4 * i, my + 1, mx + 4 + 4 * i, my + 5, color);
-			}
+		int lit = ChargeMeter.litBars(casePower().percent());
+		int color = switch (ChargeMeter.level(lit)) {
+			case LOW -> METER_LOW;
+			case MEDIUM -> METER_MEDIUM;
+			default -> METER_HIGH;
+		};
+		int mx = chargeMeter().x();
+		int my = chargeMeter().y();
+		for (int i = 0; i < lit; i++) {
+			graphics.fill(mx + 1 + 4 * i, my + 1, mx + 4 + 4 * i, my + 5, color);
 		}
 	}
 

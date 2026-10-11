@@ -9,7 +9,9 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.ContainerLevelAccess;
+import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
@@ -42,20 +44,28 @@ public final class CaseMenu extends AbstractContainerMenu {
 	};
 
 	private final Container parts;
+	private final ContainerData power;
 	private final BlockPos pos;
 	private final ContainerLevelAccess access;
 
-	/** Client side: the slots are filled in by the server's sync. */
+	/** Client side: the slots and the case's power are filled in by the server's sync. */
 	public CaseMenu(int id, Inventory inventory, BlockPos pos) {
-		this(id, inventory, new SimpleContainer(PART_SLOTS), pos, ContainerLevelAccess.NULL);
+		this(id, inventory, new SimpleContainer(PART_SLOTS), new SimpleContainerData(1), pos, ContainerLevelAccess.NULL);
 	}
 
-	public CaseMenu(int id, Inventory inventory, Container parts, BlockPos pos, ContainerLevelAccess access) {
+	/**
+	 * {@code power} holds the case's power buffer level, in ticks. The menu sends it to the
+	 * player as it changes, like a furnace's progress; it goes as a short, which a day's worth
+	 * (24000) fits.
+	 */
+	public CaseMenu(int id, Inventory inventory, Container parts, ContainerData power, BlockPos pos, ContainerLevelAccess access) {
 		super(ModMenus.CASE, id);
 		checkContainerSize(parts, PART_SLOTS);
 		this.parts = parts;
+		this.power = power;
 		this.pos = pos;
 		this.access = access;
+		addDataSlots(power);
 		for (int slot = 0; slot < PART_SLOTS; slot++) {
 			addSlot(new PartSlot(parts, slot, SLOT_POSITIONS[slot][0], SLOT_POSITIONS[slot][1]));
 		}
@@ -76,6 +86,11 @@ public final class CaseMenu extends AbstractContainerMenu {
 			return stack.is(ModItems.HARD_DISK);
 		}
 		return ModItems.cardKind(stack).isPresent();
+	}
+
+	/** The case's power buffer level, in ticks. */
+	public int powerLevel() {
+		return power.get(0);
 	}
 
 	public BlockPos pos() {

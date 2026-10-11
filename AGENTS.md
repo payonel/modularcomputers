@@ -126,8 +126,11 @@ same thing.
             all bars off; any power: at least one red bar.
           - Hovering the meter shows a hint (`CaseScreen.powerTooltip`, user's wording): "Case
             power: 75% (00:15:00)" and, with a battery in, "Battery power: 90% (09:00:00)" (or
-            "Battery power: never runs out"). Clients get the buffer level whenever its
-            percentage changes.
+            "Battery power: never runs out").
+          - The case view gets the buffer level through the menu's data (`CaseMenu.powerLevel`,
+            a `ContainerData` like a furnace's progress), so it updates every second, as the
+            battery's slot does. It's sent as a short; a day (24000 ticks) fits. The block
+            entity also syncs it whenever its percentage changes.
         - **Times read DD:MM:SS** (`power/Durations.clock`, user's format): Minecraft days, then
           the real minutes (00..19, 20 to a day) and seconds into the day.
           - When the buffer runs out, a running computer dies with the **error beep**, like

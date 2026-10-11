@@ -16,13 +16,15 @@ import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.TooltipDisplay;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.ItemLike;
 
 /** Server game tests for batteries: crafting, charging, and running a computer. */
@@ -208,7 +210,21 @@ public class BatteryGameTest {
 		});
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(maxTicks = 100)
+	public void theCaseViewFollowsTheCasePowerAsItRunsDown(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper, ModItems.TIER1_BATTERY.charged());
+		computer.pressPower();
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ItemStack.EMPTY);
+		Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+		CaseMenu menu = (CaseMenu) computer.createMenu(0, player.getInventory(), player);
+		helper.assertValueEqual(menu.powerLevel(), DAY, "full to start");
+		helper.succeedWhen(() -> {
+			helper.assertTrue(menu.powerLevel() < DAY, "the menu's power runs down");
+			helper.assertValueEqual(menu.powerLevel(), computer.power().level(), "with the case's");
+		});
+	}
+
+		@GameTest(maxTicks = 200)
 	public void aRunningComputerDrawsOnTheBatteryAndATier1DoesNotRecharge(GameTestHelper helper) {
 		int start = 5 * DAY;
 		AllInOneBlockEntity computer = computer(helper, battery(ModItems.TIER1_BATTERY, start, BatteryCharge.UNSETTLED));

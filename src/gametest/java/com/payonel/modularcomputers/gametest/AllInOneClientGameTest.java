@@ -208,13 +208,13 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			int readyButton = pixelAt(context, full, screen -> ((CaseScreen) screen).powerButton());
 			check(RED.test(readyButton), "with a CPU and a charged battery the power button should be lit red, got " + hex(readyButton));
 			// The meter shows the case's own power, not the battery: nearly drained, with a flat
-			// battery in (swapping it in also syncs the case to the client), one red bar.
+			// battery in, one red bar. The case view's menu sends the case's power as it changes.
 			singleplayer.getServer().runOnServer(server -> {
 				AllInOneBlockEntity be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
 				be.power().set(PowerBuffer.CAPACITY / 20);
 				be.parts().setItem(CaseMenu.UPS_SLOT, new ItemStack(ModItems.TIER1_BATTERY));
 			});
-			context.waitFor(client -> client.level.getBlockEntity(computer) instanceof AllInOneBlockEntity be && be.power().percent() == 5);
+			context.waitFor(client -> ((CaseScreen) client.gui.screen()).getMenu().powerLevel() == PowerBuffer.CAPACITY / 20);
 			context.waitTicks(2);
 			BufferedImage drainedShot = read(context.takeScreenshot("all-in-one-case-power-low"));
 			checkBoardPixel(context, drainedShot, 14, 121, 0xDC3C32, "low case power: one red bar");

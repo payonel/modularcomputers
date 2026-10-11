@@ -7,18 +7,16 @@ import com.payonel.modularcomputers.bus.BusOrder;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.cable.CableWalk;
 import com.payonel.modularcomputers.console.ConsoleSplitter;
-import com.payonel.modularcomputers.device.Disk;
-import com.payonel.modularcomputers.device.Keyboard;
 import com.payonel.modularcomputers.device.Card;
 import com.payonel.modularcomputers.device.CardKind;
+import com.payonel.modularcomputers.device.Disk;
+import com.payonel.modularcomputers.device.Keyboard;
 import com.payonel.modularcomputers.device.UpsBattery;
 import com.payonel.modularcomputers.display.Display;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
-import com.payonel.modularcomputers.power.BatteryCharge;
-import com.payonel.modularcomputers.power.PowerBuffer;
 import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.machine.Eeprom;
 import com.payonel.modularcomputers.machine.Hardware;
@@ -27,6 +25,8 @@ import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.machine.Motherboard;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
+import com.payonel.modularcomputers.power.BatteryCharge;
+import com.payonel.modularcomputers.power.PowerBuffer;
 import com.payonel.modularcomputers.sound.ModSounds;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -36,8 +36,8 @@ import java.util.Objects;
 import java.util.Optional;
 import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
@@ -53,6 +53,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -112,6 +113,23 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final BusOrder busOrder = new BusOrder();
 	private final Bus bus = new Bus(List.of(display, keyboard));
 	private final PowerBuffer power = new PowerBuffer();
+	/** The buffer's level for the case view, which sends it to the player as it changes. */
+	private final ContainerData powerData = new ContainerData() {
+		@Override
+		public int get(int index) {
+			return power.level();
+		}
+
+		@Override
+		public void set(int index, int value) {
+			power.set(value);
+		}
+
+		@Override
+		public int getCount() {
+			return 1;
+		}
+	};
 	/** The case power clients last saw, in percent: the meter and its time left. */
 	private int syncedPowerPercent;
 	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), bus), this::hasPower);
@@ -591,7 +609,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	@Override
 	public AbstractContainerMenu createMenu(int id, Inventory inventory, Player player) {
-		return new CaseMenu(id, inventory, parts, worldPosition, ContainerLevelAccess.create(level, worldPosition));
+		return new CaseMenu(id, inventory, parts, powerData, worldPosition, ContainerLevelAccess.create(level, worldPosition));
 	}
 
 	@Override
