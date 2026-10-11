@@ -375,14 +375,14 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	 * state carries both to clients. Returns whether it changed.
 	 */
 	private boolean setPowerState() {
-		syncedPowerPercent = power.percent();
 		BlockState state = getBlockState()
 			.setValue(AllInOneBlock.READY, machine.board().cpu().isPresent() && hasPower())
 			.setValue(AllInOneBlock.POWERED, machine.isPowered());
 		if (state == getBlockState()) {
 			return false;
 		}
-		level.setBlock(worldPosition, state, Block.UPDATE_CLIENTS);
+		level.setBlock(worldPosition, state, Block.UPDATE_CLIENTS); // sends this block entity too
+		syncedPowerPercent = power.percent();
 		return true;
 	}
 

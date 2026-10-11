@@ -24,6 +24,7 @@ import com.payonel.modularcomputers.client.screen.DisplayScreen;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.CaseMenu;
+import com.payonel.modularcomputers.power.PowerBuffer;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.UUID;
@@ -93,6 +94,15 @@ public class CableClientGameTest implements FabricClientGameTest {
 			context.waitTicks(5);
 			int lit = whiteOnScreen(read(context.takeScreenshot("screen-hello")));
 			check(lit > 30, "the wired screen should show hello world on its face, found " + lit + " white pixels");
+
+			// With the battery out the case's own power runs down, and clients see it drop.
+			singleplayer.getServer().runOnServer(server -> {
+				AllInOneBlockEntity be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
+				be.power().set(PowerBuffer.CAPACITY / 2 + 10); // just over 50%: the next draw crosses it
+				be.parts().setItem(CaseMenu.UPS_SLOT, ItemStack.EMPTY);
+			});
+			context.waitFor(client -> casePercent(client, computer) == 51);
+			context.waitFor(client -> casePercent(client, computer) == 50);
 
 			// Its screen view: the display and the toggle to its slot. The power button is the
 			// computer case's.
@@ -231,7 +241,11 @@ public class CableClientGameTest implements FabricClientGameTest {
 		singleplayer.getServer().runCommand("setblock %d %d %d modularcomputers:%s".formatted(pos.getX(), pos.getY(), pos.getZ(), block));
 	}
 
-	private static void pressPower(TestSingleplayerContext singleplayer, BlockPos computer) {
+	private static int casePercent(Minecraft client, BlockPos computer) {
+		return client.level.getBlockEntity(computer) instanceof AllInOneBlockEntity be ? be.power().percent() : -1;
+	}
+
+		private static void pressPower(TestSingleplayerContext singleplayer, BlockPos computer) {
 		singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).pressPower());
 	}
 
