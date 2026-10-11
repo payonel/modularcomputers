@@ -1,5 +1,6 @@
 package com.payonel.modularcomputers.block;
 
+import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import java.util.Optional;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -7,7 +8,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import com.payonel.modularcomputers.item.ModItems;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -27,8 +27,9 @@ import net.minecraft.world.phys.BlockHitResult;
 /**
  * A screen on its own: a monitor for computers to show their console on, joined to them by
  * cable (it takes one on any side but the glass). Right-click opens its screen view: just the
- * display. The power button is on the computer's case, not on every screen. Right-click on its
- * back opens its pairing slot, for a Bluetooth card that gives it to one computer.
+ * display and a toggle to its pairing slot (a Bluetooth card there gives it to one computer),
+ * which right-clicking its back opens directly. The power button is on the computer's case,
+ * not on every screen.
  */
 public final class ScreenBlock extends HorizontalDirectionalBlock implements EntityBlock {
 	public ScreenBlock(Properties properties) {
@@ -74,10 +75,17 @@ public final class ScreenBlock extends HorizontalDirectionalBlock implements Ent
 		if (hit.getDirection() == state.getValue(FACING).getOpposite()) {
 			player.openMenu(screen); // the back: its pairing slot
 		} else if (player instanceof ServerPlayer serverPlayer) {
-			// Just the display: the power button belongs to the computer's case.
-			ServerPlayNetworking.send(serverPlayer, new OpenDisplayPayload(pos, screen.display().buffer().resolution(), Optional.empty(), false));
+			ServerPlayNetworking.send(serverPlayer, openDisplayPayload(screen));
 		}
 		return InteractionResult.SUCCESS;
+	}
+
+	/**
+	 * What the server sends to open a screen's view: the display and the toggle to its slot,
+	 * with no power button (that belongs to the computer's case).
+	 */
+	public static OpenDisplayPayload openDisplayPayload(ScreenBlockEntity screen) {
+		return new OpenDisplayPayload(screen.getBlockPos(), screen.display().buffer().resolution(), Optional.empty(), true);
 	}
 
 	@Override

@@ -7,7 +7,6 @@ import com.payonel.modularcomputers.client.render.OutlineRenderer;
 import com.payonel.modularcomputers.client.screen.CardHolderScreen;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
-import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.menu.ModMenus;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import net.fabricmc.api.ClientModInitializer;
@@ -40,8 +39,8 @@ public final class ModularComputersClient implements ClientModInitializer {
 		ClientPlayNetworking.registerGlobalReceiver(OpenDisplayPayload.TYPE, (payload, context) -> {
 			var client = context.client();
 			client.gui.setScreen(new DisplayScreen(payload));
-			if (client.player.containerMenu instanceof CaseMenu) {
-				// Coming from the case view: the server has already closed the menu.
+			if (client.player.containerMenu != client.player.inventoryMenu) {
+				// Coming from the case view (or a screen's slot): the server has already closed the menu.
 				client.player.containerMenu = client.player.inventoryMenu;
 			}
 		});

@@ -50,7 +50,7 @@ final class ComputerButtons {
 	}
 
 	/** @param powerHeld the mouse is still down on the power button */
-	/** An empty area (no width) leaves its button out. */
+	/** An empty area (no width) leaves its button out; {@code state} is only needed for the power button. */
 	static void extract(GuiGraphicsExtractor graphics, Viewport power, Viewport toggle, Target target, BlockState state, boolean powerHeld) {
 		if (power.width() > 0) {
 			extractPower(graphics, power, state, powerHeld);

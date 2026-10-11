@@ -301,7 +301,10 @@ scripts/art/error_beep.py` into
   - **Pairing** (user design, 2026-10-11): every network block has a slot GUI with a
     **pairing slot** for a Bluetooth card.
     - Where the slot is:
-      - the screen: its only slot, opened by right-clicking its back;
+      - the screen: its only slot, opened by right-clicking its back, or with the view
+        toggle in its screen view. The slot view has the toggle back, as the all-in-one's
+        case view does; the user asked for it for convenience. With no power button, the
+        toggle sits at the top.
       - the hub: a fifth slot, apart from its four expansion slots, drawn blue;
       - the robotic piston: its one slot;
       - the paint gun: its one slot, opened by right-click.

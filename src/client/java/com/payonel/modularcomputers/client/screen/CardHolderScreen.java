@@ -3,8 +3,10 @@ package com.payonel.modularcomputers.client.screen;
 import com.payonel.modularcomputers.ModularComputers;
 import com.payonel.modularcomputers.display.Viewport;
 import com.payonel.modularcomputers.menu.CardHolderMenu;
+import com.payonel.modularcomputers.menu.ModMenus;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -14,7 +16,8 @@ import net.minecraft.world.inventory.Slot;
 /**
  * The card slots of a block on the network: a strip of circuit board with a socket per slot,
  * above the player's inventory. The pairing slot (for a Bluetooth card) has a blue socket and
- * its own label; an expansion hub's four expansion slots sit left of it.
+ * its own label; an expansion hub's four expansion slots sit left of it. A screen's slot view
+ * also has the toggle back to its screen view, where the case view has it.
  */
 public final class CardHolderScreen extends AbstractContainerScreen<CardHolderMenu> {
 	private static final int WIDTH = 176;
@@ -37,6 +40,32 @@ public final class CardHolderScreen extends AbstractContainerScreen<CardHolderMe
 	public CardHolderScreen(CardHolderMenu menu, Inventory inventory, Component title) {
 		super(menu, inventory, title, WIDTH, HEIGHT);
 		inventoryLabelY = CardHolderMenu.INVENTORY_Y - 10;
+	}
+
+	/** A screen block's slot view has a way back to the display; other blocks have no other view. */
+	private boolean hasScreenView() {
+		return menu.getType() == ModMenus.SCREEN;
+	}
+
+	/** The toggle back to the screen view, or an empty area for blocks without one. */
+	public Viewport viewToggle() {
+		return hasScreenView() ? new Viewport(leftPos + imageWidth + ComputerButtons.GAP, topPos, ComputerButtons.SIZE, ComputerButtons.SIZE)
+			: new Viewport(0, 0, 0, 0);
+	}
+
+	@Override
+	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+		var none = new Viewport(0, 0, 0, 0);
+		if (ComputerButtons.click(event, none, viewToggle(), ComputerButtons.Target.SCREEN, menu.pos()) != ComputerButtons.Hit.NONE) {
+			return true;
+		}
+		return super.mouseClicked(event, doubleClick);
+	}
+
+	@Override
+	protected boolean hasClickedOutside(double mouseX, double mouseY, int left, int top) {
+		// The toggle is part of this screen: clicking it must not drop the carried item.
+		return super.hasClickedOutside(mouseX, mouseY, left, top) && !viewToggle().contains(mouseX, mouseY);
 	}
 
 	/** A card slot's 16x16 item area on screen. */
@@ -70,6 +99,7 @@ public final class CardHolderScreen extends AbstractContainerScreen<CardHolderMe
 				graphics.blit(RenderPipelines.GUI_TEXTURED, ICONS, area.x(), area.y(), ICON_CARD * 16, 0, 16, 16, 128, 16);
 			}
 		}
+		ComputerButtons.extract(graphics, new Viewport(0, 0, 0, 0), viewToggle(), ComputerButtons.Target.SCREEN, null, false);
 		for (int slot = menu.cardSlots(); slot < menu.slots.size(); slot++) {
 			int sx = x + menu.slots.get(slot).x - 1;
 			int sy = y + menu.slots.get(slot).y - 1;

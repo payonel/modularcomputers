@@ -22,8 +22,8 @@ import net.minecraft.network.chat.Component;
  * <p>
  * The display sits in a bezel like the screen surround on the computer's front. Right of the
  * bezel, from its top edge down: the power button, which looks like the one on the computer's
- * back, and the toggle to the case view (see {@link ComputerButtons}). A screen block has
- * neither: the power button belongs to the computer's case.
+ * back, and the toggle to the case view (see {@link ComputerButtons}). A screen block has no
+ * power button (that belongs to the computer's case); its toggle opens its pairing slot.
  */
 public final class DisplayScreen extends Screen {
 	/** Share of the window, in each direction, that the display may fill. */
@@ -71,9 +71,12 @@ public final class DisplayScreen extends Screen {
 		return computer.isPresent() ? layout.powerButton() : NONE;
 	}
 
-	/** The toggle to the case view, or an empty area when there's no case. */
+	/** The toggle to the case view (at the top when there's no power button), or an empty area when there's no case. */
 	public Viewport viewToggle() {
-		return caseView ? layout.viewToggle() : NONE;
+		if (!caseView) {
+			return NONE;
+		}
+		return computer.isPresent() ? layout.viewToggle() : layout.powerButton();
 	}
 
 	@Override
@@ -110,6 +113,8 @@ public final class DisplayScreen extends Screen {
 		}
 		if (minecraft.level != null && computer.isPresent() && minecraft.level.getBlockEntity(computer.get()) instanceof AllInOneBlockEntity machine) {
 			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.CASE, machine.getBlockState(), powerHeld);
+		} else {
+			ComputerButtons.extract(graphics, NONE, viewToggle(), ComputerButtons.Target.CASE, null, false);
 		}
 		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 	}

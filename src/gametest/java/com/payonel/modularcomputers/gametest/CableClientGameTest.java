@@ -93,14 +93,15 @@ public class CableClientGameTest implements FabricClientGameTest {
 			int lit = whiteOnScreen(read(context.takeScreenshot("screen-hello")));
 			check(lit > 30, "the wired screen should show hello world on its face, found " + lit + " white pixels");
 
-			// Its screen view: just the display. The power button is the computer case's.
+			// Its screen view: the display and the toggle to its slot. The power button is the
+			// computer case's.
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(DisplayScreen.class);
 			context.waitTicks(2);
 			context.runOnClient(client -> {
 				DisplayScreen view = (DisplayScreen) client.gui.screen();
 				check(view.powerButton().width() == 0, "a screen block has no power button");
-				check(view.viewToggle().width() == 0, "a screen block has no case view");
+				check(view.viewToggle().width() > 0, "a screen block has a toggle to its slot");
 			});
 			BufferedImage view = read(context.takeScreenshot("screen-view"));
 			int viewText = context.computeOnClient(client -> {
@@ -115,6 +116,21 @@ public class CableClientGameTest implements FabricClientGameTest {
 			context.waitFor(client -> !machinePowered(client, computer) && !showsHello(client, screen));
 			pressPower(singleplayer, computer);
 			context.waitFor(client -> machinePowered(client, computer) && showsHello(client, screen));
+
+			// The toggle opens the screen's pairing slot, and back, straight from view to view.
+			int grabs = context.computeOnClient(client -> MouseGrabs.count);
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, s -> ((DisplayScreen) s).viewToggle());
+			context.waitForScreen(CardHolderScreen.class);
+			context.waitTicks(2);
+			check(context.computeOnClient(client -> ((CardHolderScreen) client.gui.screen()).getMenu().cardSlots()) == 1, "the screen's one slot");
+			context.takeScreenshot("screen-slot");
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, s -> ((CardHolderScreen) s).viewToggle());
+			context.waitForScreen(DisplayScreen.class);
+			context.waitTicks(2);
+			context.runOnClient(client -> {
+				check(MouseGrabs.count == grabs, "switching views should not grab the mouse (it recenters the cursor)");
+				check(client.player.containerMenu == client.player.inventoryMenu, "the slot's menu should be closed");
+			});
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitFor(client -> client.gui.screen() == null);
 
