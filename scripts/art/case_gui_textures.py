@@ -215,21 +215,24 @@ def case_board():
 	return p.im
 
 BUS_W, BUS_H = 176, 230
-BUS_ROWS = 10
-BUS_ROW_Y, BUS_ROW_H = 30, 19
 
 def bus_panel():
-	"""The bus order panel: board, an empty socket and an empty display for each position."""
+	"""The bus order panel's backing: just the board. Rows are drawn per device (bus_row.png)."""
 	p = Pic(BUS_W, BUS_H)
 	p.fill(0, 0, BUS_W, BUS_H, (0, 0, 0))
 	board(p, 1, 1, BUS_W - 1, BUS_H - 1)
-	for i in range(BUS_ROWS):
-		y = BUS_ROW_Y + i * BUS_ROW_H
-		cavity(p, 19, y + 1)
-		p.fill(38, y, BUS_W - 8, y + 18, BLACK)
-		for x in range(40, BUS_W - 10, 3):  # header pins along each display's top edge
-			p.px(x, y, GOLD)
-	gold_dots(p, [(BUS_W - 5, 30), (BUS_W - 5, BUS_H - 12)])
+	gold_dots(p, [(BUS_W - 4, 30), (BUS_W - 4, BUS_H - 12)])
+	return p.im
+
+ROW_W, ROW_H = 141, 18  # drawn at panel x 19; the display ends 14 short of the panel's edge
+
+def bus_row():
+	"""One bus order row: the device's icon socket, a gap, then its dark display with header pins."""
+	p = Pic(ROW_W, ROW_H)
+	cavity(p, 1, 1)
+	p.fill(19, 0, ROW_W, ROW_H, BLACK)
+	for x in range(21, ROW_W - 2, 3):
+		p.px(x, 0, GOLD)
 	return p.im
 
 def ghost(draw):
@@ -286,4 +289,5 @@ def icons():
 
 case_board().save(f"{OUT}/case_board.png")
 bus_panel().save(f"{OUT}/bus_panel.png")
+bus_row().save(f"{OUT}/bus_row.png")
 icons().save(f"{OUT}/case_icons.png")

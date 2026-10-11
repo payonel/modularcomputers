@@ -63,6 +63,8 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	private static final int CLICK_PAUSE = 6;
 	private static final IntPredicate RED = rgb -> red(rgb) > 150 && green(rgb) < 100 && blue(rgb) < 100;
 	private static final IntPredicate GREEN = rgb -> green(rgb) > 150 && red(rgb) < 130 && blue(rgb) < 130;
+	/** The circuit board's green. */
+	private static final IntPredicate GREEN_BOARD = rgb -> green(rgb) > 95 && green(rgb) < 120 && red(rgb) < 50 && blue(rgb) < 70;
 	/** The power button without a CPU: the same hue, dim. */
 	private static final IntPredicate FADED_RED = rgb -> red(rgb) > 100 && red(rgb) < 170 && red(rgb) - green(rgb) > 30;
 	private static final IntPredicate FADED_GREEN = rgb -> green(rgb) > 100 && green(rgb) < 170 && green(rgb) - red(rgb) > 25;
@@ -189,7 +191,21 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).busArrow(4, true));
 			singleplayer.getServer().waitFor(server -> serverBusKeys(server, computer).get(3).equals("exp:1"));
 			context.waitTicks(2);
-			context.takeScreenshot("all-in-one-case-reordered");
+			BufferedImage reordered = read(context.takeScreenshot("all-in-one-case-reordered"));
+			// One row per device: five devices, five rows; the sixth position is bare board. No
+			// scrollbar, since they all fit.
+			int fifthRow = screenPixel(context, reordered, screen -> {
+				Viewport arrow = ((CaseScreen) screen).busArrow(4, true);
+				return new Viewport(arrow.x() - 60, arrow.y() + 3, 1, 1);
+			});
+			int sixthRow = screenPixel(context, reordered, screen -> {
+				Viewport arrow = ((CaseScreen) screen).busArrow(5, true);
+				return new Viewport(arrow.x() - 60, arrow.y() + 3, 1, 1);
+			});
+			int scrollbar = screenPixel(context, reordered, screen -> ((CaseScreen) screen).busScrollbar());
+			check((fifthRow & 0xFFFFFF) == 0x1A1A1E, "the fifth device's display should show, got " + hex(fifthRow));
+			check(GREEN_BOARD.test(sixthRow), "no sixth row: bare board expected, got " + hex(sixthRow));
+			check(GREEN_BOARD.test(scrollbar), "no scrollbar when every device fits, got " + hex(scrollbar));
 			check(context.computeOnClient(client -> client.player.containerMenu.getCarried().isEmpty()), "clicking the panel must not pick anything up");
 
 			// Back to the screen view; the power button turns the computer on.
@@ -319,6 +335,16 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	private static List<String> serverBusKeys(net.minecraft.server.MinecraftServer server, BlockPos computer) {
 		return ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).busEntries().stream()
 			.map(AllInOneBlockEntity.BusEntry::key).toList();
+	}
+
+	/** The screenshot pixel at the middle of an area of the open screen (GUI units). */
+	private static int screenPixel(ClientGameTestContext context, BufferedImage image, Function<Screen, Viewport> area) {
+		return context.computeOnClient(client -> {
+			Screen screen = client.gui.screen();
+			double scale = (double) image.getWidth() / screen.width;
+			Viewport target = area.apply(screen);
+			return image.getRGB((int) ((target.x() + target.width() / 2.0) * scale), (int) ((target.y() + target.height() / 2.0) * scale));
+		});
 	}
 
 	/** Which hotbar slot (0-8) holds the item. */

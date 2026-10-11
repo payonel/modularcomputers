@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.client.screen;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.payonel.modularcomputers.ModularComputers;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.display.ScrollWindow;
 import com.payonel.modularcomputers.display.Viewport;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.menu.CaseMenu;
@@ -22,8 +23,8 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * The case view: the computer's motherboard with its part slots, above the player's inventory.
- * Left of it, the bus order panel lists the devices on the bus in discovery order; its arrows
- * move a device up or down. Right of it, the power button and the toggle back to the screen
+ * Left of it, the bus order panel lists every device on the bus in discovery order, one row
+ * each; its arrows move a device up or down, and it scrolls when the devices don't all fit. Right of it, the power button and the toggle back to the screen
  * view, as in the screen view.
  * <p>
  * The board, the bus panel's backing and the icons are textures (scripts/art/case_gui_textures.py);
@@ -40,9 +41,15 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int BUS_W = 176;
 	private static final int BUS_H = 230;
 	private static final int BUS_GAP = 6;
-	public static final int BUS_ROWS = 10;
+	private static final Identifier BUS_ROW = ModularComputers.id("textures/gui/bus_row.png");
+	private static final int BUS_ROW_X = 19;
+	private static final int BUS_ROW_W = 141;
 	private static final int BUS_ROW_Y = 30;
 	private static final int BUS_ROW_H = 19;
+	/** Rows that fit in the panel; more devices than this scroll. */
+	public static final int BUS_VISIBLE_ROWS = (BUS_H - 8 - BUS_ROW_Y) / BUS_ROW_H;
+	private static final int SCROLLBAR_X = BUS_W - 13;
+	private static final int SCROLLBAR_W = 6;
 	private static final Identifier ICONS = ModularComputers.id("textures/gui/case_icons.png");
 	private static final int ICON_CPU = 0, ICON_ROM = 1, ICON_RAM = 2, ICON_DISK = 3, ICON_CARD = 4, ICON_UPS = 5;
 
@@ -67,6 +74,8 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 
 	private boolean powerHeld;
 	private boolean showBus;
+	/** The first device shown in the bus order panel. */
+	private int busScroll;
 
 	public CaseScreen(CaseMenu menu, Inventory inventory, Component title) {
 		super(menu, inventory, title, WIDTH, HEIGHT);
@@ -112,10 +121,20 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		return new Viewport(leftPos - BUS_GAP - BUS_W, topPos, BUS_W, BUS_H);
 	}
 
-	/** The up or down arrow of bus order row {@code row}. */
+	/** The up or down arrow of the bus order panel's {@code row}-th visible row. */
 	public Viewport busArrow(int row, boolean up) {
 		Viewport panel = busPanel();
-		return new Viewport(panel.x() + BUS_W - 34 + (up ? 0 : 12), panel.y() + BUS_ROW_Y + row * BUS_ROW_H + 4, 11, 11);
+		return new Viewport(panel.x() + BUS_ROW_X + BUS_ROW_W - 26 + (up ? 0 : 12), panel.y() + BUS_ROW_Y + row * BUS_ROW_H + 4, 11, 11);
+	}
+
+	/** The scrollbar's track, shown only when the devices don't all fit. */
+	public Viewport busScrollbar() {
+		Viewport panel = busPanel();
+		return new Viewport(panel.x() + SCROLLBAR_X, panel.y() + BUS_ROW_Y, SCROLLBAR_W, BUS_VISIBLE_ROWS * BUS_ROW_H - 1);
+	}
+
+	private ScrollWindow busWindow(int devices) {
+		return new ScrollWindow(devices, BUS_VISIBLE_ROWS);
 	}
 
 	private List<AllInOneBlockEntity.BusEntry> busEntries() {
@@ -264,24 +283,34 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		graphics.text(font, Component.translatable("gui.modularcomputers.bus.title"), panel.x() + 10, panel.y() + 6, SILK, false);
 		graphics.text(font, Component.translatable("gui.modularcomputers.bus.subtitle"), panel.x() + 10, panel.y() + 17, SILK_DIM, false);
 		List<AllInOneBlockEntity.BusEntry> entries = busEntries();
-		for (int row = 0; row < BUS_ROWS; row++) {
+		ScrollWindow window = busWindow(entries.size());
+		busScroll = window.clamp(busScroll);
+		// One row per device on the bus, however many there are.
+		for (int row = 0; row < window.rowsShown(busScroll); row++) {
+			int index = busScroll + row;
 			int ry = panel.y() + BUS_ROW_Y + row * BUS_ROW_H;
-			// The position is etched into the board: it stays put when devices move.
-			String number = String.valueOf(row + 1);
+			// The position number is etched into the board beside the row; it stays with the
+			// position, not the device.
+			String number = String.valueOf(index + 1);
 			graphics.text(font, number, panel.x() + 11 - font.width(number) / 2, ry + 5, SILK, false);
-			if (row >= entries.size()) {
-				continue;
-			}
-			AllInOneBlockEntity.BusEntry entry = entries.get(row);
+			graphics.blit(RenderPipelines.GUI_TEXTURED, BUS_ROW, panel.x() + BUS_ROW_X, ry, 0, 0, BUS_ROW_W, 18, BUS_ROW_W, 18);
+			AllInOneBlockEntity.BusEntry entry = entries.get(index);
 			if (entry.item().isEmpty()) {
-				extractIcon(graphics, entry.builtInIcon(), panel.x() + 19, ry + 1);
+				extractIcon(graphics, entry.builtInIcon(), panel.x() + BUS_ROW_X + 1, ry + 1);
 			} else {
-				graphics.item(entry.item(), panel.x() + 19, ry + 1);
+				graphics.item(entry.item(), panel.x() + BUS_ROW_X + 1, ry + 1);
 			}
 			graphics.text(font, entry.name(), panel.x() + 41, ry + 1, LIGHT, false);
 			graphics.text(font, entry.location(), panel.x() + 41, ry + 10, SILK_DIM, false);
-			extractArrow(graphics, busArrow(row, true), true, row > 0);
-			extractArrow(graphics, busArrow(row, false), false, row < entries.size() - 1);
+			extractArrow(graphics, busArrow(row, true), true, index > 0);
+			extractArrow(graphics, busArrow(row, false), false, index < entries.size() - 1);
+		}
+		if (window.scrolls()) {
+			Viewport track = busScrollbar();
+			graphics.fill(track.x(), track.y(), track.right(), track.bottom(), 0xFF1A1A1E);
+			int start = window.thumbStart(busScroll, track.height() - 2);
+			int length = window.thumbLength(track.height() - 2);
+			graphics.fill(track.x() + 1, track.y() + 1 + start, track.right() - 1, track.y() + 1 + start + length, SILK_DIM);
 		}
 	}
 
@@ -312,17 +341,28 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		boolean leftOrRight = event.button() == InputConstants.MOUSE_BUTTON_LEFT || event.button() == InputConstants.MOUSE_BUTTON_RIGHT;
 		if (showBus && leftOrRight) {
 			int devices = busEntries().size();
-			for (int row = 0; row < devices; row++) {
+			ScrollWindow window = busWindow(devices);
+			for (int row = 0; row < window.rowsShown(busScroll); row++) {
+				int index = busScroll + row;
 				for (boolean up : new boolean[] {true, false}) {
-					boolean enabled = up ? row > 0 : row < devices - 1;
+					boolean enabled = up ? index > 0 : index < devices - 1;
 					if (enabled && busArrow(row, up).contains(event.x(), event.y())) {
-						ClientPlayNetworking.send(new ReorderBusPayload(menu.pos(), row, up));
+						ClientPlayNetworking.send(new ReorderBusPayload(menu.pos(), index, up));
 						return true;
 					}
 				}
 			}
 		}
 		return super.mouseClicked(event, doubleClick);
+	}
+
+	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+		if (showBus && busPanel().contains(mouseX, mouseY) && scrollY != 0) {
+			busScroll = busWindow(busEntries().size()).clamp(busScroll - (int) Math.signum(scrollY));
+			return true;
+		}
+		return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
 	}
 
 	@Override

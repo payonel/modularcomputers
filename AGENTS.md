@@ -116,16 +116,20 @@ same thing.
         - UPS charge meter: 6 bars filling left to right (`power/ChargeMeter`). No battery:
           all off. An empty battery shows one red bar. 2–3 bars are yellow, 4–6 green.
         - Empty slots show faint hint icons.
-      - **Bus order panel:** 10 rows.
+      - **Bus order panel:** one row per device on the bus, however many there are (no empty
+        rows).
+        - Up to 10 fit (`CaseScreen.BUS_VISIBLE_ROWS`). With more, the mouse wheel scrolls,
+          and a scrollbar with a proportional thumb appears (`display/ScrollWindow`). There's
+          no scrollbar when everything fits.
+        - The backing (`bus_panel.png`) is plain board; each row is the `bus_row.png` sprite.
         - Each position number is etched into the board to the left of its row and stays
-          put when devices move.
+          with the position when devices move.
         - Each row has the device's icon in a socket, then a dark display with its name and
           location ("built-in", "SATA 1", "expansion slot 2"; a cabled device will read
           "cable, 5m").
         - The ↑/↓ arrows send `ReorderBusPayload`; they're greyed out at the ends.
         - Order lives in `bus/BusOrder`: devices keep their place, new ones go last,
           removed ones drop out. It's saved, and the machine's `Bus` follows it.
-        - No scrollbar: all 10 possible devices fit.
         - The panel is left out on windows narrower than about 382 GUI units.
         - The **light bulb** (highlight a cabled device in the world) waits for cabled
           devices.
@@ -193,6 +197,9 @@ scripts/art/error_beep.py` into
 - **Lua runtime:** the user is building their own Lua runtime as a separate project, and it
   isn't ready. Leave VM/runtime work alone and keep building the computer's other features.
   Machine behavior stays a stand-in (like the "hello world" greeting) until the runtime lands.
+- **Cabled devices and bus-order memory** (connect/disconnect toggle, gaps in the bus walk,
+  remembering positions per case, chunk unloads) are designed in `docs/PLAN.md`, and parts
+  are **undecided: a documented gap**. Ask the user before building cabled devices.
 - **Roadmap and ideas: `docs/PLAN.md`.** Record new plans and decided-but-unbuilt ideas there.
   Move items into this section as they're built.
 - Design rule: machine logic stays in plain Java (`machine/`, `bus/`, `console/`, `device/`,

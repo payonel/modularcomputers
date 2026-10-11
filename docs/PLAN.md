@@ -59,6 +59,47 @@ The all-in-one stays the test bed. Later there are separate blocks:
   toggle button switches between the case view and the screen view. Built.
 - **Keyboards and cables:** external devices joined by cables.
 
+### Cabled devices and the bus (user decisions, 2026-10-10; not built)
+
+- **One device, many computers.** A cabled device (screen, keyboard, ...) may be connected to
+  several computers at once.
+- **Connect/disconnect toggle.** Each cabled device's row in the bus order panel gets a small
+  toggle.
+  - It shows plugged in (connected) or unplugged (disconnected), and clicking it switches.
+  - New cabled devices start connected.
+  - Built-in devices and expansion cards can't be disconnected; only cabled ones can.
+  - A disconnected device leaves a **gap** in the bus walk.
+- **Open question: how gaps look to firmware.** Today the bus walk is
+  `machine.board().bus().devices()`, an ordered list with no gaps. Options:
+  - **Position and device pairs, with numbers skipping over gaps.** This is the real-world
+    model: PCI addresses skip empty slots, and software just enumerates what's present.
+  - **A gapless list.** Programs never see the gap. Simplest for minimal EEPROM code.
+  - Either way, a disconnected device should keep its position, so reconnecting puts it
+    back where it was.
+  - Decide this before the Lua runtime defines the bus walk API.
+
+### KNOWN GAP: where a device's bus position is remembered (undecided)
+
+The bus order belongs to the **case**, not the device: the same cabled screen can be 2nd on
+one computer and 3rd on another. So the case must remember devices by something unique and
+stable (like a GUID).
+
+- **Leaning towards: the order is set the first time a device is seen.** The case caches each
+  device's position when it first discovers it.
+- **Alternatives discussed:**
+  - a "reset bus memory" button, disabled while everything is in default order;
+  - a "save current order" button, for players who like the default order they see.
+- **The problem: lost devices.**
+  - A device that's "lost" (unplugged, broken, or **in a chunk that unloaded**) may come back
+    at a different position the next time it's discovered, unless the case remembers it while
+    it's gone.
+  - Chunk unloads make "lost" ambiguous: the device still exists, the case just can't see it.
+  - How long to remember a lost device, and whether an unloaded chunk counts as lost, is
+    unsolved.
+- **Today:** only built-in devices, drives and cards exist. `BusOrder` keys them by slot
+  (`sata:1`, `exp:0`) and drops a removed device's position. That's fine for in-case parts,
+  but cabled devices need the design above.
+
 ### Ordering the devices a case sees (user idea, not decided)
 
 In real PCs, bus order comes from physical slots. For cabled devices, the user is thinking
