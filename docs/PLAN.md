@@ -96,11 +96,13 @@ Tiers are trade-offs the Lua engine can honour, not every possible feature. Thre
   bare tier 1 case leaves nearly the whole bus for external devices. A smaller CPU shrinks the
   bus and the existing overflow handling covers what no longer fits. Higher tiers draw more
   running and less waiting (halted is 0 for all). Starting values (user: "a good starting
-  point"), per tick:
+  point"), per tick. **A tier 1 CPU's bus holds exactly a tier 3 case's built-ins** (13 places
+  today: terminal, ROM, 3 UPS, 4 SATA, 4 EXP), by design, not by a rule: a full tier 3 case
+  leaves it no external devices, a smaller case some.
 
   | Tier | Running | Waiting | Bus |
   |---|---|---|---|
-  | 1 | 100 | 50 | 16 |
+  | 1 | 100 | 50 | 13 |
   | 2 | 150 | 20 | 32 |
   | 3 | 200 | 5 | 64 |
 
@@ -122,6 +124,15 @@ Tiers are trade-offs the Lua engine can honour, not every possible feature. Thre
   tier 3. It may go away, or become a creative "everything built in" block. **To revisit:** a
   case + terminal block (maybe tier 2 and 3 screens you can put a case inside), and whether
   any case has a built-in terminal.
+- **Panel bay idea (discussed, undecided):** real laptops and all-in-ones split it: the chassis
+  has a panel bay (mounting and the internal display connector), the panel decides quality. So
+  the case tier would decide whether there's a bay, and the screen put in it (a Screen item:
+  "screen" means a terminal, display and keyboard) decides the terminal tier. The screen keeps
+  its id built in or cabled. The case model changes with what's in the bay (a block state,
+  e.g. `panel = none | tier1 | tier2 | tier3`, like the power button's lit/faded models). It
+  takes the terminal's place (1) on the bus. Room on the board: an 18x18 slot fits between the
+  RAM sticks and the expansion row, left of SATA (board 110, 80); the two status LEDs and three
+  bus traces under it would move or reroute, nothing else.
 
 ## Separate blocks: cases, screens, cables
 
