@@ -13,6 +13,7 @@ import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.power.BatteryCharge;
 import com.payonel.modularcomputers.power.PowerBuffer;
+import com.payonel.modularcomputers.sound.ModSounds;
 import com.payonel.modularcomputers.power.PowerUnits;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -249,6 +250,10 @@ public class BatteryGameTest {
 				helper.assertTrue(computer.terminal().buffer().isBlank(), "the display goes dark");
 				helper.assertTrue(computer.power().isEmpty(), "the case is empty");
 				helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.NO_POWER, "won't start again");
+				helper.assertValueEqual(AllInOneBlockEntity.dyingSound(Machine.Supervision.LOST_POWER), ModSounds.POWER_DOWN,
+					"it dies with the power-down sound");
+				helper.assertValueEqual(AllInOneBlockEntity.dyingSound(Machine.Supervision.LOST_CPU), ModSounds.ERROR_BEEP,
+					"not the error beep of a pulled CPU");
 			})
 			.thenSucceed();
 	}

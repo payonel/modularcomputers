@@ -187,8 +187,10 @@ same thing.
             entity also syncs it whenever its percentage changes.
         - **Times read DD:MM:SS** (`power/Durations.clock`, user's format): Minecraft days, then
           the real minutes (00..19, 20 to a day) and seconds into the day.
-          - When the buffer runs out, a running computer dies with the **error beep**, like
-            pulling the CPU (`Machine.powerLost`).
+          - When the buffer runs out, a running computer dies with the **power-down sound**
+            (`power_down`, user, 2026-10-11): the error beep sagging from 180 Hz to 45 Hz and
+            fading out over 1.4 s, its harmonics dulling first (`scripts/art/power_down.py`;
+            `AllInOneBlockEntity.dyingSound`). Pulling the CPU still gives the plain error beep.
         - **No power** (an empty buffer): pressing power does nothing at all
           (`PowerPress.NO_POWER`): a click, no beep and no flash. The power check comes before
           the CPU check.
@@ -1112,6 +1114,7 @@ scripts/setup-headless-host.sh, scripts/headless.sh
 scripts/art/all_in_one_textures.py   draws the block, GUI and item textures (Pillow); PNGs are committed
 scripts/art/case_gui_textures.py     draws the case view's board, bus panel and icons (Pillow); PNGs are committed
 scripts/art/error_beep.py            synthesizes the error beep as Ogg Vorbis; the .ogg is committed
+scripts/art/power_down.py            synthesizes the power-down sound (the beep sagging and fading)
 scripts/art/part_sounds.py           synthesizes the part insert/remove sounds (slides, clicks, thumps, a zap)
 scripts/art/oggwrite.py              shared: writes mono Ogg Vorbis via the system's libsndfile (ctypes)
 src/main/java/.../sound/ModSounds.java   sound events (error_beep)

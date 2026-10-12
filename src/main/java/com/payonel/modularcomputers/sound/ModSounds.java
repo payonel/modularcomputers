@@ -11,6 +11,8 @@ import net.minecraft.sounds.SoundEvent;
 public final class ModSounds {
 	/** A short, low, buzzy beep: something went wrong (e.g. power pressed with no CPU). */
 	public static final SoundEvent ERROR_BEEP = register("error_beep");
+	/** The error beep sagging deeper and fading out: the case ran out of power and the computer died. */
+	public static final SoundEvent POWER_DOWN = register("power_down");
 	/** A soft hum beat: an external device joined the bus. */
 	public static final SoundEvent DEVICE_CONNECT = register("device_connect");
 	/** A deeper, rougher hum: a device was wired up but the bus is full. */

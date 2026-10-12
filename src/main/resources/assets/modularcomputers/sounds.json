@@ -5,6 +5,12 @@
 		],
 		"subtitle": "subtitles.modularcomputers.error_beep"
 	},
+	"power_down": {
+		"sounds": [
+			"modularcomputers:power_down"
+		],
+		"subtitle": "subtitles.modularcomputers.power_down"
+	},
 	"cpu_insert": {
 		"sounds": [
 			"modularcomputers:cpu_insert"

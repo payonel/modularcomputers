@@ -14,6 +14,7 @@
 	"commands.modularcomputers.giveall": "Gave %s Modular Computers items",
 	"commands.modularcomputers.reload": "Reloaded %s",
 	"subtitles.modularcomputers.error_beep": "Computer beeps an error",
+	"subtitles.modularcomputers.power_down": "Computer loses power",
 	"item.modularcomputers.tier1_ram": "Tier 1 RAM",
 	"item.modularcomputers.tier2_ram": "Tier 2 RAM",
 	"item.modularcomputers.tier3_ram": "Tier 3 RAM",

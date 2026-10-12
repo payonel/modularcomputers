@@ -56,6 +56,7 @@ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
@@ -425,7 +426,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		// The motherboard checks its CPU and power every tick, and the program gets its turn.
 		Machine.Supervision supervision = machine.tick();
 		if (supervision != Machine.Supervision.OK) {
-			errorBeep();
+			playAtCase(dyingSound(supervision));
 			setPowerState();
 		}
 		if (seenCableChanges != Cabling.changes() || ticks % RESCAN_TICKS == 0) {
@@ -475,7 +476,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		long used = machine.powerUse(level.getGameTime());
 		power.use(used);
 		pullFromBattery();
-		if (machine.powerLost() || lowPowerAlarm()) {
+		if (machine.powerLost()) {
+			playAtCase(dyingSound(Machine.Supervision.LOST_POWER));
+		} else if (lowPowerAlarm()) {
 			errorBeep();
 		}
 		setChanged();
@@ -636,7 +639,19 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	/** One short, low buzz: an error, not a confirmation. */
 	private void errorBeep() {
-		level.playSound(null, worldPosition, ModSounds.ERROR_BEEP, SoundSource.BLOCKS, ERROR_BEEP_VOLUME, 1.0f);
+		playAtCase(ModSounds.ERROR_BEEP);
+	}
+
+	private void playAtCase(SoundEvent sound) {
+		level.playSound(null, worldPosition, sound, SoundSource.BLOCKS, ERROR_BEEP_VOLUME, 1.0f);
+	}
+
+	/**
+	 * What a running computer sounds as it dies: running out of power, the beep sagging deeper and
+	 * fading out (user, 2026-10-11); anything else (the CPU pulled), the error beep.
+	 */
+	public static SoundEvent dyingSound(Machine.Supervision cause) {
+		return cause == Machine.Supervision.LOST_POWER ? ModSounds.POWER_DOWN : ModSounds.ERROR_BEEP;
 	}
 
 	/** Puts the parts in the slots onto the motherboard, and drives and cards onto the bus. */
