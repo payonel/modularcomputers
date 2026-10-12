@@ -6,10 +6,10 @@ import org.junit.jupiter.api.Test;
 
 class PowerBufferTest {
 	@Test
-	void holdsOneDayAndTakesOnlyWhatItsMissing() {
+	void holdsItsCapacityAndTakesOnlyWhatItsMissing() {
 		PowerBuffer buffer = new PowerBuffer();
 		assertThat(buffer.isEmpty()).isTrue();
-		assertThat(buffer.fill(10L * PowerUnits.DAY)).as("a day of a running all-in-one").isEqualTo(PowerUnits.DAY);
+		assertThat(buffer.fill(10L * PowerUnits.DAY)).as("a hundredth of a day of a running all-in-one").isEqualTo(PowerUnits.DAY / 100);
 		assertThat(buffer.percent()).isEqualTo(100);
 		int quarter = PowerBuffer.CAPACITY / 4;
 		buffer.use(quarter);

@@ -156,7 +156,7 @@ same thing.
           "Stored: 19.3M" (a tier 3: "Charge: 100%", "Stored: inf"; user's format); with Shift, tier 2's "Recharges itself while not in use" (the user dropped the rate line), and
           for tiers 1 and 2 the glowing items with what each adds to *this* tier ("+50%").
         - **The case's power buffer** (user design, 2026-10-11; `power/PowerBuffer`, saved as
-          `power_buffer`): the computer runs on the case's own store, which holds **one day** (of a running all-in-one).
+          `power_buffer`): the computer runs on the case's own store, which holds a **hundredth of a day** of a running all-in-one on a tier 3 (12 seconds; user cut it from a day, 2026-10-11).
           - A battery going in fills it right away, up to a day's worth, out of the battery.
             After that the buffer tops itself up from the battery every 20 ticks
             (`AllInOneBlockEntity.updateBattery`), so the battery drains while the computer
@@ -212,7 +212,7 @@ same thing.
       (`PartSlot.isActive`): no hover highlight, no clicks. A lower tier has the first slots
       of each kind (`CaseMenu.available`): battery bays 1/2/3, RAM 1/2/4, SATA 1/2/4, expansion
       2/3/4 (the user's suggestion). The CPU socket and ROM are on every tier.
-    - **Power buffer:** a quarter day, half a day, a day of a running all-in-one
+    - **Power buffer:** 0.0025, 0.005, 0.01 of a day of a running all-in-one (3, 6, 12 seconds)
       (`CaseTier.bufferCapacity`, `PowerBuffer(capacity)`).
     - **The gold slot** (tiers 2 and 3, user design): the first expansion slot is gold-trimmed and
       also takes a screen (a terminal: display and keyboard), like an AGP slot took graphics. The

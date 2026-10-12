@@ -2,13 +2,14 @@ package com.payonel.modularcomputers.power;
 
 /**
  * The case's own store of power, like a PSU's capacitors scaled up, in power units
- * ({@link PowerUnits}): a tier 3 case's holds a day of a running all-in-one, smaller cases less.
+ * ({@link PowerUnits}): a tier 3 case's holds a hundredth of a day of a running all-in-one (12
+ * seconds), smaller cases less.
  * The computer runs from it, and it refills from the batteries; with them out it runs down on its
  * own. The case's charge meter shows this, not the batteries.
  */
 public final class PowerBuffer {
-	/** A day of a running all-in-one: the biggest case's. */
-	public static final int CAPACITY = PowerUnits.DAY;
+	/** The biggest case's: a hundredth of a day of a running all-in-one (user, 2026-10-11: a day was far too much). */
+	public static final int CAPACITY = PowerUnits.DAY / 100;
 
 	private final int capacity;
 	private int level;
