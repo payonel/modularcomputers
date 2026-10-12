@@ -155,6 +155,8 @@ same thing.
       cheat command **`/modularcomputers giveall`**.
       - It gives one of every item registered under the mod's namespace, so new items are
         included automatically (`ModCommands`).
+      - The essentials go into free hotbar slots first, in order (user, 2026-10-11): all-in-one,
+        CPU, EEPROM, a charged tier 1 battery, screen, cable (`ModCommands.hotbarFirst`).
       - It needs operator permission, like `/give`: cheats on in singleplayer.
     - Breaking the block drops its parts.
   - **Two views, one block:**

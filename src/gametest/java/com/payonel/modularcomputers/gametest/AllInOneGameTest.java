@@ -309,6 +309,9 @@ public class AllInOneGameTest {
 		for (var item : List.of(ModBlocks.ALL_IN_ONE.asItem(), ModItems.CPU, ModItems.EEPROM)) {
 			helper.assertTrue(player.getInventory().contains(new ItemStack(item)), "should have " + item);
 		}
+		var hotbar = java.util.stream.IntStream.range(0, ModCommands.hotbarFirst().size())
+			.mapToObj(slot -> player.getInventory().getItem(slot).getItem()).toList();
+		helper.assertValueEqual(hotbar, ModCommands.hotbarFirst(), "the computer's essentials first, in the hotbar");
 		helper.succeed();
 	}
 
