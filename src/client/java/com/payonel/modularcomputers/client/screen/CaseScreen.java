@@ -747,7 +747,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 				for (boolean up : new boolean[] {true, false}) {
 					boolean enabled = entry.cabled() && (up ? index > firstExternal(entries) : index < devices - 1);
 					if (enabled && busArrow(row, up).contains(event.x(), event.y())) {
-						ClientPlayNetworking.send(new ReorderBusPayload(menu.pos(), index, up));
+						ClientPlayNetworking.send(new ReorderBusPayload(menu.pos(), entry.key(), up));
 						return true;
 					}
 				}

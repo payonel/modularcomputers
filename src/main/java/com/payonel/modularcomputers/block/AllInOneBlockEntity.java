@@ -257,8 +257,15 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			return entries; // no CPU, no bus
 		}
 		BusOrder busOrder = busOrder();
+		Set<String> onBus = Set.copyOf(busOrder.connected());
 		for (String key : busOrder.keys()) {
 			int position = machine.board().position(key);
+			// What's there but left off because the bus is full isn't listed (the summary counts it);
+			// offline and unplugged external devices are, to plug back in or forget.
+			boolean waiting = !onBus.contains(key) && (busOrder.isInternal(key) || busOrder.isOnline(key) && busOrder.isConnected(key));
+			if (waiting) {
+				continue;
+			}
 			if (!busOrder.isInternal(key)) {
 				Optional.ofNullable(known.get(key)).ifPresent(device -> {
 					ItemStack item = new ItemStack(device.item());
@@ -319,9 +326,10 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return true;
 	}
 
-	/** Server side: the player moved the device at {@code index} up or down the bus order. */
-	public boolean moveDevice(int index, boolean up) {
-		if (!busOrder().move(index, up)) {
+	/** Server side: the player moved device {@code key} up or down the bus order. */
+	public boolean moveDevice(String key, boolean up) {
+		int index = busOrder().keys().indexOf(key);
+		if (index < 0 || !busOrder().move(index, up)) {
 			return false;
 		}
 		rebuildBus();

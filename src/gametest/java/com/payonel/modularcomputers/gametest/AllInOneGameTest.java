@@ -157,7 +157,7 @@ public class AllInOneGameTest {
 		helper.assertValueEqual(busKeys(computer), List.of("sata:1", "exp:0"), "attached in default order");
 		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.STORAGE, DeviceType.NETWORK), "bus");
 
-		helper.assertTrue(!computer.moveDevice(1, true) && !computer.moveDevice(0, false), "the case's devices don't move");
+		helper.assertTrue(!computer.moveDevice("exp:0", true) && !computer.moveDevice("sata:1", false), "the case's devices don't move");
 		helper.assertValueEqual(computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::position).toList(), List.of(3, 6),
 			"numbered by fixed place, with gaps for empty slots");
 
@@ -415,6 +415,7 @@ public class AllInOneGameTest {
 		var bus = computer.machine().board().bus();
 		helper.assertValueEqual(bus.status().capacity(), 4, "a tier 1 CPU's bus");
 		helper.assertValueEqual(bus.devices().size(), 4, "the case's own count too: only the first 4 of its 9 fit");
+		helper.assertValueEqual(computer.busEntries().size(), 4, "and the bus order lists only those");
 		helper.assertTrue(bus.status().overflow(), "and it says so");
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		helper.assertValueEqual(bus.status().capacity(), 64, "a tier 3 CPU's bus");
