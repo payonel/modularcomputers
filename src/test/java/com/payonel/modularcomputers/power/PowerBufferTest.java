@@ -36,4 +36,13 @@ class PowerBufferTest {
 		buffer.set(Integer.MAX_VALUE);
 		assertThat(buffer.level()).isEqualTo(PowerBuffer.CAPACITY);
 	}
+
+	@Test
+	void underHalfIsLow() {
+		PowerBuffer buffer = new PowerBuffer(100);
+		buffer.set(50);
+		assertThat(buffer.isLow()).isFalse();
+		buffer.set(49);
+		assertThat(buffer.isLow()).isTrue();
+	}
 }

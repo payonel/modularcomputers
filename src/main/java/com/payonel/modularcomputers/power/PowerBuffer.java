@@ -40,6 +40,11 @@ public final class PowerBuffer {
 		return level <= 0;
 	}
 
+	/** Under half full: a case with a load sounds its low-power alarm. */
+	public boolean isLow() {
+		return level * 2L < capacity;
+	}
+
 	public int percent() {
 		return (int) Math.ceil(level * 100.0 / capacity);
 	}

@@ -253,6 +253,22 @@ public class BatteryGameTest {
 			.thenSucceed();
 	}
 
+	@GameTest
+	public void underHalfPowerWithALoadTheCaseSoundsItsAlarm(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper, ItemStack.EMPTY);
+		computer.power().set(BUFFER);
+		TestPrograms.flash(computer, TestPrograms.BUSY);
+		helper.assertTrue(!computer.lowPowerAlarm(), "off: full");
+		computer.power().set(BUFFER / 4);
+		helper.assertTrue(!computer.lowPowerAlarm(), "off: low, but no load");
+		computer.pressPower();
+		helper.assertTrue(computer.machine().currentDraw() > 0, "running: a load");
+		helper.assertTrue(computer.lowPowerAlarm(), "running, under half: the alarm");
+		computer.power().set(BUFFER / 2);
+		helper.assertTrue(!computer.lowPowerAlarm(), "running, at half: quiet");
+		helper.succeed();
+	}
+
 	@GameTest(maxTicks = 100)
 	public void pullingTheBatteryLeavesARunningComputerOnTheCaseBuffer(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper, ModItems.TIER1_BATTERY.charged());

@@ -163,6 +163,9 @@ same thing.
             runs. Time the chunk wasn't loaded doesn't count.
           - With the battery out or flat, the buffer runs down while the computer runs. Pulling
             the battery doesn't stop a running computer.
+          - **Low-power alarm** (user, 2026-10-11, like a UPS on its last minutes): under half
+            its buffer with a load (`PowerBuffer.isLow`, `AllInOneBlockEntity.lowPowerAlarm`),
+            the case plays the error beep at every battery check, once a second.
           - **Three battery bays** (user, 2026-10-11: "if 3 fit, put 3"; `CaseMenu.UPS_SLOT`,
             `UPS_BAYS`; not on the bus): in a row at the bottom left of the board (the expansion
             slots moved right and closer to make room). The case tops up from the **last bay

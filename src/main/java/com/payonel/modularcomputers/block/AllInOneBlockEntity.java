@@ -450,6 +450,15 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return !power.isEmpty();
 	}
 
+	/**
+	 * The low-power alarm, like a UPS on its last minutes: under half its buffer, with a load, the
+	 * case beeps at every battery check (each second). The batteries keep it full, so this means
+	 * they're out or flat.
+	 */
+	public boolean lowPowerAlarm() {
+		return power.isLow() && machine.currentDraw() > 0;
+	}
+
 	/** The case's own store of power, which the charge meter shows. */
 	public PowerBuffer power() {
 		return power;
@@ -466,7 +475,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		long used = machine.powerUse(level.getGameTime());
 		power.use(used);
 		pullFromBattery();
-		if (machine.powerLost()) {
+		if (machine.powerLost() || lowPowerAlarm()) {
 			errorBeep();
 		}
 		setChanged();
