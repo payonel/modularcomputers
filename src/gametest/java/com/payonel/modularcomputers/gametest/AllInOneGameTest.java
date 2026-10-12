@@ -35,8 +35,12 @@ public class AllInOneGameTest {
 		return helper.getBlockEntity(POS, AllInOneBlockEntity.class);
 	}
 
-	/** Puts parts into the case's slots, as the case view would, and a charged battery to run on. */
+	/**
+	 * Puts parts into the case's slots, as the case view would, a charged battery to run on, and a
+	 * screen in the gold slot to show on.
+	 */
 	private static AllInOneBlockEntity install(AllInOneBlockEntity computer, boolean cpu, boolean eeprom) {
+		TestPrograms.withScreen(computer);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, cpu ? new ItemStack(ModItems.TIER3_CPU) : ItemStack.EMPTY);
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, eeprom ? new ItemStack(ModItems.EEPROM) : ItemStack.EMPTY);
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
@@ -57,8 +61,12 @@ public class AllInOneGameTest {
 		helper.assertBlockProperty(POS, AllInOneBlock.READY, false);
 		helper.assertTrue(machine.board().bus().devices().isEmpty() && computer.busEntries().isEmpty(), "no CPU, no bus");
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
+		helper.assertTrue(machine.board().bus().devices().isEmpty(), "with a CPU and nothing else: an empty bus (no built-in terminal)");
+		helper.assertBlockProperty(POS, AllInOneBlock.SCREEN, false);
+		TestPrograms.withScreen(computer);
 		helper.assertValueEqual(machine.board().bus().devices().stream().map(device -> device.type()).toList(),
-			List.of(DeviceType.TERMINAL), "with a CPU: just the built-in terminal");
+			List.of(DeviceType.TERMINAL), "a screen in the gold slot is its terminal");
+		helper.assertBlockProperty(POS, AllInOneBlock.SCREEN, true);
 		helper.succeed();
 	}
 
@@ -114,13 +122,13 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.REDSTONE_CARD));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.BLUETOOTH_CARD));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 2, new ItemStack(ModItems.WEATHER_SENSOR_CARD));
-		helper.assertValueEqual(busKeys(computer), List.of("terminal", "eeprom", "exp:0", "exp:1", "exp:2"), "default order: no battery");
-		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.TERMINAL, DeviceType.FIRMWARE,
+		helper.assertValueEqual(busKeys(computer), List.of("eeprom", "exp:0", "exp:1", "exp:2"), "default order: no battery");
+		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.FIRMWARE,
 			DeviceType.REDSTONE, DeviceType.NETWORK, DeviceType.SENSOR), "each reports its class");
 		var entries = computer.busEntries();
-		helper.assertValueEqual(entries.get(1).location().getString(), "ROM", "the EEPROM sits in the ROM socket");
-		helper.assertValueEqual(entries.get(1).slot(), CaseMenu.EEPROM_SLOT, "its row goes with its slot");
-		helper.assertValueEqual(entries.get(2).name().getString(), "Redstone Card", "card names");
+		helper.assertValueEqual(entries.get(0).location().getString(), "ROM", "the EEPROM sits in the ROM socket");
+		helper.assertValueEqual(entries.get(0).slot(), CaseMenu.EEPROM_SLOT, "its row goes with its slot");
+		helper.assertValueEqual(entries.get(1).name().getString(), "Redstone Card", "card names");
 		var bus = computer.machine().board().bus();
 		for (String address : List.of("eeprom", "exp:0")) {
 			String id = bus.id(address);
@@ -134,10 +142,9 @@ public class AllInOneGameTest {
 		return computer.machine().board().bus().devices().stream().map(device -> device.type()).toList();
 	}
 
-	/** The bus order's keys, the built-in terminal's id shown as "terminal". */
+	/** The bus order's keys. */
 	static List<String> busKeys(AllInOneBlockEntity computer) {
-		String terminal = computer.machine().board().address(Motherboard.TERMINAL);
-		return computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::key).map(key -> key.equals(terminal) ? "terminal" : key).toList();
+		return computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::key).toList();
 	}
 
 	@GameTest
@@ -147,11 +154,11 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.SATA_SLOTS + 1, new ItemStack(ModItems.TIER1_HARD_DISK));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.WLAN_CARD));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER1_RAM)); // RAM is not a bus device
-		helper.assertValueEqual(busKeys(computer), List.of("terminal", "sata:1", "exp:0"), "attached in default order");
-		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.TERMINAL, DeviceType.STORAGE, DeviceType.NETWORK), "bus");
+		helper.assertValueEqual(busKeys(computer), List.of("sata:1", "exp:0"), "attached in default order");
+		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.STORAGE, DeviceType.NETWORK), "bus");
 
-		helper.assertTrue(!computer.moveDevice(2, true) && !computer.moveDevice(1, false), "the case's devices don't move");
-		helper.assertValueEqual(computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::position).toList(), List.of(1, 4, 7),
+		helper.assertTrue(!computer.moveDevice(1, true) && !computer.moveDevice(0, false), "the case's devices don't move");
+		helper.assertValueEqual(computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::position).toList(), List.of(3, 6),
 			"numbered by fixed place, with gaps for empty slots");
 
 		java.util.UUID serial = computer.parts().getItem(CaseMenu.EXP_SLOTS).get(com.payonel.modularcomputers.item.ModComponents.SERIAL);
@@ -160,9 +167,9 @@ public class AllInOneGameTest {
 			"a card answers to its id as well as its slot's path");
 
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.TIER1_HARD_DISK));
-		helper.assertValueEqual(busKeys(computer), List.of("terminal", "sata:0", "sata:1", "exp:0"), "a new drive goes in its slot's place");
+		helper.assertValueEqual(busKeys(computer), List.of("sata:0", "sata:1", "exp:0"), "a new drive goes in its slot's place");
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, ItemStack.EMPTY);
-		helper.assertValueEqual(busKeys(computer), List.of("terminal", "sata:0", "sata:1"), "a removed card drops out");
+		helper.assertValueEqual(busKeys(computer), List.of("sata:0", "sata:1"), "a removed card drops out");
 		helper.succeed();
 	}
 
@@ -173,10 +180,12 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.SATA_SLOTS + 2, new ItemStack(ModItems.TIER1_HARD_DISK));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 3, new ItemStack(ModItems.WLAN_CARD));
 		var entries = computer.busEntries();
-		helper.assertValueEqual(entries.get(0).name().getString(), "Terminal", "built-in name");
-		helper.assertValueEqual(entries.get(0).location().getString(), "built-in", "built-in location");
-		helper.assertValueEqual(entries.get(1).name().getString(), "Tier 1 Hard Disk", "drive name");
-		helper.assertValueEqual(entries.get(1).location().getString(), "SATA 3", "drive location");
+		TestPrograms.withScreen(computer);
+		entries = computer.busEntries();
+		helper.assertValueEqual(entries.get(0).name().getString(), "Tier 1 Hard Disk", "drive name");
+		helper.assertValueEqual(entries.get(0).location().getString(), "SATA 3", "drive location");
+		helper.assertValueEqual(entries.get(1).name().getString(), "Tier 3 Screen", "a screen in the gold slot");
+		helper.assertValueEqual(entries.get(1).location().getString(), "EXP 1", "its place");
 		helper.assertValueEqual(entries.get(2).location().getString(), "EXP 4", "card location");
 		helper.succeed();
 	}
@@ -190,8 +199,8 @@ public class AllInOneGameTest {
 		var registries = helper.getLevel().registryAccess();
 		var loaded = (AllInOneBlockEntity) BlockEntity.loadStatic(computer.getBlockPos(), computer.getBlockState(),
 			computer.saveWithFullMetadata(registries), registries);
-		helper.assertValueEqual(busKeys(loaded), List.of("terminal", "sata:0", "exp:0"), "bus order after reload");
-		helper.assertValueEqual(busTypes(loaded).get(1), DeviceType.STORAGE, "the machine's bus after reload");
+		helper.assertValueEqual(busKeys(loaded), List.of("sata:0", "exp:0"), "bus order after reload");
+		helper.assertValueEqual(busTypes(loaded).get(0), DeviceType.STORAGE, "the machine's bus after reload");
 		helper.succeed();
 	}
 
@@ -388,11 +397,11 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
 		var bus = computer.machine().board().bus();
 		helper.assertValueEqual(bus.status().capacity(), 4, "a tier 1 CPU's bus");
-		helper.assertValueEqual(bus.devices().size(), 4, "the case's own count too: only the first 4 of its 10 fit");
+		helper.assertValueEqual(bus.devices().size(), 4, "the case's own count too: only the first 4 of its 9 fit");
 		helper.assertTrue(bus.status().overflow(), "and it says so");
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		helper.assertValueEqual(bus.status().capacity(), 64, "a tier 3 CPU's bus");
-		helper.assertValueEqual(bus.devices().size(), 10, "everything fits (terminal, ROM, 4 disks, 4 cards; batteries aren't on the bus)");
+		helper.assertValueEqual(bus.devices().size(), 9, "everything fits (ROM, 4 disks, 4 cards; batteries aren't on the bus)");
 		helper.succeed();
 	}
 

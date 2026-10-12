@@ -44,6 +44,8 @@ public record SwitchViewPayload(BlockPos pos, boolean toCase) implements CustomP
 			}
 			if (payload.toCase()) {
 				player.openMenu((MenuProvider) block);
+			} else if (block instanceof AllInOneBlockEntity computer && !computer.showsScreen()) {
+				return; // no screen in the slot: no screen view
 			} else {
 				// Close the menu without telling the client: it swaps the case view straight for the
 				// screen view. Closing it there first would pass through "no screen", which grabs the

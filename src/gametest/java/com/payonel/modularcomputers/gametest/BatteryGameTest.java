@@ -42,6 +42,7 @@ public class BatteryGameTest {
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 		computer.parts().setItem(CaseMenu.UPS_SLOT, battery);
 		TestPrograms.flash(computer, TestPrograms.HELLO);
+		TestPrograms.withScreen(computer);
 		return computer;
 	}
 

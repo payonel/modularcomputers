@@ -59,6 +59,10 @@ public class CaseTierGameTest {
 			helper.assertTrue(menu.slots.get(CaseMenu.CPU_SLOT).mayPlace(new ItemStack(ModItems.TIER1_CPU)), name + " takes a CPU");
 			helper.assertTrue(menu.slots.get(CaseMenu.EEPROM_SLOT).mayPlace(new ItemStack(ModItems.EEPROM)), name + " takes an EEPROM");
 			helper.assertValueEqual(computer.power().capacity(), tier.bufferCapacity(), name + ": its power buffer");
+			for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
+				helper.assertValueEqual(menu.slots.get(slot).isActive(), CaseMenu.available(tier, slot),
+					name + ": slot " + slot + " is a slot only if this tier has it (no highlight otherwise)");
+			}
 		}
 		helper.assertTrue(CaseTier.TIER_1.bufferCapacity() < CaseTier.TIER_3.bufferCapacity(), "bigger cases store more");
 		helper.succeed();

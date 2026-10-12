@@ -19,16 +19,13 @@ import java.util.UUID;
  * console).
  * <p>
  * It's also the board's firmware for the bus: its <b>connectors</b> come in a fixed order, each
- * with a fixed place on the bus (the built-in terminal's, the {@code eeprom} slot, {@code sata:0..3}, {@code exp:0..3}), whatever case it's in; a case wires up the ones
- * it has. Every device has its own id, {@code id:<uuid>}. A slot's device is addressed by the
- * slot's path and answers to its id too, like Linux's {@code by-path} and {@code by-id} names;
- * the built-in terminal has no path, so its id is its address (programs find it as the first
- * terminal listed). External devices (by cable or Bluetooth) are addressed by their id, and kept
- * in the player's order ({@link BusOrder}).
+ * with a fixed place on the bus (the {@code eeprom} slot, {@code sata:0..3}, {@code exp:0..3}),
+ * whatever case it's in; a case wires up the ones it has. Every device has its own id,
+ * {@code id:<uuid>}. A slot's device is addressed by the slot's path and answers to its id too,
+ * like Linux's {@code by-path} and {@code by-id} names. External devices (by cable or Bluetooth)
+ * are addressed by their id, and kept in the player's order ({@link BusOrder}).
  */
 public final class Motherboard {
-	/** The built-in terminal's connector. It isn't an address: the terminal is known by its id. */
-	public static final String TERMINAL = "terminal";
 	public static final String EEPROM = "eeprom";
 	/** How many SATA ports, and how many expansion slots. */
 	public static final int LANES = 4;
@@ -84,7 +81,7 @@ public final class Motherboard {
 	}
 
 	private static List<String> connectors() {
-		List<String> connectors = new ArrayList<>(List.of(TERMINAL, EEPROM));
+		List<String> connectors = new ArrayList<>(List.of(EEPROM));
 		for (int lane = 0; lane < LANES; lane++) {
 			connectors.add(sata(lane));
 		}
@@ -218,9 +215,9 @@ public final class Motherboard {
 		return ids.entrySet().stream().filter(id -> id.getValue().equals(connector)).map(Map.Entry::getKey).findFirst();
 	}
 
-	/** The address of the device on a connector: the connector's path, or the built-in terminal's id. */
+	/** The address of the device on a connector: the connector's path. */
 	public String address(String connector) {
-		return connector.equals(TERMINAL) ? id(connector).orElse(connector) : connector;
+		return connector;
 	}
 
 	/** Puts the layout on the bus as it is, with no hot-plug (a client's copy, which runs nothing). */

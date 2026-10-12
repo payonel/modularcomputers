@@ -49,17 +49,11 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 	public static final BooleanProperty SCREEN = BooleanProperty.create("screen");
 
 	private final CaseTier tier;
-	private final boolean builtInTerminal;
 
-	/**
-	 * A case of a tier. {@code builtInTerminal}: it has its own screen and keyboard on the front
-	 * (the all-in-one, the dev kit); otherwise it shows a screen only when one is in its gold
-	 * expansion slot.
-	 */
-	public AllInOneBlock(Properties properties, CaseTier tier, boolean builtInTerminal) {
+	/** A case of a tier. Its front shows a screen only when one is in its gold expansion slot. */
+	public AllInOneBlock(Properties properties, CaseTier tier) {
 		super(properties);
 		this.tier = tier;
-		this.builtInTerminal = builtInTerminal;
 		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false).setValue(READY, false)
 			.setValue(SCREEN, false));
 	}
@@ -68,13 +62,9 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 		return tier;
 	}
 
-	public boolean builtInTerminal() {
-		return builtInTerminal;
-	}
-
-	/** Its front shows a screen: built in, or one in the gold slot. */
+	/** Its front shows a screen: one is in the gold slot. */
 	public boolean showsScreen(BlockState state) {
-		return builtInTerminal || state.getValue(SCREEN);
+		return state.getValue(SCREEN);
 	}
 
 	@Override

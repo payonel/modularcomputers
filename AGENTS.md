@@ -190,11 +190,16 @@ same thing.
       - It needs operator permission, like `/give`: cheats on in singleplayer.
     - Breaking the block drops its parts.
   - **Case tiers** (user design, 2026-10-11; `machine/CaseTier`; blocks `tier1_case`..`tier3_case`,
-    the same `AllInOneBlock`/`AllInOneBlockEntity` as the all-in-one, which is now the dev kit: a
-    tier 3 case with a built-in terminal, `AllInOneBlock.builtInTerminal`). Case == board.
+    the same `AllInOneBlock`/`AllInOneBlockEntity` as the all-in-one). Case == board. **The
+    all-in-one is now just a tier 3 case** (the dev kit; may become a creative pre-filled block):
+    no built-in terminal (user: it shouldn't show a screen without one in the slot); its front
+    and screen come from the gold slot like any case. Bus places: 1 ROM, 2-5 SATA, 6-9 EXP.
     - **One board for every tier**, like a fab leaving features out of cheaper boards: the case
-      view draws the same art, and what a tier lacks is greyed over (each missing slot with its
-      connector, `CaseScreen.extractTierMarks`); nothing moves. A lower tier has the first slots
+      view draws the same art, and where a tier has no slot it shows the board as left
+      unpopulated (user: "cut but not printed"): `case_board_bare.png`, the same board with each
+      part's footprint as a dashed silkscreen outline and tinned pads, copied in over the
+      missing slot (`CaseScreen.extractTierMarks`); nothing moves. Missing slots are inactive
+      (`PartSlot.isActive`): no hover highlight, no clicks. A lower tier has the first slots
       of each kind (`CaseMenu.available`): battery bays 1/2/3, RAM 1/2/4, SATA 1/2/4, expansion
       2/3/4 (the user's suggestion). The CPU socket and ROM are on every tier.
     - **Power buffer:** a quarter day, half a day, a day of a running all-in-one
@@ -204,7 +209,9 @@ same thing.
       screen is then the case's terminal, on the bus at `exp:0` (with its own id), of the
       screen's tier; the case's front shows it (block state `screen`; models `case[_screen]...`)
       and right-clicking the front opens its screen view. Without one, the front is blank
-      (`all_in_one_case_front`) and right-clicking opens the case view. Taking the screen out
+      (`all_in_one_case_front`; a tier 1, which can't take a screen, has a plain front with no
+      recess, `case_plain*` models) and right-clicking opens the case view; the case view shows
+      no screen-view toggle (and the server refuses the switch). Taking the screen out
       takes the terminal off the bus (dark).
     - `CaseMenu.stillValid` accepts any case block (a tier case's view closed at once before).
   - **Two views, one block:**

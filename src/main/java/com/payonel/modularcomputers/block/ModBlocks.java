@@ -22,8 +22,8 @@ import java.util.List;
 
 /** Block, block item and block entity registrations. */
 public final class ModBlocks {
-	/** The dev kit: a tier 3 case with its own screen and keyboard built into the front. */
-	public static final Block ALL_IN_ONE = registerWithItem("all_in_one", properties -> new AllInOneBlock(properties, CaseTier.TIER_3, true),
+	/** The dev kit: a tier 3 case (it may become a creative, everything-in block later). */
+	public static final Block ALL_IN_ONE = registerWithItem("all_in_one", properties -> new AllInOneBlock(properties, CaseTier.TIER_3),
 		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(2.0f).sound(SoundType.METAL));
 	/** Cases, by tier: the same board, with more of it at higher tiers. */
 	public static final Block TIER1_CASE = caseBlock("tier1_case", CaseTier.TIER_1);
@@ -77,7 +77,7 @@ public final class ModBlocks {
 	}
 
 	private static Block caseBlock(String name, CaseTier tier) {
-		return registerWithItem(name, properties -> new AllInOneBlock(properties, tier, false),
+		return registerWithItem(name, properties -> new AllInOneBlock(properties, tier),
 			BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(2.0f).sound(SoundType.METAL));
 	}
 

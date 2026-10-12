@@ -114,8 +114,12 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			// first frame, with a faded red power button. Pressing it is refused (an error beep):
 			// faded green only while the mouse is held, then faded red again, and it stays off.
 			// It has a battery for now, so the refusal is about the CPU, not power.
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
-				.setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged()));
+			singleplayer.getServer().runOnServer(server -> {
+				var be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
+				be.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+				TestPrograms.withScreen(be); // a screen in the gold slot: the screen view opens
+			});
+			context.waitFor(client -> client.level.getBlockState(computer).getValue(AllInOneBlock.SCREEN));
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(DisplayScreen.class);
 			checkDisplayLayout(context);
@@ -226,7 +230,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			checkBoardPixel(context, full, 154, 23, 0x3CB45A, "SATA port 1 plugged: small green plug");
 			checkBoardPixel(context, full, 154, 43, 0x1A1A1E, "SATA port 2 empty");
 			checkBoardPixel(context, full, 90, 115, 0xB0B4BC, "expansion slot 2 engaged");
-			checkBoardPixel(context, full, 66, 115, 0x1A1A1E, "expansion slot 1 empty");
+			checkBoardPixel(context, full, 114, 115, 0x1A1A1E, "expansion slot 3 empty");
 			checkBoardPixel(context, full, 42, 121, 0x5AE66E, "full case power: sixth bar green");
 			// Hovering the meter tells the case's power and the batteries', and the runtime at the recent draw.
 			moveCursorTo(context, screen -> ((CaseScreen) screen).chargeMeter());
@@ -258,7 +262,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			// The bus order panel lists the devices; its arrows reorder them on the server.
 			check(context.computeOnClient(client -> ((CaseScreen) client.gui.screen()).busPanelShown()), "the bus order panel should show");
 			// The case's devices are in their slots' order, fixed: their rows have no arrows.
-			List<String> slotOrder = List.of("terminal", "eeprom", "sata:0", "sata:2", "exp:1");
+			List<String> slotOrder = List.of("eeprom", "sata:0", "sata:2", "exp:0", "exp:1");
 			check(serverBusKeys(singleplayer, computer).equals(slotOrder), "the case's order, got " + serverBusKeys(singleplayer, computer));
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).busArrow(0, false));
 			context.waitTicks(4);
@@ -284,14 +288,14 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(CaseMenu.SATA_SLOTS));
 			context.waitTicks(2);
 			BufferedImage slotHover = read(context.takeScreenshot("all-in-one-case-hover-slot"));
-			int rowCorner = screenPixel(context, slotHover, screen -> corner(((CaseScreen) screen).busRow(2), 1));
+			int rowCorner = screenPixel(context, slotHover, screen -> corner(((CaseScreen) screen).busRow(1), 1));
 			check((rowCorner & 0xFFFFFF) == 0xF2F2E6, "hovering SATA 1 should outline its bus row, got " + hex(rowCorner));
 			moveCursorTo(context, screen -> ((CaseScreen) screen).busRow(4));
 			context.waitTicks(2);
 			BufferedImage rowHover = read(context.takeScreenshot("all-in-one-case-hover-row"));
 			int slotCorner = screenPixel(context, rowHover, screen -> corner(((CaseScreen) screen).slotArea(CaseMenu.EXP_SLOTS + 1), 2));
 			check((slotCorner & 0xFFFFFF) == 0xF2F2E6, "hovering the WLAN card's row should outline its slot, got " + hex(slotCorner));
-			int otherRow = screenPixel(context, rowHover, screen -> corner(((CaseScreen) screen).busRow(2), 1));
+			int otherRow = screenPixel(context, rowHover, screen -> corner(((CaseScreen) screen).busRow(1), 1));
 			check((otherRow & 0xFFFFFF) != 0xF2F2E6, "other rows stay plain");
 			context.getInput().setCursorPos(0, 0);
 			check(context.computeOnClient(client -> client.player.containerMenu.getCarried().isEmpty()), "clicking the panel must not pick anything up");

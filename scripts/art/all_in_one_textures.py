@@ -61,6 +61,19 @@ def case_front():
 	im.putpixel((13, 11), (74, 44, 40))
 	return im
 
+def case_front_plain():
+	"""A tier 1 case's front: it can't take a screen, so no recess for one, just the drive bays,
+	vents and the power LED where the others have them, and a plain panel above."""
+	im = casing(3)
+	for y in (11, 13):  # drive bay slots
+		rect(im, 2, y, 8, y, (66, 64, 59))
+	for x in range(10, 14, 2):  # vents
+		rect(im, x, 11, x, 14, DARK)
+	for y in (3, 5, 7):  # a few more vents up top
+		rect(im, 4, y, 11, y, SHADE)
+	im.putpixel((13, 11), (74, 44, 40))
+	return im
+
 def side():
 	im = casing(2)
 	rect(im, 1, 11, 14, 11, SHADE)  # seam where the keyboard deck meets the case
@@ -335,7 +348,7 @@ def tier3_battery_item():
 	im.putpixel((11, 9), (60, 160, 120, 255))
 	return im
 
-for name, fn in [("front", front), ("case_front", case_front), ("side", side), ("top", top), ("back", back), ("bottom", bottom)]:
+for name, fn in [("front", front), ("case_front", case_front), ("case_front_plain", case_front_plain), ("side", side), ("top", top), ("back", back), ("bottom", bottom)]:
 	fn().save(f"{OUT}/all_in_one_{name}.png")
 for state in LIT:
 	power(state).save(f"{OUT}/all_in_one_power_{state}.png")

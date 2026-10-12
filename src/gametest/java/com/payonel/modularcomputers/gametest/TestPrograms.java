@@ -46,6 +46,12 @@ public final class TestPrograms {
 	private TestPrograms() {
 	}
 
+	/** Puts a tier 3 screen in the computer's gold slot: its terminal, on its front. */
+	public static void withScreen(AllInOneBlockEntity computer) {
+		computer.parts().setItem(com.payonel.modularcomputers.menu.CaseMenu.EXP_SLOTS,
+			new net.minecraft.world.item.ItemStack(com.payonel.modularcomputers.block.ModBlocks.TIER3_SCREEN));
+	}
+
 	/** Reflashes the EEPROM in the computer's slot. */
 	public static void flash(AllInOneBlockEntity computer, Program program) {
 		computer.machine().board().eeprom().orElseThrow().flash(program);

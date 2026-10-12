@@ -48,6 +48,8 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int WIDTH = 176;
 	private static final int HEIGHT = 230;
 	private static final Identifier BOARD = ModularComputers.id("textures/gui/case_board.png");
+	/** The same board with every part's footprint left unpopulated: what a lower tier shows where it has no slot. */
+	private static final Identifier BOARD_BARE = ModularComputers.id("textures/gui/case_board_bare.png");
 	private static final int BOARD_W = 168;
 	private static final int BOARD_H = 132;
 	private static final Identifier BUS_PANEL = ModularComputers.id("textures/gui/bus_panel.png");
@@ -90,8 +92,6 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int SATA_PLUG = 0xFF3CB45A;
 	private static final int SATA_PLUG_LIGHT = 0xFF6EDC82;
 	private static final int METER_LOW = 0xFFDC3C32;
-	/** Over what a lower tier leaves out: the board, dimmed. */
-	private static final int MISSING = 0xD0142218;
 	private static final int GOLD_TRIM = 0xFFD4AA28;
 	private static final int METER_MEDIUM = 0xFFE6C83C;
 	private static final int METER_HIGH = 0xFF5AE66E;
@@ -136,6 +136,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	}
 
 	public Viewport viewToggle() {
+		if (!(minecraft != null && minecraft.level != null && minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer
+			&& computer.showsScreen())) {
+			return new Viewport(0, 0, 0, 0); // no screen in the slot: no screen view to switch to
+		}
 		Viewport power = powerButton();
 		return new Viewport(power.x(), power.bottom() + ComputerButtons.GAP, ComputerButtons.SIZE, ComputerButtons.SIZE);
 	}
@@ -439,8 +443,9 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	}
 
 	/**
-	 * The case's tier on the one board: what this tier leaves out is greyed over (each missing
-	 * slot with its connector), and the screen slot gets its gold trim.
+	 * The case's tier on the one board: where this tier has no slot, the board is as the fab left
+	 * it, unpopulated (the bare board's footprint: silkscreen and pads); the screen slot gets its
+	 * gold trim.
 	 */
 	private void extractTierMarks(GuiGraphicsExtractor graphics) {
 		int bx = leftPos + CaseMenu.BOARD_X;
@@ -448,7 +453,8 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
 			if (!CaseMenu.available(menu.tier(), slot)) {
 				Viewport part = partArt(slot);
-				graphics.fill(bx + part.x(), by + part.y(), bx + part.right(), by + part.bottom(), MISSING);
+				graphics.blit(RenderPipelines.GUI_TEXTURED, BOARD_BARE, bx + part.x(), by + part.y(), part.x(), part.y(),
+					part.width(), part.height(), BOARD_W, BOARD_H);
 			}
 		}
 		if (menu.tier().screenSlot()) {

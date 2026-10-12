@@ -163,7 +163,46 @@ RAM = [(50 + 20 * i, 36) for i in range(4)]
 SATA = [(134, 15 + 20 * i) for i in range(4)]
 EXP = [(70 + 24 * i, 110) for i in range(4)]
 
-def case_board():
+TIN = (198, 202, 208)  # bare solder pads, tinned
+
+def silk_box(p, x0, y0, x1, y1):
+	"""A footprint's silkscreen outline (x1, y1 exclusive), dashed: the printed mark of a part that isn't there."""
+	for x in range(x0, x1):
+		if (x - x0) % 3 != 2:
+			p.px(x, y0, SILK); p.px(x, y1 - 1, SILK)
+	for y in range(y0, y1):
+		if (y - y0) % 3 != 2:
+			p.px(x0, y, SILK); p.px(x1 - 1, y, SILK)
+
+def bare_cavity(p, x, y):
+	"""An unpopulated slot's footprint: its outline and two pads."""
+	silk_box(p, x - 1, y - 1, x + 17, y + 17)
+	p.fill(x + 3, y + 7, x + 5, y + 9, TIN); p.fill(x + 11, y + 7, x + 13, y + 9, TIN)
+
+def bare_dimm(p, x, y):
+	"""An unpopulated memory connector: its outline and a column of through-hole pads."""
+	silk_box(p, x + 4, y - 25, x + 12, y + 41)
+	for qy in range(y - 20, y + 37, 3):
+		p.fill(x + 7, qy, x + 9, qy + 1, TIN)
+
+def bare_sata(p, x, y):
+	"""An unpopulated SATA port: the drive's outline and the port's pads."""
+	silk_box(p, x - 1, y - 1, x + 17, y + 17)
+	silk_box(p, x + 18, y + 3, x + 24, y + 13)
+	for qy in range(y + 5, y + 12, 2):
+		p.px(x + 20, qy, TIN); p.px(x + 22, qy, TIN)
+
+def bare_exp(p, x, y):
+	"""An unpopulated expansion connector: the card's and the connector's outlines, a row of pads."""
+	silk_box(p, x - 1, y - 1, x + 17, y + 17)
+	silk_box(p, x - 5, y + 5, x + 19, y + 11)
+	for qx in range(x - 3, x + 18, 2):
+		p.px(qx, y + 7, TIN); p.px(qx, y + 8, TIN)
+
+def case_board(bare=False):
+	"""The full board, every part fitted; or, with bare, the same board with every part's
+	footprint left unpopulated, as a fab leaves a cheaper board's missing parts out. The case
+	view shows the bare board's pixels where a lower tier has no slot."""
 	p = Pic(BOARD_W, BOARD_H)
 	board(p, 0, 0, BOARD_W, BOARD_H)
 	# copper buses and gold dotted runs, under the parts
@@ -197,20 +236,20 @@ def case_board():
 	dip_socket(p, *ROM)
 	corners(p, 10, 60, 38, 84)
 	for u in UPS:
-		cavity(p, *u)
+		(bare_cavity if bare else cavity)(p, *u)
 	charge_meter(p, *METER)
 	# memory, chipset, drives, expansion
 	for r in RAM:
-		dimm(p, *r)
+		(bare_dimm if bare else dimm)(p, *r)
 	corners(p, 52, 9, 124, 79)
 	heatsink(p, 46, 3, 18, 7)
 	resistor_array(p, 104, 4); resistor_array(p, 112, 4)
 	fan_header(p, 98, 82)
 	p.fill(110, 82, 112, 83, (240, 180, 60)); p.fill(114, 82, 116, 83, (90, 230, 110))
 	for s in SATA:
-		sata(p, *s)
+		(bare_sata if bare else sata)(p, *s)
 	for e in EXP:
-		exp(p, *e)
+		(bare_exp if bare else exp)(p, *e)
 	return p.im
 
 BUS_W, BUS_H = 176, 230
@@ -286,7 +325,12 @@ def icons():
 		sheet.paste(im, (16 * i, 0))
 	return sheet
 
+state = rnd.getstate()
 case_board().save(f"{OUT}/case_board.png")
+after = rnd.getstate()
+rnd.setstate(state)  # the same copper noise and traces
+case_board(bare=True).save(f"{OUT}/case_board_bare.png")
+rnd.setstate(after)
 bus_panel().save(f"{OUT}/bus_panel.png")
 bus_row().save(f"{OUT}/bus_row.png")
 icons().save(f"{OUT}/case_icons.png")

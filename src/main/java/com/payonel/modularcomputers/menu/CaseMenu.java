@@ -201,6 +201,12 @@ public final class CaseMenu extends AbstractContainerMenu {
 			return accepts(tier, getContainerSlot(), stack);
 		}
 
+		/** A slot this tier leaves unprinted isn't a slot: no highlight, no clicks. */
+		@Override
+		public boolean isActive() {
+			return available(tier, getContainerSlot());
+		}
+
 		@Override
 		public int getMaxStackSize() {
 			return 1;

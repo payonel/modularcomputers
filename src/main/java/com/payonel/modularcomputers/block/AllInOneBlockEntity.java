@@ -102,13 +102,10 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** A test's bus capacity in place of the CPU's, saved so clients see it too. */
 	private static final String BUS_CAPACITY_OVERRIDE = "bus_capacity_override";
 	private static final String BOARD_ID = "board_id";
-	private static final String TERMINAL_ID = "terminal_id";
 	/** Looks for cabled devices this often, in ticks, even when no cable changed (chunks load and unload). */
 	private static final int RESCAN_TICKS = 20;
 	/** How often the battery is run down or recharged. */
 	private static final int BATTERY_TICKS = 20;
-	/** Icons for the built-in devices in textures/gui/case_icons.png. */
-	public static final int TERMINAL_ICON = 6;
 	private static final float ERROR_BEEP_VOLUME = 0.6f;
 	/** The slots whose parts are bus devices: each gets a serial number, its id. */
 	private static final int[] BUS_PART_SLOTS = {CaseMenu.EEPROM_SLOT,
@@ -120,8 +117,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	 * (a new one when a screen of another tier goes in). In a case without one it's off the bus.
 	 */
 	private Terminal display = new Terminal(Resolution.DEFAULT);
-	/** The built-in terminal's id, its address on the bus. Made when the computer is placed, and saved. */
-	private UUID terminalId = UUID.randomUUID();
 	/** Devices made from the parts in the slots (by lane for drives and cards); null when empty. */
 	private final Disk[] disks = new Disk[CaseMenu.LANES];
 	private final Card[] cards = new Card[CaseMenu.LANES];
@@ -129,8 +124,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final Bus bus = new Bus(List.of()); // empty until a CPU is in
 	private final PowerBuffer power;
 	private final CaseTier tier;
-	/** It's the all-in-one: a built-in terminal on its front. */
-	private final boolean builtInTerminal;
 	/** The motherboard's id: what Bluetooth cards link to. Made when the computer is placed, and saved. */
 	private UUID boardId = UUID.randomUUID();
 	/** What the computer has drawn lately, for the case view's runtime estimate. */
@@ -201,15 +194,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		super(ModBlocks.ALL_IN_ONE_ENTITY, pos, state);
 		AllInOneBlock block = state.getBlock() instanceof AllInOneBlock found ? found : (AllInOneBlock) ModBlocks.ALL_IN_ONE;
 		this.tier = block.tier();
-		this.builtInTerminal = block.builtInTerminal();
 		this.power = new PowerBuffer(tier.bufferCapacity());
 		display.setFlusher(this::syncDisplay);
-		if (builtInTerminal) {
-			// The all-in-one's own terminal, wired to its board.
-			if (builtInTerminal) {
-			machine.board().plug(Motherboard.TERMINAL, display, terminalId);
-		}
-		}
 	}
 
 	public CaseTier tier() {
@@ -218,12 +204,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	@Override
 	public boolean showsScreen() {
-		return builtInTerminal || screenInSlot();
+		return screenInSlot();
 	}
 
 	/** A screen is in the gold expansion slot (tiers 2 and 3). */
 	private boolean screenInSlot() {
-		return !builtInTerminal && CaseMenu.isScreenSlot(tier, CaseMenu.EXP_SLOTS) && parts.getItem(CaseMenu.EXP_SLOTS).getItem() instanceof ScreenItem;
+		return CaseMenu.isScreenSlot(tier, CaseMenu.EXP_SLOTS) && parts.getItem(CaseMenu.EXP_SLOTS).getItem() instanceof ScreenItem;
 	}
 
 	/** The motherboard's bus order. */
@@ -270,14 +256,10 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		if (machine.board().cpu().isEmpty()) {
 			return entries; // no CPU, no bus
 		}
-		Component builtIn = Component.translatable("gui.modularcomputers.bus.built_in");
 		BusOrder busOrder = busOrder();
 		for (String key : busOrder.keys()) {
 			int position = machine.board().position(key);
-			if (key.equals(machine.board().address(Motherboard.TERMINAL))) {
-				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.terminal"), builtIn, ItemStack.EMPTY, -1, TERMINAL_ICON,
-					Optional.empty(), true, true, position));
-			} else if (!busOrder.isInternal(key)) {
+			if (!busOrder.isInternal(key)) {
 				Optional.ofNullable(known.get(key)).ifPresent(device -> {
 					ItemStack item = new ItemStack(device.item());
 					boolean online = busOrder.isOnline(key);
@@ -816,7 +798,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			output.putInt(BUS_CAPACITY_OVERRIDE, machine.board().busCapacityOverride());
 		}
 		output.store(BOARD_ID, UUIDUtil.CODEC, boardId);
-		output.store(TERMINAL_ID, UUIDUtil.CODEC, terminalId);
 		ContainerHelper.saveAllItems(output, parts.getItems());
 		output.store(BUS_EXTERNAL, ENTRY_CODEC.listOf(), busOrder().external());
 		output.store(BUS_DISCONNECTED, Codec.STRING.listOf(), busOrder().disconnected());
@@ -834,10 +815,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		power.set(input.getIntOr(POWER_BUFFER, 0));
 		machine.board().overrideBusCapacity(input.getInt(BUS_CAPACITY_OVERRIDE).orElse(null));
 		input.read(BOARD_ID, UUIDUtil.CODEC).ifPresent(saved -> boardId = saved);
-		input.read(TERMINAL_ID, UUIDUtil.CODEC).ifPresent(saved -> terminalId = saved);
-		if (builtInTerminal) {
-			machine.board().plug(Motherboard.TERMINAL, display, terminalId);
-		}
 		parts.getItems().clear(); // not clearContent(): that would fire change handling mid-load
 		ContainerHelper.loadAllItems(input, parts.getItems());
 		input.read(BUS_EXTERNAL, ENTRY_CODEC.listOf()).ifPresent(order ->

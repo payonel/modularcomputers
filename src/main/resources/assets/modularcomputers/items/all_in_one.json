@@ -1,6 +1,6 @@
 {
 	"model": {
 		"type": "minecraft:model",
-		"model": "modularcomputers:block/all_in_one"
+		"model": "modularcomputers:block/case_faded"
 	}
 }
