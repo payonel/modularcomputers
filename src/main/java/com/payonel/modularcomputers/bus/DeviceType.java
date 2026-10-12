@@ -2,8 +2,8 @@ package com.payonel.modularcomputers.bus;
 
 /** What a device on the bus says it is, the way a real device reports its class. */
 public enum DeviceType {
-	DISPLAY,
-	KEYBOARD,
+	/** A text screen and a keyboard in one. */
+	TERMINAL,
 	STORAGE,
 	NETWORK,
 	/** Firmware (the EEPROM), listed so programs can read or reflash it. */

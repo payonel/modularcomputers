@@ -10,15 +10,15 @@ import java.util.Optional;
  * <p>
  * Devices are addressed three ways, as on a real system:
  * <ul>
- * <li>a case slot's path, fixed by the slot: {@code "edp"} (the built-in display, by its
- * embedded DisplayPort connector), {@code "kbd"}, {@code "eeprom"}, {@code "ups"},
- * {@code "sata:0"}, {@code "exp:2"};</li>
- * <li>a device's id, fixed once known, however it's connected (cable, Bluetooth, a hub, or a
- * case slot): {@code "id:<uuid>"};</li>
+ * <li>a slot's path, fixed by the slot: {@code "eeprom"}, {@code "ups"}, {@code "sata:0"},
+ * {@code "exp:2"};</li>
+ * <li>a device's id, fixed once known, however it's connected (cable, Bluetooth, a hub, a
+ * slot, or built in): {@code "id:<uuid>"}. Every device has one. A built-in terminal has no
+ * path: it's simply the first terminal listed, as the case's devices come first;</li>
  * <li>a virtual device's name, fixed by convention: {@code "console"}.</li>
  * </ul>
- * {@link #list()} gives the physical bus's addresses in bus order: paths for the case's devices,
- * ids for external ones. A card in a case slot answers to its id as well.
+ * {@link #list()} gives the physical bus's devices in bus order: each one's address (a path for
+ * a device in a slot, else its id), its id, which every device has and answers to, and its type.
  * <p>
  * Every call can be a point where the machine is paused until a later tick (each machine gets a
  * fixed number of calls a tick); the program never notices, except as time passing.
@@ -27,8 +27,16 @@ public interface Board {
 	/** The interrupt source for the bus itself: devices attached or removed. */
 	String BUS = "bus";
 
+	/**
+	 * One device on the bus: its address, its own id ({@code id:<uuid>}, which it answers to
+	 * too; the same as the address for a device without a slot) and its type. A Lua runtime
+	 * gives it as a table.
+	 */
+	record DeviceInfo(String address, String id, String type) {
+	}
+
 	/** The devices on the physical bus, in bus order. Reading it clears the bus's interrupt. */
-	List<String> list();
+	List<DeviceInfo> list();
 
 	/** How full the bus is: capacity, saved, missing, waiting, overflow. */
 	BusStatus status();

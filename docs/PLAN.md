@@ -80,15 +80,14 @@ Decided by the user:
 
 Still to do:
 - Running machines off-thread, asynchronously, and how they share the server tick.
-- **Console input** (user, 2026-10-11): the console is the multicast device for input too.
-  Every keyboard on the bus feeds one key queue on `console`, with the console's interrupt,
-  like UEFI's `ConIn` splitter and Linux's `/dev/console`. Needs keyboards to take input first
-  (typing in modal mode reaching the server).
-- Device methods for the rest: the keyboard (and its key buffer and interrupt), disks, the
+- **Typing reaches terminals** (user, 2026-10-11): keys typed in a screen's modal mode go to
+  that terminal's queue on the server. The device side is built (`Terminal.read`,
+  `console.read`, interrupts); the client-to-server part isn't.
+- Device methods for the rest: disks, the
   UPS battery (charge, time left), cards, the EEPROM.
 - Opaque handles (Lua userdata) in the value model.
 
-## Separate blocks: cases, screens, keyboards, cables
+## Separate blocks: cases, screens, cables
 
 The all-in-one stays the test bed. Later there are separate blocks:
 
@@ -98,14 +97,14 @@ The all-in-one stays the test bed. Later there are separate blocks:
   button shows only when the screen is connected to a case.
 - **The all-in-one is both.** Right-click on it opens the screen (the screen wins). The view
   toggle button switches between the case view and the screen view. Built.
-- **Keyboards:** external keyboards, joined by cable like screens. Cables and screens are
-  built.
+- **No separate keyboards** (user, 2026-10-11): a screen is a terminal, screen and keyboard
+  in one device. Cables and screens are built.
 - **Multiblock screens that auto-grow (user idea, 2026-10-11, undecided):** neighboring screen
   blocks merging into one bigger display. For now screens are single blocks.
 
 ### Cabled devices and the bus (user decisions, 2026-10-10; built 2026-10-11)
 
-- **One device, many computers.** A cabled device (screen, keyboard, ...) may be connected to
+- **One device, many computers.** A cabled device (screen, ...) may be connected to
   several computers at once.
 - **Connect/disconnect toggle.** Each cabled device's row in the bus order panel gets a small
   toggle.

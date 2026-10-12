@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.block;
 
 import com.mojang.serialization.Codec;
-import com.payonel.modularcomputers.display.Display;
+import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.menu.CardHolderMenu;
 import net.minecraft.core.BlockPos;
@@ -24,7 +24,7 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 	private static final String FOREGROUND = "display_foreground";
 	private static final String BACKGROUND = "display_background";
 
-	private final Display display = new Display(Resolution.DEFAULT);
+	private final Terminal display = new Terminal(Resolution.DEFAULT);
 	/** The display's change count last sent to clients. */
 	private int synced = -1;
 
@@ -33,7 +33,7 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 	}
 
 	@Override
-	public Display display() {
+	public Terminal terminal() {
 		return display;
 	}
 

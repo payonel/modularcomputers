@@ -218,8 +218,8 @@ same thing.
             **forget** button where the plug was (`ForgetDevicePayload`). New ones go last.
             Offline rows keep their last-known name, icon and position (`known`, saved).
           - **Bus capacity** is a motherboard setting (`Motherboard.busCapacity`, default 32,
-            saved as `bus_capacity`; settings UI later). The 12 case places are always reserved,
-            so external devices get the rest (20).
+            saved as `bus_capacity`; settings UI later). The 11 connector places are always reserved,
+            so external devices get the rest (21).
           - **Full:** a new external device bumps the one missing longest (each entry keeps
             `lastSeen`). With none missing it **waits**: not on the bus. The bus is then in its
             warning state: an amber LED top right of the panel, the summary line saying
@@ -231,11 +231,12 @@ same thing.
             is the same idea deeper (72 Hz, beating 7 Hz, sagging 15%), to sound like an error.
             Both are made by `scripts/art/part_sounds.py`; neither is checked by a test. Programs will read it from `Bus.status()` (`BusStatus`: capacity,
             devices, saved, missing, waiting, overflow).
-          - **Numbers are fixed places** (user, after looking at PCI/SATA/USB): 1 display, 2
-            keyboard, 3 ROM, 4 UPS, 5-8 SATA, 9-12 EXP, then external devices from 13 in their
+          - **Numbers are fixed places** (user, after looking at PCI/SATA/USB): 1 the built-in
+            terminal, 2 ROM, 3 UPS, 4-7 SATA, 8-11 EXP, then external devices from 12 in their
             order. Empty case slots leave gaps (like `lspci`); only present devices get rows.
-          - Hub cards are known by a serial number (`ModComponents.SERIAL`, stamped when a card
-            first goes into a hub), so moving one to another slot keeps its place.
+          - Parts and hub cards are known by a serial number (`ModComponents.SERIAL`, stamped when
+            a bus part first goes into a computer or a card into a hub), so moving a hub card to
+            another slot keeps its place.
           - It's saved (`bus_external`, `bus_disconnected`), and the machine's `Bus` follows it.
         - **Cabled devices** (screens) get two more buttons left of the arrows:
           - The **bulb** outlines the device in the world for 10 seconds, pulsing yellow and
@@ -500,34 +501,44 @@ scripts/art/error_beep.py` into
 - **Mock runtime** (`runtime/`, built 2026-10-11 after a design discussion with the user, modeled
   on OC's `machine.lua` + `component.invoke` but redesigned; OC is never named in code):
   - **Names:** `bus` and `device`, never "component" (user rule, code and docs).
-  - **The motherboard API (`runtime/Board`)** is everything a program can do: `list()` (bus
-    addresses in bus order), `status()` (`BusStatus`), `type`, `methods`, `doc`,
+  - **The motherboard API (`runtime/Board`)** is everything a program can do: `list()` (the
+    bus's devices in bus order, each a `DeviceInfo(address, id, type)`, a table in Lua), `status()` (`BusStatus`), `type`, `methods`, `doc`,
     `invoke(address, method, args...)`, `waitForInterrupt(seconds)`, `uptime()`. Addresses are
     the bus keys, three kinds as on a real system (user design, 2026-10-11):
-    - **Paths** name case slots, fixed by the slot: `edp` (the built-in display, named for its
-      embedded DisplayPort connector, so it can't be confused with `console`), `kbd` (the
-      built-in keyboard), `eeprom`, `ups`, `sata:0`, `exp:2`.
-    - **Ids** name a device however it's connected: `id:<uuid>` (a screen's or block's id, a
-      card's `SERIAL`). The user rejected `cable:`: a program shouldn't care whether a device is
-      cabled or Bluetooth, or in a hub. Cards get a serial when they first go into a computer
-      or hub, and a card in a case slot answers to both `exp:N` and `id:<serial>` (like Linux's
-      `by-path` and `by-id`; `Bus.setDevices(devices, aliases)`). `list()` gives paths for the
-      case's devices and ids for external ones.
+    - **Paths** name slots, fixed by the slot: `eeprom`, `ups`, `sata:0`, `exp:2`.
+    - **Ids** name a device however it's connected: `id:<uuid>`. **Every device has one**
+      (user, 2026-10-11: nothing is excluded): a screen's or block's id, a part's or card's
+      `SERIAL`, the built-in terminal's `terminal_id`. The user rejected `cable:`: a program
+      shouldn't care whether a device is cabled or Bluetooth, or in a hub. A part in a slot
+      answers to both its path and its id (like Linux's `by-path` and `by-id`;
+      `Bus.setDevices(devices, aliases)`, `Bus.id`); `list()` gives both.
+    - **The built-in terminal has no name of its own** (user, 2026-10-11): its address is its
+      id. A program that wants it takes the first terminal listed, since the connectors come
+      before external devices, as UEFI and Linux take the first display found as the primary.
+      A case without one simply has none. (`edp`/`kbd` were dropped: eDP carries only the
+      picture, and `tty` names every terminal, not the built-in one.)
     - **Virtual devices** are bare names, fixed by convention: `console` (the user: something as
       simple as `/dev/console` might as well be just `console`). The console is UEFI's
       ConSplitter, so it already is the "virtual multicast text buffer". **The console is the
       group's multicast device for input and output both** (user, 2026-10-11): it writes to
-      every display, and (once keyboards take input) reads key presses from every keyboard, as
-      UEFI's ConSplitter does `ConOut` and `ConIn` and Linux's `/dev/console` reads every
-      keyboard. Each keyboard stays readable on its own too.
-    - **The console's group** (user design, 2026-10-11; built for displays, keyboards listed):
-      `console.outputs()` / `inputs()` list the bound displays / keyboards by address in bus
-      order; `console.unbind(address)` takes one out (the console stops drawing on it, what's on
-      it stays, the program owns it through its address); `console.bind(address)` puts it back
-      and redraws the console on it. Names from Linux's vtconsole `bind`; the user rejected
-      "graphics mode" and numbered VTs. Not a display or keyboard on the bus: a soft failure.
-      Every display and keyboard is bound by default. The console's size is the smallest bound
-      display.
+      every terminal's screen and reads key presses from every terminal, merged
+      (`console.read()`), as UEFI's ConSplitter does `ConOut` and `ConIn` and Linux's
+      `/dev/console` (`console=tty0 console=ttyS0`) does. Each terminal stays readable on its
+      own too.
+    - **Terminals** (`device/Terminal`, type `terminal`; user decision 2026-10-11): a screen and
+      a keyboard are one device, like a VT100, so there's no separate keyboard device (the
+      user left that complexity out). Output: `getResolution`, `set`, `get`, `fill`. Input:
+      `read()` (the oldest key, or nil); keys wait in its queue, and while any do, its
+      interrupt is on, or the console's if it's in the console's group. Typing doesn't reach a
+      terminal yet (it will come from modal mode); tests use `Terminal.press`. The screen block
+      and the all-in-one's front are terminals.
+    - **The console's group** (user design, 2026-10-11): `console.terminals()` lists the bound
+      terminals by address in bus order; `console.unbind(address)` takes one out (the console
+      stops drawing on it and reading from it, what's on it stays, the program owns it through
+      its address); `console.bind(address)` puts it back and redraws the console on it. Names
+      from Linux's vtconsole `bind`; the user rejected "graphics mode" and numbered VTs. Not a
+      terminal on the bus: a soft failure. Every terminal is bound by default. The console's
+      size is the smallest bound terminal.
     - **No graphics card, one console buffer** (user, 2026-10-11, real-world "example 2", like a
       USB display adapter, not a GPU with a monitor on a cable): a screen that leaves the bus
       loses what it showed, and one that joins, new or plugged back in, is a new arrival, bound,
@@ -570,17 +581,17 @@ scripts/art/error_beep.py` into
     which changes. Unit tests build their own `Program`s; game tests flash one onto the EEPROM
     after inserting it (`Eeprom.flash`, like reflashing firmware; `gametest/TestPrograms`).
   - Device methods so far: the console (`print`, `write`, `clear`, `setColors`, `getSize`,
-    `outputs`, `inputs`, `bind`, `unbind`) and
-    displays (`getResolution`, `set`, `get`, `fill`; columns and rows from 1, as in Lua).
+    `terminals`, `bind`, `unbind`, `read`) and terminals (`getResolution`, `set`, `get`,
+    `fill`, `read`; columns and rows from 1, as in Lua).
 - **Motherboard (`Motherboard`):** holds the soldered parts (`Hardware`/`Part`, memory), the
   CPU socket, the EEPROM slot, and two buses.
   - **The bus is the motherboard's firmware, not the case's** (user, 2026-10-11: "the all in one
     HAS a motherboard"; new case types will come). `Motherboard` owns the connectors and their
-    addresses (`CONNECTORS`: `edp`, `kbd`, `eeprom`, `ups`, `sata:0-3`, `exp:0-3`, and their fixed
-    places 1-12), the `BusOrder`, `id:` aliases, bus positions, and building the bus
+    addresses (`CONNECTORS`: the built-in `TERMINAL` (no path: its address is its id), `eeprom`,
+    `ups`, `sata:0-3`, `exp:0-3`, and their fixed places 1-11), the `BusOrder`, `id:` aliases, bus positions, and building the bus
     (`plug(connector, device, id)`, `setExternal(found)`, `layout(now)`; `Machine.rebuildBus`
     applies it with hot-plug, `Motherboard.rebuildBus` without, for clients). A case only wires
-    things up: the all-in-one plugs its display into `edp` and keyboard into `kbd`, turns slot
+    things up: the all-in-one plugs its terminal into `TERMINAL` with its id, turns slot
     items into devices, and finds cabled devices. Keep it that way: no bus logic in block
     entities.
   - **Physical bus (`bus/Bus`):** the real devices in bus order (`BusOrder`: the connectors'
@@ -975,8 +986,8 @@ src/main/java/com/payonel/modularcomputers/
   machine/                         plain Java: Machine (power), Cpu, Motherboard, Eeprom, Program, HelloWorldProgram, Hardware, Part, PartKind
   bus/                             plain Java: Bus (physical), VirtualBus, Device, DeviceType
   console/ConsoleSplitter.java     the always-present console on the virtual bus
-  device/                          Keyboard, Disk (bus devices; no behavior yet)
-  display/                         plain Java: Display (bus device), Resolution, TextBuffer, Viewport, DisplayLayout (GUI layout math)
+  device/                          Terminal (screen + keyboard), Disk, Card, UpsBattery (bus devices)
+  display/                         plain Java: Resolution, TextBuffer, Viewport, DisplayLayout (GUI layout math)
   cable/CableWalk.java             plain Java: follows cables out from a block to the devices at the ends
   ModCreativeTab.java              the "Modular Computers" creative tab
   item/ModItems.java               the parts, cards and batteries

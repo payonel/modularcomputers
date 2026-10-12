@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.machine;
 
 import com.payonel.modularcomputers.bus.Device;
-import com.payonel.modularcomputers.display.Display;
+import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.runtime.ProgramRunner;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -226,7 +226,7 @@ public final class Machine {
 		}
 		for (var entry : addressed.entrySet()) {
 			// A display that joined is in the console's group: it gets the console drawn on it.
-			if (!before.contains(entry.getValue()) && entry.getValue() instanceof Display display && console.isBound(entry.getKey())) {
+			if (!before.contains(entry.getValue()) && entry.getValue() instanceof Terminal display && console.isBound(entry.getKey())) {
 				console.redraw(display);
 			}
 		}

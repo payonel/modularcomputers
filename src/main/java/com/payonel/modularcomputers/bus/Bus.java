@@ -39,6 +39,15 @@ public final class Bus {
 		return Optional.ofNullable(devices.get(aliases.getOrDefault(address, address)));
 	}
 
+	/** The id ({@code id:<uuid>}) of the device at {@code address}, or null if it has none. */
+	public String id(String address) {
+		if (address.startsWith("id:")) {
+			return address;
+		}
+		return aliases.entrySet().stream().filter(alias -> alias.getValue().equals(address))
+			.map(Map.Entry::getKey).findFirst().orElse(null);
+	}
+
 	/** The address of the device at an address or another name for one, if it's on the bus. */
 	public Optional<String> address(String name) {
 		String address = aliases.getOrDefault(name, name);

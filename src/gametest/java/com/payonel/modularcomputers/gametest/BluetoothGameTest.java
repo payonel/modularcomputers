@@ -241,6 +241,6 @@ public class BluetoothGameTest {
 	}
 
 	private static boolean onBus(AllInOneBlockEntity computer, ScreenBlockEntity screen) {
-		return computer.machine().board().bus().devices().contains(screen.display());
+		return computer.machine().board().bus().devices().contains(screen.terminal());
 	}
 }

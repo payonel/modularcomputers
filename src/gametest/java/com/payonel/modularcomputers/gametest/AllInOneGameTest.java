@@ -9,6 +9,7 @@ import com.payonel.modularcomputers.display.TextBuffer;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.machine.Machine;
+import com.payonel.modularcomputers.machine.Motherboard;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import java.util.List;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
@@ -50,12 +51,12 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = place(helper);
 		Machine machine = computer.machine();
 		helper.assertTrue(!machine.isPowered(), "a new computer should be off");
-		helper.assertTrue(computer.display().buffer().isBlank(), "an off computer's display should be blank");
+		helper.assertTrue(computer.terminal().buffer().isBlank(), "an off computer's display should be blank");
 		helper.assertTrue(computer.parts().isEmpty(), "a new computer has no CPU or EEPROM");
 		helper.assertTrue(machine.board().cpu().isEmpty() && machine.board().eeprom().isEmpty(), "nothing installed");
 		helper.assertBlockProperty(POS, AllInOneBlock.READY, false);
 		helper.assertValueEqual(machine.board().bus().devices().stream().map(device -> device.type()).toList(),
-			List.of(DeviceType.DISPLAY, DeviceType.KEYBOARD), "physical bus: just the built-ins");
+			List.of(DeviceType.TERMINAL), "physical bus: just the built-in terminal");
 		helper.succeed();
 	}
 
@@ -111,14 +112,19 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.REDSTONE_CARD));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.BLUETOOTH_CARD));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 2, new ItemStack(ModItems.WEATHER_SENSOR_CARD));
-		helper.assertValueEqual(busKeys(computer), List.of("edp", "kbd", "eeprom", "ups", "exp:0", "exp:1", "exp:2"), "default order");
-		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.DISPLAY, DeviceType.KEYBOARD, DeviceType.FIRMWARE, DeviceType.POWER,
+		helper.assertValueEqual(busKeys(computer), List.of("terminal", "eeprom", "ups", "exp:0", "exp:1", "exp:2"), "default order");
+		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.TERMINAL, DeviceType.FIRMWARE, DeviceType.POWER,
 			DeviceType.REDSTONE, DeviceType.NETWORK, DeviceType.SENSOR), "each reports its class");
 		var entries = computer.busEntries();
-		helper.assertValueEqual(entries.get(2).location().getString(), "ROM", "the EEPROM sits in the ROM socket");
-		helper.assertValueEqual(entries.get(2).slot(), CaseMenu.EEPROM_SLOT, "its row goes with its slot");
-		helper.assertValueEqual(entries.get(3).location().getString(), "UPS", "the battery's place");
-		helper.assertValueEqual(entries.get(4).name().getString(), "Redstone Card", "card names");
+		helper.assertValueEqual(entries.get(1).location().getString(), "ROM", "the EEPROM sits in the ROM socket");
+		helper.assertValueEqual(entries.get(1).slot(), CaseMenu.EEPROM_SLOT, "its row goes with its slot");
+		helper.assertValueEqual(entries.get(2).location().getString(), "UPS", "the battery's place");
+		helper.assertValueEqual(entries.get(3).name().getString(), "Redstone Card", "card names");
+		var bus = computer.machine().board().bus();
+		for (String address : List.of("eeprom", "ups", "exp:0")) {
+			String id = bus.id(address);
+			helper.assertTrue(id != null && id.startsWith("id:") && bus.device(id).equals(bus.device(address)), "every part has an id it answers to: " + address);
+		}
 		helper.assertTrue(computer.machine().board().eeprom().isPresent(), "the CPU still finds the EEPROM in its slot");
 		helper.succeed();
 	}
@@ -127,8 +133,10 @@ public class AllInOneGameTest {
 		return computer.machine().board().bus().devices().stream().map(device -> device.type()).toList();
 	}
 
-	private static List<String> busKeys(AllInOneBlockEntity computer) {
-		return computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::key).toList();
+	/** The bus order's keys, the built-in terminal's id shown as "terminal". */
+	static List<String> busKeys(AllInOneBlockEntity computer) {
+		String terminal = computer.machine().board().address(Motherboard.TERMINAL);
+		return computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::key).map(key -> key.equals(terminal) ? "terminal" : key).toList();
 	}
 
 	@GameTest
@@ -137,11 +145,11 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.SATA_SLOTS + 1, new ItemStack(ModItems.HARD_DISK));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.WLAN_CARD));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.RAM)); // RAM is not a bus device
-		helper.assertValueEqual(busKeys(computer), List.of("edp", "kbd", "sata:1", "exp:0"), "attached in default order");
-		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.DISPLAY, DeviceType.KEYBOARD, DeviceType.STORAGE, DeviceType.NETWORK), "bus");
+		helper.assertValueEqual(busKeys(computer), List.of("terminal", "sata:1", "exp:0"), "attached in default order");
+		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.TERMINAL, DeviceType.STORAGE, DeviceType.NETWORK), "bus");
 
-		helper.assertTrue(!computer.moveDevice(3, true) && !computer.moveDevice(2, false), "the case's devices don't move");
-		helper.assertValueEqual(computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::position).toList(), List.of(1, 2, 6, 9),
+		helper.assertTrue(!computer.moveDevice(2, true) && !computer.moveDevice(1, false), "the case's devices don't move");
+		helper.assertValueEqual(computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::position).toList(), List.of(1, 5, 8),
 			"numbered by fixed place, with gaps for empty slots");
 
 		java.util.UUID serial = computer.parts().getItem(CaseMenu.EXP_SLOTS).get(com.payonel.modularcomputers.item.ModComponents.SERIAL);
@@ -150,9 +158,9 @@ public class AllInOneGameTest {
 			"a card answers to its id as well as its slot's path");
 
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.HARD_DISK));
-		helper.assertValueEqual(busKeys(computer), List.of("edp", "kbd", "sata:0", "sata:1", "exp:0"), "a new drive goes in its slot's place");
+		helper.assertValueEqual(busKeys(computer), List.of("terminal", "sata:0", "sata:1", "exp:0"), "a new drive goes in its slot's place");
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, ItemStack.EMPTY);
-		helper.assertValueEqual(busKeys(computer), List.of("edp", "kbd", "sata:0", "sata:1"), "a removed card drops out");
+		helper.assertValueEqual(busKeys(computer), List.of("terminal", "sata:0", "sata:1"), "a removed card drops out");
 		helper.succeed();
 	}
 
@@ -162,11 +170,11 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.SATA_SLOTS + 2, new ItemStack(ModItems.HARD_DISK));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 3, new ItemStack(ModItems.WLAN_CARD));
 		var entries = computer.busEntries();
-		helper.assertValueEqual(entries.get(0).name().getString(), "Display", "built-in name");
+		helper.assertValueEqual(entries.get(0).name().getString(), "Terminal", "built-in name");
 		helper.assertValueEqual(entries.get(0).location().getString(), "built-in", "built-in location");
-		helper.assertValueEqual(entries.get(2).name().getString(), "Hard Disk", "drive name");
-		helper.assertValueEqual(entries.get(2).location().getString(), "SATA 3", "drive location");
-		helper.assertValueEqual(entries.get(3).location().getString(), "EXP 4", "card location");
+		helper.assertValueEqual(entries.get(1).name().getString(), "Hard Disk", "drive name");
+		helper.assertValueEqual(entries.get(1).location().getString(), "SATA 3", "drive location");
+		helper.assertValueEqual(entries.get(2).location().getString(), "EXP 4", "card location");
 		helper.succeed();
 	}
 
@@ -178,8 +186,8 @@ public class AllInOneGameTest {
 		var registries = helper.getLevel().registryAccess();
 		var loaded = (AllInOneBlockEntity) BlockEntity.loadStatic(computer.getBlockPos(), computer.getBlockState(),
 			computer.saveWithFullMetadata(registries), registries);
-		helper.assertValueEqual(busKeys(loaded), List.of("edp", "kbd", "sata:0", "exp:0"), "bus order after reload");
-		helper.assertValueEqual(busTypes(loaded).get(2), DeviceType.STORAGE, "the machine's bus after reload");
+		helper.assertValueEqual(busKeys(loaded), List.of("terminal", "sata:0", "exp:0"), "bus order after reload");
+		helper.assertValueEqual(busTypes(loaded).get(1), DeviceType.STORAGE, "the machine's bus after reload");
 		helper.succeed();
 	}
 
@@ -190,7 +198,7 @@ public class AllInOneGameTest {
 		helper.assertTrue(!computer.machine().isPowered(), "a computer without a CPU stays off");
 		helper.assertBlockProperty(POS, AllInOneBlock.READY, false);
 		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, true); // the attempt shows faded green
-		helper.assertTrue(computer.display().buffer().isBlank(), "nothing runs without a CPU");
+		helper.assertTrue(computer.terminal().buffer().isBlank(), "nothing runs without a CPU");
 		helper.runAfterDelay(AllInOneBlock.ATTEMPT_TICKS + 1, () -> {
 			helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false); // back to faded red
 			helper.assertTrue(!computer.machine().isPowered(), "still off");
@@ -207,7 +215,7 @@ public class AllInOneGameTest {
 		helper.assertTrue(!computer.machine().isPowered(), "pulling the CPU should cut power");
 		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
 		helper.assertBlockProperty(POS, AllInOneBlock.READY, false);
-		helper.assertTrue(computer.display().buffer().isBlank(), "the display goes dark");
+		helper.assertTrue(computer.terminal().buffer().isBlank(), "the display goes dark");
 		helper.succeed();
 	}
 
@@ -225,7 +233,7 @@ public class AllInOneGameTest {
 	public void cpuWithoutEepromShowsTheAbortScreen(GameTestHelper helper) {
 		AllInOneBlockEntity computer = install(place(helper), true, false);
 		computer.pressPower();
-		TextBuffer screen = computer.display().buffer();
+		TextBuffer screen = computer.terminal().buffer();
 		helper.assertValueEqual(screen.row(0).strip(), Cpu.ABORT + Cpu.NO_EEPROM, "abort message");
 		helper.assertValueEqual(screen.background(10, 10), Cpu.ABORT_BACKGROUND, "abort screen background");
 		helper.succeed();
@@ -241,11 +249,11 @@ public class AllInOneGameTest {
 		helper.useBlock(POS, player);
 		helper.assertTrue(machine.isPowered(), "sneak + right-click should turn the computer on");
 		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, true);
-		helper.assertValueEqual(computer.display().buffer().row(0).strip(), TestPrograms.GREETING, "first display row");
+		helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), TestPrograms.GREETING, "first display row");
 
 		helper.useBlock(POS, player);
 		helper.assertTrue(!machine.isPowered(), "a second sneak + right-click should turn it off");
-		helper.assertTrue(computer.display().buffer().isBlank(), "turning off should blank the display");
+		helper.assertTrue(computer.terminal().buffer().isBlank(), "turning off should blank the display");
 		helper.succeed();
 	}
 
@@ -265,7 +273,7 @@ public class AllInOneGameTest {
 		helper.useBlock(POS, player, backClick(helper, 11.5, 11.5));
 		helper.assertTrue(computer.machine().isPowered(), "the back power button should turn the computer on");
 		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, true);
-		helper.assertValueEqual(computer.display().buffer().row(0).strip(), TestPrograms.GREETING, "first display row");
+		helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), TestPrograms.GREETING, "first display row");
 
 		helper.useBlock(POS, player, backClick(helper, 11.5, 11.5));
 		helper.assertTrue(!computer.machine().isPowered(), "pressing it again should turn the computer off");
@@ -324,8 +332,8 @@ public class AllInOneGameTest {
 		helper.assertTrue(reloaded.machine().isPowered(), "a powered computer should still be powered after reload");
 		helper.assertTrue(reloaded.parts().getItem(CaseMenu.CPU_SLOT).is(ModItems.CPU), "CPU after reload");
 		helper.assertTrue(reloaded.machine().board().cpu().isPresent(), "CPU installed after reload");
-		helper.assertValueEqual(reloaded.display().buffer().rows(), computer.display().buffer().rows(), "display text after reload");
-		helper.assertValueEqual(reloaded.display().buffer().background(3, 3), Cpu.ABORT_BACKGROUND, "display colors after reload");
+		helper.assertValueEqual(reloaded.terminal().buffer().rows(), computer.terminal().buffer().rows(), "display text after reload");
+		helper.assertValueEqual(reloaded.terminal().buffer().background(3, 3), Cpu.ABORT_BACKGROUND, "display colors after reload");
 		var console = reloaded.machine().board().virtualBus().console();
 		helper.assertValueEqual(console.row(), 1, "console cursor after reload");
 		helper.assertValueEqual(console.background(), Cpu.ABORT_BACKGROUND, "console colors after reload");

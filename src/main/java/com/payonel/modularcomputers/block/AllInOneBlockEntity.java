@@ -11,9 +11,8 @@ import com.payonel.modularcomputers.console.ConsoleSplitter;
 import com.payonel.modularcomputers.device.Card;
 import com.payonel.modularcomputers.device.CardKind;
 import com.payonel.modularcomputers.device.Disk;
-import com.payonel.modularcomputers.device.Keyboard;
 import com.payonel.modularcomputers.device.UpsBattery;
-import com.payonel.modularcomputers.display.Display;
+import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.item.ModComponents;
@@ -70,7 +69,7 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
 /**
- * The all-in-one computer: its built-in display and keyboard, and a motherboard whose part
+ * The all-in-one computer: its built-in terminal (screen and keyboard), and a motherboard whose part
  * slots (CPU, EEPROM, UPS battery, RAM, SATA drives, expansion cards) are filled from the case
  * view. Drives and cards join the physical bus after the built-ins, then the screens wired to
  * it by cable, in an order the player can change (the bus order panel), where cabled devices
@@ -99,23 +98,28 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String POWER_BUFFER = "power_buffer";
 	private static final String BUS_CAPACITY = "bus_capacity";
 	private static final String BOARD_ID = "board_id";
+	private static final String TERMINAL_ID = "terminal_id";
 	/** Looks for cabled devices this often, in ticks, even when no cable changed (chunks load and unload). */
 	private static final int RESCAN_TICKS = 20;
 	/** How often the battery is run down or recharged. */
 	private static final int BATTERY_TICKS = 20;
 	/** Icons for the built-in devices in textures/gui/case_icons.png. */
-	public static final int DISPLAY_ICON = 6;
-	public static final int KEYBOARD_ICON = 7;
+	public static final int TERMINAL_ICON = 6;
 	private static final float ERROR_BEEP_VOLUME = 0.6f;
+	/** The slots whose parts are bus devices: each gets a serial number, its id. */
+	private static final int[] BUS_PART_SLOTS = {CaseMenu.EEPROM_SLOT, CaseMenu.UPS_SLOT,
+		CaseMenu.SATA_SLOTS, CaseMenu.SATA_SLOTS + 1, CaseMenu.SATA_SLOTS + 2, CaseMenu.SATA_SLOTS + 3,
+		CaseMenu.EXP_SLOTS, CaseMenu.EXP_SLOTS + 1, CaseMenu.EXP_SLOTS + 2, CaseMenu.EXP_SLOTS + 3};
 
-	private final Display display = new Display(Resolution.DEFAULT);
-	private final Keyboard keyboard = new Keyboard();
+	private final Terminal display = new Terminal(Resolution.DEFAULT);
+	/** The built-in terminal's id, its address on the bus. Made when the computer is placed, and saved. */
+	private UUID terminalId = UUID.randomUUID();
 	/** Devices made from the parts in the slots (by lane for drives and cards); null when empty. */
 	private final Disk[] disks = new Disk[CaseMenu.LANES];
 	private final Card[] cards = new Card[CaseMenu.LANES];
 	private Eeprom eeprom;
 	private UpsBattery ups;
-	private final Bus bus = new Bus(List.of(display, keyboard));
+	private final Bus bus = new Bus(List.of(display));
 	private final PowerBuffer power = new PowerBuffer();
 	/** The motherboard's id: what Bluetooth cards link to. Made when the computer is placed, and saved. */
 	private UUID boardId = UUID.randomUUID();
@@ -173,9 +177,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	public AllInOneBlockEntity(BlockPos pos, BlockState state) {
 		super(ModBlocks.ALL_IN_ONE_ENTITY, pos, state);
-		// The all-in-one's own display and keyboard, wired to its board's connectors.
-		machine.board().plug(Motherboard.EDP, display);
-		machine.board().plug(Motherboard.KBD, keyboard);
+		// The all-in-one's own terminal, wired to its board.
+		machine.board().plug(Motherboard.TERMINAL, display, terminalId);
 	}
 
 	/** The motherboard's bus order. */
@@ -187,9 +190,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return machine;
 	}
 
-	/** The built-in screen's display. */
+	/** The built-in terminal: the screen on the front and the keyboard under it. */
 	@Override
-	public Display display() {
+	public Terminal terminal() {
 		return display;
 	}
 
@@ -223,13 +226,10 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		BusOrder busOrder = busOrder();
 		for (String key : busOrder.keys()) {
 			int position = machine.board().position(key);
-			if (key.equals(Motherboard.EDP)) {
-				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.display"), builtIn, ItemStack.EMPTY, -1, DISPLAY_ICON,
+			if (key.equals(machine.board().address(Motherboard.TERMINAL))) {
+				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.terminal"), builtIn, ItemStack.EMPTY, -1, TERMINAL_ICON,
 					Optional.empty(), true, true, position));
-			} else if (key.equals(Motherboard.KBD)) {
-				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.device.keyboard"), builtIn, ItemStack.EMPTY, -1, KEYBOARD_ICON,
-					Optional.empty(), true, true, position));
-			} else if (Motherboard.isId(key)) {
+			} else if (!busOrder.isInternal(key)) {
 				Optional.ofNullable(known.get(key)).ifPresent(device -> {
 					ItemStack item = new ItemStack(device.item());
 					boolean online = busOrder.isOnline(key);
@@ -352,7 +352,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	/** The external devices on the bus now. */
 	private Set<String> externalOnBus() {
-		return busOrder().connected().stream().filter(Motherboard::isId).collect(Collectors.toSet());
+		return busOrder().connected().stream().filter(key -> !busOrder().isInternal(key)).collect(Collectors.toSet());
 	}
 
 	/**
@@ -375,7 +375,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** Server side: the player plugged a cabled device in or out in the bus order panel. */
 	public boolean setConnected(String key, boolean connected) {
 		Set<String> before = externalOnBus();
-		if (!Motherboard.isId(key) || !busOrder().setConnected(key, connected)) {
+		if (!busOrder().setConnected(key, connected)) { // external devices only
 			return false;
 		}
 		rebuildBus();
@@ -491,7 +491,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 				continue;
 			}
 			if (block instanceof ScreenBlockEntity screen) {
-				addCabled(found, devices, new Cabled(Motherboard.id(screen.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.SCREEN.asItem(), -1), screen.display());
+				addCabled(found, devices, new Cabled(Motherboard.id(screen.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.SCREEN.asItem(), -1), screen.terminal());
 			} else if (block instanceof ExpansionHubBlockEntity hub) {
 				for (int slot = 0; slot < ExpansionHubBlockEntity.SLOTS; slot++) {
 					int hubSlot = slot;
@@ -598,18 +598,19 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		boolean hasEeprom = parts.getItem(CaseMenu.EEPROM_SLOT).is(ModItems.EEPROM);
 		eeprom = hasEeprom ? (eeprom != null ? eeprom : new Eeprom(new HelloWorldProgram())) : null;
 		board.setEeprom(eeprom);
+		// Each part answers to its serial number too: a card is found by it here or in a hub.
+		board.plug(Motherboard.EEPROM, eeprom, serial(CaseMenu.EEPROM_SLOT));
 		boolean hasUps = parts.getItem(CaseMenu.UPS_SLOT).getItem() instanceof BatteryItem;
 		ups = hasUps ? (ups != null ? ups : new UpsBattery()) : null;
-		board.plug(Motherboard.UPS, ups);
+		board.plug(Motherboard.UPS, ups, serial(CaseMenu.UPS_SLOT));
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
 			boolean disk = parts.getItem(CaseMenu.SATA_SLOTS + lane).is(ModItems.HARD_DISK);
 			disks[lane] = disk ? (disks[lane] != null ? disks[lane] : new Disk()) : null;
-			board.plug(Motherboard.sata(lane), disks[lane]);
+			board.plug(Motherboard.sata(lane), disks[lane], serial(CaseMenu.SATA_SLOTS + lane));
 			ItemStack card = parts.getItem(CaseMenu.EXP_SLOTS + lane);
 			CardKind kind = ModItems.cardKind(card).orElse(null);
 			cards[lane] = kind == null ? null : cards[lane] != null && cards[lane].kind() == kind ? cards[lane] : new Card(kind);
-			// A card answers to its serial number too, so a program finds it here or in a hub.
-			board.plug(Motherboard.exp(lane), cards[lane], card.get(ModComponents.SERIAL));
+			board.plug(Motherboard.exp(lane), cards[lane], serial(CaseMenu.EXP_SLOTS + lane));
 		}
 		rebuildBus();
 	}
@@ -683,12 +684,17 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		}
 	}
 
+	/** The serial number of the part in a slot, if it has one. */
+	private UUID serial(int slot) {
+		return parts.getItem(slot).get(ModComponents.SERIAL);
+	}
+
 	private void onPartsChanged() {
 		if (level != null && !level.isClientSide()) {
-			for (int lane = 0; lane < CaseMenu.LANES; lane++) {
-				ItemStack card = parts.getItem(CaseMenu.EXP_SLOTS + lane);
-				if (!card.isEmpty()) {
-					ModComponents.serial(card); // its id, wherever it goes next
+			for (int slot : BUS_PART_SLOTS) {
+				ItemStack part = parts.getItem(slot);
+				if (!part.isEmpty()) {
+					ModComponents.serial(part); // its id, wherever it goes next
 				}
 			}
 		}
@@ -738,6 +744,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		output.putInt(POWER_BUFFER, power.level());
 		output.putInt(BUS_CAPACITY, machine.board().busCapacity());
 		output.store(BOARD_ID, UUIDUtil.CODEC, boardId);
+		output.store(TERMINAL_ID, UUIDUtil.CODEC, terminalId);
 		ContainerHelper.saveAllItems(output, parts.getItems());
 		output.store(BUS_EXTERNAL, ENTRY_CODEC.listOf(), busOrder().external());
 		output.store(BUS_DISCONNECTED, Codec.STRING.listOf(), busOrder().disconnected());
@@ -760,6 +767,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		power.set(input.getIntOr(POWER_BUFFER, 0));
 		machine.board().setBusCapacity(input.getIntOr(BUS_CAPACITY, Motherboard.DEFAULT_BUS_CAPACITY));
 		input.read(BOARD_ID, UUIDUtil.CODEC).ifPresent(saved -> boardId = saved);
+		input.read(TERMINAL_ID, UUIDUtil.CODEC).ifPresent(saved -> terminalId = saved);
+		machine.board().plug(Motherboard.TERMINAL, display, terminalId);
 		parts.getItems().clear(); // not clearContent(): that would fire change handling mid-load
 		ContainerHelper.loadAllItems(input, parts.getItems());
 		input.read(BUS_EXTERNAL, ENTRY_CODEC.listOf()).ifPresent(order ->

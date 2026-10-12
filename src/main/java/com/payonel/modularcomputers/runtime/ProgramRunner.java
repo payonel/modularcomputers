@@ -198,7 +198,7 @@ public final class ProgramRunner {
 		}
 
 		@Override
-		public List<String> list() {
+		public List<DeviceInfo> list() {
 			return call(Board::list);
 		}
 

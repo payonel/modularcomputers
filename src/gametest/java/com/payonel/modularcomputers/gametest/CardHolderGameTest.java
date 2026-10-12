@@ -65,7 +65,7 @@ public class CardHolderGameTest {
 			helper.assertValueEqual(locations(computer), List.of("hub 1, 2m", "hub 3, 2m", "cable, 3m"), "where each is");
 			helper.assertTrue(computer.machine().board().bus().devices().stream().anyMatch(device -> device.type() == DeviceType.REDSTONE),
 				"the redstone card is on the bus");
-			helper.assertTrue(computer.machine().board().bus().devices().contains(screen.display()), "the hub passes the connection on");
+			helper.assertTrue(computer.machine().board().bus().devices().contains(screen.terminal()), "the hub passes the connection on");
 		});
 	}
 

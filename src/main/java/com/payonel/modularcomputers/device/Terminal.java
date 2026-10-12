@@ -1,21 +1,46 @@
-package com.payonel.modularcomputers.display;
+package com.payonel.modularcomputers.device;
 
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.bus.DeviceType;
+import com.payonel.modularcomputers.display.Resolution;
+import com.payonel.modularcomputers.display.TextBuffer;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Optional;
 
-/** A text display on the bus. Whatever writes to its buffer shows on the screen. */
-public final class Display implements Device {
+/**
+ * A terminal on the bus: a text screen and a keyboard in one device, like a VT100 on a serial
+ * line. Whatever writes to its buffer shows on the screen. Keys typed at it wait in its queue
+ * until read; while any wait, its interrupt is on (when it's in the console's group, the
+ * console's is instead). Typing doesn't reach it yet: it will come from the screen view.
+ */
+public final class Terminal implements Device {
 	private final TextBuffer buffer;
+	private final Deque<String> keys = new ArrayDeque<>();
 
-	public Display(Resolution resolution) {
+	public Terminal(Resolution resolution) {
 		this.buffer = new TextBuffer(resolution);
 	}
 
 	public TextBuffer buffer() {
 		return buffer;
+	}
+
+	/** A key typed at the terminal. */
+	public void press(String key) {
+		keys.addLast(key);
+	}
+
+	/** Takes the oldest key typed, if any. */
+	public Optional<String> nextKey() {
+		return Optional.ofNullable(keys.pollFirst());
+	}
+
+	public boolean hasKeys() {
+		return !keys.isEmpty();
 	}
 
 	// ---- device methods. Columns and rows count from 1, as Lua does. -----------------------
@@ -69,13 +94,24 @@ public final class Display implements Device {
 		return Result.ok(true);
 	}
 
+	@Method(doc = "read(): the oldest key typed at this terminal, or nil")
+	public Result read(Arguments args) {
+		return Result.ok(nextKey().orElse(null));
+	}
+
 	@Override
 	public DeviceType type() {
-		return DeviceType.DISPLAY;
+		return DeviceType.TERMINAL;
+	}
+
+	@Override
+	public boolean interruptPending() {
+		return hasKeys();
 	}
 
 	@Override
 	public void powerOff() {
 		buffer.clear();
+		keys.clear();
 	}
 }

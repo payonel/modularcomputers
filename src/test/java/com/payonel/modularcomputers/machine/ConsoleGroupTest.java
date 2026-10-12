@@ -6,10 +6,10 @@ import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.console.ConsoleSplitter;
 import com.payonel.modularcomputers.device.Disk;
-import com.payonel.modularcomputers.device.Keyboard;
-import com.payonel.modularcomputers.display.Display;
+import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.runtime.Arguments;
+import com.payonel.modularcomputers.runtime.Board;
 import com.payonel.modularcomputers.runtime.Result;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -19,15 +19,15 @@ import java.util.TreeMap;
 import org.junit.jupiter.api.Test;
 
 /**
- * The console's group: every display and keyboard is in it until a program unbinds one. There's
- * one console buffer and no graphics card, so a screen that leaves the bus loses what it showed,
- * and one that joins (new, or plugged back in) is in the group and gets the console drawn on it.
+ * The console's group: every terminal is in it until a program unbinds one. There's one console
+ * buffer and no graphics card, so a terminal that leaves the bus loses what it showed, and one
+ * that joins (new, or plugged back in) is in the group and gets the console drawn on it. Keys
+ * typed at a terminal in the group go to the console; at an unbound one, to the terminal alone.
  */
 class ConsoleGroupTest {
-	private final Display builtIn = new Display(Resolution.DEFAULT);
-	private final Display first = new Display(Resolution.DEFAULT);
-	private final Display second = new Display(Resolution.DEFAULT);
-	private final Keyboard keyboard = new Keyboard();
+	private final Terminal builtIn = new Terminal(Resolution.DEFAULT);
+	private final Terminal first = new Terminal(Resolution.DEFAULT);
+	private final Terminal second = new Terminal(Resolution.DEFAULT);
 	private final Disk disk = new Disk();
 	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())));
 	private final List<Object> seen = new ArrayList<>();
@@ -37,11 +37,10 @@ class ConsoleGroupTest {
 		plug(Map.of("id:first", first, "id:second", second));
 	}
 
-	/** The built-in display, keyboard and a disk, then these external devices. */
-	private void plug(Map<String, Display> external) {
+	/** The built-in terminal and a disk, then these external terminals. */
+	private void plug(Map<String, Terminal> external) {
 		Map<String, Device> devices = new LinkedHashMap<>();
-		devices.put("edp", builtIn);
-		devices.put("kbd", keyboard);
+		devices.put("id:builtin", builtIn);
 		devices.put("sata:0", disk);
 		devices.putAll(new TreeMap<>(external));
 		machine.setDevices(devices);
@@ -51,22 +50,9 @@ class ConsoleGroupTest {
 		return machine.board().virtualBus().console();
 	}
 
-	/** Greets on the console, then takes every display for itself and labels it, then halts. */
-	private void bootLabellingScreens() {
-		machine.board().setEeprom(new Eeprom(board -> {
-			board.invoke("console", "print", "hello world");
-			int screen = 0;
-			for (String address : board.list()) {
-				if ("display".equals(board.type(address).orElse(null))) {
-					seen.add(board.invoke("console", "unbind", address).first());
-					board.invoke(address, "fill", 1, 1, 50, 16, " ");
-					board.invoke(address, "set", 1, 1, "screen " + screen++);
-				}
-			}
-			seen.add(board.invoke("console", "outputs").first());
-			seen.add(board.invoke("console", "inputs").first());
-			board.halt();
-		}));
+	/** Runs a program until it halts. */
+	private void boot(Program program) {
+		machine.board().setEeprom(new Eeprom(program));
 		machine.pressPower();
 		for (int i = 0; i < 5 && machine.runner().isPresent(); i++) {
 			machine.tick();
@@ -74,37 +60,50 @@ class ConsoleGroupTest {
 		assertThat(machine.runner()).as("halted").isEmpty();
 	}
 
+	/** Greets on the console, then takes every terminal for itself and labels it, then halts. */
+	private void bootLabellingScreens() {
+		boot(board -> {
+			board.invoke("console", "print", "hello world");
+			int screen = 0;
+			for (Board.DeviceInfo device : board.list()) {
+				if ("terminal".equals(device.type())) {
+					seen.add(board.invoke("console", "unbind", device.address()).first());
+					board.invoke(device.address(), "fill", 1, 1, 50, 16, " ");
+					board.invoke(device.address(), "set", 1, 1, "screen " + screen++);
+				}
+			}
+			seen.add(board.invoke("console", "terminals").first());
+			board.halt();
+		});
+	}
+
 	private static Arguments address(String address) {
 		return new Arguments(List.<Object>of(address));
 	}
 
-	private static String top(Display display) {
-		return display.buffer().row(0).strip();
+	private static String top(Terminal terminal) {
+		return terminal.buffer().row(0).strip();
 	}
 
 	@Test
-	void everyDisplayAndKeyboardIsInTheGroupByDefault() {
-		List<Object> group = new ArrayList<>();
-		machine.board().setEeprom(new Eeprom(board -> {
-			group.add(board.invoke("console", "outputs").first());
-			group.add(board.invoke("console", "inputs").first());
+	void everyTerminalIsInTheGroupByDefault() {
+		boot(board -> {
+			seen.add(board.invoke("console", "terminals").first());
 			board.halt();
-		}));
-		machine.pressPower();
-		assertThat(group).containsExactly(List.of("edp", "id:first", "id:second"), List.of("kbd"));
+		});
+		assertThat(seen).containsExactly(List.of("id:builtin", "id:first", "id:second"));
 	}
 
 	@Test
-	void unboundScreensKeepWhatTheProgramWroteOnThem() {
+	void unboundTerminalsKeepWhatTheProgramWroteOnThem() {
 		bootLabellingScreens();
-		assertThat(seen).containsExactly(true, true, true, List.of(), List.of("kbd"));
+		assertThat(seen).containsExactly(true, true, true, List.of());
 		assertThat(List.of(top(builtIn), top(first), top(second))).containsExactly("screen 0", "screen 1", "screen 2");
-		assertThat(top(builtIn)).isNotEqualTo("hello world");
 		assertThat(console().screen().row(0).strip()).as("the console's own copy").isEqualTo("hello world");
 	}
 
 	@Test
-	void consoleOutputSkipsUnboundScreens() {
+	void consoleOutputSkipsUnboundTerminals() {
 		bootLabellingScreens();
 		console().print("more");
 		assertThat(first.buffer().row(1).strip()).isEmpty();
@@ -112,7 +111,7 @@ class ConsoleGroupTest {
 	}
 
 	@Test
-	void aScreenPluggedBackInIsNewAndGetsTheConsoleBack() {
+	void aTerminalPluggedBackInIsNewAndGetsTheConsoleBack() {
 		bootLabellingScreens();
 		plug(Map.of("id:second", second)); // first's cable is cut
 		assertThat(top(first)).as("no graphics card: it lost what it showed").isEmpty();
@@ -124,16 +123,16 @@ class ConsoleGroupTest {
 	}
 
 	@Test
-	void aNewScreenJoinsTheGroupAndShowsTheConsole() {
+	void aNewTerminalJoinsTheGroupAndShowsTheConsole() {
 		bootLabellingScreens();
-		Display third = new Display(Resolution.DEFAULT);
+		Terminal third = new Terminal(Resolution.DEFAULT);
 		plug(Map.of("id:first", first, "id:second", second, "id:third", third));
 		assertThat(top(third)).isEqualTo("hello world");
 		assertThat(List.of(top(builtIn), top(first), top(second))).containsExactly("screen 0", "screen 1", "screen 2");
 	}
 
 	@Test
-	void bindingAScreenBackRedrawsTheConsoleOnIt() {
+	void bindingATerminalBackRedrawsTheConsoleOnIt() {
 		bootLabellingScreens();
 		Result bound = console().bind(address("id:second"));
 		assertThat(bound.failed()).isFalse();
@@ -142,17 +141,54 @@ class ConsoleGroupTest {
 	}
 
 	@Test
-	void onlyDisplaysAndKeyboardsOnTheBusCanBeUnbound() {
-		assertThat(console().unbind(address("sata:0")).error()).isEqualTo("not a display or keyboard on the bus: sata:0");
+	void onlyTerminalsOnTheBusCanBeUnbound() {
+		assertThat(console().unbind(address("sata:0")).error()).isEqualTo("not a terminal on the bus: sata:0");
 		assertThat(console().unbind(address("id:gone")).failed()).isTrue();
-		assertThat(console().unbind(address("kbd")).failed()).isFalse();
-		assertThat(console().isBound("kbd")).isFalse();
+		assertThat(console().unbind(address("id:first")).failed()).isFalse();
+		assertThat(console().isBound("id:first")).isFalse();
 	}
 
 	@Test
-	void powerOffPutsEveryDeviceBackInTheGroup() {
+	void powerOffPutsEveryTerminalBackInTheGroup() {
 		bootLabellingScreens();
 		machine.pressPower();
-		assertThat(List.of("edp", "id:first", "id:second")).allMatch(console()::isBound);
+		assertThat(List.of("id:builtin", "id:first", "id:second")).allMatch(console()::isBound);
+	}
+
+	@Test
+	void keysAtTerminalsInTheGroupReachTheConsoleMergedAndRaiseItsInterrupt() {
+		List<Object> keys = new ArrayList<>();
+		machine.board().setEeprom(new Eeprom(board -> {
+			board.list(); // nothing new on the bus
+			keys.add(board.waitForInterrupt(60));
+			keys.add(board.invoke("console", "read").first());
+			keys.add(board.invoke("console", "read").first());
+			keys.add(board.invoke("console", "read").first());
+			board.halt();
+		}));
+		machine.pressPower();
+		machine.tick();
+		first.press("a");
+		second.press("b");
+		machine.tick();
+		assertThat(keys).containsExactly(List.of("console"), "a", "b", null);
+	}
+
+	@Test
+	void anUnboundTerminalsKeysAreItsOwn() {
+		List<Object> keys = new ArrayList<>();
+		machine.board().setEeprom(new Eeprom(board -> {
+			board.invoke("console", "unbind", "id:second");
+			board.list();
+			keys.add(board.waitForInterrupt(60));
+			keys.add(board.invoke("console", "read").first());
+			keys.add(board.invoke("id:second", "read").first());
+			board.halt();
+		}));
+		machine.pressPower();
+		machine.tick();
+		second.press("z");
+		machine.tick();
+		assertThat(keys).containsExactly(List.of("id:second"), null, "z");
 	}
 }

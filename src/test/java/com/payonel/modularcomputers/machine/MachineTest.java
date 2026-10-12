@@ -4,16 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.device.Disk;
-import com.payonel.modularcomputers.device.Keyboard;
-import com.payonel.modularcomputers.display.Display;
+import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.display.TextBuffer;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class MachineTest {
-	private final Display display = new Display(Resolution.DEFAULT);
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of(new Keyboard(), display, new Disk()))));
+	private final Terminal display = new Terminal(Resolution.DEFAULT);
+	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of(new Disk(), display, new Disk()))));
 
 	/** The tests' own program, not the mod's stand-in firmware (which changes). */
 	private static final String GREETING = "hello world";
@@ -96,7 +95,7 @@ class MachineTest {
 	@Test
 	void theProgramGetsTheMotherboardApi() {
 		List<List<String>> seen = new java.util.ArrayList<>();
-		withParts(true, board -> { seen.add(board.list()); board.halt(); });
+		withParts(true, board -> { seen.add(board.list().stream().map(com.payonel.modularcomputers.runtime.Board.DeviceInfo::address).toList()); board.halt(); });
 		machine.pressPower();
 		assertThat(seen).containsExactly(List.of("device:0", "device:1", "device:2"));
 	}
@@ -195,7 +194,7 @@ class MachineTest {
 	void aScreenPluggedIntoARunningMachineShowsTheConsole() {
 		withParts(true, HELLO);
 		machine.pressPower();
-		Display plugged = new Display(Resolution.DEFAULT);
+		Terminal plugged = new Terminal(Resolution.DEFAULT);
 		List<com.payonel.modularcomputers.bus.Device> devices = new java.util.ArrayList<>(machine.board().bus().devices());
 		devices.add(plugged);
 		machine.setDevices(devices);
@@ -206,7 +205,7 @@ class MachineTest {
 	@Test
 	void aScreenPluggedIntoAnOffMachineStaysAsItWas() {
 		withParts(true, HELLO);
-		Display plugged = new Display(Resolution.DEFAULT);
+		Terminal plugged = new Terminal(Resolution.DEFAULT);
 		plugged.buffer().write(0, 0, "other");
 		machine.setDevices(List.of(display, plugged));
 		assertThat(plugged.buffer().row(0)).startsWith("other");
@@ -216,7 +215,7 @@ class MachineTest {
 	void unpluggingAScreenFromARunningMachineBlanksIt() {
 		withParts(true, HELLO);
 		machine.pressPower();
-		Display plugged = new Display(Resolution.DEFAULT);
+		Terminal plugged = new Terminal(Resolution.DEFAULT);
 		machine.setDevices(List.of(display, plugged));
 		assertThat(plugged.buffer().isBlank()).isFalse();
 		machine.setDevices(List.of(display));

@@ -18,22 +18,21 @@ import java.util.UUID;
  * bus with the real devices, and the virtual bus with devices that always exist (like the
  * console).
  * <p>
- * It's also the board's firmware for the bus: its <b>connectors</b> are fixed addresses, in a
- * fixed order (the built-in display's {@code edp}, the built-in keyboard's {@code kbd}, the
- * {@code eeprom} and {@code ups} slots, {@code sata:0..3}, {@code exp:0..3}), whatever case it's
- * in; a case wires up the ones it has. External devices (by cable or Bluetooth) are addressed
- * by their own id, {@code id:<uuid>}, and kept in the player's order ({@link BusOrder}). A
- * device with an id on a connector (a card) answers to both, like Linux's {@code by-path} and
- * {@code by-id} names.
+ * It's also the board's firmware for the bus: its <b>connectors</b> come in a fixed order, each
+ * with a fixed place on the bus (the built-in terminal's, the {@code eeprom} and {@code ups}
+ * slots, {@code sata:0..3}, {@code exp:0..3}), whatever case it's in; a case wires up the ones
+ * it has. Every device has its own id, {@code id:<uuid>}. A slot's device is addressed by the
+ * slot's path and answers to its id too, like Linux's {@code by-path} and {@code by-id} names;
+ * the built-in terminal has no path, so its id is its address (programs find it as the first
+ * terminal listed). External devices (by cable or Bluetooth) are addressed by their id, and kept
+ * in the player's order ({@link BusOrder}).
  */
 public final class Motherboard {
 	/** How many devices a bus holds unless the board is set otherwise. */
 	public static final int DEFAULT_BUS_CAPACITY = 32;
 
-	/** The built-in display's connector: embedded DisplayPort, as a laptop's panel. */
-	public static final String EDP = "edp";
-	/** The built-in keyboard's connector. */
-	public static final String KBD = "kbd";
+	/** The built-in terminal's connector. It isn't an address: the terminal is known by its id. */
+	public static final String TERMINAL = "terminal";
 	public static final String EEPROM = "eeprom";
 	public static final String UPS = "ups";
 	/** How many SATA ports, and how many expansion slots. */
@@ -56,7 +55,7 @@ public final class Motherboard {
 	private final BusOrder order = new BusOrder(DEFAULT_BUS_CAPACITY, CONNECTORS.size());
 	/** What's on each connector. */
 	private final Map<String, Device> plugged = new HashMap<>();
-	/** The ids of devices on connectors ({@code id:<uuid>}), each to its connector. */
+	/** The ids ({@code id:<uuid>}) of the devices on connectors, each to its connector. */
 	private final Map<String, String> ids = new HashMap<>();
 	/** The external devices found now, in the order new ones join (nearest first); null where they don't run here (a client). */
 	private Map<String, Device> external = Map.of();
@@ -74,10 +73,6 @@ public final class Motherboard {
 		return ID + id;
 	}
 
-	public static boolean isId(String address) {
-		return address.startsWith(ID);
-	}
-
 	public static boolean isSata(String address) {
 		return address.startsWith(SATA);
 	}
@@ -92,7 +87,7 @@ public final class Motherboard {
 	}
 
 	private static List<String> connectors() {
-		List<String> connectors = new ArrayList<>(List.of(EDP, KBD, EEPROM, UPS));
+		List<String> connectors = new ArrayList<>(List.of(TERMINAL, EEPROM, UPS));
 		for (int lane = 0; lane < LANES; lane++) {
 			connectors.add(sata(lane));
 		}
@@ -136,7 +131,7 @@ public final class Motherboard {
 
 	/**
 	 * Puts a device on a connector, or takes it off ({@code device} null). {@code id} is the
-	 * device's own id, if it has one (a card's serial number): it answers to that too.
+	 * device's own id (a part's serial number, a built-in's id): it answers to that too.
 	 */
 	public void plug(String connector, Device device, UUID id) {
 		ids.values().remove(connector);
@@ -168,9 +163,10 @@ public final class Motherboard {
 	 * in their order.
 	 */
 	public int position(String address) {
-		int connector = CONNECTORS.indexOf(address);
-		if (connector >= 0) {
-			return connector + 1;
+		for (int place = 0; place < CONNECTORS.size(); place++) {
+			if (address.equals(address(CONNECTORS.get(place)))) {
+				return place + 1;
+			}
 		}
 		return CONNECTORS.size() + 1 + order.external().stream().map(BusOrder.Entry::key).toList().indexOf(address);
 	}
@@ -181,19 +177,36 @@ public final class Motherboard {
 	 * the bus's status; {@link Machine#rebuildBus} or {@link #rebuildBus} puts it on the bus.
 	 */
 	public Layout layout(long now) {
-		List<String> connected = CONNECTORS.stream().filter(plugged::containsKey).toList();
-		order.sync(connected, List.copyOf(external.keySet()), now);
+		Map<String, Device> internal = new LinkedHashMap<>();
+		Map<String, String> aliases = new LinkedHashMap<>();
+		for (String connector : CONNECTORS) {
+			if (plugged.containsKey(connector)) {
+				String address = address(connector);
+				internal.put(address, plugged.get(connector));
+				id(connector).filter(id -> !id.equals(address)).ifPresent(id -> aliases.put(id, address));
+			}
+		}
+		order.sync(List.copyOf(internal.keySet()), List.copyOf(external.keySet()), now);
 		bus.setStatus(order.status());
 		Map<String, Device> devices = new LinkedHashMap<>();
 		for (String address : order.connected()) {
-			Device device = plugged.containsKey(address) ? plugged.get(address) : external.get(address);
+			Device device = internal.containsKey(address) ? internal.get(address) : external.get(address);
 			if (device != null) {
 				devices.put(address, device);
 			}
 		}
-		Map<String, String> aliases = new LinkedHashMap<>(ids);
 		aliases.values().retainAll(devices.keySet());
 		return new Layout(devices, aliases);
+	}
+
+	/** The id of the device on a connector. */
+	private Optional<String> id(String connector) {
+		return ids.entrySet().stream().filter(id -> id.getValue().equals(connector)).map(Map.Entry::getKey).findFirst();
+	}
+
+	/** The address of the device on a connector: the connector's path, or the built-in terminal's id. */
+	public String address(String connector) {
+		return connector.equals(TERMINAL) ? id(connector).orElse(connector) : connector;
 	}
 
 	/** Puts the layout on the bus as it is, with no hot-plug (a client's copy, which runs nothing). */

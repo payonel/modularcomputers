@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.bus.DeviceType;
-import com.payonel.modularcomputers.display.Display;
+import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.machine.Eeprom;
@@ -54,14 +54,14 @@ class RuntimeTest {
 		}
 	}
 
-	private final Display display = new Display(Resolution.DEFAULT);
+	private final Terminal display = new Terminal(Resolution.DEFAULT);
 	private final Sensor sensor = new Sensor();
 	private final boolean[] power = {true};
 	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())), () -> power[0]);
 
 	RuntimeTest() {
 		Map<String, Device> devices = new LinkedHashMap<>();
-		devices.put("edp", display);
+		devices.put("id:screen", display);
 		devices.put("id:sensor-1", sensor);
 		machine.setDevices(devices);
 		machine.board().setCpu(new Cpu());
@@ -84,7 +84,7 @@ class RuntimeTest {
 		AtomicInteger calls = new AtomicInteger();
 		run(board -> {
 			for (int i = 0; i < 50; i++) {
-				board.invoke("edp", "getResolution");
+				board.invoke("id:screen", "getResolution");
 				calls.incrementAndGet();
 			}
 			board.halt();
@@ -103,22 +103,23 @@ class RuntimeTest {
 		List<Object> seen = new ArrayList<>();
 		run(board -> {
 			seen.add(board.list());
-			seen.add(board.type("edp").orElseThrow());
+			seen.add(board.type("id:screen").orElseThrow());
 			seen.add(board.type("console").orElseThrow());
-			seen.add(board.methods("edp"));
+			seen.add(board.methods("id:screen"));
 			seen.add(board.doc("id:sensor-1", "read").orElseThrow());
-			seen.add(board.invoke("edp", "getResolution").values());
+			seen.add(board.invoke("id:screen", "getResolution").values());
 			seen.add(board.status().capacity());
 			board.halt();
 		});
-		assertThat(seen).containsExactly(List.of("edp", "id:sensor-1"), "display", "console",
-			List.of("fill", "get", "getResolution", "set"), "read(): the oldest reading, or nil", List.of(50L, 16L), 0);
+		assertThat(seen).containsExactly(
+			List.of(new Board.DeviceInfo("id:screen", "id:screen", "terminal"), new Board.DeviceInfo("id:sensor-1", "id:sensor-1", "sensor")),
+			"terminal", "console", List.of("fill", "get", "getResolution", "read", "set"), "read(): the oldest reading, or nil", List.of(50L, 16L), 0);
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
 	void aCardInACaseSlotAnswersToItsPathAndItsId() {
-		machine.setDevices(Map.of("edp", display, "exp:0", sensor), Map.of("id:card-7", "exp:0"));
+		machine.setDevices(Map.of("id:screen", display, "exp:0", sensor), Map.of("id:card-7", "exp:0"));
 		sensor.measure(7);
 		List<Object> seen = new ArrayList<>();
 		run(board -> {
@@ -127,7 +128,8 @@ class RuntimeTest {
 			seen.add(board.invoke("id:card-7", "read").first());
 			board.halt();
 		});
-		assertThat((List<Object>) seen.get(0)).as("listed once, by its path").containsExactlyInAnyOrder("edp", "exp:0");
+		assertThat((List<Object>) seen.get(0)).as("listed once, by its path, with its id").containsExactlyInAnyOrder(
+			new Board.DeviceInfo("id:screen", "id:screen", "terminal"), new Board.DeviceInfo("exp:0", "id:card-7", "sensor"));
 		assertThat(seen.subList(1, 3)).containsExactly("sensor", 7L);
 	}
 
@@ -137,9 +139,9 @@ class RuntimeTest {
 		run(board -> {
 			errors.add(board.invoke("nowhere", "read").error());
 			errors.add(board.invoke("id:sensor-1", "fly").error());
-			errors.add(board.invoke("edp", "set", "one", 1, "x").error());
+			errors.add(board.invoke("id:screen", "set", "one", 1, "x").error());
 			errors.add(board.invoke("id:sensor-1", "explode").error());
-			errors.add(board.invoke("edp", "set", 1, 1, "hi").failed() ? "failed" : "ok");
+			errors.add(board.invoke("id:screen", "set", 1, 1, "hi").failed() ? "failed" : "ok");
 			board.halt();
 		});
 		assertThat(errors).containsExactly("no such device: nowhere", "no such method: fly",
@@ -189,13 +191,13 @@ class RuntimeTest {
 		run(board -> {
 			board.list();
 			seen.add(board.waitForInterrupt(60));
-			seen.add(board.list());
+			seen.add(board.list().stream().map(Board.DeviceInfo::address).toList());
 			board.halt();
 		});
 		machine.tick();
-		machine.setDevices(Map.of("edp", display)); // the sensor was unplugged
+		machine.setDevices(Map.of("id:screen", display)); // the sensor was unplugged
 		machine.tick();
-		assertThat(seen).containsExactly(List.of(Board.BUS), List.of("edp"));
+		assertThat(seen).containsExactly(List.of(Board.BUS), List.of("id:screen"));
 	}
 
 	@Test

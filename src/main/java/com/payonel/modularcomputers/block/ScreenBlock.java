@@ -85,7 +85,7 @@ public final class ScreenBlock extends HorizontalDirectionalBlock implements Ent
 	 * with no power button (that belongs to the computer's case).
 	 */
 	public static OpenDisplayPayload openDisplayPayload(ScreenBlockEntity screen) {
-		return new OpenDisplayPayload(screen.getBlockPos(), screen.display().buffer().resolution(), Optional.empty(), true);
+		return new OpenDisplayPayload(screen.getBlockPos(), screen.terminal().buffer().resolution(), Optional.empty(), true);
 	}
 
 	@Override

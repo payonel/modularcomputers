@@ -9,8 +9,8 @@ import java.util.List;
  * motherboard API:
  * <ol>
  * <li>prints the greeting to the console (every display, and the console's own copy);</li>
- * <li>finds every display on the bus, takes it out of the console's group, and labels it
- * "screen 0", "screen 1", ... in bus order;</li>
+ * <li>finds every terminal on the bus, takes it out of the console's group, and labels it
+ * "screen 0", "screen 1", ... in bus order (a built-in one comes first);</li>
  * <li>halts. Power stays on, and the screens keep their labels.</li>
  * </ol>
  * A screen unplugged and plugged back in is a new arrival, in the console's group again, so the
@@ -24,14 +24,14 @@ public final class HelloWorldProgram implements Program {
 	public void run(Board board) {
 		board.invoke(VirtualBus.CONSOLE, "print", GREETING);
 		int screen = 0;
-		for (String address : board.list()) {
-			if (!"display".equals(board.type(address).orElse(null))) {
+		for (Board.DeviceInfo device : board.list()) {
+			if (!"terminal".equals(device.type())) {
 				continue;
 			}
-			board.invoke(VirtualBus.CONSOLE, "unbind", address);
-			List<Object> size = board.invoke(address, "getResolution").values();
-			board.invoke(address, "fill", 1, 1, size.get(0), size.get(1), " ");
-			board.invoke(address, "set", 1, 1, LABEL + screen++);
+			board.invoke(VirtualBus.CONSOLE, "unbind", device.address());
+			List<Object> size = board.invoke(device.address(), "getResolution").values();
+			board.invoke(device.address(), "fill", 1, 1, size.get(0), size.get(1), " ");
+			board.invoke(device.address(), "set", 1, 1, LABEL + screen++);
 		}
 		board.halt();
 	}

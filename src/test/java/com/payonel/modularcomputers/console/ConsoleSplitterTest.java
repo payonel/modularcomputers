@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.bus.Device;
-import com.payonel.modularcomputers.device.Keyboard;
-import com.payonel.modularcomputers.display.Display;
+import com.payonel.modularcomputers.device.Disk;
+import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.display.TextBuffer;
 import java.util.List;
@@ -18,7 +18,7 @@ class ConsoleSplitterTest {
 
 	@Test
 	void withNoDisplayItHasASizeAndDropsOutput() {
-		ConsoleSplitter console = console(new Keyboard());
+		ConsoleSplitter console = console(new Disk());
 		assertThat(console.size()).isEqualTo(ConsoleSplitter.HEADLESS);
 		console.print("nobody sees this");
 		assertThat(console.row()).isEqualTo(1);
@@ -26,8 +26,8 @@ class ConsoleSplitterTest {
 
 	@Test
 	void writesToTheDisplay() {
-		Display display = new Display(new Resolution(10, 3));
-		ConsoleSplitter console = console(new Keyboard(), display);
+		Terminal display = new Terminal(new Resolution(10, 3));
+		ConsoleSplitter console = console(new Disk(), display);
 		console.print("hi");
 		console.write("there");
 		assertThat(display.buffer().rows()).containsExactly("hi        ", "there     ", "          ");
@@ -37,8 +37,8 @@ class ConsoleSplitterTest {
 
 	@Test
 	void mirrorsToEveryDisplayAtTheSmallestCommonSize() {
-		Display wide = new Display(new Resolution(8, 2));
-		Display tall = new Display(new Resolution(4, 3));
+		Terminal wide = new Terminal(new Resolution(8, 2));
+		Terminal tall = new Terminal(new Resolution(4, 3));
 		ConsoleSplitter console = console(wide, tall);
 		assertThat(console.size()).isEqualTo(new Resolution(4, 2));
 		console.write("abcdef");
@@ -49,8 +49,8 @@ class ConsoleSplitterTest {
 
 	@Test
 	void newLineAtTheBottomScrollsTheConsoleArea() {
-		Display small = new Display(new Resolution(3, 2));
-		Display big = new Display(new Resolution(3, 3));
+		Terminal small = new Terminal(new Resolution(3, 2));
+		Terminal big = new Terminal(new Resolution(3, 3));
 		ConsoleSplitter console = console(small, big);
 		big.buffer().write(0, 2, "zzz"); // outside the console area
 		console.print("one");
@@ -63,13 +63,13 @@ class ConsoleSplitterTest {
 
 	@Test
 	void writesInTheCurrentColorsAndClearsTheConsoleArea() {
-		Display small = new Display(new Resolution(2, 1));
-		Display big = new Display(new Resolution(3, 2));
+		Terminal small = new Terminal(new Resolution(2, 1));
+		Terminal big = new Terminal(new Resolution(3, 2));
 		ConsoleSplitter console = console(small, big);
 		console.setColors(0x111111, 0x222222);
 		console.clear();
 		console.write("a");
-		for (Display display : List.of(small, big)) {
+		for (Terminal display : List.of(small, big)) {
 			assertThat(display.buffer().get(0, 0)).isEqualTo('a');
 			assertThat(display.buffer().foreground(0, 0)).isEqualTo(0x111111);
 			assertThat(display.buffer().background(1, 0)).as("cleared in the console's background").isEqualTo(0x222222);
@@ -80,7 +80,7 @@ class ConsoleSplitterTest {
 
 	@Test
 	void scrollingKeepsTheConsoleBackground() {
-		Display display = new Display(new Resolution(2, 2));
+		Terminal display = new Terminal(new Resolution(2, 2));
 		ConsoleSplitter console = console(display);
 		console.setColors(0x111111, 0x222222);
 		console.clear();
@@ -92,7 +92,7 @@ class ConsoleSplitterTest {
 
 	@Test
 	void resetGoesBackToTheTopLeftInDefaultColors() {
-		ConsoleSplitter console = console(new Display(new Resolution(5, 5)));
+		ConsoleSplitter console = console(new Terminal(new Resolution(5, 5)));
 		console.setColors(0x111111, 0x222222);
 		console.print("a");
 		console.write("b");

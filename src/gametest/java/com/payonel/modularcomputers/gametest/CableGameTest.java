@@ -8,7 +8,7 @@ import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.block.ScreenBlock;
 import com.payonel.modularcomputers.block.ScreenBlockEntity;
 import com.payonel.modularcomputers.bus.BusStatus;
-import com.payonel.modularcomputers.display.Display;
+import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import java.util.List;
@@ -66,10 +66,10 @@ public class CableGameTest {
 	}
 
 	private static boolean onBus(AllInOneBlockEntity computer, ScreenBlockEntity screen) {
-		return computer.machine().board().bus().devices().contains(screen.display());
+		return computer.machine().board().bus().devices().contains(screen.terminal());
 	}
 
-	private static boolean showsText(Display display) {
+	private static boolean showsText(Terminal display) {
 		return display.buffer().row(0).contains("hello");
 	}
 
@@ -106,8 +106,8 @@ public class CableGameTest {
 			if (!computer.machine().isPowered()) {
 				computer.pressPower();
 			}
-			helper.assertTrue(showsText(computer.display()), "the built-in display shows hello world");
-			helper.assertTrue(showsText(screen.display()), "so does the wired screen");
+			helper.assertTrue(showsText(computer.terminal()), "the built-in display shows hello world");
+			helper.assertTrue(showsText(screen.terminal()), "so does the wired screen");
 		});
 	}
 
@@ -116,7 +116,7 @@ public class CableGameTest {
 		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
 		computer.pressPower();
 		ScreenBlockEntity screen = wiredScreen(helper);
-		helper.succeedWhen(() -> helper.assertTrue(showsText(screen.display()), "a screen plugged into a running computer shows its console"));
+		helper.succeedWhen(() -> helper.assertTrue(showsText(screen.terminal()), "a screen plugged into a running computer shows its console"));
 	}
 
 	@GameTest
@@ -126,16 +126,16 @@ public class CableGameTest {
 		ScreenBlockEntity screen = wiredScreen(helper);
 		String key = "id:" + screen.id();
 		helper.startSequence()
-			.thenWaitUntil(() -> helper.assertTrue(showsText(screen.display()), "connected first"))
+			.thenWaitUntil(() -> helper.assertTrue(showsText(screen.terminal()), "connected first"))
 			.thenExecute(() -> {
 				helper.assertTrue(computer.setConnected(key, false), "the plug comes out");
 				helper.assertTrue(!onBus(computer, screen), "a disconnected screen is off the bus");
-				helper.assertTrue(screen.display().buffer().isBlank(), "and goes blank");
+				helper.assertTrue(screen.terminal().buffer().isBlank(), "and goes blank");
 				var entry = entryFor(computer, screen).orElseThrow(() -> helper.assertionException("still listed"));
 				helper.assertTrue(!entry.connected(), "listed as disconnected");
-				helper.assertTrue(!computer.setConnected("edp", false), "built-ins can't be unplugged");
+				helper.assertTrue(!computer.setConnected(computer.busEntries().get(0).key(), false), "built-ins can't be unplugged");
 				helper.assertTrue(computer.setConnected(key, true), "plugged back in");
-				helper.assertTrue(showsText(screen.display()), "shows the console again");
+				helper.assertTrue(showsText(screen.terminal()), "shows the console again");
 			})
 			.thenSucceed();
 	}
@@ -178,7 +178,7 @@ public class CableGameTest {
 			.thenWaitUntil(() -> helper.assertTrue(computer.busStatus().overflow(), "the bus overflows"))
 			.thenExecute(() -> {
 				BusStatus status = computer.machine().board().bus().status();
-				helper.assertValueEqual(status, new BusStatus(Motherboard.CONNECTORS.size() + 1, 3, 1, 0, 1), "the bus reports it to programs too");
+				helper.assertValueEqual(status, new BusStatus(Motherboard.CONNECTORS.size() + 1, 2, 1, 0, 1), "the bus reports it to programs too");
 				helper.destroyBlock(new BlockPos(3, 1, 1)); // cut the cable: the first screen goes missing
 			})
 			.thenWaitUntil(() -> helper.assertTrue(!computer.busStatus().overflow(), "no longer full"))
@@ -198,11 +198,11 @@ public class CableGameTest {
 		AllInOneBlockEntity second = computer(helper, new BlockPos(5, 1, 1), false);
 		helper.succeedWhen(() -> {
 			helper.assertTrue(onBus(first, screen) && onBus(second, screen), "both computers see the screen");
-			helper.assertTrue(!first.machine().board().bus().devices().contains(second.display()), "a computer's built-in display is its own");
+			helper.assertTrue(!first.machine().board().bus().devices().contains(second.terminal()), "a computer's built-in display is its own");
 			if (!first.machine().isPowered()) {
 				first.pressPower();
 			}
-			helper.assertTrue(showsText(screen.display()), "a running computer shows its console on the shared screen");
+			helper.assertTrue(showsText(screen.terminal()), "a running computer shows its console on the shared screen");
 		});
 	}
 
@@ -224,7 +224,7 @@ public class CableGameTest {
 			if (!computer.machine().isPowered()) {
 				computer.pressPower();
 			}
-			helper.assertTrue(showsText(far.display()), "the console reaches the end of the row");
+			helper.assertTrue(showsText(far.terminal()), "the console reaches the end of the row");
 		});
 	}
 

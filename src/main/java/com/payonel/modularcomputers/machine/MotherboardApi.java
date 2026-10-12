@@ -4,6 +4,8 @@ import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.bus.BusStatus;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.bus.VirtualBus;
+import com.payonel.modularcomputers.console.ConsoleSplitter;
+import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Board;
 import com.payonel.modularcomputers.runtime.DeviceMethods;
@@ -39,9 +41,12 @@ final class MotherboardApi implements Board {
 	}
 
 	@Override
-	public List<String> list() {
+	public List<DeviceInfo> list() {
 		listedChanges = board.bus().changes();
-		return board.bus().addresses();
+		Bus bus = board.bus();
+		return bus.addresses().stream()
+			.map(address -> new DeviceInfo(address, bus.id(address), type(address).orElseThrow()))
+			.toList();
 	}
 
 	@Override
@@ -93,15 +98,24 @@ final class MotherboardApi implements Board {
 		throw new UnsupportedOperationException("halt() is handled by the program runner");
 	}
 
-	/** The interrupts pending now: the bus's (it changed since last listed), then each device's, in bus order. */
+	/**
+	 * The interrupts pending now: the bus's (it changed since last listed), the console's (keys
+	 * wait at a terminal in its group), then each device's, in bus order. A terminal in the
+	 * console's group raises the console's, not its own.
+	 */
 	List<String> interrupts() {
 		List<String> pending = new ArrayList<>();
 		Bus bus = board.bus();
+		ConsoleSplitter console = board.virtualBus().console();
 		if (bus.changes() != listedChanges) {
 			pending.add(BUS);
 		}
+		if (console.interruptPending()) {
+			pending.add(VirtualBus.CONSOLE);
+		}
 		for (String address : bus.addresses()) {
-			if (bus.device(address).map(Device::interruptPending).orElse(false)) {
+			Device device = bus.device(address).orElseThrow();
+			if (device.interruptPending() && !(device instanceof Terminal && console.isBound(address))) {
 				pending.add(address);
 			}
 		}

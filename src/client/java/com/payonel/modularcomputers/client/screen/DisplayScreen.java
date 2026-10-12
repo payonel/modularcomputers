@@ -109,7 +109,7 @@ public final class DisplayScreen extends Screen {
 		Viewport display = layout.display();
 		graphics.fill(display.x(), display.y(), display.right(), display.bottom(), BLACK);
 		if (minecraft.level != null && minecraft.level.getBlockEntity(pos) instanceof DisplayHost host) {
-			extractText(graphics, host.display().buffer());
+			extractText(graphics, host.terminal().buffer());
 		}
 		if (minecraft.level != null && computer.isPresent() && minecraft.level.getBlockEntity(computer.get()) instanceof AllInOneBlockEntity machine) {
 			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.CASE, machine.getBlockState(), powerHeld);

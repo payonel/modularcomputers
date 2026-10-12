@@ -72,7 +72,7 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 		state.facing = host.getBlockState().getValue(HorizontalDirectionalBlock.FACING);
 		state.identify = Identify.pulse(host.getBlockPos());
 		state.bluetooth = BluetoothTarget.isTarget(host.getBlockPos());
-		TextBuffer display = host.display().buffer();
+		TextBuffer display = host.terminal().buffer();
 		state.resolution = display.resolution();
 		if (display.isBlank()) {
 			state.rows = null;

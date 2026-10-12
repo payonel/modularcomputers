@@ -150,7 +150,7 @@ public class BatteryGameTest {
 			helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.NO_POWER, "press result with " + battery);
 			helper.assertTrue(!computer.machine().isPowered(), "stays off");
 			helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false); // no flash: there's no power to light it
-			helper.assertTrue(computer.display().buffer().isBlank(), "nothing runs");
+			helper.assertTrue(computer.terminal().buffer().isBlank(), "nothing runs");
 		}
 		helper.succeed();
 	}
@@ -205,7 +205,7 @@ public class BatteryGameTest {
 			.thenExecute(() -> {
 				helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
 				helper.assertBlockProperty(POS, AllInOneBlock.READY, false); // faded
-				helper.assertTrue(computer.display().buffer().isBlank(), "the display goes dark");
+				helper.assertTrue(computer.terminal().buffer().isBlank(), "the display goes dark");
 				helper.assertTrue(computer.power().isEmpty(), "the case is empty");
 				helper.assertValueEqual(computer.pressPower(), Machine.PowerPress.NO_POWER, "won't start again");
 			})
