@@ -150,21 +150,33 @@ def case_button():
 def item_canvas():
 	return Image.new("RGBA", (16, 16), (0, 0, 0, 0))
 
-def cpu_item():
-	"""A square chip: dark package with a metal lid, gold pins on all four sides."""
+def cpu_item(lid=(168, 172, 180, 255), lid_light=(206, 210, 216, 255), lid_dark=(120, 124, 132, 255)):
+	"""A square chip: dark package with a metal lid, gold pins on all four sides. The lid tells the tier."""
 	im = item_canvas()
 	pin, pin_dark = (222, 182, 70, 255), (170, 132, 40, 255)
 	for i in range(3, 13, 2):
 		for x, y in [(i, 1), (i, 2), (i, 13), (i, 14), (1, i), (2, i), (13, i), (14, i)]:
 			im.putpixel((x, y), pin if (x + y) % 4 else pin_dark)
 	rect(im, 3, 3, 12, 12, (44, 46, 52, 255))  # package
-	rect(im, 5, 5, 10, 10, (168, 172, 180, 255))  # lid
-	rect(im, 5, 5, 10, 5, (206, 210, 216, 255))
-	rect(im, 5, 5, 5, 10, (206, 210, 216, 255))
-	rect(im, 6, 10, 10, 10, (120, 124, 132, 255))
-	rect(im, 10, 6, 10, 10, (120, 124, 132, 255))
+	rect(im, 5, 5, 10, 10, lid)  # lid
+	rect(im, 5, 5, 10, 5, lid_light)
+	rect(im, 5, 5, 5, 10, lid_light)
+	rect(im, 6, 10, 10, 10, lid_dark)
+	rect(im, 10, 6, 10, 10, lid_dark)
 	im.putpixel((4, 4), (222, 182, 70, 255))  # pin-1 mark
 	return im
+
+def tier1_cpu_item():
+	"""An iron lid."""
+	return cpu_item()
+
+def tier2_cpu_item():
+	"""A gold lid."""
+	return cpu_item((214, 170, 40, 255), (250, 222, 100, 255), (160, 120, 30, 255))
+
+def tier3_cpu_item():
+	"""A diamond lid."""
+	return cpu_item((70, 200, 200, 255), (160, 240, 236, 255), (40, 140, 140, 255))
 
 def eeprom_item():
 	"""A small DIP chip: black body with silver legs and a paper label."""
@@ -312,7 +324,7 @@ for state in LIT:
 	power(state).save(f"{OUT}/all_in_one_power_{state}.png")
 gui_button().save(f"{OUT}/../gui/power_button.png")
 case_button().save(f"{OUT}/../gui/case_button.png")
-for name, fn in [("cpu", cpu_item), ("eeprom", eeprom_item), ("ram", ram_item), ("hard_disk", hard_disk_item),
+for name, fn in [("tier1_cpu", tier1_cpu_item), ("tier2_cpu", tier2_cpu_item), ("tier3_cpu", tier3_cpu_item), ("eeprom", eeprom_item), ("ram", ram_item), ("hard_disk", hard_disk_item),
 		("wlan_card", wlan_card_item), ("tier1_battery", tier1_battery_item), ("tier2_battery", tier2_battery_item), ("tier3_battery", tier3_battery_item), ("redstone_card", redstone_card_item),
 		("audio_card", audio_card_item), ("motion_sensor_card", motion_sensor_card_item), ("audio_sensor_card", audio_sensor_card_item),
 		("weather_sensor_card", weather_sensor_card_item), ("bluetooth_card", bluetooth_card_item)]:

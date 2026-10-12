@@ -1,7 +1,6 @@
 package com.payonel.modularcomputers.machine;
 
 import com.payonel.modularcomputers.bus.BusPower;
-import com.payonel.modularcomputers.power.PowerUnits;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.runtime.ProgramRunner;
@@ -53,6 +52,8 @@ public final class Machine {
 	private long uptime;
 	/** Ticks the CPU executed since power use was last collected. */
 	private long cpuTicks;
+	/** Ticks it waited for an interrupt since then. */
+	private long waitingTicks;
 	/** Calls answered this tick, by the tick's turn and any interrupt turns. */
 	private int callsThisTick;
 	private boolean executedThisTick;
@@ -108,6 +109,9 @@ public final class Machine {
 		callsThisTick = 0;
 		executedThisTick = false;
 		run();
+		if (runner != null && !executedThisTick) {
+			waitingTicks++; // it waited all through this tick
+		}
 		return Supervision.OK;
 	}
 
@@ -148,7 +152,7 @@ public final class Machine {
 		boolean executed = answered > 0 || before != ProgramRunner.State.WAITING || state != ProgramRunner.State.WAITING;
 		if (executed && !executedThisTick) {
 			executedThisTick = true;
-			cpuTicks++; // it executed this tick; waiting all through for an interrupt, it's halted (sti; hlt) and draws nothing
+			cpuTicks++; // it executed this tick (waiting all through, it draws its waiting draw instead)
 		}
 		if (state == ProgramRunner.State.CRASHED) {
 			board.cpu().ifPresent(cpu -> cpu.crashed(board, runner.crash()));
@@ -196,8 +200,8 @@ public final class Machine {
 
 	/**
 	 * Power used since the last call, up to game time {@code now}, in power units:
-	 * the CPU's own ({@link PowerUnits#CPU} for each tick it executed; nothing while halted or waiting for an
-	 * interrupt, as a real CPU in {@code HLT}) and what its bus
+	 * the CPU's own (its tier's running draw for each tick it executed, its waiting draw for each
+	 * tick it waited for an interrupt, nothing while halted) and what its bus
 	 * devices owe (see {@link BusPower}; a device shared with another computer pays once, to
 	 * whichever collects first). Nothing while off.
 	 */
@@ -205,8 +209,10 @@ public final class Machine {
 		if (!powered) {
 			return 0;
 		}
-		long used = cpuTicks * PowerUnits.CPU;
+		CpuTier tier = board.cpu().map(Cpu::tier).orElse(CpuTier.TIER_1);
+		long used = cpuTicks * tier.running() + waitingTicks * tier.waiting();
 		cpuTicks = 0;
+		waitingTicks = 0;
 		for (Device device : board.bus().devices()) {
 			if (device.power() != null) {
 				used += device.power().collect(now);
@@ -257,6 +263,7 @@ public final class Machine {
 		powered = true;
 		uptime = 0;
 		cpuTicks = 0;
+		waitingTicks = 0;
 		callsThisTick = 0;
 		executedThisTick = false;
 		board.bus().devices().forEach(this::supply);

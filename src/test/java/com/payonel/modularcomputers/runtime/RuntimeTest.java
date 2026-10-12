@@ -8,6 +8,7 @@ import com.payonel.modularcomputers.bus.DeviceType;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.machine.Cpu;
+import com.payonel.modularcomputers.machine.CpuTier;
 import com.payonel.modularcomputers.machine.Eeprom;
 import com.payonel.modularcomputers.machine.Hardware;
 import com.payonel.modularcomputers.machine.Machine;
@@ -64,7 +65,7 @@ class RuntimeTest {
 		devices.put("id:screen", display);
 		devices.put("id:sensor-1", sensor);
 		machine.setDevices(devices);
-		machine.board().setCpu(new Cpu());
+		machine.board().setCpu(new Cpu(CpuTier.TIER_3));
 	}
 
 	@AfterEach

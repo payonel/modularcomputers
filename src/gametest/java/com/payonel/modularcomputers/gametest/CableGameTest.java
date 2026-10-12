@@ -33,8 +33,8 @@ public class CableGameTest {
 	private static AllInOneBlockEntity computer(GameTestHelper helper, BlockPos pos, boolean parts) {
 		helper.setBlock(pos, ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
 		AllInOneBlockEntity computer = helper.getBlockEntity(pos, AllInOneBlockEntity.class);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU)); // no CPU, no bus
 		if (parts) {
-			computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.CPU));
 			computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 			computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 			TestPrograms.flash(computer, TestPrograms.HELLO);
@@ -185,7 +185,7 @@ public class CableGameTest {
 	@GameTest(maxTicks = 100)
 	public void aFullBusMakesNewDevicesWaitAndSaysSo(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper, COMPUTER, false);
-		computer.machine().board().setBusCapacity(Motherboard.CONNECTORS.size() + 1); // room for one external device
+		computer.machine().board().overrideBusCapacity(Motherboard.CONNECTORS.size() + 1); // room for one external device
 		ScreenBlockEntity first = wiredScreen(helper);
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertTrue(onBus(computer, first), "the first screen joins"))

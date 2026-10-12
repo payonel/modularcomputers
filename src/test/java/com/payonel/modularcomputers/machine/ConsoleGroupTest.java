@@ -33,7 +33,7 @@ class ConsoleGroupTest {
 	private final List<Object> seen = new ArrayList<>();
 
 	ConsoleGroupTest() {
-		machine.board().setCpu(new Cpu());
+		machine.board().setCpu(new Cpu(CpuTier.TIER_3));
 		plug(Map.of("id:first", first, "id:second", second));
 	}
 

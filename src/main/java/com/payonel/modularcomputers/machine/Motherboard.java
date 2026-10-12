@@ -28,9 +28,6 @@ import java.util.UUID;
  * in the player's order ({@link BusOrder}).
  */
 public final class Motherboard {
-	/** How many devices a bus holds unless the board is set otherwise. */
-	public static final int DEFAULT_BUS_CAPACITY = 32;
-
 	/** The built-in terminal's connector. It isn't an address: the terminal is known by its id. */
 	public static final String TERMINAL = "terminal";
 	public static final String EEPROM = "eeprom";
@@ -54,7 +51,9 @@ public final class Motherboard {
 	private final VirtualBus virtualBus;
 	private Cpu cpu;
 	private Eeprom eeprom;
-	private final BusOrder order = new BusOrder(DEFAULT_BUS_CAPACITY, CONNECTORS.size());
+	private final BusOrder order = new BusOrder(0, CONNECTORS.size());
+	/** A bus capacity set by a test instead of the CPU's. */
+	private Integer capacityOverride;
 	/** What's on each connector. */
 	private final Map<String, Device> plugged = new HashMap<>();
 	/** The ids ({@code id:<uuid>}) of the devices on connectors, each to its connector. */
@@ -129,13 +128,24 @@ public final class Motherboard {
 		return virtualBus;
 	}
 
-	/** How many devices its bus holds, internal and external together: a board setting. */
+	/**
+	 * How many devices its bus holds, internal and external together: the CPU's (its address
+	 * width), or none without a CPU.
+	 */
 	public int busCapacity() {
-		return order.capacity();
+		if (cpu == null) {
+			return 0;
+		}
+		return capacityOverride != null ? capacityOverride : cpu.tier().busCapacity();
 	}
 
-	public void setBusCapacity(int busCapacity) {
-		order.setCapacity(busCapacity);
+	/** For tests: a bus capacity other than the CPU's (null: the CPU's again). */
+	public void overrideBusCapacity(Integer capacity) {
+		this.capacityOverride = capacity;
+	}
+
+	public Integer busCapacityOverride() {
+		return capacityOverride;
 	}
 
 	/** The bus order: the connectors' devices, then the external ones in the player's order. */
@@ -191,6 +201,12 @@ public final class Motherboard {
 	 * the bus's status; {@link Machine#rebuildBus} or {@link #rebuildBus} puts it on the bus.
 	 */
 	public Layout layout(long now) {
+		order.setCapacity(busCapacity());
+		if (cpu == null) {
+			// No CPU, no bus: nothing is on it, and the saved order waits for one.
+			bus.setStatus(com.payonel.modularcomputers.bus.BusStatus.EMPTY);
+			return new Layout(Map.of(), Map.of());
+		}
 		Map<String, Device> internal = new LinkedHashMap<>();
 		Map<String, String> aliases = new LinkedHashMap<>();
 		for (String connector : CONNECTORS) {

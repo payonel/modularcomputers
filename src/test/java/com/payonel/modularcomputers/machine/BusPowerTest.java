@@ -20,7 +20,7 @@ class BusPowerTest {
 
 	private static Machine machine(Program program) {
 		Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())));
-		machine.board().setCpu(new Cpu());
+		machine.board().setCpu(new Cpu(CpuTier.TIER_3));
 		machine.board().setEeprom(new Eeprom(program));
 		return machine;
 	}
@@ -66,7 +66,26 @@ class BusPowerTest {
 		for (int i = 0; i < 9; i++) {
 			machine.tick();
 		}
-		assertThat(machine.powerUse(0)).as("ran 6 ticks (20 calls each), then waited").isEqualTo(6 * PowerUnits.CPU);
+		assertThat(machine.powerUse(0)).as("ran 6 ticks (20 calls each), then waited 4").isEqualTo(6 * CpuTier.TIER_3.running() + 4 * CpuTier.TIER_3.waiting());
+	}
+
+	@Test
+	void eachCpuTierDrawsItsOwnRunningAndWaiting() {
+		for (CpuTier tier : CpuTier.values()) {
+			Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())));
+			machine.board().setCpu(new Cpu(tier));
+			machine.board().setEeprom(new Eeprom(board -> {
+				board.list();
+				board.waitForInterrupt(3600);
+			}));
+			machine.pressPower(); // executes the first tick, then waits
+			for (int i = 0; i < 10; i++) {
+				machine.tick();
+			}
+			assertThat(machine.powerUse(0)).as(tier.name()).isEqualTo(tier.running() + 10L * tier.waiting());
+		}
+		assertThat(CpuTier.TIER_1.waiting()).as("lower tiers idle hungrier").isGreaterThan(CpuTier.TIER_3.waiting());
+		assertThat(CpuTier.TIER_1.running()).as("and run leaner").isLessThan(CpuTier.TIER_3.running());
 	}
 
 	@Test
@@ -79,7 +98,7 @@ class BusPowerTest {
 		});
 		machine.setDevices(Map.of("id:screen", screen));
 		machine.pressPower();
-		assertThat(machine.powerUse(0)).as("one tick of CPU, and 8 writes").isEqualTo(PowerUnits.CPU + 8 * PowerUnits.TERMINAL_WRITE);
+		assertThat(machine.powerUse(0)).as("one tick of CPU, and 8 writes").isEqualTo(CpuTier.TIER_3.running() + 8 * PowerUnits.TERMINAL_WRITE);
 	}
 
 	@Test

@@ -29,7 +29,7 @@ public final class ModCreativeTab {
 				output.accept(ModBlocks.EXPANSION_HUB);
 				output.accept(ModBlocks.ROBOTIC_PISTON);
 				output.accept(ModBlocks.PAINT_GUN);
-				output.accept(ModItems.CPU);
+				ModItems.CPUS.forEach(output::accept);
 				output.accept(ModItems.EEPROM);
 				output.accept(ModItems.RAM);
 				output.accept(ModItems.HARD_DISK);

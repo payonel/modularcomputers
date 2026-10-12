@@ -31,7 +31,9 @@ public class BluetoothGameTest {
 
 	private static AllInOneBlockEntity computer(GameTestHelper helper) {
 		helper.setBlock(COMPUTER, ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		return helper.getBlockEntity(COMPUTER, AllInOneBlockEntity.class);
+		AllInOneBlockEntity computer = helper.getBlockEntity(COMPUTER, AllInOneBlockEntity.class);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU)); // no CPU, no bus
+		return computer;
 	}
 
 	private static RoboticPistonBlockEntity piston(GameTestHelper helper, BlockPos pos) {
@@ -77,6 +79,7 @@ public class BluetoothGameTest {
 		AllInOneBlockEntity computer = computer(helper);
 		helper.setBlock(new BlockPos(1, 1, 3), ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
 		AllInOneBlockEntity other = helper.getBlockEntity(new BlockPos(1, 1, 3), AllInOneBlockEntity.class);
+		other.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(null));
 		piston(helper, new BlockPos(1, 1, 6)).cards().setItem(0, card(computer.boardId()));
 		helper.startSequence()
@@ -114,6 +117,7 @@ public class BluetoothGameTest {
 		cable(helper, new BlockPos(4, 1, 1));
 		helper.setBlock(new BlockPos(5, 1, 1), ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
 		AllInOneBlockEntity other = helper.getBlockEntity(new BlockPos(5, 1, 1), AllInOneBlockEntity.class);
+		other.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		helper.succeedWhen(() -> {
 			helper.assertTrue(onBus(owner, paired) && onBus(owner, shared), "the owner has both screens");
 			helper.assertTrue(!onBus(other, paired), "the other computer doesn't get the paired screen");
@@ -212,6 +216,7 @@ public class BluetoothGameTest {
 		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(2, 1, 1), ExpansionHubBlockEntity.class);
 		helper.setBlock(new BlockPos(3, 1, 1), ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
 		AllInOneBlockEntity second = helper.getBlockEntity(new BlockPos(3, 1, 1), AllInOneBlockEntity.class);
+		second.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		first.parts().setItem(CaseMenu.EXP_SLOTS, card(null)); // the first computer's radio, for later
 		hub.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(null)); // a radio, linked nowhere: the hub is shared
 		hub.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));

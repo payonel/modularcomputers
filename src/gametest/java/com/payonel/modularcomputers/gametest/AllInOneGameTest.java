@@ -37,7 +37,7 @@ public class AllInOneGameTest {
 
 	/** Puts parts into the case's slots, as the case view would, and a charged battery to run on. */
 	private static AllInOneBlockEntity install(AllInOneBlockEntity computer, boolean cpu, boolean eeprom) {
-		computer.parts().setItem(CaseMenu.CPU_SLOT, cpu ? new ItemStack(ModItems.CPU) : ItemStack.EMPTY);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, cpu ? new ItemStack(ModItems.TIER3_CPU) : ItemStack.EMPTY);
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, eeprom ? new ItemStack(ModItems.EEPROM) : ItemStack.EMPTY);
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		if (eeprom) {
@@ -55,8 +55,10 @@ public class AllInOneGameTest {
 		helper.assertTrue(computer.parts().isEmpty(), "a new computer has no CPU or EEPROM");
 		helper.assertTrue(machine.board().cpu().isEmpty() && machine.board().eeprom().isEmpty(), "nothing installed");
 		helper.assertBlockProperty(POS, AllInOneBlock.READY, false);
+		helper.assertTrue(machine.board().bus().devices().isEmpty() && computer.busEntries().isEmpty(), "no CPU, no bus");
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		helper.assertValueEqual(machine.board().bus().devices().stream().map(device -> device.type()).toList(),
-			List.of(DeviceType.TERMINAL), "physical bus: just the built-in terminal");
+			List.of(DeviceType.TERMINAL), "with a CPU: just the built-in terminal");
 		helper.succeed();
 	}
 
@@ -77,7 +79,7 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = place(helper);
 		Player player = helper.makeMockPlayer(GameType.SURVIVAL);
 		CaseMenu menu = (CaseMenu) computer.createMenu(0, player.getInventory(), player);
-		var parts = new java.util.ArrayList<>(List.of(ModItems.CPU, ModItems.EEPROM, ModItems.RAM, ModItems.HARD_DISK));
+		var parts = new java.util.ArrayList<>(List.of(ModItems.TIER3_CPU, ModItems.EEPROM, ModItems.RAM, ModItems.HARD_DISK));
 		parts.addAll(ModItems.CARDS.keySet());
 		parts.addAll(ModItems.BATTERIES);
 		for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
@@ -95,7 +97,7 @@ public class AllInOneGameTest {
 	/** The one part each non-expansion slot takes. */
 	private static net.minecraft.world.item.Item takes(int slot) {
 		if (slot == CaseMenu.CPU_SLOT) {
-			return ModItems.CPU;
+			return ModItems.TIER3_CPU;
 		} else if (slot == CaseMenu.EEPROM_SLOT) {
 			return ModItems.EEPROM;
 		} else if (CaseMenu.isBatteryBay(slot)) {
@@ -142,6 +144,7 @@ public class AllInOneGameTest {
 	@GameTest
 	public void drivesAndCardsJoinTheBusInTheirSlotsOrder(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.SATA_SLOTS + 1, new ItemStack(ModItems.HARD_DISK));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.WLAN_CARD));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.RAM)); // RAM is not a bus device
@@ -167,6 +170,7 @@ public class AllInOneGameTest {
 	@GameTest
 	public void busEntriesNameEachDeviceAndWhereItIs(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.SATA_SLOTS + 2, new ItemStack(ModItems.HARD_DISK));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 3, new ItemStack(ModItems.WLAN_CARD));
 		var entries = computer.busEntries();
@@ -181,6 +185,7 @@ public class AllInOneGameTest {
 	@GameTest
 	public void theCaseOrderIsItsSlotsOrderAfterAReloadToo(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.WLAN_CARD));
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.HARD_DISK));
 		var registries = helper.getLevel().registryAccess();
@@ -222,7 +227,7 @@ public class AllInOneGameTest {
 	@GameTest
 	public void insertingACpuDoesNotTurnTheComputerOn(GameTestHelper helper) {
 		AllInOneBlockEntity computer = install(place(helper), false, true);
-		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.CPU));
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		helper.assertTrue(!computer.machine().isPowered(), "a new CPU waits for the power button");
 		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
 		helper.assertBlockProperty(POS, AllInOneBlock.READY, true);
@@ -306,7 +311,7 @@ public class AllInOneGameTest {
 		ServerPlayer player = helper.makeMockServerPlayerInLevel();
 		int given = ModCommands.giveAll(player);
 		helper.assertValueEqual(given, ModCommands.modItems().size(), "items given");
-		for (var item : List.of(ModBlocks.ALL_IN_ONE.asItem(), ModItems.CPU, ModItems.EEPROM)) {
+		for (var item : List.of(ModBlocks.ALL_IN_ONE.asItem(), ModItems.TIER3_CPU, ModItems.EEPROM)) {
 			helper.assertTrue(player.getInventory().contains(new ItemStack(item)), "should have " + item);
 		}
 		var hotbar = java.util.stream.IntStream.range(0, ModCommands.hotbarFirst().size())
@@ -333,7 +338,7 @@ public class AllInOneGameTest {
 		helper.assertTrue(loaded instanceof AllInOneBlockEntity, "should reload as an all-in-one");
 		AllInOneBlockEntity reloaded = (AllInOneBlockEntity) loaded;
 		helper.assertTrue(reloaded.machine().isPowered(), "a powered computer should still be powered after reload");
-		helper.assertTrue(reloaded.parts().getItem(CaseMenu.CPU_SLOT).is(ModItems.CPU), "CPU after reload");
+		helper.assertTrue(reloaded.parts().getItem(CaseMenu.CPU_SLOT).is(ModItems.TIER3_CPU), "CPU after reload");
 		helper.assertTrue(reloaded.machine().board().cpu().isPresent(), "CPU installed after reload");
 		helper.assertValueEqual(reloaded.terminal().buffer().rows(), computer.terminal().buffer().rows(), "display text after reload");
 		helper.assertValueEqual(reloaded.terminal().buffer().background(3, 3), Cpu.ABORT_BACKGROUND, "display colors after reload");
@@ -372,6 +377,27 @@ public class AllInOneGameTest {
 	}
 
 	@GameTest
+	public void theBusHoldsWhatItsCpuTierAllows(GameTestHelper helper) {
+		AllInOneBlockEntity computer = install(place(helper), false, true);
+		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+			computer.parts().setItem(CaseMenu.SATA_SLOTS + lane, new ItemStack(ModItems.HARD_DISK));
+			computer.parts().setItem(CaseMenu.EXP_SLOTS + lane, new ItemStack(ModItems.WLAN_CARD));
+		}
+		computer.parts().setItem(CaseMenu.UPS_SLOT + 1, ModItems.TIER1_BATTERY.charged());
+		computer.parts().setItem(CaseMenu.UPS_SLOT + 2, ModItems.TIER1_BATTERY.charged());
+		helper.assertTrue(computer.machine().board().bus().devices().isEmpty(), "no CPU, no bus");
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
+		var bus = computer.machine().board().bus();
+		helper.assertValueEqual(bus.status().capacity(), 12, "a tier 1 CPU's bus");
+		helper.assertValueEqual(bus.devices().size(), 12, "the dev kit's 13 places: the last one doesn't fit");
+		helper.assertTrue(bus.status().overflow(), "and it says so");
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
+		helper.assertValueEqual(bus.status().capacity(), 64, "a tier 3 CPU's bus");
+		helper.assertValueEqual(bus.devices().size(), 13, "everything fits");
+		helper.succeed();
+	}
+
+	@GameTest
 	public void dropsItself(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
 		var drops = Block.getDrops(computer.getBlockState(), helper.getLevel(), helper.absolutePos(POS), computer);
@@ -384,7 +410,7 @@ public class AllInOneGameTest {
 	public void breakingDropsItsParts(GameTestHelper helper) {
 		install(place(helper), true, true);
 		helper.destroyBlock(POS);
-		helper.assertItemEntityPresent(ModItems.CPU, POS, 2);
+		helper.assertItemEntityPresent(ModItems.TIER3_CPU, POS, 2);
 		helper.assertItemEntityPresent(ModItems.EEPROM, POS, 2);
 		helper.succeed();
 	}

@@ -1,6 +1,7 @@
 package com.payonel.modularcomputers.gametest;
 
 import com.payonel.modularcomputers.block.AllInOneBlock;
+import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
 import com.payonel.modularcomputers.block.CableBlock;
 import com.payonel.modularcomputers.block.ExpansionHubBlockEntity;
@@ -26,7 +27,9 @@ public class CardHolderGameTest {
 
 	private static AllInOneBlockEntity computer(GameTestHelper helper) {
 		helper.setBlock(COMPUTER, ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		return helper.getBlockEntity(COMPUTER, AllInOneBlockEntity.class);
+		AllInOneBlockEntity computer = helper.getBlockEntity(COMPUTER, AllInOneBlockEntity.class);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU)); // no CPU, no bus
+		return computer;
 	}
 
 	private static void cable(GameTestHelper helper, BlockPos pos) {
@@ -120,7 +123,7 @@ public class CardHolderGameTest {
 				"a hub's expansion slot taking " + card + " (Bluetooth goes in the radio slot)");
 			helper.assertValueEqual(piston.cards().canPlaceItem(0, new ItemStack(card)), card == ModItems.BLUETOOTH_CARD, "a piston taking " + card);
 		}
-		helper.assertTrue(!hub.cards().canPlaceItem(0, new ItemStack(ModItems.CPU)), "a hub takes only cards");
+		helper.assertTrue(!hub.cards().canPlaceItem(0, new ItemStack(ModItems.TIER3_CPU)), "a hub takes only cards");
 		// The menu the player clicks in follows the same rule.
 		var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
 		var menu = hub.createMenu(0, player.getInventory(), player);

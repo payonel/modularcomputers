@@ -22,7 +22,7 @@ class MachineTest {
 	};
 
 	private Machine withParts(boolean cpu, Program program) {
-		machine.board().setCpu(cpu ? new Cpu() : null);
+		machine.board().setCpu(cpu ? new Cpu(CpuTier.TIER_3) : null);
 		machine.board().setEeprom(program == null ? null : new Eeprom(program));
 		return machine;
 	}
@@ -62,7 +62,7 @@ class MachineTest {
 		boolean[] power = {false};
 		Machine unpowered = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of(display))), () -> power[0]);
 		assertThat(unpowered.pressPower()).isEqualTo(Machine.PowerPress.NO_POWER);
-		unpowered.board().setCpu(new Cpu());
+		unpowered.board().setCpu(new Cpu(CpuTier.TIER_3));
 		unpowered.board().setEeprom(new Eeprom(HELLO));
 		assertThat(unpowered.pressPower()).isEqualTo(Machine.PowerPress.NO_POWER);
 		assertThat(unpowered.isPowered()).isFalse();
@@ -104,7 +104,7 @@ class MachineTest {
 	void installingACpuDoesNotTurnTheMachineOn() {
 		int[] runs = {0};
 		withParts(false, board -> { runs[0]++; board.halt(); });
-		machine.board().setCpu(new Cpu());
+		machine.board().setCpu(new Cpu(CpuTier.TIER_3));
 		assertThat(machine.isPowered()).isFalse();
 		assertThat(runs[0]).isZero();
 	}

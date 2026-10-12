@@ -273,7 +273,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	 * a missing one's place.
 	 */
 	public static Component busSummary(BusStatus status) {
-		int room = status.capacity() - Motherboard.CONNECTORS.size();
+		if (status.capacity() == 0) {
+			return Component.translatable("gui.modularcomputers.bus.no_cpu"); // no CPU, no bus
+		}
+		int room = Math.max(0, status.capacity() - Motherboard.CONNECTORS.size());
 		if (status.overflow()) {
 			return Component.translatable("gui.modularcomputers.bus.summary_overflow", status.saved(), room, status.waiting());
 		}

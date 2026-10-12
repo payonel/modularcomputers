@@ -14,6 +14,16 @@ import java.util.Optional;
  * clears the console to a soft gray, writes {@code ABRT: <reason>} and halts. Power stays on.
  */
 public final class Cpu {
+	private final CpuTier tier;
+
+	public Cpu(CpuTier tier) {
+		this.tier = tier;
+	}
+
+	public CpuTier tier() {
+		return tier;
+	}
+
 	public static final String ABORT = "ABRT: ";
 	public static final String NO_EEPROM = "no EEPROM installed";
 	public static final String CRASHED = "EEPROM crashed: ";

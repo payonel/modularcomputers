@@ -4,6 +4,7 @@ import static com.payonel.modularcomputers.ModularComputers.id;
 
 import com.payonel.modularcomputers.device.CardKind;
 import com.payonel.modularcomputers.hint.HintedItem;
+import com.payonel.modularcomputers.machine.CpuTier;
 import com.payonel.modularcomputers.power.BatteryTier;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -24,7 +25,11 @@ import net.minecraft.world.item.ItemStack;
  * slots (and the bus) so the case view can be built out.
  */
 public final class ModItems {
-	public static final Item CPU = register("cpu");
+	/** CPUs: the tier sets the bus capacity and the power draw. */
+	public static final CpuItem TIER1_CPU = cpu("tier1_cpu", CpuTier.TIER_1);
+	public static final CpuItem TIER2_CPU = cpu("tier2_cpu", CpuTier.TIER_2);
+	public static final CpuItem TIER3_CPU = cpu("tier3_cpu", CpuTier.TIER_3);
+	public static final List<CpuItem> CPUS = List.of(TIER1_CPU, TIER2_CPU, TIER3_CPU);
 	/** Every EEPROM holds the stand-in program for now; programmable contents come with the Lua runtime. */
 	public static final Item EEPROM = register("eeprom");
 	public static final Item RAM = register("ram");
@@ -67,6 +72,10 @@ public final class ModItems {
 
 	/** Forces the static registrations above. */
 	public static void init() {
+	}
+
+	private static CpuItem cpu(String name, CpuTier tier) {
+		return (CpuItem) register(name, properties -> new CpuItem(properties, tier), UnaryOperator.identity());
 	}
 
 	private static BatteryItem battery(String name, BatteryTier tier) {

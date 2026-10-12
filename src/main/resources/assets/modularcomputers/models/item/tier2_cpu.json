@@ -1,6 +1,6 @@
 {
 	"parent": "minecraft:item/generated",
 	"textures": {
-		"layer0": "modularcomputers:item/cpu"
+		"layer0": "modularcomputers:item/tier2_cpu"
 	}
 }

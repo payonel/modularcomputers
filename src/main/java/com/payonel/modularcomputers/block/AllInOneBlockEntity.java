@@ -15,9 +15,11 @@ import com.payonel.modularcomputers.device.UpsBattery;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.item.BatteryItem;
+import com.payonel.modularcomputers.item.CpuItem;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
+import com.payonel.modularcomputers.machine.CpuTier;
 import com.payonel.modularcomputers.machine.Eeprom;
 import com.payonel.modularcomputers.machine.Hardware;
 import com.payonel.modularcomputers.machine.HelloWorldProgram;
@@ -93,7 +95,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String BUS_DISCONNECTED = "bus_disconnected";
 	private static final String CABLED = "cabled";
 	private static final String POWER_BUFFER = "power_buffer";
-	private static final String BUS_CAPACITY = "bus_capacity";
+	/** A test's bus capacity in place of the CPU's, saved so clients see it too. */
+	private static final String BUS_CAPACITY_OVERRIDE = "bus_capacity_override";
 	private static final String BOARD_ID = "board_id";
 	private static final String TERMINAL_ID = "terminal_id";
 	/** Looks for cabled devices this often, in ticks, even when no cable changed (chunks load and unload). */
@@ -116,7 +119,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final Card[] cards = new Card[CaseMenu.LANES];
 	private Eeprom eeprom;
 	private final UpsBattery[] ups = new UpsBattery[CaseMenu.UPS_BAYS];
-	private final Bus bus = new Bus(List.of(display));
+	private final Bus bus = new Bus(List.of()); // empty until a CPU is in
 	private final PowerBuffer power = new PowerBuffer();
 	/** The motherboard's id: what Bluetooth cards link to. Made when the computer is placed, and saved. */
 	private UUID boardId = UUID.randomUUID();
@@ -232,6 +235,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** The devices on the bus, in order, as the bus order panel shows them. Works on clients too. */
 	public List<BusEntry> busEntries() {
 		List<BusEntry> entries = new ArrayList<>();
+		if (machine.board().cpu().isEmpty()) {
+			return entries; // no CPU, no bus
+		}
 		Component builtIn = Component.translatable("gui.modularcomputers.bus.built_in");
 		BusOrder busOrder = busOrder();
 		for (String key : busOrder.keys()) {
@@ -615,7 +621,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** Puts the parts in the slots onto the motherboard, and drives and cards onto the bus. */
 	private void installParts() {
 		Motherboard board = machine.board();
-		board.setCpu(parts.getItem(CaseMenu.CPU_SLOT).is(ModItems.CPU) ? new Cpu() : null);
+		CpuTier cpuTier = parts.getItem(CaseMenu.CPU_SLOT).getItem() instanceof CpuItem cpu ? cpu.tier() : null;
+		if (cpuTier == null) {
+			board.setCpu(null);
+		} else if (board.cpu().map(Cpu::tier).orElse(null) != cpuTier) {
+			board.setCpu(new Cpu(cpuTier));
+		}
 		// Every EEPROM holds the stand-in program until EEPROM contents are programmable.
 		boolean hasEeprom = parts.getItem(CaseMenu.EEPROM_SLOT).is(ModItems.EEPROM);
 		eeprom = hasEeprom ? (eeprom != null ? eeprom : new Eeprom(new HelloWorldProgram())) : null;
@@ -766,7 +777,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		super.saveAdditional(output);
 		output.putBoolean(POWERED, machine.isPowered());
 		output.putInt(POWER_BUFFER, power.level());
-		output.putInt(BUS_CAPACITY, machine.board().busCapacity());
+		if (machine.board().busCapacityOverride() != null) {
+			output.putInt(BUS_CAPACITY_OVERRIDE, machine.board().busCapacityOverride());
+		}
 		output.store(BOARD_ID, UUIDUtil.CODEC, boardId);
 		output.store(TERMINAL_ID, UUIDUtil.CODEC, terminalId);
 		ContainerHelper.saveAllItems(output, parts.getItems());
@@ -784,7 +797,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		super.loadAdditional(input);
 		machine.restorePowered(input.getBooleanOr(POWERED, false));
 		power.set(input.getIntOr(POWER_BUFFER, 0));
-		machine.board().setBusCapacity(input.getIntOr(BUS_CAPACITY, Motherboard.DEFAULT_BUS_CAPACITY));
+		machine.board().overrideBusCapacity(input.getInt(BUS_CAPACITY_OVERRIDE).orElse(null));
 		input.read(BOARD_ID, UUIDUtil.CODEC).ifPresent(saved -> boardId = saved);
 		input.read(TERMINAL_ID, UUIDUtil.CODEC).ifPresent(saved -> terminalId = saved);
 		machine.board().plug(Motherboard.TERMINAL, display, terminalId);

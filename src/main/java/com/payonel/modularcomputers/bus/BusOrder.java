@@ -50,22 +50,22 @@ public final class BusOrder {
 
 	/** Changes how many devices the bus holds; the saved list shrinks to fit at the next {@link #sync}. */
 	public void setCapacity(int capacity) {
-		this.capacity = Math.max(reserved, capacity);
+		this.capacity = Math.max(0, capacity);
 	}
 
 	public int capacity() {
 		return capacity;
 	}
 
-	/** Room for external devices: the capacity less the connectors' places. */
+	/** Room for external devices: the capacity less the connectors' places (none if they don't all fit). */
 	public int externalCapacity() {
-		return capacity - reserved;
+		return Math.max(0, capacity - reserved);
 	}
 
 	/** How full the bus is (see {@link BusStatus}). */
 	public BusStatus status() {
 		long missing = external.stream().filter(entry -> !present.contains(entry.key())).count();
-		return new BusStatus(capacity, connected().size(), external.size(), (int) missing, waiting);
+		return new BusStatus(capacity, connected().size(), external.size(), (int) missing, waiting + overCapacity());
 	}
 
 	/** Every listed device in order: internal ones, then the saved external ones, online or not. */
@@ -75,11 +75,22 @@ public final class BusOrder {
 		return keys;
 	}
 
-	/** The devices on the bus: internal, then external ones that are online and connected. */
+	/**
+	 * The devices on the bus: internal, then external ones that are online and connected, up to
+	 * the capacity (a smaller CPU's bus leaves the last ones off, waiting).
+	 */
 	public List<String> connected() {
-		List<String> keys = new ArrayList<>(internal);
-		external.stream().map(Entry::key).filter(key -> present.contains(key) && !disconnected.contains(key)).forEach(keys::add);
+		List<String> keys = new ArrayList<>(internal.subList(0, Math.min(internal.size(), capacity)));
+		external.stream().map(Entry::key).filter(key -> present.contains(key) && !disconnected.contains(key))
+			.limit(Math.max(0, capacity - keys.size())).forEach(keys::add);
 		return keys;
+	}
+
+	/** Listed devices that are there and connected but don't fit (the capacity went down). */
+	private int overCapacity() {
+		long wanted = Math.min(internal.size(), capacity)
+			+ external.stream().filter(entry -> present.contains(entry.key()) && !disconnected.contains(entry.key())).count();
+		return (int) Math.max(0, wanted - connected().size()) + Math.max(0, internal.size() - capacity);
 	}
 
 	/** The saved external list, e.g. for saving. */
@@ -143,7 +154,7 @@ public final class BusOrder {
 			}
 		}
 		while (external.size() > externalCapacity() && bumpMissing()) {
-			// the capacity went down: missing devices make room first
+			// the capacity went down (a smaller CPU): missing devices make room first
 		}
 		waiting = 0;
 		for (String key : attached) {

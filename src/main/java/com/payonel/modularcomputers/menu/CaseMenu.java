@@ -2,6 +2,7 @@ package com.payonel.modularcomputers.menu;
 
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.item.BatteryItem;
+import com.payonel.modularcomputers.item.CpuItem;
 import com.payonel.modularcomputers.item.ModItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.Container;
@@ -80,7 +81,7 @@ public final class CaseMenu extends AbstractContainerMenu {
 	/** Whether a slot takes this item: each takes its own part, and expansion slots take any card. */
 	public static boolean accepts(int slot, ItemStack stack) {
 		if (slot == CPU_SLOT) {
-			return stack.is(ModItems.CPU);
+			return stack.getItem() instanceof CpuItem;
 		} else if (slot == EEPROM_SLOT) {
 			return stack.is(ModItems.EEPROM);
 		} else if (isBatteryBay(slot)) {

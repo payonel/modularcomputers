@@ -139,9 +139,9 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 
 			// The player gets every part with the cheat command, typed as they would.
 			context.runOnClient(client -> client.player.connection.sendCommand("modularcomputers giveall"));
-			context.waitFor(client -> client.player.getInventory().contains(new ItemStack(ModItems.CPU))
+			context.waitFor(client -> client.player.getInventory().contains(new ItemStack(ModItems.TIER3_CPU))
 				&& client.player.getInventory().contains(new ItemStack(ModItems.EEPROM)));
-			int cpuHotbar = hotbarSlotOf(context, ModItems.CPU);
+			int cpuHotbar = hotbarSlotOf(context, ModItems.TIER3_CPU);
 			int eepromHotbar = hotbarSlotOf(context, ModItems.EEPROM);
 
 			// The view toggle opens the case view; the parts go in with real mouse clicks.
@@ -410,7 +410,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			ItemStack computer = new ItemStack(ModBlocks.ALL_IN_ONE);
 			CreativeModeTab tab = BuiltInRegistries.CREATIVE_MODE_TAB.getValueOrThrow(ModCreativeTab.KEY);
 			check(tab.contains(computer), "the all-in-one should be in the Modular Computers tab");
-			check(tab.contains(new ItemStack(ModItems.CPU)) && tab.contains(new ItemStack(ModItems.EEPROM)), "the CPU and EEPROM should be in the tab");
+			check(tab.contains(new ItemStack(ModItems.TIER3_CPU)) && tab.contains(new ItemStack(ModItems.EEPROM)), "the CPU and EEPROM should be in the tab");
 			check(CreativeModeTabs.tabs().contains(tab), "the Modular Computers tab should be shown");
 			check(CreativeModeTabs.searchTab().contains(computer), "the all-in-one should be in creative search");
 			var screen = (FabricCreativeModeInventoryScreen) client.gui.screen();

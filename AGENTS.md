@@ -81,7 +81,8 @@ same thing.
   - **Parts:**
     - The display and keyboard are built in. Everything else is an item (`ModItems`) in the
       **case view**'s 17 slots (`CaseMenu`):
-      - CPU, EEPROM (labeled ROM), 3 UPS battery bays, 4 RAM, 4 SATA (hard disks) and 4 expansion
+      - CPU (three tiers, `CpuItem`/`CpuTier`: bus capacity 12/32/64; draw a tick 100/150/200
+        running, 50/20/5 waiting, 0 halted; iron, gold and diamond lids), EEPROM (labeled ROM), 3 UPS battery bays, 4 RAM, 4 SATA (hard disks) and 4 expansion
         slots, which take any card (`ModItems.CARDS`, `device/CardKind`): WLAN, Bluetooth,
         Redstone, Audio, Motion Sensor, Audio Sensor, Weather Sensor. All cards are
         placeholders with no function.
@@ -244,9 +245,14 @@ same thing.
             keeps its place. Absent ones stay listed, dimmed, reading "offline", with a red X
             **forget** button where the plug was (`ForgetDevicePayload`). New ones go last.
             Offline rows keep their last-known name, icon and position (`known`, saved).
-          - **Bus capacity** is a motherboard setting (`Motherboard.busCapacity`, default 32,
-            saved as `bus_capacity`; settings UI later). The 13 connector places are always reserved,
-            so external devices get the rest (19).
+          - **Bus capacity comes entirely from the CPU** (user, 2026-10-11; `CpuTier`: tier 1 12,
+            tier 2 32, tier 3 64; `Motherboard.busCapacity`). **No CPU, no bus:** nothing is on
+            it, the panel lists nothing ("no CPU: no bus"), and the saved external order waits
+            untouched. The case's connector places are reserved first (13 on the all-in-one), so
+            external devices get the rest; a CPU too small for even those leaves the last of
+            them waiting too (overflow). A smaller CPU going in makes missing devices make room
+            first, as when the list is full. Tests can set `Motherboard.overrideBusCapacity`
+            (saved as `bus_capacity_override` so clients see it).
           - **Full:** a new external device bumps the one missing longest (each entry keeps
             `lastSeen`). With none missing it **waits**: not on the bus. The bus is then in its
             warning state: an amber LED top right of the panel, the summary line saying
