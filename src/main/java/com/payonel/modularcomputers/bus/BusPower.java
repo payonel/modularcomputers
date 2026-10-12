@@ -10,24 +10,24 @@ import java.util.Set;
  * here ticks: power comes and goes on events (power on and off, hot-plug, a computer unloading),
  * and what the device used is settled lazily.
  * <p>
- * What it uses is a debt, in the batteries' unit (ticks of a running CPU): its draw for every
+ * What it uses is a debt, in power units: its draw for every
  * tick it's had power, plus whatever its work cost ({@link #charge}). The first supplier to
  * {@link #collect} pays all of it; whoever comes next owes only what's new. Which computer pays
  * a shared device is a race, and doesn't matter.
  */
 public final class BusPower {
-	private final double draw;
+	private final int draw;
 	private final Set<Object> suppliers = Collections.newSetFromMap(new IdentityHashMap<>());
 	/** Game time it's paid up to, or -1 when it isn't powered (or no one has collected yet). */
 	private long paidUntil = -1;
-	private double owed;
+	private long owed;
 
-	/** {@code draw}: what it uses each tick it has power, in ticks of a running CPU (a CPU is 1). */
-	public BusPower(double draw) {
+	/** {@code draw}: what it uses each tick it has power, in power units ({@link com.payonel.modularcomputers.power.PowerUnits}). */
+	public BusPower(int draw) {
 		this.draw = draw;
 	}
 
-	public double draw() {
+	public int draw() {
 		return draw;
 	}
 
@@ -52,14 +52,14 @@ public final class BusPower {
 		return true;
 	}
 
-	/** Work it did (a write), in ticks of a running CPU. */
-	public void charge(double cost) {
+	/** Work it did (a write), in power units. */
+	public void charge(int cost) {
 		if (powered()) {
 			owed += cost;
 		}
 	}
 
-	/** Settles up to game time {@code now}: the whole ticks it owes, which the caller pays. */
+	/** Settles up to game time {@code now}: the units it owes, which the caller pays. */
 	public long collect(long now) {
 		if (!powered()) {
 			return 0;
@@ -68,8 +68,8 @@ public final class BusPower {
 			owed += draw * (now - paidUntil);
 		}
 		paidUntil = Math.max(paidUntil, now);
-		long whole = (long) owed;
-		owed -= whole;
-		return whole;
+		long paid = owed;
+		owed = 0;
+		return paid;
 	}
 }

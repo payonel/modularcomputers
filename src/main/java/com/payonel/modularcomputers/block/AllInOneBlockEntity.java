@@ -125,21 +125,25 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final PowerBuffer power = new PowerBuffer();
 	/** The motherboard's id: what Bluetooth cards link to. Made when the computer is placed, and saved. */
 	private UUID boardId = UUID.randomUUID();
-	/** The buffer's level for the case view, which sends it to the player as it changes. */
+	/**
+	 * The buffer's level for the case view, which sends it to the player as it changes. Menu data
+	 * goes as shorts, so it's two: the low 16 bits, then the high ({@link CaseMenu#powerLevel}).
+	 */
 	private final ContainerData powerData = new ContainerData() {
 		@Override
 		public int get(int index) {
-			return power.level();
+			return index == 0 ? power.level() & 0xFFFF : power.level() >>> 16;
 		}
 
 		@Override
 		public void set(int index, int value) {
-			power.set(value);
+			int level = power.level();
+			power.set(index == 0 ? level & ~0xFFFF | value & 0xFFFF : (value & 0xFFFF) << 16 | level & 0xFFFF);
 		}
 
 		@Override
 		public int getCount() {
-			return 1;
+			return CaseMenu.POWER_DATA;
 		}
 	};
 	/** The case power clients last saw, in percent: the meter and its time left. */
@@ -456,7 +460,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		BatteryCharge charge = BatteryItem.charge(stack);
 		// While the computer runs, the battery is in use: no self-charging.
 		charge = machine.isPowered() ? charge.run(battery.tier(), 0, now) : charge.rest(battery.tier(), now);
-		charge = charge.run(battery.tier(), power.fill(charge.ticks()), now);
+		charge = charge.run(battery.tier(), power.fill(charge.units()), now);
 		stack.set(ModComponents.CHARGE, charge); // in place: not a part change
 	}
 

@@ -113,12 +113,13 @@ public final class ModConfig {
 		}
 		return List.of(
 			new Section("""
-				# How many Minecraft days (20 minutes each) a full battery runs a computer.
-				# 0 means it never runs out. Fractions work: 0.5 is ten minutes.
+				# How many Minecraft days (20 minutes each) a full battery runs an all-in-one computer
+				# (its CPU running, and its screen). 0 means it never runs out. Fractions work: 0.5 is ten minutes.
 				""", durations),
 			new Section("""
-				# How fast a tier 2 battery recharges itself while not in use: ticks of charge per tick.
-				# 0.5 takes two seconds to charge one; 1 charges as fast as it runs; 0 turns it off.
+				# How fast a tier 2 battery recharges itself while not in use, as a share of what a running
+				# all-in-one draws: 0.5 takes two seconds of rest to charge one second of running;
+				# 1 charges as fast as it runs; 0 turns it off.
 				""", Map.of(TIER2_RECHARGE_KEY, format(BatteryTier.TIER_2.defaultRechargeRate()))));
 	}
 

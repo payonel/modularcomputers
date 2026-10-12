@@ -9,7 +9,7 @@ class PowerBufferTest {
 	void holdsOneDayAndTakesOnlyWhatItsMissing() {
 		PowerBuffer buffer = new PowerBuffer();
 		assertThat(buffer.isEmpty()).isTrue();
-		assertThat(buffer.fill(10L * BatteryCharge.DAY_TICKS)).isEqualTo(BatteryCharge.DAY_TICKS);
+		assertThat(buffer.fill(10L * PowerUnits.DAY)).as("a day of a running all-in-one").isEqualTo(PowerUnits.DAY);
 		assertThat(buffer.percent()).isEqualTo(100);
 		int quarter = PowerBuffer.CAPACITY / 4;
 		buffer.use(quarter);

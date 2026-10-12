@@ -1,13 +1,13 @@
 package com.payonel.modularcomputers.power;
 
 /**
- * What a battery holds: {@code ticks} of running a CPU, as of game time {@code settledAt}. A
+ * What a battery holds: {@code units} of power ({@link PowerUnits}), as of game time {@code settledAt}. A
  * self-charging battery regains charge for the time since then that it spent resting, worked
  * out when it's next looked at, so it charges in a chest or an unloaded chunk too.
  * {@link #UNSETTLED} means the time hasn't been set yet (a new battery): it starts counting at
  * the first look.
  */
-public record BatteryCharge(int ticks, long settledAt) {
+public record BatteryCharge(int units, long settledAt) {
 	/** One Minecraft day and night. */
 	public static final int DAY_TICKS = 24000;
 	public static final long UNSETTLED = -1;
@@ -18,11 +18,11 @@ public record BatteryCharge(int ticks, long settledAt) {
 	}
 
 	public boolean isEmpty(BatteryTier tier) {
-		return !tier.infinite() && ticks <= 0;
+		return !tier.infinite() && units <= 0;
 	}
 
 	public boolean isFull(BatteryTier tier) {
-		return tier.infinite() || ticks >= tier.capacity();
+		return tier.infinite() || units >= tier.capacity();
 	}
 
 	/** The charge as a percentage, rounded up so that a battery with any charge left shows some. */
@@ -30,7 +30,7 @@ public record BatteryCharge(int ticks, long settledAt) {
 		if (tier.infinite()) {
 			return 100;
 		}
-		return (int) Math.min(100, Math.ceil(ticks * 100.0 / tier.capacity()));
+		return (int) Math.min(100, Math.ceil(units * 100.0 / tier.capacity()));
 	}
 
 	/** Adds charge (from glowing materials), up to full. */
@@ -38,20 +38,21 @@ public record BatteryCharge(int ticks, long settledAt) {
 		if (tier.infinite()) {
 			return this;
 		}
-		return new BatteryCharge((int) Math.min(tier.capacity(), (long) ticks + amount), settledAt);
+		return new BatteryCharge((int) Math.min(tier.capacity(), (long) units + amount), settledAt);
 	}
 
 	/**
 	 * The battery spent the time until {@code now} resting: a self-charging one gains its
-	 * recharge rate times that. Rest too short to earn a whole tick carries over to next time.
+	 * recharge rate (a share of a running all-in-one's draw) for each tick. Rest too short to earn
+	 * a whole unit carries over to next time.
 	 */
 	public BatteryCharge rest(BatteryTier tier, long now) {
 		if (!tier.selfCharging() || settledAt == UNSETTLED || now <= settledAt) {
-			return new BatteryCharge(ticks, now);
+			return new BatteryCharge(units, now);
 		}
-		double rate = tier.rechargeRate();
+		double rate = tier.rechargeRate() * PowerUnits.ALL_IN_ONE;
 		long gained = (long) Math.floor((now - settledAt) * rate);
-		long total = ticks + gained;
+		long total = units + gained;
 		if (total >= tier.capacity()) {
 			return new BatteryCharge(tier.capacity(), now);
 		}
@@ -59,11 +60,11 @@ public record BatteryCharge(int ticks, long settledAt) {
 		return new BatteryCharge((int) total, settledAt + spent);
 	}
 
-	/** The battery ran a computer for {@code used} ticks, until {@code now}. */
+	/** The battery gave {@code used} units to a computer, until {@code now}. */
 	public BatteryCharge run(BatteryTier tier, long used, long now) {
 		if (tier.infinite()) {
-			return new BatteryCharge(ticks, now);
+			return new BatteryCharge(units, now);
 		}
-		return new BatteryCharge((int) Math.max(0, ticks - used), now);
+		return new BatteryCharge((int) Math.max(0, units - used), now);
 	}
 }

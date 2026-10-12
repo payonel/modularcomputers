@@ -6,6 +6,7 @@ import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
+import com.payonel.modularcomputers.power.PowerUnits;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -31,16 +32,15 @@ class BusPowerTest {
 
 	@Test
 	void aDeviceOwesItsDrawForTheTimeItHadPowerAndItsWork() {
-		BusPower power = new BusPower(0.5);
-		power.charge(10);
+		BusPower power = new BusPower(10);
+		power.charge(5);
 		assertThat(power.collect(0)).as("no power, nothing owed").isZero();
 		power.supply("a");
 		assertThat(power.collect(100)).as("from the first collection on").isZero();
-		power.charge(0.25);
-		power.charge(0.25);
-		assertThat(power.collect(120)).as("20 ticks at a half, and half a tick of work").isEqualTo(10);
-		assertThat(power.collect(121)).as("the half left over, and another half").isEqualTo(1);
-		assertThat(power.collect(122)).isZero();
+		power.charge(1);
+		power.charge(1);
+		assertThat(power.collect(120)).as("20 ticks at 10, and two writes").isEqualTo(202);
+		assertThat(power.collect(120)).as("paid up").isZero();
 	}
 
 	@Test
@@ -50,7 +50,7 @@ class BusPowerTest {
 		machine.pressPower();
 		assertThat(machine.runner()).as("halted").isEmpty();
 		machine.powerUse(1000);
-		assertThat(machine.powerUse(1020)).as("half a CPU for 20 ticks").isEqualTo(10);
+		assertThat(machine.powerUse(1020)).as("a terminal for 20 ticks").isEqualTo(20 * PowerUnits.TERMINAL);
 	}
 
 	@Test
@@ -66,7 +66,7 @@ class BusPowerTest {
 		for (int i = 0; i < 9; i++) {
 			machine.tick();
 		}
-		assertThat(machine.powerUse(0)).as("ran 5 ticks (20 calls each), then waited").isEqualTo(6);
+		assertThat(machine.powerUse(0)).as("ran 6 ticks (20 calls each), then waited").isEqualTo(6 * PowerUnits.CPU);
 	}
 
 	@Test
@@ -79,7 +79,7 @@ class BusPowerTest {
 		});
 		machine.setDevices(Map.of("id:screen", screen));
 		machine.pressPower();
-		assertThat(machine.powerUse(0)).as("one tick of CPU, and 8 writes at a quarter each").isEqualTo(1 + 2);
+		assertThat(machine.powerUse(0)).as("one tick of CPU, and 8 writes").isEqualTo(PowerUnits.CPU + 8 * PowerUnits.TERMINAL_WRITE);
 	}
 
 	@Test
@@ -92,12 +92,12 @@ class BusPowerTest {
 		second.pressPower();
 		first.powerUse(0);
 		second.powerUse(0);
-		assertThat(first.powerUse(40)).isEqualTo(20);
+		assertThat(first.powerUse(40)).isEqualTo(40 * PowerUnits.TERMINAL);
 		assertThat(second.powerUse(40)).as("already paid").isZero();
 
 		first.pressPower(); // off
 		assertThat(screen.buffer().isBlank()).as("the other computer still powers it").isFalse();
-		assertThat(second.powerUse(60)).as("now the other pays").isEqualTo(10);
+		assertThat(second.powerUse(60)).as("now the other pays").isEqualTo(20 * PowerUnits.TERMINAL);
 		second.pressPower();
 		assertThat(screen.buffer().isBlank()).as("no power: dark").isTrue();
 	}

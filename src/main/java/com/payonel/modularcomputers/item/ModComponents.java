@@ -20,10 +20,10 @@ public final class ModComponents {
 	public static final DataComponentType<BatteryCharge> CHARGE = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("battery_charge"),
 		DataComponentType.<BatteryCharge>builder()
 			.persistent(RecordCodecBuilder.create(charge -> charge.group(
-				Codec.intRange(0, Integer.MAX_VALUE).fieldOf("ticks").forGetter(BatteryCharge::ticks),
+				Codec.intRange(0, Integer.MAX_VALUE).fieldOf("units").forGetter(BatteryCharge::units),
 				Codec.LONG.optionalFieldOf("settled_at", BatteryCharge.UNSETTLED).forGetter(BatteryCharge::settledAt)
 			).apply(charge, BatteryCharge::new)))
-			.networkSynchronized(StreamCodec.composite(ByteBufCodecs.VAR_INT, BatteryCharge::ticks, ByteBufCodecs.VAR_LONG, BatteryCharge::settledAt, BatteryCharge::new))
+			.networkSynchronized(StreamCodec.composite(ByteBufCodecs.VAR_INT, BatteryCharge::units, ByteBufCodecs.VAR_LONG, BatteryCharge::settledAt, BatteryCharge::new))
 			.build());
 
 	/**

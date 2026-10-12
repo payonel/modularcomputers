@@ -1,6 +1,7 @@
 package com.payonel.modularcomputers.machine;
 
 import com.payonel.modularcomputers.bus.BusPower;
+import com.payonel.modularcomputers.power.PowerUnits;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.runtime.ProgramRunner;
@@ -146,8 +147,8 @@ public final class Machine {
 	}
 
 	/**
-	 * Power used since the last call, up to game time {@code now}, in ticks of a running CPU:
-	 * the CPU's own (1 for each tick it executed; nothing while halted or waiting for an
+	 * Power used since the last call, up to game time {@code now}, in power units:
+	 * the CPU's own ({@link PowerUnits#CPU} for each tick it executed; nothing while halted or waiting for an
 	 * interrupt, as a real CPU in {@code HLT}) and what its bus
 	 * devices owe (see {@link BusPower}; a device shared with another computer pays once, to
 	 * whichever collects first). Nothing while off.
@@ -156,7 +157,7 @@ public final class Machine {
 		if (!powered) {
 			return 0;
 		}
-		long used = cpuTicks;
+		long used = cpuTicks * PowerUnits.CPU;
 		cpuTicks = 0;
 		for (Device device : board.bus().devices()) {
 			if (device.power() != null) {

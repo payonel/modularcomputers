@@ -12,6 +12,7 @@ import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.power.BatteryCharge;
+import com.payonel.modularcomputers.power.PowerUnits;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -30,7 +31,8 @@ import net.minecraft.world.level.ItemLike;
 /** Server game tests for batteries: crafting, charging, and running a computer. */
 public class BatteryGameTest {
 	private static final BlockPos POS = new BlockPos(1, 1, 1);
-	private static final int DAY = BatteryCharge.DAY_TICKS;
+	/** A day of a running all-in-one, in power units. */
+	private static final int DAY = PowerUnits.DAY;
 
 	private static AllInOneBlockEntity computer(GameTestHelper helper, ItemStack battery) {
 		helper.setBlock(POS, ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
@@ -42,9 +44,9 @@ public class BatteryGameTest {
 		return computer;
 	}
 
-	private static ItemStack battery(BatteryItem item, int ticks, long settledAt) {
+	private static ItemStack battery(BatteryItem item, int units, long settledAt) {
 		ItemStack stack = new ItemStack(item);
-		stack.set(ModComponents.CHARGE, new BatteryCharge(ticks, settledAt));
+		stack.set(ModComponents.CHARGE, new BatteryCharge(units, settledAt));
 		return stack;
 	}
 
@@ -86,7 +88,7 @@ public class BatteryGameTest {
 	public void aBatteryHintShowsItsChargeAndWithShiftHowToChargeIt(GameTestHelper helper) {
 		helper.assertValueEqual(Hint.lines(Hint.of(ModItems.TIER1_BATTERY.charged(), false)),
 			List.of("Charge: 100% (10:00:00)", "Hold [Shift] for details"), "a full tier 1");
-		ItemStack tier2 = battery(ModItems.TIER2_BATTERY, 5 * DAY + DAY / 2 + 20 * 7, 0);
+		ItemStack tier2 = battery(ModItems.TIER2_BATTERY, 5 * DAY + DAY / 2 + 20 * 7 * PowerUnits.ALL_IN_ONE, 0);
 		helper.assertValueEqual(Hint.lines(Hint.of(tier2, false)), List.of("Charge: 28% (05:10:07)", "Hold [Shift] for details"), "a tier 2");
 		List<Hint.Element> details = Hint.of(tier2, true);
 		helper.assertValueEqual(Hint.lines(details), List.of("Charge: 28% (05:10:07)", "Recharges itself while not in use",
@@ -159,16 +161,16 @@ public class BatteryGameTest {
 	public void aBatteryGoingInFillsTheCaseBufferWithADay(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper, ModItems.TIER1_BATTERY.charged());
 		helper.assertValueEqual(computer.power().level(), DAY, "the case takes a day's worth");
-		helper.assertValueEqual(charge(computer).ticks(), 9 * DAY, "out of the battery");
+		helper.assertValueEqual(charge(computer).units(), 9 * DAY, "out of the battery");
 		computer.parts().setItem(CaseMenu.UPS_SLOT, battery(ModItems.TIER1_BATTERY, DAY / 4, BatteryCharge.UNSETTLED));
 		helper.assertValueEqual(computer.power().level(), DAY, "already full: takes nothing");
-		helper.assertValueEqual(charge(computer).ticks(), DAY / 4, "the battery keeps its charge");
+		helper.assertValueEqual(charge(computer).units(), DAY / 4, "the battery keeps its charge");
 
 		AllInOneBlockEntity other = computer(helper, ItemStack.EMPTY);
 		other.power().set(0);
 		other.parts().setItem(CaseMenu.UPS_SLOT, battery(ModItems.TIER1_BATTERY, DAY / 2, BatteryCharge.UNSETTLED));
 		helper.assertValueEqual(other.power().percent(), 50, "takes what the battery has");
-		helper.assertValueEqual(charge(other).ticks(), 0, "leaving it flat");
+		helper.assertValueEqual(charge(other).units(), 0, "leaving it flat");
 		helper.succeed();
 	}
 
@@ -246,11 +248,11 @@ public class BatteryGameTest {
 		TestPrograms.flash(computer, TestPrograms.BUSY); // a CPU only draws while it executes
 		computer.pressPower();
 		helper.startSequence()
-			.thenWaitUntil(() -> helper.assertTrue(charge(computer).ticks() < afterFill, "the case tops up from the battery"))
+			.thenWaitUntil(() -> helper.assertTrue(charge(computer).units() < afterFill, "the case tops up from the battery"))
 			.thenExecute(() -> helper.assertValueEqual(computer.power().level(), DAY, "keeping the buffer full"))
 			.thenExecute(computer::pressPower)
 			.thenIdle(45)
-			.thenExecute(() -> helper.assertTrue(charge(computer).ticks() <= afterFill - 20, "a tier 1 stays down while off"))
+			.thenExecute(() -> helper.assertTrue(charge(computer).units() <= afterFill - 20, "a tier 1 stays down while off"))
 			.thenSucceed();
 	}
 
@@ -258,7 +260,7 @@ public class BatteryGameTest {
 	public void aTier2RechargesWhileTheComputerIsOff(GameTestHelper helper) {
 		long now = helper.getLevel().getGameTime();
 		AllInOneBlockEntity computer = computer(helper, battery(ModItems.TIER2_BATTERY, DAY + 100, now - 1000));
-		helper.succeedWhen(() -> helper.assertTrue(charge(computer).ticks() >= 600,
+		helper.succeedWhen(() -> helper.assertTrue(charge(computer).units() >= 100 + 1000 * PowerUnits.ALL_IN_ONE / 2,
 			"regains half the time it rested, got " + charge(computer)));
 	}
 

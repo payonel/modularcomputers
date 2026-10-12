@@ -166,12 +166,12 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	public List<Component> powerTooltip() {
 		PowerBuffer power = casePower();
 		List<Component> lines = new ArrayList<>();
-		lines.add(Component.translatable("gui.modularcomputers.power", power.percent(), Durations.clock(power.level())));
+		lines.add(Component.translatable("gui.modularcomputers.power", power.percent(), Durations.ofUnits(power.level())));
 		ItemStack stack = menu.slots.get(CaseMenu.UPS_SLOT).getItem();
 		if (stack.getItem() instanceof BatteryItem battery) {
 			lines.add(battery.tier().infinite()
 				? Component.translatable("gui.modularcomputers.power.battery_infinite")
-				: Component.translatable("gui.modularcomputers.power.battery", BatteryItem.percent(stack), Durations.clock(BatteryItem.charge(stack).ticks())));
+				: Component.translatable("gui.modularcomputers.power.battery", BatteryItem.percent(stack), Durations.ofUnits(BatteryItem.charge(stack).units())));
 		}
 		return lines;
 	}

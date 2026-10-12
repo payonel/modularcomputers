@@ -1,6 +1,6 @@
 package com.payonel.modularcomputers.power;
 
-/** Ticks of running, shown as time. */
+/** Ticks of running, or power, shown as time. */
 public final class Durations {
 	private Durations() {
 	}
@@ -13,5 +13,10 @@ public final class Durations {
 		long clamped = Math.max(0, ticks);
 		long seconds = clamped % BatteryCharge.DAY_TICKS / 20;
 		return String.format("%02d:%02d:%02d", clamped / BatteryCharge.DAY_TICKS, seconds / 60, seconds % 60);
+	}
+
+	/** How long {@code units} of power run an all-in-one, as {@link #clock}. */
+	public static String ofUnits(long units) {
+		return clock(PowerUnits.ticks(units));
 	}
 }

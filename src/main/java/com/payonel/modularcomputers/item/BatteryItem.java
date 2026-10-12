@@ -94,7 +94,7 @@ public final class BatteryItem extends HintedItem {
 			hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.infinite")));
 			return;
 		}
-		hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.charge", percent(stack), Durations.clock(charge(stack).ticks()))));
+		hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.charge", percent(stack), Durations.ofUnits(charge(stack).units()))));
 	}
 
 	@Override

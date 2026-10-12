@@ -1,12 +1,12 @@
 package com.payonel.modularcomputers.power;
 
 /**
- * The case's own store of power, like a PSU's capacitors scaled up: it holds one day of running a
- * CPU. The computer runs from it, and it refills from the battery; with the battery out it runs
+ * The case's own store of power, like a PSU's capacitors scaled up: it holds one day of a running
+ * all-in-one, in power units ({@link PowerUnits}). The computer runs from it, and it refills from the battery; with the battery out it runs
  * down on its own. The case's charge meter shows this, not the battery.
  */
 public final class PowerBuffer {
-	public static final int CAPACITY = BatteryCharge.DAY_TICKS;
+	public static final int CAPACITY = PowerUnits.DAY;
 
 	private int level;
 
@@ -34,8 +34,8 @@ public final class PowerBuffer {
 		return taken;
 	}
 
-	/** The computer ran for {@code ticks}. */
-	public void use(int ticks) {
-		level = Math.max(0, level - ticks);
+	/** The computer used {@code units}. */
+	public void use(long units) {
+		level = (int) Math.max(0, level - units);
 	}
 }

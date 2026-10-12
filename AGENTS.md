@@ -93,20 +93,36 @@ same thing.
       - RAM is a placeholder: the machine still uses the soldered `Hardware` memory.
       - **Batteries** (user design, 2026-10-11; `item/BatteryItem`, plain-Java
         `power/BatteryTier` and `power/BatteryCharge`). **The computer runs on its battery:**
-        - Charge is counted in ticks of running a CPU (`ModComponents.CHARGE`:
-          `BatteryCharge(ticks, settledAt)`). A day is 24000 ticks.
+        - **Power is counted in whole units** (user, 2026-10-11; `power/PowerUnits`): per tick, a
+          CPU draws 100 while it executes (nothing halted or waiting for an interrupt), a
+          terminal 10 while it has power (the user: CPU about 10x a terminal), and a write to a
+          terminal costs 1. The yardstick is a running all-in-one, CPU and built-in terminal,
+          110 a tick: batteries are rated in days of it (`PowerUnits.DAY`, 2,640,000), so a full
+          tier 1 (26,400,000) runs one for 10 days. An idle machine (CPU waiting) draws only its
+          terminals, so it lasts 11 times longer. Times shown (DD:MM:SS) are at the all-in-one
+          rate (`Durations.ofUnits`). Charge is `ModComponents.CHARGE`:
+          `BatteryCharge(units, settledAt)`. A day is 24000 ticks.
+        - **Bus power** (user design, 2026-10-11; `bus/BusPower`, `Machine.powerUse`): every
+          bus-powered device (terminals so far) has power while at least one running computer
+          has it on its bus, like USB's VBUS, and goes dark when the last lets go (power off,
+          unplugged, the computer broken or unloaded). **Nothing ticks for it** (the user's worry
+          for big builds): power follows events, and a device's debt (its draw for the time it
+          had power, plus its per-call costs, which only the device knows) is settled lazily
+          when a computer collects, every 20 ticks. A device shared by several computers is paid
+          for once, by whichever collects first (the user: a race, and it doesn't matter).
         - **How long each tier lasts is a setting** (see "Settings" below):
           `battery_tier1_duration` 10, `battery_tier2_duration` 20, `battery_tier3_duration` 0, in
           days; 0 means it never runs out (`BatteryTier.setDays`, `infinite()`). Any tier can be
           infinite, so every battery item carries a charge component.
           - Charging materials are percentages of a full tier 1, so they follow its setting.
         - **Tier 1** (`tier1_battery`): copper×3 / iron, redstone, iron / iron, redstone, iron.
-          Full, it runs a CPU for 10 days and nights, 10% a day.
+          Full, it runs an all-in-one for 10 days and nights, 10% a day.
         - **Tier 2** (`tier2_battery`): gold×3 / iron, redstone, iron / sea lantern, blaze rod,
           sea lantern (user changed it, 2026-10-11: self-recharge "might be op"). It holds twice
           as much. It recharges itself whenever it isn't running a computer (out of the UPS slot,
-          or in a case that's off) at `battery_tier2_recharge_rate` ticks of charge per tick:
-          0.5 by default, so two seconds of rest charge one. Rest too short to earn a whole tick
+          or in a case that's off) at `battery_tier2_recharge_rate`, a share of a running
+          all-in-one's draw: 0.5 by default, so two seconds of rest charge one second of running.
+          Rest too short to earn a whole unit
           carries over (`BatteryCharge.rest` advances `settledAt` only by what it paid for).
           - This is worked out lazily from `settledAt` (game time), so it charges in chests and
             unloaded chunks too. It's settled every 20 ticks in a player's inventory or in a case.
@@ -126,7 +142,7 @@ same thing.
           (07:06:00)" (or "Never runs out"); with Shift, tier 2's self-recharge and rate, and
           for tiers 1 and 2 the glowing items with what each adds to *this* tier ("+50%").
         - **The case's power buffer** (user design, 2026-10-11; `power/PowerBuffer`, saved as
-          `power_buffer`): the computer runs on the case's own store, which holds **one day**.
+          `power_buffer`): the computer runs on the case's own store, which holds **one day** (of a running all-in-one).
           - A battery going in fills it right away, up to a day's worth, out of the battery.
             After that the buffer tops itself up from the battery every 20 ticks
             (`AllInOneBlockEntity.updateBattery`), so the battery drains while the computer
@@ -140,7 +156,8 @@ same thing.
             "Battery power: never runs out").
           - The case view gets the buffer level through the menu's data (`CaseMenu.powerLevel`,
             a `ContainerData` like a furnace's progress), so it updates every second, as the
-            battery's slot does. It's sent as a short; a day (24000 ticks) fits. The block
+            battery's slot does. Menu data travels as shorts, so the level goes as two (low and high 16 bits,
+            `CaseMenu.POWER_DATA`). The block
             entity also syncs it whenever its percentage changes.
         - **Times read DD:MM:SS** (`power/Durations.clock`, user's format): Minecraft days, then
           the real minutes (00..19, 20 to a day) and seconds into the day.

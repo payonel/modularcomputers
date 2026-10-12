@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.payonel.modularcomputers.power.BatteryCharge;
 import com.payonel.modularcomputers.power.BatteryTier;
+import com.payonel.modularcomputers.power.PowerUnits;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,15 +40,15 @@ class ModConfigTest {
 		Path file = dir.resolve(ModConfig.FILE_NAME);
 		Files.writeString(file, "battery_tier1_duration: 0.5\nbattery_tier2_duration: 1\nbattery_tier3_duration: 0\n");
 		ModConfig.load(file);
-		assertThat(BatteryTier.TIER_1.capacity()).isEqualTo(BatteryCharge.DAY_TICKS / 2);
-		assertThat(BatteryTier.TIER_2.capacity()).isEqualTo(BatteryCharge.DAY_TICKS);
+		assertThat(BatteryTier.TIER_1.capacity()).isEqualTo(PowerUnits.DAY / 2);
+		assertThat(BatteryTier.TIER_2.capacity()).isEqualTo(PowerUnits.DAY);
 		assertThat(BatteryTier.TIER_3.infinite()).isTrue();
 		Files.writeString(file, "battery_tier1_duration: 0\nbattery_tier3_duration: 3\n");
 		ModConfig.load(file);
 		assertThat(BatteryTier.TIER_1.infinite()).as("any tier can be set to last forever").isTrue();
 		assertThat(BatteryTier.TIER_2.days()).as("missing: back to the default").isEqualTo(20);
 		assertThat(BatteryTier.TIER_3.infinite()).isFalse();
-		assertThat(BatteryTier.TIER_3.capacity()).isEqualTo(3 * BatteryCharge.DAY_TICKS);
+		assertThat(BatteryTier.TIER_3.capacity()).isEqualTo(3 * PowerUnits.DAY);
 	}
 
 	@Test

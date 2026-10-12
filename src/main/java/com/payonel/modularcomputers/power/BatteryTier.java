@@ -1,12 +1,13 @@
 package com.payonel.modularcomputers.power;
 
 /**
- * The batteries that power a computer, by how much they hold. Charge is counted in ticks of
- * running a CPU. How many Minecraft days each tier lasts is configurable ({@link #setDays}; 0
- * means it never runs out). By default a full tier 1 runs a CPU for ten days (10% a day), tier 2
- * holds twice that and recharges itself while it isn't running anything, and tier 3 never runs
- * out. Tier 2 recharges itself at a configurable rate ({@link #setRechargeRate}): by default half a
- * tick of charge for every tick it rests, so it takes two seconds to charge one.
+ * The batteries that power a computer, by how much they hold, in power units
+ * ({@link PowerUnits}). How many Minecraft days of a running all-in-one each tier lasts is
+ * configurable ({@link #setDays}; 0 means it never runs out). By default a full tier 1 runs one
+ * for ten days (10% a day), tier 2 holds twice that and recharges itself while it isn't running
+ * anything, and tier 3 never runs out. Tier 2 recharges itself at a configurable rate
+ * ({@link #setRechargeRate}), as a share of a running all-in-one's draw: by default half, so two
+ * seconds of rest charge one second of running.
  */
 public enum BatteryTier {
 	TIER_1(10, 0),
@@ -29,7 +30,7 @@ public enum BatteryTier {
 		return defaultRechargeRate;
 	}
 
-	/** Ticks of charge it regains for each tick it rests; 0 means it doesn't recharge itself. */
+	/** What it regains each tick it rests, as a share of a running all-in-one's draw; 0 means it doesn't recharge itself. */
 	public double rechargeRate() {
 		return rechargeRate;
 	}
@@ -45,7 +46,7 @@ public enum BatteryTier {
 		return defaultDays;
 	}
 
-	/** How many days a full one runs a CPU; 0 means forever. */
+	/** How many days a full one runs an all-in-one; 0 means forever. */
 	public double days() {
 		return days;
 	}
@@ -57,9 +58,9 @@ public enum BatteryTier {
 		}
 	}
 
-	/** Ticks of running a CPU when full; meaningless for an infinite battery. */
+	/** Units when full; meaningless for an infinite battery. */
 	public int capacity() {
-		return (int) Math.min(Integer.MAX_VALUE, Math.max(1, Math.round(days * BatteryCharge.DAY_TICKS)));
+		return (int) Math.min(Integer.MAX_VALUE, Math.max(1, Math.round(days * PowerUnits.DAY)));
 	}
 
 	/** It never runs out. */

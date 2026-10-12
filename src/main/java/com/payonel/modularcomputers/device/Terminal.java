@@ -6,6 +6,7 @@ import com.payonel.modularcomputers.bus.DeviceType;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.display.TextBuffer;
 import com.payonel.modularcomputers.display.VtDecoder;
+import com.payonel.modularcomputers.power.PowerUnits;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
@@ -29,10 +30,10 @@ import java.util.Optional;
  * supplying it, it's dark.
  */
 public final class Terminal implements Device {
-	/** What a terminal draws while it has power: half a running CPU. */
-	public static final double DRAW = 0.5;
-	/** What one write costs, flat, in ticks of a running CPU. */
-	public static final double WRITE_COST = 0.25;
+	/** What a terminal draws each tick it has power: a tenth of a running CPU. */
+	public static final int DRAW = PowerUnits.TERMINAL;
+	/** What one write costs, flat. */
+	public static final int WRITE_COST = PowerUnits.TERMINAL_WRITE;
 
 	private final BusPower power = new BusPower(DRAW);
 	private final TextBuffer buffer;
