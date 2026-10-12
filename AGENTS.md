@@ -81,7 +81,7 @@ same thing.
   - **Parts:**
     - The display and keyboard are built in. Everything else is an item (`ModItems`) in the
       **case view**'s 17 slots (`CaseMenu`):
-      - CPU (three tiers, `CpuItem`/`CpuTier`: bus capacity 12/32/64; draw a tick 100/150/200
+      - CPU (three tiers, `CpuItem`/`CpuTier`: bus capacity 4/16/64; draw a tick 100/150/200
         running, 50/20/5 waiting, 0 halted; iron, gold and diamond lids), EEPROM (labeled ROM), 3 UPS battery bays, 4 RAM (three tiers, `MemoryItem`/`MemoryTier`:
         256 KiB, 512 KiB, 1 MiB; not used by the machine yet), 4 SATA (hard disks, three tiers,
         `DiskItem`/`DiskTier`: 1, 4, 16 MiB, drawing 8/5/2 a tick: bus-powered like terminals,
@@ -248,12 +248,14 @@ same thing.
             keeps its place. Absent ones stay listed, dimmed, reading "offline", with a red X
             **forget** button where the plug was (`ForgetDevicePayload`). New ones go last.
             Offline rows keep their last-known name, icon and position (`known`, saved).
-          - **Bus capacity comes entirely from the CPU** (user, 2026-10-11; `CpuTier`: tier 1 12,
-            tier 2 32, tier 3 64; `Motherboard.busCapacity`). **No CPU, no bus:** nothing is on
+          - **Bus capacity comes entirely from the CPU** (user, 2026-10-11; `CpuTier`: tier 1 4,
+            tier 2 16, tier 3 64; `Motherboard.busCapacity`). **The case's own devices count
+            against it as much as external ones**, but only those installed: empty slots reserve
+            nothing, and external devices get what's left (`BusStatus.room`). A tier 1's 4 hold
+            the essentials: an EEPROM, a battery, a disk, and one card or external device. **No CPU, no bus:** nothing is on
             it, the panel lists nothing ("no CPU: no bus"), and the saved external order waits
-            untouched. The case's connector places are reserved first (13 on the all-in-one), so
-            external devices get the rest; a CPU too small for even those leaves the last of
-            them waiting too (overflow). A smaller CPU going in makes missing devices make room
+            untouched. The case's devices come first, in their slots' order; a CPU too small for
+            even those leaves the last of them waiting too (overflow). A smaller CPU going in makes missing devices make room
             first, as when the list is full. Tests can set `Motherboard.overrideBusCapacity`
             (saved as `bus_capacity_override` so clients see it).
           - **Full:** a new external device bumps the one missing longest (each entry keeps

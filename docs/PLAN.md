@@ -91,19 +91,19 @@ Still to do:
 
 Tiers are trade-offs the Lua engine can honour, not every possible feature. Three tiers per part.
 
-- **CPU:** bus capacity comes **entirely** from the CPU (its "address width"); the case only
-  reserves places for its own connectors (`BusOrder(capacity, reserved)`), so a tier 3 CPU in a
-  bare tier 1 case leaves nearly the whole bus for external devices. A smaller CPU shrinks the
+- **CPU:** bus capacity comes **entirely** from the CPU (its "address width"); the case's
+  installed devices and external ones share it, so a tier 3 CPU in a bare tier 1 case leaves
+  nearly the whole bus for external devices. A smaller CPU shrinks the
   bus and the existing overflow handling covers what no longer fits. Higher tiers draw more
   running and less waiting (halted is 0 for all). Starting values (user: "a good starting
-  point"), per tick. **A tier 1 CPU's bus holds exactly a tier 3 case's built-ins** (13 places
-  today: terminal, ROM, 3 UPS, 4 SATA, 4 EXP), by design, not by a rule: a full tier 3 case
-  leaves it no external devices, a smaller case some.
+  point"), per tick. **The case's own devices count against the bus too** (only the ones
+  installed; built: tier 1 4, tier 2 16, tier 3 64): a tier 1's 4 are the essentials (EEPROM, a
+  battery, a disk, one card or external device), so a tier 1 CPU can't use a full tier 3 case.
 
   | Tier | Running | Waiting | Bus |
   |---|---|---|---|
-  | 1 | 100 | 50 | 13 |
-  | 2 | 150 | 20 | 32 |
+  | 1 | 100 | 50 | 4 |
+  | 2 | 150 | 20 | 16 |
   | 3 | 200 | 5 | 64 |
 
 - **Cases (case == board, for our purposes):** higher tiers have more built-in, more slots and
