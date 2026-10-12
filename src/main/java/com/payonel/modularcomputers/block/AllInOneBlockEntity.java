@@ -851,6 +851,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			onPartsChanged();
 		}
 
+		/** Each slot holds one part, however the items stack elsewhere. */
+		@Override
+		public int getMaxStackSize() {
+			return 1;
+		}
+
 		@Override
 		public boolean stillValid(Player player) {
 			return Container.stillValidBlockEntity(AllInOneBlockEntity.this, player);

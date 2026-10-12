@@ -33,7 +33,7 @@ public final class ModItems {
 	public static final CpuItem TIER3_CPU = cpu("tier3_cpu", CpuTier.TIER_3);
 	public static final List<CpuItem> CPUS = List.of(TIER1_CPU, TIER2_CPU, TIER3_CPU);
 	/** Every EEPROM holds the stand-in program for now; programmable contents come with the Lua runtime. */
-	public static final Item EEPROM = register("eeprom");
+	public static final Item EEPROM = register("eeprom", ModItems::holdsData);
 	/** RAM sticks: the tier sets the size. */
 	public static final MemoryItem TIER1_RAM = ram("tier1_ram", MemoryTier.TIER_1);
 	public static final MemoryItem TIER2_RAM = ram("tier2_ram", MemoryTier.TIER_2);
@@ -89,7 +89,7 @@ public final class ModItems {
 	}
 
 	private static DiskItem disk(String name, DiskTier tier) {
-		return (DiskItem) register(name, properties -> new DiskItem(properties, tier), UnaryOperator.identity());
+		return (DiskItem) register(name, properties -> new DiskItem(properties, tier), ModItems::holdsData);
 	}
 
 	private static CpuItem cpu(String name, CpuTier tier) {
@@ -98,6 +98,11 @@ public final class ModItems {
 
 	private static BatteryItem battery(String name, BatteryTier tier) {
 		return (BatteryItem) register(name, properties -> new BatteryItem(properties, tier), UnaryOperator.identity());
+	}
+
+	/** Things that will hold data of their own (an EEPROM's program, a disk's files) don't stack. */
+	private static Item.Properties holdsData(Item.Properties properties) {
+		return properties.stacksTo(1);
 	}
 
 	private static Item register(String name) {
@@ -110,6 +115,8 @@ public final class ModItems {
 
 	private static Item register(String name, Function<Item.Properties, Item> factory, UnaryOperator<Item.Properties> extra) {
 		ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id(name));
-		return Registry.register(BuiltInRegistries.ITEM, key, factory.apply(extra.apply(new Item.Properties().setId(key).stacksTo(1))));
+		// Everything stacks (64), like vanilla items; items differing in their data (a battery's
+		// charge, a card's serial number) stack only with their own kind.
+		return Registry.register(BuiltInRegistries.ITEM, key, factory.apply(extra.apply(new Item.Properties().setId(key))));
 	}
 }

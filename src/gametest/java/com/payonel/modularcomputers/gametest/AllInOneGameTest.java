@@ -315,6 +315,23 @@ public class AllInOneGameTest {
 	}
 
 	@GameTest
+	public void itemsStackExceptThoseThatWillHoldData(GameTestHelper helper) {
+		for (var item : ModCommands.modItems()) {
+			boolean holdsData = item == ModItems.EEPROM || ModItems.HARD_DISKS.contains(item);
+			helper.assertValueEqual(new ItemStack(item).getMaxStackSize(), holdsData ? 1 : 64, "how many " + item + " stack");
+		}
+		helper.assertTrue(ItemStack.isSameItemSameComponents(ModItems.TIER1_BATTERY.charged(), ModItems.TIER1_BATTERY.charged()),
+			"batteries of the same charge stack");
+		helper.assertTrue(!ItemStack.isSameItemSameComponents(ModItems.TIER1_BATTERY.charged(), new ItemStack(ModItems.TIER1_BATTERY)),
+			"not with a different charge");
+		AllInOneBlockEntity computer = place(helper);
+		ItemStack two = new ItemStack(ModItems.TIER1_RAM, 2);
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, two.copyWithCount(1));
+		helper.assertValueEqual(computer.parts().getMaxStackSize(), 1, "each part slot holds one");
+		helper.succeed();
+	}
+
+	@GameTest
 	public void giveAllGivesEveryModItem(GameTestHelper helper) {
 		ServerPlayer player = helper.makeMockServerPlayerInLevel();
 		int given = ModCommands.giveAll(player);

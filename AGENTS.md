@@ -55,7 +55,13 @@ same thing.
 4. **No old-save compatibility** (user, 2026-10-11): this is local dev work. Change save
    formats, rename items, components and keys freely, and never keep shims, legacy keys or
    unused registrations so old worlds load. Old test worlds may simply break.
-5. **Commits:** commit **autonomously**, without asking, every time a new addition is done
+5. **Items stack** (user, 2026-10-11; applies to everything we add): every item and block item
+   stacks to 64 like vanilla's (`ModItems.register`'s default), **except things that will hold
+   data of their own** (EEPROMs and hard disks: `ModItems.holdsData`, 1). Items stack only with
+   identical data, so batteries stack at the same charge, and a card or screen that has been in a
+   machine carries its serial number (its identity) and no longer stacks with fresh ones. Part
+   slots and card slots still hold one each.
+6. **Commits:** commit **autonomously**, without asking, every time a new addition is done
    and `./gradlew testAll` passes.
    - Run `git add -A`, then commit on `master` with a message describing the addition.
    - Never commit with failing tests.
