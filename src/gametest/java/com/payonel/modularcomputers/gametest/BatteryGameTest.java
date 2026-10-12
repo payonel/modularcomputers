@@ -65,6 +65,21 @@ public class BatteryGameTest {
 	}
 
 	@GameTest
+	public void craftingAnItemAloneClearsItsIdSoItStacksAgain(GameTestHelper helper) {
+		ItemStack used = new ItemStack(ModItems.WLAN_CARD);
+		java.util.UUID serial = ModComponents.serial(used);
+		helper.assertTrue(com.payonel.modularcomputers.hint.Hint.lines(com.payonel.modularcomputers.hint.Hint.of(used, false))
+			.contains("Id: id:" + serial), "its hint shows its id");
+		helper.assertTrue(!ItemStack.isSameItemSameComponents(used, new ItemStack(ModItems.WLAN_CARD)), "with an id, it doesn't stack with new ones");
+		ItemStack cleared = craft(helper, 2, used, null, null, null);
+		helper.assertTrue(cleared.is(ModItems.WLAN_CARD) && !cleared.has(ModComponents.SERIAL), "crafted alone: the same card, no id");
+		helper.assertTrue(ItemStack.isSameItemSameComponents(cleared, new ItemStack(ModItems.WLAN_CARD)), "so it stacks again");
+		helper.assertTrue(craft(helper, 2, new ItemStack(ModItems.WLAN_CARD), null, null, null).isEmpty(), "nothing to clear: no recipe");
+		helper.assertTrue(craft(helper, 2, used, Items.STICK, null, null).isEmpty(), "only alone");
+		helper.succeed();
+	}
+
+	@GameTest
 	public void eachTierHasItsRecipeAndCraftedBatteriesStartEmpty(GameTestHelper helper) {
 		ItemStack tier1 = craft(helper, 3,
 			Items.COPPER_INGOT, Items.COPPER_INGOT, Items.COPPER_INGOT,

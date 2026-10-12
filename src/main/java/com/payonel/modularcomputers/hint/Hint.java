@@ -2,6 +2,8 @@ package com.payonel.modularcomputers.hint;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import com.payonel.modularcomputers.item.ModComponents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
@@ -45,12 +47,20 @@ public final class Hint {
 		List<Element> elements = new ArrayList<>();
 		Hinted hinted = stack.getItem() instanceof Hinted item ? item : Hinted.NONE;
 		hinted.summary(stack, elements::add);
+		UUID serial = stack.get(ModComponents.SERIAL);
+		if (serial != null) {
+			// Its id, as programs address it; crafting it alone clears it.
+			elements.add(new Text(Component.translatable("hint.modularcomputers.id", "id:" + serial).withStyle(ChatFormatting.GRAY)));
+		}
 		if (!details) {
 			elements.add(new Text(Component.translatable("hint.modularcomputers.shift",
 				Component.translatable("hint.modularcomputers.shift_key").withStyle(ChatFormatting.YELLOW)).withStyle(ChatFormatting.DARK_GRAY)));
 			return elements;
 		}
 		hinted.details(stack, elements::add);
+		if (serial != null) {
+			elements.add(text(Component.translatable("hint.modularcomputers.clear_id")));
+		}
 		elements.add(text(Component.translatable("hint.modularcomputers.crafting")));
 		elements.add(new Crafting(stack.getItem()));
 		return elements;

@@ -59,7 +59,9 @@ same thing.
    stacks to 64 like vanilla's (`ModItems.register`'s default), **except things that will hold
    data of their own** (EEPROMs and hard disks: `ModItems.holdsData`, 1). Items stack only with
    identical data, so batteries stack at the same charge, and a card or screen that has been in a
-   machine carries its serial number (its identity) and no longer stacks with fresh ones. Part
+   machine carries its serial number (its identity) and no longer stacks with fresh ones. Its
+   tooltip shows the id ("Id: id:<uuid>"), and **crafting it alone clears it** (`ClearIdRecipe`,
+   user's idea): it stacks again, and is a new device the next time it goes in. Part
    slots and card slots still hold one each.
 6. **Commits:** commit **autonomously**, without asking, every time a new addition is done
    and `./gradlew testAll` passes.
