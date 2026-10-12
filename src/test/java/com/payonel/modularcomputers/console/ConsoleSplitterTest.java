@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.device.Disk;
+import com.payonel.modularcomputers.device.DiskTier;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import java.util.List;
@@ -18,7 +19,7 @@ class ConsoleSplitterTest {
 
 	@Test
 	void withNoTerminalItHasASizeAndKeepsItsOwnCopy() {
-		ConsoleSplitter console = console(new Disk());
+		ConsoleSplitter console = console(new Disk(DiskTier.TIER_1));
 		assertThat(console.size()).isEqualTo(ConsoleSplitter.HEADLESS);
 		console.write("nobody sees this\n");
 		assertThat(console.screen().row(0).strip()).isEqualTo("nobody sees this");
@@ -28,7 +29,7 @@ class ConsoleSplitterTest {
 	void writesTheSameTextToEveryTerminal() {
 		Terminal one = new Terminal(new Resolution(6, 2));
 		Terminal two = new Terminal(new Resolution(6, 3));
-		ConsoleSplitter console = console(new Disk(), one, two);
+		ConsoleSplitter console = console(new Disk(DiskTier.TIER_1), one, two);
 		console.write("hi\nthere");
 		assertThat(one.buffer().rows()).containsExactly("hi    ", "there ");
 		assertThat(two.buffer().rows()).containsExactly("hi    ", "there ", "      ");
@@ -58,7 +59,7 @@ class ConsoleSplitterTest {
 
 	@Test
 	void aJoiningTerminalGetsTheConsoleRedrawnOnIt() {
-		ConsoleSplitter console = console(new Disk());
+		ConsoleSplitter console = console(new Disk(DiskTier.TIER_1));
 		console.write("\u001B[32mgreen\nline two");
 		Terminal late = new Terminal(Resolution.DEFAULT);
 		late.write("old junk");

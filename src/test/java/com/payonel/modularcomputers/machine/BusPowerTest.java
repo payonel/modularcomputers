@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.bus.BusPower;
+import com.payonel.modularcomputers.device.Disk;
+import com.payonel.modularcomputers.device.DiskTier;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.power.PowerUnits;
@@ -86,6 +88,19 @@ class BusPowerTest {
 		}
 		assertThat(CpuTier.TIER_1.waiting()).as("lower tiers idle hungrier").isGreaterThan(CpuTier.TIER_3.waiting());
 		assertThat(CpuTier.TIER_1.running()).as("and run leaner").isLessThan(CpuTier.TIER_3.running());
+	}
+
+	@Test
+	void disksDrawLessAtHigherTiers() {
+		for (DiskTier tier : DiskTier.values()) {
+			Machine machine = machine(HALT);
+			machine.setDevices(Map.of("sata:0", new Disk(tier)));
+			machine.pressPower();
+			machine.powerUse(100);
+			assertThat(machine.powerUse(120)).as(tier.name()).isEqualTo(20L * tier.draw());
+		}
+		assertThat(DiskTier.TIER_3.draw()).isLessThan(DiskTier.TIER_1.draw());
+		assertThat(DiskTier.TIER_3.bytes()).isGreaterThan(DiskTier.TIER_1.bytes());
 	}
 
 	@Test

@@ -207,10 +207,10 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			singleplayer.getServer().runOnServer(server -> {
 				var parts = ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts();
 				for (int lane = 0; lane < 3; lane++) {
-					parts.setItem(CaseMenu.RAM_SLOTS + lane, new ItemStack(ModItems.RAM));
+					parts.setItem(CaseMenu.RAM_SLOTS + lane, new ItemStack(ModItems.TIER1_RAM));
 				}
-				parts.setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.HARD_DISK));
-				parts.setItem(CaseMenu.SATA_SLOTS + 2, new ItemStack(ModItems.HARD_DISK));
+				parts.setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.TIER1_HARD_DISK));
+				parts.setItem(CaseMenu.SATA_SLOTS + 2, new ItemStack(ModItems.TIER1_HARD_DISK));
 				parts.setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.WLAN_CARD));
 				parts.setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 			});

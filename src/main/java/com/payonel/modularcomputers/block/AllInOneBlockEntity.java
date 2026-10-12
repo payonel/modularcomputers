@@ -16,6 +16,8 @@ import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.item.CpuItem;
+import com.payonel.modularcomputers.item.DiskItem;
+import com.payonel.modularcomputers.device.DiskTier;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
@@ -639,8 +641,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			board.plug(Motherboard.ups(bay), ups[bay], serial(CaseMenu.UPS_SLOT + bay));
 		}
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
-			boolean disk = parts.getItem(CaseMenu.SATA_SLOTS + lane).is(ModItems.HARD_DISK);
-			disks[lane] = disk ? (disks[lane] != null ? disks[lane] : new Disk()) : null;
+			DiskTier diskTier = parts.getItem(CaseMenu.SATA_SLOTS + lane).getItem() instanceof DiskItem disk ? disk.tier() : null;
+			disks[lane] = diskTier == null ? null : disks[lane] != null && disks[lane].tier() == diskTier ? disks[lane] : new Disk(diskTier);
 			board.plug(Motherboard.sata(lane), disks[lane], serial(CaseMenu.SATA_SLOTS + lane));
 			ItemStack card = parts.getItem(CaseMenu.EXP_SLOTS + lane);
 			CardKind kind = ModItems.cardKind(card).orElse(null);

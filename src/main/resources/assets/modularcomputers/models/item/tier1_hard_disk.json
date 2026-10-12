@@ -1,6 +1,6 @@
 {
 	"parent": "minecraft:item/generated",
 	"textures": {
-		"layer0": "modularcomputers:item/hard_disk"
+		"layer0": "modularcomputers:item/tier1_hard_disk"
 	}
 }

@@ -1,6 +1,6 @@
 {
 	"model": {
 		"type": "minecraft:model",
-		"model": "modularcomputers:item/hard_disk"
+		"model": "modularcomputers:item/tier2_ram"
 	}
 }

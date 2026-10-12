@@ -31,8 +31,8 @@ public final class ModCreativeTab {
 				output.accept(ModBlocks.PAINT_GUN);
 				ModItems.CPUS.forEach(output::accept);
 				output.accept(ModItems.EEPROM);
-				output.accept(ModItems.RAM);
-				output.accept(ModItems.HARD_DISK);
+				ModItems.RAMS.forEach(output::accept);
+				ModItems.HARD_DISKS.forEach(output::accept);
 				ModItems.CARDS.keySet().forEach(output::accept);
 				ModItems.BATTERIES.forEach(battery -> output.accept(battery.charged()));
 			})

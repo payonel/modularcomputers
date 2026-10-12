@@ -1,6 +1,6 @@
 {
 	"model": {
 		"type": "minecraft:model",
-		"model": "modularcomputers:item/ram"
+		"model": "modularcomputers:item/tier3_ram"
 	}
 }

@@ -3,6 +3,8 @@ package com.payonel.modularcomputers.menu;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.item.CpuItem;
+import com.payonel.modularcomputers.item.DiskItem;
+import com.payonel.modularcomputers.item.MemoryItem;
 import com.payonel.modularcomputers.item.ModItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.Container;
@@ -87,9 +89,9 @@ public final class CaseMenu extends AbstractContainerMenu {
 		} else if (isBatteryBay(slot)) {
 			return stack.getItem() instanceof BatteryItem;
 		} else if (slot < SATA_SLOTS) {
-			return stack.is(ModItems.RAM);
+			return stack.getItem() instanceof MemoryItem;
 		} else if (slot < EXP_SLOTS) {
-			return stack.is(ModItems.HARD_DISK);
+			return stack.getItem() instanceof DiskItem;
 		}
 		return ModItems.cardKind(stack).isPresent();
 	}

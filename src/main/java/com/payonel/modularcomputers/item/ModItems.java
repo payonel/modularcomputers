@@ -5,6 +5,8 @@ import static com.payonel.modularcomputers.ModularComputers.id;
 import com.payonel.modularcomputers.device.CardKind;
 import com.payonel.modularcomputers.hint.HintedItem;
 import com.payonel.modularcomputers.machine.CpuTier;
+import com.payonel.modularcomputers.machine.MemoryTier;
+import com.payonel.modularcomputers.device.DiskTier;
 import com.payonel.modularcomputers.power.BatteryTier;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -32,8 +34,16 @@ public final class ModItems {
 	public static final List<CpuItem> CPUS = List.of(TIER1_CPU, TIER2_CPU, TIER3_CPU);
 	/** Every EEPROM holds the stand-in program for now; programmable contents come with the Lua runtime. */
 	public static final Item EEPROM = register("eeprom");
-	public static final Item RAM = register("ram");
-	public static final Item HARD_DISK = register("hard_disk");
+	/** RAM sticks: the tier sets the size. */
+	public static final MemoryItem TIER1_RAM = ram("tier1_ram", MemoryTier.TIER_1);
+	public static final MemoryItem TIER2_RAM = ram("tier2_ram", MemoryTier.TIER_2);
+	public static final MemoryItem TIER3_RAM = ram("tier3_ram", MemoryTier.TIER_3);
+	public static final List<MemoryItem> RAMS = List.of(TIER1_RAM, TIER2_RAM, TIER3_RAM);
+	/** Hard disks: the tier sets the size and the power draw. */
+	public static final DiskItem TIER1_HARD_DISK = disk("tier1_hard_disk", DiskTier.TIER_1);
+	public static final DiskItem TIER2_HARD_DISK = disk("tier2_hard_disk", DiskTier.TIER_2);
+	public static final DiskItem TIER3_HARD_DISK = disk("tier3_hard_disk", DiskTier.TIER_3);
+	public static final List<DiskItem> HARD_DISKS = List.of(TIER1_HARD_DISK, TIER2_HARD_DISK, TIER3_HARD_DISK);
 	/** Expansion cards, for a computer's expansion slots or an expansion hub. */
 	public static final Item WLAN_CARD = register("wlan_card");
 	public static final Item BLUETOOTH_CARD = register("bluetooth_card", BluetoothCardItem::new, UnaryOperator.identity());
@@ -72,6 +82,14 @@ public final class ModItems {
 
 	/** Forces the static registrations above. */
 	public static void init() {
+	}
+
+	private static MemoryItem ram(String name, MemoryTier tier) {
+		return (MemoryItem) register(name, properties -> new MemoryItem(properties, tier), UnaryOperator.identity());
+	}
+
+	private static DiskItem disk(String name, DiskTier tier) {
+		return (DiskItem) register(name, properties -> new DiskItem(properties, tier), UnaryOperator.identity());
 	}
 
 	private static CpuItem cpu(String name, CpuTier tier) {

@@ -6,6 +6,7 @@ import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.console.ConsoleSplitter;
 import com.payonel.modularcomputers.device.Disk;
+import com.payonel.modularcomputers.device.DiskTier;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.runtime.Arguments;
@@ -28,7 +29,7 @@ class ConsoleGroupTest {
 	private final Terminal builtIn = new Terminal(Resolution.DEFAULT);
 	private final Terminal first = new Terminal(Resolution.DEFAULT);
 	private final Terminal second = new Terminal(Resolution.DEFAULT);
-	private final Disk disk = new Disk();
+	private final Disk disk = new Disk(DiskTier.TIER_1);
 	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())));
 	private final List<Object> seen = new ArrayList<>();
 

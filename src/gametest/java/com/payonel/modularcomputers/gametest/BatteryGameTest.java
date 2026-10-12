@@ -167,7 +167,7 @@ public class BatteryGameTest {
 		computer.parts().setItem(first, battery(ModItems.TIER1_BATTERY, DAY / 2, BatteryCharge.UNSETTLED));
 		computer.parts().setItem(last, battery(ModItems.TIER1_BATTERY, DAY / 2, BatteryCharge.UNSETTLED));
 		computer.power().set(DAY / 2);
-		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.RAM)); // any part change tops the case up
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER1_RAM)); // any part change tops the case up
 		helper.assertValueEqual(computer.power().level(), DAY, "topped up");
 		helper.assertValueEqual(BatteryItem.charge(computer.parts().getItem(last)).units(), 0, "out of the last bay");
 		helper.assertValueEqual(BatteryItem.charge(computer.parts().getItem(first)).units(), DAY / 2, "the first bay untouched");

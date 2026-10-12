@@ -82,7 +82,10 @@ same thing.
     - The display and keyboard are built in. Everything else is an item (`ModItems`) in the
       **case view**'s 17 slots (`CaseMenu`):
       - CPU (three tiers, `CpuItem`/`CpuTier`: bus capacity 12/32/64; draw a tick 100/150/200
-        running, 50/20/5 waiting, 0 halted; iron, gold and diamond lids), EEPROM (labeled ROM), 3 UPS battery bays, 4 RAM, 4 SATA (hard disks) and 4 expansion
+        running, 50/20/5 waiting, 0 halted; iron, gold and diamond lids), EEPROM (labeled ROM), 3 UPS battery bays, 4 RAM (three tiers, `MemoryItem`/`MemoryTier`:
+        256 KiB, 512 KiB, 1 MiB; not used by the machine yet), 4 SATA (hard disks, three tiers,
+        `DiskItem`/`DiskTier`: 1, 4, 16 MiB, drawing 8/5/2 a tick: bus-powered like terminals,
+        `getCapacity()`; no data yet) and 4 expansion
         slots, which take any card (`ModItems.CARDS`, `device/CardKind`): WLAN, Bluetooth,
         Redstone, Audio, Motion Sensor, Audio Sensor, Weather Sensor. All cards are
         placeholders with no function.

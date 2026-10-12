@@ -1,6 +1,6 @@
 {
 	"parent": "minecraft:item/generated",
 	"textures": {
-		"layer0": "modularcomputers:item/ram"
+		"layer0": "modularcomputers:item/tier3_ram"
 	}
 }

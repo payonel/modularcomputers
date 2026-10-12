@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.device.Disk;
+import com.payonel.modularcomputers.device.DiskTier;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.display.TextBuffer;
@@ -12,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 class MachineTest {
 	private final Terminal display = new Terminal(Resolution.DEFAULT);
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of(new Disk(), display, new Disk()))));
+	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of(new Disk(DiskTier.TIER_1), display, new Disk(DiskTier.TIER_1)))));
 
 	/** The tests' own program, not the mod's stand-in firmware (which changes). */
 	private static final String GREETING = "hello world";
