@@ -17,7 +17,7 @@ class MachineTest {
 	/** The tests' own program, not the mod's stand-in firmware (which changes). */
 	private static final String GREETING = "hello world";
 	private static final Program HELLO = board -> {
-		board.invoke("console", "print", GREETING);
+		board.invoke("console", "write", GREETING + "\n");
 		board.halt();
 	};
 
@@ -147,7 +147,7 @@ class MachineTest {
 	@Test
 	void aCrashingProgramShowsTheAbortScreen() {
 		withParts(true, board -> {
-			board.invoke("console", "print", "booting");
+			board.invoke("console", "write", "booting\n");
 			throw new IllegalStateException("out of cheese");
 		});
 		machine.pressPower();
@@ -163,7 +163,7 @@ class MachineTest {
 		machine.pressPower();
 		assertThat(screen().row(0).strip()).isEqualTo(GREETING);
 		assertThat(screen().background(0, 0)).isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
-		assertThat(machine.board().virtualBus().console().row()).as("cursor on the next line").isEqualTo(1);
+		assertThat(machine.board().virtualBus().console().decoder().row()).as("cursor on the next line").isEqualTo(1);
 	}
 
 	@Test
@@ -173,8 +173,8 @@ class MachineTest {
 		machine.pressPower();
 		assertThat(screen().isBlank()).isTrue();
 		var console = machine.board().virtualBus().console();
-		assertThat(console.row()).isZero();
-		assertThat(console.background()).isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
+		assertThat(console.decoder().row()).isZero();
+		assertThat(console.screen().isBlank()).isTrue();
 		machine.board().setEeprom(new Eeprom(HELLO));
 		machine.pressPower();
 		assertThat(screen().row(0).strip()).as("prints at the top again").isEqualTo(GREETING);

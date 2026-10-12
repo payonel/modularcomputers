@@ -2,37 +2,63 @@ package com.payonel.modularcomputers.machine;
 
 import com.payonel.modularcomputers.bus.VirtualBus;
 import com.payonel.modularcomputers.runtime.Board;
-import java.util.List;
 
 /**
  * Stand-in EEPROM contents until there's a Lua runtime, written as a mock program against the
- * motherboard API:
+ * motherboard API (the user changes it to try things out; tests never use it):
  * <ol>
- * <li>prints the greeting to the console (every display, and the console's own copy);</li>
- * <li>finds every terminal on the bus, takes it out of the console's group, and labels it
- * "screen 0", "screen 1", ... in bus order (a built-in one comes first);</li>
- * <li>halts. Power stays on, and the screens keep their labels.</li>
+ * <li>writes the greeting to the console;</li>
+ * <li>finds every terminal on the bus. The first ("screen 0", the built-in one when there is
+ * one) stays with the console; each other one is taken out of the console's group, cleared and
+ * labeled "screen 1", "screen 2", ... in bus order;</li>
+ * <li>then echoes typing to the console, forever: it waits for an interrupt, reads what waits
+ * at the console (keys typed at terminals in its group) or at an unbound terminal, and writes it
+ * to the console. Enter starts a new line and Backspace rubs out, as a tty's echo does.</li>
  * </ol>
  * A screen unplugged and plugged back in is a new arrival, in the console's group again, so the
- * console redraws its copy onto it: the greeting comes back.
+ * console redraws its copy onto it.
  */
 public final class HelloWorldProgram implements Program {
 	public static final String GREETING = "hello world";
 	public static final String LABEL = "screen ";
+	private static final double WAIT_SECONDS = 3600;
 
 	@Override
 	public void run(Board board) {
-		board.invoke(VirtualBus.CONSOLE, "print", GREETING);
+		board.invoke(VirtualBus.CONSOLE, "write", GREETING + "\n");
 		int screen = 0;
 		for (Board.DeviceInfo device : board.list()) {
 			if (!"terminal".equals(device.type())) {
 				continue;
 			}
+			if (screen == 0) {
+				screen++; // screen 0 stays bound: it shows the console
+				continue;
+			}
 			board.invoke(VirtualBus.CONSOLE, "unbind", device.address());
-			List<Object> size = board.invoke(device.address(), "getResolution").values();
-			board.invoke(device.address(), "fill", 1, 1, size.get(0), size.get(1), " ");
-			board.invoke(device.address(), "set", 1, 1, LABEL + screen++);
+			// Clear the screen, cursor home, then the label: plain text with escape sequences.
+			board.invoke(device.address(), "write", "\u001B[2J\u001B[H" + LABEL + screen++);
 		}
-		board.halt();
+		while (true) {
+			for (String source : board.waitForInterrupt(WAIT_SECONDS)) {
+				if (source.equals(Board.BUS)) {
+					board.list(); // devices came or went: listing clears the bus's interrupt
+					continue;
+				}
+				Object key;
+				while ((key = board.invoke(source, "read").first()) != null) {
+					board.invoke(VirtualBus.CONSOLE, "write", echo(key.toString()));
+				}
+			}
+		}
+	}
+
+	/** What a tty echoes for a key: Enter a new line, Backspace a rub-out, anything else itself. */
+	private static String echo(String key) {
+		return switch (key) {
+			case "\r" -> "\n";
+			case "\u007F" -> "\b \b";
+			default -> key;
+		};
 	}
 }

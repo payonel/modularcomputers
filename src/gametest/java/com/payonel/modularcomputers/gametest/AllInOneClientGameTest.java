@@ -242,7 +242,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			// battery in, one red bar. The case view's menu sends the case's power as it changes.
 			singleplayer.getServer().runOnServer(server -> {
 				AllInOneBlockEntity be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
-				TestPrograms.flash(be, TestPrograms.HELLO); // the test's own program, not the mod's stand-in
+				TestPrograms.flash(be, TestPrograms.ECHO); // the test's own program, not the mod's stand-in
 				be.power().set(PowerBuffer.CAPACITY / 20);
 				be.parts().setItem(CaseMenu.UPS_SLOT, new ItemStack(ModItems.TIER1_BATTERY));
 			});
@@ -314,6 +314,12 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			check(GREEN.test(on.buttonCenter()), "the power button should be lit green when on, got " + hex(on.buttonCenter()));
 			check(on.whitePixels(0, 1) >= 50, "the display's first row should show text, found " + on.whitePixels(0, 1));
 			check(on.whitePixels(1, 16) == 0, "the rest of the display should be black");
+			// Typing in the screen view goes to this terminal; the program echoes it to the console.
+			context.getInput().typeChars("hi");
+			context.getInput().pressKey(InputConstants.KEY_RETURN);
+			context.getInput().typeChars("ok");
+			context.waitFor(client -> client.level.getBlockEntity(computer) instanceof AllInOneBlockEntity be
+				&& be.terminal().buffer().row(1).startsWith("hi") && be.terminal().buffer().row(2).startsWith("ok"));
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitFor(client -> client.gui.screen() == null);
 

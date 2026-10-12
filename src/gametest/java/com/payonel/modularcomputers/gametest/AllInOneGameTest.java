@@ -335,8 +335,11 @@ public class AllInOneGameTest {
 		helper.assertValueEqual(reloaded.terminal().buffer().rows(), computer.terminal().buffer().rows(), "display text after reload");
 		helper.assertValueEqual(reloaded.terminal().buffer().background(3, 3), Cpu.ABORT_BACKGROUND, "display colors after reload");
 		var console = reloaded.machine().board().virtualBus().console();
-		helper.assertValueEqual(console.row(), 1, "console cursor after reload");
-		helper.assertValueEqual(console.background(), Cpu.ABORT_BACKGROUND, "console colors after reload");
+		helper.assertValueEqual(console.decoder().row(), 1, "console cursor after reload");
+		helper.assertValueEqual(java.util.Arrays.toString(console.decoder().state()),
+			java.util.Arrays.toString(computer.machine().board().virtualBus().console().decoder().state()), "console colors after reload");
+		helper.assertValueEqual(java.util.Arrays.toString(reloaded.terminal().decoder().state()),
+			java.util.Arrays.toString(computer.terminal().decoder().state()), "the terminal's cursor and colors after reload");
 		helper.succeed();
 	}
 

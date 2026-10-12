@@ -82,6 +82,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static final String DISPLAY = "display";
 	private static final String FOREGROUND = "display_foreground";
 	private static final String BACKGROUND = "display_background";
+	/** The terminal's cursor, colors and modes. */
+	private static final String TERMINAL_STATE = "display_state";
 	private static final String CONSOLE = "console";
 	/** The saved external bus order. */
 	private static final String BUS_EXTERNAL = "bus_external";
@@ -753,8 +755,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		output.store(DISPLAY, Codec.STRING.listOf(), display.buffer().rows());
 		output.putIntArray(FOREGROUND, display.buffer().foregrounds());
 		output.putIntArray(BACKGROUND, display.buffer().backgrounds());
+		output.putIntArray(TERMINAL_STATE, display.decoder().state());
 		ConsoleSplitter console = machine.board().virtualBus().console();
-		output.putIntArray(CONSOLE, new int[] {console.column(), console.row(), console.foreground(), console.background()});
+		output.putIntArray(CONSOLE, console.decoder().state());
 		output.store(CONSOLE_SCREEN, Codec.STRING.listOf(), console.screen().rows());
 		output.putIntArray(CONSOLE_FOREGROUND, console.screen().foregrounds());
 		output.putIntArray(CONSOLE_BACKGROUND, console.screen().backgrounds());
@@ -781,9 +784,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		input.read(DISPLAY, Codec.STRING.listOf()).ifPresent(display.buffer()::setRows);
 		input.getIntArray(FOREGROUND).ifPresent(foreground ->
 			input.getIntArray(BACKGROUND).ifPresent(background -> display.buffer().setColors(foreground, background)));
+		input.getIntArray(TERMINAL_STATE).ifPresent(display.decoder()::restore);
 		ConsoleSplitter console = machine.board().virtualBus().console();
-		input.getIntArray(CONSOLE).filter(state -> state.length == 4).ifPresent(state ->
-			console.restore(state[0], state[1], state[2], state[3]));
+		input.getIntArray(CONSOLE).ifPresent(console.decoder()::restore);
 		input.read(CONSOLE_SCREEN, Codec.STRING.listOf()).ifPresent(console.screen()::setRows);
 		input.getIntArray(CONSOLE_FOREGROUND).ifPresent(foreground ->
 			input.getIntArray(CONSOLE_BACKGROUND).ifPresent(background -> console.screen().setColors(foreground, background)));

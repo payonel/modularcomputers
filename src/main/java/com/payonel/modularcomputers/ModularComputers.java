@@ -11,6 +11,7 @@ import com.payonel.modularcomputers.network.ConnectDevicePayload;
 import com.payonel.modularcomputers.network.ForgetDevicePayload;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import com.payonel.modularcomputers.network.PressPowerPayload;
+import com.payonel.modularcomputers.network.TerminalInputPayload;
 import com.payonel.modularcomputers.network.ReorderBusPayload;
 import com.payonel.modularcomputers.network.SettingsPayload;
 import com.payonel.modularcomputers.network.SwitchViewPayload;
@@ -61,6 +62,7 @@ public final class ModularComputers implements ModInitializer {
 		ModCreativeTab.init();
 		OpenDisplayPayload.register();
 		PressPowerPayload.register();
+		TerminalInputPayload.register();
 		SwitchViewPayload.register();
 		ReorderBusPayload.register();
 		ConnectDevicePayload.register();

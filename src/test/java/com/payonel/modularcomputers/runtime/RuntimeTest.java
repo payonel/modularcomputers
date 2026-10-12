@@ -84,7 +84,7 @@ class RuntimeTest {
 		AtomicInteger calls = new AtomicInteger();
 		run(board -> {
 			for (int i = 0; i < 50; i++) {
-				board.invoke("id:screen", "getResolution");
+				board.invoke("id:screen", "getSize");
 				calls.incrementAndGet();
 			}
 			board.halt();
@@ -107,13 +107,13 @@ class RuntimeTest {
 			seen.add(board.type("console").orElseThrow());
 			seen.add(board.methods("id:screen"));
 			seen.add(board.doc("id:sensor-1", "read").orElseThrow());
-			seen.add(board.invoke("id:screen", "getResolution").values());
+			seen.add(board.invoke("id:screen", "getSize").values());
 			seen.add(board.status().capacity());
 			board.halt();
 		});
 		assertThat(seen).containsExactly(
 			List.of(new Board.DeviceInfo("id:screen", "id:screen", "terminal"), new Board.DeviceInfo("id:sensor-1", "id:sensor-1", "sensor")),
-			"terminal", "console", List.of("fill", "get", "getResolution", "read", "set"), "read(): the oldest reading, or nil", List.of(50L, 16L), 0);
+			"terminal", "console", List.of("getSize", "read", "write"), "read(): the oldest reading, or nil", List.of(50L, 16L), 0);
 	}
 
 	@Test
@@ -139,13 +139,13 @@ class RuntimeTest {
 		run(board -> {
 			errors.add(board.invoke("nowhere", "read").error());
 			errors.add(board.invoke("id:sensor-1", "fly").error());
-			errors.add(board.invoke("id:screen", "set", "one", 1, "x").error());
+			errors.add(board.invoke("id:screen", "write", true).error());
 			errors.add(board.invoke("id:sensor-1", "explode").error());
-			errors.add(board.invoke("id:screen", "set", 1, 1, "hi").failed() ? "failed" : "ok");
+			errors.add(board.invoke("id:screen", "write", "hi").failed() ? "failed" : "ok");
 			board.halt();
 		});
 		assertThat(errors).containsExactly("no such device: nowhere", "no such method: fly",
-			"bad argument #1 (number expected, got string)", "device error: java.lang.IllegalStateException: boom", "ok");
+			"bad argument #1 (string expected, got boolean)", "device error: java.lang.IllegalStateException: boom", "ok");
 		assertThat(display.buffer().row(0)).startsWith("hi");
 		assertThat(machine.isPowered()).isTrue();
 	}
@@ -247,7 +247,7 @@ class RuntimeTest {
 	void haltingEndsTheProgramWithPowerOnAndTheScreenKept() {
 		List<String> after = new ArrayList<>();
 		run(board -> {
-			board.invoke("console", "print", "bye");
+			board.invoke("console", "write", "bye\n");
 			board.halt();
 			after.add("ran on"); // never: halt doesn't return
 		});
@@ -260,7 +260,7 @@ class RuntimeTest {
 
 	@Test
 	void returningWithoutHaltingIsAPanic() {
-		run(board -> board.invoke("console", "print", "bye"));
+		run(board -> board.invoke("console", "write", "bye\n"));
 		assertThat(machine.runner()).isEmpty();
 		assertThat(machine.isPowered()).as("power stays on, as after any abort").isTrue();
 		assertThat(display.buffer().row(0).strip()).isEqualTo(Cpu.ABORT + Cpu.RETURNED);

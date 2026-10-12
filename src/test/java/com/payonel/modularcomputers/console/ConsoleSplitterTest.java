@@ -7,99 +7,76 @@ import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.device.Disk;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
-import com.payonel.modularcomputers.display.TextBuffer;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
+/** The console as a tty: it sends text to every terminal in its group, after its output processing. */
 class ConsoleSplitterTest {
 	private static ConsoleSplitter console(Device... devices) {
 		return new ConsoleSplitter(new Bus(List.of(devices)));
 	}
 
 	@Test
-	void withNoDisplayItHasASizeAndDropsOutput() {
+	void withNoTerminalItHasASizeAndKeepsItsOwnCopy() {
 		ConsoleSplitter console = console(new Disk());
 		assertThat(console.size()).isEqualTo(ConsoleSplitter.HEADLESS);
-		console.print("nobody sees this");
-		assertThat(console.row()).isEqualTo(1);
+		console.write("nobody sees this\n");
+		assertThat(console.screen().row(0).strip()).isEqualTo("nobody sees this");
 	}
 
 	@Test
-	void writesToTheDisplay() {
-		Terminal display = new Terminal(new Resolution(10, 3));
-		ConsoleSplitter console = console(new Disk(), display);
-		console.print("hi");
-		console.write("there");
-		assertThat(display.buffer().rows()).containsExactly("hi        ", "there     ", "          ");
-		assertThat(console.column()).isEqualTo(5);
-		assertThat(console.row()).isEqualTo(1);
+	void writesTheSameTextToEveryTerminal() {
+		Terminal one = new Terminal(new Resolution(6, 2));
+		Terminal two = new Terminal(new Resolution(6, 3));
+		ConsoleSplitter console = console(new Disk(), one, two);
+		console.write("hi\nthere");
+		assertThat(one.buffer().rows()).containsExactly("hi    ", "there ");
+		assertThat(two.buffer().rows()).containsExactly("hi    ", "there ", "      ");
+		assertThat(console.size()).isEqualTo(new Resolution(6, 2));
 	}
 
 	@Test
-	void mirrorsToEveryDisplayAtTheSmallestCommonSize() {
-		Terminal wide = new Terminal(new Resolution(8, 2));
-		Terminal tall = new Terminal(new Resolution(4, 3));
-		ConsoleSplitter console = console(wide, tall);
-		assertThat(console.size()).isEqualTo(new Resolution(4, 2));
-		console.write("abcdef");
-		// Wraps at 4 columns on both, even though the wide display has room.
-		assertThat(wide.buffer().rows()).containsExactly("abcd    ", "ef      ");
-		assertThat(tall.buffer().rows()).containsExactly("abcd", "ef  ", "    ");
+	void onlcrTurnsNewlinesIntoCrLfAndCanBeTurnedOff() {
+		Terminal terminal = new Terminal(new Resolution(6, 3));
+		ConsoleSplitter console = console(terminal);
+		assertThat(console.modes()).containsEntry(ConsoleSplitter.ONLCR, true);
+		console.write("ab\n");
+		assertThat(console.setMode(ConsoleSplitter.ONLCR, false)).isTrue();
+		console.write("cd\nef");
+		assertThat(terminal.buffer().rows()).containsExactly("ab    ", "cd    ", "  ef  ");
+		assertThat(console.setMode("nope", true)).isFalse();
 	}
 
 	@Test
-	void newLineAtTheBottomScrollsTheConsoleArea() {
-		Terminal small = new Terminal(new Resolution(3, 2));
-		Terminal big = new Terminal(new Resolution(3, 3));
-		ConsoleSplitter console = console(small, big);
-		big.buffer().write(0, 2, "zzz"); // outside the console area
-		console.print("one");
-		console.print("two");
-		console.write("3");
-		assertThat(small.buffer().rows()).containsExactly("two", "3  ");
-		assertThat(big.buffer().rows()).containsExactly("two", "3  ", "zzz");
-		assertThat(console.row()).isEqualTo(1);
+	void escapeSequencesPassThroughToTheTerminals() {
+		Terminal terminal = new Terminal(new Resolution(6, 2));
+		ConsoleSplitter console = console(terminal);
+		console.write("\u001B[2;3H\u001B[31mx");
+		assertThat(terminal.buffer().get(2, 1)).isEqualTo('x');
+		assertThat(terminal.buffer().foreground(2, 1)).isEqualTo(0xCD0000);
 	}
 
 	@Test
-	void writesInTheCurrentColorsAndClearsTheConsoleArea() {
-		Terminal small = new Terminal(new Resolution(2, 1));
-		Terminal big = new Terminal(new Resolution(3, 2));
-		ConsoleSplitter console = console(small, big);
-		console.setColors(0x111111, 0x222222);
-		console.clear();
+	void aJoiningTerminalGetsTheConsoleRedrawnOnIt() {
+		ConsoleSplitter console = console(new Disk());
+		console.write("\u001B[32mgreen\nline two");
+		Terminal late = new Terminal(Resolution.DEFAULT);
+		late.write("old junk");
+		console.redraw(late);
+		assertThat(late.buffer().rows()).isEqualTo(console.screen().rows());
+		assertThat(late.buffer().foregrounds()).isEqualTo(console.screen().foregrounds());
+		console.write("!");
+		assertThat(late.buffer().row(1).strip()).isEqualTo("line two");
+	}
+
+	@Test
+	void resetBlanksItsCopyAndRestoresTheModes() {
+		ConsoleSplitter console = console(new Terminal(Resolution.DEFAULT));
+		console.setMode(ConsoleSplitter.ONLCR, false);
 		console.write("a");
-		for (Terminal display : List.of(small, big)) {
-			assertThat(display.buffer().get(0, 0)).isEqualTo('a');
-			assertThat(display.buffer().foreground(0, 0)).isEqualTo(0x111111);
-			assertThat(display.buffer().background(1, 0)).as("cleared in the console's background").isEqualTo(0x222222);
-		}
-		assertThat(big.buffer().background(2, 0)).as("outside the console area").isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
-		assertThat(big.buffer().background(0, 1)).as("outside the console area").isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
-	}
-
-	@Test
-	void scrollingKeepsTheConsoleBackground() {
-		Terminal display = new Terminal(new Resolution(2, 2));
-		ConsoleSplitter console = console(display);
-		console.setColors(0x111111, 0x222222);
-		console.clear();
-		console.print("a");
-		console.print("b");
-		assertThat(display.buffer().rows()).containsExactly("b ", "  ");
-		assertThat(display.buffer().background(0, 1)).isEqualTo(0x222222);
-	}
-
-	@Test
-	void resetGoesBackToTheTopLeftInDefaultColors() {
-		ConsoleSplitter console = console(new Terminal(new Resolution(5, 5)));
-		console.setColors(0x111111, 0x222222);
-		console.print("a");
-		console.write("b");
 		console.reset();
-		assertThat(console.column()).isZero();
-		assertThat(console.row()).isZero();
-		assertThat(console.foreground()).isEqualTo(TextBuffer.DEFAULT_FOREGROUND);
-		assertThat(console.background()).isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
+		assertThat(console.screen().isBlank()).isTrue();
+		assertThat(console.decoder().column()).isZero();
+		assertThat(console.modes()).containsEntry(ConsoleSplitter.ONLCR, true);
 	}
 }

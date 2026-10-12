@@ -42,10 +42,13 @@ public final class Cpu {
 		abort(board, RETURNED);
 	}
 
+	/** Soft gray, cleared, then the reason: written to the console as escape sequences, like any program would. */
 	private static void abort(Motherboard board, String reason) {
 		ConsoleSplitter console = board.virtualBus().console();
-		console.setColors(ABORT_FOREGROUND, ABORT_BACKGROUND);
-		console.clear();
-		console.print(ABORT + reason);
+		console.write("\u001B[0m" + color(38, ABORT_FOREGROUND) + color(48, ABORT_BACKGROUND) + "\u001B[2J\u001B[H" + ABORT + reason + "\n");
+	}
+
+	private static String color(int code, int rgb) {
+		return "\u001B[" + code + ";2;" + (rgb >> 16 & 0xFF) + ";" + (rgb >> 8 & 0xFF) + ";" + (rgb & 0xFF) + "m";
 	}
 }

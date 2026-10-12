@@ -23,6 +23,8 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 	private static final String DISPLAY = "display";
 	private static final String FOREGROUND = "display_foreground";
 	private static final String BACKGROUND = "display_background";
+	/** The terminal's cursor, colors and modes. */
+	private static final String TERMINAL_STATE = "display_state";
 
 	private final Terminal display = new Terminal(Resolution.DEFAULT);
 	/** The display's change count last sent to clients. */
@@ -63,6 +65,7 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 		output.store(DISPLAY, Codec.STRING.listOf(), display.buffer().rows());
 		output.putIntArray(FOREGROUND, display.buffer().foregrounds());
 		output.putIntArray(BACKGROUND, display.buffer().backgrounds());
+		output.putIntArray(TERMINAL_STATE, display.decoder().state());
 	}
 
 	@Override
@@ -71,5 +74,6 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 		input.read(DISPLAY, Codec.STRING.listOf()).ifPresent(display.buffer()::setRows);
 		input.getIntArray(FOREGROUND).ifPresent(foreground ->
 			input.getIntArray(BACKGROUND).ifPresent(background -> display.buffer().setColors(foreground, background)));
+		input.getIntArray(TERMINAL_STATE).ifPresent(display.decoder()::restore);
 	}
 }

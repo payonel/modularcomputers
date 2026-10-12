@@ -310,10 +310,12 @@ scripts/art/error_beep.py` into
         and plain), and four frames in `textures/gui/power_button.png`.
   - **Boot results:**
     - CPU and EEPROM: the stand-in program (`HelloWorldProgram`, which the user keeps changing
-      to try things out): today it prints "hello world" to the console, unbinds every display
-      from the console and labels each "screen 0", "screen 1", ... in bus order, then halts.
-      Unplug a screen and plug it back in (or add a new one) and it shows "hello world": the
-      console's copy.
+      to try things out): today it writes "hello world" to the console; keeps the first
+      terminal ("screen 0", the built-in) with the console; unbinds every other terminal and
+      labels it "screen 1", "screen 2", ... in bus order; then echoes typing to the console
+      forever (from the console's terminals and from the unbound ones; Enter a new line,
+      Backspace a rub-out). Unplug a screen and plug it back in (or add a new one) and it
+      shows the console's copy.
     - CPU, no EEPROM: the soft gray **ABRT** screen, `ABRT: no EEPROM installed`.
     - No CPU: the machine won't turn on.
     - Part changes take effect at the next power-on, except that removing the CPU cuts power.
@@ -491,10 +493,9 @@ scripts/art/error_beep.py` into
     find firmware.
   - The CPU's only behavior of its own is the **abort screen**, like a kernel panic. With an
     empty slot, or when the program throws, it does this and halts, with power staying on:
-    1. sets the console colors to `ABORT_FOREGROUND` on `ABORT_BACKGROUND` (soft gray; the
-       user doesn't want blue);
-    2. clears the console;
-    3. prints `ABRT: <reason>` (`Cpu.NO_EEPROM`, or `Cpu.CRASHED` plus the message).
+    writes to the console, as escape sequences: colors `ABORT_FOREGROUND` on `ABORT_BACKGROUND`
+    (soft gray; the user doesn't want blue), clear, cursor home, then `ABRT: <reason>`
+    (`Cpu.NO_EEPROM`, `Cpu.CRASHED` plus the message, or `Cpu.RETURNED`).
 - **EEPROM (`Eeprom`):** holds a `Program`. Today that's a Java mock program
   (`HelloWorldProgram`). Later it's Lua code run by the user's Lua runtime. The CPU's side
   doesn't change.
@@ -527,11 +528,25 @@ scripts/art/error_beep.py` into
       own too.
     - **Terminals** (`device/Terminal`, type `terminal`; user decision 2026-10-11): a screen and
       a keyboard are one device, like a VT100, so there's no separate keyboard device (the
-      user left that complexity out). Output: `getResolution`, `set`, `get`, `fill`. Input:
-      `read()` (the oldest key, or nil); keys wait in its queue, and while any do, its
-      interrupt is on, or the console's if it's in the console's group. Typing doesn't reach a
-      terminal yet (it will come from modal mode); tests use `Terminal.press`. The screen block
-      and the all-in-one's front are terminals.
+      user left that complexity out). The screen block and the all-in-one's front are
+      terminals.
+      - **They're VT100/xterm decoders** (user, 2026-10-11: "vt102, but really what modern pty
+        terminal emulators support"): programs never touch cells or positions, they only
+        `write(text)` with escape sequences, and the terminal decodes them
+        (`display/VtDecoder`: cursor moves, erase, insert/delete, scroll region, SGR with 16,
+        256 and 24-bit colors, new line mode `LNM`, autowrap, cursor visibility, the alternate
+        screen, reports `5n`/`6n`/`c`; unknown sequences ignored). Methods: `write`, `read`,
+        `getSize` (like the pty window size, `TIOCGWINSZ`). Direct writes are raw: LF only
+        moves down unless the program sets `ESC[20h`. The decoder's state (cursor, colors,
+        modes) is saved with the cells (`display_state`). Nothing draws a cursor yet.
+      - **Input:** keys wait in its queue until `read()` (as do its answers to reports); while
+        any wait, its interrupt is on, or the console's if it's in the console's group.
+      - **Only the terminal the player has open gets the keys** (user, 2026-10-11): typing in a
+        screen view (`DisplayScreen`) sends `TerminalInputPayload` to that terminal.
+        Characters come from `charTyped`; other keys send what an xterm keyboard sends
+        (`client/screen/TerminalKeys`): Return CR, Backspace DEL, Tab, Ctrl+letter a control
+        character, arrows `ESC[A`..., Home/End, Insert/Delete, PageUp/PageDown. Escape still
+        closes the view. The server checks reach.
     - **The console's group** (user design, 2026-10-11): `console.terminals()` lists the bound
       terminals by address in bus order; `console.unbind(address)` takes one out (the console
       stops drawing on it and reading from it, what's on it stays, the program owns it through
@@ -580,9 +595,8 @@ scripts/art/error_beep.py` into
   - **Tests bring their own programs** (user, 2026-10-11): never assert on `HelloWorldProgram`,
     which changes. Unit tests build their own `Program`s; game tests flash one onto the EEPROM
     after inserting it (`Eeprom.flash`, like reflashing firmware; `gametest/TestPrograms`).
-  - Device methods so far: the console (`print`, `write`, `clear`, `setColors`, `getSize`,
-    `terminals`, `bind`, `unbind`, `read`) and terminals (`getResolution`, `set`, `get`,
-    `fill`, `read`; columns and rows from 1, as in Lua).
+  - Device methods so far: the console (`write`, `read`, `getSize`, `getModes`, `setMode`,
+    `terminals`, `bind`, `unbind`) and terminals (`write`, `read`, `getSize`).
 - **Motherboard (`Motherboard`):** holds the soldered parts (`Hardware`/`Part`, memory), the
   CPU socket, the EEPROM slot, and two buses.
   - **The bus is the motherboard's firmware, not the case's** (user, 2026-10-11: "the all in one
@@ -606,16 +620,21 @@ scripts/art/error_beep.py` into
   - `pressPower()` returns `ON`, `OFF` or `NO_CPU`; `NO_CPU` means refused.
   - `cpuRemoved()` cuts power if the CPU was pulled while running.
   - On means a CPU is installed and was handed control.
-- **Console (`console/ConsoleSplitter`):** modeled on UEFI's console splitter.
-  - It's never null. It writes to every display on the physical bus and drops output when
-    there are none.
-  - Its size is the smallest columns × rows among the displays. With no displays it reports
-    `HEADLESS` (a real size, never 0×0, like Linux's dummycon).
-  - It owns the cursor and the current colors. It wraps text at the right edge, `clear()`
-    fills its area, and it scrolls only its own area.
-  - Like a Linux virtual console, it keeps **its own copy of what it shows**
-    (`ConsoleSplitter.screen()`, saved with the computer). `redraw(display)` paints it onto a
-    display that joins later.
+- **Console (`console/ConsoleSplitter`):** modeled on UEFI's console splitter and Linux's tty
+  layer for `/dev/console`.
+  - It's never null. It sends the same text to every terminal in its group (raw multicast,
+    like `console=tty0 console=ttyS0`) and drops output when there are none. Each terminal
+    decodes it at its own size.
+  - **Its modes are termios's, by name** (user, 2026-10-11): `onlcr` (on by default, as on
+    Linux) sends `\n` as `\r\n`; `setMode("onlcr", false)` makes it literal. Direct
+    `id:<terminal>` writes have no tty layer: always literal. Power-off restores the
+    defaults. Input-side modes (`icrnl`, `echo`, `icanon`) are undecided.
+  - Its size is the smallest among its terminals. With none it reports `HEADLESS` (a real
+    size, never 0×0, like Linux's dummycon).
+  - Like a Linux virtual console, it keeps **its own copy of what it shows**: it decodes its
+    own output onto `ConsoleSplitter.screen()` (saved with the computer, with the decoder's
+    state). `redraw(terminal)` paints it onto a terminal that joins, as escape sequences
+    (`VtDecoder.redraw`), the way tmux redraws an attaching terminal.
 - **Hot-plug (`Machine.setDevices`):** the bus changes when a part goes in or out, a cable is
   plugged or unplugged, or the player reorders. While the machine runs:
   - devices that left get `powerOff()` (an unplugged screen goes blank);

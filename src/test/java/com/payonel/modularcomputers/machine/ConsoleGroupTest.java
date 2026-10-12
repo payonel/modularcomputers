@@ -63,13 +63,12 @@ class ConsoleGroupTest {
 	/** Greets on the console, then takes every terminal for itself and labels it, then halts. */
 	private void bootLabellingScreens() {
 		boot(board -> {
-			board.invoke("console", "print", "hello world");
+			board.invoke("console", "write", "hello world\n");
 			int screen = 0;
 			for (Board.DeviceInfo device : board.list()) {
 				if ("terminal".equals(device.type())) {
 					seen.add(board.invoke("console", "unbind", device.address()).first());
-					board.invoke(device.address(), "fill", 1, 1, 50, 16, " ");
-					board.invoke(device.address(), "set", 1, 1, "screen " + screen++);
+					board.invoke(device.address(), "write", "\u001B[2J\u001B[Hscreen " + screen++);
 				}
 			}
 			seen.add(board.invoke("console", "terminals").first());
@@ -105,7 +104,7 @@ class ConsoleGroupTest {
 	@Test
 	void consoleOutputSkipsUnboundTerminals() {
 		bootLabellingScreens();
-		console().print("more");
+		console().write("more");
 		assertThat(first.buffer().row(1).strip()).isEmpty();
 		assertThat(console().screen().row(1).strip()).isEqualTo("more");
 	}

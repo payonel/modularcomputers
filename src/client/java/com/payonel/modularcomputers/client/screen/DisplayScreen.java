@@ -8,9 +8,13 @@ import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.display.TextBuffer;
 import com.payonel.modularcomputers.display.Viewport;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
+import com.payonel.modularcomputers.network.TerminalInputPayload;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import java.util.Optional;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -89,6 +93,32 @@ public final class DisplayScreen extends Screen {
 		var hit = ComputerButtons.click(event, powerButton(), viewToggle(), ComputerButtons.Target.CASE, pos);
 		powerHeld = hit == ComputerButtons.Hit.POWER;
 		return hit != ComputerButtons.Hit.NONE || super.mouseClicked(event, doubleClick);
+	}
+
+	/**
+	 * Typing goes to this terminal, and only this one: keys that don't type a character as their
+	 * escape sequences, here; characters through {@link #charTyped}. Escape still closes the view.
+	 */
+	@Override
+	public boolean keyPressed(KeyEvent event) {
+		if (event.isEscape()) {
+			return super.keyPressed(event);
+		}
+		var sequence = TerminalKeys.sequence(event.key(), event.hasControlDown());
+		sequence.ifPresent(this::send);
+		return true;
+	}
+
+	@Override
+	public boolean charTyped(CharacterEvent event) {
+		if (event.isAllowedChatCharacter()) {
+			send(event.codepointAsString());
+		}
+		return true;
+	}
+
+	private void send(String keys) {
+		ClientPlayNetworking.send(new TerminalInputPayload(pos, keys));
 	}
 
 	@Override

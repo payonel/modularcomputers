@@ -80,9 +80,9 @@ Decided by the user:
 
 Still to do:
 - Running machines off-thread, asynchronously, and how they share the server tick.
-- **Typing reaches terminals** (user, 2026-10-11): keys typed in a screen's modal mode go to
-  that terminal's queue on the server. The device side is built (`Terminal.read`,
-  `console.read`, interrupts); the client-to-server part isn't.
+- **The console's input modes:** `icrnl` (Enter's CR becomes LF), `echo`, `icanon` (line
+  editing). Undecided; today a program echoes for itself.
+- **A drawn cursor** on terminals (hidden by `ESC[?25l`), and the bell.
 - Device methods for the rest: disks, the
   UPS battery (charge, time left), cards, the EEPROM.
 - Opaque handles (Lua userdata) in the value model.
