@@ -119,6 +119,21 @@ public class CableGameTest {
 		helper.succeedWhen(() -> helper.assertTrue(showsText(screen.terminal()), "a screen plugged into a running computer shows its console"));
 	}
 
+	@GameTest(maxTicks = 60)
+	public void breakingTheComputerLeavesItsScreensDark(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
+		computer.pressPower();
+		ScreenBlockEntity screen = wiredScreen(helper);
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(showsText(screen.terminal()), "lit by the running computer"))
+			.thenExecute(() -> helper.destroyBlock(COMPUTER))
+			.thenExecute(() -> {
+				helper.assertTrue(screen.terminal().buffer().isBlank(), "bus-powered: no computer, no power, dark");
+				helper.assertTrue(!screen.terminal().power().powered(), "nothing supplies it");
+			})
+			.thenSucceed();
+	}
+
 	@GameTest
 	public void disconnectingAScreenTakesItOffTheBusAndBlanksIt(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);

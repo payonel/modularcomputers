@@ -430,9 +430,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	 * dies with an error beep. Time this chunk wasn't loaded doesn't count.
 	 */
 	private void updateBattery() {
-		if (machine.isPowered()) {
-			power.use(BATTERY_TICKS);
-		}
+		// The CPU while it runs a program, and the bus devices it powers (see Machine.powerUse).
+		power.use((int) Math.min(Integer.MAX_VALUE, machine.powerUse(level.getGameTime())));
 		pullFromBattery();
 		if (machine.powerLost()) {
 			errorBeep();

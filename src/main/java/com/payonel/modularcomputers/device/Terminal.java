@@ -1,5 +1,6 @@
 package com.payonel.modularcomputers.device;
 
+import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.bus.DeviceType;
 import com.payonel.modularcomputers.display.Resolution;
@@ -21,10 +22,19 @@ import java.util.Optional;
  * <p>
  * What it sends back waits in its queue until read: keys typed at it, and its answers to
  * reports (the cursor position for {@code ESC[6n}). While anything waits, its interrupt is on
- * (when it's in the console's group, the console's is instead). Typing doesn't reach it yet:
- * it will come from the screen view.
+ * (when it's in the console's group, the console's is instead). Typing comes from the screen
+ * view: only the terminal a player has open gets the keys.
+ * <p>
+ * It's bus-powered ({@link #DRAW}, plus {@link #WRITE_COST} a write): with no running computer
+ * supplying it, it's dark.
  */
 public final class Terminal implements Device {
+	/** What a terminal draws while it has power: half a running CPU. */
+	public static final double DRAW = 0.5;
+	/** What one write costs, flat, in ticks of a running CPU. */
+	public static final double WRITE_COST = 0.25;
+
+	private final BusPower power = new BusPower(DRAW);
 	private final TextBuffer buffer;
 	private final Deque<String> input = new ArrayDeque<>();
 	private final VtDecoder decoder;
@@ -42,9 +52,15 @@ public final class Terminal implements Device {
 		return decoder;
 	}
 
-	/** Text down the line to the terminal, decoded as it arrives. */
+	/** Text down the line to the terminal, decoded as it arrives. Each write costs power. */
 	public void write(String text) {
+		power.charge(WRITE_COST);
 		decoder.write(text);
+	}
+
+	@Override
+	public BusPower power() {
+		return power;
 	}
 
 	/** A key typed at the terminal. */

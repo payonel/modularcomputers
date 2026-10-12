@@ -1,5 +1,6 @@
 package com.payonel.modularcomputers.machine;
 
+import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.runtime.ProgramRunner;
@@ -49,6 +50,8 @@ public final class Machine {
 	private boolean powered;
 	private ProgramRunner runner;
 	private long uptime;
+	/** Ticks the CPU executed since power use was last collected. */
+	private long cpuTicks;
 	private int callsPerTick = DEFAULT_CALLS_PER_TICK;
 
 	/** A machine on a bench supply: it always has power. */
@@ -103,6 +106,9 @@ public final class Machine {
 		if (runner == null) {
 			return;
 		}
+		if (runner.state() != ProgramRunner.State.WAITING || !api.interrupts().isEmpty()) {
+			cpuTicks++; // it executes this tick; waiting for an interrupt, it's halted (sti; hlt) and draws nothing
+		}
 		ProgramRunner.State state = runner.tick(api, callsPerTick, uptime, api::interrupts);
 		if (state == ProgramRunner.State.CRASHED) {
 			board.cpu().ifPresent(cpu -> cpu.crashed(board, runner.crash()));
@@ -117,7 +123,47 @@ public final class Machine {
 	private void cutPower() {
 		powered = false;
 		stopProgram();
-		board.powerOff();
+		releaseDevices();
+		board.virtualBus().console().reset();
+	}
+
+	/** This machine stops supplying its devices: those it was the last supplier of lose power. */
+	private void releaseDevices() {
+		board.bus().devices().forEach(this::release);
+	}
+
+	private void release(Device device) {
+		BusPower power = device.power();
+		if (power == null || power.release(this)) {
+			device.powerOff();
+		}
+	}
+
+	private void supply(Device device) {
+		if (device.power() != null) {
+			device.power().supply(this);
+		}
+	}
+
+	/**
+	 * Power used since the last call, up to game time {@code now}, in ticks of a running CPU:
+	 * the CPU's own (1 for each tick it executed; nothing while halted or waiting for an
+	 * interrupt, as a real CPU in {@code HLT}) and what its bus
+	 * devices owe (see {@link BusPower}; a device shared with another computer pays once, to
+	 * whichever collects first). Nothing while off.
+	 */
+	public long powerUse(long now) {
+		if (!powered) {
+			return 0;
+		}
+		long used = cpuTicks;
+		cpuTicks = 0;
+		for (Device device : board.bus().devices()) {
+			if (device.power() != null) {
+				used += device.power().collect(now);
+			}
+		}
+		return used;
 	}
 
 	private void stopProgram() {
@@ -127,9 +173,15 @@ public final class Machine {
 		}
 	}
 
-	/** The machine is unloading (its chunk, or the world): the program stops. It isn't saved. */
+	/**
+	 * The machine is unloading (its chunk, or the world) or gone: the program stops (it isn't
+	 * saved), and it stops supplying its devices.
+	 */
 	public void unload() {
 		stopProgram();
+		if (powered) {
+			releaseDevices();
+		}
 	}
 
 	public Motherboard board() {
@@ -155,6 +207,8 @@ public final class Machine {
 		}
 		powered = true;
 		uptime = 0;
+		cpuTicks = 0;
+		board.bus().devices().forEach(this::supply);
 		runner = cpu.get().powerOn(board).orElse(null);
 		run(); // the CPU starts executing right away
 		return PowerPress.ON;
@@ -221,13 +275,17 @@ public final class Machine {
 		}
 		for (Device device : before) {
 			if (!devices.contains(device)) {
-				device.powerOff();
+				release(device);
 			}
 		}
 		for (var entry : addressed.entrySet()) {
-			// A display that joined is in the console's group: it gets the console drawn on it.
-			if (!before.contains(entry.getValue()) && entry.getValue() instanceof Terminal display && console.isBound(entry.getKey())) {
-				console.redraw(display);
+			if (before.contains(entry.getValue())) {
+				continue;
+			}
+			supply(entry.getValue());
+			// A terminal that joined is in the console's group: it gets the console drawn on it.
+			if (entry.getValue() instanceof Terminal terminal && console.isBound(entry.getKey())) {
+				console.redraw(terminal);
 			}
 		}
 	}
@@ -239,5 +297,8 @@ public final class Machine {
 	 */
 	public void restorePowered(boolean powered) {
 		this.powered = powered;
+		if (powered) {
+			board.bus().devices().forEach(this::supply);
+		}
 	}
 }

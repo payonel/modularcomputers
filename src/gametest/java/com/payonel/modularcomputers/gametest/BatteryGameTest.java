@@ -243,6 +243,7 @@ public class BatteryGameTest {
 		int start = 5 * DAY;
 		AllInOneBlockEntity computer = computer(helper, battery(ModItems.TIER1_BATTERY, start, BatteryCharge.UNSETTLED));
 		int afterFill = start - DAY;
+		TestPrograms.flash(computer, TestPrograms.BUSY); // a CPU only draws while it executes
 		computer.pressPower();
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertTrue(charge(computer).ticks() < afterFill, "the case tops up from the battery"))

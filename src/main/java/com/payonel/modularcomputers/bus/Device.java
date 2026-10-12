@@ -17,7 +17,16 @@ public interface Device {
 		return false;
 	}
 
-	/** The machine lost power. Volatile state goes away (a display goes black). */
+	/**
+	 * Its power from the bus, if it takes any (see {@link BusPower}): it has power while a running
+	 * computer has it on its bus, and owes what it draws. Null for a device that takes none; such
+	 * a device just loses power when it leaves a running computer's bus, or the computer goes off.
+	 */
+	default BusPower power() {
+		return null;
+	}
+
+	/** It lost power. Volatile state goes away (a display goes black). */
 	default void powerOff() {
 	}
 }

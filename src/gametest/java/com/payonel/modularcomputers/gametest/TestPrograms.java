@@ -36,6 +36,13 @@ public final class TestPrograms {
 		}
 	};
 
+	/** Keeps the CPU busy forever (never waits, never halts): it draws a full CPU's power. */
+	public static final Program BUSY = board -> {
+		while (true) {
+			board.uptime();
+		}
+	};
+
 	private TestPrograms() {
 	}
 

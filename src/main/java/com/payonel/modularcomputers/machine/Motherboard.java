@@ -233,10 +233,4 @@ public final class Motherboard {
 		this.eeprom = eeprom;
 		plug(EEPROM, eeprom); // it's on the bus too, at its slot
 	}
-
-	/** Power is cut: every device loses its volatile state, and the console starts over. */
-	public void powerOff() {
-		bus.devices().forEach(Device::powerOff);
-		virtualBus.console().reset();
-	}
 }
