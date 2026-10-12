@@ -11,6 +11,7 @@ import com.payonel.modularcomputers.runtime.Result;
 public final class Disk implements Device {
 	private final DiskTier tier;
 	private final BusPower power;
+	private String label;
 
 	public Disk(DiskTier tier) {
 		this.tier = tier;
@@ -24,6 +25,20 @@ public final class Disk implements Device {
 	@Method(doc = "getCapacity(): how many bytes it holds")
 	public Result getCapacity(Arguments args) {
 		return Result.ok(tier.bytes());
+	}
+
+	public void setLabel(String label) {
+		this.label = label;
+	}
+
+	@Override
+	public String label() {
+		return label;
+	}
+
+	@Override
+	public java.util.Map<String, Object> info() {
+		return java.util.Map.of("tier", (long) tier.number(), "capacity", (long) tier.bytes());
 	}
 
 	@Override

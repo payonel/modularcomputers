@@ -241,6 +241,25 @@ Linking, resetting, daisy-chaining, distances and the held-card highlight are bu
 AGENTS.md). Open: range limits, whether links should show in the bus order differently, and
 what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` device).
 
+## Disks: storage with files (user design, 2026-10-12; handle design open)
+
+- A disk's data lives in the world save, by the disk's id (its serial), as OC kept
+  `saves/<world>/opencomputers/<address>/`.
+- **A data mode, set by a program like formatting** (user): real disks come raw, but in game a
+  disk comes as **hfs** (host filesystem): its files are real files on the host, easy to debug.
+  The other mode is an opaque block device (one file on the host; some OC players wanted it, OC
+  called it "unmanaged").
+- hfs API: open a file handle on the disk with a path; handles read and write. A handle is a
+  proxy: on the host it holds the disk device and a real host file handle. **No deferred writes**
+  (OC buffered by default): every write goes to the host file at once.
+- From OC's `FileSystem` (1.12): `open(path, mode)` returns a `HandleValue` userdata (the
+  filesystem's address and an int); `read(handle, n)` (at most 2048 bytes a call), `write`,
+  `seek(handle, whence, offset)`, `close` are the filesystem's methods taking the handle. Handles
+  are tracked per owning machine (16 at most), closed when that machine starts, stops or
+  disconnects, and when Lua garbage-collects the userdata (`dispose`).
+- Open: how a program reaches a handle (the user's note "the file handle object should be
+  reachable --" was cut off).
+
 ## Machine ideas discussed (not built)
 
 - **Hot-plug takeover:** built. The console keeps its own copy of what it shows and redraws

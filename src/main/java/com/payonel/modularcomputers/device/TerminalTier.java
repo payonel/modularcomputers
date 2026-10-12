@@ -29,4 +29,9 @@ public enum TerminalTier {
 	public String attributes() {
 		return attributes;
 	}
+
+	/** 1, 2 or 3. */
+	public int number() {
+		return ordinal() + 1;
+	}
 }

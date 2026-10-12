@@ -2,6 +2,7 @@ package com.payonel.modularcomputers.block;
 
 import com.payonel.modularcomputers.device.Card;
 import com.payonel.modularcomputers.device.CardKind;
+import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.CardHolderMenu;
 import java.util.Optional;
@@ -45,6 +46,9 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 		for (int slot = 0; slot < SLOTS; slot++) {
 			CardKind kind = ModItems.cardKind(cards().getItem(slot)).orElse(null);
 			devices[slot] = kind == null ? null : devices[slot] != null && devices[slot].kind() == kind ? devices[slot] : new Card(kind);
+			if (devices[slot] != null) {
+				devices[slot].setLabel(ModComponents.label(cards().getItem(slot)));
+			}
 		}
 	}
 

@@ -586,7 +586,16 @@ scripts/art/error_beep.py` into
   - **Names:** `bus` and `device`, never "component" (user rule, code and docs).
   - **The motherboard API (`runtime/Board`)** is everything a program can do: `list()` (the
     bus's devices in bus order, each a `DeviceInfo(address, id, type)`, a table in Lua), `status()` (`BusStatus`), `type`, `methods`, `doc`,
-    `invoke(address, method, args...)`, `waitForInterrupt(seconds)`, `uptime()`. Addresses are
+    `invoke(address, method, args...)`, `waitForInterrupt(seconds)`, `uptime()`, and what the
+    firmware reports (user, 2026-10-12): `power()` (ACPI: the case's store, each battery by bay
+    and tier, the load: `PowerInfo`), `hardware()` (SMBIOS and `/proc/meminfo`: case tier, CPU
+    tier and bus capacity, each RAM stick's slot, tier and size, memory total and used; used is
+    0 until the Lua runtime counts it: `HardwareInfo`) and `info(address)` (like `udevadm info`:
+    address, id, type, label, then what the kind adds: a tier, a size, a terminal's width, height
+    and colors; `Device.info`). The board reads the case through `machine/Chassis` (the case's
+    `CaseChassis`; `Chassis.BENCH` for a bare board: tier 0, endless power). **Labels** are what
+    the player named the item on an anvil (`ModComponents.label`), like a sticker; programs can't
+    set them yet. Screen blocks have none yet. Addresses are
     the bus keys, three kinds as on a real system (user design, 2026-10-11):
     - **Paths** name slots, fixed by the slot: `eeprom`, `sata:0`, `exp:2`.
     - **Ids** name a device however it's connected: `id:<uuid>`. **Every device has one**
@@ -714,7 +723,11 @@ scripts/art/error_beep.py` into
     which changes. Unit tests build their own `Program`s; game tests flash one onto the EEPROM
     after inserting it (`Eeprom.flash`, like reflashing firmware; `gametest/TestPrograms`).
   - Device methods so far: the console (`write`, `read`, `getSize`, `getModes`, `setMode`,
-    `terminals`, `bind`, `unbind`) and terminals (`write`, `read`, `getSize`).
+    `terminals`, `bind`, `unbind`), terminals (`write`, `read`, `getSize`), disks
+    (`getCapacity`) and the EEPROM (`get`, `set`, `getSize`: its image, up to 4 KiB, like
+    `flashrom -r`/`-w`; kept on the item as `ModComponents.EEPROM_IMAGE`; another chip is another
+    `Eeprom`, by serial. The CPU still runs the Java stand-in whatever the image holds, until the
+    Lua runtime).
 - **Motherboard (`Motherboard`):** holds the soldered parts (`Hardware`/`Part`, memory), the
   CPU socket, the EEPROM slot, and two buses.
   - **The bus is the motherboard's firmware, not the case's** (user, 2026-10-11: "the all in one

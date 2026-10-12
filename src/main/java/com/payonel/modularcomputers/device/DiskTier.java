@@ -23,4 +23,9 @@ public enum DiskTier {
 	public int draw() {
 		return draw;
 	}
+
+	/** 1, 2 or 3. */
+	public int number() {
+		return ordinal() + 1;
+	}
 }

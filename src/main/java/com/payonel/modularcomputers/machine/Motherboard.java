@@ -47,6 +47,7 @@ public final class Motherboard {
 	private final BusOrder order = new BusOrder(0);
 	/** A bus capacity set by a test instead of the CPU's. */
 	private Integer capacityOverride;
+	private Chassis chassis = Chassis.BENCH;
 	/** What's on each connector. */
 	private final Map<String, Device> plugged = new HashMap<>();
 	/** The ids ({@code id:<uuid>}) of the devices on connectors, each to its connector. */
@@ -224,6 +225,15 @@ public final class Motherboard {
 	public void rebuildBus(long now) {
 		Layout layout = layout(now);
 		bus.setDevices(layout.devices(), layout.aliases());
+	}
+
+	/** The case it's in, as its firmware reads it (power, RAM). */
+	public Chassis chassis() {
+		return chassis;
+	}
+
+	public void setChassis(Chassis chassis) {
+		this.chassis = chassis;
 	}
 
 	public Optional<Cpu> cpu() {

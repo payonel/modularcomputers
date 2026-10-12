@@ -12,8 +12,10 @@ import com.payonel.modularcomputers.runtime.DeviceMethods;
 import com.payonel.modularcomputers.runtime.Result;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.LongSupplier;
 
@@ -47,6 +49,45 @@ final class MotherboardApi implements Board {
 		return bus.addresses().stream()
 			.map(address -> new DeviceInfo(address, bus.id(address), type(address).orElseThrow()))
 			.toList();
+	}
+
+	@Override
+	public PowerInfo power() {
+		return board.chassis().power();
+	}
+
+	@Override
+	public HardwareInfo hardware() {
+		Chassis chassis = board.chassis();
+		CpuInfo cpu = board.cpu().map(Cpu::tier).map(tier -> new CpuInfo(tier.number(), board.busCapacity())).orElse(null);
+		List<MemoryInfo> memory = chassis.memory();
+		long total = memory.stream().mapToLong(MemoryInfo::capacity).sum();
+		// Programs don't use memory yet: that's the Lua runtime's to count.
+		return new HardwareInfo(chassis.tier(), cpu, memory, total, 0);
+	}
+
+	@Override
+	public Optional<Map<String, Object>> info(String address) {
+		return device(address).map(device -> {
+			Map<String, Object> info = new LinkedHashMap<>();
+			Bus bus = board.bus();
+			if (device instanceof Device real) {
+				String at = bus.address(address).orElse(address);
+				info.put("address", at);
+				if (bus.id(at) != null) {
+					info.put("id", bus.id(at));
+				}
+				info.put("type", real.type().name().toLowerCase(Locale.ROOT));
+				if (real.label() != null) {
+					info.put("label", real.label());
+				}
+				info.putAll(real.info());
+			} else {
+				info.put("address", address); // a virtual device: its name is all it has
+				info.put("type", address);
+			}
+			return info;
+		});
 	}
 
 	@Override

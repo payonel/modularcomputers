@@ -12,6 +12,15 @@ public enum ColorDepth {
 	/** Every 24-bit color. */
 	TRUE_COLOR;
 
+	/** How many colors it shows: 2 (text only), 16, or every 24-bit color. */
+	public long colors() {
+		return switch (this) {
+			case MONOCHROME -> 2;
+			case SIXTEEN -> 16;
+			case TRUE_COLOR -> 1L << 24;
+		};
+	}
+
 	/** The color this depth shows for {@code rgb}; {@code fallback} is the default it uses in monochrome. */
 	public int show(int rgb, int fallback) {
 		return switch (this) {

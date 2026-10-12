@@ -2,6 +2,7 @@ package com.payonel.modularcomputers.runtime;
 
 import com.payonel.modularcomputers.bus.BusStatus;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -34,6 +35,58 @@ public interface Board {
 	 */
 	record DeviceInfo(String address, String id, String type) {
 	}
+
+	/**
+	 * A store of power, in power units: how much it holds now and when full. An infinite one (a
+	 * tier 3 battery) is always full; a Lua runtime gives its numbers as {@code math.huge}.
+	 */
+	record Store(long stored, long capacity, boolean infinite) {
+		public static final Store NONE = new Store(0, 0, false);
+
+		public int percent() {
+			return infinite ? 100 : capacity == 0 ? 0 : (int) Math.ceil(stored * 100.0 / capacity);
+		}
+	}
+
+	/** A battery in a bay (from 0), like ACPI's BAT0, BAT1: its tier and its charge. */
+	record BatteryInfo(int bay, int tier, Store charge) {
+	}
+
+	/**
+	 * The case's power, as the firmware reports it (ACPI's battery and AC information): the case's
+	 * own store, which the computer runs on, each battery in a bay, and what the computer draws
+	 * now, a tick (its load).
+	 */
+	record PowerInfo(Store store, List<BatteryInfo> batteries, long load) {
+	}
+
+	/** The CPU in the socket (SMBIOS's processor information): its tier and how many devices its bus holds. */
+	record CpuInfo(int tier, int busCapacity) {
+	}
+
+	/** A RAM stick (SMBIOS's memory device): its slot (from 0), tier and size in bytes. */
+	record MemoryInfo(int slot, int tier, long capacity) {
+	}
+
+	/**
+	 * The board's hardware, as SMBIOS describes it ({@code dmidecode}): the case's tier, the CPU
+	 * (null without one), the RAM sticks, and the memory in all and in use ({@code /proc/meminfo}).
+	 */
+	record HardwareInfo(int caseTier, CpuInfo cpu, List<MemoryInfo> memory, long memoryTotal, long memoryUsed) {
+	}
+
+	/** The case's power: its store, its batteries and its load. */
+	PowerInfo power();
+
+	/** The board's hardware: case tier, CPU, RAM. */
+	HardwareInfo hardware();
+
+	/**
+	 * What a device says of itself, like {@code udevadm info} or {@code lsblk}: its address, id,
+	 * type and label (what the player named it, if anything), then what its kind adds (a tier, a
+	 * size). A Lua runtime gives it as a table. Empty for no such device.
+	 */
+	Optional<Map<String, Object>> info(String address);
 
 	/** The devices on the physical bus, in bus order. Reading it clears the bus's interrupt. */
 	List<DeviceInfo> list();

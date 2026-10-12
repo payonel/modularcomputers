@@ -9,7 +9,13 @@ import com.payonel.modularcomputers.device.TerminalTier;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.CaseTier;
 import com.payonel.modularcomputers.menu.CaseMenu;
+import com.payonel.modularcomputers.item.ModComponents;
+import com.payonel.modularcomputers.machine.MemoryTier;
+import com.payonel.modularcomputers.runtime.Board;
+import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -107,6 +113,39 @@ public class CaseTierGameTest {
 		helper.assertBlockProperty(POS, AllInOneBlock.SCREEN, false);
 		helper.assertTrue(bus.device("exp:0").isEmpty(), "gone from the bus");
 		helper.assertTrue(terminal.buffer().isBlank(), "and dark");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void theBoardReportsItsCaseAndTheEepromKeepsWhatAProgramWrites(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
+		ItemStack chip = new ItemStack(ModItems.EEPROM);
+		chip.set(DataComponents.CUSTOM_NAME, Component.literal("boot"));
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, chip);
+		computer.parts().setItem(CaseMenu.UPS_SLOT + 1, ModItems.TIER1_BATTERY.charged());
+		computer.parts().setItem(CaseMenu.RAM_SLOTS + 1, new ItemStack(ModItems.TIER2_RAM));
+		List<Object> seen = new ArrayList<>();
+		TestPrograms.flash(computer, board -> {
+			seen.add(board.power());
+			seen.add(board.hardware());
+			seen.add(board.info("eeprom").orElseThrow().get("label"));
+			board.invoke("eeprom", "set", "boot code");
+			board.halt();
+		});
+		computer.pressPower();
+		Board.PowerInfo power = (Board.PowerInfo) seen.get(0);
+		helper.assertValueEqual(power.store().capacity(), (long) CaseTier.TIER_2.bufferCapacity(), "the case's store");
+		helper.assertValueEqual(power.batteries().size(), 1, "one battery");
+		helper.assertValueEqual(power.batteries().get(0).bay(), 1, "in the second bay");
+		helper.assertValueEqual(power.batteries().get(0).tier(), 1, "a tier 1");
+		Board.HardwareInfo hardware = (Board.HardwareInfo) seen.get(1);
+		helper.assertValueEqual(hardware.caseTier(), 2, "case tier");
+		helper.assertValueEqual(hardware.cpu(), new Board.CpuInfo(2, 16), "the CPU");
+		helper.assertValueEqual(hardware.memory(), List.of(new Board.MemoryInfo(1, 2, MemoryTier.TIER_2.bytes())), "the RAM");
+		helper.assertValueEqual(seen.get(2), "boot", "an anvil's name is the device's label");
+		ItemStack after = computer.parts().getItem(CaseMenu.EEPROM_SLOT);
+		helper.assertValueEqual(after.get(ModComponents.EEPROM_IMAGE), "boot code", "the write is on the chip");
 		helper.succeed();
 	}
 

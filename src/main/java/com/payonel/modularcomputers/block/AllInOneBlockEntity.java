@@ -20,6 +20,10 @@ import com.payonel.modularcomputers.device.DiskTier;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
+import com.payonel.modularcomputers.item.MemoryItem;
+import com.payonel.modularcomputers.power.BatteryTier;
+import com.payonel.modularcomputers.runtime.Board;
+import com.payonel.modularcomputers.machine.Chassis;
 import com.payonel.modularcomputers.machine.CaseTier;
 import com.payonel.modularcomputers.item.ScreenItem;
 import com.payonel.modularcomputers.device.TerminalTier;
@@ -121,6 +125,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final Disk[] disks = new Disk[CaseMenu.LANES];
 	private final Card[] cards = new Card[CaseMenu.LANES];
 	private Eeprom eeprom;
+	/** The serial of the chip {@link #eeprom} was made for: another chip is another device. */
+	private UUID eepromSerial;
 	private final Bus bus = new Bus(List.of()); // empty until a CPU is in
 	private final PowerBuffer power;
 	private final CaseTier tier;
@@ -191,6 +197,42 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		this.tier = block.tier();
 		this.power = new PowerBuffer(tier.bufferCapacity());
 		display.setFlusher(this::syncDisplay);
+		machine.board().setChassis(new CaseChassis());
+	}
+
+	/** What the board's firmware reads from this case (ACPI and SMBIOS): its tier, power and RAM. */
+	private final class CaseChassis implements Chassis {
+		@Override
+		public int tier() {
+			return tier.number();
+		}
+
+		@Override
+		public Board.PowerInfo power() {
+			List<Board.BatteryInfo> batteries = new ArrayList<>();
+			for (int bay = 0; bay < CaseMenu.UPS_BAYS; bay++) {
+				ItemStack stack = parts.getItem(CaseMenu.UPS_SLOT + bay);
+				if (stack.getItem() instanceof BatteryItem battery) {
+					BatteryTier batteryTier = battery.tier();
+					Board.Store charge = batteryTier.infinite()
+						? new Board.Store(0, 0, true)
+						: new Board.Store(BatteryItem.charge(stack).units(), batteryTier.capacity(), false);
+					batteries.add(new Board.BatteryInfo(bay, batteryTier.ordinal() + 1, charge));
+				}
+			}
+			return new Board.PowerInfo(new Board.Store(power.level(), power.capacity(), false), batteries, machine.currentDraw());
+		}
+
+		@Override
+		public List<Board.MemoryInfo> memory() {
+			List<Board.MemoryInfo> memory = new ArrayList<>();
+			for (int slot = 0; slot < CaseMenu.SATA_SLOTS - CaseMenu.RAM_SLOTS; slot++) {
+				if (parts.getItem(CaseMenu.RAM_SLOTS + slot).getItem() instanceof MemoryItem stick) {
+					memory.add(new Board.MemoryInfo(slot, stick.tier().number(), stick.tier().bytes()));
+				}
+			}
+			return memory;
+		}
 	}
 
 	public CaseTier tier() {
@@ -663,15 +705,34 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		} else if (board.cpu().map(Cpu::tier).orElse(null) != cpuTier) {
 			board.setCpu(new Cpu(cpuTier));
 		}
-		// Every EEPROM holds the stand-in program until EEPROM contents are programmable.
-		boolean hasEeprom = parts.getItem(CaseMenu.EEPROM_SLOT).is(ModItems.EEPROM);
-		eeprom = hasEeprom ? (eeprom != null ? eeprom : new Eeprom(new HelloWorldProgram())) : null;
+		// Every EEPROM runs the stand-in program until the Lua runtime runs its image.
+		ItemStack chip = parts.getItem(CaseMenu.EEPROM_SLOT);
+		boolean hasEeprom = chip.is(ModItems.EEPROM);
+		UUID chipSerial = hasEeprom ? chip.get(ModComponents.SERIAL) : null;
+		if (!hasEeprom) {
+			eeprom = null;
+		} else if (eeprom == null || !java.util.Objects.equals(eepromSerial, chipSerial)) {
+			eeprom = new Eeprom(new HelloWorldProgram()); // another chip: its own image
+		}
+		eepromSerial = chipSerial;
+		if (eeprom != null) {
+			eeprom.load(chip.get(ModComponents.EEPROM_IMAGE));
+			eeprom.setLabel(ModComponents.label(chip));
+			// A program's write goes onto the chip (the item), in place: not a part change.
+			eeprom.setOnWrite(image -> {
+				parts.getItem(CaseMenu.EEPROM_SLOT).set(ModComponents.EEPROM_IMAGE, image);
+				setChanged();
+			});
+		}
 		board.setEeprom(eeprom);
 		// Each part answers to its serial number too: a card is found by it here or in a hub.
 		board.plug(Motherboard.EEPROM, eeprom, serial(CaseMenu.EEPROM_SLOT));
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
 			DiskTier diskTier = parts.getItem(CaseMenu.SATA_SLOTS + lane).getItem() instanceof DiskItem disk ? disk.tier() : null;
 			disks[lane] = diskTier == null ? null : disks[lane] != null && disks[lane].tier() == diskTier ? disks[lane] : new Disk(diskTier);
+			if (disks[lane] != null) {
+				disks[lane].setLabel(ModComponents.label(parts.getItem(CaseMenu.SATA_SLOTS + lane)));
+			}
 			board.plug(Motherboard.sata(lane), disks[lane], serial(CaseMenu.SATA_SLOTS + lane));
 			ItemStack card = parts.getItem(CaseMenu.EXP_SLOTS + lane);
 			if (lane == 0 && screenInSlot()) {
@@ -682,11 +743,15 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 					display.setFlusher(this::syncDisplay);
 				}
 				cards[lane] = null;
+				display.setLabel(ModComponents.label(card));
 				board.plug(Motherboard.exp(lane), display, serial(CaseMenu.EXP_SLOTS + lane));
 				continue;
 			}
 			CardKind kind = ModItems.cardKind(card).orElse(null);
 			cards[lane] = kind == null ? null : cards[lane] != null && cards[lane].kind() == kind ? cards[lane] : new Card(kind);
+			if (cards[lane] != null) {
+				cards[lane].setLabel(ModComponents.label(card));
+			}
 			board.plug(Motherboard.exp(lane), cards[lane], serial(CaseMenu.EXP_SLOTS + lane));
 		}
 		rebuildBus();

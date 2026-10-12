@@ -46,6 +46,7 @@ public final class Terminal implements Device {
 	private final VtDecoder decoder;
 
 	private final TerminalTier tier;
+	private String label;
 
 	/** A tier 3 terminal (every color). */
 	public Terminal(Resolution resolution) {
@@ -132,6 +133,21 @@ public final class Terminal implements Device {
 	@Override
 	public DeviceType type() {
 		return DeviceType.TERMINAL;
+	}
+
+	public void setLabel(String label) {
+		this.label = label;
+	}
+
+	@Override
+	public String label() {
+		return label;
+	}
+
+	@Override
+	public java.util.Map<String, Object> info() {
+		return java.util.Map.of("tier", (long) tier.number(), "width", (long) buffer.resolution().columns(),
+			"height", (long) buffer.resolution().rows(), "colors", tier.depth().colors());
 	}
 
 	@Override

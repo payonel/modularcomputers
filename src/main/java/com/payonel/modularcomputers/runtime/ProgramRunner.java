@@ -250,6 +250,21 @@ public final class ProgramRunner {
 		}
 
 		@Override
+		public PowerInfo power() {
+			return call(Board::power);
+		}
+
+		@Override
+		public HardwareInfo hardware() {
+			return call(Board::hardware);
+		}
+
+		@Override
+		public java.util.Optional<java.util.Map<String, Object>> info(String address) {
+			return call(board -> board.info(address));
+		}
+
+		@Override
 		public long uptime() {
 			return call(Board::uptime);
 		}

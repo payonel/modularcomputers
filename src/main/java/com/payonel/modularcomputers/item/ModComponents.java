@@ -38,11 +38,21 @@ public final class ModComponents {
 	public static final DataComponentType<UUID> BLUETOOTH_LINK = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("bluetooth_link"),
 		DataComponentType.<UUID>builder().persistent(UUIDUtil.CODEC).networkSynchronized(UUIDUtil.STREAM_CODEC).build());
 
+	/** What an EEPROM holds (its image), written by programs; up to {@code Eeprom.SIZE} bytes. Not sent to clients. */
+	public static final DataComponentType<String> EEPROM_IMAGE = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("eeprom_image"),
+		DataComponentType.<String>builder().persistent(Codec.STRING).build());
+
 	private ModComponents() {
 	}
 
 	/** Forces the static registration above. */
 	public static void init() {
+	}
+
+	/** What the player named the item (on an anvil), if anything: its device's label. */
+	public static String label(ItemStack stack) {
+		net.minecraft.network.chat.Component name = stack.get(net.minecraft.core.component.DataComponents.CUSTOM_NAME);
+		return name == null ? null : name.getString();
 	}
 
 	/** The card's serial number, stamping a new one on if it has none yet. Server side only. */

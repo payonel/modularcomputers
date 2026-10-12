@@ -8,6 +8,20 @@ package com.payonel.modularcomputers.bus;
 public interface Device {
 	DeviceType type();
 
+	/** What the player named it (an anvil's name on its item), if anything: a label, like a disk's. */
+	default String label() {
+		return null;
+	}
+
+	/**
+	 * What it says of itself beyond its address, id, type and label (see
+	 * {@link com.payonel.modularcomputers.runtime.Board#info}): its tier, its size. Values a
+	 * program can hold.
+	 */
+	default java.util.Map<String, Object> info() {
+		return java.util.Map.of();
+	}
+
 	/**
 	 * The device's interrupt line: on while it has something for the program (a key pressed, data
 	 * arrived), off once the program has read it. Level-triggered, as on real hardware: the data

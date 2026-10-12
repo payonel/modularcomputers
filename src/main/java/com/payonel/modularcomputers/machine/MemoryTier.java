@@ -15,4 +15,9 @@ public enum MemoryTier {
 	public int bytes() {
 		return bytes;
 	}
+
+	/** 1, 2 or 3. */
+	public int number() {
+		return ordinal() + 1;
+	}
 }
