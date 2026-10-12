@@ -621,6 +621,17 @@ scripts/art/error_beep.py` into
     pending (bus first, then bus order), or none on a timeout. Since interrupts are
     level-triggered, a program that waits on everything must read everything, or it spins
     (an interrupt storm); waiting on just what it reads avoids that (user, 2026-10-11).
+  - **Interrupts wake the CPU at once** (user asked to cut keystroke latency, 2026-10-11): a
+    device with an `InterruptLine` (terminals) raises it when data arrives (`Terminal.press`),
+    and every computer that has it on its bus (wired in `Machine.supply`/`release`) runs a
+    turn right then, between ticks, if its program is waiting (`Machine.wake`), as a real
+    interrupt pulls a CPU out of `HLT`. Wakes share the tick's call budget (`callsThisTick`), so
+    mashing keys buys no extra calls; power counts at most one CPU tick a game tick. After any
+    turn, bus devices `flush()`: a terminal's block sends its screen to players right away
+    instead of at its next tick. This took out the 0-50 ms wait for the tick. **Not built yet
+    (planned, agreed):** sending terminals' byte streams to clients (each runs its own
+    `VtDecoder`, with sequence numbers and a snapshot on gaps) instead of the whole block
+    entity (~15 KB) per change.
   - **Motherboard supervision** (`Machine.tick`, every tick): CPU gone or power gone, and the
     machine dies with the error beep, like a socket's CPU-present pin or a PSU's power-good.
     The event-driven checks (pulling a part) still act at once.

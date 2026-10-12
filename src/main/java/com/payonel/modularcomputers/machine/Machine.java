@@ -53,6 +53,13 @@ public final class Machine {
 	private long uptime;
 	/** Ticks the CPU executed since power use was last collected. */
 	private long cpuTicks;
+	/** Calls answered this tick, by the tick's turn and any interrupt turns. */
+	private int callsThisTick;
+	private boolean executedThisTick;
+	/** In a turn: an interrupt raised by the program's own calls waits for its next wait. */
+	private boolean running;
+	/** What the machine's devices' interrupt lines call. */
+	private final Runnable wake = this::wake;
 	private int callsPerTick = DEFAULT_CALLS_PER_TICK;
 
 	/** A machine on a bench supply: it always has power. */
@@ -98,18 +105,49 @@ public final class Machine {
 			return Supervision.LOST_POWER;
 		}
 		uptime++;
+		callsThisTick = 0;
+		executedThisTick = false;
 		run();
 		return Supervision.OK;
 	}
 
-	/** The program's turn: up to {@link #callsPerTick} calls. */
+	/**
+	 * A device's interrupt line rose: a program waiting for an interrupt runs now, between ticks,
+	 * as a real interrupt wakes a CPU from {@code HLT} at once. It spends what's left of this
+	 * tick's calls, so waking it often buys no extra time.
+	 */
+	public void wake() {
+		if (powered && runner != null && !running && runner.state() == ProgramRunner.State.WAITING) {
+			run();
+		}
+	}
+
+	/**
+	 * The program's turn: what's left of this tick's {@link #callsPerTick} calls. Afterwards the
+	 * devices push out what changed (a terminal's screen), so players see it now.
+	 */
 	private void run() {
-		if (runner == null) {
+		if (runner == null || running) {
 			return;
 		}
+		int calls = callsPerTick - callsThisTick;
+		if (calls <= 0) {
+			return; // spent: the next tick carries on
+		}
 		ProgramRunner.State before = runner.state();
-		ProgramRunner.State state = runner.tick(api, callsPerTick, uptime, api::interrupts);
-		if (before != ProgramRunner.State.WAITING || state != ProgramRunner.State.WAITING) {
+		long answeredBefore = runner.answered();
+		ProgramRunner.State state;
+		running = true;
+		try {
+			state = runner.tick(api, calls, uptime, api::interrupts);
+		} finally {
+			running = false;
+		}
+		int answered = (int) (runner.answered() - answeredBefore);
+		callsThisTick += answered;
+		boolean executed = answered > 0 || before != ProgramRunner.State.WAITING || state != ProgramRunner.State.WAITING;
+		if (executed && !executedThisTick) {
+			executedThisTick = true;
 			cpuTicks++; // it executed this tick; waiting all through for an interrupt, it's halted (sti; hlt) and draws nothing
 		}
 		if (state == ProgramRunner.State.CRASHED) {
@@ -119,6 +157,9 @@ public final class Machine {
 		}
 		if (state != ProgramRunner.State.RUNNING && state != ProgramRunner.State.WAITING) {
 			runner = null; // the CPU is halted; power stays on, and the screens keep what they show
+		}
+		if (executed) {
+			board.bus().devices().forEach(Device::flush);
 		}
 	}
 
@@ -135,6 +176,9 @@ public final class Machine {
 	}
 
 	private void release(Device device) {
+		if (device.interruptLine() != null) {
+			device.interruptLine().disconnect(wake);
+		}
 		BusPower power = device.power();
 		if (power == null || power.release(this)) {
 			device.powerOff();
@@ -142,6 +186,9 @@ public final class Machine {
 	}
 
 	private void supply(Device device) {
+		if (device.interruptLine() != null) {
+			device.interruptLine().connect(wake);
+		}
 		if (device.power() != null) {
 			device.power().supply(this);
 		}
@@ -210,6 +257,8 @@ public final class Machine {
 		powered = true;
 		uptime = 0;
 		cpuTicks = 0;
+		callsThisTick = 0;
+		executedThisTick = false;
 		board.bus().devices().forEach(this::supply);
 		runner = cpu.get().powerOn(board).orElse(null);
 		run(); // the CPU starts executing right away

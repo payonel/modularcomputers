@@ -32,6 +32,7 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 
 	public ScreenBlockEntity(BlockPos pos, BlockState state) {
 		super(ModBlocks.SCREEN_ENTITY, pos, state, 1);
+		display.setFlusher(this::serverTick); // right after a computer's turn changed it
 	}
 
 	@Override
@@ -52,7 +53,7 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 	/** Sends what the screen shows to clients when a computer changed it. */
 	void serverTick() {
 		int changes = display.buffer().changes();
-		if (changes != synced && level != null) {
+		if (changes != synced && level != null && !level.isClientSide()) {
 			synced = changes;
 			setChanged();
 			level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);

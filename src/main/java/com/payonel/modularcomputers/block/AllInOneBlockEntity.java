@@ -195,6 +195,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		super(ModBlocks.ALL_IN_ONE_ENTITY, pos, state);
 		// The all-in-one's own terminal, wired to its board.
 		machine.board().plug(Motherboard.TERMINAL, display, terminalId);
+		display.setFlusher(this::syncDisplay);
 	}
 
 	/** The motherboard's bus order. */
@@ -420,7 +421,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			seenCableChanges = Cabling.changes();
 			scanCables();
 		}
-		if (display.buffer().changes() != syncedDisplay) {
+		syncDisplay();
+	}
+
+	/** Sends the built-in screen to clients if it changed: each tick, and right after a program's turn. */
+	private void syncDisplay() {
+		if (display.buffer().changes() != syncedDisplay && level != null && !level.isClientSide()) {
 			syncedDisplay = display.buffer().changes();
 			setChanged();
 			syncToClients();

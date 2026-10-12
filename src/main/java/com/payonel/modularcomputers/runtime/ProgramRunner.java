@@ -77,6 +77,8 @@ public final class ProgramRunner {
 	private Request pending;
 	private Throwable crash;
 	private State state = State.RUNNING;
+	/** Calls answered so far, all told. */
+	private long answered;
 
 	/** {@code program} runs with a board that sends each call to the host. */
 	public ProgramRunner(Consumer<Board> program, String name) {
@@ -104,6 +106,11 @@ public final class ProgramRunner {
 		return state;
 	}
 
+	/** How many calls the host has answered, all told. */
+	public long answered() {
+		return answered;
+	}
+
 	/** Why the program crashed, when it did. */
 	public Throwable crash() {
 		return crash;
@@ -129,6 +136,7 @@ public final class ProgramRunner {
 			answer = ready;
 		} else if (pending instanceof Call call) {
 			answer = call.call().apply(board);
+			answered++;
 			calls--;
 		}
 		while (true) {
@@ -157,6 +165,7 @@ public final class ProgramRunner {
 						return state = State.RUNNING; // out of calls this tick: the call waits for the next
 					}
 					answer = call.call().apply(board);
+					answered++;
 					calls--;
 				}
 			}

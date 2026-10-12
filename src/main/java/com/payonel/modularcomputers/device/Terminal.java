@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.device;
 import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.bus.DeviceType;
+import com.payonel.modularcomputers.bus.InterruptLine;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.display.TextBuffer;
 import com.payonel.modularcomputers.display.VtDecoder;
@@ -36,6 +37,10 @@ public final class Terminal implements Device {
 	public static final int WRITE_COST = PowerUnits.TERMINAL_WRITE;
 
 	private final BusPower power = new BusPower(DRAW);
+	private final InterruptLine interruptLine = new InterruptLine();
+	/** Sends what it shows to players; set by the block it's in. */
+	private Runnable flusher = () -> {
+	};
 	private final TextBuffer buffer;
 	private final Deque<String> input = new ArrayDeque<>();
 	private final VtDecoder decoder;
@@ -64,9 +69,25 @@ public final class Terminal implements Device {
 		return power;
 	}
 
-	/** A key typed at the terminal. */
+	/** A key typed at the terminal: it waits in the queue, and the interrupt line wakes its computers. */
 	public void press(String key) {
 		input.addLast(key);
+		interruptLine.raise();
+	}
+
+	@Override
+	public InterruptLine interruptLine() {
+		return interruptLine;
+	}
+
+	/** How the block it's in sends what it shows to players. */
+	public void setFlusher(Runnable flusher) {
+		this.flusher = flusher;
+	}
+
+	@Override
+	public void flush() {
+		flusher.run();
 	}
 
 	/** Takes the oldest key typed (or report), if any. */

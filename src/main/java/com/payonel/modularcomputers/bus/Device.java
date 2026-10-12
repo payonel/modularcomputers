@@ -26,6 +26,15 @@ public interface Device {
 		return null;
 	}
 
+	/** Its interrupt line, if it can wake a computer the moment it has data (see {@link InterruptLine}). */
+	default InterruptLine interruptLine() {
+		return null;
+	}
+
+	/** A program's turn changed it: push what it shows out now (to players), rather than at the next tick. */
+	default void flush() {
+	}
+
 	/** It lost power. Volatile state goes away (a display goes black). */
 	default void powerOff() {
 	}

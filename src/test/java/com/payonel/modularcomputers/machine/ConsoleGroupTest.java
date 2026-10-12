@@ -165,10 +165,9 @@ class ConsoleGroupTest {
 			keys.add(board.invoke("console", "read").first());
 			board.halt();
 		}));
-		machine.pressPower();
-		machine.tick();
-		first.press("a");
+		first.press("a"); // typed before power-on: they wait in the terminals
 		second.press("b");
+		machine.pressPower();
 		machine.tick();
 		assertThat(keys).containsExactly(List.of("console"), "a", "b", null);
 	}
@@ -190,6 +189,50 @@ class ConsoleGroupTest {
 		first.press("a");
 		machine.tick();
 		assertThat(seen).containsExactly(List.of("console"), "a");
+	}
+
+	@Test
+	void aKeyWakesAWaitingProgramAtOnceAndItsOutputIsFlushed() {
+		int[] flushes = {0};
+		first.setFlusher(() -> flushes[0]++);
+		machine.board().setEeprom(new Eeprom(board -> {
+			board.list();
+			while (true) {
+				board.waitForInterrupt(3600, "console");
+				Object key;
+				while ((key = board.invoke("console", "read").first()) != null) {
+					board.invoke("console", "write", key.toString());
+				}
+			}
+		}));
+		machine.pressPower();
+		int before = flushes[0];
+		first.press("a"); // no tick in between: the interrupt line wakes it
+		assertThat(top(first)).isEqualTo("a");
+		assertThat(flushes[0]).as("pushed to players right away").isGreaterThan(before);
+	}
+
+	@Test
+	void wakingOftenBuysNoMoreThanATicksCalls() {
+		int[] calls = {0};
+		machine.board().setEeprom(new Eeprom(board -> {
+			board.list();
+			while (true) {
+				board.waitForInterrupt(3600, "console");
+				for (int i = 0; i < 15; i++) {
+					calls[0]++;
+					board.invoke("console", "read");
+				}
+			}
+		}));
+		machine.pressPower();
+		machine.tick();
+		first.press("a");
+		first.press("b");
+		first.press("c");
+		assertThat(calls[0]).as("20 calls this tick, however many wakes").isLessThanOrEqualTo(Machine.DEFAULT_CALLS_PER_TICK);
+		machine.tick();
+		assertThat(calls[0]).as("the next tick carries on").isGreaterThan(Machine.DEFAULT_CALLS_PER_TICK - 2);
 	}
 
 	@Test
