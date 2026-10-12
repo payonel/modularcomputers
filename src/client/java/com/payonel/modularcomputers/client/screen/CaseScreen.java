@@ -276,13 +276,14 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		if (status.capacity() == 0) {
 			return Component.translatable("gui.modularcomputers.bus.no_cpu"); // no CPU, no bus
 		}
-		int room = status.room();
+		// Everything on the bus counts against the CPU's capacity, the case's own devices too.
+		Object[] counts = {status.devices(), status.capacity(), status.internal(), status.external()};
 		if (status.overflow()) {
-			return Component.translatable("gui.modularcomputers.bus.summary_overflow", status.saved(), room, status.waiting());
+			return Component.translatable("gui.modularcomputers.bus.summary_overflow", counts[0], counts[1], counts[2], counts[3], status.waiting());
 		}
 		return status.missing() > 0
-			? Component.translatable("gui.modularcomputers.bus.summary_missing", status.saved(), room, status.missing())
-			: Component.translatable("gui.modularcomputers.bus.summary", status.saved(), room); // nothing missing: no need to say so
+			? Component.translatable("gui.modularcomputers.bus.summary_missing", counts[0], counts[1], counts[2], counts[3], status.missing())
+			: Component.translatable("gui.modularcomputers.bus.summary", counts); // nothing missing: no need to say so
 	}
 
 	/** The bus overflow warning light, top right of the bus order panel. */

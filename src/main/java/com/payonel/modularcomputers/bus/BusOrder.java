@@ -62,7 +62,7 @@ public final class BusOrder {
 	/** How full the bus is (see {@link BusStatus}). */
 	public BusStatus status() {
 		long missing = external.stream().filter(entry -> !present.contains(entry.key())).count();
-		return new BusStatus(capacity, connected().size(), external.size(), (int) missing, waiting + overCapacity(), externalCapacity());
+		return new BusStatus(capacity, connected().size(), external.size(), (int) missing, waiting + overCapacity(), Math.min(internal.size(), capacity));
 	}
 
 	/** Every listed device in order: internal ones, then the saved external ones, online or not. */

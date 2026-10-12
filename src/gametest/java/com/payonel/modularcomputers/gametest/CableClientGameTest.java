@@ -199,7 +199,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			// A full bus: with room for just one external device, a second screen has to wait.
 			// The warning light comes on.
 			int ledOff = screenPixel(context, bulbOn, s -> ((CaseScreen) s).busOverflowLed());
-			check(summary(context, computer).equals("external devices: 1 of 62"), "the summary line, got " + summary(context, computer));
+			check(summary(context, computer).equals("bus: 3 of 64 (2 internal, 1 external)"), "the summary line, got " + summary(context, computer));
 			check((ledOff & 0xFFFFFF) == 0x3A2E1A, "the overflow light is dark, got " + hex(ledOff));
 			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
 				.machine().board().overrideBusCapacity(3)); // its terminal and ROM, and room for one
@@ -212,7 +212,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			check((ledOn & 0xFFFFFF) == 0xF0A020, "the overflow light is lit, got " + hex(ledOn));
 			check(context.computeOnClient(client -> ((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busStatus().waiting()) == 1,
 				"one screen waits");
-			check(summary(context, computer).equals("external devices: 1 of 1, overflow 1"), "the summary says so, got " + summary(context, computer));
+			check(summary(context, computer).equals("bus: 3 of 3 (2 internal, 1 external), overflow 1"), "the summary says so, got " + summary(context, computer));
 			setblock(singleplayer, second, "minecraft:air");
 			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
 				.machine().board().overrideBusCapacity(null));
@@ -229,7 +229,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			});
 			check((gray & 0xFFFFFF) == 0x4E4E52, "an offline row's display is gray, got " + hex(gray));
 			check(tipAt(context, s -> ((CaseScreen) s).busPlug(row)).equals("Forget"), "and its plug is a forget button");
-			check(summary(context, computer).equals("external devices: 1 of 62, missing 1"), "missing in the summary, got " + summary(context, computer));
+			check(summary(context, computer).equals("bus: 2 of 64 (2 internal, 0 external), missing 1"), "missing in the summary, got " + summary(context, computer));
 			setblock(singleplayer, cable, "cable");
 			context.waitFor(client -> ((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busEntries().get(row).online());
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);

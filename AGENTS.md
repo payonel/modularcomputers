@@ -235,9 +235,12 @@ same thing.
         - **Linked hover:** hovering a part slot outlines its bus row, and hovering a row
           outlines its slot (`BusEntry.slot`). Built-ins have no slot.
         - The ↑/↓ arrows send `ReorderBusPayload`; they're greyed out at the ends.
-        - **The line under the title** (user wording): "external devices: 13 of 20, missing 5"
-          (saved, room, offline; ", missing 0" is left off), or "external devices: 20 of 20, overflow 2" while devices wait;
-          the two can't happen at once, since a waiting device takes a missing one's place. It
+        - **The line under the title:** "bus: 3 of 64 (2 internal, 1 external)", then ", missing 5"
+          when offline devices are listed (", missing 0" is left off), or ", overflow 2" while
+          devices wait; the two can't happen at once, since a waiting device takes a missing
+          one's place. It counts the case's own devices too, since they use the CPU's capacity
+          (the user found "external devices: 0 of 62" confusing, 2026-10-11). No CPU: "no CPU:
+          no bus". It
           shrinks to fit the panel when the numbers get long (`CaseScreen.busSummary`).
         - Order lives in `bus/BusOrder` (user design, 2026-10-11, replacing "first found on top"):
           - **The case's devices come first, fixed in their slots' order:** built-ins, ROM, UPS,

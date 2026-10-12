@@ -48,7 +48,7 @@ class BusOrderTest {
 		order.sync(CASE, concat(all, "id:new"), 1);
 		assertThat(order.keys()).doesNotContain("id:new");
 		assertThat(order.waiting()).isEqualTo(1);
-		assertThat(order.status()).isEqualTo(new BusStatus(32, 3 + 29, 29, 0, 1, 29));
+		assertThat(order.status()).isEqualTo(new BusStatus(32, 3 + 29, 29, 0, 1, 3));
 		assertThat(order.status().overflow()).isTrue();
 
 		List<String> missingTwo = new ArrayList<>(all);
@@ -60,7 +60,7 @@ class BusOrderTest {
 		assertThat(order.keys()).as("3 was missing longest").contains("id:7", "id:new").doesNotContain("id:3");
 		assertThat(order.keys().getLast()).isEqualTo("id:new");
 		assertThat(order.waiting()).isZero();
-		assertThat(order.status()).isEqualTo(new BusStatus(32, 3 + 29 - 1, 29, 1, 0, 29));
+		assertThat(order.status()).isEqualTo(new BusStatus(32, 3 + 29 - 1, 29, 1, 0, 3));
 	}
 
 	@Test
