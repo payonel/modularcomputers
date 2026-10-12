@@ -107,10 +107,11 @@ public final class Machine {
 		if (runner == null) {
 			return;
 		}
-		if (runner.state() != ProgramRunner.State.WAITING || !api.interrupts().isEmpty()) {
-			cpuTicks++; // it executes this tick; waiting for an interrupt, it's halted (sti; hlt) and draws nothing
-		}
+		ProgramRunner.State before = runner.state();
 		ProgramRunner.State state = runner.tick(api, callsPerTick, uptime, api::interrupts);
+		if (before != ProgramRunner.State.WAITING || state != ProgramRunner.State.WAITING) {
+			cpuTicks++; // it executed this tick; waiting all through for an interrupt, it's halted (sti; hlt) and draws nothing
+		}
 		if (state == ProgramRunner.State.CRASHED) {
 			board.cpu().ifPresent(cpu -> cpu.crashed(board, runner.crash()));
 		} else if (state == ProgramRunner.State.RETURNED) {

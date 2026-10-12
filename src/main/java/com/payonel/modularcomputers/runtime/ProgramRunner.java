@@ -28,8 +28,14 @@ public final class ProgramRunner {
 	public record Call(Function<Board, Object> call) implements Request {
 	}
 
-	/** Wait for an interrupt until game tick {@code until}; answered with the pending addresses. */
-	public record Wait(long until) implements Request {
+	/**
+	 * Wait for an interrupt from one of {@code sources} (any, when empty) until game tick
+	 * {@code until}; answered with those of them pending.
+	 */
+	public record Wait(long until, List<String> sources) implements Request {
+		List<String> ready(List<String> pending) {
+			return sources.isEmpty() ? pending : pending.stream().filter(sources::contains).toList();
+		}
 	}
 
 	/** The program returned, without halting: a panic. */
@@ -116,7 +122,7 @@ public final class ProgramRunner {
 		if (pending == null) {
 			thread.start(); // the first tick: the program begins
 		} else if (pending instanceof Wait wait) {
-			List<String> ready = interrupts.get();
+			List<String> ready = wait.ready(interrupts.get());
 			if (ready.isEmpty() && now < wait.until()) {
 				return state = State.WAITING;
 			}
@@ -140,7 +146,7 @@ public final class ProgramRunner {
 					return state = State.CRASHED;
 				}
 				case Wait wait -> {
-					List<String> ready = interrupts.get();
+					List<String> ready = wait.ready(interrupts.get());
 					if (ready.isEmpty() && now < wait.until()) {
 						return state = State.WAITING;
 					}
@@ -229,9 +235,9 @@ public final class ProgramRunner {
 
 		@Override
 		@SuppressWarnings("unchecked")
-		public List<String> waitForInterrupt(double seconds) {
+		public List<String> waitForInterrupt(double seconds, String... sources) {
 			long now = (long) (Long) runner.request(new Call(Board::uptime));
-			return (List<String>) runner.request(new Wait(now + Math.max(0, Math.round(seconds * 20))));
+			return (List<String>) runner.request(new Wait(now + Math.max(0, Math.round(seconds * 20)), List.of(sources)));
 		}
 
 		@Override

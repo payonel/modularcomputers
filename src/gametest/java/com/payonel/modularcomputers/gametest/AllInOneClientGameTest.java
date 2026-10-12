@@ -316,6 +316,8 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			check(on.whitePixels(0, 1) >= 50, "the display's first row should show text, found " + on.whitePixels(0, 1));
 			check(on.whitePixels(1, 16) == 0, "the rest of the display should be black");
 			// Typing in the screen view goes to this terminal; the program echoes it to the console.
+			// SDL only sends typed characters while text input is on: the view turns it on.
+			check(context.computeOnClient(AllInOneClientGameTest::textInputOn), "the screen view should turn text input on");
 			context.getInput().typeChars("hi");
 			context.getInput().pressKey(InputConstants.KEY_RETURN);
 			context.getInput().typeChars("ok");
@@ -323,6 +325,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 				&& be.terminal().buffer().row(1).startsWith("hi") && be.terminal().buffer().row(2).startsWith("ok"));
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitFor(client -> client.gui.screen() == null);
+			check(!context.computeOnClient(AllInOneClientGameTest::textInputOn), "and off again when it closes");
 
 			// On: the face shows "hello world".
 			int onFace = whitePixelsOnFace(context.takeScreenshot("all-in-one-on"));
@@ -428,6 +431,17 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			return image.getRGB((int) ((board.x() + bx + 0.5) * scale), (int) ((board.y() + by + 0.5) * scale)) & 0xFFFFFF;
 		});
 		check(actual == rgb, what + ": expected " + hex(rgb) + ", got " + hex(actual));
+	}
+
+	/** Whether SDL text input is on (TextInputManager keeps it private). */
+	private static boolean textInputOn(net.minecraft.client.Minecraft client) {
+		try {
+			var field = com.mojang.blaze3d.platform.TextInputManager.class.getDeclaredField("textInputEnabled");
+			field.setAccessible(true);
+			return field.getBoolean(client.textInputManager());
+		} catch (ReflectiveOperationException e) {
+			throw new AssertionError("TextInputManager.textInputEnabled changed", e);
+		}
 	}
 
 	private static List<String> serverBusKeys(TestSingleplayerContext singleplayer, BlockPos computer) {

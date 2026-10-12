@@ -174,6 +174,25 @@ class ConsoleGroupTest {
 	}
 
 	@Test
+	void waitingOnTheConsoleIgnoresKeysAtAnUnboundTerminal() {
+		List<Object> seen = new ArrayList<>();
+		machine.board().setEeprom(new Eeprom(board -> {
+			board.invoke("console", "unbind", "id:second");
+			seen.add(board.waitForInterrupt(60, "console"));
+			seen.add(board.invoke("console", "read").first());
+			board.halt();
+		}));
+		machine.pressPower();
+		second.press("ignored"); // its own interrupt is on, but nobody waits on it
+		machine.tick();
+		machine.tick();
+		assertThat(seen).as("still waiting").isEmpty();
+		first.press("a");
+		machine.tick();
+		assertThat(seen).containsExactly(List.of("console"), "a");
+	}
+
+	@Test
 	void anUnboundTerminalsKeysAreItsOwn() {
 		List<Object> keys = new ArrayList<>();
 		machine.board().setEeprom(new Eeprom(board -> {

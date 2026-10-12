@@ -86,6 +86,15 @@ public final class DisplayScreen extends Screen {
 	@Override
 	protected void init() {
 		layout = DisplayLayout.of(width, height, resolution.aspectRatio(), FILL, BEZEL, ComputerButtons.SIZE, ComputerButtons.GAP);
+		// The terminal takes typing: SDL only sends typed characters while text input is on, as
+		// for a focused text box.
+		minecraft.onTextInputFocusChange(this, true);
+	}
+
+	@Override
+	public void removed() {
+		minecraft.onTextInputFocusChange(this, false);
+		super.removed();
 	}
 
 	@Override

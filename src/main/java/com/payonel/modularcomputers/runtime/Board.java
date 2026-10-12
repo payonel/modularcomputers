@@ -53,11 +53,14 @@ public interface Board {
 	Result invoke(String address, String method, Object... args);
 
 	/**
-	 * Waits until a device raises an interrupt, or {@code seconds} pass. Returns the addresses
-	 * with an interrupt pending, in bus order ({@link #BUS} first), or none on a timeout. An
-	 * interrupt stays pending until the program reads the device, as with a real interrupt line.
+	 * Waits until one of {@code sources} raises an interrupt (any device, the bus or a virtual
+	 * device, when none are named), or {@code seconds} pass, like Linux's {@code poll()} on the
+	 * files a program cares about. Returns the waited-on addresses with an interrupt pending, in
+	 * bus order ({@link #BUS} first), or none on a timeout. An interrupt stays pending until the
+	 * program reads the device, as with a real interrupt line, so a program that waits on
+	 * everything has to read everything.
 	 */
-	List<String> waitForInterrupt(double seconds);
+	List<String> waitForInterrupt(double seconds, String... sources);
 
 	/** Ticks since the machine was powered on. */
 	long uptime();

@@ -11,9 +11,10 @@ import com.payonel.modularcomputers.runtime.Board;
  * <li>finds every terminal on the bus. The first ("screen 0", the built-in one when there is
  * one) stays with the console; each other one is taken out of the console's group, cleared and
  * labeled "screen 1", "screen 2", ... in bus order;</li>
- * <li>then echoes typing to the console, forever: it waits for an interrupt, reads what waits
- * at the console (keys typed at terminals in its group) or at an unbound terminal, and writes it
- * to the console. Enter starts a new line and Backspace rubs out, as a tty's echo does.</li>
+ * <li>then echoes typing to the console, forever: it waits for the console's interrupt (keys
+ * typed at any terminal in its group, merged), reads them and writes them back to the console.
+ * Enter starts a new line and Backspace rubs out, as a tty's echo does. Keys typed at an
+ * unbound terminal are that terminal's own: this program doesn't wait on them.</li>
  * </ol>
  * A screen unplugged and plugged back in is a new arrival, in the console's group again, so the
  * console redraws its copy onto it.
@@ -40,15 +41,10 @@ public final class HelloWorldProgram implements Program {
 			board.invoke(device.address(), "write", "\u001B[2J\u001B[H" + LABEL + screen++);
 		}
 		while (true) {
-			for (String source : board.waitForInterrupt(WAIT_SECONDS)) {
-				if (source.equals(Board.BUS)) {
-					board.list(); // devices came or went: listing clears the bus's interrupt
-					continue;
-				}
-				Object key;
-				while ((key = board.invoke(source, "read").first()) != null) {
-					board.invoke(VirtualBus.CONSOLE, "write", echo(key.toString()));
-				}
+			board.waitForInterrupt(WAIT_SECONDS, VirtualBus.CONSOLE);
+			Object key;
+			while ((key = board.invoke(VirtualBus.CONSOLE, "read").first()) != null) {
+				board.invoke(VirtualBus.CONSOLE, "write", echo(key.toString()));
 			}
 		}
 	}

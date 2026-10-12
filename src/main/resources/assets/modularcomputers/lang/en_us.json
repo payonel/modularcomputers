@@ -16,7 +16,6 @@
 	"item.modularcomputers.battery.charge": "Charge: %s%%",
 	"item.modularcomputers.battery.self_charging": "Recharges itself while not in use",
 	"item.modularcomputers.battery.stored": "Stored: %s",
-	"item.modularcomputers.battery.self_charging_rate": "Every %ss of rest adds 1s of charge",
 	"item.modularcomputers.battery.charging": "Charge it in a crafting grid with a glowing item:",
 	"hint.modularcomputers.shift": "Hold %s for details",
 	"hint.modularcomputers.shift_key": "[Shift]",

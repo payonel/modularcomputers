@@ -93,7 +93,7 @@ public class BatteryGameTest {
 		helper.assertValueEqual(Hint.lines(Hint.of(tier2, false)), List.of("Charge: 28%", "Stored: 14.5M", "Hold [Shift] for details"), "a tier 2");
 		List<Hint.Element> details = Hint.of(tier2, true);
 		helper.assertValueEqual(Hint.lines(details), List.of("Charge: 28%", "Stored: 14.5M", "Recharges itself while not in use",
-			"Every 2s of rest adds 1s of charge", "Charge it in a crafting grid with a glowing item:", "Crafting:"), "tier 2 details");
+			"Charge it in a crafting grid with a glowing item:", "Crafting:"), "tier 2 details");
 		Hint.Icons icons = (Hint.Icons) details.stream().filter(Hint.Icons.class::isInstance).findFirst().orElseThrow();
 		helper.assertValueEqual(icons.icons().stream().map(icon -> icon.stack().getItem()).toList(),
 			List.of(Items.SEA_LANTERN, Items.GLOWSTONE, Items.SHROOMLIGHT, Items.GLOW_INK_SAC, Items.GLOW_LICHEN), "the glowing items");

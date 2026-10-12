@@ -6,11 +6,8 @@ import com.payonel.modularcomputers.power.BatteryCharge;
 import com.payonel.modularcomputers.power.BatteryTier;
 import com.payonel.modularcomputers.power.ChargeMeter;
 import com.payonel.modularcomputers.power.PowerUnits;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.function.Consumer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -99,7 +96,6 @@ public final class BatteryItem extends HintedItem {
 	public void details(ItemStack stack, Consumer<Hint.Element> hint) {
 		if (tier.selfCharging()) {
 			hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.self_charging")));
-			hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.self_charging_rate", seconds(1 / tier.rechargeRate()))));
 		}
 		if (tier.infinite()) {
 			return;
@@ -109,10 +105,5 @@ public final class BatteryItem extends HintedItem {
 		BatteryChargingRecipe.MATERIALS.forEach((item, percent) -> icons.add(new Hint.Icon(new ItemStack(item),
 			Component.literal("+" + Math.round(BatteryChargingRecipe.added(percent) * 100.0 / tier.capacity()) + "%"))));
 		hint.accept(new Hint.Icons(icons));
-	}
-
-	/** Seconds, without a needless ".0": "2", "1.5", "3.33". */
-	private static String seconds(double seconds) {
-		return new DecimalFormat("0.##", DecimalFormatSymbols.getInstance(Locale.ROOT)).format(seconds);
 	}
 }

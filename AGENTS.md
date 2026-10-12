@@ -140,7 +140,7 @@ same thing.
         - Crafted batteries start empty (my default). The creative tab and `giveall` give
           charged ones (`BatteryItem.charged()`).
         - Items show a charge bar. Their hint (see "Item hints" below) shows "Charge: 73%" and
-          "Stored: 19.3M" (a tier 3: "Charge: 100%", "Stored: inf"; user's format); with Shift, tier 2's self-recharge and rate, and
+          "Stored: 19.3M" (a tier 3: "Charge: 100%", "Stored: inf"; user's format); with Shift, tier 2's "Recharges itself while not in use" (the user dropped the rate line), and
           for tiers 1 and 2 the glowing items with what each adds to *this* tier ("+50%").
         - **The case's power buffer** (user design, 2026-10-11; `power/PowerBuffer`, saved as
           `power_buffer`): the computer runs on the case's own store, which holds **one day** (of a running all-in-one).
@@ -340,8 +340,8 @@ scripts/art/error_beep.py` into
       to try things out): today it writes "hello world" to the console; keeps the first
       terminal ("screen 0", the built-in) with the console; unbinds every other terminal and
       labels it "screen 1", "screen 2", ... in bus order; then echoes typing to the console
-      forever (from the console's terminals and from the unbound ones; Enter a new line,
-      Backspace a rub-out). Unplug a screen and plug it back in (or add a new one) and it
+      forever: it waits on the console only and reads the console, which merges the keys of
+      every bound terminal (Enter a new line, Backspace a rub-out). Unplug a screen and plug it back in (or add a new one) and it
       shows the console's copy.
     - CPU, no EEPROM: the soft gray **ABRT** screen, `ABRT: no EEPROM installed`.
     - No CPU: the machine won't turn on.
@@ -574,6 +574,11 @@ scripts/art/error_beep.py` into
         (`client/screen/TerminalKeys`): Return CR, Backspace DEL, Tab, Ctrl+letter a control
         character, arrows `ESC[A`..., Home/End, Insert/Delete, PageUp/PageDown. Escape still
         closes the view. The server checks reach.
+      - **SDL only sends typed characters while text input is on** (26.3 gotcha; the user found
+        typing did nothing): vanilla turns it on for a focused text box. `DisplayScreen` turns
+        it on in `init` (`Minecraft.onTextInputFocusChange(this, true)`) and off in `removed`.
+        The client test's `typeChars` injects characters directly, so it checks the flag too
+        (`TextInputManager.textInputEnabled`, by reflection).
     - **The console's group** (user design, 2026-10-11): `console.terminals()` lists the bound
       terminals by address in bus order; `console.unbind(address)` takes one out (the console
       stops drawing on it and reading from it, what's on it stays, the program owns it through
@@ -611,8 +616,11 @@ scripts/art/error_beep.py` into
   - **Interrupts** are per device and level-triggered (user design): `Device.interruptPending()`
     is on while the device has data for the program; the data stays in the device until read.
     The bus itself raises `Board.BUS` when its devices changed since the program last listed
-    them. `waitForInterrupt` returns the pending addresses (bus first, then bus order), or none
-    on a timeout.
+    them. `waitForInterrupt(seconds, sources...)` waits only on the named sources (all when
+    none are named), like `poll()` on the files a program cares about, and returns those
+    pending (bus first, then bus order), or none on a timeout. Since interrupts are
+    level-triggered, a program that waits on everything must read everything, or it spins
+    (an interrupt storm); waiting on just what it reads avoids that (user, 2026-10-11).
   - **Motherboard supervision** (`Machine.tick`, every tick): CPU gone or power gone, and the
     machine dies with the error beep, like a socket's CPU-present pin or a PSU's power-good.
     The event-driven checks (pulling a part) still act at once.

@@ -83,8 +83,10 @@ final class MotherboardApi implements Board {
 	}
 
 	@Override
-	public List<String> waitForInterrupt(double seconds) {
-		return interrupts(); // the runner does the waiting; called directly, it doesn't wait
+	public List<String> waitForInterrupt(double seconds, String... sources) {
+		// The runner does the waiting; called directly, it doesn't wait.
+		List<String> wanted = List.of(sources);
+		return interrupts().stream().filter(source -> wanted.isEmpty() || wanted.contains(source)).toList();
 	}
 
 	@Override
