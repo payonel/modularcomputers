@@ -12,6 +12,7 @@ import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.machine.MemoryTier;
 import com.payonel.modularcomputers.runtime.Board;
+import com.payonel.modularcomputers.runtime.Handle;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.component.DataComponents;
@@ -146,6 +147,46 @@ public class CaseTierGameTest {
 		helper.assertValueEqual(seen.get(2), "boot", "an anvil's name is the device's label");
 		ItemStack after = computer.parts().getItem(CaseMenu.EEPROM_SLOT);
 		helper.assertValueEqual(after.get(ModComponents.EEPROM_IMAGE), "boot code", "the write is on the chip");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void aDisksFilesAreInTheWorldSaveByItsIdAndGoWithIt(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.TIER1_HARD_DISK));
+		java.util.UUID id = computer.parts().getItem(CaseMenu.SATA_SLOTS).get(ModComponents.SERIAL);
+		helper.assertTrue(id != null, "the disk has its id");
+		List<Object> seen = new ArrayList<>();
+		TestPrograms.flash(computer, board -> {
+			Handle file = (Handle) board.invoke("sata:0", "open", "/hello.txt", "w").first();
+			board.invoke(file, "write", "hello world save");
+			board.invoke(file, "close");
+			board.halt();
+		});
+		computer.pressPower();
+		java.nio.file.Path folder = AllInOneBlockEntity.diskFolder(helper.getLevel().getServer(), id);
+		helper.assertTrue(java.nio.file.Files.isRegularFile(folder.resolve("hello.txt")), "the file is in the world save: " + folder);
+		computer.pressPower(); // off
+
+		// The same disk in another computer reads it.
+		ItemStack disk = computer.parts().removeItemNoUpdate(CaseMenu.SATA_SLOTS);
+		computer.parts().setItem(CaseMenu.SATA_SLOTS, ItemStack.EMPTY);
+		helper.setBlock(POS.east(), ModBlocks.TIER2_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
+		AllInOneBlockEntity other = helper.getBlockEntity(POS.east(), AllInOneBlockEntity.class);
+		other.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
+		other.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
+		other.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		other.parts().setItem(CaseMenu.SATA_SLOTS, disk);
+		TestPrograms.flash(other, board -> {
+			Handle file = (Handle) board.invoke("sata:0", "open", "/hello.txt").first();
+			seen.add(board.invoke(file, "read", 100).first());
+			board.halt();
+		});
+		other.pressPower();
+		helper.assertValueEqual(seen, List.of("hello world save"), "what the other computer read");
 		helper.succeed();
 	}
 

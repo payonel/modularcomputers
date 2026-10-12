@@ -46,7 +46,8 @@ public final class ClearIdRecipe extends CustomRecipe {
 			}
 			found = stack;
 		}
-		if (!found.has(ModComponents.SERIAL)) {
+		if (!found.has(ModComponents.SERIAL) || found.getMaxStackSize() == 1) {
+			// Things that hold data (EEPROMs, disks) keep their id: their data goes by it.
 			return ItemStack.EMPTY;
 		}
 		ItemStack cleared = found.copyWithCount(1);

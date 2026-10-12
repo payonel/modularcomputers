@@ -106,6 +106,12 @@ public interface Board {
 	Result invoke(String address, String method, Object... args);
 
 	/**
+	 * Calls a method of a handle a device gave the program (an open file), right away. Soft
+	 * failures as for devices; a closed handle fails.
+	 */
+	Result invoke(Handle handle, String method, Object... args);
+
+	/**
 	 * Waits until one of {@code sources} raises an interrupt (any device, the bus or a virtual
 	 * device, when none are named), or {@code seconds} pass, like Linux's {@code poll()} on the
 	 * files a program cares about. Returns the waited-on addresses with an interrupt pending, in

@@ -124,6 +124,18 @@ final class MotherboardApi implements Board {
 	}
 
 	@Override
+	public Result invoke(com.payonel.modularcomputers.runtime.Handle handle, String method, Object... args) {
+		if (handle == null || !handle.isOpen()) {
+			return Result.fail("closed handle");
+		}
+		try {
+			return DeviceMethods.invoke(handle, method, new Arguments(Arrays.asList(args)));
+		} catch (IllegalArgumentException e) {
+			return Result.fail(e.getMessage());
+		}
+	}
+
+	@Override
 	public List<String> waitForInterrupt(double seconds, String... sources) {
 		// The runner does the waiting; called directly, it doesn't wait.
 		List<String> wanted = List.of(sources);

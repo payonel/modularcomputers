@@ -392,12 +392,18 @@ scripts/art/error_beep.py` into
         and plain), and four frames in `textures/gui/power_button.png`.
   - **Boot results:**
     - CPU and EEPROM: the stand-in program (`HelloWorldProgram`, which the user keeps changing
-      to try things out): today it writes "hello world" to the console; keeps the first
-      terminal ("screen 0", the built-in) with the console; unbinds every other terminal and
-      labels it "screen 1", "screen 2", ... in bus order; then echoes typing to the console
-      forever: it waits on the console only and reads the console, which merges the keys of
-      every bound terminal (Enter a new line, Backspace a rub-out). Unplug a screen and plug it back in (or add a new one) and it
-      shows the console's copy.
+      to try things out). Today it's **a tiny OS and shell, after OpenOS and busybox, all in that
+      one class** (user, 2026-10-12: "keep all functions for the os just in that one class"):
+      - a VFS with a mount table; `/` is a tmpfs in memory (like an initramfs) with `/mnt` and
+        `/tmp`; every hfs disk on the bus is mounted automatically, like udisks (`sata:N` at
+        `/mnt/sata/N`, others at `/mnt/id/<uuid>`), following the bus's interrupt; disks that
+        leave are unmounted;
+      - the shell runs on the console, editing lines itself as readline does in raw mode
+        (Backspace, Ctrl+C/U/L, Up/Down history), with quotes, backslashes, `;`, `>` and `>>`;
+      - commands: help, ls [-l], cd, pwd, cat, echo [-n], touch, mkdir [-p], rm [-r], cp, mv
+        (across disks: copy and remove), mount, umount, df, mkfs [-t hfs|raw], lsdev, free, acpi,
+        uptime, clear, halt.
+      The screen-labelling experiment is gone; every terminal shows the shell.
     - CPU, no EEPROM: the soft gray **ABRT** screen, `ABRT: no EEPROM installed`.
     - No CPU: the machine won't turn on.
     - Part changes take effect at the next power-on, except that removing the CPU cuts power.
@@ -683,7 +689,25 @@ scripts/art/error_beep.py` into
     (number expected, got string)") and device exceptions all come back as `Result.fail`.
     Only the program's own uncaught error stops it (the CPU's ABRT screen).
   - **Values** (`Values`) are Lua's: nil, boolean, Long and Double kept apart, String, List
-    (sequence), Map (table). `Arguments.check*` converts like Lua (2.0 is an integer; numbers
+    (sequence), Map (table), and **handles** (`runtime/Handle`, Lua's userdata): a value a device
+    hands a program, with methods of its own, called with `Board.invoke(handle, method, args...)`;
+    a closed one fails softly ("closed handle"). Strings are bytes for device data (files go one
+    character per byte, ISO-8859-1).
+  - **Disks** (user design, 2026-10-12; `device/Disk`): data in the world save by the disk's id
+    (`AllInOneBlockEntity.diskFolder`: `modularcomputers/disks/<id>`), so it goes with the disk to
+    any computer. Two modes, set like formatting (`setMode`, which erases it; `getMode`): **hfs**
+    (host filesystem, how a disk comes; the user's name): the disk serves files, real files in
+    that folder, like Plan 9's 9P where a device serves files itself: `open(path, mode)` (C's
+    fopen modes) gives a `Disk.FileHandle`, a proxy holding the disk and the real host file, with
+    `read(n)` (at most 4096), `write(data)`, `seek(whence, offset)`, `close()`; and `list`
+    (directories end in /), `stat`, `mkdir`, `remove`, `rename`, `getCapacity`, `getUsed`.
+    **Every write goes to the host file at once** (user: no deferred writes; OC buffered). Paths
+    can't climb out of the disk. Space counts bytes plus 512 for each file and directory. At most
+    16 open files a disk; they close when the disk loses power or leaves the bus (and, once there's
+    a Lua runtime, when the handle is garbage-collected). **raw**: sectors of 512 bytes in one
+    image file (`<id>.img`): `getSectorSize`, `readSector(n)`, `writeSector(n, data)`. A disk is
+    another device when its id changes; ids of things that hold data (EEPROMs, disks) can't be
+    cleared by crafting (their data goes by it). `Arguments.check*` converts like Lua (2.0 is an integer; numbers
     are strings).
   - **Interrupts** are per device and level-triggered (user design): `Device.interruptPending()`
     is on while the device has data for the program; the data stays in the device until read.
@@ -724,7 +748,7 @@ scripts/art/error_beep.py` into
     after inserting it (`Eeprom.flash`, like reflashing firmware; `gametest/TestPrograms`).
   - Device methods so far: the console (`write`, `read`, `getSize`, `getModes`, `setMode`,
     `terminals`, `bind`, `unbind`), terminals (`write`, `read`, `getSize`), disks
-    (`getCapacity`) and the EEPROM (`get`, `set`, `getSize`: its image, up to 4 KiB, like
+    (below) and the EEPROM (`get`, `set`, `getSize`: its image, up to 4 KiB, like
     `flashrom -r`/`-w`; kept on the item as `ModComponents.EEPROM_IMAGE`; another chip is another
     `Eeprom`, by serial. The CPU still runs the Java stand-in whatever the image holds, until the
     Lua runtime).

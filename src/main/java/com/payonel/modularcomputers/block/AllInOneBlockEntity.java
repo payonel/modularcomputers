@@ -123,6 +123,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private Terminal display = new Terminal(Resolution.DEFAULT);
 	/** Devices made from the parts in the slots (by lane for drives and cards); null when empty. */
 	private final Disk[] disks = new Disk[CaseMenu.LANES];
+	/** The serials the disks were made for: another disk is another device, with its own data. */
+	private final UUID[] diskSerials = new UUID[CaseMenu.LANES];
 	private final Card[] cards = new Card[CaseMenu.LANES];
 	private Eeprom eeprom;
 	/** The serial of the chip {@link #eeprom} was made for: another chip is another device. */
@@ -403,6 +405,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	@Override
 	public void setLevel(Level level) {
 		super.setLevel(level);
+		if (level instanceof ServerLevel) {
+			// Loaded before it had a level: its disks find their data now.
+			java.util.Arrays.fill(diskSerials, null);
+			installParts();
+		}
 		updateBluetooth();
 	}
 
@@ -696,6 +703,15 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return cause == Machine.Supervision.LOST_POWER ? ModSounds.POWER_DOWN : ModSounds.ERROR_BEEP;
 	}
 
+	/**
+	 * Where a disk's data lives: the world save's {@code modularcomputers/disks/<id>} (a folder
+	 * for hfs, with ".img" for raw), so it's the disk's wherever it goes.
+	 */
+	public static java.nio.file.Path diskFolder(net.minecraft.server.MinecraftServer server, UUID id) {
+		return server.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)
+			.resolve("modularcomputers").resolve("disks").resolve(id.toString());
+	}
+
 	/** Puts the parts in the slots onto the motherboard, and drives and cards onto the bus. */
 	private void installParts() {
 		Motherboard board = machine.board();
@@ -729,7 +745,14 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		board.plug(Motherboard.EEPROM, eeprom, serial(CaseMenu.EEPROM_SLOT));
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
 			DiskTier diskTier = parts.getItem(CaseMenu.SATA_SLOTS + lane).getItem() instanceof DiskItem disk ? disk.tier() : null;
-			disks[lane] = diskTier == null ? null : disks[lane] != null && disks[lane].tier() == diskTier ? disks[lane] : new Disk(diskTier);
+			UUID diskSerial = serial(CaseMenu.SATA_SLOTS + lane);
+			if (diskTier == null) {
+				disks[lane] = null;
+			} else if (disks[lane] == null || disks[lane].tier() != diskTier || !java.util.Objects.equals(diskSerials[lane], diskSerial)) {
+				// Another disk: its own data, in the world save by its id (none on a client).
+				disks[lane] = new Disk(diskTier, level instanceof ServerLevel server && diskSerial != null ? diskFolder(server.getServer(), diskSerial) : null);
+			}
+			diskSerials[lane] = diskSerial;
 			if (disks[lane] != null) {
 				disks[lane].setLabel(ModComponents.label(parts.getItem(CaseMenu.SATA_SLOTS + lane)));
 			}

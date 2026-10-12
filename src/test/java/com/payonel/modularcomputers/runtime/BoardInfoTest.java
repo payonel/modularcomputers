@@ -103,7 +103,7 @@ class BoardInfoTest {
 			board.halt();
 		});
 		assertThat(seen.get(0)).isEqualTo(Optional.of(Map.of("address", "sata:0", "id", "id:disk-1", "type", "storage", "label", "backups",
-			"tier", 2L, "capacity", (long) DiskTier.TIER_2.bytes())));
+			"tier", 2L, "capacity", (long) DiskTier.TIER_2.bytes(), "mode", "hfs")));
 		assertThat(seen.get(1)).as("no label unless named").isEqualTo(Optional.of(Map.of("address", "id:screen", "id", "id:screen",
 			"type", "terminal", "tier", 2L, "width", 50L, "height", 16L, "colors", 16L)));
 		assertThat(seen.get(2)).isEqualTo(Optional.of(Map.of("address", "console", "type", "console")));

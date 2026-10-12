@@ -250,6 +250,11 @@ public final class ProgramRunner {
 		}
 
 		@Override
+		public Result invoke(Handle handle, String method, Object... args) {
+			return call(board -> board.invoke(handle, method, args));
+		}
+
+		@Override
 		public PowerInfo power() {
 			return call(Board::power);
 		}

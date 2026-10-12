@@ -9,8 +9,9 @@ import java.util.Map;
 /**
  * The values that pass between programs and devices, as Lua has them: nil (null), booleans,
  * integers ({@code Long}) and floats ({@code Double}) as distinct numbers (like Lua 5.3+),
- * strings, and tables: a {@code List} for a sequence, a {@code Map} otherwise. Opaque handles
- * (Lua userdata) come later.
+ * strings, and tables: a {@code List} for a sequence, a {@code Map} otherwise, and
+ * {@link Handle}s (Lua userdata), such as an open file. Strings are bytes as Lua's are: device data
+ * (files) goes as one character per byte (ISO-8859-1).
  */
 public final class Values {
 	private Values() {
@@ -28,6 +29,7 @@ public final class Values {
 			case Double d -> d;
 			case Float f -> (double) f;
 			case String s -> s;
+			case Handle h -> h;
 			case Character c -> String.valueOf(c);
 			case List<?> list -> {
 				List<Object> copy = new ArrayList<>();
