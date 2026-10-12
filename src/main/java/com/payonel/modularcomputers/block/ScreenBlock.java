@@ -4,6 +4,7 @@ import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import java.util.Optional;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import com.payonel.modularcomputers.device.TerminalTier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -32,8 +33,11 @@ import net.minecraft.world.phys.BlockHitResult;
  * not on every screen.
  */
 public final class ScreenBlock extends HorizontalDirectionalBlock implements EntityBlock {
-	public ScreenBlock(Properties properties) {
+	private final TerminalTier tier;
+
+	public ScreenBlock(Properties properties, TerminalTier tier) {
 		super(properties);
+		this.tier = tier;
 		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
 	}
 
@@ -46,6 +50,11 @@ public final class ScreenBlock extends HorizontalDirectionalBlock implements Ent
 	public BlockState getStateForPlacement(BlockPlaceContext context) {
 		// The glass faces the player who placed it.
 		return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+	}
+
+	/** What its terminal shows: see {@link TerminalTier}. */
+	public TerminalTier tier() {
+		return tier;
 	}
 
 	@Override

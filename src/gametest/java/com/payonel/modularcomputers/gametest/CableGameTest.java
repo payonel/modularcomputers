@@ -43,7 +43,7 @@ public class CableGameTest {
 	}
 
 	private static ScreenBlockEntity screen(GameTestHelper helper, BlockPos pos, Direction facing) {
-		helper.setBlock(pos, ModBlocks.SCREEN.defaultBlockState().setValue(ScreenBlock.FACING, facing));
+		helper.setBlock(pos, ModBlocks.TIER3_SCREEN.defaultBlockState().setValue(ScreenBlock.FACING, facing));
 		return helper.getBlockEntity(pos, ScreenBlockEntity.class);
 	}
 
@@ -98,7 +98,7 @@ public class CableGameTest {
 		ScreenBlockEntity screen = wiredScreen(helper);
 		helper.succeedWhen(() -> {
 			var entry = entryFor(computer, screen).orElseThrow(() -> helper.assertionException("the screen should be in the bus order"));
-			helper.assertValueEqual(entry.name().getString(), "Screen", "cabled device name");
+			helper.assertValueEqual(entry.name().getString(), "Tier 3 Screen", "cabled device name");
 			helper.assertValueEqual(entry.location().getString(), "cable, 3m", "cabled device location");
 			helper.assertValueEqual(entry.device(), Optional.of(helper.absolutePos(new BlockPos(4, 1, 1))), "where the bulb points");
 			helper.assertTrue(entry.connected(), "new cabled devices start connected");
@@ -300,7 +300,7 @@ public class CableGameTest {
 	public void screensAndCablesDropThemselves(GameTestHelper helper) {
 		ScreenBlockEntity screen = screen(helper, new BlockPos(1, 1, 1), Direction.SOUTH);
 		var drops = Block.getDrops(screen.getBlockState(), helper.getLevel(), screen.getBlockPos(), screen);
-		helper.assertTrue(drops.size() == 1 && drops.getFirst().is(ModBlocks.SCREEN.asItem()), "a screen drops itself, got " + drops);
+		helper.assertTrue(drops.size() == 1 && drops.getFirst().is(ModBlocks.TIER3_SCREEN.asItem()), "a screen drops itself, got " + drops);
 		cable(helper, new BlockPos(2, 1, 1));
 		var cableDrops = Block.getDrops(helper.getBlockState(new BlockPos(2, 1, 1)), helper.getLevel(), helper.absolutePos(new BlockPos(2, 1, 1)), null);
 		helper.assertTrue(cableDrops.size() == 1 && cableDrops.getFirst().is(ModBlocks.CABLE.asItem()), "a cable drops itself, got " + cableDrops);

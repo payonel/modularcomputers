@@ -2,6 +2,7 @@ package com.payonel.modularcomputers.block;
 
 import com.mojang.serialization.Codec;
 import com.payonel.modularcomputers.device.Terminal;
+import com.payonel.modularcomputers.device.TerminalTier;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.menu.CardHolderMenu;
 import net.minecraft.core.BlockPos;
@@ -23,10 +24,12 @@ import net.minecraft.world.level.storage.ValueOutput;
 public final class ScreenBlockEntity extends CardHolderBlockEntity implements DisplayHost {
 	private static final String DISPLAY = "display";
 
-	private final Terminal display = new Terminal(Resolution.DEFAULT);
+	private final Terminal display;
 
 	public ScreenBlockEntity(BlockPos pos, BlockState state) {
 		super(ModBlocks.SCREEN_ENTITY, pos, state, 1);
+		// Its tier is its block's: tier 1 text only, tier 2 16 colors, tier 3 every color.
+		this.display = new Terminal(Resolution.DEFAULT, state.getBlock() instanceof ScreenBlock screen ? screen.tier() : TerminalTier.TIER_3);
 		display.setFlusher(this::serverTick); // right after a computer's turn changed it
 	}
 

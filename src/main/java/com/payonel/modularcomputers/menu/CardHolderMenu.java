@@ -79,7 +79,9 @@ public final class CardHolderMenu extends AbstractContainerMenu {
 	}
 
 	public static CardHolderMenu screen(int id, Inventory inventory, Container cards, BlockPos pos, ContainerLevelAccess access) {
-		return new CardHolderMenu(ModMenus.SCREEN, id, inventory, cards, 0, pos, access, ModBlocks.SCREEN);
+		// Whichever tier of screen is there.
+		Block screen = access.evaluate((level, at) -> level.getBlockState(at).getBlock()).orElse(ModBlocks.TIER1_SCREEN);
+		return new CardHolderMenu(ModMenus.SCREEN, id, inventory, cards, 0, pos, access, screen);
 	}
 
 	public static CardHolderMenu screen(int id, Inventory inventory, BlockPos pos) {

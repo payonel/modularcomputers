@@ -155,6 +155,32 @@ class VtDecoderTest {
 	}
 
 	@Test
+	void aMonochromeTerminalShowsTextOnlyAndASixteenColorOneTheNearest() {
+		TextBuffer mono = new TextBuffer(new Resolution(6, 1));
+		new VtDecoder(mono, reply -> { }, ColorDepth.MONOCHROME, "").write(ESC + "[31;44mx" + ESC + "[7my" + ESC + "[42m" + ESC + "[K");
+		assertThat(mono.foreground(0, 0)).isEqualTo(TextBuffer.DEFAULT_FOREGROUND);
+		assertThat(mono.background(0, 0)).isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
+		assertThat(mono.background(1, 0)).as("no reverse either").isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
+		assertThat(mono.background(5, 0)).as("erased in the default").isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
+		assertThat(mono.row(0)).startsWith("xy");
+
+		TextBuffer sixteen = new TextBuffer(new Resolution(6, 1));
+		new VtDecoder(sixteen, reply -> { }, ColorDepth.SIXTEEN, "").write(ESC + "[38;2;250;10;5mr" + ESC + "[38;5;21mb" + ESC + "[33my");
+		assertThat(sixteen.foreground(0, 0)).as("24-bit red: bright red").isEqualTo(0xFF0000);
+		assertThat(sixteen.foreground(1, 0)).as("256-color blue: a basic blue").isIn(0x0000EE, 0x5C5CFF);
+		assertThat(sixteen.foreground(2, 0)).as("the basic ones as they are").isEqualTo(0xCDCD00);
+	}
+
+	@Test
+	void eachTierAnswersDeviceAttributesAsItsKind() {
+		List<String> answers = new ArrayList<>();
+		for (com.payonel.modularcomputers.device.TerminalTier tier : com.payonel.modularcomputers.device.TerminalTier.values()) {
+			new VtDecoder(new TextBuffer(new Resolution(6, 1)), answers::add, tier.depth(), tier.attributes()).write(ESC + "[c");
+		}
+		assertThat(answers).containsExactly(ESC + "[?1;0c", ESC + "[?62;22c", ESC + "[?63;22c");
+	}
+
+	@Test
 	void cursorVisibility() {
 		vt.write(ESC + "[?25l");
 		assertThat(vt.cursorVisible()).isFalse();

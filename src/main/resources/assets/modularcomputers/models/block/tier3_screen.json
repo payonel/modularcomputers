@@ -1,0 +1,12 @@
+{
+	"parent": "minecraft:block/cube",
+	"textures": {
+		"particle": "modularcomputers:block/screen_side",
+		"north": "modularcomputers:block/tier3_screen_front",
+		"south": "modularcomputers:block/screen_back",
+		"east": "modularcomputers:block/screen_side",
+		"west": "modularcomputers:block/screen_side",
+		"up": "modularcomputers:block/screen_top",
+		"down": "modularcomputers:block/screen_top"
+	}
+}

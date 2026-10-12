@@ -577,6 +577,14 @@ scripts/art/error_beep.py` into
         `getSize` (like the pty window size, `TIOCGWINSZ`). Direct writes are raw: LF only
         moves down unless the program sets `ESC[20h`. The decoder's state (cursor, colors,
         modes) is saved with the cells (`display_state`). Nothing draws a cursor yet.
+      - **Three tiers** (user design, 2026-10-11; `device/TerminalTier`, `display/ColorDepth`;
+        blocks `tier1_screen`..`tier3_screen`, `ScreenItem`): the same decoder, showing what it
+        can of the colors it's sent. Tier 1 is text only (every cell in the default colors, no
+        reverse either), tier 2 shows the 16 basic colors (256-color and 24-bit map to the
+        nearest), tier 3 every color (pixel graphics planned for it). Each answers Device
+        Attributes (`ESC[c`) as its kind: `?1;0c` (a VT100), `?62;22c` (a VT220 with color),
+        `?63;22c`. The front's frame shows the tier as 1-3 dots, iron, gold and diamond. The
+        all-in-one's built-in terminal is tier 3.
       - **Input:** keys wait in its queue until `read()` (as do its answers to reports); while
         any wait, its interrupt is on, or the console's if it's in the console's group.
       - **Only the terminal the player has open gets the keys** (user, 2026-10-11): typing in a

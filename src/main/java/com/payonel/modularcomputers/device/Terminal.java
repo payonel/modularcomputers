@@ -45,9 +45,21 @@ public final class Terminal implements Device {
 	private final Deque<String> input = new ArrayDeque<>();
 	private final VtDecoder decoder;
 
+	private final TerminalTier tier;
+
+	/** A tier 3 terminal (every color). */
 	public Terminal(Resolution resolution) {
+		this(resolution, TerminalTier.TIER_3);
+	}
+
+	public Terminal(Resolution resolution, TerminalTier tier) {
+		this.tier = tier;
 		this.buffer = new TextBuffer(resolution);
-		this.decoder = new VtDecoder(buffer, input::addLast);
+		this.decoder = new VtDecoder(buffer, input::addLast, tier.depth(), tier.attributes());
+	}
+
+	public TerminalTier tier() {
+		return tier;
 	}
 
 	public TextBuffer buffer() {

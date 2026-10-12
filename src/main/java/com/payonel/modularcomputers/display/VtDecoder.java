@@ -68,8 +68,23 @@ public final class VtDecoder {
 	public record Screen(List<String> rows, int[] foregrounds, int[] backgrounds) {
 	}
 
-	/** Decodes onto {@code buffer}; {@code reply} gets what the terminal sends back (reports). */
+	/** What it shows of the colors it's sent. */
+	private final ColorDepth depth;
+	/** Its answer to Device Attributes ({@code ESC[c}): what kind of terminal it is. */
+	private final String attributes;
+
+	/** A full-color decoder that answers Device Attributes as a VT102. */
 	public VtDecoder(TextBuffer buffer, Consumer<String> reply) {
+		this(buffer, reply, ColorDepth.TRUE_COLOR, "\u001B[?6c");
+	}
+
+	/**
+	 * Decodes onto {@code buffer}; {@code reply} gets what the terminal sends back (reports). It
+	 * shows colors at {@code depth}, and answers Device Attributes with {@code attributes}.
+	 */
+	public VtDecoder(TextBuffer buffer, Consumer<String> reply, ColorDepth depth, String attributes) {
+		this.depth = depth;
+		this.attributes = attributes;
 		this.buffer = buffer;
 		this.reply = reply;
 		this.columns = buffer.resolution().columns();
@@ -265,7 +280,7 @@ public final class VtDecoder {
 			}
 			case 'c' -> {
 				if (!privateMode && argOrZero(args, 0) == 0) {
-					reply.accept("\u001B[?6c"); // a VT102
+					reply.accept(attributes); // what kind of terminal it is
 				}
 			}
 			default -> {
@@ -491,16 +506,39 @@ public final class VtDecoder {
 	}
 
 	private int foreground() {
-		return reverse ? baseBackground() : baseForeground();
+		if (depth == ColorDepth.MONOCHROME) {
+			return TextBuffer.DEFAULT_FOREGROUND; // text only
+		}
+		return depth.show(reverse ? baseBackground() : baseForeground(), TextBuffer.DEFAULT_FOREGROUND);
 	}
 
 	private int background() {
-		return reverse ? baseForeground() : baseBackground();
+		if (depth == ColorDepth.MONOCHROME) {
+			return TextBuffer.DEFAULT_BACKGROUND; // text only
+		}
+		return depth.show(reverse ? baseForeground() : baseBackground(), TextBuffer.DEFAULT_BACKGROUND);
 	}
 
 	/** Erased cells take the background without reverse video's swap, as xterm does. */
 	private int blankBackground() {
-		return baseBackground();
+		return depth.show(baseBackground(), TextBuffer.DEFAULT_BACKGROUND);
+	}
+
+	/** The nearest of the 16 basic colors to {@code rgb}. */
+	static int nearestBasic(int rgb) {
+		int best = PALETTE[0];
+		long bestDistance = Long.MAX_VALUE;
+		for (int color : PALETTE) {
+			long dr = (color >> 16 & 0xFF) - (rgb >> 16 & 0xFF);
+			long dg = (color >> 8 & 0xFF) - (rgb >> 8 & 0xFF);
+			long db = (color & 0xFF) - (rgb & 0xFF);
+			long distance = 3 * dr * dr + 4 * dg * dg + 2 * db * db; // weighted, roughly as eyes see it
+			if (distance < bestDistance) {
+				bestDistance = distance;
+				best = color;
+			}
+		}
+		return best;
 	}
 
 	private void sgr(List<Integer> args) {

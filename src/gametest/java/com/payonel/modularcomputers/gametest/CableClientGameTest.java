@@ -69,7 +69,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			BlockPos cable = screen.west();
 			BlockPos computer = screen.west(2);
 			setblock(singleplayer, computer, "all_in_one[facing=south]");
-			setblock(singleplayer, screen, "screen[facing=south]");
+			setblock(singleplayer, screen, "tier3_screen[facing=south]");
 			setblock(singleplayer, cable, "cable");
 			singleplayer.getServer().runOnServer(server -> {
 				var be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
@@ -159,7 +159,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 				var entries = ((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busEntries();
 				for (int i = 0; i < entries.size(); i++) {
 					if (entries.get(i).cabled()) {
-						check(entries.get(i).name().getString().equals("Screen"), "the cabled row names the screen");
+						check(entries.get(i).name().getString().equals("Tier 3 Screen"), "the cabled row names the screen");
 						check(entries.get(i).location().getString().equals("cable, 2m"), "and how far: " + entries.get(i).location().getString());
 						return i;
 					}
@@ -204,7 +204,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
 				.machine().board().overrideBusCapacity(3)); // its terminal and ROM, and room for one
 			BlockPos second = screen.east();
-			setblock(singleplayer, second, "screen[facing=south]");
+			setblock(singleplayer, second, "tier3_screen[facing=south]");
 			context.waitFor(client -> client.level.getBlockEntity(computer) instanceof AllInOneBlockEntity be && be.busStatus().overflow());
 			context.waitTicks(2);
 			BufferedImage full = read(context.takeScreenshot("case-bus-full"));
@@ -287,7 +287,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 		}
 	}
 
-	/** Sets a block by command: a mod block by its path ("screen[facing=south]"), anything else by its full id. */
+	/** Sets a block by command: a mod block by its path ("tier3_screen[facing=south]"), anything else by its full id. */
 	private static void setblock(TestSingleplayerContext singleplayer, BlockPos pos, String block) {
 		String id = block.contains(":") ? block : "modularcomputers:" + block;
 		singleplayer.getServer().runCommand("setblock %d %d %d %s".formatted(pos.getX(), pos.getY(), pos.getZ(), id));

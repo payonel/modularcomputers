@@ -521,7 +521,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 				continue;
 			}
 			if (block instanceof ScreenBlockEntity screen) {
-				addCabled(found, devices, new Cabled(Motherboard.id(screen.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.SCREEN.asItem(), -1), screen.terminal());
+				addCabled(found, devices, new Cabled(Motherboard.id(screen.id()), at.pos(), at.meters(), at.wireless(), paired, screen.getBlockState().getBlock().asItem(), -1), screen.terminal());
 			} else if (block instanceof ExpansionHubBlockEntity hub) {
 				for (int slot = 0; slot < ExpansionHubBlockEntity.SLOTS; slot++) {
 					int hubSlot = slot;

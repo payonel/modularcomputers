@@ -191,7 +191,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 				ClientRecipes.Grid grid = ClientRecipes.of(ModItems.TIER2_BATTERY).orElseThrow(() -> new AssertionError("no tier 2 recipe on the client"));
 				check(grid.cell(0, 0).getFirst().is(Items.GOLD_INGOT) && grid.cell(1, 2).getFirst().is(Items.BLAZE_ROD)
 					&& grid.cell(0, 2).getFirst().is(Items.SEA_LANTERN), "the tier 2 grid");
-				check(ClientRecipes.of(ModBlocks.SCREEN.asItem()).isEmpty(), "a screen has no recipe yet");
+				check(ClientRecipes.of(ModBlocks.TIER3_SCREEN.asItem()).isEmpty(), "a screen has no recipe yet");
 			});
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(hotbar + cpuHotbar)); // pick up the CPU
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(CaseMenu.CPU_SLOT));

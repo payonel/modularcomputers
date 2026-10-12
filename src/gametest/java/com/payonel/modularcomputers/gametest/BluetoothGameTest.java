@@ -204,7 +204,7 @@ public class BluetoothGameTest {
 		helper.succeedWhen(() -> {
 			helper.assertTrue(onBus(computer, screen), "the screen past hub 2");
 			helper.assertValueEqual(computer.busEntries().stream().filter(AllInOneBlockEntity.BusEntry::cabled)
-				.map(entry -> entry.name().getString()).toList(), List.of("Audio Card", "WLAN Card", "Screen"), "hub 1's card, hub 2's, the screen");
+				.map(entry -> entry.name().getString()).toList(), List.of("Audio Card", "WLAN Card", "Tier 3 Screen"), "hub 1's card, hub 2's, the screen");
 		});
 	}
 
@@ -235,7 +235,7 @@ public class BluetoothGameTest {
 	}
 
 	private static ScreenBlockEntity screen(GameTestHelper helper, BlockPos pos) {
-		helper.setBlock(pos, ModBlocks.SCREEN.defaultBlockState().setValue(ScreenBlock.FACING, Direction.SOUTH));
+		helper.setBlock(pos, ModBlocks.TIER3_SCREEN.defaultBlockState().setValue(ScreenBlock.FACING, Direction.SOUTH));
 		return helper.getBlockEntity(pos, ScreenBlockEntity.class);
 	}
 

@@ -15,6 +15,9 @@ import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
+import com.payonel.modularcomputers.device.TerminalTier;
+import com.payonel.modularcomputers.item.ScreenItem;
+import java.util.List;
 
 /** Block, block item and block entity registrations. */
 public final class ModBlocks {
@@ -25,12 +28,15 @@ public final class ModBlocks {
 		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("all_in_one"),
 		new BlockEntityType<>(AllInOneBlockEntity::new, Set.of(ALL_IN_ONE)));
 
-	public static final Block SCREEN = registerWithItem("screen", ScreenBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(2.0f).sound(SoundType.METAL));
+	/** Screens (terminals: a display and keyboard), by tier: what colors they show. */
+	public static final ScreenBlock TIER1_SCREEN = screen("tier1_screen", TerminalTier.TIER_1);
+	public static final ScreenBlock TIER2_SCREEN = screen("tier2_screen", TerminalTier.TIER_2);
+	public static final ScreenBlock TIER3_SCREEN = screen("tier3_screen", TerminalTier.TIER_3);
+	public static final List<ScreenBlock> SCREENS = List.of(TIER1_SCREEN, TIER2_SCREEN, TIER3_SCREEN);
 
 	public static final BlockEntityType<ScreenBlockEntity> SCREEN_ENTITY = Registry.register(
 		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("screen"),
-		new BlockEntityType<>(ScreenBlockEntity::new, Set.of(SCREEN)));
+		new BlockEntityType<>(ScreenBlockEntity::new, Set.copyOf(SCREENS)));
 
 	public static final Block CABLE = registerWithItem("cable", CableBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(0.5f).sound(SoundType.WOOL).noOcclusion());
@@ -61,6 +67,16 @@ public final class ModBlocks {
 
 	/** Forces the static registrations above. */
 	public static void init() {
+	}
+
+	private static ScreenBlock screen(String name, TerminalTier tier) {
+		ResourceKey<Block> blockKey = ResourceKey.create(Registries.BLOCK, id(name));
+		ScreenBlock block = Registry.register(BuiltInRegistries.BLOCK, blockKey, new ScreenBlock(
+			BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(2.0f).sound(SoundType.METAL).setId(blockKey), tier));
+		ResourceKey<Item> itemKey = ResourceKey.create(Registries.ITEM, id(name));
+		Registry.register(BuiltInRegistries.ITEM, itemKey,
+			new ScreenItem(block, new Item.Properties().setId(itemKey).useBlockDescriptionPrefix()));
+		return block;
 	}
 
 	private static Block registerWithItem(String name, Function<BlockBehaviour.Properties, Block> factory, BlockBehaviour.Properties properties) {

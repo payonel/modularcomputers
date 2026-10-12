@@ -39,6 +39,15 @@ def screen_front():
 	rect(im, 1, 12, 14, 12, LIGHT)  # and light below
 	return im
 
+def tier_screen_front(tier):
+	"""The screen face, with its tier as dots in the frame's bottom right corner: iron, gold,
+	diamond, as on the CPUs' lids."""
+	im = screen_front()
+	color = [(196, 200, 206), (230, 190, 60), (90, 220, 220)][tier - 1]
+	for i in range(tier):
+		im.putpixel((13 - 2 * i, 14), color)
+	return im
+
 def screen_side():
 	return casing(12)
 
@@ -122,7 +131,8 @@ def paint_gun_side():
 		rect(im, 4 + i * 3, 5, 5 + i * 3, 10, c)
 	return im
 
-textures = [("screen_front", screen_front), ("screen_side", screen_side), ("screen_back", screen_back),
+textures = [("tier1_screen_front", lambda: tier_screen_front(1)), ("tier2_screen_front", lambda: tier_screen_front(2)),
+	("tier3_screen_front", lambda: tier_screen_front(3)), ("screen_side", screen_side), ("screen_back", screen_back),
 	("screen_top", screen_top), ("cable", cable), ("expansion_hub", expansion_hub),
 	("robotic_piston_port", robotic_piston_port), ("robotic_piston_plate", robotic_piston_plate),
 	("paint_gun_nozzle", paint_gun_nozzle), ("paint_gun_side", paint_gun_side)]

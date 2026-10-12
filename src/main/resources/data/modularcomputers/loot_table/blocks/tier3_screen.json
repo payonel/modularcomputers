@@ -8,11 +8,11 @@
 			"entries": [
 				{
 					"type": "minecraft:item",
-					"name": "modularcomputers:screen"
+					"name": "modularcomputers:tier3_screen"
 				}
 			],
 			"rolls": 1
 		}
 	],
-	"random_sequence": "modularcomputers:blocks/screen"
+	"random_sequence": "modularcomputers:blocks/tier3_screen"
 }
