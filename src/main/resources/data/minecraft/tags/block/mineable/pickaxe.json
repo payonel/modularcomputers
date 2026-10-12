@@ -1,6 +1,9 @@
 {
 	"values": [
 		"modularcomputers:all_in_one",
+		"modularcomputers:tier1_case",
+		"modularcomputers:tier2_case",
+		"modularcomputers:tier3_case",
 		"modularcomputers:tier1_screen",
 		"modularcomputers:tier2_screen",
 		"modularcomputers:tier3_screen",

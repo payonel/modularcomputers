@@ -1,0 +1,11 @@
+{
+	"type": "minecraft:block",
+	"pools": [
+		{
+			"condition": { "type": "minecraft:survives_explosion" },
+			"entries": [{ "type": "minecraft:item", "name": "modularcomputers:tier3_case" }],
+			"rolls": 1
+		}
+	],
+	"random_sequence": "modularcomputers:blocks/tier3_case"
+}

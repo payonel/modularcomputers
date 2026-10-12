@@ -188,6 +188,24 @@ same thing.
         CPU, EEPROM, a charged tier 1 battery, screen, cable (`ModCommands.hotbarFirst`).
       - It needs operator permission, like `/give`: cheats on in singleplayer.
     - Breaking the block drops its parts.
+  - **Case tiers** (user design, 2026-10-11; `machine/CaseTier`; blocks `tier1_case`..`tier3_case`,
+    the same `AllInOneBlock`/`AllInOneBlockEntity` as the all-in-one, which is now the dev kit: a
+    tier 3 case with a built-in terminal, `AllInOneBlock.builtInTerminal`). Case == board.
+    - **One board for every tier**, like a fab leaving features out of cheaper boards: the case
+      view draws the same art, and what a tier lacks is greyed over (each missing slot with its
+      connector, `CaseScreen.extractTierMarks`); nothing moves. A lower tier has the first slots
+      of each kind (`CaseMenu.available`): battery bays 1/2/3, RAM 1/2/4, SATA 1/2/4, expansion
+      2/3/4 (the user's suggestion). The CPU socket and ROM are on every tier.
+    - **Power buffer:** a quarter day, half a day, a day of a running all-in-one
+      (`CaseTier.bufferCapacity`, `PowerBuffer(capacity)`).
+    - **The gold slot** (tiers 2 and 3, user design): the first expansion slot is gold-trimmed and
+      also takes a screen (a terminal: display and keyboard), like an AGP slot took graphics. The
+      screen is then the case's terminal, on the bus at `exp:0` (with its own id), of the
+      screen's tier; the case's front shows it (block state `screen`; models `case[_screen]...`)
+      and right-clicking the front opens its screen view. Without one, the front is blank
+      (`all_in_one_case_front`) and right-clicking opens the case view. Taking the screen out
+      takes the terminal off the bus (dark).
+    - `CaseMenu.stillValid` accepts any case block (a tier case's view closed at once before).
   - **Two views, one block:**
     - **Right-click** opens the **screen view** (`DisplayScreen`, the user's "modal mode").
       The display sits in a beige **bezel** (`DisplayLayout.bezel`, 6 GUI units) that matches

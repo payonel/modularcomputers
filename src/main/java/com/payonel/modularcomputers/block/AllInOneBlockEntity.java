@@ -21,6 +21,9 @@ import com.payonel.modularcomputers.device.DiskTier;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
+import com.payonel.modularcomputers.machine.CaseTier;
+import com.payonel.modularcomputers.item.ScreenItem;
+import com.payonel.modularcomputers.device.TerminalTier;
 import com.payonel.modularcomputers.machine.CpuTier;
 import com.payonel.modularcomputers.machine.Eeprom;
 import com.payonel.modularcomputers.machine.Hardware;
@@ -113,7 +116,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		CaseMenu.SATA_SLOTS, CaseMenu.SATA_SLOTS + 1, CaseMenu.SATA_SLOTS + 2, CaseMenu.SATA_SLOTS + 3,
 		CaseMenu.EXP_SLOTS, CaseMenu.EXP_SLOTS + 1, CaseMenu.EXP_SLOTS + 2, CaseMenu.EXP_SLOTS + 3};
 
-	private final Terminal display = new Terminal(Resolution.DEFAULT);
+	/**
+	 * Its terminal: the all-in-one's built-in one, or the screen in a case's gold expansion slot
+	 * (a new one when a screen of another tier goes in). In a case without one it's off the bus.
+	 */
+	private Terminal display = new Terminal(Resolution.DEFAULT);
 	/** The built-in terminal's id, its address on the bus. Made when the computer is placed, and saved. */
 	private UUID terminalId = UUID.randomUUID();
 	/** Devices made from the parts in the slots (by lane for drives and cards); null when empty. */
@@ -122,7 +129,10 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private Eeprom eeprom;
 	private final UpsBattery[] ups = new UpsBattery[CaseMenu.UPS_BAYS];
 	private final Bus bus = new Bus(List.of()); // empty until a CPU is in
-	private final PowerBuffer power = new PowerBuffer();
+	private final PowerBuffer power;
+	private final CaseTier tier;
+	/** It's the all-in-one: a built-in terminal on its front. */
+	private final boolean builtInTerminal;
 	/** The motherboard's id: what Bluetooth cards link to. Made when the computer is placed, and saved. */
 	private UUID boardId = UUID.randomUUID();
 	/** What the computer has drawn lately, for the case view's runtime estimate. */
@@ -191,9 +201,31 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	public AllInOneBlockEntity(BlockPos pos, BlockState state) {
 		super(ModBlocks.ALL_IN_ONE_ENTITY, pos, state);
-		// The all-in-one's own terminal, wired to its board.
-		machine.board().plug(Motherboard.TERMINAL, display, terminalId);
+		AllInOneBlock block = state.getBlock() instanceof AllInOneBlock found ? found : (AllInOneBlock) ModBlocks.ALL_IN_ONE;
+		this.tier = block.tier();
+		this.builtInTerminal = block.builtInTerminal();
+		this.power = new PowerBuffer(tier.bufferCapacity());
 		display.setFlusher(this::syncDisplay);
+		if (builtInTerminal) {
+			// The all-in-one's own terminal, wired to its board.
+			if (builtInTerminal) {
+			machine.board().plug(Motherboard.TERMINAL, display, terminalId);
+		}
+		}
+	}
+
+	public CaseTier tier() {
+		return tier;
+	}
+
+	@Override
+	public boolean showsScreen() {
+		return builtInTerminal || screenInSlot();
+	}
+
+	/** A screen is in the gold expansion slot (tiers 2 and 3). */
+	private boolean screenInSlot() {
+		return !builtInTerminal && CaseMenu.isScreenSlot(tier, CaseMenu.EXP_SLOTS) && parts.getItem(CaseMenu.EXP_SLOTS).getItem() instanceof ScreenItem;
 	}
 
 	/** The motherboard's bus order. */
@@ -205,7 +237,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return machine;
 	}
 
-	/** The built-in terminal: the screen on the front and the keyboard under it. */
+	/** Its terminal: built in on the all-in-one, or the screen in a case's gold slot. */
 	@Override
 	public Terminal terminal() {
 		return display;
@@ -479,7 +511,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 				continue;
 			}
 			if (battery.tier().infinite()) {
-				power.fill(PowerBuffer.CAPACITY);
+				power.fill(power.capacity());
 				continue;
 			}
 			BatteryCharge charge = BatteryItem.charge(stack);
@@ -496,7 +528,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private boolean setPowerState() {
 		BlockState state = getBlockState()
 			.setValue(AllInOneBlock.READY, machine.board().cpu().isPresent() && hasPower())
-			.setValue(AllInOneBlock.POWERED, machine.isPowered());
+			.setValue(AllInOneBlock.POWERED, machine.isPowered())
+			.setValue(AllInOneBlock.SCREEN, screenInSlot()); // the front shows a screen in the gold slot
 		if (state == getBlockState()) {
 			return false;
 		}
@@ -645,6 +678,17 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			disks[lane] = diskTier == null ? null : disks[lane] != null && disks[lane].tier() == diskTier ? disks[lane] : new Disk(diskTier);
 			board.plug(Motherboard.sata(lane), disks[lane], serial(CaseMenu.SATA_SLOTS + lane));
 			ItemStack card = parts.getItem(CaseMenu.EXP_SLOTS + lane);
+			if (lane == 0 && screenInSlot()) {
+				// A screen in the gold slot: the case's terminal, on the bus there.
+				TerminalTier screenTier = ((ScreenItem) card.getItem()).screen().tier();
+				if (display.tier() != screenTier) {
+					display = new Terminal(Resolution.DEFAULT, screenTier);
+					display.setFlusher(this::syncDisplay);
+				}
+				cards[lane] = null;
+				board.plug(Motherboard.exp(lane), display, serial(CaseMenu.EXP_SLOTS + lane));
+				continue;
+			}
 			CardKind kind = ModItems.cardKind(card).orElse(null);
 			cards[lane] = kind == null ? null : cards[lane] != null && cards[lane].kind() == kind ? cards[lane] : new Card(kind);
 			board.plug(Motherboard.exp(lane), cards[lane], serial(CaseMenu.EXP_SLOTS + lane));
@@ -759,7 +803,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	@Override
 	public AbstractContainerMenu createMenu(int id, Inventory inventory, Player player) {
-		return new CaseMenu(id, inventory, parts, powerData, worldPosition, ContainerLevelAccess.create(level, worldPosition));
+		return new CaseMenu(id, inventory, parts, powerData, worldPosition, ContainerLevelAccess.create(level, worldPosition), tier);
 	}
 
 	@Override
@@ -802,7 +846,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		machine.board().overrideBusCapacity(input.getInt(BUS_CAPACITY_OVERRIDE).orElse(null));
 		input.read(BOARD_ID, UUIDUtil.CODEC).ifPresent(saved -> boardId = saved);
 		input.read(TERMINAL_ID, UUIDUtil.CODEC).ifPresent(saved -> terminalId = saved);
-		machine.board().plug(Motherboard.TERMINAL, display, terminalId);
+		if (builtInTerminal) {
+			machine.board().plug(Motherboard.TERMINAL, display, terminalId);
+		}
 		parts.getItems().clear(); // not clearContent(): that would fire change handling mid-load
 		ContainerHelper.loadAllItems(input, parts.getItems());
 		input.read(BUS_EXTERNAL, ENTRY_CODEC.listOf()).ifPresent(order ->

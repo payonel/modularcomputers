@@ -1,6 +1,9 @@
 {
 	"itemGroup.modularcomputers": "Modular Computers",
 	"block.modularcomputers.all_in_one": "All-in-One Computer",
+	"block.modularcomputers.tier1_case": "Tier 1 Case",
+	"block.modularcomputers.tier2_case": "Tier 2 Case",
+	"block.modularcomputers.tier3_case": "Tier 3 Case",
 	"gui.modularcomputers.display": "Display",
 	"item.modularcomputers.tier1_cpu": "Tier 1 CPU",
 	"item.modularcomputers.tier2_cpu": "Tier 2 CPU",

@@ -24,6 +24,7 @@ public final class ModCreativeTab {
 			.icon(() -> new ItemStack(ModBlocks.ALL_IN_ONE))
 			.displayItems((parameters, output) -> {
 				output.accept(ModBlocks.ALL_IN_ONE);
+				ModBlocks.CASES.forEach(output::accept);
 				ModBlocks.SCREENS.forEach(output::accept);
 				output.accept(ModBlocks.CABLE);
 				output.accept(ModBlocks.EXPANSION_HUB);

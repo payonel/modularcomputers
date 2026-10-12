@@ -16,17 +16,24 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import com.payonel.modularcomputers.device.TerminalTier;
+import com.payonel.modularcomputers.machine.CaseTier;
 import com.payonel.modularcomputers.item.ScreenItem;
 import java.util.List;
 
 /** Block, block item and block entity registrations. */
 public final class ModBlocks {
-	public static final Block ALL_IN_ONE = registerWithItem("all_in_one", AllInOneBlock::new,
+	/** The dev kit: a tier 3 case with its own screen and keyboard built into the front. */
+	public static final Block ALL_IN_ONE = registerWithItem("all_in_one", properties -> new AllInOneBlock(properties, CaseTier.TIER_3, true),
 		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(2.0f).sound(SoundType.METAL));
+	/** Cases, by tier: the same board, with more of it at higher tiers. */
+	public static final Block TIER1_CASE = caseBlock("tier1_case", CaseTier.TIER_1);
+	public static final Block TIER2_CASE = caseBlock("tier2_case", CaseTier.TIER_2);
+	public static final Block TIER3_CASE = caseBlock("tier3_case", CaseTier.TIER_3);
+	public static final List<Block> CASES = List.of(TIER1_CASE, TIER2_CASE, TIER3_CASE);
 
 	public static final BlockEntityType<AllInOneBlockEntity> ALL_IN_ONE_ENTITY = Registry.register(
 		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("all_in_one"),
-		new BlockEntityType<>(AllInOneBlockEntity::new, Set.of(ALL_IN_ONE)));
+		new BlockEntityType<>(AllInOneBlockEntity::new, Set.of(ALL_IN_ONE, TIER1_CASE, TIER2_CASE, TIER3_CASE)));
 
 	/** Screens (terminals: a display and keyboard), by tier: what colors they show. */
 	public static final ScreenBlock TIER1_SCREEN = screen("tier1_screen", TerminalTier.TIER_1);
@@ -67,6 +74,11 @@ public final class ModBlocks {
 
 	/** Forces the static registrations above. */
 	public static void init() {
+	}
+
+	private static Block caseBlock(String name, CaseTier tier) {
+		return registerWithItem(name, properties -> new AllInOneBlock(properties, tier, false),
+			BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(2.0f).sound(SoundType.METAL));
 	}
 
 	private static ScreenBlock screen(String name, TerminalTier tier) {

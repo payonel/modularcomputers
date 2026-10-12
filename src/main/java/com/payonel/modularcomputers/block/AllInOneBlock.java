@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.block;
 import com.payonel.modularcomputers.item.ModItems;
 import java.util.Optional;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import com.payonel.modularcomputers.machine.CaseTier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -44,15 +45,41 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 	 * button is faded and doesn't glow.
 	 */
 	public static final BooleanProperty READY = BooleanProperty.create("ready");
+	/** A screen is in the case's gold expansion slot: its front shows it. */
+	public static final BooleanProperty SCREEN = BooleanProperty.create("screen");
 
-	public AllInOneBlock(Properties properties) {
+	private final CaseTier tier;
+	private final boolean builtInTerminal;
+
+	/**
+	 * A case of a tier. {@code builtInTerminal}: it has its own screen and keyboard on the front
+	 * (the all-in-one, the dev kit); otherwise it shows a screen only when one is in its gold
+	 * expansion slot.
+	 */
+	public AllInOneBlock(Properties properties, CaseTier tier, boolean builtInTerminal) {
 		super(properties);
-		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false).setValue(READY, false));
+		this.tier = tier;
+		this.builtInTerminal = builtInTerminal;
+		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false).setValue(READY, false)
+			.setValue(SCREEN, false));
+	}
+
+	public CaseTier tier() {
+		return tier;
+	}
+
+	public boolean builtInTerminal() {
+		return builtInTerminal;
+	}
+
+	/** Its front shows a screen: built in, or one in the gold slot. */
+	public boolean showsScreen(BlockState state) {
+		return builtInTerminal || state.getValue(SCREEN);
 	}
 
 	@Override
 	protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-		builder.add(FACING, POWERED, READY);
+		builder.add(FACING, POWERED, READY, SCREEN);
 	}
 
 	@Override
@@ -111,6 +138,8 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 		} else if (region.equals(Optional.of(BackPanel.Region.CASE))) {
 			// The window into the case opens the case view.
 			player.openMenu(computer);
+		} else if (!showsScreen(state)) {
+			player.openMenu(computer); // no screen to show: the case
 		} else if (player instanceof ServerPlayer serverPlayer) {
 			// Anywhere else: the screen wins. The client opens the display when this arrives.
 			ServerPlayNetworking.send(serverPlayer, computer.openDisplayPayload());

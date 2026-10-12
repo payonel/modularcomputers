@@ -90,6 +90,9 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int SATA_PLUG = 0xFF3CB45A;
 	private static final int SATA_PLUG_LIGHT = 0xFF6EDC82;
 	private static final int METER_LOW = 0xFFDC3C32;
+	/** Over what a lower tier leaves out: the board, dimmed. */
+	private static final int MISSING = 0xD0142218;
+	private static final int GOLD_TRIM = 0xFFD4AA28;
 	private static final int METER_MEDIUM = 0xFFE6C83C;
 	private static final int METER_HIGH = 0xFF5AE66E;
 	private static final int BULB_LIT = 0xFFFFE066;
@@ -150,7 +153,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 
 	/** The case's power, as the menu last sent it: up to date every tick. */
 	private PowerBuffer casePower() {
-		PowerBuffer power = new PowerBuffer();
+		PowerBuffer power = new PowerBuffer(menu.tier().bufferCapacity());
 		power.set(menu.powerLevel());
 		return power;
 	}
@@ -343,8 +346,9 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		graphics.blit(RenderPipelines.GUI_TEXTURED, BOARD, x + CaseMenu.BOARD_X, y + CaseMenu.BOARD_Y, 0, 0, BOARD_W, BOARD_H, BOARD_W, BOARD_H);
 		extractBoardLabels(graphics, x, y);
 		extractIndicators(graphics);
+		extractTierMarks(graphics);
 		for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
-			if (!menu.slots.get(slot).hasItem()) {
+			if (!menu.slots.get(slot).hasItem() && CaseMenu.available(menu.tier(), slot)) {
 				Viewport area = slotArea(slot);
 				extractIcon(graphics, ghostIcon(slot), area.x(), area.y());
 			}
@@ -432,6 +436,47 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		for (int i = 0; i < lit; i++) {
 			graphics.fill(mx + 1 + 4 * i, my + 1, mx + 4 + 4 * i, my + 5, color);
 		}
+	}
+
+	/**
+	 * The case's tier on the one board: what this tier leaves out is greyed over (each missing
+	 * slot with its connector), and the screen slot gets its gold trim.
+	 */
+	private void extractTierMarks(GuiGraphicsExtractor graphics) {
+		int bx = leftPos + CaseMenu.BOARD_X;
+		int by = topPos + CaseMenu.BOARD_Y;
+		for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
+			if (!CaseMenu.available(menu.tier(), slot)) {
+				Viewport part = partArt(slot);
+				graphics.fill(bx + part.x(), by + part.y(), bx + part.right(), by + part.bottom(), MISSING);
+			}
+		}
+		if (menu.tier().screenSlot()) {
+			Viewport slot = slotArea(CaseMenu.EXP_SLOTS);
+			int x0 = slot.x() - 2;
+			int y0 = slot.y() - 2;
+			int x1 = slot.right() + 2;
+			int y1 = slot.bottom() + 2;
+			graphics.fill(x0, y0, x1, y0 + 1, GOLD_TRIM);
+			graphics.fill(x0, y1 - 1, x1, y1, GOLD_TRIM);
+			graphics.fill(x0, y0, x0 + 1, y1, GOLD_TRIM);
+			graphics.fill(x1 - 1, y0, x1, y1, GOLD_TRIM);
+		}
+	}
+
+	/** Where a part slot's art is on the board, with its connector (board pixels; see the art script). */
+	private static Viewport partArt(int slot) {
+		int[] position = CaseMenu.SLOT_POSITIONS[slot];
+		int x = position[0] - CaseMenu.BOARD_X;
+		int y = position[1] - CaseMenu.BOARD_Y;
+		if (slot >= CaseMenu.RAM_SLOTS && slot < CaseMenu.SATA_SLOTS) {
+			return new Viewport(x - 1, y - 26, 19, 68); // the upright memory connector and its latches
+		} else if (slot >= CaseMenu.SATA_SLOTS && slot < CaseMenu.EXP_SLOTS) {
+			return new Viewport(x - 1, y - 1, 26, 19); // the drive and its port
+		} else if (slot >= CaseMenu.EXP_SLOTS) {
+			return new Viewport(x - 5, y - 1, 24, 19); // the card and its connector
+		}
+		return new Viewport(x - 1, y - 1, 19, 19);
 	}
 
 	private boolean hasPart(int slot) {

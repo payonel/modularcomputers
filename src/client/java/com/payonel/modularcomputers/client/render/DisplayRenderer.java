@@ -74,8 +74,8 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 		state.bluetooth = BluetoothTarget.isTarget(host.getBlockPos());
 		TextBuffer display = host.terminal().buffer();
 		state.resolution = display.resolution();
-		if (display.isBlank()) {
-			state.rows = null;
+		if (display.isBlank() || !host.showsScreen()) {
+			state.rows = null; // nothing on it, or no screen on the front (a case without one)
 			return;
 		}
 		state.rows = display.rows().toArray(String[]::new);
