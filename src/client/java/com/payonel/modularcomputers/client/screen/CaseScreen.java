@@ -17,7 +17,6 @@ import com.payonel.modularcomputers.power.ChargeMeter;
 import com.payonel.modularcomputers.power.Durations;
 import com.payonel.modularcomputers.power.PowerBuffer;
 import com.payonel.modularcomputers.power.PowerUnits;
-import com.payonel.modularcomputers.power.RecentDraw;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -170,7 +169,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 
 	/**
 	 * The meter's hover hint: the case's power and the batteries' (all the bays as one) in percent;
-	 * then what's stored in all of them, the load (the computer's recent draw, per tick) and how
+	 * then what's stored in all of them, the load (what the computer draws now, a tick) and how
 	 * long the stored power lasts at that load (DD:MM:SS). Units go without a name.
 	 */
 	public List<Component> powerTooltip() {
@@ -201,9 +200,9 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		long stored = power.level() + units;
 		lines.add(Component.translatable("gui.modularcomputers.power.stored",
 			infinite ? PowerUnits.INFINITE : PowerUnits.format(stored)));
-		long perPeriod = menu.recentDraw();
-		lines.add(Component.translatable("gui.modularcomputers.power.load", PowerUnits.format(Math.round((double) perPeriod / RecentDraw.PERIOD))));
-		long runtime = RecentDraw.runtime(stored, perPeriod);
+		long load = menu.load();
+		lines.add(Component.translatable("gui.modularcomputers.power.load", PowerUnits.format(load)));
+		long runtime = PowerUnits.runtime(stored, load);
 		if (infinite) {
 			lines.add(Component.translatable("gui.modularcomputers.power.time_forever"));
 		} else if (runtime < 0) {

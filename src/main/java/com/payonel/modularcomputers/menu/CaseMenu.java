@@ -149,8 +149,8 @@ public final class CaseMenu extends AbstractContainerMenu {
 		return (power.get(1) & 0xFFFF) << 16 | power.get(0) & 0xFFFF;
 	}
 
-	/** What the computer has drawn lately, in power units per {@link com.payonel.modularcomputers.power.RecentDraw#PERIOD} ticks. */
-	public int recentDraw() {
+	/** What the computer draws now, in power units a tick (its load). */
+	public int load() {
 		return (power.get(3) & 0xFFFF) << 16 | power.get(2) & 0xFFFF;
 	}
 

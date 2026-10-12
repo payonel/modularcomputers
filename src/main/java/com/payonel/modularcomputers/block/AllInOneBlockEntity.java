@@ -33,7 +33,6 @@ import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import com.payonel.modularcomputers.power.BatteryCharge;
 import com.payonel.modularcomputers.power.PowerBuffer;
-import com.payonel.modularcomputers.power.RecentDraw;
 import com.payonel.modularcomputers.sound.ModSounds;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -126,28 +125,23 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final CaseTier tier;
 	/** The motherboard's id: what Bluetooth cards link to. Made when the computer is placed, and saved. */
 	private UUID boardId = UUID.randomUUID();
-	/** What the computer has drawn lately, for the case view's runtime estimate. */
-	private final RecentDraw recentDraw = new RecentDraw();
 	/**
-	 * The buffer's level and the recent draw for the case view, which sends them to the player as
-	 * they change. Menu data goes as shorts, so each is two: the low 16 bits, then the high
-	 * ({@link CaseMenu#powerLevel}, {@link CaseMenu#recentDraw}).
+	 * The buffer's level and the computer's load (what it draws now) for the case view, which sends
+	 * them to the player as they change. Menu data goes as shorts, so each is two: the low 16 bits,
+	 * then the high ({@link CaseMenu#powerLevel}, {@link CaseMenu#load}).
 	 */
 	private final ContainerData powerData = new ContainerData() {
 		@Override
 		public int get(int index) {
-			int value = index < 2 ? power.level() : (int) Math.min(Integer.MAX_VALUE, recentDraw.perPeriod());
+			int value = index < 2 ? power.level() : (int) Math.min(Integer.MAX_VALUE, machine.currentDraw());
 			return index % 2 == 0 ? value & 0xFFFF : value >>> 16;
 		}
 
 		@Override
 		public void set(int index, int value) {
-			int old = index < 2 ? power.level() : (int) recentDraw.perPeriod();
-			int merged = index % 2 == 0 ? old & ~0xFFFF | value & 0xFFFF : (value & 0xFFFF) << 16 | old & 0xFFFF;
-			if (index < 2) {
-				power.set(merged);
-			} else {
-				recentDraw.set(merged);
+			if (index < 2) { // the load is only ever read from the machine
+				int old = power.level();
+				power.set(index % 2 == 0 ? old & ~0xFFFF | value & 0xFFFF : (value & 0xFFFF) << 16 | old & 0xFFFF);
 			}
 		}
 
@@ -471,7 +465,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		// The CPU while it runs a program, and the bus devices it powers (see Machine.powerUse).
 		long used = machine.powerUse(level.getGameTime());
 		power.use(used);
-		recentDraw.record(used);
 		pullFromBattery();
 		if (machine.powerLost()) {
 			errorBeep();

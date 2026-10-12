@@ -54,6 +54,8 @@ public final class Machine {
 	private long cpuTicks;
 	/** Ticks it waited for an interrupt since then. */
 	private long waitingTicks;
+	/** Whether the CPU executed in the last whole tick (or waited, or was halted). */
+	private boolean executedLastTick;
 	/** Calls answered this tick, by the tick's turn and any interrupt turns. */
 	private int callsThisTick;
 	private boolean executedThisTick;
@@ -112,6 +114,7 @@ public final class Machine {
 		if (runner != null && !executedThisTick) {
 			waitingTicks++; // it waited all through this tick
 		}
+		executedLastTick = executedThisTick;
 		return Supervision.OK;
 	}
 
@@ -196,6 +199,25 @@ public final class Machine {
 		if (device.power() != null) {
 			device.power().supply(this);
 		}
+	}
+
+	/**
+	 * What it draws now, in power units a tick: the CPU at its tier's rate for what it did last
+	 * tick (running or waiting; halted, nothing), and every powered device on its bus at its own
+	 * draw. Per-call costs (a terminal's writes) come and go, so they aren't in it. Nothing while off.
+	 */
+	public long currentDraw() {
+		if (!powered) {
+			return 0;
+		}
+		CpuTier tier = board.cpu().map(Cpu::tier).orElse(CpuTier.TIER_1);
+		long draw = runner == null ? 0 : executedLastTick ? tier.running() : tier.waiting();
+		for (Device device : board.bus().devices()) {
+			if (device.power() != null && device.power().powered()) {
+				draw += device.power().draw();
+			}
+		}
+		return draw;
 	}
 
 	/**

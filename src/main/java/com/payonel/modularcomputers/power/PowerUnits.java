@@ -45,6 +45,11 @@ public final class PowerUnits {
 		return digits + prefixes[prefix];
 	}
 
+	/** How many ticks {@code stored} units last at {@code load} units a tick; -1 with no load. */
+	public static long runtime(long stored, long load) {
+		return load <= 0 ? -1 : stored / load;
+	}
+
 	/** How long {@code units} run an all-in-one, in ticks. */
 	public static long ticks(long units) {
 		return units / ALL_IN_ONE;

@@ -171,10 +171,12 @@ same thing.
             all bars off; any power: at least one red bar.
           - Hovering the meter shows a hint (`CaseScreen.powerTooltip`, user's format, 2026-10-11):
             "Case: 75%", "Batteries: 90%" (all the bays as one, or "none"), "Stored: 29.0M" (case
-            and batteries; "inf" with a tier 3), "Load: 110" (the recent draw per tick) and
+            and batteries; "inf" with a tier 3), "Load: 205" (what it draws now, a tick) and
             "Time: 00:15:00" (how long the stored power lasts at that load; "-" with no load,
-            "forever" with a tier 3). The load is a running average the server keeps of each 20
-            ticks' use (`power/RecentDraw`), sent with the buffer level (`CaseMenu.recentDraw`).
+            "forever" with a tier 3). The load is the machine's current draw, not an average (the
+            user found the average far too slow): the CPU at its tier's rate for what it did last
+            tick, plus every powered bus device's draw, without per-call costs
+            (`Machine.currentDraw`), sent with the buffer level (`CaseMenu.load`).
           - The case view gets the buffer level through the menu's data (`CaseMenu.powerLevel`,
             a `ContainerData` like a furnace's progress), so it updates every second, as the
             battery's slot does. Menu data travels as shorts, so the level goes as two (low and high 16 bits,

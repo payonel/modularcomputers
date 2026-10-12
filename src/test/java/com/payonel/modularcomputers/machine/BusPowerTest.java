@@ -104,6 +104,26 @@ class BusPowerTest {
 	}
 
 	@Test
+	void theLoadIsWhatItDrawsNow() {
+		Machine machine = machine(board -> {
+			board.list();
+			for (int i = 0; i < 60; i++) {
+				board.uptime();
+			}
+			board.waitForInterrupt(3600);
+		});
+		machine.setDevices(Map.of("id:screen", screen));
+		assertThat(machine.currentDraw()).as("off").isZero();
+		machine.pressPower();
+		machine.tick();
+		assertThat(machine.currentDraw()).as("running").isEqualTo(CpuTier.TIER_3.running() + Terminal.DRAW);
+		for (int i = 0; i < 5; i++) {
+			machine.tick();
+		}
+		assertThat(machine.currentDraw()).as("waiting, at once: no average").isEqualTo(CpuTier.TIER_3.waiting() + Terminal.DRAW);
+	}
+
+	@Test
 	void writesCostPower() {
 		Machine machine = machine(board -> {
 			for (int i = 0; i < 8; i++) {

@@ -274,7 +274,7 @@ public class BatteryGameTest {
 		helper.succeedWhen(() -> {
 			helper.assertTrue(menu.powerLevel() < DAY, "the menu's power runs down");
 			helper.assertValueEqual(menu.powerLevel(), computer.power().level(), "with the case's");
-			helper.assertTrue(menu.recentDraw() > 0, "and what the computer draws, for the runtime estimate");
+			helper.assertTrue(menu.load() > 0, "and what the computer draws now, its load");
 		});
 	}
 
