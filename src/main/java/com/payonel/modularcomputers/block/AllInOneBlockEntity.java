@@ -11,7 +11,6 @@ import com.payonel.modularcomputers.console.ConsoleSplitter;
 import com.payonel.modularcomputers.device.Card;
 import com.payonel.modularcomputers.device.CardKind;
 import com.payonel.modularcomputers.device.Disk;
-import com.payonel.modularcomputers.device.UpsBattery;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.item.BatteryItem;
@@ -112,7 +111,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	public static final int TERMINAL_ICON = 6;
 	private static final float ERROR_BEEP_VOLUME = 0.6f;
 	/** The slots whose parts are bus devices: each gets a serial number, its id. */
-	private static final int[] BUS_PART_SLOTS = {CaseMenu.EEPROM_SLOT, CaseMenu.UPS_SLOT, CaseMenu.UPS_SLOT + 1, CaseMenu.UPS_SLOT + 2,
+	private static final int[] BUS_PART_SLOTS = {CaseMenu.EEPROM_SLOT,
 		CaseMenu.SATA_SLOTS, CaseMenu.SATA_SLOTS + 1, CaseMenu.SATA_SLOTS + 2, CaseMenu.SATA_SLOTS + 3,
 		CaseMenu.EXP_SLOTS, CaseMenu.EXP_SLOTS + 1, CaseMenu.EXP_SLOTS + 2, CaseMenu.EXP_SLOTS + 3};
 
@@ -127,7 +126,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final Disk[] disks = new Disk[CaseMenu.LANES];
 	private final Card[] cards = new Card[CaseMenu.LANES];
 	private Eeprom eeprom;
-	private final UpsBattery[] ups = new UpsBattery[CaseMenu.UPS_BAYS];
 	private final Bus bus = new Bus(List.of()); // empty until a CPU is in
 	private final PowerBuffer power;
 	private final CaseTier tier;
@@ -309,18 +307,14 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private static int partSlot(String connector) {
 		if (connector.equals(Motherboard.EEPROM)) {
 			return CaseMenu.EEPROM_SLOT;
-		} else if (Motherboard.isUps(connector)) {
-			return CaseMenu.UPS_SLOT + Motherboard.lane(connector);
 		}
 		return (Motherboard.isSata(connector) ? CaseMenu.SATA_SLOTS : CaseMenu.EXP_SLOTS) + Motherboard.lane(connector);
 	}
 
-	/** Where a part sits, as the bus order panel says it: "ROM", "UPS", "SATA 1", "EXP 2". */
+	/** Where a part sits, as the bus order panel says it: "ROM", "SATA 1", "EXP 2". */
 	private static Component partLocation(String connector) {
 		if (connector.equals(Motherboard.EEPROM)) {
 			return Component.translatable("gui.modularcomputers.bus.rom");
-		} else if (Motherboard.isUps(connector)) {
-			return Component.translatable("gui.modularcomputers.bus.ups", Motherboard.lane(connector) + 1);
 		}
 		return Component.translatable(Motherboard.isSata(connector) ? "gui.modularcomputers.bus.sata" : "gui.modularcomputers.bus.expansion",
 			Motherboard.lane(connector) + 1);
@@ -668,11 +662,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		board.setEeprom(eeprom);
 		// Each part answers to its serial number too: a card is found by it here or in a hub.
 		board.plug(Motherboard.EEPROM, eeprom, serial(CaseMenu.EEPROM_SLOT));
-		for (int bay = 0; bay < CaseMenu.UPS_BAYS; bay++) {
-			boolean hasUps = parts.getItem(CaseMenu.UPS_SLOT + bay).getItem() instanceof BatteryItem;
-			ups[bay] = hasUps ? (ups[bay] != null ? ups[bay] : new UpsBattery()) : null;
-			board.plug(Motherboard.ups(bay), ups[bay], serial(CaseMenu.UPS_SLOT + bay));
-		}
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
 			DiskTier diskTier = parts.getItem(CaseMenu.SATA_SLOTS + lane).getItem() instanceof DiskItem disk ? disk.tier() : null;
 			disks[lane] = diskTier == null ? null : disks[lane] != null && disks[lane].tier() == diskTier ? disks[lane] : new Disk(diskTier);

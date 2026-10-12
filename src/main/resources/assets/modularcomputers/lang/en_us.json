@@ -52,7 +52,6 @@
 	"block.modularcomputers.cable": "Cable",
 	"gui.modularcomputers.bus.cable": "cable, %sm",
 	"gui.modularcomputers.bus.rom": "ROM",
-	"gui.modularcomputers.bus.ups": "UPS %s",
 	"gui.modularcomputers.bus.offline": "offline",
 	"gui.modularcomputers.bus.tip.view": "View",
 	"gui.modularcomputers.bus.tip.connect": "Connect",

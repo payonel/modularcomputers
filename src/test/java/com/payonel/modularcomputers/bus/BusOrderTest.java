@@ -66,12 +66,12 @@ class BusOrderTest {
 	@Test
 	void onlyTheCasesInstalledDevicesCountNotItsEmptySlots() {
 		order.setCapacity(4);
-		order.sync(List.of("eeprom", "ups:0"), List.of("id:a", "id:b", "id:c"), 0);
-		assertThat(order.connected()).as("2 of the case's, 2 external").containsExactly("eeprom", "ups:0", "id:a", "id:b");
+		order.sync(List.of("eeprom", "sata:1"), List.of("id:a", "id:b", "id:c"), 0);
+		assertThat(order.connected()).as("2 of the case's, 2 external").containsExactly("eeprom", "sata:1", "id:a", "id:b");
 		assertThat(order.status().room()).isEqualTo(2);
 		assertThat(order.status().waiting()).isEqualTo(1);
-		order.sync(List.of("eeprom", "ups:0", "sata:0", "exp:0", "exp:1"), List.of("id:a"), 1);
-		assertThat(order.connected()).as("a full case leaves the last of its own off too").containsExactly("eeprom", "ups:0", "sata:0", "exp:0");
+		order.sync(List.of("eeprom", "sata:1", "sata:0", "exp:0", "exp:1"), List.of("id:a"), 1);
+		assertThat(order.connected()).as("a full case leaves the last of its own off too").containsExactly("eeprom", "sata:1", "sata:0", "exp:0");
 	}
 
 	@Test

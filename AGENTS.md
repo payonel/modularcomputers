@@ -90,10 +90,11 @@ same thing.
         Redstone, Audio, Motion Sensor, Audio Sensor, Weather Sensor. All cards are
         placeholders with no function.
       - Only the CPU and EEPROM affect the machine so far.
-      - On the bus: the **EEPROM** (`Eeprom` is a `Device`, `FIRMWARE`, row "ROM"), the
-        **UPS batteries** (`UpsBattery`, `POWER`, rows "UPS 1".."UPS 3"; the user says they'll get an API),
-        hard disks (`Disk`) and cards (`Card`, typed by kind). The user asked for the EEPROM
-        and UPS on the bus (2026-10-11). The CPU still loads from the EEPROM slot directly.
+      - On the bus: the **EEPROM** (`Eeprom` is a `Device`, `FIRMWARE`, row "ROM"), hard
+        disks (`Disk`) and cards (`Card`, typed by kind). The CPU still loads from the EEPROM
+        slot directly. **Batteries aren't on the bus** (user, 2026-10-11, reversing an earlier
+        choice): on real machines the firmware reports a battery (ACPI), so if programs need
+        battery info it would be a board call, not a device.
       - RAM is a placeholder: the machine still uses the soldered `Hardware` memory.
       - **Batteries** (user design, 2026-10-11; `item/BatteryItem`, plain-Java
         `power/BatteryTier` and `power/BatteryCharge`). **The computer runs on its battery:**
@@ -155,7 +156,7 @@ same thing.
           - With the battery out or flat, the buffer runs down while the computer runs. Pulling
             the battery doesn't stop a running computer.
           - **Three battery bays** (user, 2026-10-11: "if 3 fit, put 3"; `CaseMenu.UPS_SLOT`,
-            `UPS_BAYS`, bus `ups:0..2`): in a row at the bottom left of the board (the expansion
+            `UPS_BAYS`; not on the bus): in a row at the bottom left of the board (the expansion
             slots moved right and closer to make room). The case tops up from the **last bay
             first, the first bay last** (user). One meter for all.
           - **The charge meter under the bays shows the buffer, not the batteries.** Empty:
@@ -273,7 +274,7 @@ same thing.
             tier 2 16, tier 3 64; `Motherboard.busCapacity`). **The case's own devices count
             against it as much as external ones**, but only those installed: empty slots reserve
             nothing, and external devices get what's left (`BusStatus.room`). A tier 1's 4 hold
-            the essentials: an EEPROM, a battery, a disk, and one card or external device. **No CPU, no bus:** nothing is on
+            the essentials: an EEPROM, a disk, a card, and one more card or external device. **No CPU, no bus:** nothing is on
             it, the panel lists nothing ("no CPU: no bus"), and the saved external order waits
             untouched. The case's devices come first, in their slots' order; a CPU too small for
             even those leaves the last of them waiting too (overflow). A smaller CPU going in makes missing devices make room
@@ -291,7 +292,7 @@ same thing.
             Both are made by `scripts/art/part_sounds.py`; neither is checked by a test. Programs will read it from `Bus.status()` (`BusStatus`: capacity,
             devices, saved, missing, waiting, overflow).
           - **Numbers are fixed places** (user, after looking at PCI/SATA/USB): 1 the built-in
-            terminal, 2 ROM, 3-5 UPS, 6-9 SATA, 10-13 EXP, then external devices from 14 in their
+            terminal, 2 ROM, 3-6 SATA, 7-10 EXP, then external devices from 11 in their
             order. Empty case slots leave gaps (like `lspci`); only present devices get rows.
           - Parts and hub cards are known by a serial number (`ModComponents.SERIAL`, stamped when
             a bus part first goes into a computer or a card into a hub), so moving a hub card to
@@ -565,7 +566,7 @@ scripts/art/error_beep.py` into
     bus's devices in bus order, each a `DeviceInfo(address, id, type)`, a table in Lua), `status()` (`BusStatus`), `type`, `methods`, `doc`,
     `invoke(address, method, args...)`, `waitForInterrupt(seconds)`, `uptime()`. Addresses are
     the bus keys, three kinds as on a real system (user design, 2026-10-11):
-    - **Paths** name slots, fixed by the slot: `eeprom`, `ups`, `sata:0`, `exp:2`.
+    - **Paths** name slots, fixed by the slot: `eeprom`, `sata:0`, `exp:2`.
     - **Ids** name a device however it's connected: `id:<uuid>`. **Every device has one**
       (user, 2026-10-11: nothing is excluded): a screen's or block's id, a part's or card's
       `SERIAL`, the built-in terminal's `terminal_id`. The user rejected `cable:`: a program
@@ -697,7 +698,7 @@ scripts/art/error_beep.py` into
   - **The bus is the motherboard's firmware, not the case's** (user, 2026-10-11: "the all in one
     HAS a motherboard"; new case types will come). `Motherboard` owns the connectors and their
     addresses (`CONNECTORS`: the built-in `TERMINAL` (no path: its address is its id), `eeprom`,
-    `ups:0-2`, `sata:0-3`, `exp:0-3`, and their fixed places 1-13), the `BusOrder`, `id:` aliases, bus positions, and building the bus
+    `sata:0-3`, `exp:0-3`, and their fixed places 1-10), the `BusOrder`, `id:` aliases, bus positions, and building the bus
     (`plug(connector, device, id)`, `setExternal(found)`, `layout(now)`; `Machine.rebuildBus`
     applies it with hot-plug, `Motherboard.rebuildBus` without, for clients). A case only wires
     things up: the all-in-one plugs its terminal into `TERMINAL` with its id, turns slot

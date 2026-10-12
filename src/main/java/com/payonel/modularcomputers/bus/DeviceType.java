@@ -8,8 +8,6 @@ public enum DeviceType {
 	NETWORK,
 	/** Firmware (the EEPROM), listed so programs can read or reflash it. */
 	FIRMWARE,
-	/** Backup power (the UPS battery). */
-	POWER,
 	REDSTONE,
 	AUDIO,
 	SENSOR,

@@ -98,7 +98,7 @@ Tiers are trade-offs the Lua engine can honour, not every possible feature. Thre
   running and less waiting (halted is 0 for all). Starting values (user: "a good starting
   point"), per tick. **The case's own devices count against the bus too** (only the ones
   installed; built: tier 1 4, tier 2 16, tier 3 64): a tier 1's 4 are the essentials (EEPROM, a
-  battery, a disk, one card or external device), so a tier 1 CPU can't use a full tier 3 case.
+  disk, a card, one more card or external device; batteries aren't on the bus), so a tier 1 CPU can't use a full tier 3 case.
 
   | Tier | Running | Waiting | Bus |
   |---|---|---|---|

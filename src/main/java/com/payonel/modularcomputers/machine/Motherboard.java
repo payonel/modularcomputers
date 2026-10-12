@@ -19,8 +19,7 @@ import java.util.UUID;
  * console).
  * <p>
  * It's also the board's firmware for the bus: its <b>connectors</b> come in a fixed order, each
- * with a fixed place on the bus (the built-in terminal's, the {@code eeprom} slot, the battery
- * bays {@code ups:0..2}, {@code sata:0..3}, {@code exp:0..3}), whatever case it's in; a case wires up the ones
+ * with a fixed place on the bus (the built-in terminal's, the {@code eeprom} slot, {@code sata:0..3}, {@code exp:0..3}), whatever case it's in; a case wires up the ones
  * it has. Every device has its own id, {@code id:<uuid>}. A slot's device is addressed by the
  * slot's path and answers to its id too, like Linux's {@code by-path} and {@code by-id} names;
  * the built-in terminal has no path, so its id is its address (programs find it as the first
@@ -31,11 +30,8 @@ public final class Motherboard {
 	/** The built-in terminal's connector. It isn't an address: the terminal is known by its id. */
 	public static final String TERMINAL = "terminal";
 	public static final String EEPROM = "eeprom";
-	/** How many battery bays. */
-	public static final int BAYS = 3;
 	/** How many SATA ports, and how many expansion slots. */
 	public static final int LANES = 4;
-	private static final String UPS = "ups:";
 	private static final String SATA = "sata:";
 	private static final String EXP = "exp:";
 	private static final String ID = "id:";
@@ -60,15 +56,6 @@ public final class Motherboard {
 	private final Map<String, String> ids = new HashMap<>();
 	/** The external devices found now, in the order new ones join (nearest first); null where they don't run here (a client). */
 	private Map<String, Device> external = Map.of();
-
-	/** A battery bay. */
-	public static String ups(int bay) {
-		return UPS + bay;
-	}
-
-	public static boolean isUps(String address) {
-		return address.startsWith(UPS);
-	}
 
 	public static String sata(int lane) {
 		return SATA + lane;
@@ -98,9 +85,6 @@ public final class Motherboard {
 
 	private static List<String> connectors() {
 		List<String> connectors = new ArrayList<>(List.of(TERMINAL, EEPROM));
-		for (int bay = 0; bay < BAYS; bay++) {
-			connectors.add(ups(bay));
-		}
 		for (int lane = 0; lane < LANES; lane++) {
 			connectors.add(sata(lane));
 		}
