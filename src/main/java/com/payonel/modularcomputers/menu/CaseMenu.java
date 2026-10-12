@@ -31,8 +31,8 @@ public final class CaseMenu extends AbstractContainerMenu {
 	public static final int EXP_SLOTS = SATA_SLOTS + 4;
 	public static final int LANES = 4;
 	public static final int PART_SLOTS = EXP_SLOTS + 4;
-	/** Data slots for the power level: menu data travels as shorts, so the low and high 16 bits. */
-	public static final int POWER_DATA = 2;
+	/** Data slots for the power level and the recent draw: menu data travels as shorts, so the low and high 16 bits of each. */
+	public static final int POWER_DATA = 4;
 
 	/** Where the board texture is drawn inside the panel. */
 	public static final int BOARD_X = 4;
@@ -100,6 +100,11 @@ public final class CaseMenu extends AbstractContainerMenu {
 	/** The case's power buffer level, in power units, put back together from its two shorts. */
 	public int powerLevel() {
 		return (power.get(1) & 0xFFFF) << 16 | power.get(0) & 0xFFFF;
+	}
+
+	/** What the computer has drawn lately, in power units per {@link com.payonel.modularcomputers.power.RecentDraw#PERIOD} ticks. */
+	public int recentDraw() {
+		return (power.get(3) & 0xFFFF) << 16 | power.get(2) & 0xFFFF;
 	}
 
 	public BlockPos pos() {

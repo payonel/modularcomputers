@@ -21,6 +21,30 @@ public final class PowerUnits {
 	private PowerUnits() {
 	}
 
+	/** What an infinite store shows instead of a number. */
+	public static final String INFINITE = "inf";
+
+	/**
+	 * A number of units for players, short, as batteries are rated in kWh: three significant
+	 * digits with an SI prefix ("950", "12.3k", "264k", "26.4M", "1.06G").
+	 */
+	public static String format(long units) {
+		String[] prefixes = {"", "k", "M", "G", "T"};
+		double value = Math.max(0, units);
+		int prefix = 0;
+		while (value >= 999.5 && prefix < prefixes.length - 1) {
+			value /= 1000;
+			prefix++;
+		}
+		if (prefix == 0) {
+			return Long.toString(Math.max(0, units));
+		}
+		String digits = value >= 99.95 ? String.format(java.util.Locale.ROOT, "%.0f", value)
+			: value >= 9.995 ? String.format(java.util.Locale.ROOT, "%.1f", value)
+			: String.format(java.util.Locale.ROOT, "%.2f", value);
+		return digits + prefixes[prefix];
+	}
+
 	/** How long {@code units} run an all-in-one, in ticks. */
 	public static long ticks(long units) {
 		return units / ALL_IN_ONE;

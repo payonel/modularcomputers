@@ -99,8 +99,9 @@ same thing.
           terminal costs 1. The yardstick is a running all-in-one, CPU and built-in terminal,
           110 a tick: batteries are rated in days of it (`PowerUnits.DAY`, 2,640,000), so a full
           tier 1 (26,400,000) runs one for 10 days. An idle machine (CPU waiting) draws only its
-          terminals, so it lasts 11 times longer. Times shown (DD:MM:SS) are at the all-in-one
-          rate (`Durations.ofUnits`). Charge is `ModComponents.CHARGE`:
+          terminals, so it lasts 11 times longer. Players see units without a name, short with an
+          SI prefix like a kWh rating (`PowerUnits.format`: "950", "2.64M", "26.4M"; infinite is
+          "inf"). Charge is `ModComponents.CHARGE`:
           `BatteryCharge(units, settledAt)`. A day is 24000 ticks.
         - **Bus power** (user design, 2026-10-11; `bus/BusPower`, `Machine.powerUse`): every
           bus-powered device (terminals so far) has power while at least one running computer
@@ -138,8 +139,8 @@ same thing.
           - A full battery, a tier 3, or anything else in the grid gives no result.
         - Crafted batteries start empty (my default). The creative tab and `giveall` give
           charged ones (`BatteryItem.charged()`).
-        - Items show a charge bar. Their hint (see "Item hints" below) shows "Charge: 73%
-          (07:06:00)" (or "Never runs out"); with Shift, tier 2's self-recharge and rate, and
+        - Items show a charge bar. Their hint (see "Item hints" below) shows "Charge: 73%" and
+          "Stored: 19.3M" (a tier 3: "Charge: 100%", "Stored: inf"; user's format); with Shift, tier 2's self-recharge and rate, and
           for tiers 1 and 2 the glowing items with what each adds to *this* tier ("+50%").
         - **The case's power buffer** (user design, 2026-10-11; `power/PowerBuffer`, saved as
           `power_buffer`): the computer runs on the case's own store, which holds **one day** (of a running all-in-one).
@@ -155,10 +156,12 @@ same thing.
             first, the first bay last** (user). One meter for all.
           - **The charge meter under the bays shows the buffer, not the batteries.** Empty:
             all bars off; any power: at least one red bar.
-          - Hovering the meter shows a hint (`CaseScreen.powerTooltip`, user's wording): "Case
-            power: 75% (00:15:00)" and, with batteries in, "Battery power: 90% (09:00:00)", all the
-            bays together (or
-            "Battery power: never runs out").
+          - Hovering the meter shows a hint (`CaseScreen.powerTooltip`, user's format, 2026-10-11):
+            "Case: 75%", "Batteries: 90%" (all the bays as one, or "none"), "Stored: 29.0M" (case
+            and batteries; "inf" with a tier 3), "Load: 110" (the recent draw per tick) and
+            "Time: 00:15:00" (how long the stored power lasts at that load; "-" with no load,
+            "forever" with a tier 3). The load is a running average the server keeps of each 20
+            ticks' use (`power/RecentDraw`), sent with the buffer level (`CaseMenu.recentDraw`).
           - The case view gets the buffer level through the menu's data (`CaseMenu.powerLevel`,
             a `ContainerData` like a furnace's progress), so it updates every second, as the
             battery's slot does. Menu data travels as shorts, so the level goes as two (low and high 16 bits,

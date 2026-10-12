@@ -16,6 +16,8 @@ import com.payonel.modularcomputers.network.ReorderBusPayload;
 import com.payonel.modularcomputers.power.ChargeMeter;
 import com.payonel.modularcomputers.power.Durations;
 import com.payonel.modularcomputers.power.PowerBuffer;
+import com.payonel.modularcomputers.power.PowerUnits;
+import com.payonel.modularcomputers.power.RecentDraw;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -160,13 +162,14 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	}
 
 	/**
-	 * The meter's hover hint: the case's power, and the batteries' together (all the bays as one),
-	 * each with how long it runs the computer (DD:MM:SS).
+	 * The meter's hover hint: the case's power and the batteries' (all the bays as one) in percent;
+	 * then what's stored in all of them, the load (the computer's recent draw, per tick) and how
+	 * long the stored power lasts at that load (DD:MM:SS). Units go without a name.
 	 */
 	public List<Component> powerTooltip() {
 		PowerBuffer power = casePower();
 		List<Component> lines = new ArrayList<>();
-		lines.add(Component.translatable("gui.modularcomputers.power", power.percent(), Durations.ofUnits(power.level())));
+		lines.add(Component.translatable("gui.modularcomputers.power", power.percent()));
 		long units = 0;
 		long capacity = 0;
 		boolean any = false;
@@ -176,15 +179,30 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			if (stack.getItem() instanceof BatteryItem battery) {
 				any = true;
 				infinite |= battery.tier().infinite();
-				units += BatteryItem.charge(stack).units();
-				capacity += battery.tier().capacity();
+				if (!battery.tier().infinite()) {
+					units += BatteryItem.charge(stack).units();
+					capacity += battery.tier().capacity();
+				}
 			}
 		}
+		if (!any) {
+			lines.add(Component.translatable("gui.modularcomputers.power.batteries_none"));
+		} else {
+			int percent = infinite || capacity == 0 ? 100 : (int) Math.min(100, Math.ceil(units * 100.0 / capacity));
+			lines.add(Component.translatable("gui.modularcomputers.power.batteries", percent));
+		}
+		long stored = power.level() + units;
+		lines.add(Component.translatable("gui.modularcomputers.power.stored",
+			infinite ? PowerUnits.INFINITE : PowerUnits.format(stored)));
+		long perPeriod = menu.recentDraw();
+		lines.add(Component.translatable("gui.modularcomputers.power.load", PowerUnits.format(Math.round((double) perPeriod / RecentDraw.PERIOD))));
+		long runtime = RecentDraw.runtime(stored, perPeriod);
 		if (infinite) {
-			lines.add(Component.translatable("gui.modularcomputers.power.battery_infinite"));
-		} else if (any) {
-			int percent = (int) Math.min(100, Math.ceil(units * 100.0 / capacity));
-			lines.add(Component.translatable("gui.modularcomputers.power.battery", percent, Durations.ofUnits(units)));
+			lines.add(Component.translatable("gui.modularcomputers.power.time_forever"));
+		} else if (runtime < 0) {
+			lines.add(Component.translatable("gui.modularcomputers.power.time_idle"));
+		} else {
+			lines.add(Component.translatable("gui.modularcomputers.power.time", Durations.clock(runtime)));
 		}
 		return lines;
 	}

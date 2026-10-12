@@ -5,7 +5,7 @@ import com.payonel.modularcomputers.hint.HintedItem;
 import com.payonel.modularcomputers.power.BatteryCharge;
 import com.payonel.modularcomputers.power.BatteryTier;
 import com.payonel.modularcomputers.power.ChargeMeter;
-import com.payonel.modularcomputers.power.Durations;
+import com.payonel.modularcomputers.power.PowerUnits;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
@@ -90,11 +90,9 @@ public final class BatteryItem extends HintedItem {
 
 	@Override
 	public void summary(ItemStack stack, Consumer<Hint.Element> hint) {
-		if (tier.infinite()) {
-			hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.infinite")));
-			return;
-		}
-		hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.charge", percent(stack), Durations.ofUnits(charge(stack).units()))));
+		hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.charge", percent(stack))));
+		hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.stored",
+			tier.infinite() ? PowerUnits.INFINITE : PowerUnits.format(charge(stack).units()))));
 	}
 
 	@Override

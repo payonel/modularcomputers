@@ -88,11 +88,11 @@ public class BatteryGameTest {
 	@GameTest
 	public void aBatteryHintShowsItsChargeAndWithShiftHowToChargeIt(GameTestHelper helper) {
 		helper.assertValueEqual(Hint.lines(Hint.of(ModItems.TIER1_BATTERY.charged(), false)),
-			List.of("Charge: 100% (10:00:00)", "Hold [Shift] for details"), "a full tier 1");
+			List.of("Charge: 100%", "Stored: 26.4M", "Hold [Shift] for details"), "a full tier 1");
 		ItemStack tier2 = battery(ModItems.TIER2_BATTERY, 5 * DAY + DAY / 2 + 20 * 7 * PowerUnits.ALL_IN_ONE, 0);
-		helper.assertValueEqual(Hint.lines(Hint.of(tier2, false)), List.of("Charge: 28% (05:10:07)", "Hold [Shift] for details"), "a tier 2");
+		helper.assertValueEqual(Hint.lines(Hint.of(tier2, false)), List.of("Charge: 28%", "Stored: 14.5M", "Hold [Shift] for details"), "a tier 2");
 		List<Hint.Element> details = Hint.of(tier2, true);
-		helper.assertValueEqual(Hint.lines(details), List.of("Charge: 28% (05:10:07)", "Recharges itself while not in use",
+		helper.assertValueEqual(Hint.lines(details), List.of("Charge: 28%", "Stored: 14.5M", "Recharges itself while not in use",
 			"Every 2s of rest adds 1s of charge", "Charge it in a crafting grid with a glowing item:", "Crafting:"), "tier 2 details");
 		Hint.Icons icons = (Hint.Icons) details.stream().filter(Hint.Icons.class::isInstance).findFirst().orElseThrow();
 		helper.assertValueEqual(icons.icons().stream().map(icon -> icon.stack().getItem()).toList(),
@@ -100,7 +100,7 @@ public class BatteryGameTest {
 		helper.assertValueEqual(icons.icons().stream().map(icon -> icon.label().getString()).toList(),
 			List.of("+50%", "+13%", "+13%", "+5%", "+3%"), "what each adds to a tier 2");
 		helper.assertTrue(details.getLast() instanceof Hint.Crafting crafting && crafting.item() == ModItems.TIER2_BATTERY, "ends with its crafting grid");
-		helper.assertValueEqual(Hint.lines(Hint.of(new ItemStack(ModItems.TIER3_BATTERY), true)), List.of("Never runs out", "Crafting:"), "tier 3");
+		helper.assertValueEqual(Hint.lines(Hint.of(new ItemStack(ModItems.TIER3_BATTERY), true)), List.of("Charge: 100%", "Stored: inf", "Crafting:"), "tier 3");
 		helper.succeed();
 	}
 
@@ -258,6 +258,7 @@ public class BatteryGameTest {
 		helper.succeedWhen(() -> {
 			helper.assertTrue(menu.powerLevel() < DAY, "the menu's power runs down");
 			helper.assertValueEqual(menu.powerLevel(), computer.power().level(), "with the case's");
+			helper.assertTrue(menu.recentDraw() > 0, "and what the computer draws, for the runtime estimate");
 		});
 	}
 
