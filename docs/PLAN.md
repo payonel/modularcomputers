@@ -87,6 +87,42 @@ Still to do:
   UPS battery (charge, time left), cards, the EEPROM.
 - Opaque handles (Lua userdata) in the value model.
 
+## Tiers (user design, 2026-10-11; not built)
+
+Tiers are trade-offs the Lua engine can honour, not every possible feature. Three tiers per part.
+
+- **CPU:** bus capacity comes **entirely** from the CPU (its "address width"); the case only
+  reserves places for its own connectors (`BusOrder(capacity, reserved)`), so a tier 3 CPU in a
+  bare tier 1 case leaves nearly the whole bus for external devices. A smaller CPU shrinks the
+  bus and the existing overflow handling covers what no longer fits. Higher tiers draw more
+  running and less waiting (halted is 0 for all). Starting values (user: "a good starting
+  point"), per tick:
+
+  | Tier | Running | Waiting | Bus |
+  |---|---|---|---|
+  | 1 | 100 | 50 | 16 |
+  | 2 | 150 | 20 | 32 |
+  | 3 | 200 | 5 | 64 |
+
+- **Cases (case == board, for our purposes):** higher tiers have more built-in, more slots and
+  a bigger power buffer. **Every tier has the same board layout**, like a fab printing one board
+  and leaving features out on cheaper ones: lower tiers show the same art with the missing
+  slots and parts greyed out. Nothing moves between tiers; a slot a tier 1 has sits exactly
+  where it is on tiers 2 and 3, and so does the charge meter.
+- **Storage:** more space, and less power, at higher tiers.
+- **Memory:** more space. (Idea, not decided: no RAM, no boot, with a POST-style beep code.)
+- **Terminals:** all are the same VT decoder (same driver code), with a capability profile:
+  tier 1 text only (no foreground or background colours), tier 2 text with 16 colours, tier 3
+  pixel graphics as well as text. How pixels are drawn is open: sixel (the VT340's pixel
+  graphics by escape sequence, finer than the text grid), ReGIS (vectors), the kitty graphics
+  protocol, or block/braille characters; the user hasn't chosen. Ideas: tier 1 keeps reverse
+  video as the VT100 did; programs learn a terminal's tier from its Device Attributes reply
+  (`ESC[c`), as on real terminals.
+- **The all-in-one is a dev kit / placeholder** for mapping out the full layout; it's like a
+  tier 3. It may go away, or become a creative "everything built in" block. **To revisit:** a
+  case + terminal block (maybe tier 2 and 3 screens you can put a case inside), and whether
+  any case has a built-in terminal.
+
 ## Separate blocks: cases, screens, cables
 
 The all-in-one stays the test bed. Later there are separate blocks:
