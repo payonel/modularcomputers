@@ -628,10 +628,19 @@ scripts/art/error_beep.py` into
     interrupt pulls a CPU out of `HLT`. Wakes share the tick's call budget (`callsThisTick`), so
     mashing keys buys no extra calls; power counts at most one CPU tick a game tick. After any
     turn, bus devices `flush()`: a terminal's block sends its screen to players right away
-    instead of at its next tick. This took out the 0-50 ms wait for the tick. **Not built yet
-    (planned, agreed):** sending terminals' byte streams to clients (each runs its own
-    `VtDecoder`, with sequence numbers and a snapshot on gaps) instead of the whole block
-    entity (~15 KB) per change.
+    instead of at its next tick. This took out the 0-50 ms wait for the tick.
+  - **Only changed rows go to players** (user, 2026-10-11; `ScreenRowsPayload`, `ScreenRows`):
+    the server's terminal is the only decoder, and players' copies just take cells (the glass
+    shows what the device shows). `TextBuffer` marks changed rows (`takeDirtyRows`); after a turn
+    or on the block's tick, those rows (characters, colors as 3-byte RGB) go to the players
+    tracking the block. A typed key: 363 bytes, where the whole block entity was 15,385
+    (measured by a game test). The full block data still goes on first load and other
+    changes. The user turned down a client-side decoder (sending the bytes, decoding on both
+    sides): a client-only bug could show a screen the server never decoded.
+  - **Saving a screen keeps the decoder's whole state** (`block/ScreenSave`, used for terminals
+    and the console's copy): cells, cursor, colors, modes, the saved cursor, a half-received
+    escape sequence and the main screen behind the alternate one, so a reload carries on
+    exactly.
   - **Motherboard supervision** (`Machine.tick`, every tick): CPU gone or power gone, and the
     machine dies with the error beep, like a socket's CPU-present pin or a PSU's power-good.
     The event-driven checks (pulling a part) still act at once.

@@ -62,9 +62,10 @@ public final class VtDecoder {
 	private boolean cursorVisible = true;
 	private int[] saved;
 	/** The main screen while the alternate one shows: characters, then foregrounds, backgrounds. */
-	private Snapshot mainScreen;
+	private Screen mainScreen;
 
-	private record Snapshot(List<String> rows, int[] foregrounds, int[] backgrounds) {
+	/** A screen's cells, as saved: the main screen while the alternate one shows. */
+	public record Screen(List<String> rows, int[] foregrounds, int[] backgrounds) {
 	}
 
 	/** Decodes onto {@code buffer}; {@code reply} gets what the terminal sends back (reports). */
@@ -365,7 +366,7 @@ public final class VtDecoder {
 			if (saveCursor) {
 				saveCursor();
 			}
-			mainScreen = new Snapshot(buffer.rows(), buffer.foregrounds(), buffer.backgrounds());
+			mainScreen = new Screen(buffer.rows(), buffer.foregrounds(), buffer.backgrounds());
 			buffer.fill(0, 0, columns, rows, foreground(), background());
 		} else {
 			buffer.setRows(mainScreen.rows());
@@ -581,16 +582,40 @@ public final class VtDecoder {
 
 	// ---- saving and redrawing -------------------------------------------------------------
 
-	/** The cursor, colors and modes, for saving. */
+	/** The size of {@link #state()}. */
+	private static final int STATE = 19;
+
+	/**
+	 * Everything about it but the cells and {@link #pendingParams}, for saving and for a copy
+	 * elsewhere to carry on exactly where this one is: the cursor, colors, modes, scroll region,
+	 * the saved cursor, and how far it is through an escape sequence. With the cells, a decoder
+	 * restored from this decodes what comes next exactly as this one does.
+	 */
 	public int[] state() {
 		int flags = (bold ? 1 : 0) | (reverse ? 2 : 0) | (newLineMode ? 4 : 0) | (autowrap ? 8 : 0)
-			| (cursorVisible ? 16 : 0) | (pendingWrap ? 32 : 0);
-		return new int[] {x, y, fgIndex, fgRgb, bgIndex, bgRgb, flags, top, bottom};
+			| (cursorVisible ? 16 : 0) | (pendingWrap ? 32 : 0) | (stringEscape ? 64 : 0);
+		int[] state = new int[STATE];
+		int[] registers = {x, y, fgIndex, fgRgb, bgIndex, bgRgb, flags, top, bottom, parse.ordinal(), saved != null ? 1 : 0};
+		System.arraycopy(registers, 0, state, 0, registers.length);
+		if (saved != null) {
+			System.arraycopy(saved, 0, state, registers.length, saved.length);
+		}
+		return state;
 	}
 
-	/** Restores {@link #state()}; ignored if it doesn't fit. */
-	public void restore(int[] state) {
-		if (state.length != 9) {
+	/** The parameters of an escape sequence it's in the middle of, for saving with {@link #state()}. */
+	public String pendingParams() {
+		return params.toString();
+	}
+
+	/** The main screen while the alternate one shows (it comes back when the alternate one ends), or null. */
+	public Screen mainScreen() {
+		return mainScreen;
+	}
+
+	/** Restores {@link #state()}, {@link #pendingParams()} and {@link #mainScreen()}; a state that doesn't fit is ignored. */
+	public void restore(int[] state, String pendingParams, Screen main) {
+		if (state.length != STATE) {
 			return;
 		}
 		moveTo(state[0], state[1]);
@@ -605,10 +630,16 @@ public final class VtDecoder {
 		autowrap = (flags & 8) != 0;
 		cursorVisible = (flags & 16) != 0;
 		pendingWrap = (flags & 32) != 0;
+		stringEscape = (flags & 64) != 0;
 		if (state[7] >= 0 && state[7] < state[8] && state[8] < rows) {
 			top = state[7];
 			bottom = state[8];
 		}
+		parse = state[9] >= 0 && state[9] < Parse.values().length ? Parse.values()[state[9]] : Parse.GROUND;
+		saved = state[10] != 0 ? java.util.Arrays.copyOfRange(state, 11, 19) : null;
+		params.setLength(0);
+		params.append(pendingParams);
+		mainScreen = main;
 	}
 
 	/**

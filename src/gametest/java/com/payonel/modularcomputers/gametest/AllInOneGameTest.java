@@ -347,6 +347,31 @@ public class AllInOneGameTest {
 	}
 
 	@GameTest
+	public void aChangedRowGoesToPlayersAsAFewHundredBytesNotTheWholeBlock(GameTestHelper helper) {
+		AllInOneBlockEntity computer = install(place(helper), true, true);
+		computer.pressPower();
+		var registries = helper.getLevel().registryAccess();
+		int whole;
+		try {
+			var bytes = new java.io.ByteArrayOutputStream();
+			net.minecraft.nbt.NbtIo.write(computer.getUpdateTag(registries), new java.io.DataOutputStream(bytes));
+			whole = bytes.size();
+		} catch (java.io.IOException e) {
+			throw new AssertionError(e);
+		}
+		computer.terminal().buffer().takeDirtyRows(); // sent already
+		computer.terminal().write("a");
+		var payload = com.payonel.modularcomputers.network.ScreenRowsPayload.changes(computer.getBlockPos(), computer.terminal().buffer());
+		var buf = new net.minecraft.network.RegistryFriendlyByteBuf(io.netty.buffer.Unpooled.buffer(), registries);
+		com.payonel.modularcomputers.network.ScreenRowsPayload.CODEC.encode(buf, payload);
+		int rows = buf.readableBytes();
+		com.payonel.modularcomputers.ModularComputers.LOGGER.info("A typed key: {} bytes as changed rows, {} bytes as the whole block", rows, whole);
+		helper.assertValueEqual(payload.rows().size(), 1, "one row changed");
+		helper.assertTrue(rows < 400 && rows * 10 < whole, "a row is small: " + rows + " bytes, the whole block " + whole);
+		helper.succeed();
+	}
+
+	@GameTest
 	public void dropsItself(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
 		var drops = Block.getDrops(computer.getBlockState(), helper.getLevel(), helper.absolutePos(POS), computer);

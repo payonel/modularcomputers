@@ -48,6 +48,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -81,10 +82,6 @@ import net.minecraft.world.level.storage.ValueOutput;
 public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMenuProvider<BlockPos>, DisplayHost, Bluetooth.Holder {
 	private static final String POWERED = "powered";
 	private static final String DISPLAY = "display";
-	private static final String FOREGROUND = "display_foreground";
-	private static final String BACKGROUND = "display_background";
-	/** The terminal's cursor, colors and modes. */
-	private static final String TERMINAL_STATE = "display_state";
 	private static final String CONSOLE = "console";
 	/** The saved external bus order. */
 	private static final String BUS_EXTERNAL = "bus_external";
@@ -95,9 +92,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	).apply(instance, BusOrder.Entry::new));
 	private static final String BUS_DISCONNECTED = "bus_disconnected";
 	private static final String CABLED = "cabled";
-	private static final String CONSOLE_SCREEN = "console_screen";
-	private static final String CONSOLE_FOREGROUND = "console_foreground";
-	private static final String CONSOLE_BACKGROUND = "console_background";
 	private static final String POWER_BUFFER = "power_buffer";
 	private static final String BUS_CAPACITY = "bus_capacity";
 	private static final String BOARD_ID = "board_id";
@@ -171,7 +165,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final Map<String, Device> cabledDevices = new LinkedHashMap<>();
 	private long seenCableChanges = -1;
 	private int ticks;
-	private int syncedDisplay = -1;
 
 	/**
 	 * A device wired to this computer: where it is, how far the connection runs to it in meters
@@ -424,12 +417,13 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		syncDisplay();
 	}
 
-	/** Sends the built-in screen to clients if it changed: each tick, and right after a program's turn. */
+	/**
+	 * Sends the built-in screen's changed rows to the players who have it loaded: each tick, and
+	 * right after a program's turn. Only what changed goes, not the whole block.
+	 */
 	private void syncDisplay() {
-		if (display.buffer().changes() != syncedDisplay && level != null && !level.isClientSide()) {
-			syncedDisplay = display.buffer().changes();
-			setChanged();
-			syncToClients();
+		if (level instanceof ServerLevel server) {
+			ScreenRows.send(server, this, display.buffer());
 		}
 	}
 
@@ -780,15 +774,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		output.store(BUS_DISCONNECTED, Codec.STRING.listOf(), busOrder().disconnected());
 		output.store(CABLED, Cabled.CODEC.listOf(), cabled);
 		output.store(KNOWN, Cabled.CODEC.listOf(), List.copyOf(known.values()));
-		output.store(DISPLAY, Codec.STRING.listOf(), display.buffer().rows());
-		output.putIntArray(FOREGROUND, display.buffer().foregrounds());
-		output.putIntArray(BACKGROUND, display.buffer().backgrounds());
-		output.putIntArray(TERMINAL_STATE, display.decoder().state());
+		ScreenSave.save(output, DISPLAY, display.buffer(), display.decoder());
 		ConsoleSplitter console = machine.board().virtualBus().console();
-		output.putIntArray(CONSOLE, console.decoder().state());
-		output.store(CONSOLE_SCREEN, Codec.STRING.listOf(), console.screen().rows());
-		output.putIntArray(CONSOLE_FOREGROUND, console.screen().foregrounds());
-		output.putIntArray(CONSOLE_BACKGROUND, console.screen().backgrounds());
+		ScreenSave.save(output, CONSOLE, console.screen(), console.decoder());
 	}
 
 	@Override
@@ -809,15 +797,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		input.read(KNOWN, Cabled.CODEC.listOf()).orElse(List.of()).forEach(device -> known.put(device.key(), device));
 		installParts();
 		rememberParts(); // loading isn't inserting: no sounds
-		input.read(DISPLAY, Codec.STRING.listOf()).ifPresent(display.buffer()::setRows);
-		input.getIntArray(FOREGROUND).ifPresent(foreground ->
-			input.getIntArray(BACKGROUND).ifPresent(background -> display.buffer().setColors(foreground, background)));
-		input.getIntArray(TERMINAL_STATE).ifPresent(display.decoder()::restore);
+		ScreenSave.load(input, DISPLAY, display.buffer(), display.decoder());
 		ConsoleSplitter console = machine.board().virtualBus().console();
-		input.getIntArray(CONSOLE).ifPresent(console.decoder()::restore);
-		input.read(CONSOLE_SCREEN, Codec.STRING.listOf()).ifPresent(console.screen()::setRows);
-		input.getIntArray(CONSOLE_FOREGROUND).ifPresent(foreground ->
-			input.getIntArray(CONSOLE_BACKGROUND).ifPresent(background -> console.screen().setColors(foreground, background)));
+		ScreenSave.load(input, CONSOLE, console.screen(), console.decoder());
 	}
 
 	@Override

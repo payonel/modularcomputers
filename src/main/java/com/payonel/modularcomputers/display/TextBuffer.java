@@ -2,6 +2,7 @@ package com.payonel.modularcomputers.display;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.List;
 
 /**
@@ -18,6 +19,8 @@ public final class TextBuffer {
 	private final int[][] backgrounds;
 	/** Counts changes, so whoever shows the buffer can tell when it needs sending again. */
 	private int changes;
+	/** Rows changed since {@link #takeDirtyRows()} last looked: what players' copies need. */
+	private final BitSet dirty = new BitSet();
 
 	public TextBuffer(Resolution resolution) {
 		this.resolution = resolution;
@@ -77,6 +80,7 @@ public final class TextBuffer {
 	public void set(int column, int row, char c, int foreground, int background) {
 		if (row >= 0 && row < resolution.rows() && column >= 0 && column < resolution.columns()) {
 			changes++;
+			dirty.set(row);
 			chars[row][column] = c;
 			foregrounds[row][column] = foreground;
 			backgrounds[row][column] = background;
@@ -93,6 +97,7 @@ public final class TextBuffer {
 			return;
 		}
 		changes++;
+		dirty.set(0, last + 1);
 		for (int row = 0; row < last; row++) {
 			System.arraycopy(chars[row + 1], 0, chars[row], 0, resolution.columns());
 			System.arraycopy(foregrounds[row + 1], 0, foregrounds[row], 0, resolution.columns());
@@ -103,6 +108,35 @@ public final class TextBuffer {
 
 	public String row(int row) {
 		return new String(chars[row]);
+	}
+
+	/** The rows changed since the last call (and forgets them): what to send players. */
+	public BitSet takeDirtyRows() {
+		BitSet rows = (BitSet) dirty.clone();
+		dirty.clear();
+		return rows;
+	}
+
+	/** One row's foreground colors. */
+	public int[] rowForegrounds(int row) {
+		return foregrounds[row].clone();
+	}
+
+	/** One row's background colors. */
+	public int[] rowBackgrounds(int row) {
+		return backgrounds[row].clone();
+	}
+
+	/** Replaces one row's cells, e.g. from the server; ignored if it doesn't fit. */
+	public void setRow(int row, String text, int[] foreground, int[] background) {
+		int columns = resolution.columns();
+		if (row < 0 || row >= resolution.rows() || text.length() != columns || foreground.length != columns || background.length != columns) {
+			return;
+		}
+		changes++;
+		text.getChars(0, columns, chars[row], 0);
+		System.arraycopy(foreground, 0, foregrounds[row], 0, columns);
+		System.arraycopy(background, 0, backgrounds[row], 0, columns);
 	}
 
 	public List<String> rows() {
@@ -116,6 +150,7 @@ public final class TextBuffer {
 	/** Replaces the characters, e.g. from a save. Rows and text that don't fit are dropped. */
 	public void setRows(List<String> contents) {
 		changes++;
+		dirty.set(0, resolution.rows());
 		for (int row = 0; row < resolution.rows(); row++) {
 			Arrays.fill(chars[row], ' ');
 			if (row < contents.size()) {
@@ -144,6 +179,7 @@ public final class TextBuffer {
 			return;
 		}
 		changes++;
+		dirty.set(0, resolution.rows());
 		for (int row = 0; row < resolution.rows(); row++) {
 			System.arraycopy(foreground, row * resolution.columns(), foregrounds[row], 0, resolution.columns());
 			System.arraycopy(background, row * resolution.columns(), backgrounds[row], 0, resolution.columns());

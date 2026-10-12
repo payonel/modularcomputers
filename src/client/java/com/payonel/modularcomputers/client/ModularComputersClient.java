@@ -13,6 +13,8 @@ import com.payonel.modularcomputers.config.ModConfig;
 import com.payonel.modularcomputers.hint.HintTooltip;
 import com.payonel.modularcomputers.menu.ModMenus;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
+import com.payonel.modularcomputers.network.ScreenRowsPayload;
+import com.payonel.modularcomputers.block.DisplayHost;
 import com.payonel.modularcomputers.network.SettingsPayload;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -54,6 +56,11 @@ public final class ModularComputersClient implements ClientModInitializer {
 		ClientRecipes.init();
 		ClientTooltipComponentCallback.EVENT.register(data -> data instanceof HintTooltip hint ? new HintComponent(hint.stack()) : null);
 		ClientPlayNetworking.registerGlobalReceiver(SettingsPayload.TYPE, (payload, context) -> payload.apply());
+		ClientPlayNetworking.registerGlobalReceiver(ScreenRowsPayload.TYPE, (payload, context) -> {
+			if (context.client().level != null && context.client().level.getBlockEntity(payload.pos()) instanceof DisplayHost host) {
+				payload.apply(host.terminal().buffer());
+			}
+		});
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
 			Identify.clear();
 			ModConfig.load(); // back to this game's own settings, after a server's

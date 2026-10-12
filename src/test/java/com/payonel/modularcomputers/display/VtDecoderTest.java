@@ -179,11 +179,20 @@ class VtDecoderTest {
 	}
 
 	@Test
-	void stateSavesAndRestores() {
-		vt.write(ESC + "[2;3H" + ESC + "[1;35m" + ESC + "[20h");
-		VtDecoder loaded = new VtDecoder(new TextBuffer(new Resolution(6, 3)), reply -> { });
-		loaded.restore(vt.state());
+	void stateSavesAndRestoresEvenMidSequenceAndOnTheAlternateScreen() {
+		vt.write("main" + ESC + "[?1049h" + ESC + "[2;3H" + ESC + "[1;35m" + ESC + "[20h" + ESC + "7" + ESC + "[3"); // half a sequence
+		TextBuffer copy = new TextBuffer(new Resolution(6, 3));
+		copy.setRows(buffer.rows());
+		copy.setColors(buffer.foregrounds(), buffer.backgrounds());
+		VtDecoder loaded = new VtDecoder(copy, reply -> { });
+		loaded.restore(vt.state(), vt.pendingParams(), vt.mainScreen());
 		assertThat(loaded.state()).isEqualTo(vt.state());
 		assertThat(loaded.newLineMode()).isTrue();
+		String rest = "1mx" + ESC + "8y" + ESC + "[?1049l";
+		vt.write(rest);
+		loaded.write(rest);
+		assertThat(copy.rows()).as("carries on exactly the same").isEqualTo(buffer.rows());
+		assertThat(copy.foregrounds()).isEqualTo(buffer.foregrounds());
+		assertThat(copy.row(0)).isEqualTo("main  ");
 	}
 }

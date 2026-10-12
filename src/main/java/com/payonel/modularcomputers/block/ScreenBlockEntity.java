@@ -5,6 +5,7 @@ import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.menu.CardHolderMenu;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -21,14 +22,8 @@ import net.minecraft.world.level.storage.ValueOutput;
  */
 public final class ScreenBlockEntity extends CardHolderBlockEntity implements DisplayHost {
 	private static final String DISPLAY = "display";
-	private static final String FOREGROUND = "display_foreground";
-	private static final String BACKGROUND = "display_background";
-	/** The terminal's cursor, colors and modes. */
-	private static final String TERMINAL_STATE = "display_state";
 
 	private final Terminal display = new Terminal(Resolution.DEFAULT);
-	/** The display's change count last sent to clients. */
-	private int synced = -1;
 
 	public ScreenBlockEntity(BlockPos pos, BlockState state) {
 		super(ModBlocks.SCREEN_ENTITY, pos, state, 1);
@@ -52,29 +47,20 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 
 	/** Sends what the screen shows to clients when a computer changed it. */
 	void serverTick() {
-		int changes = display.buffer().changes();
-		if (changes != synced && level != null && !level.isClientSide()) {
-			synced = changes;
-			setChanged();
-			level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+		if (level instanceof ServerLevel server) {
+			ScreenRows.send(server, this, display.buffer());
 		}
 	}
 
 	@Override
 	protected void saveAdditional(ValueOutput output) {
 		super.saveAdditional(output);
-		output.store(DISPLAY, Codec.STRING.listOf(), display.buffer().rows());
-		output.putIntArray(FOREGROUND, display.buffer().foregrounds());
-		output.putIntArray(BACKGROUND, display.buffer().backgrounds());
-		output.putIntArray(TERMINAL_STATE, display.decoder().state());
+		ScreenSave.save(output, DISPLAY, display.buffer(), display.decoder());
 	}
 
 	@Override
 	protected void loadAdditional(ValueInput input) {
 		super.loadAdditional(input);
-		input.read(DISPLAY, Codec.STRING.listOf()).ifPresent(display.buffer()::setRows);
-		input.getIntArray(FOREGROUND).ifPresent(foreground ->
-			input.getIntArray(BACKGROUND).ifPresent(background -> display.buffer().setColors(foreground, background)));
-		input.getIntArray(TERMINAL_STATE).ifPresent(display.decoder()::restore);
+		ScreenSave.load(input, DISPLAY, display.buffer(), display.decoder());
 	}
 }
