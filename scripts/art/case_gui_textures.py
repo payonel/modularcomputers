@@ -131,9 +131,9 @@ def sata(p, x, y):
 	cavity(p, x, y)
 
 def exp(p, x, y):
-	p.fill(x - 6, y + 5, x + 22, y + 11, BLACK)
+	p.fill(x - 5, y + 5, x + 19, y + 11, BLACK)
 	p.fill(x + 17, y + 5, x + 18, y + 11, PIN)
-	for qx in range(x - 5, x + 22, 2):
+	for qx in range(x - 4, x + 19, 2):
 		p.fill(qx, y + 7, qx + 1, y + 9, (54, 54, 60))
 	cavity(p, x, y)
 
@@ -157,11 +157,11 @@ def charge_meter(p, x, y, segments=6):
 CPU = (14, 22)
 CHOKES = [(2, 18 + 7 * i) for i in range(4)]
 ROM = (16, 64)
-UPS = (16, 99)
-METER = (12, 119)
+UPS = [(4 + 20 * i, 99) for i in range(3)]  # three battery bays
+METER = (20, 119)
 RAM = [(50 + 20 * i, 36) for i in range(4)]
 SATA = [(134, 15 + 20 * i) for i in range(4)]
-EXP = [(52 + 27 * i, 110) for i in range(4)]
+EXP = [(70 + 24 * i, 110) for i in range(4)]
 
 def case_board():
 	p = Pic(BOARD_W, BOARD_H)
@@ -181,8 +181,7 @@ def case_board():
 	gold_dots(p, [(10, 70), (6, 66), (6, 50)])
 	gold_dots(p, [(126, 18), (130, 22), (130, 30)])
 	gold_dots(p, [(66, 9), (72, 13), (72, 14)], phase=1)
-	gold_dots(p, [(36, 110), (42, 104), (42, 100)])
-	for v in [(42, 25), (17, 59), (39, 89), (130, 91), (44, 49), (126, 83), (41, 99)]:
+	for v in [(42, 25), (17, 59), (39, 89), (130, 91), (44, 49), (126, 83)]:
 		via(p, *v)
 	for tx, ty in [(26, 56), (100, 88), (150, 98)]:
 		p.fill(tx, ty, tx + 2, ty + 2, COPPER)
@@ -197,7 +196,8 @@ def case_board():
 	# firmware, UPS battery
 	dip_socket(p, *ROM)
 	corners(p, 10, 60, 38, 84)
-	cavity(p, *UPS)
+	for u in UPS:
+		cavity(p, *u)
 	charge_meter(p, *METER)
 	# memory, chipset, drives, expansion
 	for r in RAM:
@@ -211,7 +211,6 @@ def case_board():
 		sata(p, *s)
 	for e in EXP:
 		exp(p, *e)
-	corners(p, 44, 97, 157, 129)
 	return p.im
 
 BUS_W, BUS_H = 176, 230

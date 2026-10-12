@@ -199,7 +199,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			// A full bus: with room for just one external device, a second screen has to wait.
 			// The warning light comes on.
 			int ledOff = screenPixel(context, bulbOn, s -> ((CaseScreen) s).busOverflowLed());
-			check(summary(context, computer).equals("external devices: 1 of 21"), "the summary line, got " + summary(context, computer));
+			check(summary(context, computer).equals("external devices: 1 of 19"), "the summary line, got " + summary(context, computer));
 			check((ledOff & 0xFFFFFF) == 0x3A2E1A, "the overflow light is dark, got " + hex(ledOff));
 			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
 				.machine().board().setBusCapacity(Motherboard.CONNECTORS.size() + 1));
@@ -229,7 +229,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			});
 			check((gray & 0xFFFFFF) == 0x4E4E52, "an offline row's display is gray, got " + hex(gray));
 			check(tipAt(context, s -> ((CaseScreen) s).busPlug(row)).equals("Forget"), "and its plug is a forget button");
-			check(summary(context, computer).equals("external devices: 1 of 21, missing 1"), "missing in the summary, got " + summary(context, computer));
+			check(summary(context, computer).equals("external devices: 1 of 19, missing 1"), "missing in the summary, got " + summary(context, computer));
 			setblock(singleplayer, cable, "cable");
 			context.waitFor(client -> ((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busEntries().get(row).online());
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);

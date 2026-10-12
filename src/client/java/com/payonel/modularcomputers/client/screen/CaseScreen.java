@@ -153,25 +153,38 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		return power;
 	}
 
-	/** The case power meter under the battery slot. */
+	/** The case power meter under the battery bays. */
 	public Viewport chargeMeter() {
 		Viewport board = board();
-		return new Viewport(board.x() + 12, board.y() + 119, 4 * ChargeMeter.SEGMENTS + 1, 6);
+		return new Viewport(board.x() + 20, board.y() + 119, 4 * ChargeMeter.SEGMENTS + 1, 6);
 	}
 
 	/**
-	 * The meter's hover hint: the case's power and the battery's, each with how long it runs
-	 * the computer (DD:MM:SS).
+	 * The meter's hover hint: the case's power, and the batteries' together (all the bays as one),
+	 * each with how long it runs the computer (DD:MM:SS).
 	 */
 	public List<Component> powerTooltip() {
 		PowerBuffer power = casePower();
 		List<Component> lines = new ArrayList<>();
 		lines.add(Component.translatable("gui.modularcomputers.power", power.percent(), Durations.ofUnits(power.level())));
-		ItemStack stack = menu.slots.get(CaseMenu.UPS_SLOT).getItem();
-		if (stack.getItem() instanceof BatteryItem battery) {
-			lines.add(battery.tier().infinite()
-				? Component.translatable("gui.modularcomputers.power.battery_infinite")
-				: Component.translatable("gui.modularcomputers.power.battery", BatteryItem.percent(stack), Durations.ofUnits(BatteryItem.charge(stack).units())));
+		long units = 0;
+		long capacity = 0;
+		boolean any = false;
+		boolean infinite = false;
+		for (int bay = 0; bay < CaseMenu.UPS_BAYS; bay++) {
+			ItemStack stack = menu.slots.get(CaseMenu.UPS_SLOT + bay).getItem();
+			if (stack.getItem() instanceof BatteryItem battery) {
+				any = true;
+				infinite |= battery.tier().infinite();
+				units += BatteryItem.charge(stack).units();
+				capacity += battery.tier().capacity();
+			}
+		}
+		if (infinite) {
+			lines.add(Component.translatable("gui.modularcomputers.power.battery_infinite"));
+		} else if (any) {
+			int percent = (int) Math.min(100, Math.ceil(units * 100.0 / capacity));
+			lines.add(Component.translatable("gui.modularcomputers.power.battery", percent, Durations.ofUnits(units)));
 		}
 		return lines;
 	}
@@ -337,10 +350,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private void extractBoardLabels(GuiGraphicsExtractor graphics, int x, int y) {
 		graphics.text(font, "CPU", x + 19, y + 7, SILK, false);
 		graphics.text(font, "ROM", x + 19, y + 56, SILK, false);
-		graphics.text(font, "UPS", x + 19, y + 92, SILK, false);
+		graphics.text(font, "UPS", x + 28, y + 92, SILK, false);
 		graphics.text(font, "RAM", x + 80, y + 6, SILK, false);
 		graphics.text(font, "SATA", x + 138, y + 8, SILK, false);
-		graphics.text(font, "EXP", x + 54, y + 103, SILK, false);
+		graphics.text(font, "EXP", x + 74, y + 103, SILK, false);
 	}
 
 	/** What the board shows about its parts. All coordinates are board pixels (see the art script). */
@@ -378,10 +391,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			}
 			// Expansion: the card's retention clip engages.
 			if (hasPart(CaseMenu.EXP_SLOTS + lane)) {
-				int ex = bx + 52 + 27 * lane;
+				int ex = bx + 70 + 24 * lane;
 				int ey = by + 110;
-				graphics.fill(ex - 6, ey + 5, ex - 1, ey + 11, SILVER);
-				graphics.fill(ex - 5, ey + 7, ex - 2, ey + 9, 0xFF6E727A);
+				graphics.fill(ex - 5, ey + 5, ex - 1, ey + 11, SILVER);
+				graphics.fill(ex - 4, ey + 7, ex - 2, ey + 9, 0xFF6E727A);
 			}
 		}
 		// The charge meter under the battery shows the case's power buffer, not the battery.
@@ -408,7 +421,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			return ICON_CPU;
 		} else if (slot == CaseMenu.EEPROM_SLOT) {
 			return ICON_ROM;
-		} else if (slot == CaseMenu.UPS_SLOT) {
+		} else if (CaseMenu.isBatteryBay(slot)) {
 			return ICON_UPS;
 		} else if (slot < CaseMenu.SATA_SLOTS) {
 			return ICON_RAM;

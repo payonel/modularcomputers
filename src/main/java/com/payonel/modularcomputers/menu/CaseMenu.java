@@ -23,12 +23,14 @@ import net.minecraft.world.item.ItemStack;
 public final class CaseMenu extends AbstractContainerMenu {
 	public static final int CPU_SLOT = 0;
 	public static final int EEPROM_SLOT = 1;
+	/** The first battery bay; the bays are {@link #UPS_BAYS} slots from here. */
 	public static final int UPS_SLOT = 2;
-	public static final int RAM_SLOTS = 3;
-	public static final int SATA_SLOTS = 7;
-	public static final int EXP_SLOTS = 11;
+	public static final int UPS_BAYS = 3;
+	public static final int RAM_SLOTS = UPS_SLOT + UPS_BAYS;
+	public static final int SATA_SLOTS = RAM_SLOTS + 4;
+	public static final int EXP_SLOTS = SATA_SLOTS + 4;
 	public static final int LANES = 4;
-	public static final int PART_SLOTS = 15;
+	public static final int PART_SLOTS = EXP_SLOTS + 4;
 	/** Data slots for the power level: menu data travels as shorts, so the low and high 16 bits. */
 	public static final int POWER_DATA = 2;
 
@@ -39,10 +41,11 @@ public final class CaseMenu extends AbstractContainerMenu {
 
 	/** Slot positions in the panel, in GUI units (the item's top-left), by slot index. */
 	public static final int[][] SLOT_POSITIONS = {
-		{18, 26}, {20, 68}, {20, 103},
+		{18, 26}, {20, 68},
+		{8, 103}, {28, 103}, {48, 103},
 		{54, 40}, {74, 40}, {94, 40}, {114, 40},
 		{138, 19}, {138, 39}, {138, 59}, {138, 79},
-		{56, 114}, {83, 114}, {110, 114}, {137, 114},
+		{74, 114}, {98, 114}, {122, 114}, {146, 114},
 	};
 
 	private final Container parts;
@@ -56,9 +59,9 @@ public final class CaseMenu extends AbstractContainerMenu {
 	}
 
 	/**
-	 * {@code power} holds the case's power buffer level, in ticks. The menu sends it to the
-	 * player as it changes, like a furnace's progress; it goes as a short, which a day's worth
-	 * (24000) fits.
+	 * {@code power} holds the case's power buffer level, in power units. The menu sends it to the
+	 * player as it changes, like a furnace's progress; menu data goes as shorts, so it's two
+	 * ({@link #POWER_DATA}).
 	 */
 	public CaseMenu(int id, Inventory inventory, Container parts, ContainerData power, BlockPos pos, ContainerLevelAccess access) {
 		super(ModMenus.CASE, id);
@@ -80,7 +83,7 @@ public final class CaseMenu extends AbstractContainerMenu {
 			return stack.is(ModItems.CPU);
 		} else if (slot == EEPROM_SLOT) {
 			return stack.is(ModItems.EEPROM);
-		} else if (slot == UPS_SLOT) {
+		} else if (isBatteryBay(slot)) {
 			return stack.getItem() instanceof BatteryItem;
 		} else if (slot < SATA_SLOTS) {
 			return stack.is(ModItems.RAM);
@@ -88,6 +91,10 @@ public final class CaseMenu extends AbstractContainerMenu {
 			return stack.is(ModItems.HARD_DISK);
 		}
 		return ModItems.cardKind(stack).isPresent();
+	}
+
+	public static boolean isBatteryBay(int slot) {
+		return slot >= UPS_SLOT && slot < UPS_SLOT + UPS_BAYS;
 	}
 
 	/** The case's power buffer level, in power units, put back together from its two shorts. */

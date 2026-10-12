@@ -84,7 +84,7 @@ public class AllInOneGameTest {
 			for (var part : parts) {
 				boolean placed = menu.slots.get(slot).mayPlace(new ItemStack(part));
 				helper.assertValueEqual(placed, takes(slot) == part || slot >= CaseMenu.EXP_SLOTS && ModItems.CARDS.containsKey(part)
-					|| slot == CaseMenu.UPS_SLOT && ModItems.BATTERIES.contains(part),
+					|| CaseMenu.isBatteryBay(slot) && ModItems.BATTERIES.contains(part),
 					"slot " + slot + " taking " + part);
 			}
 			helper.assertValueEqual(menu.slots.get(slot).getMaxStackSize(), 1, "slot " + slot + " holds one");
@@ -98,7 +98,7 @@ public class AllInOneGameTest {
 			return ModItems.CPU;
 		} else if (slot == CaseMenu.EEPROM_SLOT) {
 			return ModItems.EEPROM;
-		} else if (slot == CaseMenu.UPS_SLOT) {
+		} else if (CaseMenu.isBatteryBay(slot)) {
 			return null; // any battery
 		} else if (slot < CaseMenu.SATA_SLOTS) {
 			return ModItems.RAM;
@@ -112,16 +112,16 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.REDSTONE_CARD));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.BLUETOOTH_CARD));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 2, new ItemStack(ModItems.WEATHER_SENSOR_CARD));
-		helper.assertValueEqual(busKeys(computer), List.of("terminal", "eeprom", "ups", "exp:0", "exp:1", "exp:2"), "default order");
+		helper.assertValueEqual(busKeys(computer), List.of("terminal", "eeprom", "ups:0", "exp:0", "exp:1", "exp:2"), "default order");
 		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.TERMINAL, DeviceType.FIRMWARE, DeviceType.POWER,
 			DeviceType.REDSTONE, DeviceType.NETWORK, DeviceType.SENSOR), "each reports its class");
 		var entries = computer.busEntries();
 		helper.assertValueEqual(entries.get(1).location().getString(), "ROM", "the EEPROM sits in the ROM socket");
 		helper.assertValueEqual(entries.get(1).slot(), CaseMenu.EEPROM_SLOT, "its row goes with its slot");
-		helper.assertValueEqual(entries.get(2).location().getString(), "UPS", "the battery's place");
+		helper.assertValueEqual(entries.get(2).location().getString(), "UPS 1", "the first bay");
 		helper.assertValueEqual(entries.get(3).name().getString(), "Redstone Card", "card names");
 		var bus = computer.machine().board().bus();
-		for (String address : List.of("eeprom", "ups", "exp:0")) {
+		for (String address : List.of("eeprom", "ups:0", "exp:0")) {
 			String id = bus.id(address);
 			helper.assertTrue(id != null && id.startsWith("id:") && bus.device(id).equals(bus.device(address)), "every part has an id it answers to: " + address);
 		}
@@ -149,7 +149,7 @@ public class AllInOneGameTest {
 		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.TERMINAL, DeviceType.STORAGE, DeviceType.NETWORK), "bus");
 
 		helper.assertTrue(!computer.moveDevice(2, true) && !computer.moveDevice(1, false), "the case's devices don't move");
-		helper.assertValueEqual(computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::position).toList(), List.of(1, 5, 8),
+		helper.assertValueEqual(computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::position).toList(), List.of(1, 7, 10),
 			"numbered by fixed place, with gaps for empty slots");
 
 		java.util.UUID serial = computer.parts().getItem(CaseMenu.EXP_SLOTS).get(com.payonel.modularcomputers.item.ModComponents.SERIAL);

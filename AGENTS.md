@@ -80,14 +80,14 @@ same thing.
     It's also in creative search, and `/give @s modularcomputers:all_in_one` works.
   - **Parts:**
     - The display and keyboard are built in. Everything else is an item (`ModItems`) in the
-      **case view**'s 15 slots (`CaseMenu`):
-      - CPU, EEPROM (labeled ROM), UPS (a battery), 4 RAM, 4 SATA (hard disks) and 4 expansion
+      **case view**'s 17 slots (`CaseMenu`):
+      - CPU, EEPROM (labeled ROM), 3 UPS battery bays, 4 RAM, 4 SATA (hard disks) and 4 expansion
         slots, which take any card (`ModItems.CARDS`, `device/CardKind`): WLAN, Bluetooth,
         Redstone, Audio, Motion Sensor, Audio Sensor, Weather Sensor. All cards are
         placeholders with no function.
       - Only the CPU and EEPROM affect the machine so far.
       - On the bus: the **EEPROM** (`Eeprom` is a `Device`, `FIRMWARE`, row "ROM"), the
-        **UPS battery** (`UpsBattery`, `POWER`, row "UPS"; the user says it'll get an API),
+        **UPS batteries** (`UpsBattery`, `POWER`, rows "UPS 1".."UPS 3"; the user says they'll get an API),
         hard disks (`Disk`) and cards (`Card`, typed by kind). The user asked for the EEPROM
         and UPS on the bus (2026-10-11). The CPU still loads from the EEPROM slot directly.
       - RAM is a placeholder: the machine still uses the soldered `Hardware` memory.
@@ -149,10 +149,15 @@ same thing.
             runs. Time the chunk wasn't loaded doesn't count.
           - With the battery out or flat, the buffer runs down while the computer runs. Pulling
             the battery doesn't stop a running computer.
-          - **The charge meter under the UPS slot shows the buffer, not the battery.** Empty:
+          - **Three battery bays** (user, 2026-10-11: "if 3 fit, put 3"; `CaseMenu.UPS_SLOT`,
+            `UPS_BAYS`, bus `ups:0..2`): in a row at the bottom left of the board (the expansion
+            slots moved right and closer to make room). The case tops up from the **last bay
+            first, the first bay last** (user). One meter for all.
+          - **The charge meter under the bays shows the buffer, not the batteries.** Empty:
             all bars off; any power: at least one red bar.
           - Hovering the meter shows a hint (`CaseScreen.powerTooltip`, user's wording): "Case
-            power: 75% (00:15:00)" and, with a battery in, "Battery power: 90% (09:00:00)" (or
+            power: 75% (00:15:00)" and, with batteries in, "Battery power: 90% (09:00:00)", all the
+            bays together (or
             "Battery power: never runs out").
           - The case view gets the buffer level through the menu's data (`CaseMenu.powerLevel`,
             a `ContainerData` like a furnace's progress), so it updates every second, as the
@@ -237,8 +242,8 @@ same thing.
             **forget** button where the plug was (`ForgetDevicePayload`). New ones go last.
             Offline rows keep their last-known name, icon and position (`known`, saved).
           - **Bus capacity** is a motherboard setting (`Motherboard.busCapacity`, default 32,
-            saved as `bus_capacity`; settings UI later). The 11 connector places are always reserved,
-            so external devices get the rest (21).
+            saved as `bus_capacity`; settings UI later). The 13 connector places are always reserved,
+            so external devices get the rest (19).
           - **Full:** a new external device bumps the one missing longest (each entry keeps
             `lastSeen`). With none missing it **waits**: not on the bus. The bus is then in its
             warning state: an amber LED top right of the panel, the summary line saying
@@ -251,7 +256,7 @@ same thing.
             Both are made by `scripts/art/part_sounds.py`; neither is checked by a test. Programs will read it from `Bus.status()` (`BusStatus`: capacity,
             devices, saved, missing, waiting, overflow).
           - **Numbers are fixed places** (user, after looking at PCI/SATA/USB): 1 the built-in
-            terminal, 2 ROM, 3 UPS, 4-7 SATA, 8-11 EXP, then external devices from 12 in their
+            terminal, 2 ROM, 3-5 UPS, 6-9 SATA, 10-13 EXP, then external devices from 14 in their
             order. Empty case slots leave gaps (like `lspci`); only present devices get rows.
           - Parts and hub cards are known by a serial number (`ModComponents.SERIAL`, stamped when
             a bus part first goes into a computer or a card into a hub), so moving a hub card to
@@ -621,7 +626,7 @@ scripts/art/error_beep.py` into
   - **The bus is the motherboard's firmware, not the case's** (user, 2026-10-11: "the all in one
     HAS a motherboard"; new case types will come). `Motherboard` owns the connectors and their
     addresses (`CONNECTORS`: the built-in `TERMINAL` (no path: its address is its id), `eeprom`,
-    `ups`, `sata:0-3`, `exp:0-3`, and their fixed places 1-11), the `BusOrder`, `id:` aliases, bus positions, and building the bus
+    `ups:0-2`, `sata:0-3`, `exp:0-3`, and their fixed places 1-13), the `BusOrder`, `id:` aliases, bus positions, and building the bus
     (`plug(connector, device, id)`, `setExternal(found)`, `layout(now)`; `Machine.rebuildBus`
     applies it with hot-plug, `Motherboard.rebuildBus` without, for clients). A case only wires
     things up: the all-in-one plugs its terminal into `TERMINAL` with its id, turns slot

@@ -12,6 +12,7 @@ import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.power.BatteryCharge;
+import com.payonel.modularcomputers.power.PowerBuffer;
 import com.payonel.modularcomputers.power.PowerUnits;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -154,6 +155,26 @@ public class BatteryGameTest {
 			helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false); // no flash: there's no power to light it
 			helper.assertTrue(computer.terminal().buffer().isBlank(), "nothing runs");
 		}
+		helper.succeed();
+	}
+
+	@GameTest
+	public void theCaseDrawsFromTheLastBayFirst(GameTestHelper helper) {
+		AllInOneBlockEntity computer = computer(helper, ItemStack.EMPTY);
+		computer.power().set(PowerBuffer.CAPACITY); // full: the batteries keep their charge going in
+		int first = CaseMenu.UPS_SLOT;
+		int last = CaseMenu.UPS_SLOT + CaseMenu.UPS_BAYS - 1;
+		computer.parts().setItem(first, battery(ModItems.TIER1_BATTERY, DAY / 2, BatteryCharge.UNSETTLED));
+		computer.parts().setItem(last, battery(ModItems.TIER1_BATTERY, DAY / 2, BatteryCharge.UNSETTLED));
+		computer.power().set(DAY / 2);
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.RAM)); // any part change tops the case up
+		helper.assertValueEqual(computer.power().level(), DAY, "topped up");
+		helper.assertValueEqual(BatteryItem.charge(computer.parts().getItem(last)).units(), 0, "out of the last bay");
+		helper.assertValueEqual(BatteryItem.charge(computer.parts().getItem(first)).units(), DAY / 2, "the first bay untouched");
+		computer.power().set(0);
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, ItemStack.EMPTY);
+		helper.assertValueEqual(computer.power().level(), DAY / 2, "then the first bay");
+		helper.assertValueEqual(BatteryItem.charge(computer.parts().getItem(first)).units(), 0, "now flat too");
 		helper.succeed();
 	}
 

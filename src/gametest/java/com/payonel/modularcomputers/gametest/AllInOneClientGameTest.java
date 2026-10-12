@@ -225,9 +225,9 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			checkBoardPixel(context, full, 114, 12, 0xE6E6E6, "RAM lane 4 empty: latch open");
 			checkBoardPixel(context, full, 154, 23, 0x3CB45A, "SATA port 1 plugged: small green plug");
 			checkBoardPixel(context, full, 154, 43, 0x1A1A1E, "SATA port 2 empty");
-			checkBoardPixel(context, full, 73, 115, 0xB0B4BC, "expansion slot 2 engaged");
-			checkBoardPixel(context, full, 46, 115, 0x1A1A1E, "expansion slot 1 empty");
-			checkBoardPixel(context, full, 34, 121, 0x5AE66E, "full case power: sixth bar green");
+			checkBoardPixel(context, full, 90, 115, 0xB0B4BC, "expansion slot 2 engaged");
+			checkBoardPixel(context, full, 66, 115, 0x1A1A1E, "expansion slot 1 empty");
+			checkBoardPixel(context, full, 42, 121, 0x5AE66E, "full case power: sixth bar green");
 			// Hovering the meter tells the time left: the case's day, then the battery's ten (the case was full already).
 			moveCursorTo(context, screen -> ((CaseScreen) screen).chargeMeter());
 			context.waitTicks(2);
@@ -249,15 +249,15 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			context.waitFor(client -> ((CaseScreen) client.gui.screen()).getMenu().powerLevel() == PowerBuffer.CAPACITY / 20);
 			context.waitTicks(2);
 			BufferedImage drainedShot = read(context.takeScreenshot("all-in-one-case-power-low"));
-			checkBoardPixel(context, drainedShot, 14, 121, 0xDC3C32, "low case power: one red bar");
-			checkBoardPixel(context, drainedShot, 18, 121, 0x1E2621, "low case power: second bar off");
+			checkBoardPixel(context, drainedShot, 22, 121, 0xDC3C32, "low case power: one red bar");
+			checkBoardPixel(context, drainedShot, 26, 121, 0x1E2621, "low case power: second bar off");
 			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
 				.setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged())); // charged again, to run on
 
 			// The bus order panel lists the devices; its arrows reorder them on the server.
 			check(context.computeOnClient(client -> ((CaseScreen) client.gui.screen()).busPanelShown()), "the bus order panel should show");
 			// The case's devices are in their slots' order, fixed: their rows have no arrows.
-			List<String> slotOrder = List.of("terminal", "eeprom", "ups", "sata:0", "sata:2", "exp:1");
+			List<String> slotOrder = List.of("terminal", "eeprom", "ups:0", "sata:0", "sata:2", "exp:1");
 			check(serverBusKeys(singleplayer, computer).equals(slotOrder), "the case's order, got " + serverBusKeys(singleplayer, computer));
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).busArrow(0, false));
 			context.waitTicks(4);
