@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 class BusOrderTest {
 	private static final List<String> CASE = List.of("edp", "kbd", "sata:0");
-	private final BusOrder order = new BusOrder(32, 12);
+	private final BusOrder order = new BusOrder(32);
 
 	@Test
 	void internalDevicesComeFirstInTheirFixedOrderAndDontMove() {
@@ -42,12 +42,13 @@ class BusOrderTest {
 
 	@Test
 	void aFullListBumpsTheDeviceMissingLongestElseTheNewOneWaits() {
+		order.sync(CASE, List.of(), 0); // the case's 3 devices leave 29
 		List<String> all = new ArrayList<>(IntStream.range(0, order.externalCapacity()).mapToObj(i -> "id:" + i).toList());
 		order.sync(CASE, all, 0);
 		order.sync(CASE, concat(all, "id:new"), 1);
 		assertThat(order.keys()).doesNotContain("id:new");
 		assertThat(order.waiting()).isEqualTo(1);
-		assertThat(order.status()).isEqualTo(new BusStatus(32, 3 + 20, 20, 0, 1));
+		assertThat(order.status()).isEqualTo(new BusStatus(32, 3 + 29, 29, 0, 1, 29));
 		assertThat(order.status().overflow()).isTrue();
 
 		List<String> missingTwo = new ArrayList<>(all);
@@ -59,12 +60,23 @@ class BusOrderTest {
 		assertThat(order.keys()).as("3 was missing longest").contains("id:7", "id:new").doesNotContain("id:3");
 		assertThat(order.keys().getLast()).isEqualTo("id:new");
 		assertThat(order.waiting()).isZero();
-		assertThat(order.status()).isEqualTo(new BusStatus(32, 3 + 20 - 1, 20, 1, 0));
+		assertThat(order.status()).isEqualTo(new BusStatus(32, 3 + 29 - 1, 29, 1, 0, 29));
 	}
 
 	@Test
-	void theCapacityIsTheBoardsSettingAndShrinkingItDropsMissingDevicesFirst() {
-		order.setCapacity(14); // room for 2 external devices
+	void onlyTheCasesInstalledDevicesCountNotItsEmptySlots() {
+		order.setCapacity(4);
+		order.sync(List.of("eeprom", "ups:0"), List.of("id:a", "id:b", "id:c"), 0);
+		assertThat(order.connected()).as("2 of the case's, 2 external").containsExactly("eeprom", "ups:0", "id:a", "id:b");
+		assertThat(order.status().room()).isEqualTo(2);
+		assertThat(order.status().waiting()).isEqualTo(1);
+		order.sync(List.of("eeprom", "ups:0", "sata:0", "exp:0", "exp:1"), List.of("id:a"), 1);
+		assertThat(order.connected()).as("a full case leaves the last of its own off too").containsExactly("eeprom", "ups:0", "sata:0", "exp:0");
+	}
+
+	@Test
+	void theCaseCountsAgainstTheCapacityAndShrinkingItDropsMissingDevicesFirst() {
+		order.setCapacity(5); // the case's 3 devices, and room for 2 external ones
 		order.sync(CASE, List.of("id:a", "id:b", "id:c"), 0);
 		assertThat(order.keys()).containsExactly("edp", "kbd", "sata:0", "id:a", "id:b");
 		assertThat(order.waiting()).isEqualTo(1);
@@ -72,7 +84,7 @@ class BusOrderTest {
 		order.sync(CASE, List.of("id:a", "id:b", "id:c"), 1);
 		assertThat(order.waiting()).isZero();
 		order.sync(CASE, List.of("id:a", "id:c"), 2); // b missing
-		order.setCapacity(14);
+		order.setCapacity(5);
 		order.sync(CASE, List.of("id:a", "id:c"), 3);
 		assertThat(order.keys()).as("b, missing, made room").containsExactly("edp", "kbd", "sata:0", "id:a", "id:c");
 	}

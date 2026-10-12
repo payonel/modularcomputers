@@ -185,7 +185,7 @@ public class CableGameTest {
 	@GameTest(maxTicks = 100)
 	public void aFullBusMakesNewDevicesWaitAndSaysSo(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper, COMPUTER, false);
-		computer.machine().board().overrideBusCapacity(Motherboard.CONNECTORS.size() + 1); // room for one external device
+		computer.machine().board().overrideBusCapacity(2); // its built-in terminal, and room for one external device
 		ScreenBlockEntity first = wiredScreen(helper);
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertTrue(onBus(computer, first), "the first screen joins"))
@@ -193,7 +193,7 @@ public class CableGameTest {
 			.thenWaitUntil(() -> helper.assertTrue(computer.busStatus().overflow(), "the bus overflows"))
 			.thenExecute(() -> {
 				BusStatus status = computer.machine().board().bus().status();
-				helper.assertValueEqual(status, new BusStatus(Motherboard.CONNECTORS.size() + 1, 2, 1, 0, 1), "the bus reports it to programs too");
+				helper.assertValueEqual(status, new BusStatus(2, 2, 1, 0, 1, 1), "the bus reports it to programs too");
 				helper.destroyBlock(new BlockPos(3, 1, 1)); // cut the cable: the first screen goes missing
 			})
 			.thenWaitUntil(() -> helper.assertTrue(!computer.busStatus().overflow(), "no longer full"))

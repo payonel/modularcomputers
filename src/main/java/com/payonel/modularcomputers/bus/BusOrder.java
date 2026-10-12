@@ -36,15 +36,12 @@ public final class BusOrder {
 	private final Set<String> disconnected = new LinkedHashSet<>();
 	private int waiting;
 	private int capacity;
-	private final int reserved;
 
 	/**
-	 * {@code capacity}: how many devices the bus holds, internal and external together (the
-	 * motherboard's setting). {@code reserved}: the places kept for the motherboard's connectors,
-	 * filled or not.
+	 * {@code capacity}: how many devices the bus holds, the case's own and external ones together
+	 * (the CPU's). The case's own come first; external ones get what they leave.
 	 */
-	public BusOrder(int capacity, int reserved) {
-		this.reserved = reserved;
+	public BusOrder(int capacity) {
 		setCapacity(capacity);
 	}
 
@@ -57,15 +54,15 @@ public final class BusOrder {
 		return capacity;
 	}
 
-	/** Room for external devices: the capacity less the connectors' places (none if they don't all fit). */
+	/** Room for external devices: what the case's own devices leave of the capacity. */
 	public int externalCapacity() {
-		return Math.max(0, capacity - reserved);
+		return Math.max(0, capacity - internal.size());
 	}
 
 	/** How full the bus is (see {@link BusStatus}). */
 	public BusStatus status() {
 		long missing = external.stream().filter(entry -> !present.contains(entry.key())).count();
-		return new BusStatus(capacity, connected().size(), external.size(), (int) missing, waiting + overCapacity());
+		return new BusStatus(capacity, connected().size(), external.size(), (int) missing, waiting + overCapacity(), externalCapacity());
 	}
 
 	/** Every listed device in order: internal ones, then the saved external ones, online or not. */

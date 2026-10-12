@@ -276,7 +276,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		if (status.capacity() == 0) {
 			return Component.translatable("gui.modularcomputers.bus.no_cpu"); // no CPU, no bus
 		}
-		int room = Math.max(0, status.capacity() - Motherboard.CONNECTORS.size());
+		int room = status.room();
 		if (status.overflow()) {
 			return Component.translatable("gui.modularcomputers.bus.summary_overflow", status.saved(), room, status.waiting());
 		}

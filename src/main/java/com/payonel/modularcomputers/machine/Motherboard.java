@@ -51,7 +51,7 @@ public final class Motherboard {
 	private final VirtualBus virtualBus;
 	private Cpu cpu;
 	private Eeprom eeprom;
-	private final BusOrder order = new BusOrder(0, CONNECTORS.size());
+	private final BusOrder order = new BusOrder(0);
 	/** A bus capacity set by a test instead of the CPU's. */
 	private Integer capacityOverride;
 	/** What's on each connector. */

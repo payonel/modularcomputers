@@ -388,8 +388,8 @@ public class AllInOneGameTest {
 		helper.assertTrue(computer.machine().board().bus().devices().isEmpty(), "no CPU, no bus");
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
 		var bus = computer.machine().board().bus();
-		helper.assertValueEqual(bus.status().capacity(), 12, "a tier 1 CPU's bus");
-		helper.assertValueEqual(bus.devices().size(), 12, "the dev kit's 13 places: the last one doesn't fit");
+		helper.assertValueEqual(bus.status().capacity(), 4, "a tier 1 CPU's bus");
+		helper.assertValueEqual(bus.devices().size(), 4, "the case's own count too: only the first 4 of its 13 fit");
 		helper.assertTrue(bus.status().overflow(), "and it says so");
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		helper.assertValueEqual(bus.status().capacity(), 64, "a tier 3 CPU's bus");
