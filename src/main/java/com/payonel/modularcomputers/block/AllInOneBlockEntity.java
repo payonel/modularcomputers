@@ -428,7 +428,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	@Override
 	public void setLevel(Level level) {
 		super.setLevel(level);
-		if (level instanceof ServerLevel) {
+		if (level instanceof ServerLevel server) {
+			machine.setServer(server.getServer()); // a Lua CPU's calls are carried out on the server thread, as soon as it can
 			// Loaded before it had a level: its disks find their data now.
 			java.util.Arrays.fill(diskSerials, null);
 			installParts();

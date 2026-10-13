@@ -4,9 +4,10 @@ import java.util.List;
 import java.util.function.Supplier;
 
 /**
- * A program running on a CPU, as the host drives it: each tick it gets a turn, answering at most a
- * fixed number of motherboard calls on the server thread. A Java CPU's programs run as coroutines on
- * virtual threads ({@link ProgramRunner}); a Lua CPU's in the Lua engine ({@link LuaRunner}).
+ * A program running on a CPU, as the host drives it: each tick (and when it asks) the server thread
+ * carries out its motherboard calls. A Java CPU's programs run as coroutines on virtual threads, a
+ * fixed number of calls a tick ({@link ProgramRunner}); a Lua CPU's on the computer's own thread,
+ * its calls limited by server time ({@link LuaRunner}).
  */
 public interface Runner {
 	/** What a turn ended in. */
@@ -40,4 +41,13 @@ public interface Runner {
 
 	/** Stops the program, wherever it's paused: the machine lost power or unloaded. */
 	void stop();
+
+	/** Whether the host limits it to so many calls a tick ({@link #tick}'s {@code calls}); a Lua CPU is limited by server time instead. */
+	default boolean callLimited() {
+		return true;
+	}
+
+	/** Given how to ask the server thread to {@link #tick} it soon (a runner on its own thread asks when a request comes in). */
+	default void serveWith(Runnable serveSoon) {
+	}
 }

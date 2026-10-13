@@ -591,16 +591,25 @@ scripts/art/error_beep.py` into
   with mcos's class name. Creative-only items (`ModItems.CREATIVE_ONLY`) have no recipe; their hint
   says "Creative only". The EEPROM slot takes either EEPROM (`ModItems.isEeprom`).
 - **The Lua CPU** (user design, 2026-10-13): three layers, as a real CPU runs firmware under an OS.
-  - **The host, `runtime/LuaRunner`** (a `Runner`, like `ProgramRunner`): a plain VM runner only. It
-    makes the LungoLua state (base, coroutine, string, table, math, utf8, debug), runs the CPU's
-    firmware as the kernel coroutine (kernel_co), resumes it once a tick, and gives it a global
-    `host` table of direct board calls (`list`, `status`, `type`, `methods`, `doc`, `info`, `uptime`,
-    `power`, `hardware`, `invoke`, and `calls()`, what's left of the tick's 20). Board calls answer at
-    once on the server thread and never call back into Lua. The kernel's yields are its requests:
-    `"tick"` (done this tick), `"wait", ticks, sources...` (answered with the pending interrupts),
-    `"halt"`; it ends with `"returned"` (a panic), `"abort", why` (`LuaRunner.Aborted`: the CPU shows
-    `ABRT: why`) or an error (the crash screen). **Persistence will live here**: Styx persists from
-    the main thread only, so only the host can save a running machine (not built yet).
+  - **The host, `runtime/LuaRunner`** (a `Runner`, like `ProgramRunner`): a plain VM runner only, on
+    **the computer's own thread** (a low-priority daemon platform thread, one per running computer;
+    no pool; user, 2026-10-13: Java priorities do nothing on Linux by default, the real protection
+    is the server-time budget). It makes the LungoLua state (base, coroutine, string, table, math,
+    utf8, debug), runs the firmware as the kernel coroutine (kernel_co) and lets it run freely, not
+    once a tick. The kernel's yields are its requests: `"slice"` (a safe point; resumed at once),
+    `"call", name, args...` (a board call: `list`, `status`, `type`, `methods`, `doc`, `info`,
+    `uptime`, `power`, `hardware`, `invoke`), `"wait", ticks, sources...`, `"halt"`; it ends with
+    `"returned"` (a panic), `"abort", why` (`LuaRunner.Aborted`: `ABRT: why`) or an error (the crash
+    screen). **Every board call is carried out on the server thread**, where devices live: the
+    computer's thread queues it and waits; the server thread serves it as soon as it can
+    (`Machine.setServer`, the Minecraft server's `execute`, which runs tasks between and while
+    waiting for ticks; `Machine.serve`) and at each tick (`LuaRunner.tick`), within
+    **`SERVER_NANOS_PER_TICK` (1 ms) of server time a tick per computer**; past it, the rest waits
+    for the next tick (user: protect the server's tick by time, not by counting calls; power never
+    limits calls). Waits are answered by the server thread too (interrupts, the time). Power-off or
+    unload stops the thread (it unwinds out of a wait at once, or at its next yield). The Lua state
+    is only touched by the computer's thread. **Persistence will live here**: Styx persists from the
+    main thread only.
   - **The firmware, `lua/cpu/machine.lua`** (after OC's `machine.lua`): all sandboxing, budgeting,
     freezing and syscalls. It builds the sandbox (copies of coroutine, string, table, math, utf8;
     no debug, io, os, package, print, dofile, loadfile; `load` text only, into the sandbox by

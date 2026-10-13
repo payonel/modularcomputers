@@ -1,21 +1,24 @@
 -- machine.lua: the Lua CPU's firmware, between the host (the Java runner) and the EEPROM's code.
 --
--- The host runs this as the kernel coroutine (kernel_co), with the whole standard library and a
--- 'host' table of direct board calls, and resumes it once a tick. This file builds the sandbox,
+-- The host runs this as the kernel coroutine (kernel_co), on the computer's own thread, with the
+-- standard library (debug included), and resumes it whenever it has an answer. This file builds the sandbox,
 -- loads the EEPROM's text into it as the user coroutine (user_co), budgets user_co and freezes it
 -- when its slice is spent, and serves its syscalls. The EEPROM's code is user code: it never sees
--- this file's locals, the real globals, 'debug' or 'host'.
+-- this file's locals, the real globals or 'debug'.
 --
 -- What it asks the host, by yielding kernel_co:
---   "tick"                        the slice is spent: go on next tick
---   "wait", ticks, sources...     wait for an interrupt (sources: any when none); answered
---                                 with the pending sources, as a sequence
+--   "slice"                       the slice is spent: a point where the host may save the machine;
+--                                 resumed at once
+--   "call", name, args...         a board call (list, status, type, methods, doc, info, uptime,
+--                                 power, hardware, invoke), carried out on the server thread, where
+--                                 devices live; answered with its values
+--   "wait", ticks, sources...     wait for an interrupt (sources: any when none; ticks -1: no
+--                                 limit); answered with the pending sources, as a sequence
 --   "halt"                        the CPU halts; never resumed
 -- and what it ends with: "returned" (the EEPROM's code returned: a panic), "abort", why (the
 -- EEPROM's text didn't load), or an error (the EEPROM's code crashed).
 --
--- Syscalls freeze instead of yielding: a call that must wait for the host (a wait, a halt, a board
--- call past the tick's share) records its request and cuts user_co's budget to one step; the budget
+-- Syscalls freeze instead of yielding: every board call, a wait and a halt records its request and cuts user_co's budget to one step; the budget
 -- callback then freezes user_co's whole chain, wherever it is (inside coroutines, a sort's
 -- comparison, a gsub callback), and the freeze lands here. The host answers, user_co thaws, and the
 -- syscall returns the answer. No user coroutine sees a yield, and pcall can't catch a freeze.
@@ -25,7 +28,6 @@
 
 local image = ...
 
-local host = host
 local coroutine_create, coroutine_resume, coroutine_status, coroutine_yield =
   coroutine.create, coroutine.resume, coroutine.status, coroutine.yield
 local setbudget, freeze, thaw, isfrozen = debug.setbudget, debug.freeze, debug.thaw, debug.isfrozen
@@ -33,7 +35,7 @@ local load, pairs, select, type, error, tostring = load, pairs, select, type, er
 local table_pack, table_unpack = table.pack, table.unpack
 local math_huge, math_floor = math.huge, math.floor
 
--- Steps user_co runs each tick before its budget freezes it.
+-- Steps user_co runs before its budget freezes it: how often the host gets a safe point.
 local SLICE = 100000
 
 local user_co
@@ -54,14 +56,6 @@ local function syscall(...)
   local reply = answer
   answer = nil
   return table_unpack(reply, 1, reply.n)
-end
-
--- A direct board call: the tick's share of calls is the host's to count; past it, wait a tick.
-local function direct(f, ...)
-  while host.calls() <= 0 do
-    syscall("tick")
-  end
-  return f(...)
 end
 
 local function copy(t)
@@ -99,17 +93,17 @@ sandbox.collectgarbage = function(what, ...)
 end
 
 sandbox.board = {
-  list = function() return direct(host.list) end,
-  status = function() return direct(host.status) end,
-  type = function(address) return direct(host.type, address) end,
-  methods = function(address) return direct(host.methods, address) end,
-  doc = function(address, method) return direct(host.doc, address, method) end,
-  info = function(address) return direct(host.info, address) end,
-  uptime = function() return direct(host.uptime) end,
-  power = function() return direct(host.power) end,
-  hardware = function() return direct(host.hardware) end,
+  list = function() return syscall("call", "list") end,
+  status = function() return syscall("call", "status") end,
+  type = function(address) return syscall("call", "type", address) end,
+  methods = function(address) return syscall("call", "methods", address) end,
+  doc = function(address, method) return syscall("call", "doc", address, method) end,
+  info = function(address) return syscall("call", "info", address) end,
+  uptime = function() return syscall("call", "uptime") end,
+  power = function() return syscall("call", "power") end,
+  hardware = function() return syscall("call", "hardware") end,
   -- true and the method's values, or false and why it failed (a device never stops the machine)
-  invoke = function(target, method, ...) return direct(host.invoke, target, method, ...) end,
+  invoke = function(target, method, ...) return syscall("call", "invoke", target, method, ...) end,
   -- waits until one of the sources (any, when none) has an interrupt pending, or 'seconds' pass
   waitForInterrupt = function(seconds, ...)
     if seconds ~= nil and type(seconds) ~= "number" then
@@ -142,7 +136,7 @@ while true do
       request = nil
       answer = table_pack(coroutine_yield(table_unpack(asked, 1, asked.n)))
     else
-      coroutine_yield("tick") -- the slice is spent
+      coroutine_yield("slice") -- the slice is spent
     end
     setbudget(user_co, SLICE, spent) -- a new slice
     result = table_pack(thaw(user_co))
@@ -152,7 +146,7 @@ while true do
     end
     error(result[2], 0)
   else
-    coroutine_yield("tick") -- the EEPROM's code yielded at its top: it gives up its turn
+    coroutine_yield("slice") -- the EEPROM's code yielded at its top: it gives up its turn
     setbudget(user_co, SLICE, spent)
     result = table_pack(coroutine_resume(user_co))
   end

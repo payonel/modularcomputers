@@ -51,20 +51,21 @@ public class AllInOneGameTest {
 		return computer;
 	}
 
-	@GameTest
+	@GameTest(maxTicks = 100)
 	public void aNewEepromIsLuaThatALuaCpuRuns(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
 		TestPrograms.withScreen(computer);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM)); // as crafted: its Lua, not a test's program
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
-		computer.pressPower();
-		helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "hello world", "the EEPROM's Lua wrote to the console");
-		helper.assertTrue(computer.machine().isPowered() && computer.machine().runner().isEmpty(), "then halted, power on");
-		helper.succeed();
+		computer.pressPower(); // the Lua CPU runs on its own thread; its calls are carried out on the server thread
+		helper.succeedWhen(() -> {
+			helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "hello world", "the EEPROM's Lua wrote to the console");
+			helper.assertTrue(computer.machine().isPowered() && computer.machine().runner().isEmpty(), "then halted, power on");
+		});
 	}
 
-	@GameTest
+	@GameTest(maxTicks = 100)
 	public void aProgramFlashesTheEepromAndTheNextBootRunsTheNewScript(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
 		TestPrograms.withScreen(computer);
@@ -78,13 +79,16 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, chip);
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		computer.pressPower();
-		helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "first script", "the first boot runs what the chip held");
-		helper.assertTrue(computer.parts().getItem(CaseMenu.EEPROM_SLOT).get(ModComponents.EEPROM_IMAGE).contains("second script"),
-			"the program's write is on the chip (the item) at once");
-		computer.pressPower(); // off
-		computer.pressPower(); // on: the CPU reads the chip again
-		helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "second script", "the reboot runs the new script");
-		helper.succeed();
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "first script", "the first boot runs what the chip held"))
+			.thenExecute(() -> {
+				helper.assertTrue(computer.parts().getItem(CaseMenu.EEPROM_SLOT).get(ModComponents.EEPROM_IMAGE).contains("second script"),
+					"the program's write is on the item");
+				computer.pressPower(); // off
+				computer.pressPower(); // on: the CPU reads the EEPROM again
+			})
+			.thenWaitUntil(() -> helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "second script", "the reboot runs the new script"))
+			.thenSucceed();
 	}
 
 	@GameTest

@@ -64,6 +64,8 @@ public final class Machine {
 	/** What the machine's devices' interrupt lines call. */
 	private final Runnable wake = this::wake;
 	private int callsPerTick = DEFAULT_CALLS_PER_TICK;
+	/** Runs work on the server thread soon (in a game, the server); null: only at ticks. */
+	private java.util.concurrent.Executor server;
 
 	/** A machine on a bench supply: it always has power. */
 	public Machine(Motherboard board) {
@@ -75,6 +77,21 @@ public final class Machine {
 		this.board = board;
 		this.power = power;
 		this.api = new MotherboardApi(board, () -> uptime);
+	}
+
+	/** How a runner on its own thread gets the server thread to serve it soon (in a game, the server). */
+	public void setServer(java.util.concurrent.Executor server) {
+		this.server = server;
+	}
+
+	/**
+	 * The server thread serves the program now (a runner on its own thread asked): it carries out
+	 * its waiting calls and answers its wait, within its server time.
+	 */
+	public void serve() {
+		if (powered && runner != null && !running) {
+			run();
+		}
 	}
 
 	/** The program on the CPU, while one runs (or waits). */
@@ -138,7 +155,7 @@ public final class Machine {
 			return;
 		}
 		int calls = callsPerTick - callsThisTick;
-		if (calls <= 0) {
+		if (calls <= 0 && runner.callLimited()) {
 			return; // spent: the next tick carries on
 		}
 		Runner.State before = runner.state();
@@ -291,6 +308,19 @@ public final class Machine {
 		executedThisTick = false;
 		board.bus().devices().forEach(this::supply);
 		runner = cpu.get().powerOn(board).orElse(null);
+		if (runner != null) {
+			Runner started = runner;
+			// A runner on its own thread asks the server thread to serve it as soon as it can.
+			started.serveWith(() -> {
+				if (server != null) {
+					server.execute(() -> {
+						if (runner == started) {
+							serve();
+						}
+					});
+				}
+			});
+		}
 		run(); // the CPU starts executing right away
 		return PowerPress.ON;
 	}
