@@ -164,7 +164,7 @@ public class RecipeGameTest {
 
 	@GameTest
 	public void anEepromComesFlashedAndCraftingItAloneWipesIt(GameTestHelper helper) {
-		String os = com.payonel.modularcomputers.machine.Eeprom.HELLO;
+		String os = com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/hello");
 		helper.assertValueEqual(new ItemStack(ModItems.EEPROM).get(ModComponents.EEPROM_IMAGE), os, "a new EEPROM holds its Lua firmware");
 		Craft eeprom = CRAFTS.stream().filter(craft -> craft.result().equals("eeprom")).findFirst().orElseThrow();
 		helper.assertValueEqual(craft(helper, grid(eeprom, ItemStack.EMPTY)).get(ModComponents.EEPROM_IMAGE), os, "so does a crafted one");

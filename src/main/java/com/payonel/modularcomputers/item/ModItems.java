@@ -41,7 +41,7 @@ public final class ModItems {
 	public static final Item CHIP = register("chip");
 	/** Comes from the factory flashed with Lua firmware, as real boards ship with firmware (crafting it alone wipes it). */
 	public static final Item EEPROM = register("eeprom", properties -> holdsData(properties)
-		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.Eeprom.HELLO));
+		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/hello")));
 	/** Creative only, for the Java CPU: flashed with mcos's Java version (its class name). */
 	public static final Item JAVA_EEPROM = register("java_eeprom", properties -> holdsData(properties)
 		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.Mcos.class.getName()));

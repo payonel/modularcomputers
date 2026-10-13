@@ -428,7 +428,7 @@ scripts/art/error_beep.py` into
         and plain), and four frames in `textures/gui/power_button.png`.
   - **Boot results:**
     - A (Lua) CPU and a new EEPROM: the EEPROM's Lua writes `hello world` to the console and
-      halts (`Eeprom.HELLO`).
+      halts (`lua/eeprom/hello.lua`, see "Lua scripts").
     - The Java CPU and the Java EEPROM: **mcos** (`Mcos`; user's name, 2026-10-12: the Modular Computers OS, Java
       version, a Lua version to follow), which the user keeps changing
       to try things out). Today it's **a tiny OS and shell, after OpenOS and busybox, all in that
@@ -577,6 +577,14 @@ scripts/art/error_beep.py` into
   (`lua_setbudget`: a callback every n steps, which can `lua_freeze` the thread wherever it is;
   `lua_thaw` goes on) and **Styx**, persisting a whole state (`luaL_persiststate`), for saving
   running machines later.
+- **Lua scripts** (user design, 2026-10-13; `machine/LuaScripts`): the Lua that comes with the
+  mod (firmware, mcos's Lua version, utilities; to be handed out by traders, loot chests and special
+  crafting) lives as plain UTF-8 `.lua` files under `src/main/resources/data/modularcomputers/lua/`
+  (`eeprom/` for firmware), never as Java strings. `LuaScripts.read("eeprom/hello")` gives a file's
+  bytes as an EEPROM image (one character a byte), copied onto an item when the game makes it (the
+  EEPROM's default `eeprom_image`). `LuaScriptsTest` compiles every script in there with LungoLua,
+  so a broken one fails the build. They're read from the class path, not as a data pack, so
+  datapacks can't replace them yet.
 - **CPUs and architectures** (user design, 2026-10-12; `machine/Architecture`): **every crafted CPU
   is a Lua CPU**; the **Java CPU** (`java_cpu`, creative only, tier 3, "JA/VA" printed on its
   package) runs Java programs, and the **Java EEPROM** (`java_eeprom`, creative only) comes flashed
@@ -739,7 +747,7 @@ scripts/art/error_beep.py` into
   as a `Program` class with a public no-argument constructor (`Cpu.load`; looked at before it's
   initialized, so naming anything else runs nothing). Blank: `ABRT: EEPROM is blank`; not a Java
   program on the Java CPU: `ABRT: EEPROM: exec format error` (Linux's ENOEXEC). A new EEPROM comes
-  flashed with Lua (`Eeprom.HELLO`); the Java EEPROM with `Mcos`'s class name. **Crafting one alone wipes it** (user): no id, blank
+  flashed with Lua (`eeprom/hello.lua`); the Java EEPROM with `Mcos`'s class name. **Crafting one alone wipes it** (user): no id, blank
   (`ClearIdRecipe`); its hint shows what it holds ("Holds: ...", "Blank"). Tests attach Java
   program objects with `Eeprom.flash(Program)`, like an in-circuit programmer; any CPU, Lua or
   Java, runs an attached program in place of the image.
