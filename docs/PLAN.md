@@ -215,6 +215,54 @@ of letting the player order them:
   powering any of them off blanks it. A real monitor shows one input at a time; consider an
   input selector. Screens have no power button: only the case does (user).
 
+## The Lua CPU on its own thread, and device data in rings (user design, 2026-10-13; not built)
+
+Built in this order:
+
+1. **A thread per running computer** (a platform thread, low priority; no pool until there's a
+   reason). The host loop runs `machine.lua` freely, not once a tick. The firmware yields
+   `"slice"` (its budget froze user_co: a safe point, honour pinned requests, go on at once),
+   `"call", ...` (a device call: carried out on the server thread, `server.execute`), `"wait", ...`
+   (the thread sleeps until an interrupt, the time, or a pinned request) and `"halt"`. **Every
+   device call is a syscall**: device code only ever runs on the server thread, and no Java frame
+   sits in user_co's stack. The 20-calls-a-tick limit goes; instead each machine gets a **budget of
+   server-thread time a tick** (past it, its work waits for the next tick). Power never limits
+   calls (a bigger supply would make that meaningless).
+2. **Pinned requests: freeze, then persist.** The server thread pins "persist" (world save) or
+   "persist and stop" (chunk unload, power-off) and blocks until the host thread honours it at its
+   next safe point (after a slice, or at once while waiting), never in the middle of a syscall.
+   While it blocks, it carries out that machine's queued device calls (no deadlock). Styx persists
+   from the main thread only, so this is the host's (`LuaRunner`). Restore on load
+   (`luaL_restorestate`, the same libraries and the host's functions as permanents).
+3. **Device data in rings** (like DMA rings: the program reads memory, not the device):
+   - Four kinds of device traffic: events in (keys, redstone, sensors, messages) pushed; writes out
+     (terminal text) batched; rarely-changing state (the bus list, types, methods, sizes) pushed as
+     snapshots when it changes; synchronous request/response calls stay syscalls (the slow path).
+   - **Flow control by handshake, never silent drops**: a device keeps its data until the board's
+     ring has room; the board takes from the device only with room; the firmware takes from the
+     board only with room in its own ring. When a device's own buffer is full, what it does is the
+     device's choice (a keyboard could beep, as a PC's does).
+   - **The board's ring lives in the RAM sticks** (Java, outside the VM): free, not counted against
+     the VM's memory cap (the cap is the host's, on the Lua thread; world events mustn't compete with
+     it). **Tier 1 RAM has no ring**: device data then stays in the device until the program asks,
+     a slow path that slows device reads, on purpose. Higher tiers have rings, larger with the tier.
+     Pulling RAM from a running machine loses what's in its ring (fair, and interesting).
+   - **The firmware's ring is like an L1 cache**: in the VM, so it counts against the memory cap,
+     and so it's tiny and fixed: a few entries per device (fewer than 5), so it can never eat a
+     program's memory in a way the player can't see or debug.
+   - Batched writes report errors late (as `fwrite`/`fsync`, sockets, ttys do).
+   - Interrupts stay level-triggered: pending means the firmware's ring holds data for the source.
+
+## Disk files without open file descriptors (user design, 2026-10-13; not built)
+
+An open handle never keeps a host file open while user code runs. Open reads the file's size and
+a window of it into the handle's userdata (its path kept), and closes the host file; reads past the
+window fetch the next chunk (a syscall): a file's size is never limited by RAM. Writes go to a
+shadow file next to the original; **close is atomic**: one syscall writes what's pending and
+renames the shadow over the original (`rename(2)`), and only when the host confirms does the
+program drop its buffer (a failure leaves the buffer, to retry: intent is never lost). Writes not
+closed are lost at power-off, as in real life. The handle's data is in the VM, so Styx persists it.
+
 ## Placeholder blocks and cards (built as placeholders, 2026-10-11; behavior to design)
 
 - **Cards** (all do nothing yet): WLAN, Bluetooth, Redstone, Audio, Motion Sensor, Audio
