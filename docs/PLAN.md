@@ -248,6 +248,25 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
 - Open: disks in expansion hubs; hfs labels set by programs; a Lua runtime's `__gc` closing
   handles; whether a mount table belongs on the board (a kernel's job) once there's a real OS.
 
+## Recipes (draft in review with the user, 2026-10-12; not built)
+
+- Draft page: a private draft page (private to the user).
+- Theme (user): vanilla ores, minerals and drops, few custom components; real computer materials
+  (quartz for silicon until the introduction's chip is designed, amethyst for the clock crystal,
+  copper boards, gold pins, iron frames; tiers iron, gold, diamond). No bricks.
+- Every radio (WLAN and Bluetooth cards) takes an ender pearl and an emerald (beryl: beryllia under
+  a transmitter's power amplifier); Bluetooth adds lapis. Cable is dried kelp around copper (8).
+  The case's note block is its speaker. Screens: glass, glowstone for tiers 2 and 3. Expansion
+  hub: four comparators around quartz, copper and gold. Paint gun: red, green, blue dye over a
+  dispenser.
+- Cases upgrade from the tier below (user: old stuff isn't junk) and need something earned:
+  tier 2 breeze rods (trial chambers; the case's fans) and gold; tier 3 echo shards (ancient
+  cities; memory, as a recovery compass remembers), a heart of the sea (power, as it powers a
+  conduit), diamonds, a block of redstone. The user found Wither and End costs far too much.
+- Saved for later (user): shulker shells for a robot with deep internal storage.
+- The player's introduction to the mod (silicon from quartz in a blast furnace, chips from the
+  stonecutter, advancements, archaeology loot) is the next discussion.
+
 ## Machine ideas discussed (not built)
 
 - **Hot-plug takeover:** built. The console keeps its own copy of what it shows and redraws
