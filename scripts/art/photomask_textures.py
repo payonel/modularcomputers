@@ -167,6 +167,36 @@ def block_elements():
 		els.append({"from": [fx, fy, 0], "to": [tx, ty, 3], "faces": faces(sides, {inner: True})})
 	return els
 
+def gui_gear():
+	"""The gear as a picture (16x16, the item hint's turning gear): face on, peg up."""
+	im = Image.new("RGBA", (16, 16), CLEAR)
+	brass, light, dark = (204, 158, 70, 255), (232, 196, 110, 255), (150, 108, 40, 255)
+	for y in range(16):
+		for x in range(16):
+			dx, dy = x - 7.5, y - 7.5
+			d = math.hypot(dx, dy)
+			a = math.degrees(math.atan2(dx, -dy)) % 360          # 0 straight up, clockwise
+			c = None
+			if d <= 0.8:
+				c = (70, 56, 30, 255)                             # axle
+			elif d <= 2.0:
+				c = brass                                         # hub
+			elif 4.6 <= d <= 5.8:
+				c = brass                                         # rim
+			elif 5.8 < d <= 7.4 and (a + 5.625) % 22.5 < 11.25:
+				c = brass                                         # teeth
+			elif d < 4.6 and min(abs(dx), abs(dy)) <= 0.6:
+				c = brass                                         # spokes
+			if c == brass and dx + dy < -3:
+				c = light
+			elif c == brass and dx + dy > 4:
+				c = dark
+			if c:
+				im.putpixel((x, y), c)
+	for (x, y) in ((7, 3), (8, 3), (7, 4), (8, 4)):                # the crank peg, on the top spoke
+		im.putpixel((x, y), (214, 218, 226, 255))
+	return im
+
 def models(root):
 	textures = {"particle": "modularcomputers:block/photomask_side", "front": "modularcomputers:block/photomask_front",
 		"well": "modularcomputers:block/photomask_well", "side": "modularcomputers:block/photomask_side",
@@ -187,6 +217,7 @@ for name, fn in blocks.items():
 	fn().save(f"{OUT}/block/{name}.png")
 
 models(os.path.join(OUT, "..", "models"))
+gui_gear().save(f"{OUT}/gui/photomask_gear.png")
 
 sheet = Image.new("RGBA", (20 * 8 + 4, 24), (40, 40, 40, 255))
 for i, (folder, name) in enumerate([("item", n) for n in items] + [("block", n) for n in blocks]):

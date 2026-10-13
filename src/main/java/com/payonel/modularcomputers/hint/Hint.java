@@ -39,6 +39,10 @@ public final class Hint {
 	public record Icon(ItemStack stack, Component label) {
 	}
 
+	/** The photomask's gear turning and its buffer filling, again and again: how hand power works. */
+	public record Crank() implements Element {
+	}
+
 	/** The crafting grid that makes this item (empty if nothing does yet). */
 	public record Crafting(Item item) implements Element {
 	}
@@ -76,6 +80,9 @@ public final class Hint {
 		String about = "hint.modularcomputers.details." + net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath();
 		if (net.minecraft.locale.Language.getInstance().has(about)) {
 			elements.add(text(Component.translatable(about)));
+		}
+		if (stack.is(com.payonel.modularcomputers.block.ModBlocks.PHOTOMASK.asItem())) {
+			elements.add(new Crank()); // its gear turning, its buffer filling
 		}
 		if (serial != null) {
 			// Its id (programs address it as id:<uuid>), long, so only in the details (user); crafting it alone clears it.

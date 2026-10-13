@@ -23,7 +23,7 @@ public final class PhotomaskMenu extends AbstractContainerMenu {
 
 	/** Client side: the slots and progress are filled in by the server's sync. */
 	public PhotomaskMenu(int id, Inventory inventory, BlockPos pos) {
-		this(id, inventory, new SimpleContainer(PhotomaskBlockEntity.SLOTS), new SimpleContainerData(1), pos, ContainerLevelAccess.NULL);
+		this(id, inventory, new SimpleContainer(PhotomaskBlockEntity.SLOTS), new SimpleContainerData(2), pos, ContainerLevelAccess.NULL);
 	}
 
 	public PhotomaskMenu(int id, Inventory inventory, Container items, ContainerData data, BlockPos pos, ContainerLevelAccess access) {
@@ -41,6 +41,11 @@ public final class PhotomaskMenu extends AbstractContainerMenu {
 
 	public BlockPos pos() {
 		return pos;
+	}
+
+	/** How full its buffer is, in percent. */
+	public int charge() {
+		return data.get(1);
 	}
 
 	/** Turns done on the wafer in it, of {@link PhotomaskBlockEntity#WORK}. */

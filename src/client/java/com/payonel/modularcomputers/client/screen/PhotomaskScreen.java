@@ -56,6 +56,12 @@ public final class PhotomaskScreen extends AbstractContainerScreen<PhotomaskMenu
 		inventoryLabelY = PhotomaskMenu.INVENTORY_Y - 10;
 	}
 
+	/** The charge meter, under the battery's slot. */
+	public Viewport meter() {
+		Slot battery = menu.slots.get(PhotomaskBlockEntity.BATTERY);
+		return new Viewport(leftPos + battery.x + 8 - ChargeBars.WIDTH / 2, topPos + battery.y + 19, ChargeBars.WIDTH, ChargeBars.HEIGHT);
+	}
+
 	/** A slot's 16x16 item area on screen. */
 	public Viewport slotArea(int index) {
 		Slot slot = menu.slots.get(index);
@@ -94,6 +100,8 @@ public final class PhotomaskScreen extends AbstractContainerScreen<PhotomaskMenu
 			int half = i < 20 ? 2 : 6 - (i - 20);
 			graphics.fill(ax + i, ay - half, ax + i + 1, ay + half + 1, i < done ? ARROW_LIT : ARROW);
 		}
+		Viewport meter = meter();
+		ChargeBars.extract(graphics, meter.x(), meter.y(), menu.charge());
 		// Where things go: silicon and batteries to their slots, and the other way round (as the case view does).
 		SlotHints.extract(graphics, menu, hoveredSlot, PhotomaskBlockEntity.SLOTS, this::slotArea);
 	}
@@ -137,6 +145,14 @@ public final class PhotomaskScreen extends AbstractContainerScreen<PhotomaskMenu
 	@Override
 	protected void extractTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
 		super.extractTooltip(graphics, mouseX, mouseY);
+		Viewport meter = meter();
+		if (mouseX >= meter.x() && mouseX < meter.x() + meter.width() && mouseY >= meter.y() - 1 && mouseY < meter.y() + meter.height() + 1) {
+			graphics.setTooltipForNextFrame(font, java.util.List.of(
+				Component.translatable("gui.modularcomputers.photomask.charge", menu.charge()).getVisualOrderText(),
+				Component.translatable("gui.modularcomputers.photomask.crank").withStyle(net.minecraft.ChatFormatting.GRAY).getVisualOrderText()),
+				mouseX, mouseY);
+			return;
+		}
 		// An empty slot says what goes in it.
 		if (hoveredSlot != null && !hoveredSlot.hasItem() && hoveredSlot.index < PhotomaskBlockEntity.SLOTS && menu.getCarried().isEmpty()) {
 			graphics.setTooltipForNextFrame(font, Component.translatable("hint.modularcomputers.photomask.slot." + hoveredSlot.index), mouseX, mouseY);

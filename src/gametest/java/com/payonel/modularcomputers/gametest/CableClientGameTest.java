@@ -312,9 +312,17 @@ public class CableClientGameTest implements FabricClientGameTest {
 			BufferedImage turned = read(context.takeScreenshot("photomask-turned"));
 			check(differ(still, turned) > 50, "cranked, the gear turns: " + differ(still, turned) + " pixels changed");
 			check(turning.getWidth() == turned.getWidth(), "frames");
-			// Its slots: silicon and batteries light up where they go; nothing goes in the chips' slot.
-			singleplayer.getServer().runOnServer(server -> server.getPlayerList().getPlayers().getFirst()
-				.openMenu((com.payonel.modularcomputers.block.PhotomaskBlockEntity) server.overworld().getBlockEntity(screen)));
+			// Its slots: silicon and batteries light up where they go; nothing goes in the chips' slot. Turned by
+			// hand, its buffer charges, and a photomask item to hover for its hint.
+			singleplayer.getServer().runOnServer(server -> {
+				var mask = (com.payonel.modularcomputers.block.PhotomaskBlockEntity) server.overworld().getBlockEntity(screen);
+				for (int i = 0; i < 4; i++) {
+					mask.crank();
+				}
+				var player = server.getPlayerList().getPlayers().getFirst();
+				player.getInventory().add(new ItemStack(com.payonel.modularcomputers.block.ModBlocks.PHOTOMASK));
+				player.openMenu(mask);
+			});
 			context.waitForScreen(com.payonel.modularcomputers.client.screen.PhotomaskScreen.class);
 			List<List<Integer>> fits = context.computeOnClient(client -> {
 				var menu = ((com.payonel.modularcomputers.client.screen.PhotomaskScreen) client.gui.screen()).getMenu();
@@ -330,6 +338,26 @@ public class CableClientGameTest implements FabricClientGameTest {
 			check(fits.equals(List.of(List.of(com.payonel.modularcomputers.block.PhotomaskBlockEntity.INPUT),
 				List.of(com.payonel.modularcomputers.block.PhotomaskBlockEntity.BATTERY), List.of())), "where things go in a photomask: " + fits);
 			context.takeScreenshot("photomask-slots");
+			context.waitFor(client -> ((com.payonel.modularcomputers.client.screen.PhotomaskScreen) client.gui.screen()).getMenu().charge() > 0);
+			moveCursorTo(context, s2 -> ((com.payonel.modularcomputers.client.screen.PhotomaskScreen) s2).meter());
+			context.waitTicks(2);
+			context.takeScreenshot("photomask-charge");
+			int maskSlot = context.computeOnClient(client -> {
+				var menu = ((com.payonel.modularcomputers.client.screen.PhotomaskScreen) client.gui.screen()).getMenu();
+				for (var slot : menu.slots) {
+					if (slot.getItem().is(com.payonel.modularcomputers.block.ModBlocks.PHOTOMASK.asItem())) {
+						return slot.index;
+					}
+				}
+				throw new AssertionError("no photomask in the inventory");
+			});
+			moveCursorTo(context, s2 -> ((com.payonel.modularcomputers.client.screen.PhotomaskScreen) s2).slotArea(maskSlot));
+			com.payonel.modularcomputers.client.hint.HintComponent.detailsOverride = true;
+			context.waitTicks(2);
+			context.takeScreenshot("photomask-hint");
+			context.waitTicks(20);
+			context.takeScreenshot("photomask-hint-later");
+			com.payonel.modularcomputers.client.hint.HintComponent.detailsOverride = null;
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitFor(client -> client.gui.screen() == null);
 

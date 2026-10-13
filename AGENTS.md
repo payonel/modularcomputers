@@ -473,7 +473,13 @@ scripts/art/error_beep.py` into
 - **Chips** (user design, 2026-10-12): nether quartz smelts to **silicon** in a blast furnace only
   (`recipe/silicon.json`); a **photomask** (`PhotomaskBlock`, `PhotomaskBlockEntity`, `PhotomaskMenu`,
   `PhotomaskScreen`) prints silicon into **chips**: a wafer takes `WORK` (8) turns and gives
-  `CHIPS` (4). **Right-click the gear to turn it; right-click anywhere else, or crouch + right-click
+  `CHIPS` (4). **Its own small power buffer** (user, 2026-10-12; `PhotomaskBlockEntity.BUFFER`, four hand
+  turns): each hand turn of the gear charges it by `CRANK` (one turn of work plus the idle draw till
+  the next), so it prints slowly with no battery at all; a battery in its bay tops it up; on a
+  computer's bus, the bus pays instead. With too little in it, it stops. Its window shows a 6-bar
+  meter under the battery's slot (`ChargeBars`, the case meter's colors), with a short tooltip
+  ("Charge: 40%", "Turn its gear to charge it"); its item hint with Shift is one short line and an
+  animation, the gear turning while a meter fills 0 to 100 and starts over (`Hint.Crank`). **Right-click the gear to turn it; right-click anywhere else, or crouch + right-click
   anywhere (even on the gear), to open its slots** (user, 2026-10-12: click the thing you mean,
   like the case's power button; `PhotomaskBlock.onGear` checks the front face within the gear's
   circle). **The gear is 3D** (user, 2026-10-12): the block is a full cube whose front is a 1-texel

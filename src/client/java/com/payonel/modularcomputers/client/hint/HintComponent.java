@@ -29,6 +29,11 @@ public final class HintComponent implements ClientTooltipComponent {
 	private static final int ARROW_COLOR = 0xFFA0A0A0;
 	/** How long each of a cell's choices shows, when a tag fits it. */
 	private static final long CYCLE_MILLIS = 1000;
+	/** The photomask's turning gear (a picture of the block's). */
+	private static final net.minecraft.resources.Identifier GEAR =
+		com.payonel.modularcomputers.ModularComputers.id("textures/gui/photomask_gear.png");
+	/** One fill of the photomask's buffer in its hint: four hand turns, then it starts again from empty. */
+	private static final long CRANK_MILLIS = 4000;
 
 	private final List<Hint.Element> elements;
 
@@ -56,6 +61,7 @@ public final class HintComponent implements ClientTooltipComponent {
 			case Hint.Text text -> LINE;
 			case Hint.Icons icons -> 16 + 2 + LINE + 2;
 			case Hint.Crafting crafting -> 3 * SLOT + 2 + (ClientRecipes.of(crafting.item()).isEmpty() ? LINE : 0) + 2;
+			case Hint.Crank crank -> 16 + 4;
 		};
 	}
 
@@ -64,6 +70,7 @@ public final class HintComponent implements ClientTooltipComponent {
 			case Hint.Text text -> font.width(text.text());
 			case Hint.Icons icons -> icons.icons().stream().mapToInt(icon -> iconWidth(icon, font) + ICON_GAP).sum() - ICON_GAP;
 			case Hint.Crafting crafting -> 3 * SLOT + ARROW + SLOT;
+			case Hint.Crank crank -> 16 + 4 + com.payonel.modularcomputers.client.screen.ChargeBars.WIDTH;
 		};
 	}
 
@@ -90,6 +97,8 @@ public final class HintComponent implements ClientTooltipComponent {
 						graphics.text(font, note, x, y + 3 * SLOT + 2, -1, true);
 					}
 				}
+				case Hint.Crank crank -> {
+				}
 			}
 			y += height(element);
 		}
@@ -110,9 +119,23 @@ public final class HintComponent implements ClientTooltipComponent {
 					}
 				}
 				case Hint.Crafting crafting -> extractGrid(graphics, crafting, x, y);
+				case Hint.Crank crank -> extractCrank(graphics, x, y + 1);
 			}
 			y += height(element);
 		}
+	}
+
+	/** The gear turning (four hand turns, half a turn) while the buffer's meter fills, 0 to 100, again and again. */
+	private static void extractCrank(GuiGraphicsExtractor graphics, int x, int y) {
+		float done = (System.currentTimeMillis() % CRANK_MILLIS) / (float) CRANK_MILLIS;
+		var pose = graphics.pose();
+		pose.pushMatrix();
+		pose.translate(x + 8, y + 8);
+		pose.rotate((float) Math.toRadians(done * 180));
+		graphics.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, GEAR, -8, -8, 0, 0, 16, 16, 16, 16);
+		pose.popMatrix();
+		com.payonel.modularcomputers.client.screen.ChargeBars.extract(graphics, x + 20, y + 8 - com.payonel.modularcomputers.client.screen.ChargeBars.HEIGHT / 2,
+			Math.round(done * 100));
 	}
 
 	/** A 3x3 crafting grid, an arrow and the result, like the crafting table's. */
