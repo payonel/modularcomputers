@@ -25,6 +25,17 @@ repositories {
 			includeModule 'com.payonel', 'lungolua'
 		}
 	}
+	maven {
+		name = 'StyxLua'
+		url = 'https://maven.pkg.github.com/payonel/styxlua'
+		credentials {
+			username = providers.gradleProperty('gpr.user').orElse(providers.environmentVariable('GITHUB_ACTOR')).getOrNull()
+			password = providers.gradleProperty('gpr.key').orElse(providers.environmentVariable('GITHUB_TOKEN')).getOrNull()
+		}
+		content {
+			includeModule 'com.payonel', 'styxlua'
+		}
+	}
 }
 
 loom {
@@ -64,6 +75,9 @@ dependencies {
 	// are in the jar too; the mod never loads them, so JLine isn't needed.
 	implementation "com.payonel:lungolua:${project.lungolua_version}"
 	include "com.payonel:lungolua:${project.lungolua_version}"
+	// Styx, persisting a whole Lua state (saving running computers): its own library now.
+	implementation "com.payonel:styxlua:${project.styxlua_version}"
+	include "com.payonel:styxlua:${project.styxlua_version}"
 
 	// Unit tests: plain JUnit, with fabric-loader-junit so tests can bootstrap Minecraft registries.
 	testImplementation platform("org.junit:junit-bom:${project.junit_version}")

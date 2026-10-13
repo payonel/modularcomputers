@@ -592,7 +592,11 @@ scripts/art/error_beep.py` into
   never loads them, so JLine isn't a dependency. To take a newer engine, bump `lungolua_version` (the versions published:
   `maven-metadata.xml` under `com/payonel/lungolua/` there, read with the same token). Since
   `0.1.0-eceb71b5` its C-int booleans are Java `boolean`s (`lua_toboolean`, `lua_isinteger`,
-  `lua_next`, `lua_pushboolean`). Its API is C's, by C's names (`lua_resume`,
+  `lua_next`, `lua_pushboolean`). **Since `1.0.0`, Styx is its own library** (2026-10-13):
+  `com.payonel:styxlua:${styxlua_version}` from `https://maven.pkg.github.com/payonel/styxlua`
+  (same token), package `com.payonel.styxlua` (`Lstyx`, `luaL_Restored`, `luaL_StyxResult`); the
+  mod depends on and nests both jars, and their versions go together (the LungoLua agent names
+  the pair). Its API is C's, by C's names (`lua_resume`,
   `luaL_loadbufferx`, `HostString` for text crossing in). Beyond stock Lua it has **budgets**
   (`lua_setbudget`: a callback every n steps, which can `lua_freeze` the thread wherever it is;
   `lua_thaw` goes on) and **Styx**, persisting a whole state (`luaL_persiststate`), for saving
