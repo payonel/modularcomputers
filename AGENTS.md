@@ -618,8 +618,11 @@ scripts/art/error_beep.py` into
     (`mixin/ServerLevelBlockUpdates`, the mod's first mixin: Fabric has no block-change event).
 - **mcos in Lua** (`lua/mcos/`, the files a tier 1 disk comes with): a first, small OS until
   OpenOS is ported: `init.lua` (paths, the boot disk's files, a line editor on the console,
-  `require` from `/lib`, programs from `/bin`), `bin/sh.lua` (a shell) and `ls`, `cat`, `echo`,
-  `clear`, `lsdev`, `help`, `halt`. Tests don't pin what it says.
+  `require` from `/lib`, programs from `/bin`), `bin/sh.lua` and `ls`, `cat`, `echo`, `clear`,
+  `lsdev`, `help`, `halt`. **`sh` is a basic echo for now** (user, 2026-10-13): it reads what's
+  typed at the console and echoes it (Enter a new line under a `$ ` prompt, Backspace back to the
+  prompt, other non-printable keys not echoed); it runs no commands, so the `/bin` programs wait
+  for a real shell. Tests don't pin what it says.
 - **Lua scripts** (user design, 2026-10-13; `machine/LuaScripts`): the Lua that comes with the
   mod (firmware, mcos's Lua version, utilities; to be handed out by traders, loot chests and special
   crafting) lives as plain UTF-8 `.lua` files under `src/main/resources/data/modularcomputers/lua/`
