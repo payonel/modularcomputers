@@ -79,7 +79,9 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 			return;
 		}
 		state.rows = display.rows().toArray(String[]::new);
-		state.foregrounds = display.foregrounds();
+		// A monochrome terminal's phosphor has one color: the glass glows green (ColorDepth.glow).
+		var depth = host.terminal().tier().depth();
+		state.foregrounds = java.util.Arrays.stream(display.foregrounds()).map(depth::glow).toArray();
 		state.backgrounds = display.backgrounds();
 	}
 

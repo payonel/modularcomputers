@@ -1,123 +1,123 @@
 {
 	"variants": {
 		"facing=north,powered=false,ready=false,screen=false": {
-			"model": "modularcomputers:block/case_plain_faded"
+			"model": "modularcomputers:block/tier1_case_faded"
 		},
 		"facing=north,powered=false,ready=false,screen=true": {
-			"model": "modularcomputers:block/case_plain_faded"
+			"model": "modularcomputers:block/tier1_case_faded"
 		},
 		"facing=north,powered=false,ready=true,screen=false": {
-			"model": "modularcomputers:block/case_plain"
+			"model": "modularcomputers:block/tier1_case"
 		},
 		"facing=north,powered=false,ready=true,screen=true": {
-			"model": "modularcomputers:block/case_plain"
+			"model": "modularcomputers:block/tier1_case"
 		},
 		"facing=north,powered=true,ready=false,screen=false": {
-			"model": "modularcomputers:block/case_plain_on_faded"
+			"model": "modularcomputers:block/tier1_case_on_faded"
 		},
 		"facing=north,powered=true,ready=false,screen=true": {
-			"model": "modularcomputers:block/case_plain_on_faded"
+			"model": "modularcomputers:block/tier1_case_on_faded"
 		},
 		"facing=north,powered=true,ready=true,screen=false": {
-			"model": "modularcomputers:block/case_plain_on"
+			"model": "modularcomputers:block/tier1_case_on"
 		},
 		"facing=north,powered=true,ready=true,screen=true": {
-			"model": "modularcomputers:block/case_plain_on"
+			"model": "modularcomputers:block/tier1_case_on"
 		},
 		"facing=east,powered=false,ready=false,screen=false": {
-			"model": "modularcomputers:block/case_plain_faded",
+			"model": "modularcomputers:block/tier1_case_faded",
 			"y": 90
 		},
 		"facing=east,powered=false,ready=false,screen=true": {
-			"model": "modularcomputers:block/case_plain_faded",
+			"model": "modularcomputers:block/tier1_case_faded",
 			"y": 90
 		},
 		"facing=east,powered=false,ready=true,screen=false": {
-			"model": "modularcomputers:block/case_plain",
+			"model": "modularcomputers:block/tier1_case",
 			"y": 90
 		},
 		"facing=east,powered=false,ready=true,screen=true": {
-			"model": "modularcomputers:block/case_plain",
+			"model": "modularcomputers:block/tier1_case",
 			"y": 90
 		},
 		"facing=east,powered=true,ready=false,screen=false": {
-			"model": "modularcomputers:block/case_plain_on_faded",
+			"model": "modularcomputers:block/tier1_case_on_faded",
 			"y": 90
 		},
 		"facing=east,powered=true,ready=false,screen=true": {
-			"model": "modularcomputers:block/case_plain_on_faded",
+			"model": "modularcomputers:block/tier1_case_on_faded",
 			"y": 90
 		},
 		"facing=east,powered=true,ready=true,screen=false": {
-			"model": "modularcomputers:block/case_plain_on",
+			"model": "modularcomputers:block/tier1_case_on",
 			"y": 90
 		},
 		"facing=east,powered=true,ready=true,screen=true": {
-			"model": "modularcomputers:block/case_plain_on",
+			"model": "modularcomputers:block/tier1_case_on",
 			"y": 90
 		},
 		"facing=south,powered=false,ready=false,screen=false": {
-			"model": "modularcomputers:block/case_plain_faded",
+			"model": "modularcomputers:block/tier1_case_faded",
 			"y": 180
 		},
 		"facing=south,powered=false,ready=false,screen=true": {
-			"model": "modularcomputers:block/case_plain_faded",
+			"model": "modularcomputers:block/tier1_case_faded",
 			"y": 180
 		},
 		"facing=south,powered=false,ready=true,screen=false": {
-			"model": "modularcomputers:block/case_plain",
+			"model": "modularcomputers:block/tier1_case",
 			"y": 180
 		},
 		"facing=south,powered=false,ready=true,screen=true": {
-			"model": "modularcomputers:block/case_plain",
+			"model": "modularcomputers:block/tier1_case",
 			"y": 180
 		},
 		"facing=south,powered=true,ready=false,screen=false": {
-			"model": "modularcomputers:block/case_plain_on_faded",
+			"model": "modularcomputers:block/tier1_case_on_faded",
 			"y": 180
 		},
 		"facing=south,powered=true,ready=false,screen=true": {
-			"model": "modularcomputers:block/case_plain_on_faded",
+			"model": "modularcomputers:block/tier1_case_on_faded",
 			"y": 180
 		},
 		"facing=south,powered=true,ready=true,screen=false": {
-			"model": "modularcomputers:block/case_plain_on",
+			"model": "modularcomputers:block/tier1_case_on",
 			"y": 180
 		},
 		"facing=south,powered=true,ready=true,screen=true": {
-			"model": "modularcomputers:block/case_plain_on",
+			"model": "modularcomputers:block/tier1_case_on",
 			"y": 180
 		},
 		"facing=west,powered=false,ready=false,screen=false": {
-			"model": "modularcomputers:block/case_plain_faded",
+			"model": "modularcomputers:block/tier1_case_faded",
 			"y": 270
 		},
 		"facing=west,powered=false,ready=false,screen=true": {
-			"model": "modularcomputers:block/case_plain_faded",
+			"model": "modularcomputers:block/tier1_case_faded",
 			"y": 270
 		},
 		"facing=west,powered=false,ready=true,screen=false": {
-			"model": "modularcomputers:block/case_plain",
+			"model": "modularcomputers:block/tier1_case",
 			"y": 270
 		},
 		"facing=west,powered=false,ready=true,screen=true": {
-			"model": "modularcomputers:block/case_plain",
+			"model": "modularcomputers:block/tier1_case",
 			"y": 270
 		},
 		"facing=west,powered=true,ready=false,screen=false": {
-			"model": "modularcomputers:block/case_plain_on_faded",
+			"model": "modularcomputers:block/tier1_case_on_faded",
 			"y": 270
 		},
 		"facing=west,powered=true,ready=false,screen=true": {
-			"model": "modularcomputers:block/case_plain_on_faded",
+			"model": "modularcomputers:block/tier1_case_on_faded",
 			"y": 270
 		},
 		"facing=west,powered=true,ready=true,screen=false": {
-			"model": "modularcomputers:block/case_plain_on",
+			"model": "modularcomputers:block/tier1_case_on",
 			"y": 270
 		},
 		"facing=west,powered=true,ready=true,screen=true": {
-			"model": "modularcomputers:block/case_plain_on",
+			"model": "modularcomputers:block/tier1_case_on",
 			"y": 270
 		}
 	}

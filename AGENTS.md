@@ -231,6 +231,19 @@ same thing.
       (`PartSlot.isActive`): no hover highlight, no clicks. A lower tier has the first slots
       of each kind (`CaseMenu.available`): battery bays 1/2/3, RAM 1/2/4, SATA 1/2/4, expansion
       2/3/4 (the user's suggestion). The CPU socket and ROM are on every tier.
+    - **Looks: each tier is an era of the PC** (user's pick, "direction C", 2026-10-12; drafts at
+      a private draft page), and a case and a screen of one tier
+      match: tier 1 the 80s beige box with a **green-phosphor** terminal (its glass is green and
+      its text glows green: `ColorDepth.glow`/`glass`, drawing only, as phosphor is the glass's);
+      tier 2 a 90s platinum tower with a red MHz display and side vents, and a color monitor with
+      an RGB badge; tier 3 a modern graphite case with a diamond light bar, a glass side panel
+      showing the board and dark keys, and a graphite monitor. Shapes don't change between tiers:
+      the glass where text is drawn, the back's window and the **power button on the back** (still
+      right-clickable, `BackPanel`) stay put. `scripts/art/case_tier_textures.py` recolors the
+      beige originals for tiers 2 and 3 and writes the case models (`tier{N}_case[_screen][_on][_faded]`),
+      blockstates and item models (the all-in-one uses tier 3's); `cabled_block_textures.py`
+      draws each tier's screen faces (`tier{N}_screen_front/side/back/top`). The screen view's
+      bezel takes the block's era too (`DisplayScreen.Bezel`).
     - **Power buffer:** 0.0025, 0.005, 0.01 of a day of a running all-in-one (3, 6, 12 seconds)
       (`CaseTier.bufferCapacity`, `PowerBuffer(capacity)`).
     - **The gold slot** (tiers 2 and 3, user design): the first expansion slot is gold-trimmed and
@@ -1182,6 +1195,7 @@ scripts/setup-headless-host.sh, scripts/headless.sh
 scripts/art/all_in_one_textures.py   draws the block, GUI and item textures (Pillow); PNGs are committed
 scripts/art/case_gui_textures.py     draws the case view's board, bus panel and icons (Pillow); PNGs are committed
 scripts/art/error_beep.py            synthesizes the error beep as Ogg Vorbis; the .ogg is committed
+scripts/art/case_tier_textures.py    tier 2 and 3 case textures (eras) from the beige ones, plus case models and blockstates
 scripts/art/power_down.py            synthesizes the power-down sound (the beep sagging and fading)
 scripts/art/part_sounds.py           synthesizes the part insert/remove sounds (slides, clicks, thumps, a zap)
 scripts/art/oggwrite.py              shared: writes mono Ogg Vorbis via the system's libsndfile (ctypes)

@@ -35,10 +35,19 @@ public final class DisplayScreen extends Screen {
 	private static final int BLACK = 0xFF000000;
 	/** The frame around the display, in GUI units, in the computer case's colors. */
 	private static final int BEZEL = 6;
-	private static final int CASE = 0xFFCEC5A8;
-	private static final int CASE_LIGHT = 0xFFE2DAC0;
-	private static final int CASE_SHADE = 0xFFACA387;
-	private static final int CASE_DARK = 0xFF948B71;
+	/**
+	 * The bezel's colors by era (tier), matching the blocks (scripts/art): body, lit edge, shade,
+	 * recess shadow. Tier 1 beige, tier 2 platinum, tier 3 graphite.
+	 */
+	private record Bezel(int body, int light, int shade, int dark) {
+		static Bezel of(int tier) {
+			return switch (tier) {
+				case 2 -> new Bezel(0xFFC9C4B8, 0xFFDEDAD0, 0xFFA59F95, 0xFF8D887C);
+				case 3 -> new Bezel(0xFF2A2C30, 0xFF40434A, 0xFF18191C, 0xFF141518);
+				default -> new Bezel(0xFFCEC5A8, 0xFFE2DAC0, 0xFFACA387, 0xFF948B71);
+			};
+		}
+	}
 
 	private final BlockPos pos;
 	private final Resolution resolution;
@@ -144,11 +153,16 @@ public final class DisplayScreen extends Screen {
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-		extractBezel(graphics);
+		DisplayHost host = minecraft.level != null && minecraft.level.getBlockEntity(pos) instanceof DisplayHost found ? found : null;
+		// The bezel is the block's (a case's or the screen's own era); the glass and its glow, the terminal's.
+		int tier = host instanceof AllInOneBlockEntity computer ? computer.tier().number()
+			: host != null ? host.terminal().tier().number() : 1;
+		extractBezel(graphics, Bezel.of(tier));
 		Viewport display = layout.display();
-		graphics.fill(display.x(), display.y(), display.right(), display.bottom(), BLACK);
-		if (minecraft.level != null && minecraft.level.getBlockEntity(pos) instanceof DisplayHost host) {
-			extractText(graphics, host.terminal().buffer());
+		var depth = host != null ? host.terminal().tier().depth() : com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR;
+		graphics.fill(display.x(), display.y(), display.right(), display.bottom(), BLACK | depth.glass());
+		if (host != null) {
+			extractText(graphics, host.terminal().buffer(), depth);
 		}
 		if (minecraft.level != null && computer.isPresent() && minecraft.level.getBlockEntity(computer.get()) instanceof AllInOneBlockEntity machine) {
 			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.CASE, machine.getBlockState(), powerHeld);
@@ -162,17 +176,17 @@ public final class DisplayScreen extends Screen {
 	 * A frame like the screen surround on the computer's front: beige case with a lit outer
 	 * edge, and a recessed inner edge (shadow top and left, light bottom and right).
 	 */
-	private void extractBezel(GuiGraphicsExtractor graphics) {
+	private void extractBezel(GuiGraphicsExtractor graphics, Bezel colors) {
 		Viewport b = layout.bezel();
 		Viewport d = layout.display();
-		graphics.fill(b.x(), b.y(), b.right(), b.bottom(), CASE_SHADE);
-		graphics.fill(b.x(), b.y(), b.right() - 1, b.bottom() - 1, CASE_LIGHT);
-		graphics.fill(b.x() + 1, b.y() + 1, b.right() - 1, b.bottom() - 1, CASE);
-		graphics.fill(d.x() - 1, d.y() - 1, d.right() + 1, d.bottom() + 1, CASE_LIGHT);
-		graphics.fill(d.x() - 1, d.y() - 1, d.right(), d.bottom(), CASE_DARK);
+		graphics.fill(b.x(), b.y(), b.right(), b.bottom(), colors.shade());
+		graphics.fill(b.x(), b.y(), b.right() - 1, b.bottom() - 1, colors.light());
+		graphics.fill(b.x() + 1, b.y() + 1, b.right() - 1, b.bottom() - 1, colors.body());
+		graphics.fill(d.x() - 1, d.y() - 1, d.right() + 1, d.bottom() + 1, colors.light());
+		graphics.fill(d.x() - 1, d.y() - 1, d.right(), d.bottom(), colors.dark());
 	}
 
-	private void extractText(GuiGraphicsExtractor graphics, TextBuffer buffer) {
+	private void extractText(GuiGraphicsExtractor graphics, TextBuffer buffer, com.payonel.modularcomputers.display.ColorDepth depth) {
 		if (buffer.isBlank()) {
 			return;
 		}
@@ -203,7 +217,7 @@ public final class DisplayScreen extends Screen {
 				char c = buffer.get(column, row);
 				if (c != ' ') {
 					graphics.text(font, String.valueOf(c), (int) grid.x(column, c, font), (int) grid.y(row),
-						0xFF000000 | buffer.foreground(column, row), false);
+						0xFF000000 | depth.glow(buffer.foreground(column, row)), false);
 				}
 			}
 		}

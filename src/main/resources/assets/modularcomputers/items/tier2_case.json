@@ -1,6 +1,6 @@
 {
 	"model": {
 		"type": "minecraft:model",
-		"model": "modularcomputers:block/case_faded"
+		"model": "modularcomputers:block/tier2_case_faded"
 	}
 }

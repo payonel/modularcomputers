@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # Draws the 16x16 textures of the blocks on the cable network: the screen, the cable, the
-# expansion hub and the robotic piston (needs Pillow), in the all-in-one's beige. The PNGs are
+# expansion hub and the robotic piston (needs Pillow), in the all-in-one's beige. Screens come
+# in their tier's era, matching the cases (scripts/art/case_tier_textures.py; user's pick,
+# 2026-10-12): an 80s beige terminal with green-phosphor glass, a 90s platinum color monitor
+# with an RGB badge, a modern graphite flat panel. The PNGs are
 # committed; rerun after editing this to regenerate them, then check the preview.
 #   scripts/art/cabled_block_textures.py src/main/resources/assets/modularcomputers/textures/block preview.png
 import random, sys
@@ -12,16 +15,27 @@ LIGHT = (226, 218, 192)
 SHADE = (172, 163, 135)
 DARK = (148, 139, 113)
 GLASS = (10, 10, 12)
+PHOSPHOR_GLASS = (6, 33, 15)  # a monochrome terminal's green glass, unlit
 
-def casing(seed, base=BEIGE):
+# Each tier's casing: noise colors, bevel light and shadow, recess shadow.
+ERAS = {
+	1: (BEIGE, LIGHT, SHADE, DARK),
+	2: ([(201, 196, 184), (195, 190, 178), (207, 202, 190), (190, 185, 173)], (222, 218, 208), (165, 160, 149), (141, 136, 124)),
+	3: ([(42, 44, 48), (38, 40, 44), (47, 49, 54), (35, 37, 41)], (64, 67, 73), (24, 25, 28), (20, 21, 24)),
+}
+
+def casing(seed, base=BEIGE, tier=1):
+	if tier != 1:
+		base = ERAS[tier][0]
+	light, shade = ERAS[tier][1], ERAS[tier][2]
 	rnd = random.Random(seed)
 	im = Image.new("RGB", (16, 16))
 	for y in range(16):
 		for x in range(16):
 			im.putpixel((x, y), rnd.choices(base, weights=[6, 3, 2, 1])[0])
 	for i in range(16):  # bevel: light top/left, dark bottom/right
-		im.putpixel((i, 0), LIGHT); im.putpixel((0, i), LIGHT)
-		im.putpixel((i, 15), SHADE); im.putpixel((15, i), SHADE)
+		im.putpixel((i, 0), light); im.putpixel((0, i), light)
+		im.putpixel((i, 15), shade); im.putpixel((15, i), shade)
 	return im
 
 def rect(im, x0, y0, x1, y1, c):
@@ -29,39 +43,43 @@ def rect(im, x0, y0, x1, y1, c):
 		for x in range(x0, x1 + 1):
 			im.putpixel((x, y), c)
 
-def screen_front():
+def screen_front(tier=1):
 	"""A plain monitor face: one pane of glass, the same shape as the screen view (about 14:9),
-	set into an even beige frame with a recessed edge. Nothing below it to read as a keyboard."""
-	im = casing(11)
-	# Glass: x 1..14, y 3..11; the display is drawn over it (DisplayRenderer.SCREEN).
-	rect(im, 1, 3, 14, 11, GLASS)
-	rect(im, 1, 2, 14, 2, DARK)    # recess: shadow above
-	rect(im, 1, 12, 14, 12, LIGHT)  # and light below
+	set into an even frame with a recessed edge. Nothing below it to read as a keyboard."""
+	_, light, _, dark = ERAS[tier]
+	im = casing(11, tier=tier)
+	# Glass: x 1..14, y 3..11; the display is drawn over it (DisplayRenderer.SCREEN). Keep it there.
+	rect(im, 1, 3, 14, 11, PHOSPHOR_GLASS if tier == 1 else GLASS)
+	rect(im, 1, 2, 14, 2, dark)    # recess: shadow above
+	rect(im, 1, 12, 14, 12, light)  # and light below
 	return im
 
 def tier_screen_front(tier):
 	"""The screen face, with its tier as dots in the frame's bottom right corner: iron, gold,
 	diamond, as on the CPUs' lids."""
-	im = screen_front()
+	im = screen_front(tier)
 	color = [(196, 200, 206), (230, 190, 60), (90, 220, 220)][tier - 1]
 	for i in range(tier):
 		im.putpixel((13 - 2 * i, 14), color)
+	if tier == 2:  # a color monitor's RGB badge
+		for i, c in enumerate(((229, 57, 53), (67, 160, 71), (30, 136, 229))):
+			im.putpixel((2 + i, 14), c)
 	return im
 
-def screen_side():
-	return casing(12)
+def screen_side(tier=1):
+	return casing(12, tier=tier)
 
-def screen_back():
-	im = casing(13)
+def screen_back(tier=1):
+	im = casing(13, tier=tier)
 	# Vents, and the cable port in the middle.
 	for y in (2, 4, 6):
-		rect(im, 3, y, 12, y, DARK)
+		rect(im, 3, y, 12, y, ERAS[tier][3])
 	rect(im, 6, 9, 9, 12, (40, 40, 46))
 	rect(im, 7, 10, 8, 11, (90, 92, 100))
 	return im
 
-def screen_top():
-	return casing(14)
+def screen_top(tier=1):
+	return casing(14, tier=tier)
 
 def cable():
 	# Dark rubber, a lighter line along it, and a little speckle. The model uses the middle
@@ -131,9 +149,9 @@ def paint_gun_side():
 		rect(im, 4 + i * 3, 5, 5 + i * 3, 10, c)
 	return im
 
-textures = [("tier1_screen_front", lambda: tier_screen_front(1)), ("tier2_screen_front", lambda: tier_screen_front(2)),
-	("tier3_screen_front", lambda: tier_screen_front(3)), ("screen_side", screen_side), ("screen_back", screen_back),
-	("screen_top", screen_top), ("cable", cable), ("expansion_hub", expansion_hub),
+textures = [(f"tier{t}_screen_{face}", (lambda t=t, fn=fn: fn(t))) for t in (1, 2, 3)
+	for face, fn in (("front", tier_screen_front), ("side", screen_side), ("back", screen_back), ("top", screen_top))] + [
+	("cable", cable), ("expansion_hub", expansion_hub),
 	("robotic_piston_port", robotic_piston_port), ("robotic_piston_plate", robotic_piston_plate),
 	("paint_gun_nozzle", paint_gun_nozzle), ("paint_gun_side", paint_gun_side)]
 for name, fn in textures:

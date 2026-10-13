@@ -1,7 +1,0 @@
-{
-	"parent": "modularcomputers:block/all_in_one_base",
-	"textures": {
-		"north": "modularcomputers:block/all_in_one_case_front_plain",
-		"button": "modularcomputers:block/all_in_one_power_off"
-	}
-}

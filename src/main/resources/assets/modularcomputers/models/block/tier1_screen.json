@@ -1,12 +1,12 @@
 {
 	"parent": "minecraft:block/cube",
 	"textures": {
-		"particle": "modularcomputers:block/screen_side",
+		"particle": "modularcomputers:block/tier1_screen_side",
 		"north": "modularcomputers:block/tier1_screen_front",
-		"south": "modularcomputers:block/screen_back",
-		"east": "modularcomputers:block/screen_side",
-		"west": "modularcomputers:block/screen_side",
-		"up": "modularcomputers:block/screen_top",
-		"down": "modularcomputers:block/screen_top"
+		"south": "modularcomputers:block/tier1_screen_back",
+		"east": "modularcomputers:block/tier1_screen_side",
+		"west": "modularcomputers:block/tier1_screen_side",
+		"up": "modularcomputers:block/tier1_screen_top",
+		"down": "modularcomputers:block/tier1_screen_top"
 	}
 }

@@ -1,0 +1,13 @@
+{
+	"parent": "modularcomputers:block/all_in_one_base_faded",
+	"textures": {
+		"north": "modularcomputers:block/tier3_case_front",
+		"south": "modularcomputers:block/tier3_case_back",
+		"east": "modularcomputers:block/tier3_case_side",
+		"west": "modularcomputers:block/tier3_case_side",
+		"up": "modularcomputers:block/tier3_case_top",
+		"down": "modularcomputers:block/tier3_case_bottom",
+		"particle": "modularcomputers:block/tier3_case_side",
+		"button": "modularcomputers:block/all_in_one_power_on_faded"
+	}
+}

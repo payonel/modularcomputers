@@ -52,8 +52,9 @@ public class CableClientGameTest implements FabricClientGameTest {
 	private static final IntPredicate BLUE = rgb -> AllInOneClientGameTest.blue(rgb) > 200 && AllInOneClientGameTest.red(rgb) < 120
 		&& AllInOneClientGameTest.green(rgb) > 100 && AllInOneClientGameTest.green(rgb) < 190;
 	/** The bulb's outline color (DisplayRenderer). */
-	private static final IntPredicate OUTLINE = rgb -> AllInOneClientGameTest.red(rgb) > 170 && AllInOneClientGameTest.green(rgb) > 140
-		&& AllInOneClientGameTest.blue(rgb) < 110;
+	/** The pulsing yellow outline, by hue: it blends with the frame under it, beige or graphite. */
+	private static final IntPredicate OUTLINE = rgb -> AllInOneClientGameTest.red(rgb) > 110 && AllInOneClientGameTest.green(rgb) > 90
+		&& AllInOneClientGameTest.red(rgb) >= AllInOneClientGameTest.green(rgb) && AllInOneClientGameTest.blue(rgb) < AllInOneClientGameTest.red(rgb) * 0.55;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
