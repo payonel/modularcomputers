@@ -595,8 +595,8 @@ scripts/art/error_beep.py` into
   `lua_next`, `lua_pushboolean`). **Since `1.0.0`, Styx is its own library** (2026-10-13):
   `com.payonel:styxlua:${styxlua_version}` from `https://maven.pkg.github.com/payonel/styxlua`
   (same token), package `com.payonel.styxlua` (`Lstyx`, `luaL_Restored`, `luaL_StyxResult`); the
-  mod depends on and nests both jars, and their versions go together (the LungoLua agent names
-  the pair). Its API is C's, by C's names (`lua_resume`,
+  mod depends on and nests both jars. **Always take the latest published build of each** (user,
+  2026-10-13), even past the lungolua version styxlua's pom names (Gradle resolves to the higher). Its API is C's, by C's names (`lua_resume`,
   `luaL_loadbufferx`, `HostString` for text crossing in). Beyond stock Lua it has **budgets**
   (`lua_setbudget`: a callback every n steps, which can `lua_freeze` the thread wherever it is;
   `lua_thaw` goes on) and **Styx**, persisting a whole state (`luaL_persiststate`), for saving
