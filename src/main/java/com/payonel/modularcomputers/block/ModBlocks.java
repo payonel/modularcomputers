@@ -69,6 +69,14 @@ public final class ModBlocks {
 		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("paint_gun"),
 		new BlockEntityType<>(PaintGunBlockEntity::new, Set.of(PAINT_GUN)));
 
+	/** The photomask: prints chips from silicon, cranked by hand or run on a battery. */
+	public static final Block PHOTOMASK = registerWithItem("photomask", PhotomaskBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).sound(SoundType.METAL));
+
+	public static final BlockEntityType<PhotomaskBlockEntity> PHOTOMASK_ENTITY = Registry.register(
+		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("photomask"),
+		new BlockEntityType<>(PhotomaskBlockEntity::new, Set.of(PHOTOMASK)));
+
 	private ModBlocks() {
 	}
 

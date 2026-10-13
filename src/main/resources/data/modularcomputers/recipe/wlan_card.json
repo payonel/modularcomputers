@@ -4,7 +4,7 @@
 	"key": {
 		"G": "minecraft:gold_nugget",
 		"O": "minecraft:ender_pearl",
-		"Q": "minecraft:quartz",
+		"Q": "modularcomputers:chip",
 		"c": "minecraft:copper_nugget",
 		"m": "minecraft:emerald"
 	},

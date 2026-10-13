@@ -466,10 +466,24 @@ scripts/art/error_beep.py` into
     `ClientRecipes` keeps the ones that make mod items. A tag cell cycles its items each
     second. The battery upgrade's recipe type is synchronized too. Items without a recipe (the
     all-in-one) show an empty grid and "No recipe yet".
+- **Chips** (user design, 2026-10-12): nether quartz smelts to **silicon** in a blast furnace only
+  (`recipe/silicon.json`); a **photomask** (`PhotomaskBlock`, `PhotomaskBlockEntity`, `PhotomaskMenu`,
+  `PhotomaskScreen`) prints silicon into **chips**: a wafer takes `WORK` (8) turns and gives
+  `CHIPS` (4). Right-click turns its crank, and its brass gear turns an eighth on its front
+  (`PhotomaskRenderer`, a quad drawn with `submitCustomGeometry`, lit from the block in front;
+  clients learn of a turn by a block event, `SPIN_EVENT`, and ease the gear round); a charged
+  battery in its bay turns it every 5 ticks for 100 units a turn, gear spinning (block state
+  `working`). Right-click with silicon or a battery puts it in; sneak + right-click opens its
+  slots. It keeps its contents when broken, like the holders. Its recipe needs chips (iron,
+  glass pane, two chips, amethyst lens, copper, redstone): an intentional circle, so the first
+  photomask is found (an ancient site) or bought (a villager), not yet built. Art:
+  `scripts/art/photomask_textures.py`. Items without code of their own can explain themselves
+  with Shift through `hint.modularcomputers.details.<item>` in the lang file.
 - **Recipes** (user design, 2026-10-12; `data/modularcomputers/recipe/`, checked grid by grid by
   `RecipeGameTest`; the draft page with game textures: a private draft page):
   real computer materials from vanilla, few custom components, each grid laid out like the part
-  (CPU lid on top, pins below). Quartz is the silicon (until the introduction's chip is designed),
+  (CPU lid on top, pins below). **Chips** take the place of silicon in every part (they replaced
+  quartz, user 2026-10-12; see "Chips" below),
   amethyst the CPU's clock crystal, copper boards and cable cores, gold pins and contacts, iron
   frames; tiers are iron, gold, diamond. **Every tier above 1 is built around the tier below, in
   the center** (user: an upgrade keeps the old part from being junk); a used part (with an id)

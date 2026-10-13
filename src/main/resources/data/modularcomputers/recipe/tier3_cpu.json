@@ -5,7 +5,7 @@
 		"#": "modularcomputers:tier2_cpu",
 		"D": "minecraft:diamond",
 		"G": "minecraft:gold_nugget",
-		"Q": "minecraft:quartz",
+		"Q": "modularcomputers:chip",
 		"R": "minecraft:redstone"
 	},
 	"pattern": [

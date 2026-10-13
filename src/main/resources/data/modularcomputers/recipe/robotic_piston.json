@@ -5,7 +5,7 @@
 		"C": "minecraft:copper_ingot",
 		"I": "minecraft:iron_ingot",
 		"P": "minecraft:piston",
-		"Q": "minecraft:quartz"
+		"Q": "modularcomputers:chip"
 	},
 	"pattern": [
 		"IPI",

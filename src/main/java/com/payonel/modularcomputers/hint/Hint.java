@@ -72,6 +72,11 @@ public final class Hint {
 			return elements;
 		}
 		hinted.details(stack, elements::add);
+		// Items without code of their own can say how they work in the language file.
+		String about = "hint.modularcomputers.details." + net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath();
+		if (net.minecraft.locale.Language.getInstance().has(about)) {
+			elements.add(text(Component.translatable(about)));
+		}
 		if (serial != null) {
 			// Its id (programs address it as id:<uuid>), long, so only in the details (user); crafting it alone clears it.
 			elements.add(text(Component.translatable("hint.modularcomputers.id", serial.toString())));
@@ -114,6 +119,10 @@ public final class Hint {
 				order.add(slot);
 			}
 			label = Hint::caseSlot;
+		} else if (item.getBlock() instanceof com.payonel.modularcomputers.block.PhotomaskBlock) {
+			slots = NonNullList.withSize(com.payonel.modularcomputers.block.PhotomaskBlockEntity.SLOTS, ItemStack.EMPTY);
+			order.addAll(List.of(0, 1, 2));
+			label = slot -> Component.translatable("hint.modularcomputers.photomask.slot." + slot);
 		} else {
 			int radio = item.getBlock() instanceof ExpansionHubBlock ? ExpansionHubBlockEntity.RADIO_SLOT : 0;
 			slots = NonNullList.withSize(radio + 1, ItemStack.EMPTY);

@@ -4,7 +4,7 @@
 	"key": {
 		"I": "minecraft:iron_ingot",
 		"P": "minecraft:piston",
-		"Q": "minecraft:quartz",
+		"Q": "modularcomputers:chip",
 		"R": "minecraft:redstone"
 	},
 	"pattern": [

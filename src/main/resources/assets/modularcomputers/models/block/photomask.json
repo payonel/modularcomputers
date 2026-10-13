@@ -1,0 +1,12 @@
+{
+	"parent": "minecraft:block/cube",
+	"textures": {
+		"particle": "modularcomputers:block/photomask_side",
+		"north": "modularcomputers:block/photomask_front",
+		"south": "modularcomputers:block/photomask_side",
+		"east": "modularcomputers:block/photomask_side",
+		"west": "modularcomputers:block/photomask_side",
+		"up": "modularcomputers:block/photomask_top",
+		"down": "modularcomputers:block/photomask_bottom"
+	}
+}

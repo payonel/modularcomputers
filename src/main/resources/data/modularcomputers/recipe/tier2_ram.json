@@ -4,7 +4,7 @@
 	"key": {
 		"#": "modularcomputers:tier1_ram",
 		"G": "minecraft:gold_nugget",
-		"Q": "minecraft:quartz",
+		"Q": "modularcomputers:chip",
 		"g": "minecraft:gold_ingot"
 	},
 	"pattern": [

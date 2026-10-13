@@ -3,7 +3,7 @@
 	"category": "redstone",
 	"key": {
 		"G": "minecraft:gold_nugget",
-		"Q": "minecraft:quartz",
+		"Q": "modularcomputers:chip",
 		"c": "minecraft:copper_nugget",
 		"u": "minecraft:sculk_sensor"
 	},

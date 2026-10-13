@@ -285,7 +285,40 @@ public class CableClientGameTest implements FabricClientGameTest {
 				context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 				context.waitFor(client -> client.gui.screen() == null);
 			}
+
+			// A photomask where the screen was: its brass gear shows on its front, and turns when cranked.
+			setblock(singleplayer, screen, "photomask[facing=south]");
+			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof com.payonel.modularcomputers.block.PhotomaskBlockEntity);
+			context.waitTicks(3);
+			BufferedImage still = read(context.takeScreenshot("photomask"));
+			int brass = count(still, 0, 0, still.getWidth(), still.getHeight(), BRASS);
+			check(brass > 200, "the photomask's gear should show, found " + brass + " brass pixels");
+			singleplayer.getServer().runOnServer(server ->
+				((com.payonel.modularcomputers.block.PhotomaskBlockEntity) server.overworld().getBlockEntity(screen)).crank());
+			context.waitTicks(1);
+			BufferedImage turning = read(context.takeScreenshot("photomask-turning"));
+			context.waitTicks(4);
+			BufferedImage turned = read(context.takeScreenshot("photomask-turned"));
+			check(differ(still, turned) > 50, "cranked, the gear turns: " + differ(still, turned) + " pixels changed");
+			check(turning.getWidth() == turned.getWidth(), "frames");
 		}
+	}
+
+	/** The gear's brass. */
+	private static final IntPredicate BRASS = rgb -> AllInOneClientGameTest.red(rgb) > 60
+		&& AllInOneClientGameTest.red(rgb) > AllInOneClientGameTest.green(rgb) + 12 && AllInOneClientGameTest.green(rgb) > AllInOneClientGameTest.blue(rgb) + 15;
+
+	/** How many pixels differ between two screenshots of the same view. */
+	private static int differ(BufferedImage a, BufferedImage b) {
+		int changed = 0;
+		for (int y = 0; y < a.getHeight(); y++) {
+			for (int x = 0; x < a.getWidth(); x++) {
+				if (a.getRGB(x, y) != b.getRGB(x, y)) {
+					changed++;
+				}
+			}
+		}
+		return changed;
 	}
 
 	/** Sets a block by command: a mod block by its path ("tier3_screen[facing=south]"), anything else by its full id. */

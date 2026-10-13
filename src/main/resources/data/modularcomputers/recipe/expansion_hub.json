@@ -3,7 +3,7 @@
 	"category": "redstone",
 	"key": {
 		"C": "minecraft:copper_ingot",
-		"Q": "minecraft:quartz",
+		"Q": "modularcomputers:chip",
 		"X": "minecraft:comparator",
 		"g": "minecraft:gold_ingot"
 	},

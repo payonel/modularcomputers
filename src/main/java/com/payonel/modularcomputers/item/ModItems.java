@@ -33,6 +33,10 @@ public final class ModItems {
 	public static final CpuItem TIER3_CPU = cpu("tier3_cpu", CpuTier.TIER_3);
 	public static final List<CpuItem> CPUS = List.of(TIER1_CPU, TIER2_CPU, TIER3_CPU);
 	/** Every EEPROM holds the stand-in program for now; programmable contents come with the Lua runtime. */
+	/** Refined from nether quartz in a blast furnace: what chips are printed on. */
+	public static final Item SILICON = register("silicon");
+	/** A die, printed from silicon through a photomask: the chip in every part. */
+	public static final Item CHIP = register("chip");
 	/** Comes from the factory flashed with mcos, as real boards ship with firmware (crafting it alone wipes it). */
 	public static final Item EEPROM = register("eeprom", properties -> holdsData(properties)
 		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.Mcos.class.getName()));

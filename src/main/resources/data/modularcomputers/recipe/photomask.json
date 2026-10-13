@@ -1,0 +1,20 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"A": "minecraft:amethyst_shard",
+		"C": "minecraft:copper_ingot",
+		"I": "minecraft:iron_ingot",
+		"R": "minecraft:redstone",
+		"X": "modularcomputers:chip",
+		"w": "minecraft:glass_pane"
+	},
+	"pattern": [
+		"IwI",
+		"XAX",
+		"CRC"
+	],
+	"result": {
+		"id": "modularcomputers:photomask"
+	}
+}

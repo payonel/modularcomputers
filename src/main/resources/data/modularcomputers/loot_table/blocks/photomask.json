@@ -1,0 +1,22 @@
+{
+	"type": "minecraft:block",
+	"pools": [
+		{
+			"entries": [
+				{
+					"type": "minecraft:item",
+					"name": "modularcomputers:photomask",
+					"modifier": {
+						"type": "minecraft:copy_components",
+						"source": "block_entity",
+						"include": [
+							"minecraft:container"
+						]
+					}
+				}
+			],
+			"rolls": 1
+		}
+	],
+	"random_sequence": "modularcomputers:blocks/photomask"
+}

@@ -4,7 +4,7 @@
 	"key": {
 		"G": "minecraft:gold_nugget",
 		"I": "minecraft:iron_ingot",
-		"Q": "minecraft:quartz",
+		"Q": "modularcomputers:chip",
 		"c": "minecraft:copper_nugget"
 	},
 	"pattern": [

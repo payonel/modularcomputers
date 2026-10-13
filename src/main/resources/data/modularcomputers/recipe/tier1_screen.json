@@ -3,7 +3,7 @@
 	"category": "redstone",
 	"key": {
 		"I": "minecraft:iron_ingot",
-		"Q": "minecraft:quartz",
+		"Q": "modularcomputers:chip",
 		"R": "minecraft:redstone",
 		"k": "minecraft:chiseled_stone_bricks",
 		"w": "minecraft:glass_pane"

@@ -3,7 +3,7 @@
 	"category": "redstone",
 	"key": {
 		"I": "minecraft:iron_ingot",
-		"Q": "minecraft:quartz",
+		"Q": "modularcomputers:chip",
 		"b": "minecraft:blue_dye",
 		"d": "minecraft:dispenser",
 		"e": "minecraft:green_dye",

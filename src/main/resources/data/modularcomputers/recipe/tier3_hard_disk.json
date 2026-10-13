@@ -5,7 +5,7 @@
 		"#": "modularcomputers:tier2_hard_disk",
 		"D": "minecraft:diamond",
 		"I": "minecraft:iron_ingot",
-		"Q": "minecraft:quartz",
+		"Q": "modularcomputers:chip",
 		"R": "minecraft:redstone"
 	},
 	"pattern": [

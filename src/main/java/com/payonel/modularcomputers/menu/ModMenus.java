@@ -24,6 +24,9 @@ public final class ModMenus {
 	public static final ExtendedMenuType<CardHolderMenu, BlockPos> PAINT_GUN = Registry.register(BuiltInRegistries.MENU, id("paint_gun"),
 		new ExtendedMenuType<>(CardHolderMenu::paintGun, BlockPos.STREAM_CODEC));
 
+	public static final ExtendedMenuType<PhotomaskMenu, BlockPos> PHOTOMASK = Registry.register(BuiltInRegistries.MENU, id("photomask"),
+		new ExtendedMenuType<>(PhotomaskMenu::new, BlockPos.STREAM_CODEC));
+
 	private ModMenus() {
 	}
 

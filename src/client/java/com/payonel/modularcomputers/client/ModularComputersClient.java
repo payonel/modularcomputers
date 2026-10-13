@@ -39,11 +39,13 @@ public final class ModularComputersClient implements ClientModInitializer {
 		BlockEntityRenderers.register(ModBlocks.EXPANSION_HUB_ENTITY, context -> new OutlineRenderer<>());
 		BlockEntityRenderers.register(ModBlocks.ROBOTIC_PISTON_ENTITY, context -> new OutlineRenderer<>());
 		BlockEntityRenderers.register(ModBlocks.PAINT_GUN_ENTITY, context -> new OutlineRenderer<>());
+		BlockEntityRenderers.register(ModBlocks.PHOTOMASK_ENTITY, context -> new com.payonel.modularcomputers.client.render.PhotomaskRenderer());
 		MenuScreens.register(ModMenus.CASE, CaseScreen::new);
 		MenuScreens.register(ModMenus.EXPANSION_HUB, CardHolderScreen::new);
 		MenuScreens.register(ModMenus.ROBOTIC_PISTON, CardHolderScreen::new);
 		MenuScreens.register(ModMenus.SCREEN, CardHolderScreen::new);
 		MenuScreens.register(ModMenus.PAINT_GUN, CardHolderScreen::new);
+		MenuScreens.register(ModMenus.PHOTOMASK, com.payonel.modularcomputers.client.screen.PhotomaskScreen::new);
 		ClientPlayNetworking.registerGlobalReceiver(OpenDisplayPayload.TYPE, (payload, context) -> {
 			var client = context.client();
 			client.gui.setScreen(new DisplayScreen(payload));

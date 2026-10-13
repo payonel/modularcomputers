@@ -4,7 +4,7 @@
 	"key": {
 		"#": "modularcomputers:tier1_hard_disk",
 		"I": "minecraft:iron_ingot",
-		"Q": "minecraft:quartz",
+		"Q": "modularcomputers:chip",
 		"R": "minecraft:redstone",
 		"g": "minecraft:gold_ingot"
 	},

@@ -5,7 +5,7 @@
 		"A": "minecraft:amethyst_shard",
 		"G": "minecraft:gold_nugget",
 		"I": "minecraft:iron_ingot",
-		"Q": "minecraft:quartz",
+		"Q": "modularcomputers:chip",
 		"R": "minecraft:redstone"
 	},
 	"pattern": [

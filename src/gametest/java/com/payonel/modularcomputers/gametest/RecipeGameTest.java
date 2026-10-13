@@ -27,7 +27,7 @@ public class RecipeGameTest {
 	/** The grid letters: vanilla items by id, and {@code #} for the tier below. */
 	private static final Map<Character, String> LEGEND = Map.ofEntries(
 		Map.entry('I', "iron_ingot"), Map.entry('g', "gold_ingot"), Map.entry('D', "diamond"), Map.entry('C', "copper_ingot"),
-		Map.entry('c', "copper_nugget"), Map.entry('G', "gold_nugget"), Map.entry('Q', "quartz"), Map.entry('R', "redstone"),
+		Map.entry('c', "copper_nugget"), Map.entry('G', "gold_nugget"), Map.entry('Q', "modularcomputers:chip"), Map.entry('R', "redstone"),
 		Map.entry('A', "amethyst_shard"), Map.entry('L', "glowstone_dust"), Map.entry('p', "paper"), Map.entry('K', "dried_kelp"),
 		Map.entry('P', "piston"), Map.entry('N', "note_block"), Map.entry('w', "glass_pane"), Map.entry('k', "chiseled_stone_bricks"),
 		Map.entry('X', "comparator"), Map.entry('d', "dispenser"), Map.entry('r', "red_dye"), Map.entry('e', "green_dye"),
@@ -56,6 +56,7 @@ public class RecipeGameTest {
 		upgrade("tier2_ram", "tier1_ram", "QQQ", "g#g", "GGG"),
 		upgrade("tier3_ram", "tier2_ram", "QQQ", "D#D", "GGG"),
 		make("eeprom", " Q ", "pRp", "GGG"),
+		make("photomask", "IwI", "QAQ", "CRC"),
 		make("tier1_hard_disk", "IRI", "IPI", "IQI"),
 		upgrade("tier2_hard_disk", "tier1_hard_disk", "IRI", "g#g", "IQI"),
 		upgrade("tier3_hard_disk", "tier2_hard_disk", "IRI", "D#D", "IQI"),
@@ -79,8 +80,9 @@ public class RecipeGameTest {
 		upgrade("tier2_battery", "tier1_battery", "ggg", "I#I", "SzS"),
 		upgrade("tier3_battery", "tier2_battery", "DsD", "n#n", "nyn"));
 
+	/** A grid item by id: vanilla's, unless it names its namespace (our chip). */
 	private static Item vanilla(String id) {
-		return BuiltInRegistries.ITEM.getValue(Identifier.withDefaultNamespace(id));
+		return BuiltInRegistries.ITEM.getValue(id.contains(":") ? Identifier.parse(id) : Identifier.withDefaultNamespace(id));
 	}
 
 	private static Item ours(String id) {
@@ -119,6 +121,17 @@ public class RecipeGameTest {
 			helper.assertValueEqual(made.getItem(), ours(craft.result()), craft.result() + "'s recipe");
 			helper.assertValueEqual(made.getCount(), craft.count(), craft.result() + "'s count");
 		}
+		helper.succeed();
+	}
+
+	@GameTest
+	public void siliconIsQuartzFromABlastFurnace(GameTestHelper helper) {
+		var input = new net.minecraft.world.item.crafting.SingleRecipeInput(new ItemStack(Items.QUARTZ));
+		ItemStack made = helper.getLevel().recipeAccess().getRecipeFor(RecipeType.BLASTING, input, helper.getLevel())
+			.map(recipe -> recipe.value().assemble(input)).orElse(ItemStack.EMPTY);
+		helper.assertValueEqual(made.getItem(), ModItems.SILICON, "silicon from the blast furnace");
+		helper.assertTrue(helper.getLevel().recipeAccess().getRecipeFor(RecipeType.SMELTING, input, helper.getLevel()).isEmpty(),
+			"not from a plain furnace");
 		helper.succeed();
 	}
 
