@@ -481,7 +481,10 @@ scripts/art/error_beep.py` into
   `fabricator`, no methods yet: an API comes later): cabled on every side but its gear face, at
   `id:<its id>`; while a running computer has it on its bus it runs on the bus's power first
   (idle draw 5, plus 100 a turn charged to the computers supplying it), else on its battery. Right-click with silicon or a battery puts it in. Its slots light up
-  for silicon and batteries, as the case view's do (`SlotHints`). It keeps its contents when broken, like the holders. Its recipe needs chips (iron,
+  for silicon and batteries, as the case view's do (`SlotHints`). Its window is the machine: a
+  riveted steel plate with the mask's glass and chrome traces behind the slots, an arrow that
+  lights as a wafer prints, and empty slots showing a ghost of what goes in them (silicon, a
+  battery, chips), named by a tooltip (user: pictures, not words). It keeps its contents when broken, like the holders. Its recipe needs chips (iron,
   glass pane, two chips, amethyst lens, copper, redstone): an intentional circle, so the first
   photomask is found (an ancient site) or bought (a villager), not yet built. Art:
   `scripts/art/photomask_textures.py`. Items without code of their own can explain themselves
