@@ -89,4 +89,10 @@ class BatteryChargeTest {
 		assertThat(new BatteryCharge(1, 0).percent(BatteryTier.TIER_1)).isEqualTo(1);
 		assertThat(BatteryCharge.EMPTY.percent(BatteryTier.TIER_1)).isZero();
 	}
+
+	@Test
+	void aFullBatteryRestingIsLeftAsItIs() {
+		BatteryCharge full = new BatteryCharge(BatteryTier.TIER_2.capacity(), 500);
+		assertThat(full.rest(BatteryTier.TIER_2, 500 + 10 * DAY_TICKS)).as("unchanged, time and all: its data doesn't tick in hand").isSameAs(full);
+	}
 }

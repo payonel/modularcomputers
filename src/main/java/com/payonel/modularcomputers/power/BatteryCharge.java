@@ -47,6 +47,9 @@ public record BatteryCharge(int units, long settledAt) {
 	 * a whole unit carries over to next time.
 	 */
 	public BatteryCharge rest(BatteryTier tier, long now) {
+		if (isFull(tier)) {
+			return this; // nothing to gain: unchanged, so a full battery's data doesn't change in a player's hand
+		}
 		if (!tier.selfCharging() || settledAt == UNSETTLED || now <= settledAt) {
 			return new BatteryCharge(units, now);
 		}

@@ -81,8 +81,18 @@ public final class BatteryItem extends HintedItem {
 	@Override
 	public void inventoryTick(ItemStack stack, ServerLevel level, Entity owner, EquipmentSlot slot) {
 		if (tier.selfCharging() && level.getGameTime() % REST_INTERVAL == 0) {
-			stack.set(ModComponents.CHARGE, charge(stack).rest(tier, level.getGameTime()));
+			BatteryCharge rested = charge(stack).rest(tier, level.getGameTime());
+			if (!rested.equals(charge(stack))) {
+				stack.set(ModComponents.CHARGE, rested);
+			}
 		}
+	}
+
+	/** Its charge changing (a tier 2 recharging in hand) isn't a new item: no re-equip bob, as with a compass. */
+	@Override
+	public boolean allowComponentsUpdateAnimation(net.minecraft.world.entity.player.Player player, net.minecraft.world.InteractionHand hand,
+		ItemStack oldStack, ItemStack newStack) {
+		return oldStack.getItem() != newStack.getItem();
 	}
 
 	@Override
