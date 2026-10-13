@@ -472,11 +472,12 @@ scripts/art/error_beep.py` into
   `CHIPS` (4). Right-click turns its crank, and its brass gear turns an eighth on its front
   (`PhotomaskRenderer`, a quad drawn with `submitCustomGeometry`, lit from the block in front;
   clients learn of a turn by a block event, `SPIN_EVENT`, and ease the gear round); a charged
-  battery in its bay turns it every 5 ticks for 100 units a turn, gear spinning (block state
-  `working`). **It's also a bus device** (user, 2026-10-12; `device/Photomask`, type
+  battery in its bay runs it: with power it's on (gear spinning, block state `working`), idling
+  at 5 units a tick with nothing to print (like an idle tier 3 CPU; user 2026-10-12), and working
+  a turn every 5 ticks for 100 units more while there's silicon. Chips go to its output slot. **It's also a bus device** (user, 2026-10-12; `device/Photomask`, type
   `fabricator`, no methods yet: an API comes later): cabled on every side but its gear face, at
   `id:<its id>`; while a running computer has it on its bus it runs on the bus's power first
-  (standby draw 2, plus 100 a turn charged to the computers supplying it), else on its battery. Right-click with silicon or a battery puts it in; sneak + right-click opens its
+  (idle draw 5, plus 100 a turn charged to the computers supplying it), else on its battery. Right-click with silicon or a battery puts it in; sneak + right-click opens its
   slots. It keeps its contents when broken, like the holders. Its recipe needs chips (iron,
   glass pane, two chips, amethyst lens, copper, redstone): an intentional circle, so the first
   photomask is found (an ancient site) or bought (a villager), not yet built. Art:
@@ -489,7 +490,7 @@ scripts/art/error_beep.py` into
     computers** (`BrokenCaseBlock`, a cracked-open model: lid askew, bezel fallen forward, the
     board inside showing; decoration), cables along the floor, a chest of parts
     (`loot_table/chests/ancient_lab.json`: cables, chips, silicon, copper, gold, redstone, now and
-    then an EEPROM, RAM or battery) and a **working photomask** on its bench. Weathering (moss,
+    then an EEPROM or RAM; chance drops, weighted; no batteries: too much for a find, user) and a **working photomask** on its bench. Weathering (moss,
     cracks, missing cables and windows) comes from the processor list at generation. The template
     is written by `scripts/data/ancient_lab_structure.py` (26.3 structure palettes use `id` and
     `properties`, not `Name`/`Properties`; processor `output_state` is a plain id).

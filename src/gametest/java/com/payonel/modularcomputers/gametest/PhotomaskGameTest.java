@@ -69,9 +69,16 @@ public class PhotomaskGameTest {
 			.thenWaitUntil(() -> helper.assertBlockProperty(POS, PhotomaskBlock.WORKING, true))
 			.thenWaitUntil(() -> helper.assertValueEqual(mask.items().getItem(PhotomaskBlockEntity.OUTPUT).getCount(),
 				2 * PhotomaskBlockEntity.CHIPS, "both wafers printed"))
-			.thenWaitUntil(() -> helper.assertBlockProperty(POS, PhotomaskBlock.WORKING, false))
-			.thenExecute(() -> helper.assertValueEqual(BatteryItem.charge(mask.items().getItem(PhotomaskBlockEntity.BATTERY)).units(),
-				full - 2 * PhotomaskBlockEntity.WORK * PhotomaskBlockEntity.TURN_COST, "a turn's power for each turn"))
+			.thenIdle(10)
+			.thenExecute(() -> {
+				helper.assertBlockProperty(POS, PhotomaskBlock.WORKING, true); // nothing left to print: it idles, still running
+				int used = full - BatteryItem.charge(mask.items().getItem(PhotomaskBlockEntity.BATTERY)).units();
+				int work = 2 * PhotomaskBlockEntity.WORK * PhotomaskBlockEntity.TURN_COST;
+				helper.assertTrue(used > work, "a turn's power for each turn, and a little more idling: " + used);
+				helper.assertTrue(used < work * 2, "idling draws very little: " + used);
+				mask.items().setItem(PhotomaskBlockEntity.BATTERY, ItemStack.EMPTY);
+			})
+			.thenWaitUntil(() -> helper.assertBlockProperty(POS, PhotomaskBlock.WORKING, false)) // no power: it stops
 			.thenSucceed();
 	}
 

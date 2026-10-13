@@ -28,7 +28,7 @@ import net.minecraft.world.phys.BlockHitResult;
  * right-click to open its slots. Right-click holding silicon or a battery puts it in.
  */
 public final class PhotomaskBlock extends HorizontalDirectionalBlock implements EntityBlock {
-	/** Running on its battery: its gear turns by itself. */
+	/** Running, on the bus's power or its battery (idling or working): its gear turns by itself. */
 	public static final BooleanProperty WORKING = BooleanProperty.create("working");
 
 	public PhotomaskBlock(Properties properties) {

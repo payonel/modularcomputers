@@ -9,8 +9,11 @@ import com.payonel.modularcomputers.bus.DeviceType;
  * bus and prints chips without a battery. It has no methods yet; programs will drive it later.
  */
 public final class Photomask implements Device {
-	/** What it draws standing by, each tick it has power; each turn of its work costs more ({@link BusPower#charge}). */
-	public static final int STANDBY = 2;
+	/**
+	 * What it draws idling, each tick it has power: very little, like an idle CPU (a tier 3's,
+	 * user 2026-10-12). Each turn of work costs more ({@link BusPower#charge}).
+	 */
+	public static final int STANDBY = 5;
 	private final BusPower power = new BusPower(STANDBY);
 
 	@Override

@@ -106,11 +106,6 @@
 				},
 				{
 					"type": "minecraft:item",
-					"name": "modularcomputers:tier1_battery",
-					"weight": 3
-				},
-				{
-					"type": "minecraft:item",
 					"name": "modularcomputers:tier1_ram",
 					"weight": 3
 				}

@@ -40,9 +40,11 @@ import java.util.UUID;
 /**
  * A photomask's frame: silicon in, chips out, and a bay for a battery. Each wafer of silicon takes
  * {@link #WORK} turns of the crank and gives {@link #CHIPS} chips, as a wafer is printed and diced
- * into dies. Powered, it turns every {@link #TICKS_PER_TURN} ticks, for {@link #TURN_COST} units a
- * turn: from the bus, when a running computer has it on its bus (it's a device, wired by cable),
- * or else from a charged battery in its bay. Broken, it keeps what's in it and its id (like a
+ * into dies. With power it runs (its gear turns), idling at {@link Photomask#STANDBY} a tick when
+ * there's nothing to print (user, 2026-10-12), and working a turn every {@link #TICKS_PER_TURN}
+ * ticks, for {@link #TURN_COST} units more a turn, when there is. Power comes from the bus, when a
+ * running computer has it on its bus (it's a device, wired by cable), or else from a charged
+ * battery in its bay. Broken, it keeps what's in it and its id (like a
  * shulker box).
  */
 public final class PhotomaskBlockEntity extends BlockEntity implements ExtendedMenuProvider<BlockPos> {
@@ -183,22 +185,28 @@ public final class PhotomaskBlockEntity extends BlockEntity implements ExtendedM
 		return items.getItem(BATTERY).getItem() instanceof BatteryItem battery ? battery : null;
 	}
 
-	/** Server, every tick: power from the bus, or else a charged battery, turns it while there's work. */
+	/**
+	 * Server, every tick: with power from the bus, or else a charged battery, it runs: idling, or
+	 * working a turn every {@link #TICKS_PER_TURN} ticks while there's silicon to print. The bus's
+	 * idle draw is the device's own ({@link Photomask#STANDBY}); a battery pays it in batches.
+	 */
 	void serverTick() {
 		BatteryItem battery = battery();
 		ItemStack stack = items.getItem(BATTERY);
 		long now = level.getGameTime();
 		boolean bus = device.power().powered();
 		boolean charged = battery != null && !BatteryItem.charge(stack).isEmpty(battery.tier());
-		boolean powered = (bus || charged) && canWork();
-		if (powered && now % TICKS_PER_TURN == 0) {
+		boolean running = bus || charged;
+		if (running && now % TICKS_PER_TURN == 0) {
+			boolean worked = turn();
+			int cost = worked ? TURN_COST : 0;
 			if (bus) {
-				device.power().charge(TURN_COST); // the computers supplying it pay
+				device.power().charge(cost); // the computers supplying it pay
 			} else {
-				stack.set(ModComponents.CHARGE, BatteryItem.charge(stack).run(battery.tier(), TURN_COST, now));
+				stack.set(ModComponents.CHARGE, BatteryItem.charge(stack).run(battery.tier(), cost + Photomask.STANDBY * TICKS_PER_TURN, now));
 			}
-			turn();
 		}
+		boolean powered = running;
 		if (getBlockState().getValue(PhotomaskBlock.WORKING) != powered) {
 			level.setBlock(worldPosition, getBlockState().setValue(PhotomaskBlock.WORKING, powered), Block.UPDATE_CLIENTS);
 		}
