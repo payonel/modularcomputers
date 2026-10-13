@@ -71,7 +71,7 @@ public final class ModBlocks {
 
 	/** The photomask: prints chips from silicon, cranked by hand or run on a battery. */
 	public static final Block PHOTOMASK = registerWithItem("photomask", PhotomaskBlock::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).sound(SoundType.METAL));
+		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).sound(SoundType.METAL).noOcclusion()); // light reaches into its gear's recess
 
 	public static final BlockEntityType<PhotomaskBlockEntity> PHOTOMASK_ENTITY = Registry.register(
 		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("photomask"),

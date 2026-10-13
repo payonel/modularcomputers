@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # Draws the chip-making textures (needs Pillow): the silicon and chip items, the photomask
-# block's faces, and its gear (drawn by PhotomaskRenderer, turning as it's cranked). The PNGs are
-# committed; rerun after editing this to regenerate them, then check the preview.
+# block's faces, and its gear's brass (drawn by PhotomaskRenderer, turning as it's cranked); and the
+# block and item models: a full cube with a recess in its front for the gear (the item's holds the
+# gear too, built from the same numbers as PhotomaskRenderer's). The PNGs and models are committed;
+# rerun after editing this to regenerate them, then check the preview.
 #   scripts/art/photomask_textures.py src/main/resources/assets/modularcomputers/textures preview.png
-import math, random, sys
+import json, math, os, random, sys
 from PIL import Image
 
 OUT = sys.argv[1]
@@ -63,16 +65,19 @@ def top():
 	return im
 
 def front():
-	"""The front, where the gear turns: a round recess for it, and a small output chute below."""
-	im = casing(32)
+	"""The front's frame around the recess (only its edge shows)."""
+	return casing(32)
+
+def well():
+	"""The recess the gear sits in: dark steel walls, and a round well behind the gear."""
+	rnd = random.Random(35)
+	im = Image.new("RGBA", (16, 16))
 	for y in range(16):
 		for x in range(16):
 			d = math.hypot(x - 7.5, y - 7.5)
-			if d <= 5.6:
-				im.putpixel((x, y), (40, 42, 48, 255))
-			elif d <= 6.4:
-				im.putpixel((x, y), (70, 74, 82, 255))
-	rect(im, 6, 14, 9, 14, (30, 30, 34, 255))
+			c = (40, 42, 48) if d <= 6.6 else (58, 62, 70)
+			n = rnd.randint(-3, 3)
+			im.putpixel((x, y), (c[0] + n, c[1] + n, c[2] + n, 255))
 	return im
 
 def side():
@@ -85,33 +90,105 @@ def bottom():
 	return casing(34)
 
 def gear():
-	"""A brass gear: eight teeth, a ring, a hub with a hole. Transparent around it."""
-	im = Image.new("RGBA", (16, 16), CLEAR)
-	brass, dark, light = (196, 150, 64, 255), (140, 100, 36, 255), (232, 196, 110, 255)
+	"""The gear's materials, in columns: brass (0-11), the shadowed axle (12-13), the peg's steel (14-15)."""
+	rnd = random.Random(36)
+	im = Image.new("RGBA", (16, 16))
+	brass = [(204, 158, 70), (196, 150, 64), (212, 168, 80), (188, 142, 58)]
 	for y in range(16):
 		for x in range(16):
-			dx, dy = x - 7.5, y - 7.5
-			d = math.hypot(dx, dy)
-			a = (math.degrees(math.atan2(dy, dx)) + 360) % 45
-			tooth = a < 22.5
-			if d <= 1.2:
-				continue                              # the axle hole
-			if d <= 2.2:
-				im.putpixel((x, y), dark)
-			elif d <= 5.2:
-				im.putpixel((x, y), light if dx + dy < -2 else brass)
-			elif d <= 7.4 and tooth:
-				im.putpixel((x, y), brass if dx + dy < 2 else dark)
+			if x < 12:
+				c = rnd.choices(brass, weights=[5, 4, 2, 2])[0]
+			elif x < 14:
+				c = (70, 56, 30)
+			else:
+				c = (200, 204, 212) if y % 4 else (170, 174, 182)
+			im.putpixel((x, y), c + (255,))
 	return im
 
+# The gear, as PhotomaskRenderer builds it: boxes in texels around the axle (z out of the face, 0 at
+# the face), each turned about the axle, sampling the texture from column u.
+DEPTH = 2.5
+G_BRASS, G_AXLE, G_STEEL = 0, 12, 14
+def gear_parts():
+	parts = []
+	for i in range(16):
+		parts.append((-0.75, 5.75, -DEPTH, 0.75, 6.9, 0, i * 22.5, G_BRASS))   # a tooth
+		parts.append((-1.15, 4.75, -DEPTH, 1.15, 5.75, 0, i * 22.5, G_BRASS))  # the rim
+	for i in range(2):
+		parts.append((-0.6, -4.9, -DEPTH + 0.3, 0.6, 4.9, -0.4, i * 90, G_BRASS))  # two spokes across
+	for i in range(2):
+		parts.append((-1.6, -1.6, -DEPTH, 1.6, 1.6, 0, i * 45, G_BRASS))     # the hub, an octagon
+	parts.append((-0.6, -0.6, -DEPTH, 0.6, 0.6, 0.2, 0, G_AXLE))
+	parts.append((-0.6, 3.3, 0, 0.6, 4.5, 1, 0, G_STEEL))                 # the crank peg
+	return parts
+
+def r(v):
+	return round(v, 4)
+
+def gear_elements():
+	"""The gear as model elements on the north face. A model turns an element at most 45 degrees, so a
+	part at 22.5k degrees is first swung round by quarter turns (exact), then turned the rest."""
+	out = []
+	for (x0, y0, z0, x1, y1, z1, angle, u) in gear_parts():
+		quarter = int(round(angle / 90)) % 4
+		rest = angle - round(angle / 90) * 90
+		for _ in range(quarter):          # (x, y) -> (-y, x)
+			x0, y0, x1, y1 = -y1, x0, -y0, x1
+		width = 12 if u == G_BRASS else 2
+		def face(a, b):
+			return {"uv": [u, 0, r(u + min(width, max(a, 0.5))), r(min(16, max(b, 0.5)))], "texture": "#gear"}
+		w, h, d = x1 - x0, y1 - y0, z1 - z0
+		el = {
+			# North is the front: model x runs the other way seen from the front, and z goes into the block.
+			"from": [r(8 - x1), r(8 + y0), r(-z1)], "to": [r(8 - x0), r(8 + y1), r(-z0)],
+			"faces": {"north": face(w, h), "south": face(w, h), "east": face(d, h), "west": face(d, h), "up": face(w, d), "down": face(w, d)},
+		}
+		if rest:
+			el["rotation"] = {"origin": [8, 8, 0], "axis": "z", "angle": rest}
+		out.append(el)
+	return out
+
+def block_elements():
+	"""A full cube but for its front: a 1-texel frame around a 3-deep recess, the well at its back."""
+	def faces(sides, wall):
+		f = {}
+		for side, tex in sides.items():
+			f[side] = {"texture": tex}
+			if not wall.get(side):
+				f[side]["cullface"] = side
+		return f
+	outer = {"south": "#side", "east": "#side", "west": "#side", "up": "#top", "down": "#bottom"}
+	els = [{"from": [0, 0, 3], "to": [16, 16, 16], "faces": faces({**outer, "north": "#well"}, {"north": True})}]
+	for (fx, fy, tx, ty, inner) in ((0, 15, 16, 16, "down"), (0, 0, 16, 1, "up"), (15, 1, 16, 15, "west"), (0, 1, 1, 15, "east")):
+		sides = {"north": "#front", inner: "#well"}
+		for side in ("east", "west", "up", "down"):
+			if side != inner and ((side == "up" and ty == 16) or (side == "down" and fy == 0) or (side == "east" and tx == 16) or (side == "west" and fx == 0)):
+				sides[side] = outer[side]
+		els.append({"from": [fx, fy, 0], "to": [tx, ty, 3], "faces": faces(sides, {inner: True})})
+	return els
+
+def models(root):
+	textures = {"particle": "modularcomputers:block/photomask_side", "front": "modularcomputers:block/photomask_front",
+		"well": "modularcomputers:block/photomask_well", "side": "modularcomputers:block/photomask_side",
+		"top": "modularcomputers:block/photomask_top", "bottom": "modularcomputers:block/photomask_bottom"}
+	block = {"parent": "minecraft:block/block", "textures": textures, "elements": block_elements()}
+	item = {"parent": "minecraft:block/block", "textures": {**textures, "gear": "modularcomputers:block/photomask_gear"},
+		"elements": block_elements() + gear_elements()}
+	for path, model in ((f"{root}/block/photomask.json", block), (f"{root}/item/photomask.json", item)):
+		with open(path, "w") as f:
+			json.dump(model, f, indent="\t")
+			f.write("\n")
+
 items = {"silicon": silicon, "chip": chip}
-blocks = {"photomask_top": top, "photomask_front": front, "photomask_side": side, "photomask_bottom": bottom, "photomask_gear": gear}
+blocks = {"photomask_top": top, "photomask_front": front, "photomask_well": well, "photomask_side": side, "photomask_bottom": bottom, "photomask_gear": gear}
 for name, fn in items.items():
 	fn().save(f"{OUT}/item/{name}.png")
 for name, fn in blocks.items():
 	fn().save(f"{OUT}/block/{name}.png")
 
-sheet = Image.new("RGBA", (20 * 7 + 4, 24), (40, 40, 40, 255))
+models(os.path.join(OUT, "..", "models"))
+
+sheet = Image.new("RGBA", (20 * 8 + 4, 24), (40, 40, 40, 255))
 for i, (folder, name) in enumerate([("item", n) for n in items] + [("block", n) for n in blocks]):
 	sheet.alpha_composite(Image.open(f"{OUT}/{folder}/{name}.png").convert("RGBA"), (4 + i * 20, 4))
 sheet.resize((sheet.width * 8, sheet.height * 8), Image.NEAREST).save(sys.argv[2])

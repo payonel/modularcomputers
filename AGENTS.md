@@ -474,9 +474,15 @@ scripts/art/error_beep.py` into
   `CHIPS` (4). **Right-click the gear to turn it; right-click anywhere else, or crouch + right-click
   anywhere (even on the gear), to open its slots** (user, 2026-10-12: click the thing you mean,
   like the case's power button; `PhotomaskBlock.onGear` checks the front face within the gear's
-  circle). Its item model shows the gear on its front (the block's gear is drawn by the
-  renderer). Each turn, its brass gear turns an eighth on its front
-  (`PhotomaskRenderer`, a quad drawn with `submitCustomGeometry`, lit from the block in front;
+  circle). **The gear is 3D** (user, 2026-10-12): the block is a full cube whose front is a 1-texel
+  frame around a 3-deep recess (`noOcclusion`, so light reaches in), and the gear fills it flush
+  with the face: a brass spur gear, 16 teeth on a rim, four symmetrical spokes, an octagonal hub on
+  its axle, and a steel crank peg standing out of the top spoke (so it shows turning: the gear
+  alone looks the same every 22.5 degrees). The renderer builds it from boxes
+  (`PhotomaskRenderer.gear`); `photomask_textures.py` writes the block and item models, the item's
+  holding the same gear from the same numbers (a model turns an element at most 45 degrees, so
+  parts are swung by quarter turns first). Each turn, its gear turns an eighth
+  (`PhotomaskRenderer`, boxes drawn with `submitCustomGeometry`, lit from the block in front;
   clients learn of a turn by a block event, `SPIN_EVENT`, and ease the gear round); a charged
   battery in its bay runs it: with power it's on (gear spinning, block state `working`), idling
   at 5 units a tick with nothing to print (like an idle tier 3 CPU; user 2026-10-12), and working

@@ -89,8 +89,8 @@ public final class PhotomaskBlock extends HorizontalDirectionalBlock implements 
 		return InteractionResult.SUCCESS;
 	}
 
-	/** Half the gear's width on the front, in blocks, with a little give around its teeth. */
-	public static final double GEAR_RADIUS = 6.5 / 16;
+	/** Half the gear's width on the front, in blocks, to its teeth's tips (its recess is 14 across). */
+	public static final double GEAR_RADIUS = 7.0 / 16;
 
 	/** Whether a click landed on the gear: on the front face, within its circle. */
 	public static boolean onGear(BlockState state, BlockPos pos, BlockHitResult hit) {
