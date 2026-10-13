@@ -105,8 +105,8 @@ same thing.
         `DiskItem`/`DiskTier`: 1, 4, 16 MiB, drawing 8/5/2 a tick: bus-powered like terminals,
         `getCapacity()`; no data yet) and 4 expansion
         slots, which take any card (`ModItems.CARDS`, `device/CardKind`): WLAN, Bluetooth,
-        Redstone, Audio, Motion Sensor, Audio Sensor, Weather Sensor. All cards are
-        placeholders with no function.
+        Redstone, Audio, Motion Sensor, Audio Sensor, Weather Sensor. **Redstone, weather and motion
+        cards work** (see "Cards that work"); the others are placeholders.
       - Only the CPU and EEPROM affect the machine so far.
       - On the bus: the **EEPROM** (`Eeprom` is a `Device`, `FIRMWARE`, row "ROM"), hard
         disks (`Disk`) and cards (`Card`, typed by kind). The CPU still loads from the EEPROM
@@ -582,6 +582,25 @@ scripts/art/error_beep.py` into
   (`lua_setbudget`: a callback every n steps, which can `lua_freeze` the thread wherever it is;
   `lua_thaw` goes on) and **Styx**, persisting a whole state (`luaL_persiststate`), for saving
   running machines later.
+- **Cards that work** (user design, 2026-10-13; `device/Cards.make` by kind, the world glue in
+  `block/CardWorld`, ticked by the block they're in, a case or a hub; a card works while a running
+  computer powers it). Events wait in a bounded queue (32; when full the oldest goes and the next
+  says how many were `lost`), raise the card's interrupt, and are read with `pull()`:
+  - **Redstone card** (`RedstoneCard`): `setOutput(side, 0..15)` (returns what it was),
+    `getOutput(side)`, `getInput(side)`, sides as world directions; a change coming in is an
+    event `{name="redstone", side, old, new}`. The case and the hub are signal sources
+    (`getSignal`: the strongest of their redstone cards' outputs on that face). Power-off sets
+    its outputs to 0.
+  - **Weather sensor card** (`WeatherCard`): `getWeather()` (`clear`, `rain`, `snow`, `thunder`:
+    the world's weather and the biome's precipitation where it is, sky or not; a desert's is
+    clear), and an event `{name="weather", old, new}` when it changes (checked each second).
+  - **Motion sensor card** (`MotionSensorCard`): events `{name="motion", kind, type, x, y, z, ...}`
+    with `x, y, z` relative to the block it's in (to a tenth): `entity` (mobs, players; with
+    `id`), `drop` (item entities; with `item`, `count`), `fluid` (fluid newly flowing),
+    `door` (doors, trapdoors, gates opening or closing; with `open`). `setMode` all, entities,
+    drops or blocks; `setRange(1..32)` costs power each tick, `1 + range`. Entities are looked
+    at every 5 ticks; block changes come from a hook on the server's block updates
+    (`mixin/ServerLevelBlockUpdates`, the mod's first mixin: Fabric has no block-change event).
 - **mcos in Lua** (`lua/mcos/`, the files a tier 1 disk comes with): a first, small OS until
   OpenOS is ported: `init.lua` (paths, the boot disk's files, a line editor on the console,
   `require` from `/lib`, programs from `/bin`), `bin/sh.lua` (a shell) and `ls`, `cat`, `echo`,
@@ -687,8 +706,8 @@ scripts/art/error_beep.py` into
     - Each card in it is a cabled device of every computer wired to it. The key is
       `id:<card serial>`, and the location reads "hub 2, 3m".
     - Each card can be unplugged on its own.
-    - A card works where it's installed: a redstone card in a hub will emit and detect
-      redstone at the hub (user, 2026-10-11). Nothing works yet.
+    - A card works where it's installed: a redstone card in a hub emits and detects redstone at
+      the hub (see "Cards that work").
   - **Robotic piston** (`RoboticPistonBlock`, a `DirectionalBlock`; user design, 2026-10-13): its
     `FACING` is its one cable port (placed with the port toward the block it was put against); it
     pushes on every other face, when a computer says: its device's `push(side)` (`down`, `up`,

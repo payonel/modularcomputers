@@ -45,7 +45,7 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 	protected void cardsChanged() {
 		for (int slot = 0; slot < SLOTS; slot++) {
 			CardKind kind = ModItems.cardKind(cards().getItem(slot)).orElse(null);
-			devices[slot] = kind == null ? null : devices[slot] != null && devices[slot].kind() == kind ? devices[slot] : new Card(kind);
+			devices[slot] = kind == null ? null : devices[slot] != null && devices[slot].kind() == kind ? devices[slot] : cardHere(kind);
 			if (devices[slot] != null) {
 				int at = slot;
 				devices[slot].labelFrom(() -> ModComponents.label(cards().getItem(at))); // read from the card itself
@@ -56,5 +56,32 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 	@Override
 	public AbstractContainerMenu createMenu(int id, Inventory inventory, Player player) {
 		return CardHolderMenu.hub(id, inventory, cards(), worldPosition, ContainerLevelAccess.create(level, worldPosition));
+	}
+
+	/** A card that works here, at the hub: a redstone card's output changes update the hub's neighbours. */
+	private Card cardHere(com.payonel.modularcomputers.device.CardKind kind) {
+		Card card = com.payonel.modularcomputers.device.Cards.make(kind);
+		if (card instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
+			redstone.onOutput(() -> {
+				if (level != null && !level.isClientSide()) {
+					level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
+				}
+			});
+		}
+		return card;
+	}
+
+	/** The redstone the hub's cards put out toward a neighbour ({@code direction}: from the neighbour to the hub). */
+	public int redstoneOut(net.minecraft.core.Direction direction) {
+		return CardWorld.redstone(java.util.Arrays.stream(devices).filter(java.util.Objects::nonNull).toList(), direction);
+	}
+
+	/** Server, every tick: its cards work where they are. */
+	void serverTick() {
+		for (Card card : devices) {
+			if (card != null) {
+				CardWorld.tick(card, (net.minecraft.server.level.ServerLevel) level, worldPosition, level.getGameTime());
+			}
+		}
 	}
 }

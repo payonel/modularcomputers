@@ -16,7 +16,7 @@ import java.util.Set;
  * a shared device is a race, and doesn't matter.
  */
 public final class BusPower {
-	private final int draw;
+	private int draw;
 	private final Set<Object> suppliers = Collections.newSetFromMap(new IdentityHashMap<>());
 	/** Game time it's paid up to, or -1 when it isn't powered (or no one has collected yet). */
 	private long paidUntil = -1;
@@ -29,6 +29,11 @@ public final class BusPower {
 
 	public int draw() {
 		return draw;
+	}
+
+	/** A device whose draw changes with what it's set to do (a motion sensor's range). */
+	public void setDraw(int draw) {
+		this.draw = draw;
 	}
 
 	public boolean powered() {

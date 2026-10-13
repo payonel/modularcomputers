@@ -54,4 +54,24 @@ public final class ExpansionHubBlock extends Block implements EntityBlock {
 	protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos, boolean movedByPiston) {
 		Cabling.changed();
 	}
+
+	@Override
+	@SuppressWarnings("unchecked")
+	public <T extends BlockEntity> net.minecraft.world.level.block.entity.BlockEntityTicker<T> getTicker(Level level, BlockState state,
+		net.minecraft.world.level.block.entity.BlockEntityType<T> type) {
+		return level.isClientSide() || type != ModBlocks.EXPANSION_HUB_ENTITY ? null
+			: (net.minecraft.world.level.block.entity.BlockEntityTicker<T>) (net.minecraft.world.level.block.entity.BlockEntityTicker<ExpansionHubBlockEntity>)
+				(tickLevel, pos, tickState, hub) -> hub.serverTick();
+	}
+
+	/** Its redstone cards put out redstone (user, 2026-10-13). */
+	@Override
+	protected boolean isSignalSource(BlockState state) {
+		return true;
+	}
+
+	@Override
+	protected int getSignal(BlockState state, net.minecraft.world.level.BlockGetter level, BlockPos pos, net.minecraft.core.Direction direction) {
+		return level.getBlockEntity(pos) instanceof ExpansionHubBlockEntity hub ? hub.redstoneOut(direction) : 0;
+	}
 }

@@ -504,6 +504,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		if (ticks % BATTERY_TICKS == 0) {
 			updateBattery();
 		}
+		for (Card card : cards) {
+			if (card != null) {
+				CardWorld.tick(card, (ServerLevel) level, worldPosition, level.getGameTime()); // cards work where they're installed
+			}
+		}
 		// The motherboard checks its CPU and power every tick, and the program gets its turn.
 		Machine.Supervision supervision = machine.tick();
 		if (supervision != Machine.Supervision.OK) {
@@ -759,6 +764,24 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	 * Where a disk's data lives: the world save's {@code modularcomputers/disks/<id>} (a folder
 	 * for hfs, with ".img" for raw), so it's the disk's wherever it goes.
 	 */
+	/** A card that works here, at the case: a redstone card's output changes update the case's neighbours. */
+	private Card cardHere(CardKind kind) {
+		Card card = com.payonel.modularcomputers.device.Cards.make(kind);
+		if (card instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
+			redstone.onOutput(() -> {
+				if (level != null && !level.isClientSide()) {
+					level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
+				}
+			});
+		}
+		return card;
+	}
+
+	/** The redstone the case's cards put out toward a neighbour ({@code direction}: from the neighbour to the case). */
+	public int redstoneOut(net.minecraft.core.Direction direction) {
+		return CardWorld.redstone(java.util.Arrays.stream(cards).filter(java.util.Objects::nonNull).toList(), direction);
+	}
+
 	private void retireDisk(int lane) {
 		if (disks[lane] != null) {
 			disks[lane].retire();
@@ -849,7 +872,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 				continue;
 			}
 			CardKind kind = ModItems.cardKind(card).orElse(null);
-			cards[lane] = kind == null ? null : cards[lane] != null && cards[lane].kind() == kind ? cards[lane] : new Card(kind);
+			cards[lane] = kind == null ? null : cards[lane] != null && cards[lane].kind() == kind ? cards[lane] : cardHere(kind);
 			if (cards[lane] != null) {
 				int slot = CaseMenu.EXP_SLOTS + lane;
 				cards[lane].labelFrom(() -> ModComponents.label(parts.getItem(slot))); // read from the card itself

@@ -1,0 +1,11 @@
+{
+	"required": true,
+	"package": "com.payonel.modularcomputers.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"ServerLevelBlockUpdates"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

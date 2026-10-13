@@ -98,6 +98,17 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 			: (BlockEntityTicker<T>) (BlockEntityTicker<AllInOneBlockEntity>) (tickLevel, pos, tickState, computer) -> computer.serverTick();
 	}
 
+	/** Its redstone cards put out redstone (user, 2026-10-13). */
+	@Override
+	protected boolean isSignalSource(BlockState state) {
+		return true;
+	}
+
+	@Override
+	protected int getSignal(BlockState state, net.minecraft.world.level.BlockGetter level, BlockPos pos, net.minecraft.core.Direction direction) {
+		return level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer ? computer.redstoneOut(direction) : 0;
+	}
+
 	@Override
 	protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
 		if (!oldState.is(this)) {

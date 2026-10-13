@@ -15,6 +15,7 @@
 			"com.payonel.modularcomputers.gametest.CaseTierGameTest",
 			"com.payonel.modularcomputers.gametest.DiskGameTest",
 			"com.payonel.modularcomputers.gametest.RoboticPistonGameTest",
+			"com.payonel.modularcomputers.gametest.CardGameTest",
 			"com.payonel.modularcomputers.gametest.RecipeGameTest",
 			"com.payonel.modularcomputers.gametest.KeepPartsGameTest",
 			"com.payonel.modularcomputers.gametest.PhotomaskGameTest",
