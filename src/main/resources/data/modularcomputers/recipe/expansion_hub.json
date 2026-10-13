@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"C": "minecraft:copper_ingot",
+		"Q": "minecraft:quartz",
+		"X": "minecraft:comparator",
+		"g": "minecraft:gold_ingot"
+	},
+	"pattern": [
+		"CXC",
+		"XQX",
+		"gXg"
+	],
+	"result": {
+		"id": "modularcomputers:expansion_hub"
+	}
+}

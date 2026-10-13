@@ -90,14 +90,15 @@ public class BatteryGameTest {
 			Items.IRON_INGOT, Items.REDSTONE, Items.IRON_INGOT);
 		helper.assertTrue(tier1.is(ModItems.TIER1_BATTERY), "tier 1 recipe, got " + tier1);
 		helper.assertValueEqual(BatteryItem.percent(tier1), 0, "a crafted battery is empty");
+		// Each higher tier is built around the tier below (see RecipeGameTest, which checks its charge goes with it).
 		ItemStack tier2 = craft(helper, 3,
 			Items.GOLD_INGOT, Items.GOLD_INGOT, Items.GOLD_INGOT,
-			Items.IRON_INGOT, Items.REDSTONE, Items.IRON_INGOT,
+			Items.IRON_INGOT, tier1, Items.IRON_INGOT,
 			Items.SEA_LANTERN, Items.BLAZE_ROD, Items.SEA_LANTERN);
 		helper.assertTrue(tier2.is(ModItems.TIER2_BATTERY), "tier 2 recipe, got " + tier2);
 		ItemStack tier3 = craft(helper, 3,
-			Items.DIAMOND, Items.DIAMOND, Items.DIAMOND,
-			Items.NETHERITE_INGOT, Items.NETHER_STAR, Items.NETHERITE_INGOT,
+			Items.DIAMOND, Items.NETHER_STAR, Items.DIAMOND,
+			Items.NETHERITE_INGOT, tier2, Items.NETHERITE_INGOT,
 			Items.NETHERITE_INGOT, Items.ENDER_EYE, Items.NETHERITE_INGOT);
 		helper.assertTrue(tier3.is(ModItems.TIER3_BATTERY), "tier 3 recipe, got " + tier3);
 		helper.assertValueEqual(BatteryItem.percent(tier3), 100, "tier 3 is always full");

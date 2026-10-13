@@ -1,17 +1,17 @@
 {
-	"type": "minecraft:crafting_shaped",
+	"type": "modularcomputers:battery_upgrade",
 	"category": "redstone",
 	"key": {
-		"G": "minecraft:gold_ingot",
+		"#": "modularcomputers:tier1_battery",
 		"I": "minecraft:iron_ingot",
-		"R": "minecraft:redstone",
-		"B": "minecraft:blaze_rod",
-		"S": "minecraft:sea_lantern"
+		"S": "minecraft:sea_lantern",
+		"g": "minecraft:gold_ingot",
+		"z": "minecraft:blaze_rod"
 	},
 	"pattern": [
-		"GGG",
-		"IRI",
-		"SBS"
+		"ggg",
+		"I#I",
+		"SzS"
 	],
 	"result": {
 		"id": "modularcomputers:tier2_battery"

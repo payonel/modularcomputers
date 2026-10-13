@@ -248,7 +248,7 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
 - Open: disks in expansion hubs; hfs labels set by programs; a Lua runtime's `__gc` closing
   handles; whether a mount table belongs on the board (a kernel's job) once there's a real OS.
 
-## Recipes (draft in review with the user, 2026-10-12; not built)
+## Recipes (built 2026-10-12; see AGENTS.md)
 
 - Draft page: a private draft page (private to the user).
 - Theme (user): vanilla ores, minerals and drops, few custom components; real computer materials
@@ -259,6 +259,9 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
   The case's note block is its speaker. Screens: glass, glowstone for tiers 2 and 3. Expansion
   hub: four comparators around quartz, copper and gold. Paint gun: red, green, blue dye over a
   dispenser.
+- **Every tier upgrade takes the tier below as its center** (user, 2026-10-12): CPUs, RAM, disks,
+  screens, cases, batteries. The audio card takes a jukebox; a terminal's keyboard is a block of
+  chiseled stone bricks; tier 3 screens take prismarine crystals.
 - Cases upgrade from the tier below (user: old stuff isn't junk) and need something earned:
   tier 2 breeze rods (trial chambers; the case's fans) and gold; tier 3 echo shards (ancient
   cities; memory, as a recovery compass remembers), a heart of the sea (power, as it powers a

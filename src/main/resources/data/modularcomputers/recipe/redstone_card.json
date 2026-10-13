@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"G": "minecraft:gold_nugget",
+		"Q": "minecraft:quartz",
+		"X": "minecraft:comparator",
+		"c": "minecraft:copper_nugget"
+	},
+	"pattern": [
+		"XQ ",
+		"ccc",
+		"GGG"
+	],
+	"result": {
+		"id": "modularcomputers:redstone_card"
+	}
+}

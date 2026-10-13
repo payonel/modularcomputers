@@ -1,0 +1,19 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"#": "modularcomputers:tier2_case",
+		"B": "minecraft:redstone_block",
+		"D": "minecraft:diamond",
+		"E": "minecraft:echo_shard",
+		"H": "minecraft:heart_of_the_sea"
+	},
+	"pattern": [
+		"EHE",
+		"D#D",
+		"EBE"
+	],
+	"result": {
+		"id": "modularcomputers:tier3_case"
+	}
+}

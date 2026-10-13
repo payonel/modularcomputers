@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"C": "minecraft:copper_ingot",
+		"I": "minecraft:iron_ingot",
+		"P": "minecraft:piston",
+		"Q": "minecraft:quartz"
+	},
+	"pattern": [
+		"IPI",
+		"PQP",
+		"ICI"
+	],
+	"result": {
+		"id": "modularcomputers:robotic_piston"
+	}
+}

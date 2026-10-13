@@ -1,0 +1,17 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"#": "modularcomputers:tier1_screen",
+		"L": "minecraft:glowstone_dust",
+		"g": "minecraft:gold_ingot"
+	},
+	"pattern": [
+		"gLg",
+		"L#L",
+		"gLg"
+	],
+	"result": {
+		"id": "modularcomputers:tier2_screen"
+	}
+}

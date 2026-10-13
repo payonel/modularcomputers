@@ -1,0 +1,20 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"G": "minecraft:gold_nugget",
+		"O": "minecraft:ender_pearl",
+		"Q": "minecraft:quartz",
+		"c": "minecraft:copper_nugget",
+		"l": "minecraft:lapis_lazuli",
+		"m": "minecraft:emerald"
+	},
+	"pattern": [
+		"OQm",
+		"clc",
+		"GGG"
+	],
+	"result": {
+		"id": "modularcomputers:bluetooth_card"
+	}
+}

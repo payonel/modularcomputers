@@ -4,6 +4,7 @@ import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.command.ModCommands;
 import com.payonel.modularcomputers.config.ModConfig;
 import com.payonel.modularcomputers.item.BatteryChargingRecipe;
+import com.payonel.modularcomputers.item.BatteryUpgradeRecipe;
 import com.payonel.modularcomputers.item.ClearIdRecipe;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
@@ -57,8 +58,10 @@ public final class ModularComputers implements ModInitializer {
 		ModItems.init();
 		BatteryChargingRecipe.init();
 		ClearIdRecipe.init();
+		BatteryUpgradeRecipe.init();
 		// Clients get the shaped recipes, so tooltips can show how to craft each item.
 		RecipeSynchronization.synchronizeRecipeSerializer(ShapedRecipe.SERIALIZER);
+		RecipeSynchronization.synchronizeRecipeSerializer(BatteryUpgradeRecipe.SERIALIZER);
 		ModBlocks.init();
 		ModMenus.init();
 		ModCommands.init();

@@ -1,0 +1,19 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"#": "modularcomputers:tier2_hard_disk",
+		"D": "minecraft:diamond",
+		"I": "minecraft:iron_ingot",
+		"Q": "minecraft:quartz",
+		"R": "minecraft:redstone"
+	},
+	"pattern": [
+		"IRI",
+		"D#D",
+		"IQI"
+	],
+	"result": {
+		"id": "modularcomputers:tier3_hard_disk"
+	}
+}

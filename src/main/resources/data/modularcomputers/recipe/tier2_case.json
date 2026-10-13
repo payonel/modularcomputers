@@ -1,0 +1,17 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"#": "modularcomputers:tier1_case",
+		"Z": "minecraft:breeze_rod",
+		"g": "minecraft:gold_ingot"
+	},
+	"pattern": [
+		"gZg",
+		"Z#Z",
+		"gZg"
+	],
+	"result": {
+		"id": "modularcomputers:tier2_case"
+	}
+}

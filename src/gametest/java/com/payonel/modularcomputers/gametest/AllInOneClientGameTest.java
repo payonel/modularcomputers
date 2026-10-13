@@ -195,7 +195,10 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 				ClientRecipes.Grid grid = ClientRecipes.of(ModItems.TIER2_BATTERY).orElseThrow(() -> new AssertionError("no tier 2 recipe on the client"));
 				check(grid.cell(0, 0).getFirst().is(Items.GOLD_INGOT) && grid.cell(1, 2).getFirst().is(Items.BLAZE_ROD)
 					&& grid.cell(0, 2).getFirst().is(Items.SEA_LANTERN), "the tier 2 grid");
-				check(ClientRecipes.of(ModBlocks.TIER3_SCREEN.asItem()).isEmpty(), "a screen has no recipe yet");
+				// Built around the tier below: the battery upgrade's own recipe type reaches the client too.
+				check(grid.cell(1, 1).getFirst().is(ModItems.TIER1_BATTERY), "a tier 1 battery in the center");
+				ClientRecipes.Grid screen = ClientRecipes.of(ModBlocks.TIER3_SCREEN.asItem()).orElseThrow(() -> new AssertionError("no tier 3 screen recipe"));
+				check(screen.cell(1, 1).getFirst().is(ModBlocks.TIER2_SCREEN.asItem()), "a tier 3 screen is built around a tier 2");
 			});
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(hotbar + cpuHotbar)); // pick up the CPU
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(CaseMenu.CPU_SLOT));

@@ -12,7 +12,8 @@
 			"com.payonel.modularcomputers.gametest.CardHolderGameTest",
 			"com.payonel.modularcomputers.gametest.BluetoothGameTest",
 			"com.payonel.modularcomputers.gametest.BatteryGameTest",
-			"com.payonel.modularcomputers.gametest.CaseTierGameTest"
+			"com.payonel.modularcomputers.gametest.CaseTierGameTest",
+			"com.payonel.modularcomputers.gametest.RecipeGameTest"
 		],
 		"fabric-client-gametest": [
 			"com.payonel.modularcomputers.gametest.ModularComputersClientGameTest",

@@ -131,8 +131,9 @@ same thing.
           - Charging materials are percentages of a full tier 1, so they follow its setting.
         - **Tier 1** (`tier1_battery`): copper×3 / iron, redstone, iron / iron, redstone, iron.
           Full, it runs an all-in-one for 10 days and nights, 10% a day.
-        - **Tier 2** (`tier2_battery`): gold×3 / iron, redstone, iron / sea lantern, blaze rod,
-          sea lantern (user changed it, 2026-10-11: self-recharge "might be op"). It holds twice
+        - **Tier 2** (`tier2_battery`): gold×3 / iron, a tier 1 battery, iron / sea lantern, blaze
+          rod, sea lantern (user changed it, 2026-10-11: self-recharge "might be op"; built around
+          the tier below, 2026-10-12, keeping its charge: `BatteryUpgradeRecipe`). It holds twice
           as much. It recharges itself whenever it isn't running a computer (out of the UPS slot,
           or in a case that's off) at `battery_tier2_recharge_rate`, a share of a running
           all-in-one's draw: 0.5 by default, so two seconds of rest charge one second of running.
@@ -141,7 +142,8 @@ same thing.
           - This is worked out lazily from `settledAt` (game time), so it charges in chests and
             unloaded chunks too. It's settled every 20 ticks in a player's inventory or in a case.
           - A new battery is `UNSETTLED`: it starts counting at the first look.
-        - **Tier 3** (`tier3_battery`): diamond×3 / netherite, nether star, netherite /
+        - **Tier 3** (`tier3_battery`): diamond, nether star, diamond / netherite, a tier 2
+          battery, netherite /
           netherite, ender eye, netherite. It never runs out and has no charge component.
         - **Charging** (`BatteryChargingRecipe`, a special crafting recipe, like repairing a
           tool): put the battery and glowing materials in any grid (2x2 is enough). Each
@@ -434,7 +436,24 @@ scripts/art/error_beep.py` into
   - **Grids come from the real recipes:** the mod asks Fabric to synchronize shaped recipes to
     clients (`RecipeSynchronization.synchronizeRecipeSerializer(ShapedRecipe.SERIALIZER)`), and
     `ClientRecipes` keeps the ones that make mod items. A tag cell cycles its items each
-    second. Items without a recipe (most, for now) show an empty grid and "No recipe yet".
+    second. The battery upgrade's recipe type is synchronized too. Items without a recipe (the
+    all-in-one) show an empty grid and "No recipe yet".
+- **Recipes** (user design, 2026-10-12; `data/modularcomputers/recipe/`, checked grid by grid by
+  `RecipeGameTest`; the draft page with game textures: a private draft page):
+  real computer materials from vanilla, few custom components, each grid laid out like the part
+  (CPU lid on top, pins below). Quartz is the silicon (until the introduction's chip is designed),
+  amethyst the CPU's clock crystal, copper boards and cable cores, gold pins and contacts, iron
+  frames; tiers are iron, gold, diamond. **Every tier above 1 is built around the tier below, in
+  the center** (user: an upgrade keeps the old part from being junk); a used part (with an id)
+  upgrades too, and a battery keeps its charge. Notable choices: every radio (WLAN, Bluetooth)
+  takes an ender pearl and an emerald (beryl: beryllia under a transmitter's amplifier), Bluetooth
+  adds lapis; cable is dried kelp around copper (8); the case's note block is its speaker; a
+  terminal's keyboard is chiseled stone bricks; screens are glass, glowstone from tier 2,
+  prismarine crystals at tier 3; the audio card a jukebox; the hub four comparators around quartz;
+  the paint gun red, green and blue dye over a dispenser. Cases need something earned: tier 2
+  breeze rods (trial chambers; its fans), tier 3 echo shards (ancient cities; memory) and a heart
+  of the sea (buried treasure; power). The robotic piston and paint gun take no radio parts (their
+  radio is a card). The all-in-one has no recipe (dev kit).
   - The Shift check reads the real key (`Minecraft.hasShiftDown`), which client tests can't
     press; tests set `HintComponent.detailsOverride`.
 - **Settings** (`config/ModConfig`, user request 2026-10-11): `config/modularcomputers.properties`

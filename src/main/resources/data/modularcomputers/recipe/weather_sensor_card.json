@@ -1,0 +1,19 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"G": "minecraft:gold_nugget",
+		"Q": "minecraft:quartz",
+		"c": "minecraft:copper_nugget",
+		"t": "minecraft:daylight_detector",
+		"v": "minecraft:lightning_rod"
+	},
+	"pattern": [
+		"tQv",
+		"ccc",
+		"GGG"
+	],
+	"result": {
+		"id": "modularcomputers:weather_sensor_card"
+	}
+}

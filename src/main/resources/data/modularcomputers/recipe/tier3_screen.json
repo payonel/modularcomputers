@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"#": "modularcomputers:tier2_screen",
+		"D": "minecraft:diamond",
+		"L": "minecraft:glowstone_dust",
+		"x": "minecraft:prismarine_crystals"
+	},
+	"pattern": [
+		"xDx",
+		"L#L",
+		"xDx"
+	],
+	"result": {
+		"id": "modularcomputers:tier3_screen"
+	}
+}

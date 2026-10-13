@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"#": "modularcomputers:tier2_ram",
+		"D": "minecraft:diamond",
+		"G": "minecraft:gold_nugget",
+		"Q": "minecraft:quartz"
+	},
+	"pattern": [
+		"QQQ",
+		"D#D",
+		"GGG"
+	],
+	"result": {
+		"id": "modularcomputers:tier3_ram"
+	}
+}

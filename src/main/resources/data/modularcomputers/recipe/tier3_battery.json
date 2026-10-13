@@ -1,16 +1,17 @@
 {
-	"type": "minecraft:crafting_shaped",
+	"type": "modularcomputers:battery_upgrade",
 	"category": "redstone",
 	"key": {
+		"#": "modularcomputers:tier2_battery",
 		"D": "minecraft:diamond",
-		"N": "minecraft:netherite_ingot",
-		"S": "minecraft:nether_star",
-		"E": "minecraft:ender_eye"
+		"n": "minecraft:netherite_ingot",
+		"s": "minecraft:nether_star",
+		"y": "minecraft:ender_eye"
 	},
 	"pattern": [
-		"DDD",
-		"NSN",
-		"NEN"
+		"DsD",
+		"n#n",
+		"nyn"
 	],
 	"result": {
 		"id": "modularcomputers:tier3_battery"

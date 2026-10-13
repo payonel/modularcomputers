@@ -1,0 +1,17 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"C": "minecraft:copper_ingot",
+		"K": "minecraft:dried_kelp"
+	},
+	"pattern": [
+		"KKK",
+		"KCK",
+		"KKK"
+	],
+	"result": {
+		"id": "modularcomputers:cable",
+		"count": 8
+	}
+}

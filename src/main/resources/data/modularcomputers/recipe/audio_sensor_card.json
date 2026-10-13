@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"G": "minecraft:gold_nugget",
+		"Q": "minecraft:quartz",
+		"c": "minecraft:copper_nugget",
+		"u": "minecraft:sculk_sensor"
+	},
+	"pattern": [
+		"uQ ",
+		"ccc",
+		"GGG"
+	],
+	"result": {
+		"id": "modularcomputers:audio_sensor_card"
+	}
+}

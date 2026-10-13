@@ -1,0 +1,19 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"A": "minecraft:amethyst_shard",
+		"G": "minecraft:gold_nugget",
+		"I": "minecraft:iron_ingot",
+		"Q": "minecraft:quartz",
+		"R": "minecraft:redstone"
+	},
+	"pattern": [
+		"III",
+		"QAQ",
+		"GRG"
+	],
+	"result": {
+		"id": "modularcomputers:tier1_cpu"
+	}
+}
