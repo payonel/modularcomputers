@@ -89,7 +89,7 @@ class LuaRunnerTest {
 			  local t = {}
 			  for i = 1, 1000000 do t[i] = string.rep("x", 1000) .. i end
 			end)
-			collectgarbage() -- (the next call's frames may still hold the dead table: reported to LungoLua, maybe stock Lua's stale registers)
+			collectgarbage() -- (as stock Lua: growing a stack never collects, so the next call may fail until something does)
 			board.invoke("console", "write", tostring(used > 0) .. " " .. tostring(ok) .. " " .. tostring(err))
 			board.halt()
 			""");
