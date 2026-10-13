@@ -488,7 +488,7 @@ scripts/art/error_beep.py` into
     jigsaw on the surface, every ~40 chunks in plains, forests, taiga, savanna, meadow, hills):
     a copper-trimmed stone lab with its front roof fallen in, workbenches with **broken
     computers** (`BrokenCaseBlock`, a cracked-open model: lid askew, bezel fallen forward, the
-    board inside showing; decoration), cables along the floor, a chest of parts
+    board inside showing; decoration; broken blocks break to nothing, no drops, user 2026-10-12), cables along the floor, a chest of parts
     (`loot_table/chests/ancient_lab.json`: cables, chips, silicon, copper, gold, redstone, now and
     then an EEPROM or RAM; chance drops, weighted; and in about one chest in twenty, a flat tier 1
     battery: its own pool with a 5% chance, user 2026-10-12) and a **working photomask** on its bench. Weathering (moss,

@@ -99,4 +99,13 @@ public class AncientLabGameTest {
 		helper.assertTrue(batteries > chests / 20 / 2 && batteries < chests / 20 * 2, "about one chest in twenty: " + batteries + " of " + chests);
 		helper.succeed();
 	}
+
+	@GameTest
+	public void aBrokenComputerBreaksToNothing(GameTestHelper helper) {
+		BlockPos pos = new BlockPos(1, 1, 1);
+		helper.setBlock(pos, ModBlocks.BROKEN_CASE);
+		var drops = Block.getDrops(helper.getBlockState(pos), helper.getLevel(), helper.absolutePos(pos), null);
+		helper.assertTrue(drops.isEmpty(), "no drops, got " + drops);
+		helper.succeed();
+	}
 }
