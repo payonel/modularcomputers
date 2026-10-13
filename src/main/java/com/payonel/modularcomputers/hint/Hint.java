@@ -58,10 +58,6 @@ public final class Hint {
 		hinted.summary(stack, elements::add);
 		contents(stack, elements::add);
 		UUID serial = stack.get(ModComponents.SERIAL);
-		if (serial != null) {
-			// Its id, as programs address it; crafting it alone clears it.
-			elements.add(new Text(Component.translatable("hint.modularcomputers.id", "id:" + serial).withStyle(ChatFormatting.GRAY)));
-		}
 		if (!details) {
 			elements.add(new Text(Component.translatable("hint.modularcomputers.shift",
 				Component.translatable("hint.modularcomputers.shift_key").withStyle(ChatFormatting.YELLOW)).withStyle(ChatFormatting.DARK_GRAY)));
@@ -69,6 +65,8 @@ public final class Hint {
 		}
 		hinted.details(stack, elements::add);
 		if (serial != null) {
+			// Its id (programs address it as id:<uuid>), long, so only in the details (user); crafting it alone clears it.
+			elements.add(text(Component.translatable("hint.modularcomputers.id", serial.toString())));
 			elements.add(text(Component.translatable("hint.modularcomputers.clear_id")));
 		}
 		elements.add(text(Component.translatable("hint.modularcomputers.crafting")));
