@@ -31,11 +31,14 @@ import java.util.stream.Stream;
  * <li><b>hfs</b> (host filesystem), how a disk comes: the disk serves files, and they're real
  * files in a folder on the host, easy to look at. Programs {@code open} a file and get a
  * {@link FileHandle}, then read and write through it, like Plan 9's 9P, where a device serves
- * files itself. Writes go to the host file at once (no deferred writes).</li>
+ * files itself. A handle never keeps a host file open (user design, 2026-10-13): it reads through
+ * a window of the file, buffers its writes, and commits them atomically at {@code close}.</li>
  * <li><b>raw</b>, an opaque block device: sectors of {@link #SECTOR} bytes, kept on the host as one
  * image file.</li>
  * </ul>
- * Paths are the disk's own, from its root ({@code /notes/a.txt}); {@code ..} can't climb out. Data
+ * Paths are the disk's own, from its root ({@code /notes/a.txt}): {@code /} is the disk's folder in
+ * the world save ({@code modularcomputers/disks/<id>}), and nothing a program names can reach
+ * outside it ({@link #resolve}). Data
  * is bytes: strings carry one character per byte (ISO-8859-1), as Lua's do. Space counts each
  * file's bytes plus {@link #ENTRY} for each file and directory, so empty files aren't free.
  */
@@ -49,12 +52,20 @@ public final class Disk implements Device {
 	public static final int MAX_HANDLES = 16;
 	/** The most a read gives at once. */
 	public static final int MAX_READ = 4096;
+	/** How much of a file a handle holds to read from: what it costs the program's memory, whatever the file's size. */
+	public static final int WINDOW = 4096;
+	/** What a full disk says, as a real file descriptor's write does (ENOSPC). */
+	public static final String NO_SPACE = "No space left on device";
+	/** Live disks by id (their folder's name): a handle finds its disk by it, also after a restore. */
+	private static final Map<String, Disk> LIVE = new java.util.concurrent.ConcurrentHashMap<>();
 
 	private final DiskTier tier;
 	private final BusPower power;
 	/** Where its data lives: a folder (hfs), or this plus ".img" (raw). Null on a client's copy: no data there. */
 	private final Path storage;
 	private final List<FileHandle> handles = new ArrayList<>();
+	/** Space open handles' buffered writes will take when they close (reserved at write, as delayed allocation does). */
+	private long reserved;
 	/** Where its label is (its item's anvil name), read when asked: no copy of it here. */
 	private java.util.function.Supplier<String> label = () -> null;
 	/** Bytes in use, worked out on first need, then kept up to date. */
@@ -67,7 +78,15 @@ public final class Disk implements Device {
 	public Disk(DiskTier tier, Path storage) {
 		this.tier = tier;
 		this.power = new BusPower(tier.draw());
-		this.storage = storage;
+		this.storage = storage == null ? null : storage.toAbsolutePath().normalize(); // (the inside-the-folder checks compare normalized paths)
+		if (storage != null) {
+			LIVE.put(id(), this);
+		}
+	}
+
+	/** Its id: its folder's name in the world save. */
+	public String id() {
+		return storage.getFileName().toString();
 	}
 
 	public DiskTier tier() {
@@ -107,11 +126,11 @@ public final class Disk implements Device {
 		return DeviceType.STORAGE;
 	}
 
-	/** Power's gone, or it left the bus: open files close. */
+	/** Power's gone, or it left the bus: open files close, and what they hadn't committed is lost (as at a power cut). */
 	@Override
 	public void powerOff() {
 		for (FileHandle handle : List.copyOf(handles)) {
-			handle.close();
+			handle.drop();
 		}
 	}
 
@@ -139,8 +158,18 @@ public final class Disk implements Device {
 		return storage;
 	}
 
-	/** A path on the disk, as a host path inside its folder. */
-	private Path resolve(String path) {
+	/** Names a host could take as something else: Windows' devices. */
+	private static final java.util.Set<String> RESERVED = java.util.Set.of("con", "prn", "aux", "nul",
+		"com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+		"lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9");
+
+	/**
+	 * A path on the disk, as a host path inside its folder. Every path is the disk's own: relative
+	 * or absolute, it starts at the disk's root, {@code ..} at the root stays there, and a name a
+	 * host could read as more than a name (a separator, a drive, a device, a NUL) is refused. The
+	 * result is checked to be inside the folder, through any link on the host too.
+	 */
+	Path resolve(String path) {
 		Path root = root();
 		Path at = root;
 		for (String name : path.split("/")) {
@@ -151,12 +180,38 @@ public final class Disk implements Device {
 				at = at.equals(root) ? root : at.getParent();
 				continue;
 			}
-			if (name.indexOf('\\') >= 0 || name.indexOf('\0') >= 0) {
+			String bare = name.toLowerCase(Locale.ROOT);
+			int dot = bare.indexOf('.');
+			if (name.indexOf('\\') >= 0 || name.indexOf('\0') >= 0 || name.indexOf(':') >= 0 || name.endsWith(" ") || name.endsWith(".")
+				|| RESERVED.contains(dot < 0 ? bare : bare.substring(0, dot))) {
 				throw new Refused("bad name: " + name);
 			}
 			at = at.resolve(name);
 		}
+		if (!at.normalize().startsWith(root)) {
+			throw new Refused("outside the disk: " + path);
+		}
+		try {
+			// Through links: the nearest part that exists must really be inside the folder.
+			Path real = root.toRealPath();
+			Path nearest = at;
+			while (!Files.exists(nearest, java.nio.file.LinkOption.NOFOLLOW_LINKS) && !nearest.equals(root)) {
+				nearest = nearest.getParent();
+			}
+			if (!nearest.toRealPath().startsWith(real)) {
+				throw new Refused("outside the disk: " + path);
+			}
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 		return at;
+	}
+
+	/** Where a handle builds what it commits: beside the disk's folder, never in it (not visible, not counted). */
+	private Path scratch() throws IOException {
+		Path folder = storage.resolveSibling(storage.getFileName() + ".tmp");
+		Files.createDirectories(folder);
+		return folder;
 	}
 
 	private long used() {
@@ -183,10 +238,18 @@ public final class Disk implements Device {
 
 	/** Takes {@code bytes} more space (fewer, if negative), or refuses if there isn't room. */
 	void grow(long bytes) {
-		if (bytes > 0 && used() + bytes > tier.bytes()) {
-			throw new Refused("not enough space");
+		if (bytes > 0 && used() + reserved + bytes > tier.bytes()) {
+			throw new Refused(NO_SPACE);
 		}
 		used = used() + bytes;
+	}
+
+	/** Reserves {@code bytes} more for a handle's buffered writes (fewer, if negative), or refuses if there isn't room. */
+	void reserve(long bytes) {
+		if (bytes > 0 && used() + reserved + bytes > tier.bytes()) {
+			throw new Refused(NO_SPACE);
+		}
+		reserved += bytes;
 	}
 
 	private Result run(java.util.function.Supplier<Result> action) {
@@ -214,9 +277,9 @@ public final class Disk implements Device {
 		return Result.ok(tier.bytes());
 	}
 
-	@Method(doc = "getUsed(): how many bytes are in use (hfs: files and their entries; raw: all of it)")
+	@Method(doc = "getUsed(): how many bytes are in use (hfs: files and their entries, and what open files have written; raw: all of it)")
 	public Result getUsed(Arguments args) {
-		return run(() -> Result.ok(mode().equals(RAW) ? tier.bytes() : used()));
+		return run(() -> Result.ok(mode().equals(RAW) ? tier.bytes() : used() + reserved)); // what open files will take counts, as df counts delayed allocation
 	}
 
 	@Method(doc = "getMode(): \"hfs\" (it serves files) or \"raw\" (sectors)")
@@ -265,17 +328,15 @@ public final class Disk implements Device {
 
 	// ---- device methods: hfs -----------------------------------------------------------------
 
-	@Method(doc = "open(path[, mode]): opens a file and returns its handle; mode is r (the default), r+, w, w+, a or a+, as C's fopen")
+	@Method(doc = "open(path[, mode]): opens a file and returns its handle; mode is r (the default), r+, w, w+, a or a+, as C's fopen; writes take effect at close")
 	public Result open(Arguments args) {
 		String path = args.checkString(0);
 		String mode = args.optString(1, "r").replace("b", "");
 		return run(() -> {
-			Path file = resolve(path);
-			boolean read = mode.startsWith("r") || mode.endsWith("+");
-			boolean write = !mode.equals("r");
 			if (!List.of("r", "r+", "w", "w+", "a", "a+").contains(mode)) {
 				throw new Refused("bad mode: " + mode);
 			}
+			Path file = resolve(path);
 			if (Files.isDirectory(file)) {
 				throw new Refused("is a directory: " + path);
 			}
@@ -283,23 +344,16 @@ public final class Disk implements Device {
 				throw new Refused("too many open files");
 			}
 			boolean exists = Files.isRegularFile(file);
-			if (!exists && mode.startsWith("r")) {
-				throw new NoSuchFileRuntime(path);
-			}
-			if (!exists && !Files.isDirectory(file.getParent())) {
+			if (!exists && (mode.startsWith("r") || !Files.isDirectory(file.getParent()))) {
 				throw new NoSuchFileRuntime(path);
 			}
 			try {
 				if (!exists) {
-					grow(ENTRY);
-				} else if (mode.startsWith("w")) {
-					grow(-Files.size(file));
+					grow(ENTRY); // a new file is there at once, empty, as fopen makes it
+					Files.createFile(file);
 				}
-				RandomAccessFile host = new RandomAccessFile(file.toFile(), write ? "rw" : "r");
-				if (mode.startsWith("w")) {
-					host.setLength(0);
-				}
-				FileHandle handle = new FileHandle(this, host, read, write, mode.startsWith("a"));
+				String relative = storage.relativize(file).toString().replace('\\', '/');
+				FileHandle handle = new FileHandle(id(), relative, mode, Files.size(file));
 				handles.add(handle);
 				return Result.ok(handle);
 			} catch (IOException e) {
@@ -480,23 +534,73 @@ public final class Disk implements Device {
 	// ---- open files --------------------------------------------------------------------------
 
 	/**
-	 * An open file on an hfs disk: a proxy that holds the disk and the real host file. Its methods
-	 * are the program's; it closes when the program closes it, or the disk loses power.
+	 * An open file on an hfs disk (user design, 2026-10-13). It never keeps a host file open while
+	 * the program runs: it holds the file's path on the disk, where it's at, a window of the file to
+	 * read from ({@link #WINDOW} bytes, refilled as reads move on, so a file's size never costs the
+	 * program's memory), and the writes it hasn't committed, as extents over the file. Its own reads
+	 * see its writes. Writes reserve the space they'll take, or fail as a full disk does
+	 * ({@link #NO_SPACE}). {@code close} commits them atomically: the new file is built beside the
+	 * disk's folder and renamed over the old one, so the file is all old or all new; only when that
+	 * worked does the handle drop its buffer (a failure leaves it, to retry). Power lost before
+	 * {@code close} loses them, as in real life. It's a Lua userdata that Styx keeps when the computer
+	 * is saved ({@link #persisted}, {@link #restore}).
 	 */
 	public static final class FileHandle implements Handle {
-		private final Disk disk;
-		private final RandomAccessFile file;
-		private final boolean read;
-		private final boolean write;
-		private final boolean append;
+		/** Styx's name for the kind. */
+		public static final String KIND = "modularcomputers.file";
+		private final String diskId;
+		private final String path;
+		private final String mode;
+		/** The file's size when it was opened (the base the writes go over). */
+		private final long base;
+		/** The size it will have: the base, truncated by "w", grown by writes. */
+		private long length;
+		private long position;
+		/** Buffered writes, by where they start; never overlapping. */
+		private final java.util.TreeMap<Long, byte[]> writes = new java.util.TreeMap<>();
+		private long windowStart = -1;
+		private byte[] window = new byte[0];
 		private boolean open = true;
 
-		FileHandle(Disk disk, RandomAccessFile file, boolean read, boolean write, boolean append) {
-			this.disk = disk;
-			this.file = file;
-			this.read = read;
-			this.write = write;
-			this.append = append;
+		FileHandle(String diskId, String path, String mode, long base) {
+			this.diskId = diskId;
+			this.path = path;
+			this.mode = mode;
+			this.base = base;
+			this.length = mode.startsWith("w") ? 0 : base;
+			this.position = mode.startsWith("a") ? length : 0;
+		}
+
+		private boolean readable() {
+			return mode.startsWith("r") || mode.endsWith("+");
+		}
+
+		private boolean writable() {
+			return !mode.equals("r");
+		}
+
+		/** Its disk, if it's still there (a disk taken out leaves its handles closed). */
+		private Disk disk() {
+			Disk disk = LIVE.get(diskId);
+			if (disk == null || !disk.handles.contains(this) && !adopt(disk)) {
+				throw new Refused("closed handle");
+			}
+			return disk;
+		}
+
+		/** After a restore: the handle joins its disk again. */
+		private boolean adopt(Disk disk) {
+			if (!open || disk.handles.size() >= MAX_HANDLES) {
+				return false;
+			}
+			disk.handles.add(this);
+			disk.reserved += reservation();
+			return true;
+		}
+
+		/** What its buffered writes will add to the disk. */
+		private long reservation() {
+			return writes.isEmpty() && length == base ? 0 : Math.max(0, length - base);
 		}
 
 		@Override
@@ -504,46 +608,160 @@ public final class Disk implements Device {
 			return open;
 		}
 
-		void close() {
-			if (open) {
-				open = false;
-				disk.handles.remove(this);
-				try {
-					file.close();
-				} catch (IOException ignored) {
-					// closed either way
+		/** Closed without committing (power lost, the disk left): its writes are gone. */
+		void drop() {
+			Disk disk = LIVE.get(diskId);
+			if (open && disk != null && disk.handles.remove(this)) {
+				disk.reserved -= reservation();
+			}
+			open = false;
+			writes.clear();
+		}
+
+		/** The bytes at {@code at}, from the file (through the window) and over them its writes. */
+		private byte[] bytesAt(Disk disk, long at, int count) throws IOException {
+			count = (int) Math.max(0, Math.min(count, length - at));
+			byte[] out = new byte[count];
+			int done = 0;
+			while (done < count) {
+				long here = at + done;
+				if (here >= (mode.startsWith("w") ? 0 : base)) {
+					break; // past the old file: only writes (or zeros)
 				}
+				if (here < windowStart || here >= windowStart + window.length) {
+					fill(disk, here);
+				}
+				int take = (int) Math.min(count - done, windowStart + window.length - here);
+				if (take <= 0) {
+					break;
+				}
+				System.arraycopy(window, (int) (here - windowStart), out, done, take);
+				done += take;
+			}
+			for (var write : writes.subMap(writes.floorKey(at) != null ? writes.floorKey(at) : at, at + count).entrySet()) {
+				long from = Math.max(at, write.getKey());
+				long to = Math.min(at + count, write.getKey() + write.getValue().length);
+				if (from < to) {
+					System.arraycopy(write.getValue(), (int) (from - write.getKey()), out, (int) (from - at), (int) (to - from));
+				}
+			}
+			return out;
+		}
+
+		/** Reads a window of the file around {@code at}: the host file is open only for this. */
+		private void fill(Disk disk, long at) throws IOException {
+			windowStart = at - at % WINDOW;
+			try (RandomAccessFile file = new RandomAccessFile(disk.resolve(path).toFile(), "r")) {
+				file.seek(windowStart);
+				byte[] bytes = new byte[(int) Math.max(0, Math.min(WINDOW, file.length() - windowStart))];
+				file.readFully(bytes);
+				window = bytes;
 			}
 		}
 
 		@Method(doc = "read(n): up to n bytes (at most " + MAX_READ + "), or nil at the end")
 		public Result read(Arguments args) {
-			if (!read) {
+			if (!readable()) {
 				return Result.fail("not open for reading");
 			}
 			int count = (int) Math.clamp(args.checkInteger(0), 0, MAX_READ);
 			try {
-				byte[] bytes = new byte[count];
-				int got = file.read(bytes);
-				return got < 0 ? Result.ok() : Result.ok(new String(bytes, 0, got, StandardCharsets.ISO_8859_1));
+				Disk disk = disk();
+				if (position >= length) {
+					return Result.ok();
+				}
+				byte[] bytes = bytesAt(disk, position, count);
+				position += bytes.length;
+				return Result.ok(new String(bytes, StandardCharsets.ISO_8859_1));
+			} catch (Refused e) {
+				return Result.fail(e.getMessage());
 			} catch (IOException e) {
 				return Result.fail("i/o error: " + e.getMessage());
 			}
 		}
 
-		@Method(doc = "write(data): writes bytes where the file is at (at the end, opened to append)")
+		@Method(doc = "write(data): writes bytes where the file is at (at the end, opened to append); they take effect at close")
 		public Result write(Arguments args) {
-			if (!write) {
+			if (!writable()) {
 				return Result.fail("not open for writing");
 			}
 			byte[] data = args.checkString(0).getBytes(StandardCharsets.ISO_8859_1);
 			try {
-				if (append) {
-					file.seek(file.length());
+				Disk disk = disk();
+				long at = mode.startsWith("a") ? length : position;
+				long newLength = Math.max(length, at + data.length);
+				long before = reservation();
+				long grows = Math.max(0, newLength - base) - before;
+				disk.reserve(grows); // refuses with NO_SPACE: nothing written, the program's buffer as it was
+				put(at, data);
+				length = newLength;
+				position = at + data.length;
+				return Result.ok();
+			} catch (Refused e) {
+				return Result.fail(e.getMessage());
+			}
+		}
+
+		/** Lays {@code data} over the buffered writes at {@code at}, merging what it touches. */
+		private void put(long at, byte[] data) {
+			long start = at;
+			long end = at + data.length;
+			Long from = writes.floorKey(at);
+			if (from != null && from + writes.get(from).length >= at) {
+				start = from;
+			}
+			for (var write : writes.subMap(start, true, end, true).entrySet()) {
+				end = Math.max(end, write.getKey() + write.getValue().length);
+			}
+			byte[] merged = new byte[(int) (end - start)];
+			for (var write : List.copyOf(writes.subMap(start, true, end, true).entrySet())) {
+				System.arraycopy(write.getValue(), 0, merged, (int) (write.getKey() - start), write.getValue().length);
+				writes.remove(write.getKey());
+			}
+			System.arraycopy(data, 0, merged, (int) (at - start), data.length);
+			writes.put(start, merged);
+		}
+
+		@Method(doc = "seek([whence[, offset]]): moves to offset from \"set\" (the start), \"cur\" (the default) or \"end\"; returns where it is")
+		public Result seek(Arguments args) {
+			String whence = args.optString(0, "cur").toLowerCase(Locale.ROOT);
+			long offset = args.optInteger(1, 0);
+			long from = switch (whence) {
+				case "set" -> 0;
+				case "cur" -> position;
+				case "end" -> length;
+				default -> -1;
+			};
+			if (from < 0) {
+				return Result.fail("bad whence: " + whence);
+			}
+			if (from + offset < 0) {
+				return Result.fail("can't seek before the start");
+			}
+			try {
+				disk();
+			} catch (Refused e) {
+				return Result.fail(e.getMessage());
+			}
+			position = from + offset;
+			return Result.ok(position);
+		}
+
+		@Method(doc = "close(): commits what was written, all at once (the file is all old or all new), and closes; on failure it stays open, its writes kept")
+		public Result close(Arguments args) {
+			if (!open) {
+				return Result.ok();
+			}
+			try {
+				Disk disk = disk();
+				if (writable() && (!writes.isEmpty() || length != base)) {
+					commit(disk); // (its reservation becomes the file's space)
+				} else {
+					disk.reserved -= reservation();
 				}
-				long grows = Math.max(0, file.getFilePointer() + data.length - file.length());
-				disk.grow(grows);
-				file.write(data);
+				disk.handles.remove(this);
+				open = false;
+				writes.clear();
 				return Result.ok();
 			} catch (Refused e) {
 				return Result.fail(e.getMessage());
@@ -552,34 +770,95 @@ public final class Disk implements Device {
 			}
 		}
 
-		@Method(doc = "seek([whence[, offset]]): moves to offset from \"set\" (the start), \"cur\" (the default) or \"end\"; returns where it is")
-		public Result seek(Arguments args) {
-			String whence = args.optString(0, "cur").toLowerCase(Locale.ROOT);
-			long offset = args.optInteger(1, 0);
+		/** Builds the new file beside the disk's folder and renames it over the old one, in one step. */
+		private void commit(Disk disk) throws IOException {
+			Path target = disk.resolve(path);
+			long current = Files.isRegularFile(target) ? Files.size(target) : 0;
+			// The space it takes now (the file may have changed meanwhile); its own reservation is given back as it goes.
+			long reservation = reservation();
+			disk.reserved -= reservation;
 			try {
-				long base = switch (whence) {
-					case "set" -> 0;
-					case "cur" -> file.getFilePointer();
-					case "end" -> file.length();
-					default -> -1;
-				};
-				if (base < 0) {
-					return Result.fail("bad whence: " + whence);
+				disk.grow(length - current);
+			} catch (Refused e) {
+				disk.reserved += reservation; // nothing changed: the program can retry
+				throw e;
+			}
+			Path scratch = Files.createTempFile(disk.scratch(), "commit", ".tmp");
+			try {
+				try (RandomAccessFile out = new RandomAccessFile(scratch.toFile(), "rw")) {
+					if (!mode.startsWith("w") && Files.isRegularFile(target)) {
+						try (var in = Files.newInputStream(target)) {
+							byte[] chunk = new byte[64 * 1024];
+							long left = Math.min(base, length);
+							int got;
+							while (left > 0 && (got = in.read(chunk, 0, (int) Math.min(chunk.length, left))) > 0) {
+								out.write(chunk, 0, got);
+								left -= got;
+							}
+						}
+					}
+					out.setLength(length);
+					for (var write : writes.entrySet()) {
+						out.seek(write.getKey());
+						out.write(write.getValue());
+					}
 				}
-				if (base + offset < 0) {
-					return Result.fail("can't seek before the start");
-				}
-				file.seek(base + offset);
-				return Result.ok(file.getFilePointer());
+				Files.move(scratch, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
 			} catch (IOException e) {
-				return Result.fail("i/o error: " + e.getMessage());
+				Files.deleteIfExists(scratch);
+				disk.grow(current - length); // undo: nothing was committed
+				disk.reserved += reservation;
+				throw e;
+			}
+			windowStart = -1;
+		}
+
+		/** What Styx keeps of it: everything above, but the window (read again as needed). */
+		public byte[] persisted() {
+			try (var bytes = new java.io.ByteArrayOutputStream(); var out = new java.io.DataOutputStream(bytes)) {
+				out.writeInt(1);
+				out.writeUTF(diskId);
+				out.writeUTF(path);
+				out.writeUTF(mode);
+				out.writeLong(base);
+				out.writeLong(length);
+				out.writeLong(position);
+				out.writeBoolean(open);
+				out.writeInt(writes.size());
+				for (var write : writes.entrySet()) {
+					out.writeLong(write.getKey());
+					out.writeInt(write.getValue().length);
+					out.write(write.getValue());
+				}
+				out.flush();
+				return bytes.toByteArray();
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
 			}
 		}
 
-		@Method(doc = "close(): closes the file")
-		public Result close(Arguments args) {
-			close();
-			return Result.ok();
+		/** A handle again, from {@link #persisted}: it joins its disk at its next use. */
+		public static FileHandle restore(byte[] saved) {
+			try (var in = new java.io.DataInputStream(new java.io.ByteArrayInputStream(saved))) {
+				in.readInt();
+				String diskId = in.readUTF();
+				String path = in.readUTF();
+				String mode = in.readUTF();
+				FileHandle handle = new FileHandle(diskId, path, mode, in.readLong());
+				handle.length = in.readLong();
+				handle.position = in.readLong();
+				handle.open = in.readBoolean();
+				int count = in.readInt();
+				for (int i = 0; i < count; i++) {
+					long at = in.readLong();
+					byte[] data = new byte[in.readInt()];
+					in.readFully(data);
+					handle.writes.put(at, data);
+				}
+				return handle;
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
+			}
 		}
 	}
 }

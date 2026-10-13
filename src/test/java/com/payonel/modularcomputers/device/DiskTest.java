@@ -64,7 +64,7 @@ class DiskTest {
 			Handle file = (Handle) board.invoke("sata:0", "open", "/notes/hello.txt", "w").first();
 			seen.add(board.invoke(file, "write", "hello ").failed());
 			seen.add(file.isOpen());
-			// It's on the host already: no deferred writes.
+			// Made at open, empty; the writes take effect at close, all at once (user design, 2026-10-13).
 			seen.add(read(storage().resolve("notes/hello.txt")));
 			board.invoke(file, "write", "disk\n");
 			board.invoke(file, "close");
@@ -79,7 +79,7 @@ class DiskTest {
 			seen.add(board.invoke("sata:0", "stat", "/notes/hello.txt").first());
 			board.halt();
 		});
-		assertThat(seen).containsExactly("hfs", false, false, true, "hello ", "closed handle", "hello", 6L, "disk\n", null,
+		assertThat(seen).containsExactly("hfs", false, false, true, "", "closed handle", "hello", 6L, "disk\n", null,
 			List.of("notes/"), List.of("hello.txt"), seen.get(12));
 		@SuppressWarnings("unchecked")
 		Map<String, Object> stat = (Map<String, Object>) seen.get(12);
@@ -127,7 +127,7 @@ class DiskTest {
 			seen.add(board.invoke("sata:0", "getUsed").first());
 			board.halt();
 		});
-		assertThat(seen).containsExactly((long) Disk.ENTRY, false, (long) Disk.ENTRY + 4096, "not enough space", 0L);
+		assertThat(seen).containsExactly((long) Disk.ENTRY, false, (long) Disk.ENTRY + 4096, Disk.NO_SPACE, 0L);
 	}
 
 	@Test
@@ -161,5 +161,101 @@ class DiskTest {
 		assertThat(seen).containsExactly(false, false, "raw disk: no filesystem", false, Disk.SECTOR, "boot",
 			"no such sector: " + DiskTier.TIER_1.bytes() / Disk.SECTOR, false, List.of());
 		assertThat(storage().resolveSibling("d1.img")).doesNotExist();
+	}
+
+	@Test
+	void nothingAProgramNamesReachesOutsideTheDisksFolder() throws Exception {
+		Files.createDirectories(world.resolve("disks"));
+		Files.writeString(world.resolve("secret.txt"), "the host's");
+		run(DiskTier.TIER_1, board -> {
+			for (String path : List.of("../../secret.txt", "/../../../secret.txt", "a/../../..//secret.txt", "../d1/../../secret.txt")) {
+				// Relative or absolute, a path starts at the disk's root, and .. at the root stays there.
+				seen.add(board.invoke("sata:0", "open", path).error());
+			}
+			for (String name : List.of("C:x", "a\\b", "nul", "con.txt", "trailing.", "trailing ")) {
+				seen.add(board.invoke("sata:0", "open", name, "w").error());
+			}
+			Handle file = (Handle) board.invoke("sata:0", "open", "../../escape.txt", "w").first();
+			board.invoke(file, "write", "stays in");
+			board.invoke(file, "close");
+			board.halt();
+		});
+		assertThat(seen.subList(0, 4)).allMatch(error -> String.valueOf(error).startsWith("no such file"));
+		assertThat(seen.subList(4, 10)).allMatch(error -> String.valueOf(error).startsWith("bad name"));
+		assertThat(Files.readString(storage().resolve("escape.txt"))).as("written inside the disk").isEqualTo("stays in");
+		assertThat(Files.exists(world.resolve("escape.txt"))).isFalse();
+	}
+
+	@Test
+	void aLinkOnTheHostCantTakeItOutside() throws Exception {
+		Files.createDirectories(storage());
+		Files.writeString(world.resolve("secret.txt"), "the host's");
+		Files.createSymbolicLink(storage().resolve("link"), world);
+		run(DiskTier.TIER_1, board -> {
+			seen.add(board.invoke("sata:0", "open", "/link/secret.txt").error());
+			seen.add(board.invoke("sata:0", "open", "/link/new.txt", "w").error());
+			board.halt();
+		});
+		assertThat(seen).allMatch(error -> String.valueOf(error).startsWith("outside the disk"));
+		assertThat(Files.exists(world.resolve("new.txt"))).isFalse();
+	}
+
+	@Test
+	void aBigFileIsReadThroughASmallWindow() throws Exception {
+		Files.createDirectories(storage());
+		StringBuilder text = new StringBuilder();
+		for (int i = 0; text.length() < 20_000; i++) {
+			text.append(i).append(',');
+		}
+		Files.writeString(storage().resolve("big.txt"), text);
+		run(DiskTier.TIER_1, board -> {
+			Handle file = (Handle) board.invoke("sata:0", "open", "/big.txt").first();
+			StringBuilder got = new StringBuilder();
+			Object chunk;
+			while ((chunk = board.invoke(file, "read", 4096).first()) != null) {
+				got.append(chunk);
+			}
+			seen.add(got.toString());
+			board.invoke(file, "close");
+			board.halt();
+		});
+		assertThat(seen).containsExactly(text.toString());
+	}
+
+	@Test
+	void writesTakeEffectAtCloseAllAtOnceAndAreReadBackBeforeThat() throws Exception {
+		Files.createDirectories(storage());
+		Files.writeString(storage().resolve("a.txt"), "hello world");
+		run(DiskTier.TIER_1, board -> {
+			Handle file = (Handle) board.invoke("sata:0", "open", "/a.txt", "r+").first();
+			board.invoke(file, "seek", "set", 6);
+			board.invoke(file, "write", "WORLD!");
+			board.invoke(file, "seek", "set", 0);
+			seen.add(board.invoke(file, "read", 100).first()); // its own writes, over the file
+			seen.add(read(storage().resolve("a.txt"))); // the host file: as it was
+			seen.add(board.invoke(file, "close").failed());
+			seen.add(read(storage().resolve("a.txt")));
+			board.halt();
+		});
+		assertThat(seen).containsExactly("hello WORLD!", "hello world", false, "hello WORLD!");
+	}
+
+	@Test
+	void writesNotClosedAreLostWithThePowerAndTheirSpaceIsFree() throws Exception {
+		Files.createDirectories(storage());
+		Files.writeString(storage().resolve("a.txt"), "old");
+		run(DiskTier.TIER_1, board -> {
+			Handle file = (Handle) board.invoke("sata:0", "open", "/a.txt", "w").first();
+			board.invoke(file, "write", "x".repeat(10_000));
+			seen.add(board.invoke("sata:0", "getUsed").first());
+			board.halt();
+		});
+		machine.pressPower(); // a power cut
+		assertThat(Files.readString(storage().resolve("a.txt"))).isEqualTo("old");
+		run(DiskTier.TIER_1, board -> {
+			seen.add(board.invoke("sata:0", "getUsed").first());
+			board.halt();
+		});
+		assertThat(seen).containsExactly((long) Disk.ENTRY + 10_000, (long) Disk.ENTRY + 3);
 	}
 }

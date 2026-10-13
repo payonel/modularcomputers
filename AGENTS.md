@@ -16,7 +16,10 @@ Last updated: 2026-10-11 (battery tiers: recipes, charging, drain, power).
 - **Modular Computers** is a new mod that deliberately reuses many of OC's paradigms and
   features (computers, components, Lua machines, networks, etc.), but it is built **from
   scratch, green**:
-  - Do **not** copy OC source code into this repo.
+  - Do **not** copy OC source code into this repo. **Exception: OpenOS** (user, 2026-10-13): the user
+    wrote OpenOS, and it's MIT; porting it to mcos is allowed (postponed for now). Our terminals are
+    VT102 devices, so OpenOS's own terminal emulation isn't needed, and its `pullSignal` and
+    `component` layers become our `board` and interrupts.
   - Do **not** reuse OC's build process, versioning scheme, or plugin/addon process.
   - **Design from real hardware, not from OC.** The user designs by abstracting how real PCs
     work (CPU, motherboard, buses, firmware, consoles). Then they decide what to mimic and
@@ -900,13 +903,25 @@ scripts/art/error_beep.py` into
     any computer. Two modes, set like formatting (`setMode`, which erases it; `getMode`): **hfs**
     (host filesystem, how a disk comes; the user's name): the disk serves files, real files in
     that folder, like Plan 9's 9P where a device serves files itself: `open(path, mode)` (C's
-    fopen modes) gives a `Disk.FileHandle`, a proxy holding the disk and the real host file, with
-    `read(n)` (at most 4096), `write(data)`, `seek(whence, offset)`, `close()`; and `list`
-    (directories end in /), `stat`, `mkdir`, `remove`, `rename`, `getCapacity`, `getUsed`.
-    **Every write goes to the host file at once** (user: no deferred writes; OC buffered). Paths
-    can't climb out of the disk. Space counts bytes plus 512 for each file and directory. At most
-    16 open files a disk; they close when the disk loses power or leaves the bus (and, once there's
-    a Lua runtime, when the handle is garbage-collected). **raw**: sectors of 512 bytes in one
+    fopen modes) gives a `Disk.FileHandle`, with `read(n)` (at most 4096), `write(data)`,
+    `seek(whence, offset)`, `close()`; and `list` (directories end in /), `stat`, `mkdir`,
+    `remove`, `rename`, `getCapacity`, `getUsed`. **A handle never keeps a host file open** (user
+    design, 2026-10-13, replacing "no deferred writes"): it holds the disk's id, the path, its mode
+    and position, a 4 KiB window of the file to read from (refilled as reads move on: a file's size
+    never costs the program's memory), and its buffered writes as extents (its own reads see them).
+    A write reserves the space it will take (`getUsed` counts reservations, as df counts delayed
+    allocation) or fails with `No space left on device` (ENOSPC), nothing written. **`close` commits
+    atomically**: the new file is built in `<id>.tmp/` beside the disk's folder (not visible, not
+    counted) and renamed over the old one; the buffer is dropped only when that worked (a failure
+    leaves it, to retry). `open` makes a new file at once, empty, as fopen does. Power lost before
+    `close` loses the writes (a power cut) and frees their reservation. A handle is a Lua userdata
+    Styx keeps with a saved computer (`FileHandle.persisted`/`restore`, kind `modularcomputers.file`);
+    it finds its disk again by id (`Disk.LIVE`). **Paths can never leave the disk's folder**
+    (`Disk.resolve`): relative or absolute, a path starts at the disk's root (`/` is
+    `modularcomputers/disks/<id>/`); `..` at the root stays there; names with a backslash, a colon,
+    a NUL, a trailing dot or space, or a Windows device name (`nul`, `con.txt`) are refused; and the
+    nearest existing part is checked through links to be really inside. Space counts bytes plus 512
+    for each file and directory. At most 16 open files a disk. **raw**: sectors of 512 bytes in one
     image file (`<id>.img`): `getSectorSize`, `readSector(n)`, `writeSector(n, data)`. A disk is
     another device when its id changes; ids of things that hold data (EEPROMs, disks) can't be
     cleared by crafting (their data goes by it). `Arguments.check*` converts like Lua (2.0 is an integer; numbers

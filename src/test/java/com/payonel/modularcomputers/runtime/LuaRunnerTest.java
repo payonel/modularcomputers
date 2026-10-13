@@ -304,6 +304,35 @@ class LuaRunnerTest {
 	}
 
 	@Test
+	void anOpenFileIsKeptWithTheComputersSavedState(@org.junit.jupiter.api.io.TempDir java.nio.file.Path world) throws Exception {
+		com.payonel.modularcomputers.device.Disk disk = new com.payonel.modularcomputers.device.Disk(
+			com.payonel.modularcomputers.device.DiskTier.TIER_1, world.resolve("disk-a"));
+		Map<String, Device> devices = new LinkedHashMap<>();
+		devices.put("id:screen", screen);
+		devices.put("sata:0", disk);
+		machine.setDevices(devices);
+		boot("""
+			local _, file = board.invoke("sata:0", "open", "/log.txt", "w")
+			board.invoke(file, "write", "before ")
+			board.waitForInterrupt(0.5, "nothing")
+			board.invoke(file, "write", "after")
+			board.invoke(file, "close")
+			board.halt()
+			""");
+		settle(() -> machine.runner().map(r -> r.state() == Runner.State.WAITING).orElse(false));
+		byte[] saved = machine.persistProgram().orElseThrow();
+		machine.pressPower(); // the original stops: its open file's writes are lost with its power
+		Machine again = reloaded(new Terminal(Resolution.DEFAULT));
+		Map<String, Device> devices2 = new LinkedHashMap<>();
+		devices2.put("sata:0", new com.payonel.modularcomputers.device.Disk(com.payonel.modularcomputers.device.DiskTier.TIER_1, world.resolve("disk-a")));
+		again.setDevices(devices2);
+		again.resumeProgram(saved);
+		settle(again, () -> again.runner().isEmpty());
+		assertThat(java.nio.file.Files.readString(world.resolve("disk-a/log.txt"))).as("its handle, writes and all, came back").isEqualTo("before after");
+		again.pressPower();
+	}
+
+	@Test
 	void anErrorIsTheAbortScreen() {
 		boot("local x = nil\nx.y = 1\n");
 		untilHalted();

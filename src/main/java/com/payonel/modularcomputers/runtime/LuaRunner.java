@@ -143,8 +143,23 @@ public final class LuaRunner implements Runner {
 		}
 	}
 
-	/** A handle (an open file, say) held by a program: Lua userdata. */
+	/** A handle (an open file, say) held by a program: Lua userdata, kept by Styx when its kind can be. */
 	private record HandleObject(Handle handle) implements lua_UserObject {
+		@Override
+		public String persistkind() {
+			return handle instanceof com.payonel.modularcomputers.device.Disk.FileHandle ? com.payonel.modularcomputers.device.Disk.FileHandle.KIND : null;
+		}
+
+		@Override
+		public ByteView persistbytes() {
+			return handle instanceof com.payonel.modularcomputers.device.Disk.FileHandle file ? new ByteView(file.persisted()) : ByteView.EMPTY;
+		}
+	}
+
+	static {
+		com.payonel.lungolua.object.Lnames.lua_registerobjectkind(com.payonel.modularcomputers.device.Disk.FileHandle.KIND, (L, ints, count, bytes) ->
+			new HandleObject(com.payonel.modularcomputers.device.Disk.FileHandle.restore(
+				java.util.Arrays.copyOfRange(bytes.array(), bytes.offset(), bytes.offset() + bytes.size()))));
 	}
 
 	/** A board call waiting for the server thread. */
