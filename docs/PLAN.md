@@ -245,7 +245,8 @@ Built in this order:
    - **The board's ring lives in the RAM sticks** (Java, outside the VM): free, not counted against
      the VM's memory cap (the cap is the host's, on the Lua thread; world events mustn't compete with
      it). **Tier 1 RAM has no ring**: device data then stays in the device until the program asks,
-     a slow path that slows device reads, on purpose. Higher tiers have rings, larger with the tier.
+     a slow path that slows device reads, on purpose. Tier 2 has a ring, tier 3 a larger one (sizes to
+     settle; proposed 16 and 64 entries, summed over the sticks).
      Pulling RAM from a running machine loses what's in its ring (fair, and interesting).
    - **The firmware's ring is like an L1 cache**: in the VM, so it counts against the memory cap,
      and so it's tiny and fixed: a few entries per device (fewer than 5), so it can never eat a
