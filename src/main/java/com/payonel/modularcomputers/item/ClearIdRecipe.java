@@ -47,7 +47,7 @@ public final class ClearIdRecipe extends CustomRecipe {
 			}
 			found = stack;
 		}
-		if (found.is(ModItems.EEPROM)) {
+		if (ModItems.isEeprom(found)) {
 			// An EEPROM alone is wiped (user, 2026-10-12): no id, nothing on it.
 			if (!found.has(ModComponents.SERIAL) && found.getOrDefault(ModComponents.EEPROM_IMAGE, "").isEmpty()) {
 				return ItemStack.EMPTY;

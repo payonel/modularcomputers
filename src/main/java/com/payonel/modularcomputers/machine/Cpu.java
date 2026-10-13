@@ -1,7 +1,9 @@
 package com.payonel.modularcomputers.machine;
 
 import com.payonel.modularcomputers.console.ConsoleSplitter;
+import com.payonel.modularcomputers.runtime.LuaRunner;
 import com.payonel.modularcomputers.runtime.ProgramRunner;
+import com.payonel.modularcomputers.runtime.Runner;
 import java.util.Optional;
 
 /**
@@ -9,8 +11,8 @@ import java.util.Optional;
  * motherboard's EEPROM slot (a fixed place, like a real CPU's reset vector, so no bus walk) and
  * starts executing it.
  * <p>
- * The EEPROM holds plain text; this CPU is a Java machine, so it runs the program class the text
- * names ({@link #load}).
+ * The EEPROM holds plain text, run as the CPU's {@link Architecture} reads it: a Lua CPU runs it as
+ * a Lua chunk ({@link LuaRunner}); the Java CPU runs the program class it names ({@link #load}).
  * <p>
  * Its only behavior of its own is the abort screen, like a kernel panic: with no EEPROM, when
  * the program crashes, or when it returns instead of halting (Linux panics when init exits), it
@@ -18,13 +20,24 @@ import java.util.Optional;
  */
 public final class Cpu {
 	private final CpuTier tier;
+	private final Architecture architecture;
 
+	/** A Lua CPU, as every crafted one is. */
 	public Cpu(CpuTier tier) {
+		this(tier, Architecture.LUA);
+	}
+
+	public Cpu(CpuTier tier, Architecture architecture) {
 		this.tier = tier;
+		this.architecture = architecture;
 	}
 
 	public CpuTier tier() {
 		return tier;
+	}
+
+	public Architecture architecture() {
+		return architecture;
 	}
 
 	public static final String ABORT = "ABRT: ";
@@ -35,30 +48,49 @@ public final class Cpu {
 	public static final String BLANK = "EEPROM is blank";
 	/** The image isn't a program for this CPU (Linux's ENOEXEC: a binary of another architecture). */
 	public static final String EXEC_FORMAT = "EEPROM: exec format error";
+	/** Before what's wrong with the EEPROM's text, such as Lua's syntax error. */
+	public static final String EEPROM = "EEPROM: ";
 	public static final int ABORT_FOREGROUND = 0x2E2E2E;
 	public static final int ABORT_BACKGROUND = 0xBDBDBD;
 
-	/** Starts the EEPROM's program, or shows the abort screen without one. */
-	public Optional<ProgramRunner> powerOn(Motherboard board) {
+	/**
+	 * Starts the EEPROM's program, or shows the abort screen without one. A Java program attached
+	 * to the chip (a test's in-circuit programmer) runs on any CPU.
+	 */
+	public Optional<Runner> powerOn(Motherboard board) {
 		var eeprom = board.eeprom();
 		if (eeprom.isEmpty()) {
 			abort(board, NO_EEPROM);
 			return Optional.empty();
 		}
 		Eeprom chip = eeprom.get();
-		Optional<Program> program = chip.attached().or(() -> load(chip.image()));
+		if (chip.attached().isPresent()) {
+			return Optional.of(new ProgramRunner(chip.attached().get()::run, "cpu"));
+		}
+		if (chip.image().isBlank()) {
+			abort(board, BLANK);
+			return Optional.empty();
+		}
+		if (architecture == Architecture.LUA) {
+			try {
+				return Optional.of(new LuaRunner(chip.image()));
+			} catch (LuaRunner.LoadFailed failed) {
+				abort(board, EEPROM + failed.getMessage()); // it doesn't compile: Lua's own message says where
+				return Optional.empty();
+			}
+		}
+		Optional<Program> program = load(chip.image());
 		if (program.isEmpty()) {
-			abort(board, chip.image().isBlank() ? BLANK : EXEC_FORMAT);
+			abort(board, EXEC_FORMAT);
 			return Optional.empty();
 		}
 		return Optional.of(new ProgramRunner(program.get()::run, "cpu"));
 	}
 
 	/**
-	 * Today's CPUs are Java machines: the EEPROM's text names the program's class (its first
-	 * line), which must be a {@link Program} with a public no-argument constructor. The class is
-	 * looked at before it's initialized, so naming anything else runs nothing. A Lua CPU will read
-	 * the same text as Lua instead. Empty when it isn't a Java program.
+	 * The Java CPU's reading: the EEPROM's text names the program's class (its first line), which
+	 * must be a {@link Program} with a public no-argument constructor. The class is looked at before
+	 * it's initialized, so naming anything else runs nothing. Empty when it isn't a Java program.
 	 */
 	public static Optional<Program> load(String image) {
 		String name = image.strip().lines().findFirst().orElse("").strip();

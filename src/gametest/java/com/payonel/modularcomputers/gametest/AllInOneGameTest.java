@@ -51,6 +51,36 @@ public class AllInOneGameTest {
 	}
 
 	@GameTest
+	public void aNewEepromIsLuaThatALuaCpuRuns(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper);
+		TestPrograms.withScreen(computer);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM)); // as crafted: its Lua, not a test's program
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		computer.pressPower();
+		helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "hello world", "the EEPROM's Lua wrote to the console");
+		helper.assertTrue(computer.machine().isPowered() && computer.machine().runner().isEmpty(), "then halted, power on");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void theJavaCpuRunsTheJavaEepromAndNotLua(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper);
+		TestPrograms.withScreen(computer);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.JAVA_CPU));
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		computer.pressPower();
+		helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), Cpu.ABORT + Cpu.EXEC_FORMAT, "Lua on the Java CPU");
+		computer.pressPower();
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.JAVA_EEPROM));
+		computer.pressPower();
+		helper.assertTrue(computer.machine().runner().isPresent(), "the Java EEPROM's program runs");
+		helper.assertTrue(!computer.terminal().buffer().row(0).startsWith(Cpu.ABORT), "no abort");
+		helper.succeed();
+	}
+
+	@GameTest
 	public void placedComputerIsOffAndEmptyWithItsDevicesOnTheBus(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
 		Machine machine = computer.machine();
@@ -317,7 +347,7 @@ public class AllInOneGameTest {
 	@GameTest
 	public void itemsStackExceptThoseThatWillHoldData(GameTestHelper helper) {
 		for (var item : ModCommands.modItems()) {
-			boolean holdsData = item == ModItems.EEPROM || ModItems.HARD_DISKS.contains(item);
+			boolean holdsData = ModItems.EEPROMS.contains(item) || ModItems.HARD_DISKS.contains(item);
 			helper.assertValueEqual(new ItemStack(item).getMaxStackSize(), holdsData ? 1 : 64, "how many " + item + " stack");
 		}
 		helper.assertTrue(ItemStack.isSameItemSameComponents(ModItems.TIER1_BATTERY.charged(), ModItems.TIER1_BATTERY.charged()),

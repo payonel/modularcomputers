@@ -19,7 +19,7 @@ import java.util.function.Function;
  * Not saveable: a running program's state lives in its thread. When the machine unloads, the
  * program stops.
  */
-public final class ProgramRunner {
+public final class ProgramRunner implements Runner {
 	/** Something the program asks the host for. */
 	public sealed interface Request {
 	}
@@ -57,20 +57,6 @@ public final class ProgramRunner {
 		}
 	}
 
-	/** What the host's {@link #tick} found. */
-	public enum State {
-		/** Paused mid-run: the next tick carries on. */
-		RUNNING,
-		/** Waiting for an interrupt. */
-		WAITING,
-		/** The program halted the CPU; power stays on. */
-		HALTED,
-		/** The program returned instead of halting: a panic, like Linux's init exiting. */
-		RETURNED,
-		/** The program threw; see {@link #crash()}. */
-		CRASHED,
-	}
-
 	private final SynchronousQueue<Object> toProgram = new SynchronousQueue<>();
 	private final SynchronousQueue<Request> toHost = new SynchronousQueue<>();
 	private final Thread thread;
@@ -102,25 +88,22 @@ public final class ProgramRunner {
 		});
 	}
 
+	@Override
 	public State state() {
 		return state;
 	}
 
-	/** How many calls the host has answered, all told. */
+	@Override
 	public long answered() {
 		return answered;
 	}
 
-	/** Why the program crashed, when it did. */
+	@Override
 	public Throwable crash() {
 		return crash;
 	}
 
-	/**
-	 * Host side: lets the program run, answering at most {@code calls} motherboard calls with
-	 * {@code board}, the real one. {@code now} is the game tick; {@code interrupts} lists the
-	 * pending interrupts, for a waiting program.
-	 */
+	@Override
 	public State tick(Board board, int calls, long now, java.util.function.Supplier<List<String>> interrupts) {
 		if (state != State.RUNNING && state != State.WAITING) {
 			return state;
@@ -172,7 +155,7 @@ public final class ProgramRunner {
 		}
 	}
 
-	/** Stops the program, wherever it's paused: the machine lost power or unloaded. */
+	@Override
 	public void stop() {
 		state = State.HALTED;
 		thread.interrupt();

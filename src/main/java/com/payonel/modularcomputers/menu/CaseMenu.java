@@ -129,7 +129,7 @@ public final class CaseMenu extends AbstractContainerMenu {
 		if (slot == CPU_SLOT) {
 			return stack.getItem() instanceof CpuItem;
 		} else if (slot == EEPROM_SLOT) {
-			return stack.is(ModItems.EEPROM);
+			return ModItems.isEeprom(stack);
 		} else if (isBatteryBay(slot)) {
 			return stack.getItem() instanceof BatteryItem;
 		} else if (slot < SATA_SLOTS) {

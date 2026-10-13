@@ -1,0 +1,37 @@
+// LungoLua, the Lua engine (the user's separate project, com.payonel.lungolua), built from its
+// sources in place (gradle.properties: lungolua_dir) and nested in the mod's jar. Its standalone
+// interpreter, its JLine line editor and its test launchers stay out.
+plugins {
+	id 'java-library'
+}
+
+def lungoluaDir = rootProject.file(rootProject.property('lungolua_dir'))
+group = 'com.payonel'
+version = '0.1.0'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+
+sourceSets {
+	main {
+		java {
+			srcDirs = [new File(lungoluaDir, 'src')]
+			exclude 'com/payonel/lungolua/host/**'
+			exclude 'com/payonel/lungolua/platform/Readline.java'
+			exclude 'com/payonel/lungolua/tests/libs/**'
+			exclude 'com/payonel/lungolua/tests/EngineTests.java'
+			exclude 'com/payonel/lungolua/tests/Gate.java'
+			exclude 'com/payonel/lungolua/tests/PublicApi.java'
+			exclude 'com/payonel/lungolua/tests/StyxTests.java'
+		}
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.release = 21
+	options.encoding = 'UTF-8'
+	options.compilerArgs += ['-Xmaxerrs', '10000']
+}

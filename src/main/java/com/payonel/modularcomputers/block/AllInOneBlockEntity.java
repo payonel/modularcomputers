@@ -720,15 +720,15 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** Puts the parts in the slots onto the motherboard, and drives and cards onto the bus. */
 	private void installParts() {
 		Motherboard board = machine.board();
-		CpuTier cpuTier = parts.getItem(CaseMenu.CPU_SLOT).getItem() instanceof CpuItem cpu ? cpu.tier() : null;
-		if (cpuTier == null) {
+		CpuItem cpuItem = parts.getItem(CaseMenu.CPU_SLOT).getItem() instanceof CpuItem cpu ? cpu : null;
+		if (cpuItem == null) {
 			board.setCpu(null);
-		} else if (board.cpu().map(Cpu::tier).orElse(null) != cpuTier) {
-			board.setCpu(new Cpu(cpuTier));
+		} else if (board.cpu().map(cpu -> cpu.tier() != cpuItem.tier() || cpu.architecture() != cpuItem.architecture()).orElse(true)) {
+			board.setCpu(new Cpu(cpuItem.tier(), cpuItem.architecture()));
 		}
 		// The chip's text is what the CPU runs (a new chip holds the stand-in OS's class name).
 		ItemStack chip = parts.getItem(CaseMenu.EEPROM_SLOT);
-		boolean hasEeprom = chip.is(ModItems.EEPROM);
+		boolean hasEeprom = ModItems.isEeprom(chip);
 		UUID chipSerial = hasEeprom ? chip.get(ModComponents.SERIAL) : null;
 		if (!hasEeprom) {
 			eeprom = null;

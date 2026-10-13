@@ -57,8 +57,8 @@ public final class Hint {
 		Hinted hinted = stack.getItem() instanceof Hinted item ? item : Hinted.NONE;
 		hinted.summary(stack, elements::add);
 		contents(stack, elements::add);
-		if (stack.is(com.payonel.modularcomputers.item.ModItems.EEPROM)) {
-			// What's on the chip: its first line (a Java CPU's program class), or blank.
+		if (com.payonel.modularcomputers.item.ModItems.isEeprom(stack)) {
+			// What's on the chip: its first line (a Lua comment, say, or the Java CPU's program class), or blank.
 			String image = stack.getOrDefault(ModComponents.EEPROM_IMAGE, "").strip();
 			String first = image.lines().findFirst().orElse("");
 			first = first.length() > 28 ? "\u2026" + first.substring(first.length() - 27) : first;
@@ -84,10 +84,12 @@ public final class Hint {
 				elements.add(text(Component.translatable("hint.modularcomputers.clear_id")));
 			}
 		}
-		if (stack.is(com.payonel.modularcomputers.item.ModItems.EEPROM)) {
+		if (com.payonel.modularcomputers.item.ModItems.isEeprom(stack)) {
 			elements.add(text(Component.translatable("hint.modularcomputers.eeprom.wipe")));
 		}
-		if (!stack.is(com.payonel.modularcomputers.block.ModBlocks.BROKEN_CASE.asItem())) { // broken things are found, never made
+		if (com.payonel.modularcomputers.item.ModItems.CREATIVE_ONLY.contains(stack.getItem())) {
+			elements.add(text(Component.translatable("hint.modularcomputers.creative_only")));
+		} else if (!stack.is(com.payonel.modularcomputers.block.ModBlocks.BROKEN_CASE.asItem())) { // broken things are found, never made
 			elements.add(text(Component.translatable("hint.modularcomputers.crafting")));
 			elements.add(new Crafting(stack.getItem()));
 		}

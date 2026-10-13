@@ -134,6 +134,10 @@ public class BatteryGameTest {
 			if (item == com.payonel.modularcomputers.block.ModBlocks.BROKEN_CASE.asItem()) {
 				continue; // broken things are found, never made: no grid (AncientLabGameTest)
 			}
+			if (ModItems.CREATIVE_ONLY.contains(item)) {
+				helper.assertValueEqual(Hint.lines(Hint.of(stack, true)).getLast(), "Creative only", item + " is creative only");
+				continue;
+			}
 			helper.assertTrue(Hint.of(stack, true).getLast() instanceof Hint.Crafting crafting && crafting.item() == item, item + " shows how it's crafted");
 		}
 		helper.succeed();

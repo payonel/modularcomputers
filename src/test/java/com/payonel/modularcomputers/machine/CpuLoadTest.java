@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 /**
- * The EEPROM holds plain text; a Java CPU runs the program class it names, and anything else is
+ * The EEPROM holds plain text; the Java CPU runs the program class it names, and anything else is
  * a panic: blank, or not a program for this CPU (Linux's "exec format error").
  */
 class CpuLoadTest {
@@ -27,7 +27,7 @@ class CpuLoadTest {
 	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())));
 
 	private String boot(String image) {
-		machine.board().setCpu(new Cpu(CpuTier.TIER_1));
+		machine.board().setCpu(new Cpu(CpuTier.TIER_1, Architecture.JAVA));
 		machine.board().setEeprom(new Eeprom(image));
 		machine.pressPower();
 		return machine.board().virtualBus().console().screen().row(0).strip();

@@ -420,7 +420,9 @@ scripts/art/error_beep.py` into
       - There are four block models (`all_in_one[_on][_faded]`) on two base models (emissive,
         and plain), and four frames in `textures/gui/power_button.png`.
   - **Boot results:**
-    - CPU and EEPROM: **mcos** (`Mcos`; user's name, 2026-10-12: the Modular Computers OS, Java
+    - A (Lua) CPU and a new EEPROM: the EEPROM's Lua writes `hello world` to the console and
+      halts (`Eeprom.HELLO`).
+    - The Java CPU and the Java EEPROM: **mcos** (`Mcos`; user's name, 2026-10-12: the Modular Computers OS, Java
       version, a Lua version to follow), which the user keeps changing
       to try things out). Today it's **a tiny OS and shell, after OpenOS and busybox, all in that
       one class** (user, 2026-10-12: "keep all functions for the os just in that one class"):
@@ -546,9 +548,37 @@ scripts/art/error_beep.py` into
   - Where it is: a launcher install's `.minecraft/config/`, the dev client's `run/config/`
     (`./gradlew runClient`), or `build/run/productionClientGameTest/config/` for the tests.
     The tests run with the defaults.
-- **Lua runtime:** the user is building their own Lua runtime as a separate project, and it
-  isn't ready. Leave VM/runtime work alone and keep building the computer's other features.
-  Machine behavior stays a stand-in (like the "hello world" greeting) until the runtime lands.
+- **Lua: LungoLua** (user, 2026-10-12): the user's own Lua 5.5 engine, a line-by-line Java port
+  of their C++ fork (`~/code/lua-java`, branch `lua-java`, package `com.payonel.lungolua`; its
+  docs are `docs/summary.md`, `docs/java-port.md`, `docs/styx.md`). It's the user's separate
+  project: don't edit it from here; report what it needs. **Built from its sources in place**: the
+  Gradle subproject `:lungolua` (`lungolua/build.gradle`) compiles `${lungolua_dir}/src`
+  (`gradle.properties`, `../lua-java/java`), leaving out its interpreter (`host`), its JLine line
+  editor (`platform/Readline`) and its test launchers, and the mod nests the jar (Loom `include`,
+  `META-INF/jars/lungolua-0.1.0.jar`). Its API is C's, by C's names (`lua_resume`,
+  `luaL_loadbufferx`, `HostString` for text crossing in). Beyond stock Lua it has **budgets**
+  (`lua_setbudget`: a callback every n steps, which can `lua_freeze` the thread wherever it is;
+  `lua_thaw` goes on) and **Styx**, persisting a whole state (`luaL_persiststate`), for saving
+  running machines later.
+- **CPUs and architectures** (user design, 2026-10-12; `machine/Architecture`): **every crafted CPU
+  is a Lua CPU**; the **Java CPU** (`java_cpu`, creative only, tier 3, "JA/VA" printed on its
+  package) runs Java programs, and the **Java EEPROM** (`java_eeprom`, creative only) comes flashed
+  with mcos's class name. Creative-only items (`ModItems.CREATIVE_ONLY`) have no recipe; their hint
+  says "Creative only". The EEPROM slot takes either EEPROM (`ModItems.isEeprom`).
+- **The Lua CPU** (`runtime/LuaRunner`, a `Runner` like `ProgramRunner`): the EEPROM's text is a
+  Lua chunk (`=eeprom`), run on the server thread as a coroutine the host resumes each tick: no
+  thread of its own. Its budget (`STEPS_PER_TICK`, 100,000 steps) freezes it wherever it is, and
+  the next tick thaws it, so loops that never call are preempted (unless a call that can't freeze
+  is in the way: then it runs on to the next budget point; no hard stop yet). Board calls past the
+  tick's 20, `waitForInterrupt` and `halt` yield to the host. The program sees the global `board`
+  (`list`, `status`, `type`, `methods`, `doc`, `info`, `uptime`, `power`, `hardware`, `invoke`,
+  `waitForInterrupt([seconds], sources...)`, `halt`); `invoke` answers as `pcall` does (`true,
+  ...` or `false, why`); handles are userdata; board records come as tables; strings cross as
+  bytes (ISO-8859-1). Libraries: base (no `dofile`, `loadfile`, `print`), coroutine, string,
+  table, math, utf8; no io, os, package or debug (they reach the server). A syntax error is `ABRT:
+  EEPROM: eeprom:1: ...`; a runtime error the crash screen with Lua's message. Power-off drops the
+  state (closing it would run the program's finalizers). Not saved yet. Memory isn't limited or
+  counted yet.
 - **Screens and cables** (built 2026-10-11, the user's request):
   - **Screen** (`ScreenBlock`, `ScreenBlockEntity`): a monitor block, 50x16 like the built-in
     display. It faces the player who places it.
@@ -681,15 +711,14 @@ scripts/art/error_beep.py` into
     (soft gray; the user doesn't want blue), clear, cursor home, then `ABRT: <reason>`
     (`Cpu.NO_EEPROM`, `Cpu.CRASHED` plus the message, or `Cpu.RETURNED`).
 - **EEPROM (`Eeprom`):** holds **plain text, whatever the CPU's architecture** (user design,
-  2026-10-12). Today's CPUs are Java machines: the text's first line names a `Program` class with
-  a public no-argument constructor, which the CPU loads (`Cpu.load`; looked at before it's
-  initialized, so naming anything else runs nothing). A Lua CPU will read the same text as Lua.
-  Blank: `ABRT: EEPROM is blank`; not a Java program: `ABRT: EEPROM: exec format error` (Linux's
-  ENOEXEC). A new EEPROM comes flashed with mcos (`Mcos`'s class name is
-  the item's default `eeprom_image`). **Crafting one alone wipes it** (user): no id, blank
+  2026-10-12). A Lua CPU runs it as Lua (`LuaRunner`). The Java CPU reads the text's first line
+  as a `Program` class with a public no-argument constructor (`Cpu.load`; looked at before it's
+  initialized, so naming anything else runs nothing). Blank: `ABRT: EEPROM is blank`; not a Java
+  program on the Java CPU: `ABRT: EEPROM: exec format error` (Linux's ENOEXEC). A new EEPROM comes
+  flashed with Lua (`Eeprom.HELLO`); the Java EEPROM with `Mcos`'s class name. **Crafting one alone wipes it** (user): no id, blank
   (`ClearIdRecipe`); its hint shows what it holds ("Holds: ...", "Blank"). Tests attach Java
-  program objects with `Eeprom.flash(Program)`, like an in-circuit programmer; the CPU runs an
-  attached program in place of the image.
+  program objects with `Eeprom.flash(Program)`, like an in-circuit programmer; any CPU, Lua or
+  Java, runs an attached program in place of the image.
 - **Mock runtime** (`runtime/`, built 2026-10-11 after a design discussion with the user, modeled
   on OC's `machine.lua` + `component.invoke` but redesigned; OC is never named in code):
   - **Names:** `bus` and `device`, never "component" (user rule, code and docs).

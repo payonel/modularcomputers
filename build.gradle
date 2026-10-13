@@ -49,6 +49,9 @@ dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// LungoLua, the Lua CPU's engine (./lungolua), nested in the mod's jar.
+	implementation project(':lungolua')
+	include project(':lungolua')
 
 	// Unit tests: plain JUnit, with fabric-loader-junit so tests can bootstrap Minecraft registries.
 	testImplementation platform("org.junit:junit-bom:${project.junit_version}")

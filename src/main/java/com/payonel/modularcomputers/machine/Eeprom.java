@@ -23,6 +23,12 @@ import java.util.function.Consumer;
  * the CPU then runs that instead.
  */
 public final class Eeprom implements Device {
+	/** What a new EEPROM comes flashed with: Lua, for a Lua CPU. */
+	public static final String HELLO = """
+		-- hello, world: on the console, then halt (power stays on)
+		board.invoke("console", "write", "hello world\\n")
+		board.halt()
+		""";
 	private Program attached;
 	private String image = "";
 	private String label;

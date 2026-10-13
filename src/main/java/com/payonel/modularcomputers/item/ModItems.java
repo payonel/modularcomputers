@@ -32,14 +32,22 @@ public final class ModItems {
 	public static final CpuItem TIER2_CPU = cpu("tier2_cpu", CpuTier.TIER_2);
 	public static final CpuItem TIER3_CPU = cpu("tier3_cpu", CpuTier.TIER_3);
 	public static final List<CpuItem> CPUS = List.of(TIER1_CPU, TIER2_CPU, TIER3_CPU);
-	/** Every EEPROM holds the stand-in program for now; programmable contents come with the Lua runtime. */
+	/** Creative only (user, 2026-10-12): a tier 3 that runs Java programs, not Lua. */
+	public static final CpuItem JAVA_CPU = (CpuItem) register("java_cpu",
+		properties -> new CpuItem(properties, CpuTier.TIER_3, com.payonel.modularcomputers.machine.Architecture.JAVA), UnaryOperator.identity());
 	/** Refined from nether quartz in a blast furnace: what chips are printed on. */
 	public static final Item SILICON = register("silicon");
 	/** A die, printed from silicon through a photomask: the chip in every part. */
 	public static final Item CHIP = register("chip");
-	/** Comes from the factory flashed with mcos, as real boards ship with firmware (crafting it alone wipes it). */
+	/** Comes from the factory flashed with Lua firmware, as real boards ship with firmware (crafting it alone wipes it). */
 	public static final Item EEPROM = register("eeprom", properties -> holdsData(properties)
+		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.Eeprom.HELLO));
+	/** Creative only, for the Java CPU: flashed with mcos's Java version (its class name). */
+	public static final Item JAVA_EEPROM = register("java_eeprom", properties -> holdsData(properties)
 		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.Mcos.class.getName()));
+	public static final List<Item> EEPROMS = List.of(EEPROM, JAVA_EEPROM);
+	/** Items with no recipe on purpose: the creative tab's (and giveall's). */
+	public static final List<Item> CREATIVE_ONLY = List.of(JAVA_CPU, JAVA_EEPROM);
 	/** RAM sticks: the tier sets the size. */
 	public static final MemoryItem TIER1_RAM = ram("tier1_ram", MemoryTier.TIER_1);
 	public static final MemoryItem TIER2_RAM = ram("tier2_ram", MemoryTier.TIER_2);
@@ -84,6 +92,11 @@ public final class ModItems {
 	/** The kind of expansion card a stack is, if it is one. */
 	public static Optional<CardKind> cardKind(ItemStack stack) {
 		return Optional.ofNullable(CARDS.get(stack.getItem()));
+	}
+
+	/** Any EEPROM: what the EEPROM slot takes. */
+	public static boolean isEeprom(ItemStack stack) {
+		return EEPROMS.stream().anyMatch(stack::is);
 	}
 
 	/** Forces the static registrations above. */

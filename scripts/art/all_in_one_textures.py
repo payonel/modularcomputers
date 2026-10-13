@@ -205,7 +205,30 @@ def tier3_cpu_item():
 	"""A diamond lid."""
 	return cpu_item((70, 200, 200, 255), (160, 240, 236, 255), (40, 140, 140, 255))
 
-def eeprom_item():
+FONT_3X3 = {
+	"J": ["..x", "x.x", ".x."],
+	"A": [".x.", "xxx", "x.x"],
+	"V": ["x.x", "x.x", ".x."],
+}
+
+def java_cpu_item():
+	"""The Java CPU (creative only): no lid, its package printed JAVA, in two lines."""
+	im = cpu_item()
+	rect(im, 4, 4, 11, 11, (44, 46, 52, 255))  # no lid: the package shows
+	ink = (236, 150, 60, 255)
+	for word, y in (("JA", 4), ("VA", 8)):
+		for i, letter in enumerate(word):
+			for dy, line in enumerate(FONT_3X3[letter]):
+				for dx, c in enumerate(line):
+					if c == "x":
+						im.putpixel((4 + i * 5 + dx, y + dy), ink)
+	return im
+
+def java_eeprom_item(writing=(220, 120, 40, 255)):
+	"""The Java EEPROM (creative only): the EEPROM, its label written in orange."""
+	return eeprom_item(writing)
+
+def eeprom_item(writing=(90, 110, 170, 255)):
 	"""A small DIP chip: black body with silver legs and a paper label."""
 	im = item_canvas()
 	leg = (196, 200, 206, 255)
@@ -217,8 +240,8 @@ def eeprom_item():
 	im.putpixel((2, 7), (12, 12, 14, 255))  # notch
 	im.putpixel((2, 8), (12, 12, 14, 255))
 	rect(im, 4, 6, 11, 9, (236, 232, 214, 255))  # label
-	rect(im, 5, 7, 9, 7, (90, 110, 170, 255))  # writing
-	rect(im, 5, 8, 7, 8, (90, 110, 170, 255))
+	rect(im, 5, 7, 9, 7, writing)  # writing
+	rect(im, 5, 8, 7, 8, writing)
 	return im
 
 def ram_item(tier=1):
@@ -355,6 +378,7 @@ for state in LIT:
 gui_button().save(f"{OUT}/../gui/power_button.png")
 case_button().save(f"{OUT}/../gui/case_button.png")
 for name, fn in [("tier1_cpu", tier1_cpu_item), ("tier2_cpu", tier2_cpu_item), ("tier3_cpu", tier3_cpu_item), ("eeprom", eeprom_item),
+		("java_cpu", java_cpu_item), ("java_eeprom", java_eeprom_item),
 		("tier1_ram", lambda: ram_item(1)), ("tier2_ram", lambda: ram_item(2)), ("tier3_ram", lambda: ram_item(3)),
 		("tier1_hard_disk", lambda: hard_disk_item(1)), ("tier2_hard_disk", lambda: hard_disk_item(2)), ("tier3_hard_disk", lambda: hard_disk_item(3)),
 		("wlan_card", wlan_card_item), ("tier1_battery", tier1_battery_item), ("tier2_battery", tier2_battery_item), ("tier3_battery", tier3_battery_item), ("redstone_card", redstone_card_item),

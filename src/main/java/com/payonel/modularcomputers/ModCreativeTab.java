@@ -34,7 +34,9 @@ public final class ModCreativeTab {
 				output.accept(ModItems.SILICON);
 				output.accept(ModItems.CHIP);
 				ModItems.CPUS.forEach(output::accept);
+				output.accept(ModItems.JAVA_CPU);
 				output.accept(ModItems.EEPROM);
+				output.accept(ModItems.JAVA_EEPROM);
 				ModItems.RAMS.forEach(output::accept);
 				ModItems.HARD_DISKS.forEach(output::accept);
 				ModItems.CARDS.keySet().forEach(output::accept);

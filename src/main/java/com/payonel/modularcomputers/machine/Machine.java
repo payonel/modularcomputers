@@ -3,7 +3,7 @@ package com.payonel.modularcomputers.machine;
 import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.device.Terminal;
-import com.payonel.modularcomputers.runtime.ProgramRunner;
+import com.payonel.modularcomputers.runtime.Runner;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +48,7 @@ public final class Machine {
 	private final BooleanSupplier power;
 	private final MotherboardApi api;
 	private boolean powered;
-	private ProgramRunner runner;
+	private Runner runner;
 	private long uptime;
 	/** Ticks the CPU executed since power use was last collected. */
 	private long cpuTicks;
@@ -78,7 +78,7 @@ public final class Machine {
 	}
 
 	/** The program on the CPU, while one runs (or waits). */
-	public Optional<ProgramRunner> runner() {
+	public Optional<Runner> runner() {
 		return Optional.ofNullable(runner);
 	}
 
@@ -124,7 +124,7 @@ public final class Machine {
 	 * tick's calls, so waking it often buys no extra time.
 	 */
 	public void wake() {
-		if (powered && runner != null && !running && runner.state() == ProgramRunner.State.WAITING) {
+		if (powered && runner != null && !running && runner.state() == Runner.State.WAITING) {
 			run();
 		}
 	}
@@ -141,9 +141,9 @@ public final class Machine {
 		if (calls <= 0) {
 			return; // spent: the next tick carries on
 		}
-		ProgramRunner.State before = runner.state();
+		Runner.State before = runner.state();
 		long answeredBefore = runner.answered();
-		ProgramRunner.State state;
+		Runner.State state;
 		running = true;
 		try {
 			state = runner.tick(api, calls, uptime, api::interrupts);
@@ -152,17 +152,17 @@ public final class Machine {
 		}
 		int answered = (int) (runner.answered() - answeredBefore);
 		callsThisTick += answered;
-		boolean executed = answered > 0 || before != ProgramRunner.State.WAITING || state != ProgramRunner.State.WAITING;
+		boolean executed = answered > 0 || before != Runner.State.WAITING || state != Runner.State.WAITING;
 		if (executed && !executedThisTick) {
 			executedThisTick = true;
 			cpuTicks++; // it executed this tick (waiting all through, it draws its waiting draw instead)
 		}
-		if (state == ProgramRunner.State.CRASHED) {
+		if (state == Runner.State.CRASHED) {
 			board.cpu().ifPresent(cpu -> cpu.crashed(board, runner.crash()));
-		} else if (state == ProgramRunner.State.RETURNED) {
+		} else if (state == Runner.State.RETURNED) {
 			board.cpu().ifPresent(cpu -> cpu.returned(board));
 		}
-		if (state != ProgramRunner.State.RUNNING && state != ProgramRunner.State.WAITING) {
+		if (state != Runner.State.RUNNING && state != Runner.State.WAITING) {
 			runner = null; // the CPU is halted; power stays on, and the screens keep what they show
 		}
 		if (executed) {
