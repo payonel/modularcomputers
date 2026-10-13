@@ -1,0 +1,14 @@
+{
+	"placement": {
+		"type": "minecraft:random_spread",
+		"salt": 20261012,
+		"separation": 12,
+		"spacing": 40
+	},
+	"structures": [
+		{
+			"structure": "modularcomputers:ancient_lab",
+			"weight": 1
+		}
+	]
+}

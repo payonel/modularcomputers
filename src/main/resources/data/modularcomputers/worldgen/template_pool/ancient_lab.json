@@ -1,0 +1,14 @@
+{
+	"elements": [
+		{
+			"element": {
+				"element_type": "minecraft:single_pool_element",
+				"location": "modularcomputers:ancient_lab",
+				"processors": "modularcomputers:ancient_lab",
+				"projection": "rigid"
+			},
+			"weight": 1
+		}
+	],
+	"fallback": "minecraft:empty"
+}

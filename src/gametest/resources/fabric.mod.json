@@ -15,7 +15,8 @@
 			"com.payonel.modularcomputers.gametest.CaseTierGameTest",
 			"com.payonel.modularcomputers.gametest.RecipeGameTest",
 			"com.payonel.modularcomputers.gametest.KeepPartsGameTest",
-			"com.payonel.modularcomputers.gametest.PhotomaskGameTest"
+			"com.payonel.modularcomputers.gametest.PhotomaskGameTest",
+			"com.payonel.modularcomputers.gametest.AncientLabGameTest"
 		],
 		"fabric-client-gametest": [
 			"com.payonel.modularcomputers.gametest.ModularComputersClientGameTest",

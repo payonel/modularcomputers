@@ -1,0 +1,16 @@
+{
+	"gives": {
+		"id": "modularcomputers:photomask"
+	},
+	"max_uses": 3,
+	"reputation_discount": 0.05,
+	"wants": {
+		"count": 24,
+		"id": "minecraft:emerald"
+	},
+	"additional_wants": {
+		"count": 4,
+		"id": "minecraft:glass_pane"
+	},
+	"xp": 30
+}

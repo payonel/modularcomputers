@@ -479,6 +479,21 @@ scripts/art/error_beep.py` into
   photomask is found (an ancient site) or bought (a villager), not yet built. Art:
   `scripts/art/photomask_textures.py`. Items without code of their own can explain themselves
   with Shift through `hint.modularcomputers.details.<item>` in the lang file.
+- **The first photomask** (user design, 2026-10-12) is found or bought, never built first:
+  - **The ancient lab**, a world-gen ruin (`worldgen/structure/ancient_lab.json`, a one-piece
+    jigsaw on the surface, every ~40 chunks in plains, forests, taiga, savanna, meadow, hills):
+    a copper-trimmed stone lab with its front roof fallen in, workbenches with **broken
+    computers** (`BrokenCaseBlock`, a cracked-open model: lid askew, bezel fallen forward, the
+    board inside showing; decoration), cables along the floor, a chest of parts
+    (`loot_table/chests/ancient_lab.json`: cables, chips, silicon, copper, gold, redstone, now and
+    then an EEPROM, RAM or battery) and a **working photomask** on its bench. Weathering (moss,
+    cracks, missing cables and windows) comes from the processor list at generation. The template
+    is written by `scripts/data/ancient_lab_structure.py` (26.3 structure palettes use `id` and
+    `properties`, not `Name`/`Properties`; processor `output_state` is a plain id).
+  - **A toolsmith at expert level** sells one for 24 emeralds and 4 glass panes (villager trades
+    are data in 26.3: `villager_trade/toolsmith/4/emerald_photomask.json`, added to the tag
+    `minecraft:toolsmith/level_4`).
+  - Programs from ruins and traders, and books with programs, come later (user).
 - **Recipes** (user design, 2026-10-12; `data/modularcomputers/recipe/`, checked grid by grid by
   `RecipeGameTest`; the draft page with game textures: a private draft page):
   real computer materials from vanilla, few custom components, each grid laid out like the part
@@ -1224,6 +1239,9 @@ scripts/art/all_in_one_textures.py   draws the block, GUI and item textures (Pil
 scripts/art/case_gui_textures.py     draws the case view's board, bus panel and icons (Pillow); PNGs are committed
 scripts/art/error_beep.py            synthesizes the error beep as Ogg Vorbis; the .ogg is committed
 scripts/art/case_tier_textures.py    tier 2 and 3 case textures (eras) from the beige ones, plus case models and blockstates
+scripts/art/photomask_textures.py    silicon, chip, the photomask's faces and its gear
+scripts/art/ancient_site_textures.py the broken computer's faces (from the beige case's)
+scripts/data/ancient_lab_structure.py writes the ancient lab's structure template (.nbt)
 scripts/art/power_down.py            synthesizes the power-down sound (the beep sagging and fading)
 scripts/art/part_sounds.py           synthesizes the part insert/remove sounds (slides, clicks, thumps, a zap)
 scripts/art/oggwrite.py              shared: writes mono Ogg Vorbis via the system's libsndfile (ctypes)

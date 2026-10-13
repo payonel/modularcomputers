@@ -301,6 +301,15 @@ public class CableClientGameTest implements FabricClientGameTest {
 			BufferedImage turned = read(context.takeScreenshot("photomask-turned"));
 			check(differ(still, turned) > 50, "cranked, the gear turns: " + differ(still, turned) + " pixels changed");
 			check(turning.getWidth() == turned.getWidth(), "frames");
+
+			// A broken computer from the ancient sites: cracked open, its board showing.
+			setblock(singleplayer, screen, "broken_case[facing=south]");
+			context.waitTicks(3);
+			BufferedImage broken = read(context.takeScreenshot("broken-case"));
+			int board = count(broken, 0, 0, broken.getWidth(), broken.getHeight(),
+				rgb -> AllInOneClientGameTest.green(rgb) > AllInOneClientGameTest.red(rgb) + 25 && AllInOneClientGameTest.green(rgb) > AllInOneClientGameTest.blue(rgb) + 15
+					&& AllInOneClientGameTest.green(rgb) < 140);
+			check(board > 40, "the broken computer's board shows through, found " + board);
 		}
 	}
 

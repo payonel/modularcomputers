@@ -10,6 +10,7 @@
 		"modularcomputers:expansion_hub",
 		"modularcomputers:robotic_piston",
 		"modularcomputers:paint_gun",
-		"modularcomputers:photomask"
+		"modularcomputers:photomask",
+		"modularcomputers:broken_case"
 	]
 }

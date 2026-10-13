@@ -93,6 +93,8 @@
 	"block.modularcomputers.robotic_piston": "Robotic Piston",
 	"block.modularcomputers.paint_gun": "Paint Gun",
 	"block.modularcomputers.photomask": "Photomask",
+	"block.modularcomputers.broken_case": "Broken Computer",
+	"hint.modularcomputers.details.broken_case": "Left behind by whoever built computers here before you",
 	"item.modularcomputers.silicon": "Silicon",
 	"item.modularcomputers.chip": "Chip",
 	"gui.modularcomputers.photomask.silicon": "Silicon",

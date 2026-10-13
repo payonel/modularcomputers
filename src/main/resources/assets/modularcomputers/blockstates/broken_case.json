@@ -1,0 +1,19 @@
+{
+	"variants": {
+		"facing=north": {
+			"model": "modularcomputers:block/broken_case"
+		},
+		"facing=east": {
+			"model": "modularcomputers:block/broken_case",
+			"y": 90
+		},
+		"facing=south": {
+			"model": "modularcomputers:block/broken_case",
+			"y": 180
+		},
+		"facing=west": {
+			"model": "modularcomputers:block/broken_case",
+			"y": 270
+		}
+	}
+}

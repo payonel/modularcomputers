@@ -77,6 +77,10 @@ public final class ModBlocks {
 		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("photomask"),
 		new BlockEntityType<>(PhotomaskBlockEntity::new, Set.of(PHOTOMASK)));
 
+	/** A broken computer from the ancient sites: decoration, nothing works. */
+	public static final Block BROKEN_CASE = registerWithItem("broken_case", BrokenCaseBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(1.5f).sound(SoundType.METAL).noOcclusion());
+
 	private ModBlocks() {
 	}
 
