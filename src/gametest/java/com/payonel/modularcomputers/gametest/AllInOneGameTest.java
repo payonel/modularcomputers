@@ -6,6 +6,7 @@ import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.bus.DeviceType;
 import com.payonel.modularcomputers.command.ModCommands;
 import com.payonel.modularcomputers.display.TextBuffer;
+import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.machine.Machine;
@@ -60,6 +61,29 @@ public class AllInOneGameTest {
 		computer.pressPower();
 		helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "hello world", "the EEPROM's Lua wrote to the console");
 		helper.assertTrue(computer.machine().isPowered() && computer.machine().runner().isEmpty(), "then halted, power on");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void aProgramFlashesTheEepromAndTheNextBootRunsTheNewScript(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper);
+		TestPrograms.withScreen(computer);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
+		ItemStack chip = new ItemStack(ModItems.EEPROM);
+		chip.set(ModComponents.EEPROM_IMAGE, """
+			board.invoke("eeprom", "set", 'board.invoke("console", "write", "second script") board.halt()')
+			board.invoke("console", "write", "first script")
+			board.halt()
+			""");
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, chip);
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		computer.pressPower();
+		helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "first script", "the first boot runs what the chip held");
+		helper.assertTrue(computer.parts().getItem(CaseMenu.EEPROM_SLOT).get(ModComponents.EEPROM_IMAGE).contains("second script"),
+			"the program's write is on the chip (the item) at once");
+		computer.pressPower(); // off
+		computer.pressPower(); // on: the CPU reads the chip again
+		helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "second script", "the reboot runs the new script");
 		helper.succeed();
 	}
 
