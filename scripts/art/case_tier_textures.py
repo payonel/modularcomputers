@@ -3,8 +3,11 @@
 # draws, and writes the case models and blockstates (needs Pillow). Each tier is an era of the PC
 # (user's pick, 2026-10-12), matching its screens (cabled_block_textures.py):
 #   tier 1: the 80s beige box (the originals, unchanged);
-#   tier 2: a 90s platinum tower, with a red MHz display on the front and vents on the side;
-#   tier 3: a modern graphite case, a diamond light bar down the front, a glass side panel.
+#   tier 2: a 90s platinum tower, with a red MHz display on the front;
+#   tier 3: a modern graphite case, with a diamond light bar down the front.
+# The sides keep tier 1's line across them (the user likes how it breaks up the color), and show
+# no board: the board shows only through the back's window, where the power button is, so a
+# player looking for the back isn't misled (user, 2026-10-12).
 # The shapes stay the tier 1 ones (the glass the display is drawn on, the back's window and power
 # button housing, which BackPanel maps clicks to); only colors and the era's details change.
 # Rerun after all_in_one_textures.py, then check the preview.
@@ -54,20 +57,6 @@ def light_bar(im):
 	for y in range(10, 15):
 		im.putpixel((14, y), DIAMOND)
 
-def vents(im, tier):
-	for y in range(3, 13, 2):
-		rect(im, 4, y, 11, y, ERAS[tier][0])
-
-def glass_side(im):
-	"""A tempered glass side panel: the board inside, a CPU cooler, RAM, a glow."""
-	rect(im, 2, 2, 13, 13, (26, 29, 34))
-	rect(im, 3, 3, 12, 12, (31, 90, 53))
-	rect(im, 4, 4, 6, 6, (201, 201, 201)); rect(im, 5, 5, 5, 5, (120, 124, 130))  # cooler
-	rect(im, 8, 4, 8, 7, (43, 43, 43)); rect(im, 10, 4, 10, 7, (43, 43, 43))      # RAM
-	rect(im, 4, 9, 7, 9, (232, 195, 58)); rect(im, 4, 11, 9, 11, (43, 43, 43))   # card
-	rect(im, 12, 3, 12, 12, DIAMOND)                                             # glow strip
-	rect(im, 2, 2, 13, 2, (58, 64, 72)); im.putpixel((3, 3), (125, 138, 153))   # glass glint
-
 def src(name):
 	return Image.open(f"{TEX}/{name}.png").convert("RGBA")
 
@@ -78,7 +67,6 @@ for tier in (2, 3):
 	side = recolor(src("all_in_one_side"), tier)
 	if tier == 2:
 		mhz(front)
-		vents(side, tier)
 	else:
 		# Dark keys and lit drive bays: beige keys and black bays don't read on graphite.
 		for im in (front, front_screen):
@@ -91,7 +79,6 @@ for tier in (2, 3):
 						im.putpixel((x, y), (16, 17, 19, 255) if im is front_screen else (88, 93, 101, 255))
 		light_bar(front)
 		light_bar(front_screen)
-		glass_side(side)
 	made[f"tier{tier}_case_front"] = front
 	made[f"tier{tier}_case_front_screen"] = front_screen
 	made[f"tier{tier}_case_side"] = side

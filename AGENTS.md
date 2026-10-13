@@ -235,9 +235,11 @@ same thing.
       a private draft page), and a case and a screen of one tier
       match: tier 1 the 80s beige box with a **green-phosphor** terminal (its glass is green and
       its text glows green: `ColorDepth.glow`/`glass`, drawing only, as phosphor is the glass's);
-      tier 2 a 90s platinum tower with a red MHz display and side vents, and a color monitor with
-      an RGB badge; tier 3 a modern graphite case with a diamond light bar, a glass side panel
-      showing the board and dark keys, and a graphite monitor. Shapes don't change between tiers:
+      tier 2 a 90s platinum tower with a red MHz display, and a color monitor with an RGB badge;
+      tier 3 a modern graphite case with a diamond light bar and dark keys, and a graphite
+      monitor. Every tier's sides keep tier 1's line across them, and **only the back shows the
+      board** (user: a side showing it would send players looking for the power button to the
+      wrong face). Shapes don't change between tiers:
       the glass where text is drawn, the back's window and the **power button on the back** (still
       right-clickable, `BackPanel`) stay put. `scripts/art/case_tier_textures.py` recolors the
       beige originals for tiers 2 and 3 and writes the case models (`tier{N}_case[_screen][_on][_faded]`),
