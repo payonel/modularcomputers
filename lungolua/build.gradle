@@ -6,6 +6,11 @@ plugins {
 }
 
 def lungoluaDir = rootProject.file(rootProject.property('lungolua_dir'))
+// The mod uses the engine by its package, com.payonel.lungolua (lua-java 4f9a9536 and later).
+if (!new File(lungoluaDir, 'src/com/payonel/lungolua').isDirectory()) {
+	throw new GradleException("LungoLua's sources aren't at ${lungoluaDir}/src/com/payonel/lungolua: " +
+		"check out (or pull) the lua-java branch of lua-java there, at 4f9a9536 or later, or set lungolua_dir in gradle.properties")
+}
 group = 'com.payonel'
 version = '0.1.0'
 
@@ -19,13 +24,13 @@ sourceSets {
 	main {
 		java {
 			srcDirs = [new File(lungoluaDir, 'src')]
-			exclude 'com/payonel/lungolua/host/**'
-			exclude 'com/payonel/lungolua/platform/Readline.java'
-			exclude 'com/payonel/lungolua/tests/libs/**'
-			exclude 'com/payonel/lungolua/tests/EngineTests.java'
-			exclude 'com/payonel/lungolua/tests/Gate.java'
-			exclude 'com/payonel/lungolua/tests/PublicApi.java'
-			exclude 'com/payonel/lungolua/tests/StyxTests.java'
+			exclude '**/host/**'
+			exclude '**/platform/Readline.java'
+			exclude '**/tests/libs/**'
+			exclude '**/tests/EngineTests.java'
+			exclude '**/tests/Gate.java'
+			exclude '**/tests/PublicApi.java'
+			exclude '**/tests/StyxTests.java'
 		}
 	}
 }
