@@ -89,7 +89,7 @@ class BoardInfoTest {
 	@Test
 	void eachDeviceSaysWhatItIs() {
 		Disk disk = new Disk(DiskTier.TIER_2);
-		disk.setLabel("backups");
+		disk.labelFrom(() -> "backups");
 		Terminal terminal = new Terminal(Resolution.DEFAULT, TerminalTier.TIER_2);
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("sata:0", disk);
@@ -113,7 +113,18 @@ class BoardInfoTest {
 	@Test
 	void theEepromsContentsAreReadAndWrittenWithGetAndSet() {
 		List<String> written = new ArrayList<>();
-		Eeprom eeprom = new Eeprom(board -> {
+		Eeprom eeprom = new Eeprom(new Eeprom.Storage() { // where the contents are: each write lands here, each read comes from here
+			@Override
+			public String read() {
+				return written.isEmpty() ? "" : written.getLast();
+			}
+
+			@Override
+			public void write(String image) {
+				written.add(image);
+			}
+		});
+		eeprom.flash(board -> {
 			seen.add(board.invoke("eeprom", "get").first());
 			seen.add(board.invoke("eeprom", "set", "print('hi')").failed());
 			seen.add(board.invoke("eeprom", "get").first());
@@ -122,12 +133,11 @@ class BoardInfoTest {
 			seen.add(board.info("eeprom").orElseThrow().get("used"));
 			board.halt();
 		});
-		eeprom.setOnWrite(written::add);
 		machine.board().setCpu(new Cpu(CpuTier.TIER_2));
 		machine.board().setEeprom(eeprom);
 		machine.setDevices(Map.of("eeprom", eeprom));
 		machine.pressPower();
 		assertThat(seen).containsExactly("", false, "print('hi')", 11L, false, 100_000L);
-		assertThat(written).as("each write goes onto the chip").containsExactly("print('hi')", "x".repeat(100_000));
+		assertThat(written).as("each write goes to its storage").containsExactly("print('hi')", "x".repeat(100_000));
 	}
 }

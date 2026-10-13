@@ -130,8 +130,26 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	private final UUID[] diskSerials = new UUID[CaseMenu.LANES];
 	private final Card[] cards = new Card[CaseMenu.LANES];
 	private Eeprom eeprom;
-	/** The serial of the chip {@link #eeprom} was made for: another chip is another device. */
+	/** The serial of the EEPROM {@link #eeprom} was made for: another EEPROM is another device. */
 	private UUID eepromSerial;
+	/** The EEPROM's storage: the item in the EEPROM slot, read and written in place (not a part change). */
+	private final Eeprom.Storage eepromSlot = new Eeprom.Storage() {
+		@Override
+		public String read() {
+			return parts.getItem(CaseMenu.EEPROM_SLOT).getOrDefault(ModComponents.EEPROM_IMAGE, "");
+		}
+
+		@Override
+		public void write(String image) {
+			parts.getItem(CaseMenu.EEPROM_SLOT).set(ModComponents.EEPROM_IMAGE, image);
+			setChanged();
+		}
+
+		@Override
+		public String label() {
+			return ModComponents.label(parts.getItem(CaseMenu.EEPROM_SLOT));
+		}
+	};
 	private final Bus bus = new Bus(List.of()); // empty until a CPU is in
 	private final PowerBuffer power;
 	private final CaseTier tier;
@@ -726,25 +744,16 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		} else if (board.cpu().map(cpu -> cpu.tier() != cpuItem.tier() || cpu.architecture() != cpuItem.architecture()).orElse(true)) {
 			board.setCpu(new Cpu(cpuItem.tier(), cpuItem.architecture()));
 		}
-		// The chip's text is what the CPU runs (a new chip holds the stand-in OS's class name).
-		ItemStack chip = parts.getItem(CaseMenu.EEPROM_SLOT);
-		boolean hasEeprom = ModItems.isEeprom(chip);
-		UUID chipSerial = hasEeprom ? chip.get(ModComponents.SERIAL) : null;
+		// The EEPROM reads and writes the item in its slot directly (EepromSlot): no copy of its text.
+		ItemStack stack = parts.getItem(CaseMenu.EEPROM_SLOT);
+		boolean hasEeprom = ModItems.isEeprom(stack);
+		UUID serial = hasEeprom ? stack.get(ModComponents.SERIAL) : null;
 		if (!hasEeprom) {
 			eeprom = null;
-		} else if (eeprom == null || !java.util.Objects.equals(eepromSerial, chipSerial)) {
-			eeprom = new Eeprom(""); // another chip: its own image, loaded below
+		} else if (eeprom == null || !java.util.Objects.equals(eepromSerial, serial)) {
+			eeprom = new Eeprom(eepromSlot); // another EEPROM: another device
 		}
-		eepromSerial = chipSerial;
-		if (eeprom != null) {
-			eeprom.load(chip.get(ModComponents.EEPROM_IMAGE));
-			eeprom.setLabel(ModComponents.label(chip));
-			// A program's write goes onto the chip (the item), in place: not a part change.
-			eeprom.setOnWrite(image -> {
-				parts.getItem(CaseMenu.EEPROM_SLOT).set(ModComponents.EEPROM_IMAGE, image);
-				setChanged();
-			});
-		}
+		eepromSerial = serial;
 		board.setEeprom(eeprom);
 		// Each part answers to its serial number too: a card is found by it here or in a hub.
 		board.plug(Motherboard.EEPROM, eeprom, serial(CaseMenu.EEPROM_SLOT));
@@ -759,7 +768,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			}
 			diskSerials[lane] = diskSerial;
 			if (disks[lane] != null) {
-				disks[lane].setLabel(ModComponents.label(parts.getItem(CaseMenu.SATA_SLOTS + lane)));
+				int slot = CaseMenu.SATA_SLOTS + lane;
+				disks[lane].labelFrom(() -> ModComponents.label(parts.getItem(slot))); // read from the disk itself
 			}
 			board.plug(Motherboard.sata(lane), disks[lane], serial(CaseMenu.SATA_SLOTS + lane));
 			ItemStack card = parts.getItem(CaseMenu.EXP_SLOTS + lane);
@@ -771,14 +781,15 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 					display.setFlusher(this::syncDisplay);
 				}
 				cards[lane] = null;
-				display.setLabel(ModComponents.label(card));
+				display.labelFrom(() -> ModComponents.label(parts.getItem(CaseMenu.EXP_SLOTS))); // read from the screen itself
 				board.plug(Motherboard.exp(lane), display, serial(CaseMenu.EXP_SLOTS + lane));
 				continue;
 			}
 			CardKind kind = ModItems.cardKind(card).orElse(null);
 			cards[lane] = kind == null ? null : cards[lane] != null && cards[lane].kind() == kind ? cards[lane] : new Card(kind);
 			if (cards[lane] != null) {
-				cards[lane].setLabel(ModComponents.label(card));
+				int slot = CaseMenu.EXP_SLOTS + lane;
+				cards[lane].labelFrom(() -> ModComponents.label(parts.getItem(slot))); // read from the card itself
 			}
 			board.plug(Motherboard.exp(lane), cards[lane], serial(CaseMenu.EXP_SLOTS + lane));
 		}

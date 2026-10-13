@@ -46,7 +46,8 @@ public final class Terminal implements Device {
 	private final VtDecoder decoder;
 
 	private final TerminalTier tier;
-	private String label;
+	/** Where its label is (its item's anvil name), read when asked: no copy of it here. */
+	private java.util.function.Supplier<String> label = () -> null;
 
 	/** A tier 3 terminal (every color). */
 	public Terminal(Resolution resolution) {
@@ -135,13 +136,13 @@ public final class Terminal implements Device {
 		return DeviceType.TERMINAL;
 	}
 
-	public void setLabel(String label) {
+	public void labelFrom(java.util.function.Supplier<String> label) {
 		this.label = label;
 	}
 
 	@Override
 	public String label() {
-		return label;
+		return label.get();
 	}
 
 	@Override

@@ -55,7 +55,8 @@ public final class Disk implements Device {
 	/** Where its data lives: a folder (hfs), or this plus ".img" (raw). Null on a client's copy: no data there. */
 	private final Path storage;
 	private final List<FileHandle> handles = new ArrayList<>();
-	private String label;
+	/** Where its label is (its item's anvil name), read when asked: no copy of it here. */
+	private java.util.function.Supplier<String> label = () -> null;
 	/** Bytes in use, worked out on first need, then kept up to date. */
 	private long used = -1;
 
@@ -73,13 +74,13 @@ public final class Disk implements Device {
 		return tier;
 	}
 
-	public void setLabel(String label) {
+	public void labelFrom(java.util.function.Supplier<String> label) {
 		this.label = label;
 	}
 
 	@Override
 	public String label() {
-		return label;
+		return label.get();
 	}
 
 	private Path image() {

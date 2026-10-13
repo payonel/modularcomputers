@@ -146,7 +146,12 @@ public class CaseTierGameTest {
 		helper.assertValueEqual(hardware.memory(), List.of(new Board.MemoryInfo(1, 2, MemoryTier.TIER_2.bytes())), "the RAM");
 		helper.assertValueEqual(seen.get(2), "boot", "an anvil's name is the device's label");
 		ItemStack after = computer.parts().getItem(CaseMenu.EEPROM_SLOT);
-		helper.assertValueEqual(after.get(ModComponents.EEPROM_IMAGE), "boot code", "the write is on the chip");
+		helper.assertValueEqual(after.get(ModComponents.EEPROM_IMAGE), "boot code", "the write is on the item");
+		after.set(DataComponents.CUSTOM_NAME, Component.literal("renamed")); // the item changes in place
+		after.set(ModComponents.EEPROM_IMAGE, "edited");
+		var eeprom = computer.machine().board().eeprom().orElseThrow();
+		helper.assertValueEqual(eeprom.label(), "renamed", "the device reads its label from the item");
+		helper.assertValueEqual(eeprom.image(), "edited", "and its contents: no copy in between");
 		helper.succeed();
 	}
 

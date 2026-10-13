@@ -69,6 +69,13 @@ same thing.
    - Never commit with failing tests.
    - Don't push (the repo is local only), and don't open pull requests unless asked.
    - Keep model identifiers out of commit messages and code.
+7. **Read and write directly; no copies** (user, 2026-10-13): data has one home, and code reads
+   and writes it there, instead of copying it into another object and syncing it back. Copies and
+   write-back hooks are confusing extra layers, and they go stale. When plain-Java machine code
+   needs Minecraft-held data (an item's component, a name), give it a small source to read and
+   write through (like `Eeprom.Storage`, or a `Supplier` for a device's label), backed by the item
+   in the slot in game and by a plain value in unit tests. Disks already work this way (their files
+   are in the world save). Watch for the same pattern elsewhere and point it out.
 
 ## 3. Current state
 
@@ -902,9 +909,13 @@ scripts/art/error_beep.py` into
     `terminals`, `bind`, `unbind`), terminals (`write`, `read`, `getSize`), disks
     (below) and the EEPROM (`get`, `set`: its image, no size limit for now (user, 2026-10-12; EEPROMs will
     later hold a bootloader, with the OS installed on a disk), like
-    `flashrom -r`/`-w`; kept on the item as `ModComponents.EEPROM_IMAGE`; another chip is another
-    `Eeprom`, by serial. The CPU still runs the Java stand-in whatever the image holds, until the
-    Lua runtime).
+    `flashrom -r`/`-w`. **The device keeps no copy** (user, 2026-10-13): `Eeprom` reads and writes its
+    `Eeprom.Storage`, which in a case is the item in the EEPROM slot (`ModComponents.EEPROM_IMAGE`,
+    read and set in place: `AllInOneBlockEntity.eepromSlot`); a bare chip (tests) keeps its own.
+    The CPU reads it at every power-on, so a program's `set` runs at the next boot. The image is
+    one character a byte (ISO-8859-1, as Lua's strings), and Lua compiles those bytes. Another
+    EEPROM (by serial) is another `Eeprom`. Device labels are read the same way, from the item
+    (`labelFrom`), not copied).
 - **Motherboard (`Motherboard`):** holds the soldered parts (`Hardware`/`Part`, memory), the
   CPU socket, the EEPROM slot, and two buses.
   - **The bus is the motherboard's firmware, not the case's** (user, 2026-10-11: "the all in one

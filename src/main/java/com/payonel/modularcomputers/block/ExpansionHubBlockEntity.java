@@ -47,7 +47,8 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 			CardKind kind = ModItems.cardKind(cards().getItem(slot)).orElse(null);
 			devices[slot] = kind == null ? null : devices[slot] != null && devices[slot].kind() == kind ? devices[slot] : new Card(kind);
 			if (devices[slot] != null) {
-				devices[slot].setLabel(ModComponents.label(cards().getItem(slot)));
+				int at = slot;
+				devices[slot].labelFrom(() -> ModComponents.label(cards().getItem(at))); // read from the card itself
 			}
 		}
 	}

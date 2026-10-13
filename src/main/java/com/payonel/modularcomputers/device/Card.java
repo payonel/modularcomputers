@@ -6,7 +6,8 @@ import com.payonel.modularcomputers.bus.DeviceType;
 /** An expansion card, in a computer's expansion slot or in an expansion hub. None work yet; they're on the bus. */
 public final class Card implements Device {
 	private final CardKind kind;
-	private String label;
+	/** Where its label is (its item's anvil name), read when asked: no copy of it here. */
+	private java.util.function.Supplier<String> label = () -> null;
 
 	public Card(CardKind kind) {
 		this.kind = kind;
@@ -16,13 +17,13 @@ public final class Card implements Device {
 		return kind;
 	}
 
-	public void setLabel(String label) {
+	public void labelFrom(java.util.function.Supplier<String> label) {
 		this.label = label;
 	}
 
 	@Override
 	public String label() {
-		return label;
+		return label.get();
 	}
 
 	@Override

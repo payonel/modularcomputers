@@ -59,12 +59,12 @@ class CpuLoadTest {
 	void anAttachedProgramRunsInPlaceOfTheImage() {
 		AtomicBoolean ran = new AtomicBoolean();
 		machine.board().setCpu(new Cpu(CpuTier.TIER_1));
-		Eeprom chip = new Eeprom("");
-		chip.flash(board -> {
+		Eeprom eeprom = new Eeprom("");
+		eeprom.flash(board -> {
 			ran.set(true);
 			board.halt();
 		});
-		machine.board().setEeprom(chip);
+		machine.board().setEeprom(eeprom);
 		machine.pressPower();
 		assertThat(ran).isTrue();
 	}

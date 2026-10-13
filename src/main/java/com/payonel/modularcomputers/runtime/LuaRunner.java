@@ -144,7 +144,7 @@ public final class LuaRunner implements Runner {
 
 		program = lua_newthread(main);
 		lua_setfield(main, LUA_REGISTRYINDEX, new HostString("modularcomputers.program")); // kept from the collector
-		byte[] code = image.getBytes(StandardCharsets.UTF_8);
+		byte[] code = image.getBytes(StandardCharsets.ISO_8859_1); // one character a byte, as the EEPROM holds it
 		if (luaL_loadbufferx(program, new ByteView(code), new HostString(CHUNK), new HostString("t")) != LUA_OK) {
 			throw new LoadFailed(text(program, -1));
 		}

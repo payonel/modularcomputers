@@ -164,6 +164,24 @@ class LuaRunnerTest {
 	}
 
 	@Test
+	void aReflashedImageKeepsItsBytesAcrossAReboot() {
+		Eeprom eeprom = new Eeprom("""
+			local next = 'board.invoke("console", "write", "length " .. #"' .. string.char(233) .. '") board.halt()'
+			board.invoke("eeprom", "set", next)
+			board.halt()
+			""");
+		Map<String, Device> devices = new LinkedHashMap<>();
+		devices.put("id:screen", screen);
+		devices.put("eeprom", eeprom);
+		machine.setDevices(devices);
+		machine.board().setEeprom(eeprom);
+		machine.pressPower();
+		machine.pressPower();
+		machine.pressPower();
+		assertThat(row(0)).as("one byte, still one byte").isEqualTo("length 1");
+	}
+
+	@Test
 	void anErrorIsTheAbortScreen() {
 		boot("local x = nil\nx.y = 1\n");
 		assertThat(row(0)).startsWith(Cpu.ABORT + Cpu.CRASHED + "eeprom:2:");

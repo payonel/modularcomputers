@@ -55,31 +55,32 @@ public final class Cpu {
 
 	/**
 	 * Starts the EEPROM's program, or shows the abort screen without one. A Java program attached
-	 * to the chip (a test's in-circuit programmer) runs on any CPU.
+	 * to the EEPROM (a test's in-circuit programmer) runs on any CPU.
 	 */
 	public Optional<Runner> powerOn(Motherboard board) {
-		var eeprom = board.eeprom();
-		if (eeprom.isEmpty()) {
+		var installed = board.eeprom();
+		if (installed.isEmpty()) {
 			abort(board, NO_EEPROM);
 			return Optional.empty();
 		}
-		Eeprom chip = eeprom.get();
-		if (chip.attached().isPresent()) {
-			return Optional.of(new ProgramRunner(chip.attached().get()::run, "cpu"));
+		Eeprom eeprom = installed.get();
+		if (eeprom.attached().isPresent()) {
+			return Optional.of(new ProgramRunner(eeprom.attached().get()::run, "cpu"));
 		}
-		if (chip.image().isBlank()) {
+		String image = eeprom.image(); // read from the EEPROM itself, at every power-on
+		if (image.isBlank()) {
 			abort(board, BLANK);
 			return Optional.empty();
 		}
 		if (architecture == Architecture.LUA) {
 			try {
-				return Optional.of(new LuaRunner(chip.image()));
+				return Optional.of(new LuaRunner(image));
 			} catch (LuaRunner.LoadFailed failed) {
 				abort(board, EEPROM + failed.getMessage()); // it doesn't compile: Lua's own message says where
 				return Optional.empty();
 			}
 		}
-		Optional<Program> program = load(chip.image());
+		Optional<Program> program = load(image);
 		if (program.isEmpty()) {
 			abort(board, EXEC_FORMAT);
 			return Optional.empty();
