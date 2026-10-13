@@ -12,9 +12,11 @@
 --   "call", name, args...         a board call (list, status, type, methods, doc, info, uptime,
 --                                 power, hardware, invoke), carried out on the server thread, where
 --                                 devices live; answered with its values
---   "wait", ticks, held, sources...
---                                 wait for an interrupt (sources: any when none; ticks -1: no
---                                 limit; held: what the inbox holds, by address); answered with
+--   "clock"                       the machine's clock (uptime), in ticks; answered at once
+--   "wait", deadline, held, sources...
+--                                 wait for an interrupt (sources: any when none; deadline: on the
+--                                 machine's clock, -1 for none, so a wait saved partway ends when
+--                                 it would have; held: what the inbox holds, by address); answered with
 --                                 the pending sources, as a sequence, and the device data taken
 --                                 for the inbox: {address, method, value} each
 --   "halt"                        the CPU halts; never resumed
@@ -171,6 +173,9 @@ while true do
     if request then
       local asked = request
       request = nil
+      if asked[1] == "wait" and asked[2] >= 0 then
+        asked[2] = ask("clock") + asked[2] -- its length becomes a deadline
+      end
       answer = table_pack(ask(table_unpack(asked, 1, asked.n)))
     else
       ask("slice") -- the slice is spent

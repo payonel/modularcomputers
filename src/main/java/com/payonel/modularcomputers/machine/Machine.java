@@ -103,9 +103,19 @@ public final class Machine {
 		this.callsPerTick = callsPerTick;
 	}
 
-	/** Ticks since power-on. */
+	/**
+	 * Ticks since power-on, counting only ticks it's been loaded and on: like Linux's
+	 * CLOCK_MONOTONIC, it stands still while the computer is unloaded (a hibernated machine), and
+	 * it's saved with it. Waits end on deadlines on this clock. Real time is another device's (a
+	 * future card), not the board's.
+	 */
 	public long uptime() {
 		return uptime;
+	}
+
+	/** After a load: the clock goes on from where it was saved. */
+	public void restoreUptime(long uptime) {
+		this.uptime = uptime;
 	}
 
 	/**

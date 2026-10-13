@@ -581,7 +581,10 @@ scripts/art/error_beep.py` into
   needs a token even for a public repo**: `gpr.user` and `gpr.key` (a token with `read:packages`)
   in `~/.gradle/gradle.properties` (set up on the dev host), or `GITHUB_ACTOR`/`GITHUB_TOKEN` in CI. The
   jar also holds its interpreter (`host`) and JLine line editor (`platform/Readline`); the mod
-  never loads them, so JLine isn't a dependency. To take a newer engine, bump `lungolua_version`. Its API is C's, by C's names (`lua_resume`,
+  never loads them, so JLine isn't a dependency. To take a newer engine, bump `lungolua_version` (the versions published:
+  `maven-metadata.xml` under `com/payonel/lungolua/` there, read with the same token). Since
+  `0.1.0-eceb71b5` its C-int booleans are Java `boolean`s (`lua_toboolean`, `lua_isinteger`,
+  `lua_next`, `lua_pushboolean`). Its API is C's, by C's names (`lua_resume`,
   `luaL_loadbufferx`, `HostString` for text crossing in). Beyond stock Lua it has **budgets**
   (`lua_setbudget`: a callback every n steps, which can `lua_freeze` the thread wherever it is;
   `lua_thaw` goes on) and **Styx**, persisting a whole state (`luaL_persiststate`), for saving
@@ -630,7 +633,8 @@ scripts/art/error_beep.py` into
     utf8, debug), runs the firmware as the kernel coroutine (kernel_co) and lets it run freely, not
     once a tick. The kernel's yields are its requests: `"slice"` (a safe point; resumed at once),
     `"call", name, args...` (a board call: `list`, `status`, `type`, `methods`, `doc`, `info`,
-    `uptime`, `power`, `hardware`, `invoke`), `"wait", ticks, sources...`, `"halt"`; it ends with
+    `uptime`, `power`, `hardware`, `invoke`), `"clock"` (the machine's uptime, answered at once), `"wait", deadline, held, sources...`,
+    `"halt"`; it ends with
     `"returned"` (a panic), `"abort", why` (`LuaRunner.Aborted`: `ABRT: why`) or an error (the crash
     screen). **Every board call is carried out on the server thread**, where devices live: the
     computer's thread queues it and waits; the server thread serves it as soon as it can
@@ -650,7 +654,10 @@ scripts/art/error_beep.py` into
     else it isn't saved. The bytes go in the case's NBT (`program`). On load the case resumes it
     (`Machine.resumeProgram`, `LuaRunner.restore`) at its first tick, after the bus is found again;
     the restored kernel's request is still on its stack, so the computer's thread carries on with it
-    (a wait starts over). The program is persisted before the case's devices are saved, since the
+    (a wait ends on its deadline: the firmware makes a wait's length a deadline on the machine's
+    clock, `Machine.uptime`, which is saved with the case and stands still while it's unloaded,
+    like Linux's CLOCK_MONOTONIC across hibernation; user, 2026-10-13. Real time isn't the board's:
+    maybe a future card). The program is persisted before the case's devices are saved, since the
     calls it makes meanwhile change them. **Devices save what they hold for the program**
     (`Device.saved`/`restore`, `block/DeviceSave`: runtime values as NBT, types kept): a terminal's
     keys waiting, a card's events, outputs, what it last saw and the mode and range a program set;

@@ -488,6 +488,7 @@ public class AllInOneGameTest {
 		helper.assertTrue(loaded instanceof AllInOneBlockEntity, "should reload as an all-in-one");
 		AllInOneBlockEntity reloaded = (AllInOneBlockEntity) loaded;
 		helper.assertTrue(reloaded.machine().isPowered(), "a powered computer should still be powered after reload");
+		helper.assertValueEqual(reloaded.machine().uptime(), computer.machine().uptime(), "its clock goes on from where it was");
 		helper.assertTrue(reloaded.parts().getItem(CaseMenu.CPU_SLOT).is(ModItems.TIER3_CPU), "CPU after reload");
 		helper.assertTrue(reloaded.machine().board().cpu().isPresent(), "CPU installed after reload");
 		helper.assertValueEqual(reloaded.terminal().buffer().rows(), computer.terminal().buffer().rows(), "display text after reload");

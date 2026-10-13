@@ -285,6 +285,21 @@ class LuaRunnerTest {
 	}
 
 	@Test
+	void aWaitSavedPartwayEndsOnItsDeadlineOnTheSavedClock() {
+		boot("board.waitForInterrupt(4, \"nothing\") board.halt()"); // 80 ticks
+		settle(() -> machine.uptime() >= 40 && machine.runner().map(r -> r.state() == Runner.State.WAITING).orElse(false));
+		byte[] saved = machine.persistProgram().orElseThrow();
+		long at = machine.uptime();
+		machine.unload(); // frozen: its clock stands still
+		Machine again = reloaded(new Terminal(Resolution.DEFAULT));
+		again.restoreUptime(at);
+		again.resumeProgram(saved);
+		settle(again, () -> again.runner().isEmpty());
+		assertThat(again.uptime()).as("it ended when it would have, not a whole wait later").isBetween(80L, 86L);
+		again.pressPower();
+	}
+
+	@Test
 	void aComputerSavedInTheMiddleOfALoopGoesOn() {
 		boot("""
 			local n = 0

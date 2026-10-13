@@ -196,7 +196,7 @@ public final class LuaRunner implements Runner {
 	private long budgetTick = -1;
 	private long spentNanos;
 	/** Server side: the tick it last saw, for waits with a limit. */
-	private long now;
+	private volatile long now;
 
 	/** A CPU about to run {@code image}, the EEPROM's text; the firmware loads it when the thread starts. */
 	public LuaRunner(String image) {
@@ -494,6 +494,11 @@ public final class LuaRunner implements Runner {
 						reply = awaitWait(waitFor(said)); // the sources ready, and the device data taken
 						lua_settop(kernel, top - asked);
 					}
+					case "clock" -> {
+						// The machine's clock, in ticks (uptime): the firmware makes a wait's deadline from it.
+						lua_settop(kernel, top - asked);
+						reply = List.of(now);
+					}
 					case "halt" -> {
 						finish(State.HALTED, null);
 						return;
@@ -598,15 +603,19 @@ public final class LuaRunner implements Runner {
 		return i < args.size() && args.get(i) != null ? String.valueOf(args.get(i)) : "";
 	}
 
-	/** {@code "wait", ticks, held, sources...}: held is what the firmware's inbox holds now, by address. */
+	/**
+	 * {@code "wait", deadline, held, sources...}: the deadline is on the machine's clock (uptime; -1
+	 * for none), so a wait saved partway ends when it would have; held is what the firmware's inbox
+	 * holds now, by address.
+	 */
 	private CompletableFuture<List<Object>> waitFor(List<Object> said) {
-		long ticks = said.size() > 1 && said.get(1) instanceof Long l ? l : -1;
+		long deadline = said.size() > 1 && said.get(1) instanceof Long l ? l : -1;
 		Map<String, Integer> held = new java.util.HashMap<>();
 		if (said.size() > 2 && said.get(2) instanceof Map<?, ?> map) {
 			map.forEach((address, count) -> held.put(String.valueOf(address), count instanceof Long n ? n.intValue() : 0));
 		}
 		List<String> sources = said.stream().skip(3).map(String::valueOf).toList();
-		Wait request = new Wait(ticks < 0 ? Long.MAX_VALUE : now + ticks, sources, held, new CompletableFuture<>());
+		Wait request = new Wait(deadline < 0 ? Long.MAX_VALUE : deadline, sources, held, new CompletableFuture<>());
 		wait = request;
 		serveSoon.run(); // it may be over already
 		return request.answer();
@@ -649,8 +658,8 @@ public final class LuaRunner implements Runner {
 	private static Object toJava(lua_State L, int idx, int depth) {
 		return switch (lua_type(L, idx)) {
 			case LUA_TNIL -> null;
-			case LUA_TBOOLEAN -> lua_toboolean(L, idx) != 0;
-			case LUA_TNUMBER -> lua_isinteger(L, idx) != 0 ? (Object) lua_tointegerx(L, idx).getAsLong() : (Object) lua_tonumberx(L, idx).getAsDouble();
+			case LUA_TBOOLEAN -> lua_toboolean(L, idx);
+			case LUA_TNUMBER -> lua_isinteger(L, idx) ? (Object) lua_tointegerx(L, idx).getAsLong() : (Object) lua_tonumberx(L, idx).getAsDouble();
 			case LUA_TSTRING -> {
 				ByteView bytes = lua_tolstring(L, idx);
 				yield new String(bytes.array(), bytes.offset(), bytes.size(), StandardCharsets.ISO_8859_1);
@@ -678,7 +687,7 @@ public final class LuaRunner implements Runner {
 		luaL_checkstack(L, 3, new HostString("tables nest too deep for a device"));
 		Map<Object, Object> map = new LinkedHashMap<>();
 		lua_pushnil(L);
-		while (lua_next(L, at) != 0) {
+		while (lua_next(L, at)) {
 			map.put(toJava(L, -2, depth + 1), toJava(L, -1, depth + 1));
 			lua_pop(L, 1);
 		}
@@ -700,7 +709,7 @@ public final class LuaRunner implements Runner {
 		luaL_checkstack(L, 3, new HostString("a device's answer nests too deep"));
 		switch (value) {
 			case null -> lua_pushnil(L);
-			case Boolean b -> lua_pushboolean(L, b ? 1 : 0);
+			case Boolean b -> lua_pushboolean(L, b);
 			case Long l -> lua_pushinteger(L, l);
 			case Integer i -> lua_pushinteger(L, i);
 			case Double d -> lua_pushnumber(L, d);

@@ -202,6 +202,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** Writing the client's copy (a sync), not a save: no program state in it. */
 	private boolean syncing;
 	private static final String PROGRAM = "program";
+	/** The machine's clock ({@link Machine#uptime}), saved so it goes on after a load. */
+	private static final String UPTIME = "uptime";
 	/** A card's saved state, by lane ({@link DeviceSave}). */
 	private static final String CARD = "card_";
 
@@ -1060,6 +1062,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	protected void saveAdditional(ValueOutput output) {
 		super.saveAdditional(output);
 		output.putBoolean(POWERED, machine.isPowered());
+		output.putLong(UPTIME, machine.uptime());
 		output.putInt(POWER_BUFFER, power.level());
 		if (machine.board().busCapacityOverride() != null) {
 			output.putInt(BUS_CAPACITY_OVERRIDE, machine.board().busCapacityOverride());
@@ -1092,6 +1095,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	protected void loadAdditional(ValueInput input) {
 		super.loadAdditional(input);
 		machine.restorePowered(input.getBooleanOr(POWERED, false));
+		machine.restoreUptime(input.getLongOr(UPTIME, 0));
 		power.set(input.getIntOr(POWER_BUFFER, 0));
 		machine.board().overrideBusCapacity(input.getInt(BUS_CAPACITY_OVERRIDE).orElse(null));
 		input.read(BOARD_ID, UUIDUtil.CODEC).ifPresent(saved -> boardId = saved);
