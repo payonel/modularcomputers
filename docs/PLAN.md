@@ -211,9 +211,9 @@ of letting the player order them:
 - **Virtual multicast text buffer (user, 2026-10-11):** today every connected screen gets the
   console (hard-coded hello world). The plan is a virtual device from the motherboard
   (virtual bus) that the EEPROM uses to choose where the console goes.
-- **Several computers on one screen:** today each writes to it and the last write wins;
-  powering any of them off blanks it. A real monitor shows one input at a time; consider an
-  input selector. Screens have no power button: only the case does (user).
+- **Several computers on one screen:** settled (user, 2026-10-13): a device is on one bus at a
+  time (`BusHolds`, see AGENTS.md); the first board to have it holds it. Screens have no power
+  button: only the case does (user).
 
 ## The Lua CPU on its own thread, and device data in rings (user design, 2026-10-13; not built)
 
