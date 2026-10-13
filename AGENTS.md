@@ -465,11 +465,14 @@ scripts/art/error_beep.py` into
     clients (`RecipeSynchronization.synchronizeRecipeSerializer(ShapedRecipe.SERIALIZER)`), and
     `ClientRecipes` keeps the ones that make mod items. A tag cell cycles its items each
     second. The battery upgrade's recipe type is synchronized too. Items without a recipe (the
-    all-in-one) show an empty grid and "No recipe yet".
+    all-in-one) show an empty grid and "No recipe yet"; broken things (the broken computer) show
+    no grid: they're found, never made (user). A blast furnace recipe (silicon) shows as its input
+    over a blast furnace (`ClientRecipes`; `BlastingRecipe`'s serializer is synchronized too).
 - **Chips** (user design, 2026-10-12): nether quartz smelts to **silicon** in a blast furnace only
   (`recipe/silicon.json`); a **photomask** (`PhotomaskBlock`, `PhotomaskBlockEntity`, `PhotomaskMenu`,
   `PhotomaskScreen`) prints silicon into **chips**: a wafer takes `WORK` (8) turns and gives
-  `CHIPS` (4). Right-click turns its crank, and its brass gear turns an eighth on its front
+  `CHIPS` (4). **Right-click opens its slots; crouch + right-click turns its crank** (user,
+  2026-10-12), and its brass gear turns an eighth on its front
   (`PhotomaskRenderer`, a quad drawn with `submitCustomGeometry`, lit from the block in front;
   clients learn of a turn by a block event, `SPIN_EVENT`, and ease the gear round); a charged
   battery in its bay runs it: with power it's on (gear spinning, block state `working`), idling
@@ -477,8 +480,8 @@ scripts/art/error_beep.py` into
   a turn every 5 ticks for 100 units more while there's silicon. Chips go to its output slot. **It's also a bus device** (user, 2026-10-12; `device/Photomask`, type
   `fabricator`, no methods yet: an API comes later): cabled on every side but its gear face, at
   `id:<its id>`; while a running computer has it on its bus it runs on the bus's power first
-  (idle draw 5, plus 100 a turn charged to the computers supplying it), else on its battery. Right-click with silicon or a battery puts it in; sneak + right-click opens its
-  slots. It keeps its contents when broken, like the holders. Its recipe needs chips (iron,
+  (idle draw 5, plus 100 a turn charged to the computers supplying it), else on its battery. Right-click with silicon or a battery puts it in. Its slots light up
+  for silicon and batteries, as the case view's do (`SlotHints`). It keeps its contents when broken, like the holders. Its recipe needs chips (iron,
   glass pane, two chips, amethyst lens, copper, redstone): an intentional circle, so the first
   photomask is found (an ancient site) or bought (a villager), not yet built. Art:
   `scripts/art/photomask_textures.py`. Items without code of their own can explain themselves
