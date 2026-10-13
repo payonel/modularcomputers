@@ -696,8 +696,9 @@ scripts/art/error_beep.py` into
         nearest), tier 3 every color (pixel graphics planned for it). Each is a real DEC model
         (2026-10-12), named in its tooltip, and answers Device Attributes (`ESC[c`) as that model
         did: tier 1 a **VT102** on green phosphor (`?6c`), tier 2 a **VT525**, DEC's color text
-        terminal (`?65;22c`), tier 3 `?63;22c` (a VT340's level; it will add `;4`, sixel, once
-        sixel is built). The front's frame shows the tier as 1-3 dots, iron, gold and diamond. The
+        terminal (`?65;22c`), tier 3's tooltip says "Sixel" (user, 2026-10-12: the plan, not
+        built yet) and it answers `?63;22c` (a VT340's level; it adds `;4`, sixel, once sixel is
+        built, so programs never send pixels to a terminal that would drop them). The front's frame shows the tier as 1-3 dots, iron, gold and diamond. The
         all-in-one's built-in terminal is tier 3.
       - **Input:** keys wait in its queue until `read()` (as do its answers to reports); while
         any wait, its interrupt is on, or the console's if it's in the console's group.

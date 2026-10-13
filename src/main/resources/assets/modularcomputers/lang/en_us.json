@@ -57,7 +57,7 @@
 	"block.modularcomputers.tier3_screen": "Tier 3 Screen",
 	"item.modularcomputers.screen.tier_1": "VT102: text, green phosphor",
 	"item.modularcomputers.screen.tier_2": "VT525: text, 16 colors",
-	"item.modularcomputers.screen.tier_3": "Text, every color",
+	"item.modularcomputers.screen.tier_3": "Sixel: text, every color",
 	"block.modularcomputers.cable": "Cable",
 	"gui.modularcomputers.bus.cable": "cable, %sm",
 	"gui.modularcomputers.bus.rom": "ROM",
