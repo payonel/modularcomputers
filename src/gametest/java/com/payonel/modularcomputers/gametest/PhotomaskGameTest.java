@@ -30,14 +30,18 @@ public class PhotomaskGameTest {
 	@GameTest
 	public void crankingPrintsAWaferIntoChips(GameTestHelper helper) {
 		PhotomaskBlockEntity mask = place(helper);
-		Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+		Player player = helper.makeMockServerPlayerInLevel(); // a server player: menus open for it
 		player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.SILICON, 2));
 		helper.useBlock(POS, player);
 		helper.assertValueEqual(mask.items().getItem(PhotomaskBlockEntity.INPUT).getCount(), 2, "right-click with silicon puts it in");
 		helper.assertTrue(player.getMainHandItem().isEmpty(), "out of the hand");
 
+		helper.useBlock(POS, player); // a plain right-click opens its slots
+		helper.assertTrue(player.containerMenu instanceof com.payonel.modularcomputers.menu.PhotomaskMenu, "its slots open, got " + player.containerMenu);
+		helper.assertValueEqual(mask.progress(), 0, "and the crank doesn't turn");
+		player.setShiftKeyDown(true);
 		for (int turn = 0; turn < PhotomaskBlockEntity.WORK; turn++) {
-			helper.useBlock(POS, player); // an empty hand turns the crank
+			helper.useBlock(POS, player); // crouching, an empty hand turns the crank
 		}
 		helper.assertValueEqual(mask.items().getItem(PhotomaskBlockEntity.OUTPUT).getCount(), PhotomaskBlockEntity.CHIPS, "a wafer's chips");
 		helper.assertTrue(mask.items().getItem(PhotomaskBlockEntity.OUTPUT).is(ModItems.CHIP), "chips");

@@ -27,6 +27,12 @@ public final class PhotomaskScreen extends AbstractContainerScreen<PhotomaskMenu
 		inventoryLabelY = PhotomaskMenu.INVENTORY_Y - 10;
 	}
 
+	/** A slot's 16x16 item area on screen. */
+	public com.payonel.modularcomputers.display.Viewport slotArea(int index) {
+		Slot slot = menu.slots.get(index);
+		return new com.payonel.modularcomputers.display.Viewport(leftPos + slot.x, topPos + slot.y, 16, 16);
+	}
+
 	@Override
 	public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
 		super.extractBackground(graphics, mouseX, mouseY, partialTick);
@@ -46,13 +52,15 @@ public final class PhotomaskScreen extends AbstractContainerScreen<PhotomaskMenu
 			graphics.fill(sx - pad + 1, sy - pad + 1, sx - pad + size - 1, sy - pad + size - 1, SLOT);
 		}
 		// The arrow from the silicon to the chips, filling as the wafer is printed.
-		int ax = x + 72;
+		int ax = x + 84;
 		int ay = y + 39;
 		int done = Math.round(26f * menu.progress() / PhotomaskBlockEntity.WORK);
 		for (int i = 0; i < 26; i++) {
 			int half = i < 20 ? 2 : 6 - (i - 20);
 			graphics.fill(ax + i, ay - half, ax + i + 1, ay + half + 1, i < done ? ARROW_DONE : ARROW);
 		}
+		// Where things go: silicon and batteries to their slots, and the other way round (as the case view does).
+		SlotHints.extract(graphics, menu, hoveredSlot, PhotomaskBlockEntity.SLOTS, this::slotArea);
 	}
 
 	@Override
@@ -60,8 +68,8 @@ public final class PhotomaskScreen extends AbstractContainerScreen<PhotomaskMenu
 		graphics.text(font, title, titleLabelX, titleLabelY, LABEL, false);
 		graphics.text(font, playerInventoryTitle, inventoryLabelX, inventoryLabelY, LABEL, false);
 		Component battery = Component.translatable("gui.modularcomputers.photomask.battery");
-		graphics.text(font, battery, 44 - 4 - font.width(battery), 54, LABEL, false);
+		graphics.text(font, battery, 58 - 5 - font.width(battery), 54, LABEL, false);
 		Component silicon = Component.translatable("gui.modularcomputers.photomask.silicon");
-		graphics.text(font, silicon, 44 - 4 - font.width(silicon), 30, LABEL, false);
+		graphics.text(font, silicon, 58 - 5 - font.width(silicon), 30, LABEL, false);
 	}
 }

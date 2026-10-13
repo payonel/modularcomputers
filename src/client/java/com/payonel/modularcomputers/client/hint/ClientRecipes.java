@@ -19,6 +19,8 @@ import net.minecraft.world.item.crafting.ShapedRecipe;
 /**
  * The crafting grids for this mod's items, from the shaped recipes the server sends (the mod
  * asks Fabric to synchronize them). Each cell lists every item that fits it; a tag fits many.
+ * A blast furnace recipe shows as its input over a blast furnace, as the furnace's own screen
+ * puts the item above the fire.
  */
 public final class ClientRecipes {
 	/** A shaped recipe's cells, row by row, {@code width} by {@code height}; an empty list is an empty cell. */
@@ -46,6 +48,17 @@ public final class ClientRecipes {
 	static void update(Collection<RecipeHolder<?>> recipes) {
 		Map<Item, Grid> found = new HashMap<>();
 		for (RecipeHolder<?> holder : recipes) {
+			if (holder.value() instanceof net.minecraft.world.item.crafting.BlastingRecipe blasting) {
+				List<ItemStack> input = stacks(blasting.input());
+				ItemStack result = input.isEmpty() ? ItemStack.EMPTY : blasting.assemble(new net.minecraft.world.item.crafting.SingleRecipeInput(input.getFirst()));
+				if (!result.isEmpty() && BuiltInRegistries.ITEM.getKey(result.getItem()).getNamespace().equals(ModularComputers.MOD_ID)) {
+					List<List<ItemStack>> cells = new java.util.ArrayList<>(java.util.Collections.nCopies(9, List.<ItemStack>of()));
+					cells.set(1, input);
+					cells.set(7, List.of(new ItemStack(net.minecraft.world.item.Items.BLAST_FURNACE)));
+					found.putIfAbsent(result.getItem(), new Grid(3, 3, List.copyOf(cells)));
+				}
+				continue;
+			}
 			if (!(holder.value() instanceof ShapedRecipe recipe)) {
 				continue;
 			}

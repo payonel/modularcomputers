@@ -199,6 +199,9 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 				check(grid.cell(1, 1).getFirst().is(ModItems.TIER1_BATTERY), "a tier 1 battery in the center");
 				ClientRecipes.Grid screen = ClientRecipes.of(ModBlocks.TIER3_SCREEN.asItem()).orElseThrow(() -> new AssertionError("no tier 3 screen recipe"));
 				check(screen.cell(1, 1).getFirst().is(ModBlocks.TIER2_SCREEN.asItem()), "a tier 3 screen is built around a tier 2");
+				// Silicon's is the blast furnace's: quartz over a blast furnace.
+				ClientRecipes.Grid silicon = ClientRecipes.of(ModItems.SILICON).orElseThrow(() -> new AssertionError("no silicon recipe"));
+				check(silicon.cell(1, 0).getFirst().is(Items.QUARTZ) && silicon.cell(1, 2).getFirst().is(Items.BLAST_FURNACE), "quartz over a blast furnace");
 			});
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(hotbar + cpuHotbar)); // pick up the CPU
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(CaseMenu.CPU_SLOT));

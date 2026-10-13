@@ -281,6 +281,17 @@ public class CableClientGameTest implements FabricClientGameTest {
 				context.waitTicks(2);
 				int slots = context.computeOnClient(client -> ((CardHolderScreen) client.gui.screen()).getMenu().cardSlots());
 				check(slots == (holder == hub ? 5 : 1), "card slots: " + slots);
+				// Carrying a Bluetooth card, only the radio slot lights up as where it goes.
+				List<Integer> radio = context.computeOnClient(client -> {
+					var menu = ((CardHolderScreen) client.gui.screen()).getMenu();
+					menu.setCarried(new ItemStack(ModItems.BLUETOOTH_CARD));
+					List<Integer> fit = com.payonel.modularcomputers.client.screen.SlotHints.fitting(menu, null, menu.cardSlots()).stream()
+						.map(slot -> slot.index).toList();
+					menu.setCarried(ItemStack.EMPTY);
+					return fit;
+				});
+				int radioSlot = context.computeOnClient(client -> ((CardHolderScreen) client.gui.screen()).getMenu().radioSlot());
+				check(radio.equals(List.of(radioSlot)), "a Bluetooth card fits the radio slot: " + radio);
 				context.takeScreenshot(holder == hub ? "expansion-hub" : "robotic-piston");
 				context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 				context.waitFor(client -> client.gui.screen() == null);
@@ -301,6 +312,26 @@ public class CableClientGameTest implements FabricClientGameTest {
 			BufferedImage turned = read(context.takeScreenshot("photomask-turned"));
 			check(differ(still, turned) > 50, "cranked, the gear turns: " + differ(still, turned) + " pixels changed");
 			check(turning.getWidth() == turned.getWidth(), "frames");
+			// Its slots: silicon and batteries light up where they go; nothing goes in the chips' slot.
+			singleplayer.getServer().runOnServer(server -> server.getPlayerList().getPlayers().getFirst()
+				.openMenu((com.payonel.modularcomputers.block.PhotomaskBlockEntity) server.overworld().getBlockEntity(screen)));
+			context.waitForScreen(com.payonel.modularcomputers.client.screen.PhotomaskScreen.class);
+			List<List<Integer>> fits = context.computeOnClient(client -> {
+				var menu = ((com.payonel.modularcomputers.client.screen.PhotomaskScreen) client.gui.screen()).getMenu();
+				List<List<Integer>> out = new java.util.ArrayList<>();
+				for (ItemStack carried : List.of(new ItemStack(ModItems.SILICON), ModItems.TIER1_BATTERY.charged(), new ItemStack(ModItems.CHIP))) {
+					menu.setCarried(carried);
+					out.add(com.payonel.modularcomputers.client.screen.SlotHints.fitting(menu, null,
+						com.payonel.modularcomputers.block.PhotomaskBlockEntity.SLOTS).stream().map(slot -> slot.index).toList());
+				}
+				menu.setCarried(ItemStack.EMPTY);
+				return out;
+			});
+			check(fits.equals(List.of(List.of(com.payonel.modularcomputers.block.PhotomaskBlockEntity.INPUT),
+				List.of(com.payonel.modularcomputers.block.PhotomaskBlockEntity.BATTERY), List.of())), "where things go in a photomask: " + fits);
+			context.takeScreenshot("photomask-slots");
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+			context.waitFor(client -> client.gui.screen() == null);
 
 			// A broken computer from the ancient sites: cracked open, its board showing.
 			setblock(singleplayer, screen, "broken_case[facing=south]");

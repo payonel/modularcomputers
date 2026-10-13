@@ -87,8 +87,10 @@ public final class Hint {
 		if (stack.is(com.payonel.modularcomputers.item.ModItems.EEPROM)) {
 			elements.add(text(Component.translatable("hint.modularcomputers.eeprom.wipe")));
 		}
-		elements.add(text(Component.translatable("hint.modularcomputers.crafting")));
-		elements.add(new Crafting(stack.getItem()));
+		if (!stack.is(com.payonel.modularcomputers.block.ModBlocks.BROKEN_CASE.asItem())) { // broken things are found, never made
+			elements.add(text(Component.translatable("hint.modularcomputers.crafting")));
+			elements.add(new Crafting(stack.getItem()));
+		}
 		return elements;
 	}
 

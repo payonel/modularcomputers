@@ -23,9 +23,10 @@ import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * A photomask (user design, 2026-10-12): the stencil chips are printed through, in a hand-cranked
- * lithography frame. Silicon goes in, chips come out. Right-click turns its crank (its gear turns
- * on the front); a charged battery in it turns it on its own ({@link #WORKING}). Sneak and
- * right-click to open its slots. Right-click holding silicon or a battery puts it in.
+ * lithography frame. Silicon goes in, chips come out. Right-click opens its slots; crouch and
+ * right-click to turn its crank (its gear turns on the front) (user, 2026-10-12). Power (a battery
+ * in it, or a running computer on its bus) runs it on its own ({@link #WORKING}). Right-click
+ * holding silicon or a battery puts it in.
  */
 public final class PhotomaskBlock extends HorizontalDirectionalBlock implements EntityBlock {
 	/** Running, on the bus's power or its battery (idling or working): its gear turns by itself. */
@@ -79,9 +80,9 @@ public final class PhotomaskBlock extends HorizontalDirectionalBlock implements 
 	protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
 		if (!level.isClientSide() && level.getBlockEntity(pos) instanceof PhotomaskBlockEntity mask) {
 			if (player.isShiftKeyDown()) {
-				player.openMenu(mask);
+				mask.crank(); // crouching, the player turns the crank
 			} else {
-				mask.crank();
+				player.openMenu(mask);
 			}
 		}
 		return InteractionResult.SUCCESS;

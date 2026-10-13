@@ -14,7 +14,7 @@ import net.minecraft.world.item.ItemStack;
  * for a card, and so on). The other way round too: hovering one of the block's slots outlines
  * the items in the inventory that fit it.
  */
-final class SlotHints {
+public final class SlotHints {
 	/** The same light outline as the case view's linked hover. */
 	static final int COLOR = 0xFFF2F2E6;
 
@@ -25,7 +25,7 @@ final class SlotHints {
 	 * The block's slots (the first {@code blockSlots} of the menu) that take the carried item,
 	 * or else the item under the mouse in the player's inventory.
 	 */
-	static List<Slot> fitting(AbstractContainerMenu menu, Slot hovered, int blockSlots) {
+	public static List<Slot> fitting(AbstractContainerMenu menu, Slot hovered, int blockSlots) {
 		ItemStack stack = menu.getCarried();
 		if (stack.isEmpty() && hovered != null && hovered.index >= blockSlots) {
 			stack = hovered.getItem();

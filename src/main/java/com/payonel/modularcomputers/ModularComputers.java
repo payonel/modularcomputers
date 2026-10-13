@@ -62,6 +62,7 @@ public final class ModularComputers implements ModInitializer {
 		// Clients get the shaped recipes, so tooltips can show how to craft each item.
 		RecipeSynchronization.synchronizeRecipeSerializer(ShapedRecipe.SERIALIZER);
 		RecipeSynchronization.synchronizeRecipeSerializer(BatteryUpgradeRecipe.SERIALIZER);
+		RecipeSynchronization.synchronizeRecipeSerializer(net.minecraft.world.item.crafting.BlastingRecipe.SERIALIZER);
 		ModBlocks.init();
 		ModMenus.init();
 		ModCommands.init();

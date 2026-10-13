@@ -32,9 +32,9 @@ public final class PhotomaskMenu extends AbstractContainerMenu {
 		this.data = data;
 		this.pos = pos;
 		this.access = access;
-		addSlot(new Part(items, PhotomaskBlockEntity.INPUT, 44, 26));
-		addSlot(new Part(items, PhotomaskBlockEntity.OUTPUT, 116, 35));
-		addSlot(new Part(items, PhotomaskBlockEntity.BATTERY, 44, 50));
+		addSlot(new Part(items, PhotomaskBlockEntity.INPUT, 58, 26));
+		addSlot(new Part(items, PhotomaskBlockEntity.OUTPUT, 120, 35));
+		addSlot(new Part(items, PhotomaskBlockEntity.BATTERY, 58, 50));
 		addDataSlots(data);
 		addStandardInventorySlots(inventory, 8, INVENTORY_Y);
 	}

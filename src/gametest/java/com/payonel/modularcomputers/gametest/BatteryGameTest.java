@@ -131,6 +131,9 @@ public class BatteryGameTest {
 		for (var item : ModCommands.modItems()) {
 			ItemStack stack = new ItemStack(item);
 			helper.assertTrue(item.getTooltipImage(stack).orElse(null) instanceof HintTooltip, item + " shows a hint");
+			if (item == com.payonel.modularcomputers.block.ModBlocks.BROKEN_CASE.asItem()) {
+				continue; // broken things are found, never made: no grid (AncientLabGameTest)
+			}
 			helper.assertTrue(Hint.of(stack, true).getLast() instanceof Hint.Crafting crafting && crafting.item() == item, item + " shows how it's crafted");
 		}
 		helper.succeed();

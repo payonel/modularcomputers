@@ -106,6 +106,8 @@ public class AncientLabGameTest {
 		helper.setBlock(pos, ModBlocks.BROKEN_CASE);
 		var drops = Block.getDrops(helper.getBlockState(pos), helper.getLevel(), helper.absolutePos(pos), null);
 		helper.assertTrue(drops.isEmpty(), "no drops, got " + drops);
+		var hint = com.payonel.modularcomputers.hint.Hint.of(new net.minecraft.world.item.ItemStack(ModBlocks.BROKEN_CASE), true);
+		helper.assertTrue(hint.stream().noneMatch(com.payonel.modularcomputers.hint.Hint.Crafting.class::isInstance), "and no crafting grid: it's found, never made");
 		helper.succeed();
 	}
 }
