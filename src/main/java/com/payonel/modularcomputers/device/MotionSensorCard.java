@@ -91,6 +91,11 @@ public final class MotionSensorCard extends Card {
 	}
 
 	@Override
+	public String streamMethod() {
+		return "pull";
+	}
+
+	@Override
 	public boolean interruptPending() {
 		return events.pending();
 	}

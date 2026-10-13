@@ -27,6 +27,15 @@ public interface Device {
 	 * arrived), off once the program has read it. Level-triggered, as on real hardware: the data
 	 * stays in the device, not in a machine-wide queue.
 	 */
+	/**
+	 * The method that takes its next piece of data (a terminal's {@code read}, a sensor's
+	 * {@code pull}), when it has a stream of it: the board can take it ahead of the program, into
+	 * the ring in its RAM (user design, 2026-10-13). Null: none.
+	 */
+	default String streamMethod() {
+		return null;
+	}
+
 	default boolean interruptPending() {
 		return false;
 	}

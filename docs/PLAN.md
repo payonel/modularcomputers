@@ -215,7 +215,7 @@ of letting the player order them:
   time (`BusHolds`, see AGENTS.md); the first board to have it holds it. Screens have no power
   button: only the case does (user).
 
-## The Lua CPU on its own thread, and device data in rings (user design, 2026-10-13; not built)
+## The Lua CPU on its own thread, and device data in rings (user design, 2026-10-13; built 2026-10-13, see AGENTS.md)
 
 Built in this order:
 
@@ -254,7 +254,7 @@ Built in this order:
    - Batched writes report errors late (as `fwrite`/`fsync`, sockets, ttys do).
    - Interrupts stay level-triggered: pending means the firmware's ring holds data for the source.
 
-## Disk files without open file descriptors (user design, 2026-10-13; not built)
+## Disk files without open file descriptors (user design, 2026-10-13; built 2026-10-13, see AGENTS.md)
 
 An open handle never keeps a host file open while user code runs. Open reads the file's size and
 a window of it into the handle's userdata (its path kept), and closes the host file; reads past the

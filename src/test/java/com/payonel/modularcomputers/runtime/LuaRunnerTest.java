@@ -354,6 +354,69 @@ class LuaRunnerTest {
 		assertThat(row(0)).isEqualTo("boot: no bootable disk");
 	}
 
+	/** RAM sticks of {@code tier} in the case, for the board's ring. */
+	private void ram(int tier) {
+		machine.board().setChassis(new com.payonel.modularcomputers.machine.Chassis() {
+			@Override
+			public int tier() {
+				return 3;
+			}
+
+			@Override
+			public Board.PowerInfo power() {
+				return com.payonel.modularcomputers.machine.Chassis.BENCH.power();
+			}
+
+			@Override
+			public java.util.List<Board.MemoryInfo> memory() {
+				return java.util.List.of(new Board.MemoryInfo(0, tier, 1 << 20));
+			}
+		});
+	}
+
+	private static final String TYPED = """
+		local n = 0
+		for i = 1, 3000000 do n = n + 1 end -- busy while keys come in
+		local keys = ""
+		for i = 1, 3 do
+		  local _, key = board.invoke("console", "read")
+		  keys = keys .. tostring(key)
+		end
+		board.invoke("console", "write", keys)
+		board.halt()
+		""";
+
+	@Test
+	void withARingKeysLeaveTheTerminalAheadOfTheProgramAndReadsNeedNoCall() {
+		ram(2);
+		boot(TYPED);
+		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
+		screen.press("a");
+		screen.press("b");
+		screen.press("c");
+		settle(() -> !screen.interruptPending()); // the board took them, into its ring, while the program was busy
+		untilHalted();
+		assertThat(row(0)).isEqualTo("abc");
+		assertThat(runner.answered()).as("the reads came from memory: only the write reached the server").isEqualTo(1);
+	}
+
+	@Test
+	void withoutARingKeysWaitInTheTerminalAndEachReadIsACall() {
+		ram(1);
+		boot(TYPED);
+		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
+		screen.press("a");
+		screen.press("b");
+		screen.press("c");
+		for (int i = 0; i < 5; i++) {
+			machine.tick();
+		}
+		assertThat(screen.interruptPending()).as("tier 1 RAM: no ring, the keys stay in the terminal").isTrue();
+		untilHalted();
+		assertThat(row(0)).isEqualTo("abc");
+		assertThat(runner.answered()).as("each read went to the device").isEqualTo(4);
+	}
+
 	@Test
 	void anErrorIsTheAbortScreen() {
 		boot("local x = nil\nx.y = 1\n");

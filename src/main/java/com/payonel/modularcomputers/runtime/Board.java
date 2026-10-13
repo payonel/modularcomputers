@@ -130,4 +130,19 @@ public interface Board {
 	 * program must end this way: returning instead is a panic, as when Linux's init exits.
 	 */
 	void halt();
+
+	/** The method that takes the next piece of a device's data, when it has a stream (see {@code Device.streamMethod}). */
+	default Optional<String> streamMethod(String address) {
+		return Optional.empty();
+	}
+
+	/** How much device data the board's ring holds, from its RAM (tier 1: none). */
+	default int ringCapacity() {
+		return 0;
+	}
+
+	/** The sources with an interrupt pending now (the bus, the console, devices), as {@link #waitForInterrupt} sees them. */
+	default List<String> pending() {
+		return List.of();
+	}
 }

@@ -158,6 +158,28 @@ final class MotherboardApi implements Board {
 	 * wait at a terminal in its group), then each device's, in bus order. A terminal in the
 	 * console's group raises the console's, not its own.
 	 */
+	@Override
+	public Optional<String> streamMethod(String address) {
+		if (address.equals(VirtualBus.CONSOLE)) {
+			return Optional.of("read");
+		}
+		return board.bus().device(address).map(Device::streamMethod);
+	}
+
+	@Override
+	public int ringCapacity() {
+		int capacity = 0;
+		for (MemoryInfo stick : board.chassis().memory()) {
+			capacity += MemoryTier.values()[stick.tier() - 1].ring();
+		}
+		return capacity;
+	}
+
+	@Override
+	public List<String> pending() {
+		return interrupts();
+	}
+
 	List<String> interrupts() {
 		List<String> pending = new ArrayList<>();
 		Bus bus = board.bus();

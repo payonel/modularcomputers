@@ -162,6 +162,10 @@ public final class LuaRunner implements Runner {
 				java.util.Arrays.copyOfRange(bytes.array(), bytes.offset(), bytes.offset() + bytes.size()))));
 	}
 
+	/** A piece of a device's data in the board's ring (its RAM), taken ahead of the program. */
+	private record Staged(String address, String method, Object value) {
+	}
+
 	/** A board call waiting for the server thread. */
 	private record Call(Function<Board, Object> call, CompletableFuture<Object> answer) {
 	}
@@ -180,6 +184,16 @@ public final class LuaRunner implements Runner {
 	/** A pinned request to persist, answered with the state's bytes (or null, when it can't be). */
 	private final AtomicReference<CompletableFuture<byte[]>> persistPin = new AtomicReference<>();
 	private final ConcurrentLinkedQueue<Call> calls = new ConcurrentLinkedQueue<>();
+	/**
+	 * The board's ring (user design, 2026-10-13): device data the server thread takes ahead of the
+	 * program while there's room ({@link Board#ringCapacity}, from the RAM: a tier 1 has none), in
+	 * the order it came; the computer's thread hands it to the firmware's inbox (its L1) when there's
+	 * room there, or serves a read from it at once. A device keeps its data until there's room.
+	 * Not saved: what's in the ring at a save is lost, as RAM's contents are.
+	 */
+	private final ConcurrentLinkedQueue<Staged> ring = new ConcurrentLinkedQueue<>();
+	/** What the firmware's inbox holds for each device, at most. */
+	public static final int INBOX = 4;
 	private volatile Wait wait;
 	private volatile State state = State.RUNNING;
 	private volatile Throwable crash;
@@ -351,16 +365,43 @@ public final class LuaRunner implements Runner {
 		while (spentNanos + (System.nanoTime() - start) < SERVER_NANOS_PER_TICK && (call = calls.poll()) != null) {
 			answer(call, board);
 		}
+		if (state == State.RUNNING && thread.isAlive()) {
+			stage(board, interrupts, start);
+		}
 		spentNanos += System.nanoTime() - start;
 		Wait waiting = wait;
 		if (waiting != null) {
-			List<String> pending = waiting.ready(interrupts.get());
+			List<String> pending = new ArrayList<>(interrupts.get());
+			for (Staged staged : ring) {
+				if (!pending.contains(staged.address())) {
+					pending.add(staged.address()); // its data's in the ring: still pending for the program
+				}
+			}
+			pending = waiting.ready(pending);
 			if (!pending.isEmpty() || now >= waiting.until()) {
 				wait = null;
 				waiting.answer().complete(pending);
 			}
 		}
 		return state();
+	}
+
+	/** Server side: takes device data ahead of the program into the ring, while there's room (and server time). */
+	private void stage(Board board, Supplier<List<String>> interrupts, long start) {
+		int capacity = board.ringCapacity();
+		if (capacity <= 0) {
+			return; // no ring (tier 1 RAM): the data stays in the device until the program asks
+		}
+		for (String source : interrupts.get()) {
+			String method = board.streamMethod(source).orElse(null);
+			while (method != null && ring.size() < capacity && spentNanos + (System.nanoTime() - start) < SERVER_NANOS_PER_TICK) {
+				Result taken = board.invoke(source, method);
+				if (taken.failed() || taken.first() == null) {
+					break;
+				}
+				ring.add(new Staged(source, method, taken.first()));
+			}
+		}
 	}
 
 	/** Server side: makes a board call and hands back its answer. */
@@ -392,23 +433,26 @@ public final class LuaRunner implements Runner {
 		return thread != null && thread.isAlive();
 	}
 
-	/** The computer's thread: runs the firmware, serving its requests, until it halts or is stopped. */
+	/**
+	 * The computer's thread: runs the firmware, serving its requests, until it halts or is stopped.
+	 * Every resume hands the firmware first whether device data waits in the board's ring (it then
+	 * asks for it, {@code "take"}), then the answer.
+	 */
 	private void run() {
 		try {
-			int answers;
-			if (image != null) {
-				push(kernel, image); // the EEPROM's text, as the CPU read it at power-on
-				answers = 1;
-			} else {
-				answers = -1; // restored: the kernel is suspended in a yield, its request on its stack
-			}
+			List<Object> reply = image != null ? List.of(image) : null; // (restored: its request is on its stack)
 			while (true) {
 				if (stopping) {
 					return;
 				}
 				int asked;
-				if (answers >= 0) {
-					lua_ResumeResult result = lua_resume(kernel, null, answers);
+				if (reply != null) {
+					luaL_checkstack(kernel, reply.size() + 2, new HostString("too many results"));
+					lua_pushboolean(kernel, ring.isEmpty() ? 0 : 1);
+					for (Object value : reply) {
+						push(kernel, value);
+					}
+					lua_ResumeResult result = lua_resume(kernel, null, reply.size() + 1);
 					if (result.status != LUA_YIELD) {
 						end(result);
 						return;
@@ -428,19 +472,23 @@ public final class LuaRunner implements Runner {
 					case "slice" -> {
 						honour();
 						lua_settop(kernel, top - asked);
-						answers = 0;
+						reply = List.of();
 					}
 					case "call" -> {
 						honour();
 						Object answer = await(serve(said));
 						lua_settop(kernel, top - asked);
-						answers = answer(answer);
+						reply = values(answer);
 					}
 					case "wait" -> {
 						honour();
 						List<String> pending = awaitWait(waitFor(said));
 						lua_settop(kernel, top - asked);
-						answers = push(kernel, pending);
+						reply = List.of(pending);
+					}
+					case "take" -> {
+						lua_settop(kernel, top - asked);
+						reply = List.of(take(said.size() > 1 ? said.get(1) : null));
 					}
 					case "halt" -> {
 						finish(State.HALTED, null);
@@ -457,6 +505,50 @@ public final class LuaRunner implements Runner {
 		} catch (RuntimeException | StackOverflowError e) {
 			finish(State.CRASHED, e);
 		}
+	}
+
+	/** A board call's answer as the firmware gets it: an invoke's as pcall's ({@code true} and its values, or {@code false} and why), else its value. */
+	private static List<Object> values(Object answer) {
+		if (answer instanceof Result result) {
+			List<Object> values = new ArrayList<>();
+			if (result.failed()) {
+				values.add(false);
+				values.add(result.error());
+			} else {
+				values.add(true);
+				values.addAll(result.values());
+			}
+			return values;
+		}
+		return java.util.Collections.singletonList(answer);
+	}
+
+	/**
+	 * The firmware takes device data from the ring into its inbox: in the order it came, for each
+	 * device only as much as its inbox has room for ({@code used}: what it holds now, by address);
+	 * the rest stays in the ring.
+	 */
+	private List<Map<String, Object>> take(Object used) {
+		Map<String, Integer> held = new java.util.HashMap<>();
+		if (used instanceof Map<?, ?> map) {
+			map.forEach((address, count) -> held.put(String.valueOf(address), count instanceof Long n ? n.intValue() : 0));
+		}
+		List<Map<String, Object>> packet = new ArrayList<>();
+		for (var it = ring.iterator(); it.hasNext();) {
+			Staged staged = it.next();
+			int holds = held.getOrDefault(staged.address(), 0);
+			if (holds >= INBOX) {
+				continue;
+			}
+			it.remove();
+			held.put(staged.address(), holds + 1);
+			Map<String, Object> item = new LinkedHashMap<>();
+			item.put("address", staged.address());
+			item.put("method", staged.method());
+			item.put("value", staged.value());
+			packet.add(item);
+		}
+		return packet;
 	}
 
 	/** The kernel returned or failed: the EEPROM's code returned, its text didn't load, or it crashed. */
@@ -498,10 +590,19 @@ public final class LuaRunner implements Runner {
 		}
 	}
 
-	/** A board call, as the server thread will make it. */
+	/** A board call, as the server thread will make it; a read of data already in the ring is answered from it, at once. */
 	private CompletableFuture<Object> serve(List<Object> said) {
 		String name = String.valueOf(said.size() > 1 ? said.get(1) : "");
 		List<Object> args = said.subList(Math.min(2, said.size()), said.size());
+		if (name.equals("invoke") && args.size() == 2 && args.get(0) instanceof String address) {
+			for (var it = ring.iterator(); it.hasNext();) {
+				Staged staged = it.next();
+				if (staged.address().equals(address) && staged.method().equals(args.get(1))) {
+					it.remove();
+					return CompletableFuture.completedFuture(Result.ok(staged.value()));
+				}
+			}
+		}
 		Function<Board, Object> call = switch (name) {
 			case "list" -> Board::list;
 			case "status" -> Board::status;
@@ -548,24 +649,6 @@ public final class LuaRunner implements Runner {
 		} catch (ExecutionException e) {
 			throw new IllegalStateException(e.getCause());
 		}
-	}
-
-	/** Pushes a board call's answer: an invoke's as pcall's ({@code true} and its values, or {@code false} and why), else its value. */
-	private int answer(Object answer) {
-		if (answer instanceof Result result) {
-			if (result.failed()) {
-				lua_pushboolean(kernel, 0);
-				push(kernel, result.error());
-				return 2;
-			}
-			luaL_checkstack(kernel, result.values().size() + 1, new HostString("too many results"));
-			lua_pushboolean(kernel, 1);
-			for (Object value : result.values()) {
-				push(kernel, value);
-			}
-			return 1 + result.values().size();
-		}
-		return push(kernel, answer);
 	}
 
 	private static String string(lua_State L, int arg) {

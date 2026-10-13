@@ -15,6 +15,15 @@
 --   "wait", ticks, sources...     wait for an interrupt (sources: any when none; ticks -1: no
 --                                 limit); answered with the pending sources, as a sequence
 --   "halt"                        the CPU halts; never resumed
+--   "take", held                  device data from the board's ring, for its inbox: held says what
+--                                 the inbox holds per address (it holds at most 4 of each)
+-- Every resume starts with whether device data waits in the board's ring (then it takes it).
+--
+-- Device data (user design, 2026-10-13): the board takes what devices have (keys, sensor events)
+-- into a ring in its RAM; this file keeps a few of each device's in its inbox, like an L1: tiny,
+-- since it counts against the program's memory. A read of a device's stream (a terminal's read,
+-- a sensor's pull) comes from the inbox with no syscall, and a wait for a device with data in the
+-- inbox returns at once.
 -- and what it ends with: "returned" (the EEPROM's code returned: a panic), "abort", why (the
 -- EEPROM's text didn't load), or an error (the EEPROM's code crashed).
 --
@@ -26,13 +35,13 @@
 -- This file never calls methods on strings ("s:sub()"): the string metatable is shared with user
 -- code.
 
-local image = ...
+local _, image = ...
 
 local coroutine_create, coroutine_resume, coroutine_status, coroutine_yield =
   coroutine.create, coroutine.resume, coroutine.status, coroutine.yield
 local setbudget, freeze, thaw, isfrozen = debug.setbudget, debug.freeze, debug.thaw, debug.isfrozen
-local load, pairs, select, type, error, tostring = load, pairs, select, type, error, tostring
-local table_pack, table_unpack = table.pack, table.unpack
+local load, pairs, ipairs, select, type, error, tostring = load, pairs, ipairs, select, type, error, tostring
+local table_pack, table_unpack, table_remove = table.pack, table.unpack, table.remove
 local math_huge, math_floor = math.huge, math.floor
 
 -- Steps user_co runs before its budget freezes it: how often the host gets a safe point.
@@ -41,6 +50,31 @@ local SLICE = 100000
 local user_co
 local request -- the syscall waiting for the host, packed
 local answer  -- the host's answer to it, packed
+
+-- The inbox: a few of each device's data, by address: {method = ..., [1] = oldest, ...}.
+local INBOX = 4
+local inbox = {}
+
+-- Asks the host (yields kernel_co); first takes in the device data the board has waiting.
+local function ask(...)
+  local reply = table_pack(coroutine_yield(...))
+  if reply[1] then
+    local held = {}
+    for address, queue in pairs(inbox) do
+      held[address] = #queue
+    end
+    local packet = table_pack(coroutine_yield("take", held))
+    for _, item in ipairs(packet[2] or {}) do
+      local queue = inbox[item.address]
+      if not queue or queue.method ~= item.method then
+        queue = {method = item.method}
+        inbox[item.address] = queue
+      end
+      queue[#queue + 1] = item.value
+    end
+  end
+  return table_unpack(reply, 2, reply.n)
+end
 
 -- The budget's callback always freezes: where a freeze can't happen, the engine ends user_co's
 -- chain with an error instead, and the CPU shows it. Nothing runs on unfrozen past its slice.
@@ -102,12 +136,35 @@ sandbox.board = {
   uptime = function() return syscall("call", "uptime") end,
   power = function() return syscall("call", "power") end,
   hardware = function() return syscall("call", "hardware") end,
-  -- true and the method's values, or false and why it failed (a device never stops the machine)
-  invoke = function(target, method, ...) return syscall("call", "invoke", target, method, ...) end,
+  -- true and the method's values, or false and why it failed (a device never stops the machine);
+  -- a read of a device's stream comes from the inbox when it has some
+  invoke = function(target, method, ...)
+    local queue = inbox[target]
+    if queue and queue.method == method and queue[1] ~= nil and select("#", ...) == 0 then
+      return true, table_remove(queue, 1)
+    end
+    return syscall("call", "invoke", target, method, ...)
+  end,
   -- waits until one of the sources (any, when none) has an interrupt pending, or 'seconds' pass
   waitForInterrupt = function(seconds, ...)
     if seconds ~= nil and type(seconds) ~= "number" then
       error("bad argument #1 to 'waitForInterrupt' (number expected, got " .. type(seconds) .. ")", 2)
+    end
+    -- Data in the inbox is pending already: no need to ask.
+    local wanted, ready = table_pack(...), {}
+    for address, queue in pairs(inbox) do
+      if queue[1] ~= nil then
+        local want = wanted.n == 0
+        for i = 1, wanted.n do
+          want = want or wanted[i] == address
+        end
+        if want then
+          ready[#ready + 1] = address
+        end
+      end
+    end
+    if #ready > 0 then
+      return ready
     end
     local ticks = (seconds == nil or seconds == math_huge) and -1 or math_floor(seconds * 20 + 0.5)
     if ticks < -1 then
@@ -134,9 +191,9 @@ while true do
     if request then
       local asked = request
       request = nil
-      answer = table_pack(coroutine_yield(table_unpack(asked, 1, asked.n)))
+      answer = table_pack(ask(table_unpack(asked, 1, asked.n)))
     else
-      coroutine_yield("slice") -- the slice is spent
+      ask("slice") -- the slice is spent
     end
     setbudget(user_co, SLICE, spent) -- a new slice
     result = table_pack(thaw(user_co))
@@ -146,7 +203,7 @@ while true do
     end
     error(result[2], 0)
   else
-    coroutine_yield("slice") -- the EEPROM's code yielded at its top: it gives up its turn
+    ask("slice") -- the EEPROM's code yielded at its top: it gives up its turn
     setbudget(user_co, SLICE, spent)
     result = table_pack(coroutine_resume(user_co))
   end

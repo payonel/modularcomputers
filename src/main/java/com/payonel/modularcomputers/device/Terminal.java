@@ -90,6 +90,11 @@ public final class Terminal implements Device {
 	}
 
 	@Override
+	public String streamMethod() {
+		return "read";
+	}
+
+	@Override
 	public InterruptLine interruptLine() {
 		return interruptLine;
 	}

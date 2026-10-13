@@ -665,6 +665,21 @@ scripts/art/error_beep.py` into
     wherever it is (inside coroutines, a sort's comparison), the freeze lands in the firmware, which
     asks the host, and the thaw returns the answer. No user coroutine sees a yield; `pcall` can't
     catch it. The firmware never calls methods on strings (the string metatable is shared).
+  - **Device data in rings** (user design, 2026-10-13; DMA-like: the program reads memory, not the
+    device). Each device with a stream (`Device.streamMethod`: a terminal's or the console's
+    `read`, a card's `pull`) has its data taken ahead of the program: the server thread
+    (`LuaRunner.stage`, within the computer's server time) takes it, for the sources with an
+    interrupt pending, into **the board's ring** (in its RAM, Java side, not counted against the
+    program's memory: `MemoryTier.ring`, tier 1 none, tier 2 16, tier 3 64 entries, summed over the
+    sticks; `Board.ringCapacity`). **Handshake, no silent drops**: a device keeps its data until
+    the ring has room; the ring hands it on only when the firmware's inbox has room. **The firmware's
+    inbox** (machine.lua, its L1: at most `INBOX` 4 per device, in the VM's memory, so tiny) takes it
+    at its next resume (every resume says whether mail waits; the firmware asks with `"take", held`).
+    A read of a device's stream comes from the inbox with no syscall, or from the ring on the
+    computer's thread with no server call; a wait for a source with data in the inbox returns at
+    once, and a waiting computer wakes for data in the ring. **With tier 1 RAM there's no ring**:
+    data stays in the device and every read is a server call (slower, on purpose). What's in the
+    ring at a save is lost (as RAM's contents are); the inbox is in the VM, so it's saved.
   - **User code**: the EEPROM's text and what it runs, seen as untrusted. It gets `board` (`invoke`
     answers as `pcall` does), and user coroutines that yield normally. `debug` stays hidden until
     LungoLua has a sandboxed debug library (user's plan) that can't touch the firmware's budget.
@@ -703,7 +718,7 @@ scripts/art/error_beep.py` into
   - **Expansion hub** (`ExpansionHubBlock`, `ExpansionHubBlockEntity`): 4 card slots on the
     network, like an external expansion chassis. It takes a cable on every side and passes
     the connection on.
-    - Each card in it is a cabled device of every computer wired to it. The key is
+    - Each card in it is a cabled device of the computer wired to it that holds it (one bus at a time). The key is
       `id:<card serial>`, and the location reads "hub 2, 3m".
     - Each card can be unplugged on its own.
     - A card works where it's installed: a redstone card in a hub emits and detects redstone at
