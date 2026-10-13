@@ -110,6 +110,19 @@
 					"weight": 3
 				}
 			]
+		},
+		{
+			"rolls": 1,
+			"condition": {
+				"type": "minecraft:random_chance",
+				"chance": 0.05
+			},
+			"entries": [
+				{
+					"type": "minecraft:item",
+					"name": "modularcomputers:tier1_battery"
+				}
+			]
 		}
 	],
 	"random_sequence": "modularcomputers:chests/ancient_lab"

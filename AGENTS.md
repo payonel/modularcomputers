@@ -490,7 +490,8 @@ scripts/art/error_beep.py` into
     computers** (`BrokenCaseBlock`, a cracked-open model: lid askew, bezel fallen forward, the
     board inside showing; decoration), cables along the floor, a chest of parts
     (`loot_table/chests/ancient_lab.json`: cables, chips, silicon, copper, gold, redstone, now and
-    then an EEPROM or RAM; chance drops, weighted; no batteries: too much for a find, user) and a **working photomask** on its bench. Weathering (moss,
+    then an EEPROM or RAM; chance drops, weighted; and in about one chest in twenty, a flat tier 1
+    battery: its own pool with a 5% chance, user 2026-10-12) and a **working photomask** on its bench. Weathering (moss,
     cracks, missing cables and windows) comes from the processor list at generation. The template
     is written by `scripts/data/ancient_lab_structure.py` (26.3 structure palettes use `id` and
     `properties`, not `Name`/`Properties`; processor `output_state` is a plain id).

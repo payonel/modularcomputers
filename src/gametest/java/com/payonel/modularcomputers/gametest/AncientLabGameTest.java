@@ -78,4 +78,25 @@ public class AncientLabGameTest {
 			"among an expert toolsmith's trades");
 		helper.succeed();
 	}
+
+	@GameTest
+	public void aFlatBatteryTurnsUpInAboutOneChestInTwenty(GameTestHelper helper) {
+		var key = ResourceKey.create(Registries.LOOT_TABLE, ModularComputers.id("chests/ancient_lab"));
+		var table = helper.getLevel().getServer().reloadableRegistries().getLootTable(key);
+		int chests = 2000;
+		int batteries = 0;
+		for (int chest = 0; chest < chests; chest++) {
+			var params = new net.minecraft.world.level.storage.loot.LootParams.Builder(helper.getLevel())
+				.withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.ORIGIN, net.minecraft.world.phys.Vec3.ZERO)
+				.create(net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.CHEST);
+			for (var stack : table.getRandomItems(params, chest)) {
+				if (stack.is(com.payonel.modularcomputers.item.ModItems.TIER1_BATTERY)) {
+					batteries++;
+					helper.assertValueEqual(com.payonel.modularcomputers.item.BatteryItem.charge(stack).units(), 0, "a flat battery");
+				}
+			}
+		}
+		helper.assertTrue(batteries > chests / 20 / 2 && batteries < chests / 20 * 2, "about one chest in twenty: " + batteries + " of " + chests);
+		helper.succeed();
+	}
 }
