@@ -8,4 +8,11 @@ package com.payonel.modularcomputers.runtime;
  */
 public interface Handle {
 	boolean isOpen();
+
+	/**
+	 * The program let go of it without closing it (Lua collected it): it gives back what it holds
+	 * (memory charged to the program, a disk's reserved space). Server thread.
+	 */
+	default void abandon() {
+	}
 }

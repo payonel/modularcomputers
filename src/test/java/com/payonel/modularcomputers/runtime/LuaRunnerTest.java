@@ -536,6 +536,25 @@ class LuaRunnerTest {
 	}
 
 	@Test
+	void aWaitTheInboxCanAnswerIsFree() {
+		ram(3);
+		boot("""
+			board.waitForInterrupt(nil, "console") -- cold: the server thread answers, and fills the inbox
+			board.invoke("console", "read")
+			board.waitForInterrupt(nil, "console") -- warm: answered on the computer's thread
+			board.invoke("console", "read")
+			board.invoke("console", "write", "done")
+			board.halt()
+			""");
+		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
+		screen.press("a");
+		screen.press("b");
+		untilHalted();
+		assertThat(row(0)).isEqualTo("done");
+		assertThat(runner.handedOver()).as("one wait and the write reached the server thread").isEqualTo(2);
+	}
+
+	@Test
 	void withOnlyTier1RamTheresNoInboxAndEachReadIsACall() {
 		ram(1);
 		boot(TYPED);
@@ -557,9 +576,10 @@ class LuaRunnerTest {
 		devices.put("id:redstone", card);
 		machine.setDevices(devices);
 		boot("""
-			board.waitForInterrupt() -- takes 2 keys and 2 events
-			board.invoke("console", "read") -- from the inbox: room for one more key
-			board.waitForInterrupt() -- tops up the keys only: the card's queue is full
+			board.waitForInterrupt() -- cold: takes 2 keys and 2 events
+			board.invoke("console", "read") -- from the inbox
+			board.invoke("console", "read") -- the keys' queue is empty now
+			board.waitForInterrupt(nil, "console") -- cold for the keys: tops them up; the card's queue is full
 			board.invoke("console", "write", "waited")
 			board.waitForInterrupt(1000, "nothing")
 			""");
@@ -578,7 +598,7 @@ class LuaRunnerTest {
 			events++;
 		}
 		assertThat(events).as("the card keeps what its full queue had no room for").isEqualTo(3);
-		assertThat(keys).as("left in the terminal: 5, less 2, less the 1 more").isEqualTo(2);
+		assertThat(keys).as("left in the terminal: 5, less 2, less 2 more").isEqualTo(1);
 	}
 
 	@Test

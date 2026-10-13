@@ -56,6 +56,8 @@ public final class Disk implements Device {
 	public static final int WINDOW = 4096;
 	/** What a full disk says, as a real file descriptor's write does (ENOSPC). */
 	public static final String NO_SPACE = "No space left on device";
+	/** A write the program's memory has no room for (ENOMEM): a handle's buffered writes are charged to it. */
+	public static final String NO_MEMORY = "Cannot allocate memory";
 	/** Live disks by id (their folder's name): a handle finds its disk by it, also after a restore. */
 	private static final Map<String, Disk> LIVE = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -583,6 +585,9 @@ public final class Disk implements Device {
 		private long windowStart = -1;
 		private byte[] window = new byte[0];
 		private boolean open = true;
+		/** The program's memory its buffered writes are charged to, and how much (their bytes). */
+		private com.payonel.modularcomputers.runtime.MemoryAccount account = com.payonel.modularcomputers.runtime.MemoryAccount.UNLIMITED;
+		private long charged;
 
 		FileHandle(String diskId, String path, String mode, long base) {
 			this.diskId = diskId;
@@ -630,6 +635,12 @@ public final class Disk implements Device {
 			return open;
 		}
 
+		/** The program let go of it without closing it (Lua collected it): as a power cut, its writes are gone. */
+		@Override
+		public void abandon() {
+			drop();
+		}
+
 		/** Closed without committing (power lost, the disk left): its writes are gone. */
 		void drop() {
 			Disk disk = LIVE.get(diskId);
@@ -637,7 +648,21 @@ public final class Disk implements Device {
 				disk.reserved -= reservation();
 			}
 			open = false;
+			clearWrites();
+		}
+
+		/** Its buffered writes are gone: their memory goes back to the program. */
+		private void clearWrites() {
 			writes.clear();
+			account.release(charged);
+			charged = 0;
+		}
+
+		/** After a restore: its buffered writes are charged to the restored program's memory, as they were before. */
+		public void chargeTo(com.payonel.modularcomputers.runtime.MemoryAccount restored) {
+			account = restored;
+			charged = writes.values().stream().mapToLong(write -> write.length).sum();
+			restored.force(charged);
 		}
 
 		/** The bytes at {@code at}, from the file (through the window) and over them its writes. */
@@ -714,8 +739,26 @@ public final class Disk implements Device {
 				long newLength = Math.max(length, at + data.length);
 				long before = reservation();
 				long grows = Math.max(0, newLength - base) - before;
-				disk.reserve(grows); // refuses with NO_SPACE: nothing written, the program's buffer as it was
-				put(at, data);
+				// The buffer is the program's memory, held outside its VM: charged up front, the
+				// excess back once it's merged (an overwrite of what's buffered costs nothing more).
+				var payer = args.account();
+				if (charged > 0 && payer != account) {
+					account.release(charged); // another program's now: what it holds moves with it
+					payer.force(charged);
+				}
+				account = payer;
+				if (!payer.charge(data.length)) {
+					return Result.fail(NO_MEMORY); // nothing written, the program's buffer as it was
+				}
+				try {
+					disk.reserve(grows); // refuses with NO_SPACE: nothing written, the program's buffer as it was
+				} catch (Refused e) {
+					payer.release(data.length);
+					throw e;
+				}
+				long added = put(at, data);
+				payer.release(data.length - added);
+				charged += added;
 				length = newLength;
 				position = at + data.length;
 				return Result.ok();
@@ -724,8 +767,8 @@ public final class Disk implements Device {
 			}
 		}
 
-		/** Lays {@code data} over the buffered writes at {@code at}, merging what it touches. */
-		private void put(long at, byte[] data) {
+		/** Lays {@code data} over the buffered writes at {@code at}, merging what it touches; returns how much the buffer grew. */
+		private long put(long at, byte[] data) {
 			long start = at;
 			long end = at + data.length;
 			Long from = writes.floorKey(at);
@@ -736,12 +779,15 @@ public final class Disk implements Device {
 				end = Math.max(end, write.getKey() + write.getValue().length);
 			}
 			byte[] merged = new byte[(int) (end - start)];
+			long had = 0;
 			for (var write : List.copyOf(writes.subMap(start, true, end, true).entrySet())) {
 				System.arraycopy(write.getValue(), 0, merged, (int) (write.getKey() - start), write.getValue().length);
 				writes.remove(write.getKey());
+				had += write.getValue().length;
 			}
 			System.arraycopy(data, 0, merged, (int) (at - start), data.length);
 			writes.put(start, merged);
+			return merged.length - had;
 		}
 
 		@Method(doc = "seek([whence[, offset]]): moves to offset from \"set\" (the start), \"cur\" (the default) or \"end\"; returns where it is")
@@ -783,7 +829,7 @@ public final class Disk implements Device {
 				}
 				disk.handles.remove(this);
 				open = false;
-				writes.clear();
+				clearWrites();
 				return Result.ok();
 			} catch (Refused e) {
 				return Result.fail(e.getMessage());

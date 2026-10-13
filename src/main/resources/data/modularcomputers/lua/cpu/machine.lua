@@ -26,7 +26,7 @@
 -- data, as much as that device's queue has room for (its size comes from the RAM: none with only
 -- tier 1); a device keeps the rest, so nothing is dropped, and a full queue never crowds out
 -- another device's. A read of a device's stream (a terminal's read, a sensor's pull) comes from the
--- inbox with no syscall.
+-- inbox with no syscall, and a wait the inbox can answer needs none either.
 -- and what it ends with: "returned" (the EEPROM's code returned: a panic), "abort", why (the
 -- EEPROM's text didn't load), or an error (the EEPROM's code crashed).
 --
@@ -150,6 +150,24 @@ sandbox.board = {
   waitForInterrupt = function(seconds, ...)
     if seconds ~= nil and type(seconds) ~= "number" then
       error("bad argument #1 to 'waitForInterrupt' (number expected, got " .. type(seconds) .. ")", 2)
+    end
+    -- A warm inbox answers at once, on this thread: free. Only a cold one goes to the server thread,
+    -- which tops every device's queue up as it answers. (Interrupts are level-triggered: other
+    -- sources pending now are reported once the inbox has nothing for the wait.)
+    local wanted, ready = table_pack(...), {}
+    for address, queue in pairs(inbox) do
+      if queue[1] ~= nil then
+        local want = wanted.n == 0
+        for i = 1, wanted.n do
+          want = want or wanted[i] == address
+        end
+        if want then
+          ready[#ready + 1] = address
+        end
+      end
+    end
+    if #ready > 0 then
+      return ready
     end
     local ticks = (seconds == nil or seconds == math_huge) and -1 or math_floor(seconds * 20 + 0.5)
     if ticks < -1 then

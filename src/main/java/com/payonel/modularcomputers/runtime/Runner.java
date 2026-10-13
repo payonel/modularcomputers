@@ -60,6 +60,11 @@ public interface Runner {
 		return 0;
 	}
 
+	/** The program's memory, which devices charge what they hold for it to ({@link Arguments#account}). */
+	default MemoryAccount memoryAccount() {
+		return MemoryAccount.UNLIMITED;
+	}
+
 		/** Given how to ask the server thread to {@link #tick} it soon (a runner on its own thread asks when a request comes in). */
 	default void serveWith(Runnable serveSoon) {
 	}

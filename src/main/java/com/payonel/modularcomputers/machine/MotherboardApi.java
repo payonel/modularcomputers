@@ -28,13 +28,17 @@ final class MotherboardApi implements Board {
 	private final LongSupplier uptime;
 	/** What the program holds of the memory (its runtime counts it). */
 	private final LongSupplier memoryUsed;
+	/** The program's memory, which devices charge what they hold for it to. */
+	private final java.util.function.Supplier<com.payonel.modularcomputers.runtime.MemoryAccount> account;
 	/** The bus's changes when the program last listed it: newer ones raise the bus's interrupt. */
 	private int listedChanges;
 
-	MotherboardApi(Motherboard board, LongSupplier uptime, LongSupplier memoryUsed) {
+	MotherboardApi(Motherboard board, LongSupplier uptime, LongSupplier memoryUsed,
+		java.util.function.Supplier<com.payonel.modularcomputers.runtime.MemoryAccount> account) {
 		this.board = board;
 		this.uptime = uptime;
 		this.memoryUsed = memoryUsed;
+		this.account = account;
 		this.listedChanges = board.bus().changes();
 	}
 
@@ -119,7 +123,7 @@ final class MotherboardApi implements Board {
 			return Result.fail("no such device: " + address);
 		}
 		try {
-			return DeviceMethods.invoke(device.get(), method, new Arguments(Arrays.asList(args)));
+			return DeviceMethods.invoke(device.get(), method, new Arguments(Arrays.asList(args), account.get()));
 		} catch (IllegalArgumentException e) {
 			return Result.fail(e.getMessage()); // an argument that isn't a value a program can hold
 		}
@@ -131,7 +135,7 @@ final class MotherboardApi implements Board {
 			return Result.fail("closed handle");
 		}
 		try {
-			return DeviceMethods.invoke(handle, method, new Arguments(Arrays.asList(args)));
+			return DeviceMethods.invoke(handle, method, new Arguments(Arrays.asList(args), account.get()));
 		} catch (IllegalArgumentException e) {
 			return Result.fail(e.getMessage());
 		}

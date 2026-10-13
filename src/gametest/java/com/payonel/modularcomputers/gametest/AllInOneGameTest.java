@@ -97,6 +97,28 @@ public class AllInOneGameTest {
 	}
 
 	@GameTest(maxTicks = 100)
+	public void takingRamOutFromUnderARunningProgramAbortsIt(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper);
+		TestPrograms.withScreen(computer);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM));
+		ItemStack eeprom = new ItemStack(ModItems.EEPROM);
+		eeprom.set(ModComponents.EEPROM_IMAGE, "board.waitForInterrupt(nil, \"nothing\")");
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, eeprom);
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		computer.pressPower();
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(computer.machine().runner().isPresent(), "it runs"))
+			.thenExecute(() -> computer.parts().setItem(CaseMenu.RAM_SLOTS, ItemStack.EMPTY))
+			.thenWaitUntil(() -> {
+				helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "ABRT: " + Cpu.RAM_CHANGED, "the CPU aborts");
+				helper.assertTrue(computer.machine().isPowered() && computer.machine().runner().isEmpty(), "power stays on, the CPU stopped");
+				helper.assertBlockProperty(POS, AllInOneBlock.HALTED, true);
+			})
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 100)
 	public void aProgramFlashesTheEepromAndTheNextBootRunsTheNewScript(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
 		TestPrograms.withScreen(computer);

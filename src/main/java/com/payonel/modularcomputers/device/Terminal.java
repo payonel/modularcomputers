@@ -43,6 +43,12 @@ public final class Terminal implements Device {
 	};
 	private final TextBuffer buffer;
 	private final Deque<String> input = new ArrayDeque<>();
+	/**
+	 * How many keys (and report answers) wait, at most (user, 2026-10-13: devices keep their own
+	 * rings). Past it a key is dropped, as a PC's keyboard buffer drops what it has no room for
+	 * (and beeps: no bell here yet); what waits isn't overwritten.
+	 */
+	public static final int INPUT_CAPACITY = 256;
 	private final VtDecoder decoder;
 
 	private final TerminalTier tier;
@@ -57,7 +63,7 @@ public final class Terminal implements Device {
 	public Terminal(Resolution resolution, TerminalTier tier) {
 		this.tier = tier;
 		this.buffer = new TextBuffer(resolution);
-		this.decoder = new VtDecoder(buffer, input::addLast, tier.depth(), tier.attributes());
+		this.decoder = new VtDecoder(buffer, this::queue, tier.depth(), tier.attributes());
 	}
 
 	public TerminalTier tier() {
@@ -95,9 +101,19 @@ public final class Terminal implements Device {
 
 	/** A key typed at the terminal: it waits in the queue, and the interrupt line wakes its computers. */
 	public void press(String key) {
+		if (queue(key)) {
+			interruptLine.raise();
+		}
+	}
+
+	/** Puts a key (or a report's answer) in the queue, if there's room: whether it went in. */
+	private boolean queue(String key) {
+		if (input.size() >= INPUT_CAPACITY) {
+			return false; // full: dropped
+		}
 		input.addLast(key);
 		changed.run();
-		interruptLine.raise();
+		return true;
 	}
 
 	@Override
@@ -186,7 +202,7 @@ public final class Terminal implements Device {
 	public void restore(java.util.Map<String, Object> saved) {
 		input.clear();
 		if (saved.get("input") instanceof java.util.List<?> keys) {
-			keys.forEach(key -> input.addLast(String.valueOf(key)));
+			keys.stream().limit(INPUT_CAPACITY).forEach(key -> input.addLast(String.valueOf(key)));
 			changed.run();
 		}
 	}

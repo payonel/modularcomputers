@@ -76,7 +76,8 @@ public final class Machine {
 	public Machine(Motherboard board, BooleanSupplier power) {
 		this.board = board;
 		this.power = power;
-		this.api = new MotherboardApi(board, () -> uptime, () -> runner == null ? 0 : runner.memoryUsed());
+		this.api = new MotherboardApi(board, () -> uptime, () -> runner == null ? 0 : runner.memoryUsed(),
+			() -> runner == null ? com.payonel.modularcomputers.runtime.MemoryAccount.UNLIMITED : runner.memoryAccount());
 	}
 
 	/** How a runner on its own thread gets the server thread to serve it soon (in a game, the server). */
@@ -339,6 +340,7 @@ public final class Machine {
 		callsThisTick = 0;
 		executedThisTick = false;
 		board.bus().devices().forEach(this::supply);
+		memoryAtStart = board.chassis().memory();
 		adopt(cpu.get().powerOn(board).orElse(null));
 		run(); // the CPU starts executing right away
 		return PowerPress.ON;
@@ -384,12 +386,30 @@ public final class Machine {
 			return;
 		}
 		try {
+			memoryAtStart = board.chassis().memory();
 			adopt(board.cpu().get().resume(saved).orElse(null));
 		} catch (RuntimeException e) {
 			com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A saved computer didn't restore; its CPU comes back halted", e);
 			return;
 		}
 		run();
+	}
+
+	/** The RAM the running program started with (its memory): a change aborts it. */
+	private List<com.payonel.modularcomputers.runtime.Board.MemoryInfo> memoryAtStart = List.of();
+
+	/**
+	 * Call after the parts changed. RAM put in or taken out while the CPU runs a program aborts it
+	 * (user, 2026-10-13), as a real machine crashes: the CPU's abort screen, power stays on.
+	 * Returns whether it did.
+	 */
+	public boolean memoryChanged() {
+		if (!powered || runner == null || board.chassis().memory().equals(memoryAtStart)) {
+			return false;
+		}
+		stopProgram();
+		board.cpu().ifPresent(cpu -> cpu.memoryChanged(board));
+		return true;
 	}
 
 	/**

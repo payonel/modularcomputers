@@ -79,6 +79,9 @@ same thing.
    write through (like `Eeprom.Storage`, or a `Supplier` for a device's label), backed by the item
    in the slot in game and by a plain value in unit tests. Disks already work this way (their files
    are in the world save). Watch for the same pattern elsewhere and point it out.
+8. **Named constants, never inline magic numbers** (user, 2026-10-13). Tunable values (limits,
+   thresholds, sizes) stay hard-coded for now, each as a named constant with a comment saying what
+   it is; settings come later.
 
 ## 3. Current state
 
@@ -115,7 +118,10 @@ same thing.
         slot directly. **Batteries aren't on the bus** (user, 2026-10-11, reversing an earlier
         choice): on real machines the firmware reports a battery (ACPI), so if programs need
         battery info it would be a board call, not a device.
-      - RAM is a placeholder: the machine still uses the soldered `Hardware` memory.
+      - RAM is the program's memory (see "Memory" under the Lua CPU). Putting a stick in or taking
+        one out while the CPU runs a program aborts it (user, 2026-10-13), as a real machine
+        crashes: `ABRT: RAM changed while running` with the error beep, power on
+        (`Machine.memoryChanged`, against the RAM it started with).
       - **Batteries** (user design, 2026-10-11; `item/BatteryItem`, plain-Java
         `power/BatteryTier` and `power/BatteryCharge`). **The computer runs on its battery:**
         - **Power is counted in whole units** (user, 2026-10-11; `power/PowerUnits`): per tick, a
@@ -427,7 +433,8 @@ scripts/art/error_beep.py` into
       - Ready, with a CPU and case power (block state `ready=true`), the button is lit (an
         emissive model element): red when off, green when on, and **amber when on with its CPU
         stopped** (block state `halted`, `Machine.isHalted`; user, 2026-10-13: a halted OS showed
-        nothing): the program halted, or the CPU aborted or crashed. Power stays on.
+        nothing): the program halted, or the CPU aborted or crashed. Power stays on. Green means
+        only that the EEPROM's program runs (its thread, waiting for an interrupt or not).
       - Otherwise it's **faded and unlit**, and red, since the machine can't be on.
         - In the GUIs it also shows faded green while the mouse is held down on it.
         - It's back to faded red on release (`ComputerButtons`, `powerHeld`).
@@ -720,7 +727,9 @@ scripts/art/error_beep.py` into
     taken (`LuaRunner.take`): from each device with data, as much as its queue has room for, within
     the computer's server time; a device keeps the rest, so nothing is dropped. Data is taken only
     as a wait is answered, straight into the answer. A read of a device's stream comes from the
-    inbox with no syscall; an empty queue, or **no inbox (only tier 1 RAM)**, makes it a call to the
+    inbox with no syscall, and **a wait the inbox can answer is free** (answered on the computer's
+    thread; user, 2026-10-13: only a cold cache goes to the server thread, which tops every device's
+    queue up as it answers); an empty queue, or **no inbox (only tier 1 RAM)**, makes it a call to the
     device (slower, on purpose). **Nothing is lost on a save** (user, 2026-10-13: "wholly
     unacceptable"): the inbox is in the VM, saved with it; a save pinned while a wait's answer is
     on its way waits for it to reach the VM (`LuaRunner.honour(answered)`); devices save what they
@@ -739,7 +748,14 @@ scripts/art/error_beep.py` into
     (`usermode(true)`, a host function in the registry, switched by machine.lua around each resume
     of user code and its syscalls' bookkeeping, and off in the budget callback), so a program that
     fills its memory gets the error in its own code and the firmware can still answer the host and
-    keep device data. `board.hardware().memoryUsed` is the real count. Found while testing (for
+    keep device data. **What devices hold for a program outside its VM is charged to it too**
+    (user, 2026-10-13: not byte-exact, but nothing a program can grow goes without a cost):
+    `runtime/MemoryAccount`, given to device methods with their arguments (`Arguments.account`); a
+    file handle's buffered writes are charged as they're buffered (an overwrite of what's buffered
+    costs nothing more), fail with ENOMEM ("Cannot allocate memory") past the program's share, and
+    are given back at close or drop, or when Lua collects an unclosed handle (`lua_UserObject.freed`,
+    handed to the server thread: `Handle.abandon`, which also frees its disk reservation); a restored
+    handle charges its writes again. `board.hardware().memoryUsed` is the real count, both. Found while testing (for
     LungoLua): garbage a dead frame left in a coroutine isn't freed by the emergency collection a
     refused allocation runs (a main thread's is), and `collectgarbage("count")` reads far more than
     the bytes `permit` saw.
@@ -960,7 +976,10 @@ scripts/art/error_beep.py` into
         built, so programs never send pixels to a terminal that would drop them). The front's frame shows the tier as 1-3 dots, iron, gold and diamond. The
         all-in-one's built-in terminal is tier 3.
       - **Input:** keys wait in its queue until `read()` (as do its answers to reports); while
-        any wait, its interrupt is on, or the console's if it's in the console's group.
+        any wait, its interrupt is on, or the console's if it's in the console's group. **The queue
+        has its own limit** (`Terminal.INPUT_CAPACITY`, 256; user, 2026-10-13: devices keep their
+        own rings): past it a key is dropped, as a PC's keyboard buffer drops what it has no room
+        for (it beeps; no bell here yet).
       - **Only the terminal the player has open gets the keys** (user, 2026-10-11): typing in a
         screen view (`DisplayScreen`) sends `TerminalInputPayload` to that terminal.
         Characters come from `charTyped`; other keys send what an xterm keyboard sends

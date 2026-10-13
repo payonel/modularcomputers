@@ -16,9 +16,21 @@ public final class Arguments {
 	}
 
 	private final List<Object> values;
+	/** The calling program's memory, for what the device holds for it outside its VM. */
+	private final MemoryAccount account;
 
 	public Arguments(List<Object> values) {
+		this(values, MemoryAccount.UNLIMITED);
+	}
+
+	public Arguments(List<Object> values, MemoryAccount account) {
 		this.values = values.stream().map(Values::normalize).toList();
+		this.account = account;
+	}
+
+	/** The calling program's memory: a device charges what it holds for the program to it. */
+	public MemoryAccount account() {
+		return account;
 	}
 
 	public int count() {

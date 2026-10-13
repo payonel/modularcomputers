@@ -20,8 +20,10 @@ public final class RedstoneCard extends Card {
 	/** It works while a running computer has it on its bus (it draws nothing to speak of). */
 	private final com.payonel.modularcomputers.bus.BusPower power = new com.payonel.modularcomputers.bus.BusPower(0);
 	private final EventQueue events = new EventQueue(line, this::changed);
-	private final int[] input = new int[6];
-	private final int[] output = new int[6];
+	/** A redstone signal's strength, at most (Minecraft's 0 to 15). */
+	public static final int MAX_SIGNAL = 15;
+	private final int[] input = new int[SIDES.size()];
+	private final int[] output = new int[SIDES.size()];
 	/** Tells the world its outputs changed (the block it's in updates its neighbours). */
 	private Runnable onOutput = () -> {
 	};
@@ -73,7 +75,7 @@ public final class RedstoneCard extends Card {
 	@Method(doc = "setOutput(side, value): puts out a signal on that side, 0 to 15; returns what it was")
 	public Result setOutput(Arguments args) {
 		int side = side(args);
-		int value = (int) Math.clamp(args.checkInteger(1), 0, 15);
+		int value = (int) Math.clamp(args.checkInteger(1), 0, MAX_SIGNAL);
 		int was = output[side];
 		if (was != value) {
 			output[side] = value;
@@ -119,7 +121,7 @@ public final class RedstoneCard extends Card {
 	private static void restoreSides(Object kept, int[] sides) {
 		if (kept instanceof java.util.List<?> values) {
 			for (int i = 0; i < sides.length && i < values.size(); i++) {
-				sides[i] = values.get(i) instanceof Long v ? (int) Math.clamp(v, 0, 15) : 0;
+				sides[i] = values.get(i) instanceof Long v ? (int) Math.clamp(v, 0, MAX_SIGNAL) : 0;
 			}
 		}
 	}

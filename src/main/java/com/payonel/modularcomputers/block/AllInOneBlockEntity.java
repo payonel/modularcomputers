@@ -235,7 +235,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		machine.board().setChassis(new CaseChassis());
 		// How a log names it: which board, where.
 		machine.describedBy(() -> "board " + boardId + " at " + worldPosition.toShortString()
-			+ (level != null ? " in " + level.dimension().identifier() : "") + ", chunk " + (worldPosition.getX() >> 4) + "," + (worldPosition.getZ() >> 4));
+			+ (level != null ? " in " + level.dimension().identifier() : "") + ", chunk " + net.minecraft.core.SectionPos.blockToSectionCoord(worldPosition.getX())
+			+ "," + net.minecraft.core.SectionPos.blockToSectionCoord(worldPosition.getZ()));
 	}
 
 	/** What the board's firmware reads from this case (ACPI and SMBIOS): its tier, power and RAM. */
@@ -1010,6 +1011,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		if (machine.cpuRemoved()) {
 			// Pulling the CPU out of a running machine kills it.
 			errorBeep();
+		} else if (machine.memoryChanged()) {
+			errorBeep(); // RAM in or out under a running program: the CPU aborts
 		}
 		pullFromBattery(); // a battery going in fills the buffer right away
 		if (!setPowerState()) {

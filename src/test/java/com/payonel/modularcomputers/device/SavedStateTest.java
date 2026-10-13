@@ -28,6 +28,23 @@ class SavedStateTest {
 	}
 
 	@Test
+	void aTerminalsKeyQueueHasItsOwnLimitAndDropsWhatHasNoRoom() {
+		Terminal terminal = new Terminal(Resolution.DEFAULT);
+		for (int i = 0; i < Terminal.INPUT_CAPACITY + 10; i++) {
+			terminal.press("k" + i);
+		}
+		int kept = 0;
+		String last = null;
+		Object key;
+		while ((key = terminal.read(args()).first()) != null) {
+			kept++;
+			last = (String) key;
+		}
+		assertThat(kept).isEqualTo(Terminal.INPUT_CAPACITY);
+		assertThat(last).as("what waited stays; the newest are dropped").isEqualTo("k" + (Terminal.INPUT_CAPACITY - 1));
+	}
+
+	@Test
 	void aRedstoneCardKeepsItsEventsItsOutputsAndWhatItSaw() {
 		RedstoneCard card = new RedstoneCard();
 		card.setOutput(args("north", 7L));

@@ -44,6 +44,8 @@ public final class Cpu {
 	public static final String NO_EEPROM = "no EEPROM installed";
 	/** No RAM: nothing to run in, as a real PC that won't POST (user, 2026-10-13: memory is the RAM installed). */
 	public static final String NO_RAM = "no RAM installed";
+	/** RAM put in or taken out while a program runs: its memory is gone from under it. */
+	public static final String RAM_CHANGED = "RAM changed while running";
 	public static final String CRASHED = "EEPROM crashed: ";
 	public static final String RETURNED = "EEPROM returned without halting";
 	/** A wiped EEPROM: nothing to run, like a BIOS's "no bootable device". */
@@ -122,6 +124,11 @@ public final class Cpu {
 			return;
 		}
 		abort(board, CRASHED + error.getMessage());
+	}
+
+	/** The RAM changed under the running program (user, 2026-10-13): the abort screen. */
+	public void memoryChanged(Motherboard board) {
+		abort(board, RAM_CHANGED);
 	}
 
 	/** The program returned instead of halting: the abort screen. */

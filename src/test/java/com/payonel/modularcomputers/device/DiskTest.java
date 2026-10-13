@@ -87,6 +87,69 @@ class DiskTest {
 		assertThat(Files.readString(storage().resolve("notes/hello.txt"))).isEqualTo("hello disk\n");
 	}
 
+	/** A program's memory with room for {@code cap} bytes, counting what's charged to it. */
+	private static final class Account implements com.payonel.modularcomputers.runtime.MemoryAccount {
+		final long cap;
+		long held;
+
+		Account(long cap) {
+			this.cap = cap;
+		}
+
+		@Override
+		public boolean charge(long bytes) {
+			if (held + bytes > cap) {
+				return false;
+			}
+			held += bytes;
+			return true;
+		}
+
+		@Override
+		public void force(long bytes) {
+			held += bytes;
+		}
+
+		@Override
+		public void release(long bytes) {
+			held -= bytes;
+		}
+	}
+
+	@Test
+	void aHandlesBufferedWritesAreChargedToTheProgramsMemory() {
+		disk = new Disk(DiskTier.TIER_1, storage());
+		Account account = new Account(10_000);
+		String chunk = "x".repeat(4000);
+		Disk.FileHandle file = (Disk.FileHandle) disk.open(new com.payonel.modularcomputers.runtime.Arguments(List.of("/f", "w"))).first();
+		java.util.function.Function<Object[], com.payonel.modularcomputers.runtime.Result> write = values ->
+			file.write(new com.payonel.modularcomputers.runtime.Arguments(List.of(values), account));
+		assertThat(write.apply(new Object[] {chunk}).failed()).isFalse();
+		assertThat(account.held).isEqualTo(4000);
+		file.seek(new com.payonel.modularcomputers.runtime.Arguments(List.of("set", 0L)));
+		write.apply(new Object[] {chunk});
+		assertThat(account.held).as("overwriting what's buffered costs nothing more").isEqualTo(4000);
+		write.apply(new Object[] {chunk});
+		assertThat(account.held).isEqualTo(8000);
+		assertThat(write.apply(new Object[] {chunk}).error()).as("no room: ENOMEM, nothing written").isEqualTo(Disk.NO_MEMORY);
+		assertThat(account.held).isEqualTo(8000);
+		assertThat(file.close(new com.payonel.modularcomputers.runtime.Arguments(List.of())).failed()).isFalse();
+		assertThat(account.held).as("committed: given back").isZero();
+	}
+
+	@Test
+	void aHandleTheProgramLetGoOfGivesBackItsMemoryAndSpace() {
+		disk = new Disk(DiskTier.TIER_1, storage());
+		Account account = new Account(100_000);
+		long used = (long) disk.getUsed(new com.payonel.modularcomputers.runtime.Arguments(List.of())).first();
+		Disk.FileHandle file = (Disk.FileHandle) disk.open(new com.payonel.modularcomputers.runtime.Arguments(List.of("/g", "w"))).first();
+		file.write(new com.payonel.modularcomputers.runtime.Arguments(List.of("y".repeat(5000)), account));
+		file.abandon();
+		assertThat(account.held).isZero();
+		assertThat(file.isOpen()).isFalse();
+		assertThat(disk.getUsed(new com.payonel.modularcomputers.runtime.Arguments(List.of())).first()).as("its reservation too").isEqualTo(used + 512);
+	}
+
 	private static String read(Path path) {
 		try {
 			return Files.readString(path);

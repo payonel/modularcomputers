@@ -330,3 +330,13 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
 - **EEPROM as a bus device:** also listed on the physical bus, so programs can read or
   reflash it.
 - **Monospace bitmap font:** today text uses Minecraft's proportional font, centered per cell.
+
+## Open for later (user, 2026-10-13)
+
+- **RAM sizes:** the tiers' sizes (and their per-device ring sizes) can't be judged yet: settle
+  them once the VM and mcos are finished, with OC's values as a reference.
+- **Server time across many computers:** each computer gets its own server time a tick for now
+  (`SERVER_NANOS_PER_TICK`), with no overall management; later, round robin which machines get
+  server time each tick, if many busy computers starve the tick.
+- **Settings:** tunable values stay named, hard-coded constants until settings are revisited.
+- **A bell:** terminals ignore BEL, and a full key queue drops keys silently; a real keyboard beeps.

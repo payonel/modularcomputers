@@ -74,7 +74,7 @@ import java.util.function.Supplier;
  */
 public final class LuaRunner implements Runner {
 	/** How long a computer's board calls may use the server thread each tick. */
-	public static final long SERVER_NANOS_PER_TICK = 1_000_000;
+	public static final long SERVER_NANOS_PER_TICK = TimeUnit.MILLISECONDS.toNanos(1);
 	/** The firmware, in the mod's Lua scripts. */
 	private static final String FIRMWARE = "cpu/machine";
 	/** What the VM opens: the firmware needs debug (budgets, freezing); it hands out what it chooses. */
@@ -90,7 +90,7 @@ public final class LuaRunner implements Runner {
 	 * while it waits (again at each doubling), and once it's done, how long the computer took to
 	 * reach a safe point (its freeze) and how long Styx took.
 	 */
-	private static final long SLOW_SAVE_NANOS = 50_000_000L;
+	private static final long SLOW_SAVE_NANOS = TimeUnit.MILLISECONDS.toNanos(50);
 	/**
 	 * The permanents: every C function and userdata reachable from the registry and the string
 	 * metatable once the libraries are open, and each such userdata's metatable, named by its path
@@ -160,12 +160,22 @@ public final class LuaRunner implements Runner {
 		public ByteView persistbytes() {
 			return handle instanceof com.payonel.modularcomputers.device.Disk.FileHandle file ? new ByteView(file.persisted()) : ByteView.EMPTY;
 		}
+
+		/** Lua collected it (the computer's thread): the server thread lets it go, as devices are its. */
+		@Override
+		public void freed(lua_State L) {
+			((Memory) lua_getallocf(L)).abandoned.add(handle);
+		}
 	}
 
 	static {
 		com.payonel.lungolua.object.Lnames.lua_registerobjectkind(com.payonel.modularcomputers.device.Disk.FileHandle.KIND, (L, ints, count, bytes) ->
-			new HandleObject(com.payonel.modularcomputers.device.Disk.FileHandle.restore(
-				java.util.Arrays.copyOfRange(bytes.array(), bytes.offset(), bytes.offset() + bytes.size()))));
+		{
+			var handle = com.payonel.modularcomputers.device.Disk.FileHandle.restore(
+				java.util.Arrays.copyOfRange(bytes.array(), bytes.offset(), bytes.offset() + bytes.size()));
+			handle.chargeTo((Memory) lua_getallocf(L)); // its buffered writes, the restored program's memory again
+			return new HandleObject(handle);
+		});
 	}
 
 	/** A board call waiting for the server thread. */
@@ -188,7 +198,7 @@ public final class LuaRunner implements Runner {
 	 * library's included. Past its cap, an allocation is refused (after a full collection) and Lua
 	 * raises "not enough memory", in the program.
 	 */
-	public static final class Memory implements lua_Alloc {
+	public static final class Memory implements lua_Alloc, MemoryAccount {
 		/** Bytes it may hold; 0 while unset (no limit). Set by the server thread at power-on. */
 		private volatile long cap;
 		/** Bytes held now. Written only by the thread running the VM. */
@@ -201,19 +211,44 @@ public final class LuaRunner implements Runner {
 		private boolean user;
 		/** What the firmware keeps for itself, as a kernel reserves memory. */
 		public static final long RESERVE = 32 << 10;
+		/** Handles Lua collected unclosed, for the server thread to let go ({@link Handle#abandon}). */
+		final ConcurrentLinkedQueue<Handle> abandoned = new ConcurrentLinkedQueue<>();
+		/** What devices hold for the program outside the VM (a file's buffered writes): any thread. */
+		private final java.util.concurrent.atomic.AtomicLong held = new java.util.concurrent.atomic.AtomicLong();
 
 		@Override
 		public boolean permit(long osize, long nsize, int tag) {
 			long grow = nsize - osize;
-			if (grow > 0 && cap > 0 && used + grow > (user ? cap - RESERVE : cap)) {
+			if (grow > 0 && cap > 0 && used + held.get() + grow > (user ? cap - RESERVE : cap)) {
 				return false;
 			}
 			used += grow;
 			return true;
 		}
 
+		/** Devices' charges: what the program may hold, user code's share (less the reserve). Not exact across threads, but bounded. */
+		@Override
+		public boolean charge(long bytes) {
+			if (cap > 0 && used + held.get() + bytes > cap - RESERVE) {
+				return false;
+			}
+			held.addAndGet(bytes);
+			return true;
+		}
+
+		@Override
+		public void force(long bytes) {
+			held.addAndGet(bytes);
+		}
+
+		@Override
+		public void release(long bytes) {
+			held.addAndGet(-bytes);
+		}
+
+		/** All it holds: the VM's, and what devices hold for it. */
 		public long used() {
-			return used;
+			return used + held.get();
 		}
 
 		public long cap() {
@@ -397,7 +432,7 @@ public final class LuaRunner implements Runner {
 				} catch (TimeoutException e) {
 					long now = System.nanoTime() - snapshot.askedAt;
 					if (now >= waited) {
-						com.payonel.modularcomputers.ModularComputers.LOGGER.warn("Saving {}: still waiting after {} ms for it {}", who, now / 1_000_000,
+						com.payonel.modularcomputers.ModularComputers.LOGGER.warn("Saving {}: still waiting after {} ms for it {}", who, TimeUnit.NANOSECONDS.toMillis(now),
 							snapshot.frozeAt == 0 ? "to reach a safe point (its program is in a long step)" : "to persist (Styx)");
 						waited *= 2;
 					}
@@ -419,7 +454,7 @@ public final class LuaRunner implements Runner {
 		long freeze = snapshot.frozeAt - snapshot.askedAt;
 		if (freeze >= SLOW_SAVE_NANOS || snapshot.styxNanos >= SLOW_SAVE_NANOS) {
 			com.payonel.modularcomputers.ModularComputers.LOGGER.warn("Saving {} took long: {} ms to reach a safe point, {} ms to persist",
-				who, freeze / 1_000_000, snapshot.styxNanos / 1_000_000);
+				who, TimeUnit.NANOSECONDS.toMillis(freeze), TimeUnit.NANOSECONDS.toMillis(snapshot.styxNanos));
 		}
 	}
 
@@ -528,6 +563,10 @@ public final class LuaRunner implements Runner {
 			spentNanos = 0;
 		}
 		long start = System.nanoTime();
+		Handle abandoned;
+		while ((abandoned = memory.abandoned.poll()) != null) {
+			abandoned.abandon(); // Lua collected it unclosed: what it holds goes back
+		}
 		Call call;
 		while (spentNanos + (System.nanoTime() - start) < SERVER_NANOS_PER_TICK && (call = calls.poll()) != null) {
 			answer(call, board);
@@ -612,6 +651,11 @@ public final class LuaRunner implements Runner {
 	@Override
 	public long memoryUsed() {
 		return memory.used();
+	}
+
+	@Override
+	public MemoryAccount memoryAccount() {
+		return memory;
 	}
 
 	/** The program's memory: what it holds, and its cap. */
@@ -814,6 +858,11 @@ public final class LuaRunner implements Runner {
 			}
 			park();
 		}
+	}
+
+	/** What the server thread handed the computer: calls' and waits' answers (tests). */
+	long handedOver() {
+		return served;
 	}
 
 	/** How many calls wait for the server thread (tests). */

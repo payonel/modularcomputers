@@ -25,7 +25,7 @@ public interface Chassis {
 		/** A tier 3 stick: a bench has RAM, or nothing would run. */
 		@Override
 		public List<Board.MemoryInfo> memory() {
-			return List.of(new Board.MemoryInfo(0, 3, MemoryTier.TIER_3.bytes()));
+			return List.of(new Board.MemoryInfo(0, MemoryTier.TIER_3.number(), MemoryTier.TIER_3.bytes()));
 		}
 	};
 
