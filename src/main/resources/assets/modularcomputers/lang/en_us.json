@@ -35,7 +35,7 @@
 	"hint.modularcomputers.shift": "Hold %s for details",
 	"hint.modularcomputers.shift_key": "[Shift]",
 	"hint.modularcomputers.id": "Id: %s",
-	"hint.modularcomputers.clear_id": "Craft it alone to clear its id: it then stacks again, and is a new device",
+	"hint.modularcomputers.clear_id": "Craft alone to clear the id",
 	"hint.modularcomputers.crafting": "Crafting:",
 	"hint.modularcomputers.no_recipe": "No recipe yet",
 	"hint.modularcomputers.holds": "%s: %s",

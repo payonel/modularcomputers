@@ -67,7 +67,9 @@ public final class Hint {
 		if (serial != null) {
 			// Its id (programs address it as id:<uuid>), long, so only in the details (user); crafting it alone clears it.
 			elements.add(text(Component.translatable("hint.modularcomputers.id", serial.toString())));
-			elements.add(text(Component.translatable("hint.modularcomputers.clear_id")));
+			if (stack.getMaxStackSize() > 1) { // things holding data keep their id (ClearIdRecipe)
+				elements.add(text(Component.translatable("hint.modularcomputers.clear_id")));
+			}
 		}
 		elements.add(text(Component.translatable("hint.modularcomputers.crafting")));
 		elements.add(new Crafting(stack.getItem()));
