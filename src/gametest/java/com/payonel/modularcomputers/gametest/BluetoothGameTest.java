@@ -105,7 +105,7 @@ public class BluetoothGameTest {
 		helper.succeedWhen(() -> helper.assertValueEqual(locations(computer), List.of("paired"), "found over Bluetooth, paired"));
 	}
 
-	@GameTest
+	@GameTest(maxTicks = 100)
 	public void aPairedScreenIsOnlyOnItsOwnersBusButStillCarriesTheCable(GameTestHelper helper) {
 		// A - cable - screen - cable - B, and a second, unpaired screen on top of the first.
 		AllInOneBlockEntity owner = computer(helper);
@@ -118,12 +118,19 @@ public class BluetoothGameTest {
 		helper.setBlock(new BlockPos(5, 1, 1), ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
 		AllInOneBlockEntity other = helper.getBlockEntity(new BlockPos(5, 1, 1), AllInOneBlockEntity.class);
 		other.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
-		helper.succeedWhen(() -> {
-			helper.assertTrue(onBus(owner, paired) && onBus(owner, shared), "the owner has both screens");
-			helper.assertTrue(!onBus(other, paired), "the other computer doesn't get the paired screen");
-			helper.assertTrue(onBus(other, shared), "but reaches the unpaired one through it: it still carries the cable");
-			helper.assertTrue(locations(owner).contains("paired"), "the owner's row says paired");
-		});
+		helper.startSequence()
+			.thenWaitUntil(() -> {
+				helper.assertTrue(onBus(owner, paired), "the owner has its paired screen");
+				helper.assertTrue(locations(owner).contains("paired"), "the owner's row says paired");
+				helper.assertTrue(!onBus(other, paired), "the other computer doesn't get the paired screen");
+				helper.assertTrue(onBus(owner, shared) != onBus(other, shared), "the unpaired one is on one bus or the other");
+			})
+			.thenExecute(() -> owner.parts().setItem(CaseMenu.CPU_SLOT, ItemStack.EMPTY)) // no CPU, no bus: it lets go
+			.thenWaitUntil(() -> {
+				helper.assertTrue(onBus(other, shared), "the other reaches the unpaired one through it: it still carries the cable");
+				helper.assertTrue(!onBus(other, paired), "and still not the paired one");
+			})
+			.thenSucceed();
 	}
 
 	@GameTest
@@ -223,13 +230,15 @@ public class BluetoothGameTest {
 		piston(helper, new BlockPos(2, 1, 6)).cards().setItem(0, card(hub.boardId()));
 		helper.startSequence()
 			.thenWaitUntil(() -> {
-				helper.assertValueEqual(locations(first), List.of("hub 1, 1m", "paired"), "the first computer has the hub and its piston");
-				helper.assertValueEqual(locations(second), List.of("hub 1, 1m", "paired"), "and so does the second");
+				// One bus at a time: whichever got there first has the hub's card and the piston, the other finds them missing.
+				List<List<String>> both = List.of(locations(first), locations(second));
+				helper.assertTrue(both.contains(List.of("hub 1, 1m", "paired")) && both.contains(List.of()),
+					"one computer has the hub's card and the piston: " + both);
 			})
 			.thenExecute(() -> hub.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(first.boardId()))) // the hub pairs with the first
 			.thenWaitUntil(() -> {
 				helper.assertValueEqual(locations(first), List.of("hub 1, paired", "paired"), "the first keeps both");
-				helper.assertValueEqual(locations(second), List.of("offline", "offline"), "the second loses both");
+				helper.assertTrue(locations(second).stream().allMatch("offline"::equals), "the second has neither: " + locations(second));
 			})
 			.thenSucceed();
 	}

@@ -717,16 +717,21 @@ scripts/art/error_beep.py` into
         else.
       - This is deterministic: it's saved in the cards, so it doesn't depend on which chunk
         loads first. The user found first-wins and last-wins hopeless for that reason.
-    - **Unpaired devices are shared** by every computer that reaches them. That's racy by
-      nature; the user calls it undefined behavior and accepts it.
+    - **Unpaired devices go to whichever computer has them first** (one bus at a time, below).
   - The screen, hub, piston and paint gun share `CardHolderBlockEntity`: an id, card slots
     with a radio slot, save and sync, keeping cards and id in the dropped item, card sounds, Bluetooth registration, and
     `Cabling.changed()` when their cards change. They also share `CardHolderMenu` and
     `CardHolderScreen`. Hubs, pistons and paint guns use `OutlineRenderer` for the outlines.
-  - **One screen, many computers:** a screen can be wired to several computers, and each
-    has it on its bus.
-    - Each writes to it; the last write wins, and powering one off blanks it.
-    - Proper sharing waits for the "virtual multicast text buffer" design (below).
+  - **One bus at a time** (user, 2026-10-13, replacing "one screen, many computers"; `bus/BusHolds`): a
+    device is on one bus. Whichever board has it on its bus first holds it; another board that
+    reaches it (on the same cable, or loading later) finds it missing: a board that had it in its
+    saved order lists it offline, one that never had it doesn't list it. The holder lets go when
+    the device leaves its bus (unplugged, forgotten, out of reach), when it unloads or is broken
+    (`Machine.unload`), or when it loses its CPU (no bus); a release bumps `BusHolds.version()` and
+    the other computers lay their buses out again (`AllInOneBlockEntity.relayout`), the first to do
+    so taking it. Nothing is saved: holds are worked out afresh as boards load, so nothing falls out
+    of sync over long cables or unloaded chunks. `Motherboard.layout` treats a device another board
+    holds as absent; `Machine.rebuildBus` holds what lands on the bus.
   - **The console writes to every display in its group** (see the console's group under
     "Mock runtime"); the EEPROM chooses by unbinding displays.
 - **Bus order and gaps:**

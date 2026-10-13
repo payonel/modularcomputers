@@ -255,6 +255,7 @@ public final class Machine {
 	 * saved), and it stops supplying its devices.
 	 */
 	public void unload() {
+		com.payonel.modularcomputers.bus.BusHolds.releaseAll(board); // its devices are free for other boards
 		stopProgram();
 		if (powered) {
 			releaseDevices();
@@ -335,6 +336,7 @@ public final class Machine {
 	/** Puts the motherboard's {@link Motherboard#layout} on the bus, with hot-plug. */
 	public void rebuildBus(long now) {
 		Motherboard.Layout layout = board.layout(now);
+		com.payonel.modularcomputers.bus.BusHolds.hold(board, layout.devices().values()); // one bus at a time
 		setDevices(layout.devices(), layout.aliases());
 	}
 

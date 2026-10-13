@@ -198,11 +198,15 @@ public final class Motherboard {
 				id(connector).filter(id -> !id.equals(address)).ifPresent(id -> aliases.put(id, address));
 			}
 		}
-		order.sync(List.copyOf(internal.keySet()), List.copyOf(external.keySet()), now);
+		// A device another board holds is missing here: it's on that bus (BusHolds).
+		List<String> present = external.entrySet().stream()
+			.filter(entry -> entry.getValue() == null || !com.payonel.modularcomputers.bus.BusHolds.heldByAnother(entry.getValue(), this))
+			.map(Map.Entry::getKey).toList();
+		order.sync(List.copyOf(internal.keySet()), present, now);
 		bus.setStatus(order.status());
 		Map<String, Device> devices = new LinkedHashMap<>();
 		for (String address : order.connected()) {
-			Device device = internal.containsKey(address) ? internal.get(address) : external.get(address);
+			Device device = internal.containsKey(address) ? internal.get(address) : present.contains(address) ? external.get(address) : null;
 			if (device != null) {
 				devices.put(address, device);
 			}

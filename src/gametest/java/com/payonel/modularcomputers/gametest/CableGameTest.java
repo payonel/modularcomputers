@@ -205,21 +205,35 @@ public class CableGameTest {
 			.thenSucceed();
 	}
 
-		@GameTest
-	public void oneScreenCanBeWiredToTwoComputers(GameTestHelper helper) {
+		@GameTest(maxTicks = 200)
+	public void aScreenWiredToTwoComputersIsOnOneBusAtATime(GameTestHelper helper) {
+		// A device is on one bus (user, 2026-10-13): the first board to have it holds it, the other finds it missing.
 		AllInOneBlockEntity first = computer(helper, COMPUTER, true);
 		cable(helper, new BlockPos(2, 1, 1));
 		ScreenBlockEntity screen = screen(helper, new BlockPos(3, 1, 1), Direction.SOUTH);
 		cable(helper, new BlockPos(4, 1, 1));
 		AllInOneBlockEntity second = computer(helper, new BlockPos(5, 1, 1), false);
-		helper.succeedWhen(() -> {
-			helper.assertTrue(onBus(first, screen) && onBus(second, screen), "both computers see the screen");
-			helper.assertTrue(!first.machine().board().bus().devices().contains(second.terminal()), "a computer's built-in display is its own");
-			if (!first.machine().isPowered()) {
-				first.pressPower();
-			}
-			helper.assertTrue(showsText(screen.terminal()), "a running computer shows its console on the shared screen");
-		});
+		AllInOneBlockEntity[] holder = new AllInOneBlockEntity[1];
+		helper.startSequence()
+			.thenWaitUntil(() -> {
+				helper.assertTrue(onBus(first, screen) != onBus(second, screen), "exactly one computer has the screen");
+				holder[0] = onBus(first, screen) ? first : second;
+				AllInOneBlockEntity other = holder[0] == first ? second : first;
+				helper.assertTrue(entryFor(other, screen).isEmpty(), "the other never had it: not on its bus, not listed");
+			})
+			.thenExecute(() -> helper.setBlock(holder[0] == first ? COMPUTER : new BlockPos(5, 1, 1), net.minecraft.world.level.block.Blocks.AIR))
+			.thenWaitUntil(() -> helper.assertTrue(onBus(holder[0] == first ? second : first, screen), "its holder gone, the other takes it"))
+			.thenExecute(() -> {
+				AllInOneBlockEntity taker = holder[0] == first ? second : first;
+				holder[0] = taker == first ? second : first;
+				helper.setBlock(holder[0] == first ? COMPUTER : new BlockPos(5, 1, 1), ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
+				AllInOneBlockEntity again = helper.getBlockEntity(holder[0] == first ? COMPUTER : new BlockPos(5, 1, 1), AllInOneBlockEntity.class);
+				again.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
+				holder[0] = again;
+			})
+			.thenIdle(25)
+			.thenExecute(() -> helper.assertTrue(!onBus(holder[0], screen), "a computer placed again doesn't take it from the one that has it"))
+			.thenSucceed();
 	}
 
 	@GameTest

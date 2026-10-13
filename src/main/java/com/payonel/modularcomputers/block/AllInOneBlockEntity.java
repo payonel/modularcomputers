@@ -194,6 +194,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** Server side: the cabled devices, by key. */
 	private final Map<String, Device> cabledDevices = new LinkedHashMap<>();
 	private long seenCableChanges = -1;
+	/** The holds version last seen ({@link com.payonel.modularcomputers.bus.BusHolds}). */
+	private long seenHolds;
 	private int ticks;
 
 	/**
@@ -503,6 +505,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			seenCableChanges = Cabling.changes();
 			scanCables();
 		}
+		if (seenHolds != com.payonel.modularcomputers.bus.BusHolds.version()) {
+			// Another board let go of a device: if it's one of ours, it may join this bus now.
+			seenHolds = com.payonel.modularcomputers.bus.BusHolds.version();
+			relayout(false);
+		}
 		syncDisplay();
 	}
 
@@ -641,12 +648,19 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		cabled = List.copyOf(found);
 		cabledDevices.clear();
 		cabledDevices.putAll(devices);
+		relayout(true); // (what was found changed: distances and places too)
+	}
+
+	/** Lays the bus out again, with the join and overflow sounds, and tells clients when something changed. */
+	private void relayout(boolean changed) {
 		Set<String> before = externalOnBus();
 		int waitingBefore = busOrder().waiting();
 		rebuildBus();
-		busSounds(before, waitingBefore);
-		setChanged();
-		syncToClients();
+		if (changed || !before.equals(externalOnBus()) || waitingBefore != busOrder().waiting()) {
+			busSounds(before, waitingBefore);
+			setChanged();
+			syncToClients();
+		}
 	}
 
 	/**
