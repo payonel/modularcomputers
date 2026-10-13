@@ -131,6 +131,19 @@ def robotic_piston_plate():
 		im.putpixel((x, y), (90, 92, 100))
 	return im
 
+def robotic_sticky_piston_plate():
+	"""A sticky pushing face (user, 2026-10-13: slime makes it sticky): the plate with a pad of green slime."""
+	im = robotic_piston_plate()
+	rnd = random.Random(21)
+	for y in range(3, 13):
+		for x in range(3, 13):
+			if (x in (3, 12)) and (y in (3, 12)):
+				continue  # (the corners show the bolts)
+			im.putpixel((x, y), rnd.choice([(116, 190, 94), (126, 204, 104), (104, 176, 86), (138, 214, 116)]))
+	for i in range(4, 12):
+		im.putpixel((i, 4), (168, 232, 150))  # its sheen
+	return im
+
 def paint_gun_nozzle():
 	"""The nozzle face: a dark muzzle with dabs of paint around it."""
 	im = casing(19)
@@ -153,6 +166,7 @@ textures = [(f"tier{t}_screen_{face}", (lambda t=t, fn=fn: fn(t))) for t in (1, 
 	for face, fn in (("front", tier_screen_front), ("side", screen_side), ("back", screen_back), ("top", screen_top))] + [
 	("cable", cable), ("expansion_hub", expansion_hub),
 	("robotic_piston_port", robotic_piston_port), ("robotic_piston_plate", robotic_piston_plate),
+	("robotic_sticky_piston_plate", robotic_sticky_piston_plate),
 	("paint_gun_nozzle", paint_gun_nozzle), ("paint_gun_side", paint_gun_side)]
 for name, fn in textures:
 	fn().save(f"{OUT}/{name}.png")

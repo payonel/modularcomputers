@@ -1,0 +1,23 @@
+{
+	"type": "minecraft:block",
+	"pools": [
+		{
+			"entries": [
+				{
+					"type": "minecraft:item",
+					"name": "modularcomputers:robotic_sticky_piston",
+					"modifier": {
+						"type": "minecraft:copy_components",
+						"source": "block_entity",
+						"include": [
+							"minecraft:container",
+							"modularcomputers:serial"
+						]
+					}
+				}
+			],
+			"rolls": 1
+		}
+	],
+	"random_sequence": "modularcomputers:blocks/robotic_piston"
+}

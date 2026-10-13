@@ -1,0 +1,12 @@
+{
+	"parent": "minecraft:block/cube",
+	"textures": {
+		"particle": "modularcomputers:block/robotic_sticky_piston_plate",
+		"north": "modularcomputers:block/robotic_piston_port",
+		"south": "modularcomputers:block/robotic_sticky_piston_plate",
+		"east": "modularcomputers:block/robotic_sticky_piston_plate",
+		"west": "modularcomputers:block/robotic_sticky_piston_plate",
+		"up": "modularcomputers:block/robotic_sticky_piston_plate",
+		"down": "modularcomputers:block/robotic_sticky_piston_plate"
+	}
+}

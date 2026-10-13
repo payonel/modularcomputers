@@ -1,0 +1,9 @@
+{
+	"parent": "minecraft:block/template_piston_head",
+	"textures": {
+		"platform": "modularcomputers:block/robotic_sticky_piston_plate",
+		"side": "minecraft:block/piston_side",
+		"unsticky": "modularcomputers:block/robotic_piston_plate",
+		"particle": "modularcomputers:block/robotic_piston_plate"
+	}
+}

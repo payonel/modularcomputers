@@ -369,6 +369,19 @@ public class CableClientGameTest implements FabricClientGameTest {
 				rgb -> AllInOneClientGameTest.green(rgb) > AllInOneClientGameTest.red(rgb) + 25 && AllInOneClientGameTest.green(rgb) > AllInOneClientGameTest.blue(rgb) + 15
 					&& AllInOneClientGameTest.green(rgb) < 140);
 			check(board > 40, "the broken computer's board shows through, found " + board);
+
+			// A robotic sticky piston, its cable away from us, pushing to the side: its arm comes out, and goes back.
+			setblock(singleplayer, screen, "robotic_sticky_piston[facing=north]");
+			context.waitTicks(3);
+			BufferedImage before = read(context.takeScreenshot("robotic-piston-in"));
+			String pushed = singleplayer.getServer().computeOnServer(server -> String.valueOf(((com.payonel.modularcomputers.block.RoboticPistonBlockEntity) server.overworld().getBlockEntity(screen))
+				.device().push(new com.payonel.modularcomputers.runtime.Arguments(List.of("east")))));
+			check(pushed.contains("true"), "pushed: " + pushed);
+			context.waitFor(client -> client.level.getBlockState(screen.east()).is(com.payonel.modularcomputers.block.ModBlocks.ROBOTIC_PISTON_ARM));
+			context.waitTicks(2);
+			BufferedImage out = read(context.takeScreenshot("robotic-piston-out"));
+			check(differ(before, out) > 500, "its arm comes out: " + differ(before, out) + " pixels changed");
+			context.waitFor(client -> client.level.getBlockState(screen.east()).isAir());
 		}
 	}
 

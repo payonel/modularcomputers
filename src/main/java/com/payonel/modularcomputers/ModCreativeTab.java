@@ -29,6 +29,7 @@ public final class ModCreativeTab {
 				output.accept(ModBlocks.CABLE);
 				output.accept(ModBlocks.EXPANSION_HUB);
 				output.accept(ModBlocks.ROBOTIC_PISTON);
+				output.accept(ModBlocks.ROBOTIC_STICKY_PISTON);
 				output.accept(ModBlocks.PAINT_GUN);
 				output.accept(ModBlocks.PHOTOMASK);
 				output.accept(ModItems.SILICON);

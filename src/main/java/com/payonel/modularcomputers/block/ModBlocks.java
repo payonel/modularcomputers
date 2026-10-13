@@ -55,12 +55,19 @@ public final class ModBlocks {
 		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("expansion_hub"),
 		new BlockEntityType<>(ExpansionHubBlockEntity::new, Set.of(EXPANSION_HUB)));
 
-	public static final Block ROBOTIC_PISTON = registerWithItem("robotic_piston", RoboticPistonBlock::new,
+	public static final Block ROBOTIC_PISTON = registerWithItem("robotic_piston", properties -> new RoboticPistonBlock(properties, false),
 		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).sound(SoundType.METAL));
+	/** Crafted from a robotic piston and slime (user, 2026-10-13): it pulls back what it pushed. */
+	public static final Block ROBOTIC_STICKY_PISTON = registerWithItem("robotic_sticky_piston", properties -> new RoboticPistonBlock(properties, true),
+		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).sound(SoundType.METAL));
+	/** A robotic piston's arm, out while it pushes: no item, no drops, can't be pushed. */
+	public static final Block ROBOTIC_PISTON_ARM = register("robotic_piston_arm", RoboticPistonArmBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(1.5f).sound(SoundType.METAL).noOcclusion().noLootTable()
+			.pushReaction(net.minecraft.world.level.material.PushReaction.IMMOVEABLE));
 
 	public static final BlockEntityType<RoboticPistonBlockEntity> ROBOTIC_PISTON_ENTITY = Registry.register(
 		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("robotic_piston"),
-		new BlockEntityType<>(RoboticPistonBlockEntity::new, Set.of(ROBOTIC_PISTON)));
+		new BlockEntityType<>(RoboticPistonBlockEntity::new, Set.of(ROBOTIC_PISTON, ROBOTIC_STICKY_PISTON)));
 
 	public static final Block PAINT_GUN = registerWithItem("paint_gun", PaintGunBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).sound(SoundType.METAL));
@@ -108,6 +115,11 @@ public final class ModBlocks {
 		return new Item.Properties().setId(itemKey).useBlockDescriptionPrefix()
 			.component(net.minecraft.core.component.DataComponents.TOOLTIP_DISPLAY,
 				net.minecraft.world.item.component.TooltipDisplay.DEFAULT.withHidden(net.minecraft.core.component.DataComponents.CONTAINER, true));
+	}
+
+	private static Block register(String name, Function<BlockBehaviour.Properties, Block> factory, BlockBehaviour.Properties properties) {
+		ResourceKey<Block> blockKey = ResourceKey.create(Registries.BLOCK, id(name));
+		return Registry.register(BuiltInRegistries.BLOCK, blockKey, factory.apply(properties.setId(blockKey)));
 	}
 
 	private static Block registerWithItem(String name, Function<BlockBehaviour.Properties, Block> factory, BlockBehaviour.Properties properties) {

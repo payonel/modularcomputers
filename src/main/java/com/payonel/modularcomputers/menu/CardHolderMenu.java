@@ -70,12 +70,12 @@ public final class CardHolderMenu extends AbstractContainerMenu {
 		return hub(id, inventory, new SimpleContainer(ExpansionHubBlockEntity.SLOTS + 1), pos, ContainerLevelAccess.NULL);
 	}
 
-	public static CardHolderMenu piston(int id, Inventory inventory, Container cards, BlockPos pos, ContainerLevelAccess access) {
-		return new CardHolderMenu(ModMenus.ROBOTIC_PISTON, id, inventory, cards, 0, pos, access, ModBlocks.ROBOTIC_PISTON);
+	public static CardHolderMenu piston(int id, Inventory inventory, Container cards, BlockPos pos, ContainerLevelAccess access, net.minecraft.world.level.block.Block block) {
+		return new CardHolderMenu(ModMenus.ROBOTIC_PISTON, id, inventory, cards, 0, pos, access, block);
 	}
 
 	public static CardHolderMenu piston(int id, Inventory inventory, BlockPos pos) {
-		return piston(id, inventory, new SimpleContainer(1), pos, ContainerLevelAccess.NULL);
+		return piston(id, inventory, new SimpleContainer(1), pos, ContainerLevelAccess.NULL, ModBlocks.ROBOTIC_PISTON);
 	}
 
 	public static CardHolderMenu screen(int id, Inventory inventory, Container cards, BlockPos pos, ContainerLevelAccess access) {

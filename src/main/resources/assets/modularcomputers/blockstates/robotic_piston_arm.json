@@ -1,0 +1,50 @@
+{
+	"variants": {
+		"facing=north,sticky=false": {
+			"model": "modularcomputers:block/robotic_piston_arm"
+		},
+		"facing=north,sticky=true": {
+			"model": "modularcomputers:block/robotic_piston_arm_sticky"
+		},
+		"facing=south,sticky=false": {
+			"model": "modularcomputers:block/robotic_piston_arm",
+			"y": 180
+		},
+		"facing=south,sticky=true": {
+			"model": "modularcomputers:block/robotic_piston_arm_sticky",
+			"y": 180
+		},
+		"facing=east,sticky=false": {
+			"model": "modularcomputers:block/robotic_piston_arm",
+			"y": 90
+		},
+		"facing=east,sticky=true": {
+			"model": "modularcomputers:block/robotic_piston_arm_sticky",
+			"y": 90
+		},
+		"facing=west,sticky=false": {
+			"model": "modularcomputers:block/robotic_piston_arm",
+			"y": 270
+		},
+		"facing=west,sticky=true": {
+			"model": "modularcomputers:block/robotic_piston_arm_sticky",
+			"y": 270
+		},
+		"facing=up,sticky=false": {
+			"model": "modularcomputers:block/robotic_piston_arm",
+			"x": 270
+		},
+		"facing=up,sticky=true": {
+			"model": "modularcomputers:block/robotic_piston_arm_sticky",
+			"x": 270
+		},
+		"facing=down,sticky=false": {
+			"model": "modularcomputers:block/robotic_piston_arm",
+			"x": 90
+		},
+		"facing=down,sticky=true": {
+			"model": "modularcomputers:block/robotic_piston_arm_sticky",
+			"x": 90
+		}
+	}
+}

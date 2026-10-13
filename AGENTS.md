@@ -689,11 +689,19 @@ scripts/art/error_beep.py` into
     - Each card can be unplugged on its own.
     - A card works where it's installed: a redstone card in a hub will emit and detect
       redstone at the hub (user, 2026-10-11). Nothing works yet.
-  - **Robotic piston** (`RoboticPistonBlock`, a `DirectionalBlock`, placeholder): its `FACING`
-    is its one cable port. It will push on every other face.
-    - It's placed with the port toward the block it was put against.
-    - It has one slot inside, for a Bluetooth card instead of a cable. It's a cabled device
-      (`ACTUATOR`) and doesn't pass the connection on.
+  - **Robotic piston** (`RoboticPistonBlock`, a `DirectionalBlock`; user design, 2026-10-13): its
+    `FACING` is its one cable port (placed with the port toward the block it was put against); it
+    pushes on every other face, when a computer says: its device's `push(side)` (`down`, `up`,
+    `north`, `south`, `west`, `east`, world directions) answers `true`, or fails with `cannot push`
+    (the cable's side, an arm out there already, or what won't move: obsidian, too many blocks). Each
+    push costs power (`RoboticPiston.PUSH_COST`, 500), moved or not. It pushes as a real piston: the
+    blocks slide (vanilla's `PistonStructureResolver` and moving-piston block entities, our copy of
+    `PistonBaseBlock.moveBlocks`), its arm (`robotic_piston_arm`, a piston head on vanilla's head
+    template, our plate; no item, no drops, immovable) slides out with the piston sounds, and goes
+    back after `ARM_TICKS` (6). **The robotic sticky piston** (slime ball over a robotic piston;
+    a green slime pad on its plates) pulls back what's in front of its arm. It has one slot inside,
+    for a Bluetooth card instead of a cable. It's a cabled device (`ACTUATOR`) and doesn't pass the
+    connection on.
   - **Paint gun** (`PaintGunBlock`, a `DirectionalBlock`, placeholder; user idea): it will
     shoot paint colors at nearby wool. Its nozzle is its `FACING`, set where the player looks,
     and it takes a cable on every other face. It's a cabled device (`ACTUATOR`), with an id

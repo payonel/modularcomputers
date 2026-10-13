@@ -1,0 +1,27 @@
+{
+	"variants": {
+		"facing=north": {
+			"model": "modularcomputers:block/robotic_sticky_piston"
+		},
+		"facing=south": {
+			"model": "modularcomputers:block/robotic_sticky_piston",
+			"y": 180
+		},
+		"facing=east": {
+			"model": "modularcomputers:block/robotic_sticky_piston",
+			"y": 90
+		},
+		"facing=west": {
+			"model": "modularcomputers:block/robotic_sticky_piston",
+			"y": 270
+		},
+		"facing=up": {
+			"model": "modularcomputers:block/robotic_sticky_piston",
+			"x": 270
+		},
+		"facing=down": {
+			"model": "modularcomputers:block/robotic_sticky_piston",
+			"x": 90
+		}
+	}
+}
