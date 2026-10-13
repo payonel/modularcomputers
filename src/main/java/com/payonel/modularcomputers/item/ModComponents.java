@@ -39,9 +39,13 @@ public final class ModComponents {
 	public static final DataComponentType<UUID> BLUETOOTH_LINK = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("bluetooth_link"),
 		DataComponentType.<UUID>builder().persistent(UUIDUtil.CODEC).networkSynchronized(UUIDUtil.STREAM_CODEC).build());
 
-	/** What an EEPROM holds (its image), written by programs; up to {@code Eeprom.SIZE} bytes. Not sent to clients. */
+	/**
+	 * What an EEPROM holds (its image): plain text, up to {@code Eeprom.SIZE} bytes, whatever the
+	 * CPU's architecture. A Java CPU reads it as the name of a program class; a Lua CPU will read
+	 * Lua. A new EEPROM comes flashed with the stand-in OS (the item's default); a wiped one holds "".
+	 */
 	public static final DataComponentType<String> EEPROM_IMAGE = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("eeprom_image"),
-		DataComponentType.<String>builder().persistent(Codec.STRING).build());
+		DataComponentType.<String>builder().persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.STRING_UTF8).build());
 
 	/**
 	 * A computer's bus order (external devices by id, and the ones unplugged), kept on its item

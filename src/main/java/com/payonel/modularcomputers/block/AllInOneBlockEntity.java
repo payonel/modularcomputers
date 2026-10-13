@@ -34,7 +34,6 @@ import com.payonel.modularcomputers.device.TerminalTier;
 import com.payonel.modularcomputers.machine.CpuTier;
 import com.payonel.modularcomputers.machine.Eeprom;
 import com.payonel.modularcomputers.machine.Hardware;
-import com.payonel.modularcomputers.machine.HelloWorldProgram;
 import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.machine.Motherboard;
 import com.payonel.modularcomputers.menu.CaseMenu;
@@ -725,14 +724,14 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		} else if (board.cpu().map(Cpu::tier).orElse(null) != cpuTier) {
 			board.setCpu(new Cpu(cpuTier));
 		}
-		// Every EEPROM runs the stand-in program until the Lua runtime runs its image.
+		// The chip's text is what the CPU runs (a new chip holds the stand-in OS's class name).
 		ItemStack chip = parts.getItem(CaseMenu.EEPROM_SLOT);
 		boolean hasEeprom = chip.is(ModItems.EEPROM);
 		UUID chipSerial = hasEeprom ? chip.get(ModComponents.SERIAL) : null;
 		if (!hasEeprom) {
 			eeprom = null;
 		} else if (eeprom == null || !java.util.Objects.equals(eepromSerial, chipSerial)) {
-			eeprom = new Eeprom(new HelloWorldProgram()); // another chip: its own image
+			eeprom = new Eeprom(""); // another chip: its own image, loaded below
 		}
 		eepromSerial = chipSerial;
 		if (eeprom != null) {

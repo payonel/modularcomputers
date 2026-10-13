@@ -57,6 +57,14 @@ public final class Hint {
 		Hinted hinted = stack.getItem() instanceof Hinted item ? item : Hinted.NONE;
 		hinted.summary(stack, elements::add);
 		contents(stack, elements::add);
+		if (stack.is(com.payonel.modularcomputers.item.ModItems.EEPROM)) {
+			// What's on the chip: its first line (a Java CPU's program class), or blank.
+			String image = stack.getOrDefault(ModComponents.EEPROM_IMAGE, "").strip();
+			String first = image.lines().findFirst().orElse("");
+			first = first.length() > 28 ? "\u2026" + first.substring(first.length() - 27) : first;
+			elements.add(text(image.isEmpty() ? Component.translatable("hint.modularcomputers.eeprom.blank")
+				: Component.translatable("hint.modularcomputers.eeprom.holds", first)));
+		}
 		UUID serial = stack.get(ModComponents.SERIAL);
 		if (!details) {
 			elements.add(new Text(Component.translatable("hint.modularcomputers.shift",
@@ -67,9 +75,12 @@ public final class Hint {
 		if (serial != null) {
 			// Its id (programs address it as id:<uuid>), long, so only in the details (user); crafting it alone clears it.
 			elements.add(text(Component.translatable("hint.modularcomputers.id", serial.toString())));
-			if (stack.getMaxStackSize() > 1) { // things holding data keep their id (ClearIdRecipe)
+			if (stack.getMaxStackSize() > 1) { // disks keep their id (ClearIdRecipe)
 				elements.add(text(Component.translatable("hint.modularcomputers.clear_id")));
 			}
+		}
+		if (stack.is(com.payonel.modularcomputers.item.ModItems.EEPROM)) {
+			elements.add(text(Component.translatable("hint.modularcomputers.eeprom.wipe")));
 		}
 		elements.add(text(Component.translatable("hint.modularcomputers.crafting")));
 		elements.add(new Crafting(stack.getItem()));

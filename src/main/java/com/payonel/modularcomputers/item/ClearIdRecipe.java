@@ -15,7 +15,8 @@ import net.minecraft.world.level.Level;
 /**
  * Clearing an item's id (its serial number, stamped the first time it goes into a machine): the
  * item alone in a crafting grid comes out without one, as good as new, so it stacks with new
- * ones again. Put back in a machine, it gets a new id: it's a new device to the bus.
+ * ones again. Put back in a machine, it gets a new id: it's a new device to the bus. An EEPROM
+ * alone is wiped as well: blank, no id. Disks keep theirs (their files are kept by it).
  */
 public final class ClearIdRecipe extends CustomRecipe {
 	public static final ClearIdRecipe INSTANCE = new ClearIdRecipe();
@@ -46,8 +47,18 @@ public final class ClearIdRecipe extends CustomRecipe {
 			}
 			found = stack;
 		}
+		if (found.is(ModItems.EEPROM)) {
+			// An EEPROM alone is wiped (user, 2026-10-12): no id, nothing on it.
+			if (!found.has(ModComponents.SERIAL) && found.getOrDefault(ModComponents.EEPROM_IMAGE, "").isEmpty()) {
+				return ItemStack.EMPTY;
+			}
+			ItemStack wiped = found.copyWithCount(1);
+			wiped.remove(ModComponents.SERIAL);
+			wiped.set(ModComponents.EEPROM_IMAGE, "");
+			return wiped;
+		}
 		if (!found.has(ModComponents.SERIAL) || found.getMaxStackSize() == 1) {
-			// Things that hold data (EEPROMs, disks) keep their id: their data goes by it.
+			// Disks keep their id: their files are kept by it.
 			return ItemStack.EMPTY;
 		}
 		ItemStack cleared = found.copyWithCount(1);

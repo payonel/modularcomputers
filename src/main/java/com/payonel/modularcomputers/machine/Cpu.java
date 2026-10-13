@@ -9,6 +9,9 @@ import java.util.Optional;
  * motherboard's EEPROM slot (a fixed place, like a real CPU's reset vector, so no bus walk) and
  * starts executing it.
  * <p>
+ * The EEPROM holds plain text; this CPU is a Java machine, so it runs the program class the text
+ * names ({@link #load}).
+ * <p>
  * Its only behavior of its own is the abort screen, like a kernel panic: with no EEPROM, when
  * the program crashes, or when it returns instead of halting (Linux panics when init exits), it
  * clears the console to a soft gray, writes {@code ABRT: <reason>} and halts. Power stays on.
@@ -28,6 +31,10 @@ public final class Cpu {
 	public static final String NO_EEPROM = "no EEPROM installed";
 	public static final String CRASHED = "EEPROM crashed: ";
 	public static final String RETURNED = "EEPROM returned without halting";
+	/** A wiped EEPROM: nothing to run, like a BIOS's "no bootable device". */
+	public static final String BLANK = "EEPROM is blank";
+	/** The image isn't a program for this CPU (Linux's ENOEXEC: a binary of another architecture). */
+	public static final String EXEC_FORMAT = "EEPROM: exec format error";
 	public static final int ABORT_FOREGROUND = 0x2E2E2E;
 	public static final int ABORT_BACKGROUND = 0xBDBDBD;
 
@@ -38,8 +45,35 @@ public final class Cpu {
 			abort(board, NO_EEPROM);
 			return Optional.empty();
 		}
-		Program program = eeprom.get().program();
-		return Optional.of(new ProgramRunner(program::run, "cpu"));
+		Eeprom chip = eeprom.get();
+		Optional<Program> program = chip.attached().or(() -> load(chip.image()));
+		if (program.isEmpty()) {
+			abort(board, chip.image().isBlank() ? BLANK : EXEC_FORMAT);
+			return Optional.empty();
+		}
+		return Optional.of(new ProgramRunner(program.get()::run, "cpu"));
+	}
+
+	/**
+	 * Today's CPUs are Java machines: the EEPROM's text names the program's class (its first
+	 * line), which must be a {@link Program} with a public no-argument constructor. The class is
+	 * looked at before it's initialized, so naming anything else runs nothing. A Lua CPU will read
+	 * the same text as Lua instead. Empty when it isn't a Java program.
+	 */
+	public static Optional<Program> load(String image) {
+		String name = image.strip().lines().findFirst().orElse("").strip();
+		if (!name.matches("[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*")) {
+			return Optional.empty();
+		}
+		try {
+			Class<?> type = Class.forName(name, false, Program.class.getClassLoader());
+			if (!Program.class.isAssignableFrom(type)) {
+				return Optional.empty();
+			}
+			return Optional.of((Program) type.getConstructor().newInstance());
+		} catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
+			return Optional.empty();
+		}
 	}
 
 	/** The program threw: the abort screen. */

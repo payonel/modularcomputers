@@ -14,32 +14,41 @@ import java.util.function.Consumer;
  * fixed place, so it never walks the bus for it); it's also on the bus, so programs can find it
  * to read or reflash it. Flashing takes effect at the next power-on.
  * <p>
- * Its contents (its image) are what {@code get} and {@code set} read and write, like
- * {@code flashrom -r} and {@code -w} on a board's SPI flash: up to {@link #SIZE} bytes, kept on
- * the chip (its item). Until the Lua runtime lands, the CPU still runs the stand-in Java
- * {@link Program}, whatever the image holds.
+ * Its contents (its image) are plain text, whatever the CPU's architecture: what {@code get} and
+ * {@code set} read and write, like {@code flashrom -r} and {@code -w} on a board's SPI flash, up
+ * to {@link #SIZE} bytes, kept on the chip (its item). The CPU loads its program from it (a Java
+ * CPU: the class it names, {@link Cpu#load}; a Lua CPU later: Lua source). Tests and tools can
+ * also attach a Java program object directly ({@link #flash}), like an in-circuit programmer;
+ * the CPU then runs that instead.
  */
 public final class Eeprom implements Device {
 	/** How many bytes it holds: 4 KiB. */
 	public static final int SIZE = 4096;
 
-	private Program program;
+	private Program attached;
 	private String image = "";
 	private String label;
 	private Consumer<String> onWrite = image -> {
 	};
 
+	/** A chip holding {@code image}. */
+	public Eeprom(String image) {
+		load(image);
+	}
+
+	/** A chip with a Java program attached (tests, tools), and nothing in its image. */
 	public Eeprom(Program program) {
-		this.program = program;
+		this.attached = program;
 	}
 
-	public Program program() {
-		return program;
+	/** The Java program attached to it, if any: the CPU runs it in place of the image. */
+	public java.util.Optional<Program> attached() {
+		return java.util.Optional.ofNullable(attached);
 	}
 
-	/** Writes a new program onto the chip, as reflashing firmware does. */
+	/** Attaches a Java program to the chip (tests, tools), as an in-circuit programmer would. */
 	public void flash(Program program) {
-		this.program = program;
+		this.attached = program;
 	}
 
 	/** What the chip holds. */

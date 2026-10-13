@@ -148,4 +148,30 @@ public class RecipeGameTest {
 		helper.assertValueEqual(BatteryItem.charge(empty).units(), 0, "an empty one stays empty");
 		helper.succeed();
 	}
+
+	@GameTest
+	public void anEepromComesFlashedAndCraftingItAloneWipesIt(GameTestHelper helper) {
+		String os = com.payonel.modularcomputers.machine.HelloWorldProgram.class.getName();
+		helper.assertValueEqual(new ItemStack(ModItems.EEPROM).get(ModComponents.EEPROM_IMAGE), os, "a new EEPROM holds the stand-in OS");
+		Craft eeprom = CRAFTS.stream().filter(craft -> craft.result().equals("eeprom")).findFirst().orElseThrow();
+		helper.assertValueEqual(craft(helper, grid(eeprom, ItemStack.EMPTY)).get(ModComponents.EEPROM_IMAGE), os, "so does a crafted one");
+
+		ItemStack used = new ItemStack(ModItems.EEPROM);
+		ModComponents.serial(used);
+		used.set(ModComponents.EEPROM_IMAGE, "something a program wrote");
+		List<ItemStack> alone = new ArrayList<>(java.util.Collections.nCopies(9, ItemStack.EMPTY));
+		alone.set(4, used);
+		ItemStack wiped = craft(helper, alone);
+		helper.assertTrue(wiped.is(ModItems.EEPROM), "alone, an EEPROM is wiped, got " + wiped);
+		helper.assertValueEqual(wiped.get(ModComponents.EEPROM_IMAGE), "", "nothing on it");
+		helper.assertTrue(!wiped.has(ModComponents.SERIAL), "and no id");
+		alone.set(4, wiped);
+		helper.assertTrue(craft(helper, alone).isEmpty(), "a blank one has nothing to wipe");
+
+		ItemStack disk = new ItemStack(ModItems.TIER1_HARD_DISK);
+		ModComponents.serial(disk);
+		alone.set(4, disk);
+		helper.assertTrue(craft(helper, alone).isEmpty(), "a disk keeps its id: its files go by it");
+		helper.succeed();
+	}
 }

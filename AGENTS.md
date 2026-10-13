@@ -630,9 +630,16 @@ scripts/art/error_beep.py` into
     writes to the console, as escape sequences: colors `ABORT_FOREGROUND` on `ABORT_BACKGROUND`
     (soft gray; the user doesn't want blue), clear, cursor home, then `ABRT: <reason>`
     (`Cpu.NO_EEPROM`, `Cpu.CRASHED` plus the message, or `Cpu.RETURNED`).
-- **EEPROM (`Eeprom`):** holds a `Program`. Today that's a Java mock program
-  (`HelloWorldProgram`). Later it's Lua code run by the user's Lua runtime. The CPU's side
-  doesn't change.
+- **EEPROM (`Eeprom`):** holds **plain text, whatever the CPU's architecture** (user design,
+  2026-10-12). Today's CPUs are Java machines: the text's first line names a `Program` class with
+  a public no-argument constructor, which the CPU loads (`Cpu.load`; looked at before it's
+  initialized, so naming anything else runs nothing). A Lua CPU will read the same text as Lua.
+  Blank: `ABRT: EEPROM is blank`; not a Java program: `ABRT: EEPROM: exec format error` (Linux's
+  ENOEXEC). A new EEPROM comes flashed with the stand-in OS (`HelloWorldProgram`'s class name is
+  the item's default `eeprom_image`). **Crafting one alone wipes it** (user): no id, blank
+  (`ClearIdRecipe`); its hint shows what it holds ("Holds: ...", "Blank"). Tests attach Java
+  program objects with `Eeprom.flash(Program)`, like an in-circuit programmer; the CPU runs an
+  attached program in place of the image.
 - **Mock runtime** (`runtime/`, built 2026-10-11 after a design discussion with the user, modeled
   on OC's `machine.lua` + `component.invoke` but redesigned; OC is never named in code):
   - **Names:** `bus` and `device`, never "component" (user rule, code and docs).
