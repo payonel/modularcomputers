@@ -340,3 +340,20 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
   server time each tick, if many busy computers starve the tick.
 - **Settings:** tunable values stay named, hard-coded constants until settings are revisited.
 - **A bell:** terminals ignore BEL, and a full key queue drops keys silently; a real keyboard beeps.
+
+## mcos (user design, 2026-10-13; the Lua OS on a tier 1 disk)
+
+- **No lazy loading.** OpenOS split libraries into halves loaded on first use (`package.delay`,
+  `full_*.lua`) to fit OC's RAM limits, which were as real as ours. It wasn't worth it: slow loads,
+  much complexity, and loading in pieces costs more memory than loading whole. mcos loads what it
+  needs, whole.
+- **No legacy compatibility:** OpenOS grew complex supporting old programs; mcos isn't tied to them.
+- **The terminal decodes VT100:** mcos writes bytes and escape sequences; none of OpenOS's VT
+  parsing, software cursor blink, GPU windows or viewports.
+- **First version: the shell only.** No filesystem library and no threads or child processes yet;
+  a shell in the real-world style, with readline a separate library from it (OpenOS's cursor
+  library mixed the two, and echo with them).
+- Open (asked 2026-10-13): where the line discipline lives (echo, canonical mode, Ctrl+C: mcos, or
+  the console device beside `onlcr`); whether v1's shell runs `/bin` programs off the boot disk or
+  has built-ins only; whether Ctrl+C on a busy program waits for a sandboxed budget for user
+  coroutines (v1 interrupting reads only).
