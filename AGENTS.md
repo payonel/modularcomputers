@@ -683,8 +683,9 @@ scripts/art/error_beep.py` into
     position, dimension, chunk): while it waits (at each doubling: reaching a safe point, or in
     Styx), and once done, the freeze time and the Styx time. The remaining slow case is a program
     deep in one long step (a library call with no budget checks, such as `string.rep`, which
-    LungoLua is fixing); the plan is an async "signal" in LungoLua that runs the budget out at the
-    next step. The bytes go in the case's NBT (`program`). On load the case resumes it
+    LungoLua is fixing: library loops get budget checks). A computer reaches its safe point within
+    a slice (`SLICE`, 100,000 steps): an async "freeze now" signal was declined by the LungoLua agent
+    (its runtime cost outweighs the gain). The bytes go in the case's NBT (`program`). On load the case resumes it
     (`Machine.resumeProgram`, `LuaRunner.restore`) at its first tick, after the bus is found again;
     the restored kernel's request is still on its stack, so the computer's thread carries on with it
     (a wait ends on its deadline: the firmware makes a wait's length a deadline on the machine's
@@ -779,8 +780,9 @@ scripts/art/error_beep.py` into
     handed to the server thread: `Handle.abandon`, which also frees its disk reservation); a restored
     handle charges its writes again. `board.hardware().memoryUsed` is the real count, both. Found while testing (for
     LungoLua): garbage a dead frame left in a coroutine isn't freed by the emergency collection a
-    refused allocation runs (a main thread's is), and `collectgarbage("count")` reads far more than
-    the bytes `permit` saw.
+    refused allocation runs (a main thread's is). (A `count` far above the cap, also reported, was
+    ours: `LuaRunnerTest.ram` gave every stick 1 MiB; it now uses the tier's size, and `count`
+    agrees with `permit`.)
 - **Screens and cables** (built 2026-10-11, the user's request):
   - **Screen** (`ScreenBlock`, `ScreenBlockEntity`): a monitor block, 50x16 like the built-in
     display. It faces the player who places it.

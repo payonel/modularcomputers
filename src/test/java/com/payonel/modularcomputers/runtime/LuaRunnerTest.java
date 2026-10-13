@@ -506,7 +506,7 @@ class LuaRunnerTest {
 
 			@Override
 			public java.util.List<Board.MemoryInfo> memory() {
-				return java.util.List.of(new Board.MemoryInfo(0, tier, 1 << 20));
+				return java.util.List.of(new Board.MemoryInfo(0, tier, com.payonel.modularcomputers.machine.MemoryTier.values()[tier - 1].bytes()));
 			}
 		});
 	}
