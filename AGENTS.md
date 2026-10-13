@@ -779,8 +779,10 @@ scripts/art/error_beep.py` into
     are given back at close or drop, or when Lua collects an unclosed handle (`lua_UserObject.freed`,
     handed to the server thread: `Handle.abandon`, which also frees its disk reservation); a restored
     handle charges its writes again. `board.hardware().memoryUsed` is the real count, both. Found while testing (for
-    LungoLua): garbage a dead frame left in a coroutine isn't freed by the emergency collection a
-    refused allocation runs (a main thread's is). (A `count` far above the cap, also reported, was
+    LungoLua): a string buffer's growth skipped the emergency collection (fixed in
+    `1.0.6560-8133ec8d`); a call into nested vararg frames right after a refused allocation can
+    still fail to free a dead table that an explicit `collectgarbage()` frees (reported with a
+    repro; maybe stock Lua's stale registers), so the memory test still collects first. (A `count` far above the cap, also reported, was
     ours: `LuaRunnerTest.ram` gave every stick 1 MiB; it now uses the tier's size, and `count`
     agrees with `permit`.)
 - **Screens and cables** (built 2026-10-11, the user's request):
