@@ -555,6 +555,41 @@ class LuaRunnerTest {
 	}
 
 	@Test
+	void aKeyTypedWhileTheProgramIsBusyIsNewsItsNextWaitSeesAtOnce() {
+		ram(3);
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		Map<String, Device> devices = new LinkedHashMap<>();
+		devices.put("id:screen", screen);
+		devices.put("id:redstone", card);
+		machine.setDevices(devices);
+		boot("""
+			board.list() -- (so the bus has no interrupt raised: the key alone is news)
+			board.waitForInterrupt() -- cold: the card's events into the inbox
+			board.invoke("console", "write", "busy")
+			local n = 0
+			for i = 1, 5000000 do n = n + 1 end -- a key is typed meanwhile
+			local ready = board.waitForInterrupt() -- the inbox has the card's events, but the key is news
+			table.sort(ready)
+			board.invoke("console", "write", " " .. table.concat(ready, ","))
+			board.halt()
+			""");
+		for (int i = 1; i <= 3; i++) {
+			card.sense(0, i);
+		}
+		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
+		settle(() -> row(0).equals("busy"));
+		screen.press("k"); // the line rises: the board's interrupt status shows it at once
+		long end = System.nanoTime() + 10_000_000_000L;
+		while (runner.state() != Runner.State.WAITING && runner.queuedCalls() == 0) { // no server thread meanwhile: no tick, no turn
+			assertThat(System.nanoTime()).isLessThan(end);
+			Thread.onSpinWait();
+		}
+		assertThat(runner.state()).as("its wait went to the server thread, not answered from the inbox without the key").isEqualTo(Runner.State.WAITING);
+		untilHalted();
+		assertThat(row(0)).isEqualTo("busy console,id:redstone");
+	}
+
+	@Test
 	void withOnlyTier1RamTheresNoInboxAndEachReadIsACall() {
 		ram(1);
 		boot(TYPED);

@@ -46,6 +46,9 @@ local setbudget, freeze, thaw, isfrozen = debug.setbudget, debug.freeze, debug.t
 -- The host's switch: while user code runs it may use the RAM less the firmware's reserve, so a
 -- program that fills its memory gets Lua's error and this file can still answer the host.
 local usermode = debug.getregistry()["modularcomputers.usermode"]
+-- The board's interrupt status, as the server thread published it the moment a line rose: the
+-- sources with an interrupt raised (the bus, devices with data they still hold). Read here, free.
+local pending = debug.getregistry()["modularcomputers.pending"]
 local load, pairs, ipairs, select, type, error, tostring = load, pairs, ipairs, select, type, error, tostring
 local table_pack, table_unpack, table_remove = table.pack, table.unpack, table.remove
 local math_huge, math_floor = math.huge, math.floor
@@ -151,23 +154,41 @@ sandbox.board = {
     if seconds ~= nil and type(seconds) ~= "number" then
       error("bad argument #1 to 'waitForInterrupt' (number expected, got " .. type(seconds) .. ")", 2)
     end
-    -- A warm inbox answers at once, on this thread: free. Only a cold one goes to the server thread,
-    -- which tops every device's queue up as it answers. (Interrupts are level-triggered: other
-    -- sources pending now are reported once the inbox has nothing for the wait.)
+    -- A warm inbox answers at once, on this thread: free. But news goes cold: a source waited on
+    -- with an interrupt raised and nothing of it in the inbox (a key just typed, a bus change) goes
+    -- to the server thread, which answers with everything pending and tops every device's queue up.
     local wanted, ready = table_pack(...), {}
-    for address, queue in pairs(inbox) do
-      if queue[1] ~= nil then
-        local want = wanted.n == 0
-        for i = 1, wanted.n do
-          want = want or wanted[i] == address
+    local function want(address)
+      if wanted.n == 0 then
+        return true
+      end
+      for i = 1, wanted.n do
+        if wanted[i] == address then
+          return true
         end
-        if want then
+      end
+      return false
+    end
+    usermode(false)
+    local raised = pending()
+    usermode(true)
+    local news = false
+    for _, address in ipairs(raised) do
+      local queue = inbox[address]
+      if (not queue or queue[1] == nil) and want(address) then
+        news = true
+        break
+      end
+    end
+    if not news then
+      for address, queue in pairs(inbox) do
+        if queue[1] ~= nil and want(address) then
           ready[#ready + 1] = address
         end
       end
-    end
-    if #ready > 0 then
-      return ready
+      if #ready > 0 then
+        return ready
+      end
     end
     local ticks = (seconds == nil or seconds == math_huge) and -1 or math_floor(seconds * 20 + 0.5)
     if ticks < -1 then

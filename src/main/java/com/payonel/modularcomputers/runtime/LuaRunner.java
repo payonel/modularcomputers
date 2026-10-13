@@ -211,6 +211,12 @@ public final class LuaRunner implements Runner {
 		private boolean user;
 		/** What the firmware keeps for itself, as a kernel reserves memory. */
 		public static final long RESERVE = 32 << 10;
+		/**
+		 * The sources with an interrupt raised, as the server thread last published them (the
+		 * board's interrupt status register: the firmware reads it with {@code pending()}). It lives
+		 * here, with what else of the VM's the host keeps, as the C function finds it from its state.
+		 */
+		volatile List<String> raised = List.of();
 		/** Handles Lua collected unclosed, for the server thread to let go ({@link Handle#abandon}). */
 		final ConcurrentLinkedQueue<Handle> abandoned = new ConcurrentLinkedQueue<>();
 		/** What devices hold for the program outside the VM (a file's buffered writes): any thread. */
@@ -352,11 +358,21 @@ public final class LuaRunner implements Runner {
 		return 0;
 	}
 
+	/** The firmware's read of the board's interrupt status ({@code pending()}): the sources raised, a sequence. */
+	private static final String PENDING = "modularcomputers.pending";
+
+	private static int pending(lua_State L) {
+		push(L, ((Memory) lua_getallocf(L)).raised);
+		return 1;
+	}
+
 	/** The same libraries and permanents for a new state and a restored one; leaves the inverse permanents (name to object) on the stack. */
 	private static void prepare(lua_State L) {
 		luaL_openselectedlibs(L, LIBRARIES, 0);
 		lua_pushcfunction(L, LuaRunner::userMode);
 		lua_setfield(L, LUA_REGISTRYINDEX, new HostString(USER_MODE));
+		lua_pushcfunction(L, LuaRunner::pending);
+		lua_setfield(L, LUA_REGISTRYINDEX, new HostString(PENDING));
 		byte[] walk = PERMANENTS_WALK.getBytes(StandardCharsets.UTF_8);
 		if (luaL_loadbufferx(L, new ByteView(walk), new HostString("=permanents"), new HostString("t")) != LUA_OK) {
 			throw new IllegalStateException("the permanents don't load: " + text(L, -1));
@@ -590,7 +606,13 @@ public final class LuaRunner implements Runner {
 			}
 		}
 		spentNanos += System.nanoTime() - start;
+		memory.raised = List.copyOf(interrupts.get()); // after this turn's takes and calls: current both ways
 		return state();
+	}
+
+	@Override
+	public void interruptsRaised(List<String> raised) {
+		memory.raised = List.copyOf(raised);
 	}
 
 	/**

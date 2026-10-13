@@ -729,7 +729,13 @@ scripts/art/error_beep.py` into
     as a wait is answered, straight into the answer. A read of a device's stream comes from the
     inbox with no syscall, and **a wait the inbox can answer is free** (answered on the computer's
     thread; user, 2026-10-13: only a cold cache goes to the server thread, which tops every device's
-    queue up as it answers); an empty queue, or **no inbox (only tier 1 RAM)**, makes it a call to the
+    queue up as it answers). **News goes cold** (design "D", user, 2026-10-13: a key's latency is a
+    high bar): the server thread publishes which sources have an interrupt raised the moment a line
+    rises (`Machine.wake`, `publishInterrupts`; also when the bus changes, and after every turn),
+    like an interrupt controller's status register, and the firmware reads it free (`pending()`, a
+    host function in the registry): a wait goes cold when a source it waits on is raised with
+    nothing of it in the inbox, so a key typed while the program is busy reaches its next wait in
+    one round trip, never a tick later, and a source the program ignores can't starve the others; an empty queue, or **no inbox (only tier 1 RAM)**, makes it a call to the
     device (slower, on purpose). **Nothing is lost on a save** (user, 2026-10-13: "wholly
     unacceptable"): the inbox is in the VM, saved with it; a save pinned while a wait's answer is
     on its way waits for it to reach the VM (`LuaRunner.honour(answered)`); devices save what they

@@ -152,8 +152,19 @@ public final class Machine {
 	 * tick's calls, so waking it often buys no extra time.
 	 */
 	public void wake() {
+		publishInterrupts(); // at once, whether it waits or not: its next wait sees the news
 		if (powered && runner != null && !running && runner.state() == Runner.State.WAITING) {
 			run();
+		}
+	}
+
+	/**
+	 * Tells the program which sources have an interrupt raised now, as an interrupt controller's
+	 * status register does: read by the CPU without asking the devices. Server thread.
+	 */
+	private void publishInterrupts() {
+		if (powered && runner != null) {
+			runner.interruptsRaised(api.interrupts());
 		}
 	}
 
@@ -487,6 +498,7 @@ public final class Machine {
 				console.redraw(terminal);
 			}
 		}
+		publishInterrupts(); // the bus changed: an interrupt of its own
 	}
 
 	/**

@@ -60,6 +60,13 @@ public interface Runner {
 		return 0;
 	}
 
+	/**
+	 * Server thread: the sources with an interrupt raised now (the bus, devices with data they still
+	 * hold), published as soon as one rises, like an interrupt controller's status register.
+	 */
+	default void interruptsRaised(List<String> raised) {
+	}
+
 	/** The program's memory, which devices charge what they hold for it to ({@link Arguments#account}). */
 	default MemoryAccount memoryAccount() {
 		return MemoryAccount.UNLIMITED;
