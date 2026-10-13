@@ -205,7 +205,15 @@ same thing.
       - The essentials go into free hotbar slots first, in order (user, 2026-10-11): all-in-one,
         CPU, EEPROM, a charged tier 1 battery, screen, cable (`ModCommands.hotbarFirst`).
       - It needs operator permission, like `/give`: cheats on in singleplayer.
-    - Breaking the block drops its parts.
+    - **Breaking it doesn't spill its parts** (user, 2026-10-12): like a shulker box, it drops
+      as one item that keeps them (`minecraft:container`), its board id (the item's
+      `modularcomputers:serial`, so Bluetooth links still find it) and its bus order
+      (`modularcomputers:bus_order`, like NVRAM), copied by the loot table
+      (`copy_components`) from `collectImplicitComponents`; placing it puts them back
+      (`applyImplicitComponents`). It comes back off, with its buffer empty until a battery
+      fills it. Explosions drop it too (no survives-explosion condition), so parts aren't lost.
+      Screens, hubs, robotic pistons and paint guns do the same with their cards and ids. An
+      empty one still has its id, so it stacks with new ones only once crafted alone.
   - **Case tiers** (user design, 2026-10-11; `machine/CaseTier`; blocks `tier1_case`..`tier3_case`,
     the same `AllInOneBlock`/`AllInOneBlockEntity` as the all-in-one). Case == board. **The
     all-in-one is now just a tier 3 case** (the dev kit; may become a creative pre-filled block):
@@ -572,7 +580,7 @@ scripts/art/error_beep.py` into
     - **Unpaired devices are shared** by every computer that reaches them. That's racy by
       nature; the user calls it undefined behavior and accepts it.
   - The screen, hub, piston and paint gun share `CardHolderBlockEntity`: an id, card slots
-    with a radio slot, save and sync, drops, card sounds, Bluetooth registration, and
+    with a radio slot, save and sync, keeping cards and id in the dropped item, card sounds, Bluetooth registration, and
     `Cabling.changed()` when their cards change. They also share `CardHolderMenu` and
     `CardHolderScreen`. Hubs, pistons and paint guns use `OutlineRenderer` for the outlines.
   - **One screen, many computers:** a screen can be wired to several computers, and each

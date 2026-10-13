@@ -2,13 +2,18 @@
 	"type": "minecraft:block",
 	"pools": [
 		{
-			"condition": {
-				"type": "minecraft:survives_explosion"
-			},
 			"entries": [
 				{
 					"type": "minecraft:item",
-					"name": "modularcomputers:robotic_piston"
+					"name": "modularcomputers:robotic_piston",
+					"modifier": {
+						"type": "minecraft:copy_components",
+						"source": "block_entity",
+						"include": [
+							"minecraft:container",
+							"modularcomputers:serial"
+						]
+					}
 				}
 			],
 			"rolls": 1

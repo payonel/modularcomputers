@@ -433,11 +433,17 @@ public class AllInOneGameTest {
 	}
 
 	@GameTest
-	public void breakingDropsItsParts(GameTestHelper helper) {
-		install(place(helper), true, true);
+	public void breakingKeepsItsPartsInsideItsItem(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper);
+		install(computer, true, true);
+		var drops = net.minecraft.world.level.block.Block.getDrops(computer.getBlockState(), helper.getLevel(), computer.getBlockPos(), computer);
+		helper.assertValueEqual(drops.size(), 1, "one item");
+		var inside = drops.getFirst().getOrDefault(net.minecraft.core.component.DataComponents.CONTAINER,
+			net.minecraft.world.item.component.ItemContainerContents.EMPTY).nonEmptyItemCopyStream().map(ItemStack::getItem).toList();
+		helper.assertTrue(inside.contains(ModItems.TIER3_CPU) && inside.contains(ModItems.EEPROM), "with its parts in it, got " + inside);
 		helper.destroyBlock(POS);
-		helper.assertItemEntityPresent(ModItems.TIER3_CPU, POS, 2);
-		helper.assertItemEntityPresent(ModItems.EEPROM, POS, 2);
+		helper.assertItemEntityNotPresent(ModItems.TIER3_CPU, POS, 2);
+		helper.assertItemEntityNotPresent(ModItems.EEPROM, POS, 2);
 		helper.succeed();
 	}
 }

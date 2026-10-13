@@ -4,6 +4,7 @@ import static com.payonel.modularcomputers.ModularComputers.id;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import com.payonel.modularcomputers.bus.BusOrder;
 import com.payonel.modularcomputers.power.BatteryCharge;
 import java.util.UUID;
 import net.minecraft.core.Registry;
@@ -41,6 +42,24 @@ public final class ModComponents {
 	/** What an EEPROM holds (its image), written by programs; up to {@code Eeprom.SIZE} bytes. Not sent to clients. */
 	public static final DataComponentType<String> EEPROM_IMAGE = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("eeprom_image"),
 		DataComponentType.<String>builder().persistent(Codec.STRING).build());
+
+	/**
+	 * A computer's bus order (external devices by id, and the ones unplugged), kept on its item
+	 * when it's broken, as a board's NVRAM keeps its boot order.
+	 */
+	public record SavedBusOrder(java.util.List<BusOrder.Entry> external, java.util.List<String> disconnected) {
+		private static final Codec<BusOrder.Entry> ENTRY = RecordCodecBuilder.create(entry -> entry.group(
+			Codec.STRING.fieldOf("key").forGetter(BusOrder.Entry::key),
+			Codec.LONG.fieldOf("last_seen").forGetter(BusOrder.Entry::lastSeen)
+		).apply(entry, BusOrder.Entry::new));
+		static final Codec<SavedBusOrder> CODEC = RecordCodecBuilder.create(order -> order.group(
+			ENTRY.listOf().fieldOf("external").forGetter(SavedBusOrder::external),
+			Codec.STRING.listOf().fieldOf("disconnected").forGetter(SavedBusOrder::disconnected)
+		).apply(order, SavedBusOrder::new));
+	}
+
+	public static final DataComponentType<SavedBusOrder> BUS_ORDER = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("bus_order"),
+		DataComponentType.<SavedBusOrder>builder().persistent(SavedBusOrder.CODEC).build());
 
 	private ModComponents() {
 	}

@@ -2,8 +2,21 @@
 	"type": "minecraft:block",
 	"pools": [
 		{
-			"condition": { "type": "minecraft:survives_explosion" },
-			"entries": [{ "type": "minecraft:item", "name": "modularcomputers:all_in_one" }],
+			"entries": [
+				{
+					"type": "minecraft:item",
+					"name": "modularcomputers:all_in_one",
+					"modifier": {
+						"type": "minecraft:copy_components",
+						"source": "block_entity",
+						"include": [
+							"minecraft:container",
+							"modularcomputers:serial",
+							"modularcomputers:bus_order"
+						]
+					}
+				}
+			],
 			"rolls": 1
 		}
 	],

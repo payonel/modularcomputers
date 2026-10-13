@@ -2,13 +2,18 @@
 	"type": "minecraft:block",
 	"pools": [
 		{
-			"condition": {
-				"type": "minecraft:survives_explosion"
-			},
 			"entries": [
 				{
 					"type": "minecraft:item",
-					"name": "modularcomputers:paint_gun"
+					"name": "modularcomputers:paint_gun",
+					"modifier": {
+						"type": "minecraft:copy_components",
+						"source": "block_entity",
+						"include": [
+							"minecraft:container",
+							"modularcomputers:serial"
+						]
+					}
 				}
 			],
 			"rolls": 1

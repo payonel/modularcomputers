@@ -1,5 +1,9 @@
 package com.payonel.modularcomputers.block;
 
+import net.minecraft.world.item.component.ItemContainerContents;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentMap;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.payonel.modularcomputers.bus.Bus;
@@ -252,7 +256,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	}
 
 	/** The motherboard's bus order. */
-	private BusOrder busOrder() {
+	public BusOrder busOrder() {
 		return machine.board().order();
 	}
 
@@ -895,11 +899,52 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		return worldPosition;
 	}
 
+	/*
+	 * Broken, a computer drops as one item that keeps its parts, its board id (what Bluetooth
+	 * cards link to) and its bus order (user, 2026-10-12), like a shulker box: the loot table
+	 * copies these onto the item, and placing it puts them back. The parts don't spill. What a
+	 * running machine holds goes, as unplugging one does: it's off, its screens dark, and its
+	 * power buffer empty until a battery fills it.
+	 */
 	@Override
-	public void preRemoveSideEffects(BlockPos pos, BlockState state) {
-		if (level != null) {
-			Containers.dropContents(level, pos, parts);
+	protected void collectImplicitComponents(DataComponentMap.Builder components) {
+		super.collectImplicitComponents(components);
+		if (parts.getItems().stream().anyMatch(stack -> !stack.isEmpty())) {
+			components.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(parts.getItems()));
 		}
+		components.set(ModComponents.SERIAL, boardId);
+		if (!busOrder().external().isEmpty() || !busOrder().disconnected().isEmpty()) {
+			components.set(ModComponents.BUS_ORDER, new ModComponents.SavedBusOrder(busOrder().external(), busOrder().disconnected()));
+		}
+	}
+
+	@Override
+	protected void applyImplicitComponents(DataComponentGetter components) {
+		super.applyImplicitComponents(components);
+		UUID serial = components.get(ModComponents.SERIAL);
+		if (serial != null) {
+			boardId = serial;
+		}
+		ModComponents.SavedBusOrder order = components.get(ModComponents.BUS_ORDER);
+		if (order != null) {
+			busOrder().restore(order.external(), order.disconnected());
+		}
+		parts.getItems().clear(); // not clearContent(): that would fire change handling
+		components.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(parts.getItems());
+		installParts();
+		rememberParts(); // placing isn't inserting: no sounds
+		if (level != null && !level.isClientSide()) {
+			updateBattery(); // a battery that came along fills the buffer
+		}
+	}
+
+	@Override
+	public void removeComponentsFromTag(ValueOutput output) {
+		super.removeComponentsFromTag(output);
+		output.discard(BOARD_ID);
+		output.discard("Items");
+		output.discard(BUS_EXTERNAL);
+		output.discard(BUS_DISCONNECTED);
 	}
 
 	@Override

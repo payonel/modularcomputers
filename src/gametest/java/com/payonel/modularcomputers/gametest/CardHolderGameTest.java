@@ -160,7 +160,7 @@ public class CardHolderGameTest {
 	}
 
 	@GameTest
-	public void hubsAndPistonsKeepTheirCardsAndDropThem(GameTestHelper helper) {
+	public void hubsAndPistonsKeepTheirCardsInsideWhenBroken(GameTestHelper helper) {
 		ExpansionHubBlockEntity hub = hub(helper, new BlockPos(1, 1, 1));
 		hub.cards().setItem(3, new ItemStack(ModItems.MOTION_SENSOR_CARD));
 		var registries = helper.getLevel().registryAccess();
@@ -174,11 +174,12 @@ public class CardHolderGameTest {
 		for (var block : List.of(hub, piston)) {
 			var drops = Block.getDrops(block.getBlockState(), helper.getLevel(), block.getBlockPos(), block);
 			helper.assertTrue(drops.size() == 1 && drops.getFirst().is(block.getBlockState().getBlock().asItem()), "drops itself, got " + drops);
+			helper.assertTrue(drops.getFirst().has(net.minecraft.core.component.DataComponents.CONTAINER), "with its card inside");
 		}
 		helper.destroyBlock(new BlockPos(1, 1, 1));
 		helper.destroyBlock(new BlockPos(3, 1, 1));
-		helper.assertItemEntityPresent(ModItems.MOTION_SENSOR_CARD, new BlockPos(1, 1, 1), 2);
-		helper.assertItemEntityPresent(ModItems.BLUETOOTH_CARD, new BlockPos(3, 1, 1), 2);
+		helper.assertItemEntityNotPresent(ModItems.MOTION_SENSOR_CARD, new BlockPos(1, 1, 1), 2);
+		helper.assertItemEntityNotPresent(ModItems.BLUETOOTH_CARD, new BlockPos(3, 1, 1), 2);
 		helper.succeed();
 	}
 

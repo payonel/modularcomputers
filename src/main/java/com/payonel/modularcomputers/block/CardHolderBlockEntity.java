@@ -1,5 +1,9 @@
 package com.payonel.modularcomputers.block;
 
+import net.minecraft.world.item.component.ItemContainerContents;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentMap;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.sound.ModSounds;
@@ -173,11 +177,39 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements Exten
 		}
 	}
 
+	/*
+	 * Broken, it drops as one item that keeps its cards and its id (user, 2026-10-12), like a
+	 * shulker box: the loot table copies these components onto the item, and placing it puts
+	 * them back. Its cards don't spill.
+	 */
 	@Override
-	public void preRemoveSideEffects(BlockPos pos, BlockState state) {
-		if (level != null) {
-			Containers.dropContents(level, pos, cards);
+	protected void collectImplicitComponents(DataComponentMap.Builder components) {
+		super.collectImplicitComponents(components);
+		if (cards.getItems().stream().anyMatch(stack -> !stack.isEmpty())) {
+			components.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(cards.getItems()));
 		}
+		components.set(ModComponents.SERIAL, id);
+	}
+
+	@Override
+	protected void applyImplicitComponents(DataComponentGetter components) {
+		super.applyImplicitComponents(components);
+		UUID serial = components.get(ModComponents.SERIAL);
+		if (serial != null) {
+			id = serial;
+		}
+		cards.getItems().clear();
+		components.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(cards.getItems());
+		cardsChanged();
+		updateBluetooth();
+		remember(); // placing isn't inserting: no sounds
+	}
+
+	@Override
+	public void removeComponentsFromTag(ValueOutput output) {
+		super.removeComponentsFromTag(output);
+		output.discard(ID);
+		output.discard("Items");
 	}
 
 	@Override
