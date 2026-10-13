@@ -693,9 +693,11 @@ scripts/art/error_beep.py` into
         blocks `tier1_screen`..`tier3_screen`, `ScreenItem`): the same decoder, showing what it
         can of the colors it's sent. Tier 1 is text only (every cell in the default colors, no
         reverse either), tier 2 shows the 16 basic colors (256-color and 24-bit map to the
-        nearest), tier 3 every color (pixel graphics planned for it). Each answers Device
-        Attributes (`ESC[c`) as its kind: `?1;0c` (a VT100), `?62;22c` (a VT220 with color),
-        `?63;22c`. The front's frame shows the tier as 1-3 dots, iron, gold and diamond. The
+        nearest), tier 3 every color (pixel graphics planned for it). Each is a real DEC model
+        (2026-10-12), named in its tooltip, and answers Device Attributes (`ESC[c`) as that model
+        did: tier 1 a **VT102** on green phosphor (`?6c`), tier 2 a **VT525**, DEC's color text
+        terminal (`?65;22c`), tier 3 `?63;22c` (a VT340's level; it will add `;4`, sixel, once
+        sixel is built). The front's frame shows the tier as 1-3 dots, iron, gold and diamond. The
         all-in-one's built-in terminal is tier 3.
       - **Input:** keys wait in its queue until `read()` (as do its answers to reports); while
         any wait, its interrupt is on, or the console's if it's in the console's group.

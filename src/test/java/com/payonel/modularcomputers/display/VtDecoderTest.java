@@ -177,7 +177,7 @@ class VtDecoderTest {
 		for (com.payonel.modularcomputers.device.TerminalTier tier : com.payonel.modularcomputers.device.TerminalTier.values()) {
 			new VtDecoder(new TextBuffer(new Resolution(6, 1)), answers::add, tier.depth(), tier.attributes()).write(ESC + "[c");
 		}
-		assertThat(answers).containsExactly(ESC + "[?1;0c", ESC + "[?62;22c", ESC + "[?63;22c");
+		assertThat(answers).containsExactly(ESC + "[?6c", ESC + "[?65;22c", ESC + "[?63;22c");
 	}
 
 	@Test
