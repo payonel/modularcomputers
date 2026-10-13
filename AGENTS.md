@@ -489,8 +489,8 @@ scripts/art/error_beep.py` into
     - Right-click opens its screen view: just the display, with no power button and no view
       toggle. The user wants the power button **only on the case**, not on every screen on
       the network (2026-10-11).
-    - Each screen has a UUID (`screen_id`, saved), its bus order key `id:<uuid>`. A
-      re-placed screen is a new screen.
+    - Each screen has a UUID (its holder id, saved), its bus order key `id:<uuid>`. Broken and
+      placed again, it's the same screen (the id goes with its item); a newly crafted one is new.
     - It saves its display and sends changes to clients from its own tick (`TextBuffer.changes`).
   - **Cable** (`CableBlock`, a vanilla `PipeBlock`, 4 pixels thick): joins any neighbor that
     takes a cable on that side, and its multipart model shows each join.
