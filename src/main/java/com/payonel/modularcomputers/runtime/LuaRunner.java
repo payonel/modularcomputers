@@ -8,12 +8,17 @@ import static com.payonel.lungolua.api.LuaAuxLib.luaL_loadbufferx;
 import static com.payonel.lungolua.api.LuaAuxLib.luaL_newstate;
 import static com.payonel.lungolua.lib.Linit.luaL_openselectedlibs;
 import static com.payonel.lungolua.lib.Lualib.*;
+import static com.payonel.lungolua.lib.Lstyx.luaL_persiststate;
+import static com.payonel.lungolua.lib.Lstyx.luaL_restorestate;
 import static com.payonel.lungolua.runtime.Ldo.lua_resume;
 import static com.payonel.lungolua.runtime.Lstate.lua_newthread;
 
 import com.payonel.lungolua.api.HostString;
 import com.payonel.lungolua.api.lua_ResumeResult;
 import com.payonel.lungolua.api.lua_UserObject;
+import com.payonel.lungolua.api.lua_Writer;
+import com.payonel.lungolua.lib.luaL_Restored;
+import com.payonel.lungolua.lib.luaL_StyxResult;
 import com.payonel.lungolua.bytes.ByteView;
 import com.payonel.lungolua.runtime.lua_State;
 import com.payonel.modularcomputers.machine.LuaScripts;
@@ -27,6 +32,9 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -54,6 +62,14 @@ import java.util.function.Supplier;
  * <p>
  * Values cross as {@link Values}: strings as bytes (ISO-8859-1), handles as userdata, the board's
  * records as tables. The Lua state is only ever touched by the computer's thread.
+ * <p>
+ * <b>Saving a running computer</b> (Styx, LungoLua's persistence, which works from the main thread
+ * only, so it's the host's): the server thread pins a request ({@link #persist}) and the computer's
+ * thread honours it at its next safe point: the kernel suspended in a yield, its request still on its
+ * stack (a slice, a board call not yet made, or a wait, honoured at once). No Lua runs while it
+ * persists. {@link #restore} makes the state again; the restored kernel's request is on its stack,
+ * and the computer's thread carries on with it (a wait starts over). The permanents (the standard
+ * library's functions and userdata, named by their path) are worked out the same way in both.
  */
 public final class LuaRunner implements Runner {
 	/** How long a computer's board calls may use the server thread each tick. */
@@ -64,6 +80,47 @@ public final class LuaRunner implements Runner {
 	private static final int LIBRARIES = LUA_GLIBK | LUA_COLIBK | LUA_TABLIBK | LUA_STRLIBK | LUA_MATHLIBK | LUA_UTF8LIBK | LUA_DBLIBK;
 	/** How deep tables nest between programs and devices. */
 	private static final int MAX_DEPTH = 16;
+	/** Registry keys: the kernel, and the permanents (object to name). */
+	private static final String KERNEL = "modularcomputers.kernel";
+	private static final String PERMANENTS = "modularcomputers.perms";
+	/** How long a save waits for the computer's thread to reach a safe point. */
+	private static final long PERSIST_NANOS = 2_000_000_000L;
+	/**
+	 * The permanents: every C function and userdata reachable from the registry and the string
+	 * metatable once the libraries are open, and each such userdata's metatable, named by its path
+	 * (keys sorted, so two states with the same libraries agree); kept in the registry (object to
+	 * name), and the inverse returned. LungoLua's own gate works them out this way.
+	 */
+	private static final String PERMANENTS_WALK = """
+		local perms, seen = {}, {}
+		local function upv(f) local _, x = debug.getupvalue(f, 1) return x end
+		local function walk(t, name)
+		  if seen[t] then return end
+		  seen[t] = true
+		  local keys = {}
+		  for k in pairs(t) do keys[#keys + 1] = k end
+		  table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+		  for _, k in ipairs(keys) do
+		    local v = t[k]
+		    local n = name .. '.' .. tostring(k)
+		    if (type(v) == 'function' and debug.getinfo(v, 'S').what == 'C' and type(upv(v)) ~= 'table') or type(v) == 'userdata' then
+		      if perms[v] == nil then perms[v] = n end
+		      local mt = type(v) == 'userdata' and debug.getmetatable(v)
+		      if mt and perms[mt] == nil then perms[mt] = n .. '<mt>' end
+		    elseif type(v) == 'table' then
+		      walk(v, n)
+		    end
+		  end
+		  local mt = getmetatable(t)
+		  if mt then walk(mt, name .. '<mt>') end
+		end
+		walk(getmetatable(''), 'smt')
+		walk(debug.getregistry(), 'R')
+		local back = {}
+		for v, n in pairs(perms) do back[n] = v end
+		debug.getregistry()['modularcomputers.perms'] = perms
+		return back
+		""";
 
 	/** Lua's error, as the program left it. */
 	public static final class LuaException extends RuntimeException {
@@ -103,7 +160,10 @@ public final class LuaRunner implements Runner {
 
 	private final lua_State main;
 	private final lua_State kernel;
+	/** The EEPROM's text, for a fresh start; null for a restored one (its request is on the kernel's stack). */
 	private final String image;
+	/** A pinned request to persist, answered with the state's bytes (or null, when it can't be). */
+	private final AtomicReference<CompletableFuture<byte[]>> persistPin = new AtomicReference<>();
 	private final ConcurrentLinkedQueue<Call> calls = new ConcurrentLinkedQueue<>();
 	private volatile Wait wait;
 	private volatile State state = State.RUNNING;
@@ -124,12 +184,98 @@ public final class LuaRunner implements Runner {
 	public LuaRunner(String image) {
 		this.image = image;
 		main = luaL_newstate();
-		luaL_openselectedlibs(main, LIBRARIES, 0);
+		prepare(main);
+		lua_pop(main, 1); // (the inverse permanents: only a restore needs them)
 		kernel = lua_newthread(main);
-		lua_setfield(main, LUA_REGISTRYINDEX, new HostString("modularcomputers.kernel")); // kept from the collector
+		lua_setfield(main, LUA_REGISTRYINDEX, new HostString(KERNEL)); // kept from the collector, and found again after a restore
 		byte[] firmware = LuaScripts.read(FIRMWARE).getBytes(StandardCharsets.ISO_8859_1);
 		if (luaL_loadbufferx(kernel, new ByteView(firmware), new HostString("=machine"), new HostString("t")) != LUA_OK) {
 			throw new IllegalStateException("the CPU's firmware doesn't load: " + text(kernel, -1)); // a bug in the mod
+		}
+	}
+
+	/** A computer coming back from its saved state ({@link #persist}). */
+	private LuaRunner(lua_State main) {
+		this.image = null;
+		this.main = main;
+		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(KERNEL));
+		this.kernel = lua_tothread(main, -1);
+		lua_pop(main, 1);
+	}
+
+	/** The same libraries and permanents for a new state and a restored one; leaves the inverse permanents (name to object) on the stack. */
+	private static void prepare(lua_State L) {
+		luaL_openselectedlibs(L, LIBRARIES, 0);
+		byte[] walk = PERMANENTS_WALK.getBytes(StandardCharsets.UTF_8);
+		if (luaL_loadbufferx(L, new ByteView(walk), new HostString("=permanents"), new HostString("t")) != LUA_OK) {
+			throw new IllegalStateException("the permanents don't load: " + text(L, -1));
+		}
+		lua_call(L, 0, 1);
+	}
+
+	/** Makes a saved computer again ({@link #persist}'s bytes); it carries on from where it was saved when its thread starts. */
+	public static LuaRunner restore(byte[] saved) {
+		lua_State scratch = luaL_newstate(); // (for the allocator)
+		luaL_Restored restored = luaL_restorestate(lua_getallocf(scratch), new ByteView(saved), LuaRunner::prepare);
+		if (restored.L == null) {
+			throw new IllegalStateException("the computer's saved state doesn't restore: " + restored.msg);
+		}
+		lua_settop(restored.L, 0); // (nothing of the host's is left on it)
+		return new LuaRunner(restored.L);
+	}
+
+	/**
+	 * Server side: saves the computer as it runs. Pins a request the computer's thread honours at
+	 * its next safe point, carrying out its board calls meanwhile (it may be waiting on one), and
+	 * waits for it. Empty when it can't be saved now (it's not running, the state holds what can't
+	 * be persisted, or it took too long); the computer then comes back halted.
+	 */
+	@Override
+	public Optional<byte[]> persist(Board board) {
+		if (thread == null || !thread.isAlive() || state != State.RUNNING) {
+			return Optional.empty();
+		}
+		CompletableFuture<byte[]> pin = new CompletableFuture<>();
+		persistPin.set(pin);
+		long end = System.nanoTime() + PERSIST_NANOS;
+		while (System.nanoTime() < end) {
+			Call call;
+			while ((call = calls.poll()) != null) {
+				answer(call, board);
+			}
+			try {
+				return Optional.ofNullable(pin.get(1, TimeUnit.MILLISECONDS));
+			} catch (TimeoutException e) {
+				// not at a safe point yet
+			} catch (InterruptedException | ExecutionException e) {
+				break;
+			}
+		}
+		persistPin.compareAndSet(pin, null);
+		return Optional.empty();
+	}
+
+	/** Computer's thread, at a safe point: honours a pinned save. */
+	private void honour() {
+		CompletableFuture<byte[]> pin = persistPin.getAndSet(null);
+		if (pin == null) {
+			return;
+		}
+		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(PERMANENTS));
+		java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+		lua_Writer writer = (L, bytes) -> {
+			if (bytes != null) {
+				out.write(bytes.array(), bytes.offset(), bytes.size());
+			}
+			return 0;
+		};
+		luaL_StyxResult result = luaL_persiststate(main, lua_gettop(main), writer);
+		lua_pop(main, 1);
+		if (result.status != LUA_OK) {
+			com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A computer can't be saved as it runs: {}", result.msg);
+			pin.complete(null);
+		} else {
+			pin.complete(out.toByteArray());
 		}
 	}
 
@@ -188,14 +334,7 @@ public final class LuaRunner implements Runner {
 		long start = System.nanoTime();
 		Call call;
 		while (spentNanos + (System.nanoTime() - start) < SERVER_NANOS_PER_TICK && (call = calls.poll()) != null) {
-			Object answer;
-			try {
-				answer = call.call().apply(board);
-			} catch (RuntimeException e) {
-				answer = Result.fail(e.getMessage()); // a device never stops the machine
-			}
-			answered++;
-			call.answer().complete(answer);
+			answer(call, board);
 		}
 		spentNanos += System.nanoTime() - start;
 		Wait waiting = wait;
@@ -207,6 +346,18 @@ public final class LuaRunner implements Runner {
 			}
 		}
 		return state();
+	}
+
+	/** Server side: makes a board call and hands back its answer. */
+	private void answer(Call call, Board board) {
+		Object answer;
+		try {
+			answer = call.call().apply(board);
+		} catch (RuntimeException e) {
+			answer = Result.fail(e.getMessage()); // a device never stops the machine
+		}
+		answered++;
+		call.answer().complete(answer);
 	}
 
 	@Override
@@ -229,52 +380,98 @@ public final class LuaRunner implements Runner {
 	/** The computer's thread: runs the firmware, serving its requests, until it halts or is stopped. */
 	private void run() {
 		try {
-			push(kernel, image); // the EEPROM's text, as the CPU read it at power-on
-			int answers = 1;
+			int answers;
+			if (image != null) {
+				push(kernel, image); // the EEPROM's text, as the CPU read it at power-on
+				answers = 1;
+			} else {
+				answers = -1; // restored: the kernel is suspended in a yield, its request on its stack
+			}
 			while (true) {
 				if (stopping) {
 					return;
 				}
-				lua_ResumeResult result = lua_resume(kernel, null, answers);
+				int asked;
+				if (answers >= 0) {
+					lua_ResumeResult result = lua_resume(kernel, null, answers);
+					if (result.status != LUA_YIELD) {
+						end(result);
+						return;
+					}
+					asked = result.nres;
+				} else {
+					asked = lua_gettop(kernel);
+				}
+				// The request stays on the kernel's stack until it's answered: a save now keeps it.
 				List<Object> said = new ArrayList<>();
 				int top = lua_gettop(kernel);
-				if (result.status == LUA_YIELD || result.status == LUA_OK) {
-					for (int i = top - result.nres + 1; i <= top; i++) {
-						said.add(toJava(kernel, i, 0));
-					}
-					lua_settop(kernel, top - result.nres);
+				for (int i = top - asked + 1; i <= top; i++) {
+					said.add(toJava(kernel, i, 0));
 				}
 				Object what = said.isEmpty() ? null : said.getFirst();
-				if (result.status == LUA_YIELD) {
-					switch (String.valueOf(what)) {
-						case "slice" -> answers = 0;
-						case "call" -> answers = answer(serve(said));
-						case "wait" -> answers = push(kernel, await(waitFor(said)));
-						case "halt" -> {
-							finish(State.HALTED, null);
-							return;
-						}
-						default -> {
-							finish(State.CRASHED, new LuaException("the firmware asked for '" + what + "'"));
-							return;
-						}
+				switch (String.valueOf(what)) {
+					case "slice" -> {
+						honour();
+						lua_settop(kernel, top - asked);
+						answers = 0;
 					}
-				} else if (result.status == LUA_OK) {
-					if ("abort".equals(what)) {
-						finish(State.CRASHED, new Aborted(String.valueOf(said.size() > 1 ? said.get(1) : "?")));
-					} else {
-						finish(State.RETURNED, null);
+					case "call" -> {
+						honour();
+						Object answer = await(serve(said));
+						lua_settop(kernel, top - asked);
+						answers = answer(answer);
 					}
-					return;
-				} else {
-					finish(State.CRASHED, new LuaException(text(kernel, -1)));
-					return;
+					case "wait" -> {
+						honour();
+						List<String> pending = awaitWait(waitFor(said));
+						lua_settop(kernel, top - asked);
+						answers = push(kernel, pending);
+					}
+					case "halt" -> {
+						finish(State.HALTED, null);
+						return;
+					}
+					default -> {
+						finish(State.CRASHED, new LuaException("the firmware asked for '" + what + "'"));
+						return;
+					}
 				}
 			}
 		} catch (Stopped stopped) {
 			// power off, or unloaded
 		} catch (RuntimeException | StackOverflowError e) {
 			finish(State.CRASHED, e);
+		}
+	}
+
+	/** The kernel returned or failed: the EEPROM's code returned, its text didn't load, or it crashed. */
+	private void end(lua_ResumeResult result) {
+		if (result.status == LUA_OK) {
+			int top = lua_gettop(kernel);
+			Object what = result.nres > 0 ? toJava(kernel, top - result.nres + 1, 0) : null;
+			if ("abort".equals(what)) {
+				Object why = result.nres > 1 ? toJava(kernel, top - result.nres + 2, 0) : "?";
+				finish(State.CRASHED, new Aborted(String.valueOf(why)));
+			} else {
+				finish(State.RETURNED, null);
+			}
+		} else {
+			finish(State.CRASHED, new LuaException(text(kernel, -1)));
+		}
+	}
+
+	/** Waits for a wait's answer; a pinned save is honoured meanwhile (the kernel is at a safe point). */
+	private List<String> awaitWait(CompletableFuture<List<String>> answer) {
+		while (true) {
+			try {
+				return answer.get(10, TimeUnit.MILLISECONDS);
+			} catch (TimeoutException e) {
+				honour();
+			} catch (InterruptedException e) {
+				throw new Stopped();
+			} catch (ExecutionException e) {
+				throw new IllegalStateException(e.getCause());
+			}
 		}
 	}
 
@@ -339,8 +536,7 @@ public final class LuaRunner implements Runner {
 	}
 
 	/** Pushes a board call's answer: an invoke's as pcall's ({@code true} and its values, or {@code false} and why), else its value. */
-	private int answer(CompletableFuture<Object> pending) {
-		Object answer = await(pending);
+	private int answer(Object answer) {
 		if (answer instanceof Result result) {
 			if (result.failed()) {
 				lua_pushboolean(kernel, 0);

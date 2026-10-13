@@ -83,7 +83,12 @@ public final class Cpu {
 		return Optional.of(new ProgramRunner(program.get()::run, "cpu"));
 	}
 
-	/**
+	/** A saved program, going on (a Lua CPU's: its VM restored); the Java CPU's programs aren't saved. */
+	public Optional<Runner> resume(byte[] saved) {
+		return architecture == Architecture.LUA ? Optional.of(LuaRunner.restore(saved)) : Optional.empty();
+	}
+
+		/**
 	 * The Java CPU's reading: the EEPROM's text names the program's class (its first line), which
 	 * must be a {@link Program} with a public no-argument constructor. The class is looked at before
 	 * it's initialized, so naming anything else runs nothing. Empty when it isn't a Java program.

@@ -91,6 +91,44 @@ public class AllInOneGameTest {
 			.thenSucceed();
 	}
 
+	@GameTest(maxTicks = 300)
+	public void aRunningLuaComputerIsSavedAndGoesOnWhereItWasAfterALoad(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper);
+		TestPrograms.withScreen(computer);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
+		ItemStack eeprom = new ItemStack(ModItems.EEPROM);
+		eeprom.set(ModComponents.EEPROM_IMAGE, """
+			local total = 0
+			for i = 1, 6 do
+			  total = total + i
+			  board.invoke("console", "write", tostring(i))
+			  board.waitForInterrupt(0.5, "nothing")
+			end
+			board.invoke("console", "write", " total " .. total)
+			board.halt()
+			""");
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, eeprom);
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		computer.pressPower();
+		var registries = helper.getLevel().registryAccess();
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(computer.terminal().buffer().row(0).strip().startsWith("12"), "it's counting"))
+			.thenExecute(() -> {
+				// Saved as the world is (its VM, by Styx), then gone, and loaded again.
+				net.minecraft.nbt.CompoundTag saved = computer.saveWithoutMetadata(registries);
+				helper.assertTrue(saved.contains("program"), "the running program is saved");
+				helper.setBlock(POS, net.minecraft.world.level.block.Blocks.AIR);
+				AllInOneBlockEntity again = place(helper);
+				again.loadWithComponents(net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, registries, saved));
+			})
+			.thenWaitUntil(() -> {
+				AllInOneBlockEntity again = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+				helper.assertTrue(again.terminal().buffer().row(0).strip().endsWith("6 total 21"), "it goes on: " + again.terminal().buffer().row(0).strip());
+				helper.assertTrue(again.machine().isPowered() && again.machine().runner().isEmpty(), "and halts");
+			})
+			.thenSucceed();
+	}
+
 	@GameTest
 	public void theJavaCpuRunsTheJavaEepromAndNotLua(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);

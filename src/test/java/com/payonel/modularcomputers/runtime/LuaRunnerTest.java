@@ -52,6 +52,10 @@ class LuaRunnerTest {
 
 	/** Plays the server thread until {@code done}: its asked-for tasks, and a tick a millisecond. */
 	private void settle(BooleanSupplier done) {
+		settle(machine, done);
+	}
+
+	private void settle(Machine machine, BooleanSupplier done) {
 		long end = System.nanoTime() + 10_000_000_000L;
 		while (!done.getAsBoolean()) {
 			assertThat(System.nanoTime()).as("settled in time").isLessThan(end);
@@ -243,6 +247,60 @@ class LuaRunnerTest {
 		machine.pressPower();
 		untilHalted();
 		assertThat(row(0)).as("one byte, still one byte").isEqualTo("length 1");
+	}
+
+	/** The same computer after a reload: a new machine with the same CPU and a new screen, on, nothing booted. */
+	private Machine reloaded(Terminal screen) {
+		Machine again = new Machine(new Motherboard(Hardware.allInOne(), new Bus(java.util.List.of())));
+		Map<String, Device> devices = new LinkedHashMap<>();
+		devices.put("id:screen", screen);
+		again.setDevices(devices);
+		again.board().setCpu(new Cpu(CpuTier.TIER_3));
+		again.setServer(server::add);
+		again.restorePowered(true);
+		return again;
+	}
+
+	@Test
+	void aComputerSavedInAWaitGoesOnWhereItWas() {
+		boot("""
+			local total = 0
+			for i = 1, 6 do
+			  total = total + i
+			  board.invoke("console", "write", tostring(i))
+			  board.waitForInterrupt(0.25, "id:screen")
+			end
+			board.invoke("console", "write", " total " .. total)
+			board.halt()
+			""");
+		settle(() -> row(0).startsWith("12"));
+		byte[] saved = machine.persistProgram().orElseThrow();
+		machine.pressPower(); // this one stops; the saved one goes on elsewhere
+		Terminal screen2 = new Terminal(Resolution.DEFAULT);
+		Machine again = reloaded(screen2);
+		again.resumeProgram(saved);
+		settle(again, () -> again.runner().isEmpty());
+		assertThat(again.board().virtualBus().console().screen().row(0).strip()).as("its locals and its loop, as they were").endsWith("6 total 21");
+		again.pressPower();
+	}
+
+	@Test
+	void aComputerSavedInTheMiddleOfALoopGoesOn() {
+		boot("""
+			local n = 0
+			for i = 1, 3000000 do n = n + 1 end
+			board.invoke("console", "write", "counted " .. n)
+			board.halt()
+			""");
+		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
+		settle(runner::alive);
+		byte[] saved = machine.persistProgram().orElseThrow(); // at its next slice
+		machine.pressPower();
+		Machine again = reloaded(new Terminal(Resolution.DEFAULT));
+		again.resumeProgram(saved);
+		settle(again, () -> again.runner().isEmpty());
+		assertThat(again.board().virtualBus().console().screen().row(0).strip()).isEqualTo("counted 3000000");
+		again.pressPower();
 	}
 
 	@Test

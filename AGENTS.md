@@ -608,8 +608,20 @@ scripts/art/error_beep.py` into
     for the next tick (user: protect the server's tick by time, not by counting calls; power never
     limits calls). Waits are answered by the server thread too (interrupts, the time). Power-off or
     unload stops the thread (it unwinds out of a wait at once, or at its next yield). The Lua state
-    is only touched by the computer's thread. **Persistence will live here**: Styx persists from the
-    main thread only.
+    is only touched by the computer's thread.
+  - **Saving a running computer** (user, 2026-10-13; Styx persists from the main thread only, so it's
+    the host's): the case's `saveAdditional` (world saves, chunk unloads; not client syncs) asks
+    `Machine.persistProgram`, which pins a request (`LuaRunner.persist`) and blocks, carrying out the
+    computer's board calls meanwhile (no deadlock), until the computer's thread honours it at its
+    next safe point: the kernel suspended in a yield with its request still on its stack (a slice, a
+    call not yet made, or a wait, honoured at once), so no Lua runs while it persists. Up to 2 s,
+    else it isn't saved. The bytes go in the case's NBT (`program`). On load the case resumes it
+    (`Machine.resumeProgram`, `LuaRunner.restore`) at its first tick, after the bus is found again;
+    the restored kernel's request is still on its stack, so the computer's thread carries on with it
+    (a wait starts over). Permanents (the standard library's C functions and userdata, named by path,
+    as LungoLua's gate does) are worked out the same way in a new state and a restored one. A state
+    holding what can't be persisted (a userdata with no persist kind) isn't saved: the CPU comes back
+    halted, as before.
   - **The firmware, `lua/cpu/machine.lua`** (after OC's `machine.lua`): all sandboxing, budgeting,
     freezing and syscalls. It builds the sandbox (copies of coroutine, string, table, math, utf8;
     no debug, io, os, package, print, dofile, loadfile; `load` text only, into the sandbox by

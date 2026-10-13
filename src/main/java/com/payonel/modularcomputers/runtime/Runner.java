@@ -47,7 +47,12 @@ public interface Runner {
 		return true;
 	}
 
-	/** Given how to ask the server thread to {@link #tick} it soon (a runner on its own thread asks when a request comes in). */
+	/** Server side: the program's state as it runs, to save; empty when it can't be saved (it comes back halted). */
+	default java.util.Optional<byte[]> persist(Board board) {
+		return java.util.Optional.empty();
+	}
+
+		/** Given how to ask the server thread to {@link #tick} it soon (a runner on its own thread asks when a request comes in). */
 	default void serveWith(Runnable serveSoon) {
 	}
 }

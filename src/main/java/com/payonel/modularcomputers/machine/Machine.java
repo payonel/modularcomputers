@@ -307,10 +307,15 @@ public final class Machine {
 		callsThisTick = 0;
 		executedThisTick = false;
 		board.bus().devices().forEach(this::supply);
-		runner = cpu.get().powerOn(board).orElse(null);
-		if (runner != null) {
-			Runner started = runner;
-			// A runner on its own thread asks the server thread to serve it as soon as it can.
+		adopt(cpu.get().powerOn(board).orElse(null));
+		run(); // the CPU starts executing right away
+		return PowerPress.ON;
+	}
+
+	/** Takes {@code started} as the program on the CPU; a runner on its own thread asks the server thread to serve it as soon as it can. */
+	private void adopt(Runner started) {
+		runner = started;
+		if (started != null) {
 			started.serveWith(() -> {
 				if (server != null) {
 					server.execute(() -> {
@@ -321,8 +326,31 @@ public final class Machine {
 				}
 			});
 		}
-		run(); // the CPU starts executing right away
-		return PowerPress.ON;
+	}
+
+	/**
+	 * The running program's state, to save with the computer (a Lua CPU's, by Styx); empty when
+	 * nothing runs or it can't be saved now (it then comes back halted). Server thread.
+	 */
+	public Optional<byte[]> persistProgram() {
+		if (!powered || runner == null) {
+			return Optional.empty();
+		}
+		return runner.persist(api);
+	}
+
+	/** After a load: the saved program goes on where it was ({@link #persistProgram}). The machine must be on, with its CPU. */
+	public void resumeProgram(byte[] saved) {
+		if (!powered || runner != null || board.cpu().isEmpty()) {
+			return;
+		}
+		try {
+			adopt(board.cpu().get().resume(saved).orElse(null));
+		} catch (RuntimeException e) {
+			com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A saved computer didn't restore; its CPU comes back halted", e);
+			return;
+		}
+		run();
 	}
 
 	/**
@@ -404,8 +432,8 @@ public final class Machine {
 
 	/**
 	 * Sets the switch from a save or a sync, without booting or cutting power: the devices
-	 * restore their own state. A program that was running isn't saved (the mock runtime isn't
-	 * saveable): the CPU comes back halted.
+	 * restore their own state. The program comes back with {@link #resumeProgram} (a Lua CPU's);
+	 * without it, the CPU is halted.
 	 */
 	public void restorePowered(boolean powered) {
 		this.powered = powered;

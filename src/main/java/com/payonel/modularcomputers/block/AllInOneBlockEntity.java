@@ -197,6 +197,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** The holds version last seen ({@link com.payonel.modularcomputers.bus.BusHolds}). */
 	private long seenHolds;
 	private int ticks;
+	/** A running program's saved state, from a load, to go on with once the bus is found again. */
+	private byte[] savedProgram;
+	/** Writing the client's copy (a sync), not a save: no program state in it. */
+	private boolean syncing;
+	private static final String PROGRAM = "program";
 
 	/**
 	 * A device wired to this computer: where it is, how far the connection runs to it in meters
@@ -510,6 +515,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			// Another board let go of a device: if it's one of ours, it may join this bus now.
 			seenHolds = com.payonel.modularcomputers.bus.BusHolds.version();
 			relayout(false);
+		}
+		if (savedProgram != null) {
+			// Loaded running: the program goes on where it was saved, now its bus is found again.
+			byte[] saved = savedProgram;
+			savedProgram = null;
+			machine.resumeProgram(saved);
 		}
 		syncDisplay();
 	}
@@ -991,6 +1002,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		ScreenSave.save(output, DISPLAY, display.buffer(), display.decoder());
 		ConsoleSplitter console = machine.board().virtualBus().console();
 		ScreenSave.save(output, CONSOLE, console.screen(), console.decoder());
+		if (!syncing) {
+			// A running Lua program is saved as it runs (its VM, by Styx), at its next safe point.
+			machine.persistProgram().or(() -> java.util.Optional.ofNullable(savedProgram))
+				.ifPresent(saved -> output.store(PROGRAM, Codec.BYTE_BUFFER, java.nio.ByteBuffer.wrap(saved)));
+		}
 	}
 
 	@Override
@@ -1012,6 +1028,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		ScreenSave.load(input, DISPLAY, display.buffer(), display.decoder());
 		ConsoleSplitter console = machine.board().virtualBus().console();
 		ScreenSave.load(input, CONSOLE, console.screen(), console.decoder());
+		savedProgram = input.read(PROGRAM, Codec.BYTE_BUFFER).map(buffer -> {
+			byte[] bytes = new byte[buffer.remaining()];
+			buffer.get(bytes);
+			return bytes;
+		}).filter(bytes -> machine.isPowered()).orElse(null);
 	}
 
 	@Override
@@ -1021,7 +1042,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 
 	@Override
 	public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-		return saveWithoutMetadata(registries);
+		syncing = true;
+		try {
+			return saveWithoutMetadata(registries);
+		} finally {
+			syncing = false;
+		}
 	}
 
 	/** The part slots. Changes install the parts and update the power button. */
