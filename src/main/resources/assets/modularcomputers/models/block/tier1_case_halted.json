@@ -1,0 +1,13 @@
+{
+	"parent": "modularcomputers:block/all_in_one_base",
+	"textures": {
+		"north": "modularcomputers:block/all_in_one_case_front_plain",
+		"south": "modularcomputers:block/all_in_one_back",
+		"east": "modularcomputers:block/all_in_one_side",
+		"west": "modularcomputers:block/all_in_one_side",
+		"up": "modularcomputers:block/all_in_one_top",
+		"down": "modularcomputers:block/all_in_one_bottom",
+		"particle": "modularcomputers:block/all_in_one_side",
+		"button": "modularcomputers:block/all_in_one_power_halted"
+	}
+}

@@ -92,6 +92,8 @@ LIT = {
 	# No CPU: the same colors, faded and not glowing (the model drops the emission too).
 	"off_faded": [(150, 104, 98), (124, 72, 66), (100, 58, 54)],
 	"on_faded": [(118, 150, 114), (84, 124, 84), (64, 100, 66)],
+	# On, its CPU halted (the OS called halt): amber, like a standby light.
+	"halted": [(255, 236, 150), (236, 190, 40), (176, 132, 20)],
 }
 
 def button_face(state):
@@ -141,7 +143,7 @@ def power(state):
 			im.putpixel((HOUSING[0] + 1 + dx, HOUSING[1] + 1 + dy), c)
 	return im
 
-GUI_STATES = ("off", "on", "off_faded", "on_faded")
+GUI_STATES = ("off", "on", "off_faded", "on_faded", "halted")
 
 def gui_button():
 	"""GUI power button, one 5x5 frame per state in GUI_STATES: housing ring plus the same face."""

@@ -95,6 +95,28 @@ public final class MotionSensorCard extends Card {
 		return "pull";
 	}
 
+	/** Its events waiting, and the mode and range the program set. */
+	@Override
+	public Map<String, Object> saved() {
+		Map<String, Object> saved = new java.util.LinkedHashMap<>();
+		events.save(saved);
+		saved.put("mode", mode);
+		saved.put("range", (long) range);
+		return saved;
+	}
+
+	@Override
+	public void restore(Map<String, Object> saved) {
+		events.restore(saved);
+		if (saved.get("mode") instanceof String kept && MODES.contains(kept)) {
+			mode = kept;
+		}
+		if (saved.get("range") instanceof Long kept) {
+			range = (int) Math.clamp(kept, 1, MAX_RANGE);
+			power.setDraw(BASE_DRAW + range * DRAW_PER_RANGE);
+		}
+	}
+
 	@Override
 	public boolean interruptPending() {
 		return events.pending();

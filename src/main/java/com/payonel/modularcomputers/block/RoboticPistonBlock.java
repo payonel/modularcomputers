@@ -16,6 +16,7 @@ import net.minecraft.world.level.block.DirectionalBlock;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.piston.MovingPistonBlock;
+import net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
 import net.minecraft.world.level.block.piston.PistonStructureResolver;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -76,6 +77,10 @@ public final class RoboticPistonBlock extends DirectionalBlock implements Entity
 	static void retract(Level level, BlockPos pos, Direction side) {
 		BlockState state = level.getBlockState(pos);
 		BlockPos armPos = pos.relative(side);
+		if (level.getBlockEntity(armPos) instanceof PistonMovingBlockEntity sliding && sliding.isExtending()
+			&& sliding.getMovedState().is(ModBlocks.ROBOTIC_PISTON_ARM)) {
+			sliding.finalTick(); // still sliding out: it's out now, then back
+		}
 		if (!(state.getBlock() instanceof RoboticPistonBlock piston) || !level.getBlockState(armPos).is(ModBlocks.ROBOTIC_PISTON_ARM)) {
 			return;
 		}

@@ -54,6 +54,42 @@ public class RoboticPistonGameTest {
 		helper.succeed();
 	}
 
+	private static Result move(RoboticPistonBlockEntity piston, String method, String side) {
+		Arguments args = new Arguments(List.of(side));
+		return method.equals("extend") ? piston.device().extend(args) : piston.device().retract(args);
+	}
+
+	@GameTest(maxTicks = 80)
+	public void anExtendedArmStaysOutUntilRetracted(GameTestHelper helper) {
+		RoboticPistonBlockEntity piston = piston(helper, ModBlocks.ROBOTIC_STICKY_PISTON);
+		helper.setBlock(PISTON.north(), Blocks.STONE);
+		helper.assertValueEqual(move(piston, "retract", "north").error(), RoboticPiston.NOT_EXTENDED, "nothing out to retract");
+		helper.assertTrue(!move(piston, "extend", "north").failed(), "extend");
+		helper.assertTrue(!move(piston, "extend", "north").failed(), "extend again: it's out, true");
+		helper.assertValueEqual(push(piston, "north").error(), RoboticPiston.CANNOT_PUSH, "a push needs its arm in");
+		var registries = helper.getLevel().registryAccess();
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertBlockPresent(ModBlocks.ROBOTIC_PISTON_ARM, PISTON.north()))
+			.thenIdle(RoboticPistonBlock.ARM_TICKS * 3)
+			.thenExecute(() -> {
+				helper.assertBlockPresent(ModBlocks.ROBOTIC_PISTON_ARM, PISTON.north()); // still out
+				helper.assertBlockPresent(Blocks.STONE, PISTON.north(2));
+				// It stays out through a save and a load.
+				RoboticPistonBlockEntity loaded = (RoboticPistonBlockEntity) net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+					piston.getBlockPos(), piston.getBlockState(), piston.saveWithFullMetadata(registries), registries);
+				helper.getLevel().setBlockEntity(loaded);
+			})
+			.thenIdle(RoboticPistonBlock.ARM_TICKS * 2)
+			.thenExecute(() -> {
+				helper.assertBlockPresent(ModBlocks.ROBOTIC_PISTON_ARM, PISTON.north());
+				RoboticPistonBlockEntity loaded = helper.getBlockEntity(PISTON, RoboticPistonBlockEntity.class);
+				helper.assertTrue(!move(loaded, "retract", "north").failed(), "retract");
+			})
+			.thenWaitUntil(() -> helper.assertBlockPresent(Blocks.STONE, PISTON.north())) // a sticky one pulls it back
+			.thenExecute(() -> helper.assertBlockPresent(Blocks.AIR, PISTON.north(2)))
+			.thenSucceed();
+	}
+
 	@GameTest(maxTicks = 60)
 	public void aStickyOnePullsBackWhatItPushed(GameTestHelper helper) {
 		RoboticPistonBlockEntity piston = piston(helper, ModBlocks.ROBOTIC_STICKY_PISTON);

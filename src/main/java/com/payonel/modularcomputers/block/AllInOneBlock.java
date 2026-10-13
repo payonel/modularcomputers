@@ -45,6 +45,11 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 	 * button is faded and doesn't glow.
 	 */
 	public static final BooleanProperty READY = BooleanProperty.create("ready");
+	/**
+	 * On, with its CPU stopped (halted, aborted or crashed; user, 2026-10-13): the power light is
+	 * amber instead of green, so a halted machine shows it.
+	 */
+	public static final BooleanProperty HALTED = BooleanProperty.create("halted");
 	/** A screen is in the case's gold expansion slot: its front shows it. */
 	public static final BooleanProperty SCREEN = BooleanProperty.create("screen");
 
@@ -55,7 +60,7 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 		super(properties);
 		this.tier = tier;
 		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false).setValue(READY, false)
-			.setValue(SCREEN, false));
+			.setValue(HALTED, false).setValue(SCREEN, false));
 	}
 
 	public CaseTier tier() {
@@ -69,7 +74,7 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 
 	@Override
 	protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-		builder.add(FACING, POWERED, READY, SCREEN);
+		builder.add(FACING, POWERED, READY, HALTED, SCREEN);
 	}
 
 	@Override

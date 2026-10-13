@@ -54,6 +54,23 @@ public final class WeatherCard extends Card {
 		return "pull";
 	}
 
+	/** Its events waiting, and the weather it saw last (so a load isn't a change). */
+	@Override
+	public Map<String, Object> saved() {
+		Map<String, Object> saved = new LinkedHashMap<>();
+		events.save(saved);
+		if (weather != null) {
+			saved.put("weather", weather);
+		}
+		return saved;
+	}
+
+	@Override
+	public void restore(Map<String, Object> saved) {
+		events.restore(saved);
+		weather = saved.get("weather") instanceof String seen ? seen : null;
+	}
+
 	@Override
 	public boolean interruptPending() {
 		return events.pending();

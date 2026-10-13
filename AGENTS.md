@@ -4,7 +4,7 @@ This file is the full context for any agent session working on this repo. `CLAUD
 (Claude Code reads `CLAUDE.md`, not `AGENTS.md`; other agent tools read `AGENTS.md`). Keep it
 current: when a decision is made or a gotcha is found, record it here.
 
-Last updated: 2026-10-11 (battery tiers: recipes, charging, drain, power).
+Last updated: 2026-10-13 (amber halted light, piston extend/retract, nothing lost on save or unload).
 
 ---
 
@@ -423,12 +423,15 @@ scripts/art/error_beep.py` into
     - **Sneak + right-click** anywhere also still presses it.
     - **Look:**
       - Ready, with a CPU and case power (block state `ready=true`), the button is lit (an
-        emissive model element): red when off, green when on.
+        emissive model element): red when off, green when on, and **amber when on with its CPU
+        stopped** (block state `halted`, `Machine.isHalted`; user, 2026-10-13: a halted OS showed
+        nothing): the program halted, or the CPU aborted or crashed. Power stays on.
       - Otherwise it's **faded and unlit**, and red, since the machine can't be on.
         - In the GUIs it also shows faded green while the mouse is held down on it.
         - It's back to faded red on release (`ComputerButtons`, `powerHeld`).
-      - There are four block models (`all_in_one[_on][_faded]`) on two base models (emissive,
-        and plain), and four frames in `textures/gui/power_button.png`.
+      - Each case tier has five block models (`tier{N}_case[_screen][_on|_halted][_faded]`, no
+        faded halted) on two base models (emissive, and plain), and `textures/gui/power_button.png`
+        has five frames (off, on, off faded, on faded, halted).
   - **Boot results:**
     - A (Lua) CPU and a new EEPROM: its **bootloader** (`lua/eeprom/boot.lua`, user, 2026-10-13), like a
       BIOS, boots the first disk in bus order with `/init.lua`, handing it the disk's address;
@@ -646,7 +649,16 @@ scripts/art/error_beep.py` into
     else it isn't saved. The bytes go in the case's NBT (`program`). On load the case resumes it
     (`Machine.resumeProgram`, `LuaRunner.restore`) at its first tick, after the bus is found again;
     the restored kernel's request is still on its stack, so the computer's thread carries on with it
-    (a wait starts over). Permanents (the standard library's C functions and userdata, named by path,
+    (a wait starts over). The program is persisted before the case's devices are saved, since the
+    calls it makes meanwhile change them. **Devices save what they hold for the program**
+    (`Device.saved`/`restore`, `block/DeviceSave`: runtime values as NBT, types kept): a terminal's
+    keys waiting, a card's events, outputs, what it last saw and the mode and range a program set;
+    the block they're in keeps them (case, screen, hub). **An unload freezes, it isn't a power cut**
+    (`Machine.unload`): the computer stops supplying its devices but doesn't power them off, so a
+    cabled screen or a hub's card in a chunk that stays loaded keeps what it shows and holds;
+    breaking the case is the power cut (`preRemoveSideEffects`, `Machine.removed`). Two blocks save
+    separately, so a call served while the case persists can, rarely, leave an event both in a hub
+    saved just before and in the program. Permanents (the standard library's C functions and userdata, named by path,
     as LungoLua's gate does) are worked out the same way in a new state and a restored one. A state
     holding what can't be persisted (a userdata with no persist kind) isn't saved: the CPU comes back
     halted, as before.
@@ -678,8 +690,10 @@ scripts/art/error_beep.py` into
     A read of a device's stream comes from the inbox with no syscall, or from the ring on the
     computer's thread with no server call; a wait for a source with data in the inbox returns at
     once, and a waiting computer wakes for data in the ring. **With tier 1 RAM there's no ring**:
-    data stays in the device and every read is a server call (slower, on purpose). What's in the
-    ring at a save is lost (as RAM's contents are); the inbox is in the VM, so it's saved.
+    data stays in the device and every read is a server call (slower, on purpose). **Nothing is lost
+    on a save** (user, 2026-10-13: "wholly unacceptable"): the ring goes with the program's state
+    (`LuaRunner.honour` puts it in the registry for Styx; a restore takes it back), the inbox is in
+    the VM, and devices save what they hold (below).
   - **User code**: the EEPROM's text and what it runs, seen as untrusted. It gets `board` (`invoke`
     answers as `pcall` does), and user coroutines that yield normally. `debug` stays hidden until
     LungoLua has a sandboxed debug library (user's plan) that can't touch the firmware's budget.
@@ -732,7 +746,9 @@ scripts/art/error_beep.py` into
     blocks slide (vanilla's `PistonStructureResolver` and moving-piston block entities, our copy of
     `PistonBaseBlock.moveBlocks`), its arm (`robotic_piston_arm`, a piston head on vanilla's head
     template, our plate; no item, no drops, immovable) slides out with the piston sounds, and goes
-    back after `ARM_TICKS` (6). **The robotic sticky piston** (slime ball over a robotic piston;
+    back after `ARM_TICKS` (6). `extend(side)` pushes the same way and leaves the arm out (true when
+    it's out already), saved with the block, until `retract(side)` takes it back (false with `not
+    extended` when nothing's out); every call costs a push's power. **The robotic sticky piston** (slime ball over a robotic piston;
     a green slime pad on its plates) pulls back what's in front of its arm. It has one slot inside,
     for a Bluetooth card instead of a cable. It's a cabled device (`ACTUATOR`) and doesn't pass the
     connection on.
@@ -1011,9 +1027,8 @@ scripts/art/error_beep.py` into
   - **Motherboard supervision** (`Machine.tick`, every tick): CPU gone or power gone, and the
     machine dies with the error beep, like a socket's CPU-present pin or a PSU's power-good.
     The event-driven checks (pulling a part) still act at once.
-  - **Not saveable** (user): a running program lives in its thread. Unloading stops it
-    (`Machine.unload`); after a load a powered machine's CPU is halted. Save/restore waits for
-    the real Lua runtime.
+  - **Saving:** a Lua program is saved as it runs (see "Saving a running computer"); a Java
+    program (`ProgramRunner`) isn't: after a load a powered machine's Java CPU is halted.
   - **Tests bring their own programs** (user, 2026-10-11): never assert on `Mcos`,
     which changes. Unit tests build their own `Program`s; game tests flash one onto the EEPROM
     after inserting it (`Eeprom.flash`, like reflashing firmware; `gametest/TestPrograms`).

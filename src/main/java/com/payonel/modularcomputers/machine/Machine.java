@@ -268,15 +268,32 @@ public final class Machine {
 	}
 
 	/**
-	 * The machine is unloading (its chunk, or the world) or gone: the program stops (it isn't
-	 * saved), and it stops supplying its devices.
+	 * The machine is unloading (its chunk, or the world): it's frozen, not switched off. Its program
+	 * stops here (it was saved, and goes on after a load) and it stops supplying its devices, but they
+	 * aren't powered off: what they hold for the program (keys, events) and show stays for when it's
+	 * back. Breaking it is a power cut ({@link #removed}).
 	 */
 	public void unload() {
 		com.payonel.modularcomputers.bus.BusHolds.releaseAll(board); // its devices are free for other boards
 		stopProgram();
 		if (powered) {
+			board.bus().devices().forEach(device -> {
+				if (device.interruptLine() != null) {
+					device.interruptLine().disconnect(wake);
+				}
+				if (device.power() != null) {
+					device.power().release(this);
+				}
+			});
+		}
+	}
+
+	/** The machine is gone (broken): its power is cut, and the devices it was the last to supply lose power. */
+	public void removed() {
+		if (powered) {
 			releaseDevices();
 		}
+		unload();
 	}
 
 	public Motherboard board() {
@@ -286,6 +303,11 @@ public final class Machine {
 	/** The machine is on (and so has a CPU). */
 	public boolean isPowered() {
 		return powered;
+	}
+
+	/** On, but its CPU has stopped: the program halted, or the CPU aborted or crashed. Power stays on. */
+	public boolean isHalted() {
+		return powered && runner == null;
 	}
 
 	public PowerPress pressPower() {

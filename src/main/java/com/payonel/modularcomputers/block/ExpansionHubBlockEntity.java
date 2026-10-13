@@ -27,6 +27,9 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 	/** The devices made from the cards, by slot; null when empty. */
 	private final Card[] devices = new Card[SLOTS];
 
+	/** A card's saved state, by slot ({@link DeviceSave}). */
+	private static final String CARD = "card_";
+
 	public ExpansionHubBlockEntity(BlockPos pos, BlockState state) {
 		super(ModBlocks.EXPANSION_HUB_ENTITY, pos, state, SLOTS + 1);
 	}
@@ -69,6 +72,27 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 			});
 		}
 		return card;
+	}
+
+	/** What its cards hold for programs (events) and the settings programs made: a save isn't a power cut. */
+	@Override
+	protected void saveAdditional(net.minecraft.world.level.storage.ValueOutput output) {
+		super.saveAdditional(output);
+		for (int slot = 0; slot < SLOTS; slot++) {
+			if (devices[slot] != null) {
+				DeviceSave.save(output, CARD + slot, devices[slot]);
+			}
+		}
+	}
+
+	@Override
+	protected void loadAdditional(net.minecraft.world.level.storage.ValueInput input) {
+		super.loadAdditional(input); // makes the cards
+		for (int slot = 0; slot < SLOTS; slot++) {
+			if (devices[slot] != null) {
+				DeviceSave.load(input, CARD + slot, devices[slot]);
+			}
+		}
 	}
 
 	/** The redstone the hub's cards put out toward a neighbour ({@code direction}: from the neighbour to the hub). */

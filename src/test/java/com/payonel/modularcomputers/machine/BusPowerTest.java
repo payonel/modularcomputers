@@ -157,12 +157,24 @@ class BusPowerTest {
 	}
 
 	@Test
-	void aComputerThatUnloadsOrGoesAwayLeavesItsTerminalsDark() {
+	void aComputerThatUnloadsIsFrozenItsTerminalsKeepWhatTheyShowAndHold() {
+		Machine machine = machine(HALT);
+		machine.setDevices(Map.of("id:screen", screen));
+		machine.pressPower();
+		screen.press("a");
+		machine.unload();
+		assertThat(screen.power().powered()).as("nothing supplies it now").isFalse();
+		assertThat(screen.buffer().isBlank()).as("an unload isn't a power cut").isFalse();
+		assertThat(screen.interruptPending()).as("its key still waits for the program").isTrue();
+	}
+
+	@Test
+	void aComputerThatGoesAwayLeavesItsTerminalsDark() {
 		Machine machine = machine(HALT);
 		machine.setDevices(Map.of("id:screen", screen));
 		machine.pressPower();
 		assertThat(screen.buffer().isBlank()).isFalse();
-		machine.unload();
+		machine.removed();
 		assertThat(screen.buffer().isBlank()).isTrue();
 		assertThat(screen.power().powered()).isFalse();
 	}

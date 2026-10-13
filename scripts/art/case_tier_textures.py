@@ -110,15 +110,22 @@ for tier in (1, 2, 3):
 				textures["button"] = "modularcomputers:block/all_in_one_power_" + ("on" if on else "off") + ("_faded" if faded else "")
 				write(f"{ROOT}/models/block/{name}.json",
 					{"parent": "modularcomputers:block/all_in_one_base" + ("_faded" if faded else ""), "textures": textures})
+		# On with its CPU halted: the button lit amber (only a ready machine can be on).
+		textures = {face: f"modularcomputers:block/{tex}" for face, tex in faces(tier, screen).items()}
+		textures["particle"] = textures["east"]
+		textures["button"] = "modularcomputers:block/all_in_one_power_halted"
+		write(f"{ROOT}/models/block/tier{tier}_case" + ("_screen" if screen else "") + "_halted.json",
+			{"parent": "modularcomputers:block/all_in_one_base", "textures": textures})
 	variants = {}
 	for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270)):
-		for powered in (False, True):
-			for ready in (False, True):
-				for screen in (False, True):
-					model = f"modularcomputers:block/tier{tier}_case" + ("_screen" if screen and tier > 1 else "") \
-						+ ("_on" if powered else "") + ("" if ready else "_faded")
-					key = f"facing={facing},powered={str(powered).lower()},ready={str(ready).lower()},screen={str(screen).lower()}"
-					variants[key] = {"model": model} | ({"y": y} if y else {})
+		for halted in (False, True):
+			for powered in (False, True):
+				for ready in (False, True):
+					for screen in (False, True):
+						model = f"modularcomputers:block/tier{tier}_case" + ("_screen" if screen and tier > 1 else "") \
+							+ (("_halted" if halted and ready else "_on") if powered else "") + ("" if ready else "_faded")
+						key = f"facing={facing},halted={str(halted).lower()},powered={str(powered).lower()},ready={str(ready).lower()},screen={str(screen).lower()}"
+						variants[key] = {"model": model} | ({"y": y} if y else {})
 	states = {"variants": variants}
 	write(f"{ROOT}/blockstates/tier{tier}_case.json", states)
 	if tier == 3:

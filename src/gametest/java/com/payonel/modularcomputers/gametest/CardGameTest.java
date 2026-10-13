@@ -71,6 +71,32 @@ public class CardGameTest {
 	}
 
 	@GameTest(maxTicks = 60)
+	public void aCardsEventsAndOutputsOutlastASave(GameTestHelper helper) {
+		RedstoneCard card = computerWith(helper, ModItems.REDSTONE_CARD, RedstoneCard.class);
+		card.setOutput(args("east", 9L));
+		helper.setBlock(POS.west(), Blocks.REDSTONE_BLOCK);
+		var registries = helper.getLevel().registryAccess();
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(card.interruptPending(), "the change waits for the program"))
+			.thenExecute(() -> {
+				// Saved as the world is, then gone, and loaded again: a save isn't a power cut.
+				net.minecraft.nbt.CompoundTag saved = helper.getBlockEntity(POS, AllInOneBlockEntity.class).saveWithoutMetadata(registries);
+				helper.setBlock(POS, Blocks.AIR);
+				helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
+				AllInOneBlockEntity again = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+				again.loadWithComponents(net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, registries, saved));
+				RedstoneCard loaded = again.machine().board().bus().devices().stream()
+					.filter(RedstoneCard.class::isInstance).map(RedstoneCard.class::cast).findFirst().orElseThrow();
+				helper.assertTrue(loaded != card, "a new card device, from the save");
+				helper.assertValueEqual(loaded.getOutput(args("east")).first(), 9L, "what it put out");
+				Object event = loaded.pull(args()).first();
+				helper.assertTrue(event instanceof Map<?, ?> map && "west".equals(map.get("side")) && Long.valueOf(15).equals(map.get("new")),
+					"the event that waited: " + event);
+			})
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 60)
 	public void aWeatherCardReportsTheWeatherAndItsChanges(GameTestHelper helper) {
 		WeatherCard card = computerWith(helper, ModItems.WEATHER_SENSOR_CARD, WeatherCard.class);
 		// The test world's biome never rains (as a desert): it reports clear there, rain or not.

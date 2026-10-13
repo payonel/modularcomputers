@@ -202,6 +202,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** Writing the client's copy (a sync), not a save: no program state in it. */
 	private boolean syncing;
 	private static final String PROGRAM = "program";
+	/** A card's saved state, by lane ({@link DeviceSave}). */
+	private static final String CARD = "card_";
 
 	/**
 	 * A device wired to this computer: where it is, how far the connection runs to it in meters
@@ -443,9 +445,15 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	}
 
 	@Override
+	public void preRemoveSideEffects(BlockPos pos, BlockState state) {
+		super.preRemoveSideEffects(pos, state);
+		machine.removed(); // broken: a power cut (an unload only freezes it)
+	}
+
+	@Override
 	public void setRemoved() {
 		super.setRemoved();
-		machine.unload(); // a running program isn't saved: it stops
+		machine.unload(); // its program was saved: it stops here, and goes on after a load
 		for (int lane = 0; lane < disks.length; lane++) {
 			retireDisk(lane);
 		}
@@ -514,6 +522,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		if (supervision != Machine.Supervision.OK) {
 			playAtCase(dyingSound(supervision));
 			setPowerState();
+		} else if (machine.isHalted() != getBlockState().getValue(AllInOneBlock.HALTED)) {
+			setPowerState(); // the CPU stopped (or started): the light turns amber (or green)
 		}
 		if (seenCableChanges != Cabling.changes() || ticks % RESCAN_TICKS == 0) {
 			seenCableChanges = Cabling.changes();
@@ -615,6 +625,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		BlockState state = getBlockState()
 			.setValue(AllInOneBlock.READY, machine.board().cpu().isPresent() && hasPower())
 			.setValue(AllInOneBlock.POWERED, machine.isPowered())
+			.setValue(AllInOneBlock.HALTED, machine.isHalted())
 			.setValue(AllInOneBlock.SCREEN, screenInSlot()); // the front shows a screen in the gold slot
 		if (state == getBlockState()) {
 			return false;
@@ -1059,14 +1070,22 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		output.store(BUS_DISCONNECTED, Codec.STRING.listOf(), busOrder().disconnected());
 		output.store(CABLED, Cabled.CODEC.listOf(), cabled);
 		output.store(KNOWN, Cabled.CODEC.listOf(), List.copyOf(known.values()));
+		if (!syncing) {
+			// A running Lua program is saved as it runs (its VM, by Styx, with its board's ring), at its
+			// next safe point. First: the calls it makes meanwhile change the devices saved below.
+			machine.persistProgram().or(() -> java.util.Optional.ofNullable(savedProgram))
+				.ifPresent(saved -> output.store(PROGRAM, Codec.BYTE_BUFFER, java.nio.ByteBuffer.wrap(saved)));
+			// What its devices hold for the program (keys, events) and settings it made: a save isn't a power cut.
+			DeviceSave.save(output, DISPLAY + "_device", display);
+			for (int lane = 0; lane < cards.length; lane++) {
+				if (cards[lane] != null) {
+					DeviceSave.save(output, CARD + lane, cards[lane]);
+				}
+			}
+		}
 		ScreenSave.save(output, DISPLAY, display.buffer(), display.decoder());
 		ConsoleSplitter console = machine.board().virtualBus().console();
 		ScreenSave.save(output, CONSOLE, console.screen(), console.decoder());
-		if (!syncing) {
-			// A running Lua program is saved as it runs (its VM, by Styx), at its next safe point.
-			machine.persistProgram().or(() -> java.util.Optional.ofNullable(savedProgram))
-				.ifPresent(saved -> output.store(PROGRAM, Codec.BYTE_BUFFER, java.nio.ByteBuffer.wrap(saved)));
-		}
 	}
 
 	@Override
@@ -1086,6 +1105,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		installParts();
 		rememberParts(); // loading isn't inserting: no sounds
 		ScreenSave.load(input, DISPLAY, display.buffer(), display.decoder());
+		DeviceSave.load(input, DISPLAY + "_device", display);
+		for (int lane = 0; lane < cards.length; lane++) {
+			if (cards[lane] != null) {
+				DeviceSave.load(input, CARD + lane, cards[lane]);
+			}
+		}
 		ConsoleSplitter console = machine.board().virtualBus().console();
 		ScreenSave.load(input, CONSOLE, console.screen(), console.decoder());
 		savedProgram = input.read(PROGRAM, Codec.BYTE_BUFFER).map(buffer -> {

@@ -401,6 +401,35 @@ class LuaRunnerTest {
 	}
 
 	@Test
+	void whatsInTheRingIsSavedWithTheComputer() {
+		ram(2);
+		boot("""
+			local n = 0
+			for i = 1, 3000000 do n = n + 1 end -- busy while keys come in, and while it's saved
+			local keys = ""
+			for i = 1, 8 do
+			  local _, key = board.invoke("console", "read")
+			  keys = keys .. tostring(key)
+			end
+			board.invoke("console", "write", keys)
+			board.halt()
+			""");
+		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
+		for (String key : new String[] {"a", "b", "c", "d", "e", "f", "g", "h"}) {
+			screen.press(key);
+		}
+		// Four go on to the firmware's inbox (in the VM); the other four wait in the ring (the RAM).
+		settle(() -> !screen.interruptPending() && runner.staged() == 4);
+		byte[] saved = machine.persistProgram().orElseThrow();
+		machine.pressPower();
+		Machine again = reloaded(new Terminal(Resolution.DEFAULT));
+		again.resumeProgram(saved);
+		settle(again, () -> again.runner().isEmpty());
+		assertThat(again.board().virtualBus().console().screen().row(0).strip()).as("none lost, in order").isEqualTo("abcdefgh");
+		again.pressPower();
+	}
+
+	@Test
 	void withoutARingKeysWaitInTheTerminalAndEachReadIsACall() {
 		ram(1);
 		boot(TYPED);

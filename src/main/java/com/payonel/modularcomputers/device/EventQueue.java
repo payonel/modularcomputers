@@ -47,4 +47,24 @@ final class EventQueue {
 		events.clear();
 		lost = 0;
 	}
+
+	/** What it holds, to save: the events waiting, and how many were lost since the last kept. */
+	void save(Map<String, Object> saved) {
+		saved.put("events", java.util.List.copyOf(events));
+		saved.put("lost", lost);
+	}
+
+	/** Takes back what {@link #save} kept. */
+	@SuppressWarnings("unchecked")
+	void restore(Map<String, Object> saved) {
+		events.clear();
+		if (saved.get("events") instanceof java.util.List<?> kept) {
+			for (Object event : kept) {
+				if (event instanceof Map<?, ?> map && events.size() < CAPACITY) {
+					events.addLast((Map<String, Object>) map);
+				}
+			}
+		}
+		lost = saved.get("lost") instanceof Long n ? n : 0;
+	}
 }

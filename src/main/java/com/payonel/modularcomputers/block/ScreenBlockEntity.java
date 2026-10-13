@@ -59,11 +59,13 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 	protected void saveAdditional(ValueOutput output) {
 		super.saveAdditional(output);
 		ScreenSave.save(output, DISPLAY, display.buffer(), display.decoder());
+		DeviceSave.save(output, DISPLAY + "_device", display); // keys waiting to be read
 	}
 
 	@Override
 	protected void loadAdditional(ValueInput input) {
 		super.loadAdditional(input);
 		ScreenSave.load(input, DISPLAY, display.buffer(), display.decoder());
+		DeviceSave.load(input, DISPLAY + "_device", display);
 	}
 }

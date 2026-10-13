@@ -66,6 +66,34 @@ public class AllInOneGameTest {
 	}
 
 	@GameTest(maxTicks = 100)
+	public void thePowerLightIsGreenWhileItRunsAndAmberOnceItsHalted(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper);
+		TestPrograms.withScreen(computer);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
+		ItemStack eeprom = new ItemStack(ModItems.EEPROM);
+		eeprom.set(ModComponents.EEPROM_IMAGE, "board.waitForInterrupt(0.5, \"nothing\") board.halt()");
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, eeprom);
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		computer.pressPower();
+		helper.startSequence()
+			.thenIdle(2)
+			.thenExecute(() -> {
+				helper.assertBlockProperty(POS, AllInOneBlock.POWERED, true);
+				helper.assertBlockProperty(POS, AllInOneBlock.HALTED, false); // green: it runs
+			})
+			.thenWaitUntil(() -> helper.assertBlockProperty(POS, AllInOneBlock.HALTED, true)) // amber: halted, power on
+			.thenExecute(() -> {
+				helper.assertBlockProperty(POS, AllInOneBlock.POWERED, true);
+				computer.pressPower(); // off
+			})
+			.thenWaitUntil(() -> {
+				helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
+				helper.assertBlockProperty(POS, AllInOneBlock.HALTED, false);
+			})
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 100)
 	public void aProgramFlashesTheEepromAndTheNextBootRunsTheNewScript(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
 		TestPrograms.withScreen(computer);

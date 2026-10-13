@@ -161,6 +161,20 @@ public final class Terminal implements Device {
 		return hasKeys();
 	}
 
+	/** Keys (and answers to reports) waiting to be read outlast a save. */
+	@Override
+	public java.util.Map<String, Object> saved() {
+		return input.isEmpty() ? java.util.Map.of() : java.util.Map.of("input", java.util.List.copyOf(input));
+	}
+
+	@Override
+	public void restore(java.util.Map<String, Object> saved) {
+		input.clear();
+		if (saved.get("input") instanceof java.util.List<?> keys) {
+			keys.forEach(key -> input.addLast(String.valueOf(key)));
+		}
+	}
+
 	/** Power's gone: a blank screen, the cursor home, default modes, nothing waiting. */
 	@Override
 	public void powerOff() {

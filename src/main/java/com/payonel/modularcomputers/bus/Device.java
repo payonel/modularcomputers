@@ -61,4 +61,17 @@ public interface Device {
 	/** It lost power. Volatile state goes away (a display goes black). */
 	default void powerOff() {
 	}
+
+	/**
+	 * What it holds that must outlast a save or an unload, as runtime values: data waiting for the
+	 * program (keys, events), settings a program made. A save isn't a power cut: nothing is lost.
+	 * The block it's in keeps it, and hands it back with {@link #restore}.
+	 */
+	default java.util.Map<String, Object> saved() {
+		return java.util.Map.of();
+	}
+
+	/** Takes back what {@link #saved} gave, after a load. */
+	default void restore(java.util.Map<String, Object> saved) {
+	}
 }

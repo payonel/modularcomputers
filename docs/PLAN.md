@@ -65,8 +65,8 @@ Decided by the user:
 - **On the server tick** for now. Running machines off-thread, asynchronously, is a
   documented follow-up (TODO), not built.
 - **Addressing:** the motherboard API looks devices up by stable id and by bus order.
-- **Not saveable:** a machine running a mock program doesn't survive a save; save/restore
-  waits for the real Lua runtime.
+- **Saving:** a running Lua computer is saved with Styx, with its board's ring and its devices'
+  data (built 2026-10-13); a Java mock program still isn't.
 - **Device methods never kill the machine.** Every device failure is soft, like a status bit
   the driver reads and decides about. Only the motherboard's own supervision ends a run: the
   CPU and power (it should check them on a schedule too, not only on events).

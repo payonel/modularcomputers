@@ -97,6 +97,31 @@ public final class RedstoneCard extends Card {
 		return "pull";
 	}
 
+	/** Its events waiting, what it puts out, and what it saw coming in (so a load isn't a change). */
+	@Override
+	public Map<String, Object> saved() {
+		Map<String, Object> saved = new LinkedHashMap<>();
+		events.save(saved);
+		saved.put("input", java.util.Arrays.stream(input).mapToObj(v -> (Object) (long) v).toList());
+		saved.put("output", java.util.Arrays.stream(output).mapToObj(v -> (Object) (long) v).toList());
+		return saved;
+	}
+
+	@Override
+	public void restore(Map<String, Object> saved) {
+		events.restore(saved);
+		restoreSides(saved.get("input"), input);
+		restoreSides(saved.get("output"), output);
+	}
+
+	private static void restoreSides(Object kept, int[] sides) {
+		if (kept instanceof java.util.List<?> values) {
+			for (int i = 0; i < sides.length && i < values.size(); i++) {
+				sides[i] = values.get(i) instanceof Long v ? (int) Math.clamp(v, 0, 15) : 0;
+			}
+		}
+	}
+
 	@Override
 	public boolean interruptPending() {
 		return events.pending();

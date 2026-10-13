@@ -83,6 +83,8 @@ public final class LuaRunner implements Runner {
 	/** Registry keys: the kernel, and the permanents (object to name). */
 	private static final String KERNEL = "modularcomputers.kernel";
 	private static final String PERMANENTS = "modularcomputers.perms";
+	/** Where the board's ring rides in the registry while the state is persisted (the ring is the RAM's: saved with it). */
+	private static final String RING = "modularcomputers.ring";
 	/** How long a save waits for the computer's thread to reach a safe point. */
 	private static final long PERSIST_NANOS = 2_000_000_000L;
 	/**
@@ -189,7 +191,7 @@ public final class LuaRunner implements Runner {
 	 * program while there's room ({@link Board#ringCapacity}, from the RAM: a tier 1 has none), in
 	 * the order it came; the computer's thread hands it to the firmware's inbox (its L1) when there's
 	 * room there, or serves a read from it at once. A device keeps its data until there's room.
-	 * Not saved: what's in the ring at a save is lost, as RAM's contents are.
+	 * Saved with the computer: {@link #honour} hands it to Styx with the state, and a restore takes it back.
 	 */
 	private final ConcurrentLinkedQueue<Staged> ring = new ConcurrentLinkedQueue<>();
 	/** What the firmware's inbox holds for each device, at most. */
@@ -230,6 +232,18 @@ public final class LuaRunner implements Runner {
 		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(KERNEL));
 		this.kernel = lua_tothread(main, -1);
 		lua_pop(main, 1);
+		// The ring as it was at the save, in order.
+		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(RING));
+		if (lua_type(main, -1) == LUA_TTABLE && toJava(main, -1, 0) instanceof List<?> saved) {
+			for (Object entry : saved) {
+				if (entry instanceof Map<?, ?> item) {
+					ring.add(new Staged(String.valueOf(item.get("address")), String.valueOf(item.get("method")), item.get("value")));
+				}
+			}
+		}
+		lua_pop(main, 1);
+		lua_pushnil(main);
+		lua_setfield(main, LUA_REGISTRYINDEX, new HostString(RING));
 	}
 
 	/** The same libraries and permanents for a new state and a restored one; leaves the inverse permanents (name to object) on the stack. */
@@ -290,6 +304,17 @@ public final class LuaRunner implements Runner {
 		if (pin == null) {
 			return;
 		}
+		// The ring goes with the state (nothing else touches it now: the server thread is waiting on this pin).
+		List<Map<String, Object>> held = new ArrayList<>();
+		for (Staged staged : ring) {
+			Map<String, Object> item = new LinkedHashMap<>();
+			item.put("address", staged.address());
+			item.put("method", staged.method());
+			item.put("value", staged.value());
+			held.add(item);
+		}
+		push(main, held);
+		lua_setfield(main, LUA_REGISTRYINDEX, new HostString(RING));
 		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(PERMANENTS));
 		java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
 		lua_Writer writer = (L, bytes) -> {
@@ -300,6 +325,8 @@ public final class LuaRunner implements Runner {
 		};
 		luaL_StyxResult result = luaL_persiststate(main, lua_gettop(main), writer);
 		lua_pop(main, 1);
+		lua_pushnil(main);
+		lua_setfield(main, LUA_REGISTRYINDEX, new HostString(RING));
 		if (result.status != LUA_OK) {
 			com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A computer can't be saved as it runs: {}", result.msg);
 			pin.complete(null);
@@ -426,6 +453,11 @@ public final class LuaRunner implements Runner {
 			thread.interrupt(); // out of a wait for an answer; a running slice sees 'stopping' at its next yield
 		}
 		// The VM is left to the collector: closing it would run the program's finalizers.
+	}
+
+	/** How much device data waits in the ring (tests). */
+	int staged() {
+		return ring.size();
 	}
 
 	/** Whether the computer's thread is still going (tests: it ends when stopped). */
