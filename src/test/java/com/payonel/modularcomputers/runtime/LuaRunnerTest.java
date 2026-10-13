@@ -656,10 +656,15 @@ class LuaRunnerTest {
 			screen.press(key);
 		}
 		settle(() -> row(0).equals("busy"));
+		// Saved as the world is: the program (its inbox, 2 keys), then the terminal's block (2 more keys).
 		byte[] saved = machine.persistProgram().orElseThrow();
-		machine.unload(); // frozen, not switched off: the terminal keeps its keys
-		Machine again = reloaded(screen);
-		again.resumeProgram(saved);
+		Map<String, Object> terminalSaved = screen.saved();
+		machine.unload();
+		assertThat(screen.interruptPending()).as("no program runs now: the live terminal drops what it held").isFalse();
+		Terminal loaded = new Terminal(Resolution.DEFAULT);
+		loaded.restore(terminalSaved); // its block loads
+		Machine again = reloaded(loaded);
+		again.resumeProgram(saved); // goes on: what its devices kept for it stays
 		settle(again, () -> again.runner().isEmpty());
 		assertThat(again.board().virtualBus().console().screen().row(0).strip()).as("none lost, in order").isEqualTo("abcd");
 		again.pressPower();

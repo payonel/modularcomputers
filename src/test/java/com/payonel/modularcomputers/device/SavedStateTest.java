@@ -17,6 +17,7 @@ class SavedStateTest {
 	@Test
 	void keysWaitingInATerminalAreKept() {
 		Terminal terminal = new Terminal(Resolution.DEFAULT);
+		terminal.accepting(true); // on a running board\'s bus
 		terminal.press("a");
 		terminal.press("\u001b[A");
 		Terminal loaded = new Terminal(Resolution.DEFAULT);
@@ -28,8 +29,28 @@ class SavedStateTest {
 	}
 
 	@Test
+	void aDeviceTakesNoDataWhileNotAcceptingAndDropsWhatItHadWhenItStops() {
+		Terminal terminal = new Terminal(Resolution.DEFAULT);
+		terminal.press("before"); // no running board: dropped
+		assertThat(terminal.interruptPending()).isFalse();
+		terminal.accepting(true);
+		terminal.press("a");
+		terminal.accepting(false); // its board halted, was turned off, or let it go
+		assertThat(terminal.interruptPending()).isFalse();
+		RedstoneCard card = new RedstoneCard();
+		card.sense(0, 3);
+		assertThat(card.interruptPending()).as("an event while not accepting: dropped").isFalse();
+		card.accepting(true);
+		card.sense(0, 5);
+		assertThat(card.interruptPending()).isTrue();
+		card.accepting(false);
+		assertThat(card.interruptPending()).isFalse();
+	}
+
+	@Test
 	void aTerminalsKeyQueueHasItsOwnLimitAndDropsWhatHasNoRoom() {
 		Terminal terminal = new Terminal(Resolution.DEFAULT);
+		terminal.accepting(true); // on a running board\'s bus
 		for (int i = 0; i < Terminal.INPUT_CAPACITY + 10; i++) {
 			terminal.press("k" + i);
 		}
@@ -47,6 +68,7 @@ class SavedStateTest {
 	@Test
 	void aRedstoneCardKeepsItsEventsItsOutputsAndWhatItSaw() {
 		RedstoneCard card = new RedstoneCard();
+		card.accepting(true); // on a running board\'s bus
 		card.setOutput(args("north", 7L));
 		card.sense(0, 9);
 		RedstoneCard loaded = new RedstoneCard();
@@ -63,6 +85,7 @@ class SavedStateTest {
 	@Test
 	void aMotionSensorKeepsItsModeRangeAndEvents() {
 		MotionSensorCard card = new MotionSensorCard();
+		card.accepting(true); // on a running board\'s bus
 		card.setMode(args("drops"));
 		card.setRange(args(20L));
 		card.sense("drop", Map.of("x", 1.0));
@@ -77,6 +100,7 @@ class SavedStateTest {
 	@Test
 	void aWeatherCardKeepsWhatItSawSoALoadIsntAChange() {
 		WeatherCard card = new WeatherCard();
+		card.accepting(true); // on a running board\'s bus
 		card.sense("rain");
 		WeatherCard loaded = new WeatherCard();
 		loaded.restore(card.saved());

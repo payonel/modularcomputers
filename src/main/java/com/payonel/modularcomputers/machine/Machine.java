@@ -203,6 +203,7 @@ public final class Machine {
 		}
 		if (state != Runner.State.RUNNING && state != Runner.State.WAITING) {
 			runner = null; // the CPU is halted; power stays on, and the screens keep what they show
+			setAccepting(false);
 		}
 		if (executed) {
 			board.bus().devices().forEach(Device::flush);
@@ -287,6 +288,31 @@ public final class Machine {
 			runner.stop();
 			runner = null;
 		}
+		setAccepting(false);
+	}
+
+	/**
+	 * Whether the devices on its bus take data (keys, events) now (user, 2026-10-13). A device takes
+	 * data only while all three hold: a board holds it on its bus, the board powers it, and the
+	 * board's CPU runs a program (not halted, aborted or off). When any ends, it drops all it holds;
+	 * until they hold again, it drops what comes in. This machine's devices are on its bus and held
+	 * by it, and it powers them while it's on, so it's on with a program running.
+	 */
+	private boolean accepting;
+
+	private void setAccepting(boolean now) {
+		if (now == accepting) {
+			return;
+		}
+		accepting = now;
+		board.bus().devices().forEach(device -> device.accepting(now));
+	}
+
+	/** A program starts afresh: its devices start empty (what came in before is dropped), then take data. */
+	private void startAccepting() {
+		board.bus().devices().forEach(device -> device.accepting(false));
+		accepting = false;
+		setAccepting(true);
 	}
 
 	/**
@@ -353,6 +379,9 @@ public final class Machine {
 		board.bus().devices().forEach(this::supply);
 		memoryAtStart = board.chassis().memory();
 		adopt(cpu.get().powerOn(board).orElse(null));
+		if (runner != null) {
+			startAccepting();
+		}
 		run(); // the CPU starts executing right away
 		return PowerPress.ON;
 	}
@@ -399,6 +428,7 @@ public final class Machine {
 		try {
 			memoryAtStart = board.chassis().memory();
 			adopt(board.cpu().get().resume(saved).orElse(null));
+			setAccepting(runner != null); // it goes on: what its devices kept for it (saved with them) stays
 		} catch (RuntimeException e) {
 			com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A saved computer didn't restore; its CPU comes back halted", e);
 			return;
@@ -486,6 +516,7 @@ public final class Machine {
 		for (Device device : before) {
 			if (!devices.contains(device)) {
 				release(device);
+				device.accepting(false); // off its bus: it drops what it held
 			}
 		}
 		for (var entry : addressed.entrySet()) {
@@ -493,6 +524,10 @@ public final class Machine {
 				continue;
 			}
 			supply(entry.getValue());
+			if (accepting) {
+				entry.getValue().accepting(false); // what it had before it joined isn't this program's
+				entry.getValue().accepting(true);
+			}
 			// A terminal that joined is in the console's group: it gets the console drawn on it.
 			if (entry.getValue() instanceof Terminal terminal && console.isBound(entry.getKey())) {
 				console.redraw(terminal);

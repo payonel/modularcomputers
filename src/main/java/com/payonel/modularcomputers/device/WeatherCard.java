@@ -15,7 +15,7 @@ public final class WeatherCard extends Card {
 	private final InterruptLine line = new InterruptLine();
 	/** It works while a running computer has it on its bus (it draws nothing to speak of). */
 	private final com.payonel.modularcomputers.bus.BusPower power = new com.payonel.modularcomputers.bus.BusPower(0);
-	private final EventQueue events = new EventQueue(line, this::changed);
+	private final EventQueue events = new EventQueue(line, this::changed, this::isAccepting);
 	private String weather;
 
 	public WeatherCard() {
@@ -73,6 +73,12 @@ public final class WeatherCard extends Card {
 	public void restore(Map<String, Object> saved) {
 		events.restore(saved);
 		weather = saved.get("weather") instanceof String seen ? seen : null;
+	}
+
+	/** It stopped taking data: its events go. */
+	@Override
+	protected void dropData() {
+		events.clear();
 	}
 
 	@Override

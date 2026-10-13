@@ -76,6 +76,14 @@ public interface Device {
 	}
 
 	/**
+	 * Whether it takes data (keys typed, events sensed) now (user, 2026-10-13): only while a board
+	 * holds it on its bus, powers it and runs a program. False: it drops everything it holds for a
+	 * program, and drops what comes in until it's true again. Set by the board; false at first.
+	 */
+	default void accepting(boolean accepting) {
+	}
+
+	/**
 	 * Who to tell, at once, when what it saves ({@link #saved}) or shows changes: the block it's in,
 	 * which marks its chunk changed. Minecraft writes only chunks marked changed, at a save or an
 	 * unload, so an unmarked change would leave the old copy on disk. Server thread.

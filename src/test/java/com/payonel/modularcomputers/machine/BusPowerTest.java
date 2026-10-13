@@ -157,15 +157,20 @@ class BusPowerTest {
 	}
 
 	@Test
-	void aComputerThatUnloadsIsFrozenItsTerminalsKeepWhatTheyShowAndHold() {
-		Machine machine = machine(HALT);
+	void aComputerThatUnloadsLeavesItsTerminalsShowingButHoldingNothing() {
+		Machine machine = machine(board -> {
+			board.invoke("console", "write", "hi\n");
+			board.waitForInterrupt(1000, "nothing");
+			board.halt();
+		});
 		machine.setDevices(Map.of("id:screen", screen));
 		machine.pressPower();
 		screen.press("a");
+		assertThat(screen.interruptPending()).as("a running program's terminal takes keys").isTrue();
 		machine.unload();
 		assertThat(screen.power().powered()).as("nothing supplies it now").isFalse();
 		assertThat(screen.buffer().isBlank()).as("an unload isn't a power cut").isFalse();
-		assertThat(screen.interruptPending()).as("its key still waits for the program").isTrue();
+		assertThat(screen.interruptPending()).as("no program runs: what it held is dropped").isFalse();
 	}
 
 	@Test

@@ -49,6 +49,25 @@ public class Card implements Device {
 		this.changed = changed;
 	}
 
+	/** Whether it takes data now (see {@link Device#accepting}); its events drop what comes in while not. */
+	private boolean accepting;
+
+	@Override
+	public void accepting(boolean accepting) {
+		this.accepting = accepting;
+		if (!accepting) {
+			dropData();
+		}
+	}
+
+	protected boolean isAccepting() {
+		return accepting;
+	}
+
+	/** It stopped taking data: what it holds for the program goes. */
+	protected void dropData() {
+	}
+
 	/** What it saves changed: its block marks itself. */
 	protected void changed() {
 		changed.run();

@@ -19,7 +19,7 @@ public final class RedstoneCard extends Card {
 	private final InterruptLine line = new InterruptLine();
 	/** It works while a running computer has it on its bus (it draws nothing to speak of). */
 	private final com.payonel.modularcomputers.bus.BusPower power = new com.payonel.modularcomputers.bus.BusPower(0);
-	private final EventQueue events = new EventQueue(line, this::changed);
+	private final EventQueue events = new EventQueue(line, this::changed, this::isAccepting);
 	/** A redstone signal's strength, at most (Minecraft's 0 to 15). */
 	public static final int MAX_SIGNAL = 15;
 	private final int[] input = new int[SIDES.size()];
@@ -124,6 +124,12 @@ public final class RedstoneCard extends Card {
 				sides[i] = values.get(i) instanceof Long v ? (int) Math.clamp(v, 0, MAX_SIGNAL) : 0;
 			}
 		}
+	}
+
+	/** It stopped taking data: its events go. */
+	@Override
+	protected void dropData() {
+		events.clear();
 	}
 
 	@Override

@@ -198,11 +198,22 @@ class DiskTest {
 		Handle[] kept = new Handle[1];
 		run(DiskTier.TIER_1, board -> {
 			kept[0] = (Handle) board.invoke("sata:0", "open", "/a", "w").first();
+			board.waitForInterrupt(1000, "nothing");
 			board.halt();
 		});
 		assertThat(kept[0].isOpen()).isTrue();
 		machine.pressPower(); // off
 		assertThat(kept[0].isOpen()).isFalse();
+	}
+
+	@Test
+	void aProgramThatHaltsLeavesNoFilesOpen() {
+		Handle[] kept = new Handle[1];
+		run(DiskTier.TIER_1, board -> {
+			kept[0] = (Handle) board.invoke("sata:0", "open", "/a", "w").first();
+			board.halt();
+		});
+		assertThat(kept[0].isOpen()).as("its program's gone: what it held goes too").isFalse();
 	}
 
 	@Test

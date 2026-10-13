@@ -16,14 +16,20 @@ final class EventQueue {
 	private final InterruptLine line;
 	/** Its card, told when its contents change. */
 	private final Runnable changed;
+	/** Whether its card takes data now: events that come while it doesn't are dropped. */
+	private final java.util.function.BooleanSupplier accepting;
 	private long lost;
 
-	EventQueue(InterruptLine line, Runnable changed) {
+	EventQueue(InterruptLine line, Runnable changed, java.util.function.BooleanSupplier accepting) {
 		this.line = line;
 		this.changed = changed;
+		this.accepting = accepting;
 	}
 
 	void add(Map<String, Object> event) {
+		if (!accepting.getAsBoolean()) {
+			return; // its card takes no data now
+		}
 		if (events.size() >= CAPACITY) {
 			events.removeFirst();
 			lost++;

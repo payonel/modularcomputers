@@ -162,15 +162,17 @@ class ConsoleGroupTest {
 			board.list(); // nothing new on the bus
 			keys.add(board.waitForInterrupt(60));
 			keys.add(board.invoke("console", "read").first());
+			keys.add(board.waitForInterrupt(60));
 			keys.add(board.invoke("console", "read").first());
 			keys.add(board.invoke("console", "read").first());
 			board.halt();
 		}));
-		first.press("a"); // typed before power-on: they wait in the terminals
-		second.press("b");
+		first.press("x"); // typed before power-on: dropped (no program runs to take it)
 		machine.pressPower();
+		first.press("a"); // each wakes the waiting program at once
+		second.press("b");
 		machine.tick();
-		assertThat(keys).containsExactly(List.of("console"), "a", "b", null);
+		assertThat(keys).containsExactly(List.of("console"), "a", List.of("console"), "b", null);
 	}
 
 	@Test

@@ -143,6 +143,14 @@ public final class Disk implements Device {
 		}
 	}
 
+	/** Its board stopped taking data (no program runs): the program's open files close, uncommitted. */
+	@Override
+	public void accepting(boolean accepting) {
+		if (!accepting) {
+			powerOff();
+		}
+	}
+
 	// ---- the host side -----------------------------------------------------------------------
 
 	/** Thrown for a soft failure, with the message the program gets. */

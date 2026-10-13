@@ -28,8 +28,10 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 /** Cards that work where they're installed (user design, 2026-10-13): redstone, weather, motion. */
 public class CardGameTest {
 	private static final BlockPos POS = new BlockPos(4, 2, 4);
+	/** How long the test computer's program waits at a time (it waits on, so its cards take data). */
+	private static final double WAIT_SECONDS = 1000;
 
-	/** A running computer (its program halted: power stays on) with {@code card} in its first expansion slot. */
+	/** A running computer (its program waits on: its devices take data only while one runs) with {@code card} in its first expansion slot. */
 	@SuppressWarnings("unchecked")
 	private static <T> T computerWith(GameTestHelper helper, Item card, Class<T> type) {
 		helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
@@ -39,7 +41,11 @@ public class CardGameTest {
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(card));
-		TestPrograms.flash(computer, board -> board.halt());
+		TestPrograms.flash(computer, board -> {
+			while (true) {
+				board.waitForInterrupt(WAIT_SECONDS, "nothing");
+			}
+		});
 		computer.pressPower();
 		return (T) computer.machine().board().bus().devices().stream().filter(type::isInstance).findFirst().orElseThrow();
 	}
@@ -111,6 +117,8 @@ public class CardGameTest {
 		var hub = helper.getBlockEntity(hubPos, com.payonel.modularcomputers.block.ExpansionHubBlockEntity.class);
 		hub.cards().setItem(0, new ItemStack(ModItems.REDSTONE_CARD));
 		RedstoneCard card = (RedstoneCard) hub.card(0).orElseThrow();
+		screen.terminal().accepting(true); // as on a running computer's bus
+		card.accepting(true);
 		var screenChunk = helper.getLevel().getChunkAt(helper.absolutePos(screenPos));
 		var hubChunk = helper.getLevel().getChunkAt(helper.absolutePos(hubPos));
 		java.util.Map<Runnable, net.minecraft.world.level.chunk.LevelChunk> changes = new java.util.LinkedHashMap<>();

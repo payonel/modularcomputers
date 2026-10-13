@@ -23,7 +23,7 @@ public final class MotionSensorCard extends Card {
 	public static final int BASE_DRAW = 1;
 	public static final int DRAW_PER_RANGE = 1;
 	private final InterruptLine line = new InterruptLine();
-	private final EventQueue events = new EventQueue(line, this::changed);
+	private final EventQueue events = new EventQueue(line, this::changed, this::isAccepting);
 	private final BusPower power = new BusPower(BASE_DRAW + 8 * DRAW_PER_RANGE);
 	private String mode = "all";
 	private int range = 8;
@@ -118,6 +118,12 @@ public final class MotionSensorCard extends Card {
 			range = (int) Math.clamp(kept, 1, MAX_RANGE);
 			power.setDraw(BASE_DRAW + range * DRAW_PER_RANGE);
 		}
+	}
+
+	/** It stopped taking data: its events go. */
+	@Override
+	protected void dropData() {
+		events.clear();
 	}
 
 	@Override

@@ -106,10 +106,22 @@ public final class Terminal implements Device {
 		}
 	}
 
-	/** Puts a key (or a report's answer) in the queue, if there's room: whether it went in. */
+	/** Whether it takes keys now (see {@link Device#accepting}): typed at a computer that's off, they go nowhere. */
+	private boolean accepting;
+
+	@Override
+	public void accepting(boolean accepting) {
+		this.accepting = accepting;
+		if (!accepting && !input.isEmpty()) {
+			input.clear();
+			changed.run();
+		}
+	}
+
+	/** Puts a key (or a report's answer) in the queue, if it takes keys and there's room: whether it went in. */
 	private boolean queue(String key) {
-		if (input.size() >= INPUT_CAPACITY) {
-			return false; // full: dropped
+		if (!accepting || input.size() >= INPUT_CAPACITY) {
+			return false; // not taking data, or full: dropped
 		}
 		input.addLast(key);
 		changed.run();

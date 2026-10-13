@@ -694,10 +694,19 @@ scripts/art/error_beep.py` into
     calls it makes meanwhile change them. **Devices save what they hold for the program**
     (`Device.saved`/`restore`, `block/DeviceSave`: runtime values as NBT, types kept): a terminal's
     keys waiting, a card's events, outputs, what it last saw and the mode and range a program set;
-    the block they're in keeps them (case, screen, hub). **An unload freezes, it isn't a power cut**
+    the block they're in keeps them (case, screen, hub). **An unload isn't a power cut**
     (`Machine.unload`): the computer stops supplying its devices but doesn't power them off, so a
-    cabled screen or a hub's card in a chunk that stays loaded keeps what it shows and holds;
-    breaking the case is the power cut (`preRemoveSideEffects`, `Machine.removed`). **Gotcha:
+    cabled screen in a chunk that stays loaded keeps what it shows; breaking the case is the power
+    cut (`preRemoveSideEffects`, `Machine.removed`). **A device takes data only while a program
+    runs on the board holding it** (user, 2026-10-13: keys typed at a computer that was off came in
+    when it booted): it must (1) be on a board's bus, held by it, (2) have its power supplied, and
+    (3) the board's CPU must be running a program (not halted, aborted or off); else its buffers
+    are empty and what comes in is dropped, and when any of the three ends, all it holds is voided
+    (`Device.accepting`, set by `Machine.setAccepting`: a terminal's keys, a card's events, a
+    disk's open files). A program that starts afresh gets its devices empty; one that resumes
+    after a load keeps what its devices saved with them; a device that joins a running program's
+    bus starts empty. So an unloading computer's devices in other chunks drop what they held (the
+    program was saved without it; its own case's devices were saved with it). **Gotcha:
     Minecraft writes only chunks marked changed, even at an unload** (`ChunkMap.save`,
     `tryMarkSaved`): a block whose data changes without marking keeps its old copy on disk. So a
     device tells its block at once when what it saves or shows changes (`Device.onChange`), and the
