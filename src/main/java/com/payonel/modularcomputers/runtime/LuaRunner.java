@@ -181,7 +181,21 @@ public final class LuaRunner implements Runner {
 	/** The EEPROM's text, for a fresh start; null for a restored one (its request is on the kernel's stack). */
 	private final String image;
 	/** A pinned request to persist, answered with the state's bytes (or null, when it can't be). */
-	private final AtomicReference<CompletableFuture<byte[]>> persistPin = new AtomicReference<>();
+	private final AtomicReference<Snapshot> pin = new AtomicReference<>();
+	/**
+	 * A save asked of the computer's thread: its state's bytes once it's at a safe point (null when it
+	 * can't be saved, or it ended). {@code servedAt}: what the server thread had handed it then
+	 * ({@link #served}); bytes taken after more was handed over would miss it, so they're not used.
+	 */
+	private record Snapshot(long servedAt, CompletableFuture<byte[]> bytes) {
+	}
+
+	/** The computer's thread has ended: set before it looks for a save asked, so one asked after sees it. */
+	private volatile boolean ended;
+	/** Server side: counts what's handed to the computer's thread (calls' and waits' answers). */
+	private volatile long served;
+	/** The computers whose threads run, for {@link #prepareAll}. */
+	private static final java.util.Set<LuaRunner> LIVE = java.util.concurrent.ConcurrentHashMap.newKeySet();
 	private final ConcurrentLinkedQueue<Call> calls = new ConcurrentLinkedQueue<>();
 	private volatile Wait wait;
 	private volatile State state = State.RUNNING;
@@ -243,31 +257,77 @@ public final class LuaRunner implements Runner {
 	}
 
 	/**
-	 * Server side: saves the computer as it runs. Pins a request the computer's thread honours at
-	 * its next safe point, and waits for it. It carries out no calls meanwhile: a call queued but
-	 * not made is a safe point itself (the computer's thread takes it back, honours the pin with the
-	 * request still on the kernel's stack, then queues it again), so a save never moves data
-	 * between the program and its devices, and every block's saved copy agrees with the program's.
-	 * Empty when it can't be saved now (it's not running, the state holds what can't be persisted,
-	 * or it took too long); the computer then comes back halted.
+	 * Server side, as a world save starts (autosave, /save-all, shutdown; Fabric's BEFORE_SAVE):
+	 * every running computer is asked for its state at once, and each saves itself on its own
+	 * thread, in parallel, at its next safe point. Each case's save then takes its computer's bytes,
+	 * so the save waits about as long as the slowest computer, not all of them one after another.
+	 * Nothing is handed to the computers until the save is over, so the snapshots stay good.
+	 */
+	public static void prepareAll() {
+		LIVE.forEach(LuaRunner::prepare);
+	}
+
+	/** Server side, as a world save ends: snapshots no case took are dropped (they'd go stale). */
+	public static void releaseAll() {
+		LIVE.forEach(runner -> runner.pin.set(null));
+	}
+
+	/** Server side: asks for a snapshot now, unless a good one is asked for already. */
+	private Snapshot prepare() {
+		Snapshot current = pin.get();
+		if (current != null && current.servedAt() == served) {
+			return current;
+		}
+		Snapshot fresh = new Snapshot(served, new CompletableFuture<>());
+		pin.set(fresh);
+		ring();
+		if (thread == null || ended) {
+			fresh.bytes().complete(null); // not running, or it ended: nothing will honour it
+		}
+		return fresh;
+	}
+
+	/**
+	 * Server side: saves the computer as it runs: the snapshot asked for as the save started
+	 * ({@link #prepareAll}), or one asked for now (a chunk unloading), taken by the computer's thread
+	 * at its next safe point. It carries out no calls meanwhile: a call queued but not made is a safe
+	 * point itself (the computer's thread takes it back, saves with the request still on the kernel's
+	 * stack, then queues it again), so a save never moves data between the program and its devices,
+	 * and every block's saved copy agrees with the program's. Empty when it can't be saved now (it's
+	 * not running, the state holds what can't be persisted, or it took too long); the computer then
+	 * comes back halted.
 	 */
 	@Override
 	public Optional<byte[]> persist(Board board) {
 		if (thread == null || !thread.isAlive() || state != State.RUNNING) {
 			return Optional.empty();
 		}
-		CompletableFuture<byte[]> pin = new CompletableFuture<>();
-		persistPin.set(pin);
+		Snapshot snapshot = prepare();
 		try {
-			return Optional.ofNullable(pin.get(PERSIST_NANOS, TimeUnit.NANOSECONDS));
+			return Optional.ofNullable(snapshot.bytes().get(PERSIST_NANOS, TimeUnit.NANOSECONDS));
 		} catch (TimeoutException e) {
 			com.payonel.modularcomputers.ModularComputers.LOGGER.error(
 				"A running computer didn't reach a safe point to be saved in {} ms: it will come back halted, its program lost", PERSIST_NANOS / 1_000_000);
 		} catch (InterruptedException | ExecutionException e) {
 			com.payonel.modularcomputers.ModularComputers.LOGGER.error("A running computer couldn't be saved: it will come back halted", e);
+		} finally {
+			pin.compareAndSet(snapshot, null);
 		}
-		persistPin.compareAndSet(pin, null);
 		return Optional.empty();
+	}
+
+	/** Wakes the computer's thread: it has news (an answer, a save asked for, a stop), like an interrupt pulling a CPU out of HLT. */
+	private void ring() {
+		Thread waiting = thread;
+		if (waiting != null) {
+			java.util.concurrent.locks.LockSupport.unpark(waiting);
+		}
+	}
+
+	/** Computer's thread: whether a save is asked for and not yet taken. */
+	private boolean saveAsked() {
+		Snapshot asked = pin.get();
+		return asked != null && !asked.bytes().isDone();
 	}
 
 	/** Computer's thread, at a safe point: honours a pinned save. */
@@ -282,11 +342,8 @@ public final class LuaRunner implements Runner {
 	 * seeing the pin means seeing the answer.
 	 */
 	private void honour(CompletableFuture<?> answered) {
-		if (persistPin.get() == null || (answered != null && answered.isDone())) {
-			return;
-		}
-		CompletableFuture<byte[]> pin = persistPin.getAndSet(null);
-		if (pin == null) {
+		Snapshot asked = pin.get();
+		if (asked == null || asked.bytes().isDone() || (answered != null && answered.isDone())) {
 			return;
 		}
 		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(PERMANENTS));
@@ -301,9 +358,9 @@ public final class LuaRunner implements Runner {
 		lua_pop(main, 1);
 		if (result.status != LUA_OK) {
 			com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A computer can't be saved as it runs: {}", result.msg);
-			pin.complete(null);
+			asked.bytes().complete(null);
 		} else {
-			pin.complete(out.toByteArray());
+			asked.bytes().complete(out.toByteArray());
 		}
 	}
 
@@ -353,6 +410,7 @@ public final class LuaRunner implements Runner {
 		this.now = now;
 		if (thread == null) {
 			thread = Thread.ofPlatform().name("modularcomputers-cpu").daemon().priority(Thread.MIN_PRIORITY).unstarted(this::run);
+			LIVE.add(this);
 			thread.start();
 		}
 		if (now != budgetTick) {
@@ -377,7 +435,9 @@ public final class LuaRunner implements Runner {
 				// Only now is data taken from the devices: it goes straight into the answer.
 				List<Map<String, Object>> taken = take(board, interrupts.get(), waiting.held(), start);
 				wait = null;
+				served++;
 				waiting.answer().complete(List.of(ready, taken));
+				ring();
 			}
 		}
 		spentNanos += System.nanoTime() - start;
@@ -422,7 +482,9 @@ public final class LuaRunner implements Runner {
 			answer = Result.fail(e.getMessage()); // a device never stops the machine
 		}
 		answered++;
+		served++;
 		call.answer().complete(answer);
+		ring();
 	}
 
 	@Override
@@ -510,6 +572,14 @@ public final class LuaRunner implements Runner {
 			// power off, or unloaded
 		} catch (RuntimeException | StackOverflowError e) {
 			finish(State.CRASHED, e);
+		} finally {
+			LIVE.remove(this);
+			ended = true;
+			// Ended (halted, crashed, stopped): a save asked for gets "nothing to save" at once.
+			Snapshot asked = pin.get();
+			if (asked != null) {
+				asked.bytes().complete(null);
+			}
 		}
 	}
 
@@ -545,18 +615,28 @@ public final class LuaRunner implements Runner {
 		}
 	}
 
-	/** Waits for a wait's answer; a pinned save is honoured meanwhile (the kernel is at a safe point). */
+	/**
+	 * Waits for a wait's answer, parked until there's news ({@link #ring}): the answer, a save asked
+	 * for (honoured here: the kernel is at a safe point), or a stop.
+	 */
 	private List<Object> awaitWait(CompletableFuture<List<Object>> answer) {
 		while (true) {
-			try {
-				return answer.get(10, TimeUnit.MILLISECONDS);
-			} catch (TimeoutException e) {
-				honour(answer);
-			} catch (InterruptedException e) {
-				throw new Stopped();
-			} catch (ExecutionException e) {
-				throw new IllegalStateException(e.getCause());
+			if (answer.isDone()) {
+				return answer.join();
 			}
+			if (saveAsked()) {
+				honour(answer);
+				continue;
+			}
+			park();
+		}
+	}
+
+	/** Parks the computer's thread until {@link #ring} (or a stop, which interrupts it). */
+	private void park() {
+		java.util.concurrent.locks.LockSupport.park(this);
+		if (Thread.interrupted() || stopping) {
+			throw new Stopped();
 		}
 	}
 
@@ -603,19 +683,16 @@ public final class LuaRunner implements Runner {
 	 */
 	private Object awaitCall(Call call) {
 		while (true) {
-			try {
-				return call.answer().get(10, TimeUnit.MILLISECONDS);
-			} catch (TimeoutException e) {
-				if (persistPin.get() != null && calls.remove(call)) {
-					honour();
-					calls.add(call);
-					serveSoon.run();
-				}
-			} catch (InterruptedException e) {
-				throw new Stopped();
-			} catch (ExecutionException e) {
-				throw new IllegalStateException(e.getCause());
+			if (call.answer().isDone()) {
+				return call.answer().join();
 			}
+			if (saveAsked() && calls.remove(call)) {
+				honour();
+				calls.add(call);
+				serveSoon.run();
+				continue;
+			}
+			park();
 		}
 	}
 

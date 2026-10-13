@@ -654,9 +654,18 @@ scripts/art/error_beep.py` into
     not made is taken back out of the queue, the state saved with it on the stack, and queued again
     (`LuaRunner.awaitCall`), so nothing moves between the program and its devices during a save and
     every block's saved copy agrees with the program's (an autosave writes all chunks in one pass,
-    with no ticks between). Up to 2 s, else it isn't saved (logged as an error: the program is lost,
-    it comes back halted). The user's open concern: the server thread blocking on a computer to
-    reach a safe point at a save or shutdown; to revisit. The bytes go in the case's NBT (`program`). On load the case resumes it
+    with no ticks between). **A world save asks every computer at once** (Fabric's `BEFORE_SAVE`,
+    which covers autosave, /save-all and shutdown: `LuaRunner.prepareAll`): each saves itself on
+    its own thread, in parallel, and each case's save takes its computer's bytes, so the save waits
+    about as long as the slowest computer, not their sum. A snapshot is used only if nothing was
+    handed to the computer since it was asked for (`Snapshot.servedAt`); `AFTER_SAVE` drops unused
+    ones. **The computer's thread parks on one doorbell** (`LockSupport`, `LuaRunner.ring`), rung by
+    whatever has news for it (a call's or a wait's answer, a save asked, a stop), like an interrupt
+    pulling a CPU out of HLT: no polling. A thread that ends answers a save asked of it at once
+    (nothing to save). Up to 2 s, else it isn't saved (logged as an error: the program is lost, it
+    comes back halted). The user's open concern: the server thread blocking on a computer that's
+    deep in one long step (case 5: a library call with no budget checks, such as `string.rep`,
+    which LungoLua is fixing); to do better than 2 s. The bytes go in the case's NBT (`program`). On load the case resumes it
     (`Machine.resumeProgram`, `LuaRunner.restore`) at its first tick, after the bus is found again;
     the restored kernel's request is still on its stack, so the computer's thread carries on with it
     (a wait ends on its deadline: the firmware makes a wait's length a deadline on the machine's

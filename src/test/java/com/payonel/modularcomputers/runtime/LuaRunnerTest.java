@@ -334,6 +334,39 @@ class LuaRunnerTest {
 	}
 
 	@Test
+	void aSnapshotTakenAsASaveStartsIsntUsedOnceTheComputerWasHandedMore() {
+		Counter counter = new Counter();
+		Map<String, Device> devices = new LinkedHashMap<>();
+		devices.put("id:screen", screen);
+		devices.put("id:counter", counter);
+		machine.setDevices(devices);
+		boot("""
+			local x = 0
+			for i = 1, 2000000 do x = x + 1 end
+			local _, n = board.invoke("id:counter", "hit")
+			for i = 1, 3000000 do x = x + 1 end
+			board.invoke("console", "write", "hits " .. n)
+			board.halt()
+			""");
+		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
+		settle(runner::alive);
+		LuaRunner.prepareAll(); // a save starts: every computer takes its snapshot, here before its call
+		settle(() -> counter.hits == 1); // no save happened after all, and its call was made
+		byte[] saved = machine.persistProgram().orElseThrow(); // the old snapshot would miss the call
+		machine.unload();
+		Machine again = new Machine(new Motherboard(Hardware.allInOne(), new Bus(java.util.List.of())));
+		again.setDevices(devices);
+		again.board().setCpu(new Cpu(CpuTier.TIER_3));
+		again.setServer(server::add);
+		again.restorePowered(true);
+		again.resumeProgram(saved);
+		settle(again, () -> again.runner().isEmpty());
+		assertThat(again.board().virtualBus().console().screen().row(0).strip()).isEqualTo("hits 1");
+		assertThat(counter.hits).as("the call was made once").isEqualTo(1);
+		again.pressPower();
+	}
+
+	@Test
 	void aWaitSavedPartwayEndsOnItsDeadlineOnTheSavedClock() {
 		boot("board.waitForInterrupt(4, \"nothing\") board.halt()"); // 80 ticks
 		settle(() -> machine.uptime() >= 40 && machine.runner().map(r -> r.state() == Runner.State.WAITING).orElse(false));

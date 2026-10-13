@@ -64,6 +64,12 @@ public final class ModularComputers implements ModInitializer {
 		RecipeSynchronization.synchronizeRecipeSerializer(BatteryUpgradeRecipe.SERIALIZER);
 		RecipeSynchronization.synchronizeRecipeSerializer(net.minecraft.world.item.crafting.BlastingRecipe.SERIALIZER);
 		ModBlocks.init();
+		// A world save asks every running computer for its state at once; each saves itself, in
+		// parallel, and each case's save takes its computer's bytes (LuaRunner.prepareAll).
+		net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.BEFORE_SAVE.register((server, flush, force) ->
+			com.payonel.modularcomputers.runtime.LuaRunner.prepareAll());
+		net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.AFTER_SAVE.register((server, flush, force) ->
+			com.payonel.modularcomputers.runtime.LuaRunner.releaseAll());
 		ModMenus.init();
 		ModCommands.init();
 		ModCreativeTab.init();
