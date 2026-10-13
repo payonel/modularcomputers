@@ -83,8 +83,6 @@ public final class LuaRunner implements Runner {
 	/** Registry keys: the kernel, and the permanents (object to name). */
 	private static final String KERNEL = "modularcomputers.kernel";
 	private static final String PERMANENTS = "modularcomputers.perms";
-	/** Where the board's ring rides in the registry while the state is persisted (the ring is the RAM's: saved with it). */
-	private static final String RING = "modularcomputers.ring";
 	/** How long a save waits for the computer's thread to reach a safe point. */
 	private static final long PERSIST_NANOS = 2_000_000_000L;
 	/**
@@ -164,16 +162,15 @@ public final class LuaRunner implements Runner {
 				java.util.Arrays.copyOfRange(bytes.array(), bytes.offset(), bytes.offset() + bytes.size()))));
 	}
 
-	/** A piece of a device's data in the board's ring (its RAM), taken ahead of the program. */
-	private record Staged(String address, String method, Object value) {
-	}
-
 	/** A board call waiting for the server thread. */
 	private record Call(Function<Board, Object> call, CompletableFuture<Object> answer) {
 	}
 
-	/** A wait for an interrupt, answered by the server thread with the sources pending. */
-	private record Wait(long until, List<String> sources, CompletableFuture<List<String>> answer) {
+	/**
+	 * A wait for an interrupt, answered by the server thread with the sources pending and the device
+	 * data taken for the firmware's inbox; {@code held}: what the inbox holds now, by address.
+	 */
+	private record Wait(long until, List<String> sources, Map<String, Integer> held, CompletableFuture<List<Object>> answer) {
 		List<String> ready(List<String> pending) {
 			return sources.isEmpty() ? pending : pending.stream().filter(sources::contains).toList();
 		}
@@ -186,16 +183,6 @@ public final class LuaRunner implements Runner {
 	/** A pinned request to persist, answered with the state's bytes (or null, when it can't be). */
 	private final AtomicReference<CompletableFuture<byte[]>> persistPin = new AtomicReference<>();
 	private final ConcurrentLinkedQueue<Call> calls = new ConcurrentLinkedQueue<>();
-	/**
-	 * The board's ring (user design, 2026-10-13): device data the server thread takes ahead of the
-	 * program while there's room ({@link Board#ringCapacity}, from the RAM: a tier 1 has none), in
-	 * the order it came; the computer's thread hands it to the firmware's inbox (its L1) when there's
-	 * room there, or serves a read from it at once. A device keeps its data until there's room.
-	 * Saved with the computer: {@link #honour} hands it to Styx with the state, and a restore takes it back.
-	 */
-	private final ConcurrentLinkedQueue<Staged> ring = new ConcurrentLinkedQueue<>();
-	/** What the firmware's inbox holds for each device, at most. */
-	public static final int INBOX = 4;
 	private volatile Wait wait;
 	private volatile State state = State.RUNNING;
 	private volatile Throwable crash;
@@ -232,18 +219,6 @@ public final class LuaRunner implements Runner {
 		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(KERNEL));
 		this.kernel = lua_tothread(main, -1);
 		lua_pop(main, 1);
-		// The ring as it was at the save, in order.
-		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(RING));
-		if (lua_type(main, -1) == LUA_TTABLE && toJava(main, -1, 0) instanceof List<?> saved) {
-			for (Object entry : saved) {
-				if (entry instanceof Map<?, ?> item) {
-					ring.add(new Staged(String.valueOf(item.get("address")), String.valueOf(item.get("method")), item.get("value")));
-				}
-			}
-		}
-		lua_pop(main, 1);
-		lua_pushnil(main);
-		lua_setfield(main, LUA_REGISTRYINDEX, new HostString(RING));
 	}
 
 	/** The same libraries and permanents for a new state and a restored one; leaves the inverse permanents (name to object) on the stack. */
@@ -300,21 +275,23 @@ public final class LuaRunner implements Runner {
 
 	/** Computer's thread, at a safe point: honours a pinned save. */
 	private void honour() {
+		honour(null);
+	}
+
+	/**
+	 * {@link #honour()}, unless {@code answered} (the wait it's in) has its answer: then the answer
+	 * (it may carry device data, out of the devices now) goes into the VM first, and the pin is
+	 * honoured at the next safe point. The server thread answers a wait before it pins a save, so
+	 * seeing the pin means seeing the answer.
+	 */
+	private void honour(CompletableFuture<?> answered) {
+		if (persistPin.get() == null || (answered != null && answered.isDone())) {
+			return;
+		}
 		CompletableFuture<byte[]> pin = persistPin.getAndSet(null);
 		if (pin == null) {
 			return;
 		}
-		// The ring goes with the state (nothing else touches it now: the server thread is waiting on this pin).
-		List<Map<String, Object>> held = new ArrayList<>();
-		for (Staged staged : ring) {
-			Map<String, Object> item = new LinkedHashMap<>();
-			item.put("address", staged.address());
-			item.put("method", staged.method());
-			item.put("value", staged.value());
-			held.add(item);
-		}
-		push(main, held);
-		lua_setfield(main, LUA_REGISTRYINDEX, new HostString(RING));
 		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(PERMANENTS));
 		java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
 		lua_Writer writer = (L, bytes) -> {
@@ -325,8 +302,6 @@ public final class LuaRunner implements Runner {
 		};
 		luaL_StyxResult result = luaL_persiststate(main, lua_gettop(main), writer);
 		lua_pop(main, 1);
-		lua_pushnil(main);
-		lua_setfield(main, LUA_REGISTRYINDEX, new HostString(RING));
 		if (result.status != LUA_OK) {
 			com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A computer can't be saved as it runs: {}", result.msg);
 			pin.complete(null);
@@ -392,43 +367,53 @@ public final class LuaRunner implements Runner {
 		while (spentNanos + (System.nanoTime() - start) < SERVER_NANOS_PER_TICK && (call = calls.poll()) != null) {
 			answer(call, board);
 		}
-		if (state == State.RUNNING && thread.isAlive()) {
-			stage(board, interrupts, start);
-		}
-		spentNanos += System.nanoTime() - start;
 		Wait waiting = wait;
 		if (waiting != null) {
 			List<String> pending = new ArrayList<>(interrupts.get());
-			for (Staged staged : ring) {
-				if (!pending.contains(staged.address())) {
-					pending.add(staged.address()); // its data's in the ring: still pending for the program
+			waiting.held().forEach((address, held) -> {
+				if (held > 0 && !pending.contains(address)) {
+					pending.add(address); // its data's in the inbox: still pending for the program
 				}
-			}
-			pending = waiting.ready(pending);
-			if (!pending.isEmpty() || now >= waiting.until()) {
+			});
+			List<String> ready = waiting.ready(pending);
+			if (!ready.isEmpty() || now >= waiting.until()) {
+				// Only now is data taken from the devices: it goes straight into the answer.
+				List<Map<String, Object>> taken = take(board, interrupts.get(), waiting.held(), start);
 				wait = null;
-				waiting.answer().complete(pending);
+				waiting.answer().complete(List.of(ready, taken));
 			}
 		}
+		spentNanos += System.nanoTime() - start;
 		return state();
 	}
 
-	/** Server side: takes device data ahead of the program into the ring, while there's room (and server time). */
-	private void stage(Board board, Supplier<List<String>> interrupts, long start) {
-		int capacity = board.ringCapacity();
-		if (capacity <= 0) {
-			return; // no ring (tier 1 RAM): the data stays in the device until the program asks
-		}
-		for (String source : interrupts.get()) {
+	/**
+	 * Server side, as a wait is answered: takes device data for the firmware's inbox (machine.lua's
+	 * cache, in the VM; user design, 2026-10-13), from each source with data, as much as the inbox has
+	 * room for that device: {@link Board#inboxSize} (from the RAM: each device has its own room, so a
+	 * full one never crowds out another) less what it {@code held}s, within the tick's server time.
+	 * Handshake: a device keeps what there's no room for, so nothing is dropped.
+	 */
+	private List<Map<String, Object>> take(Board board, List<String> sources, Map<String, Integer> held, long start) {
+		List<Map<String, Object>> taken = new ArrayList<>();
+		int size = board.inboxSize();
+		for (String source : sources) {
 			String method = board.streamMethod(source).orElse(null);
-			while (method != null && ring.size() < capacity && spentNanos + (System.nanoTime() - start) < SERVER_NANOS_PER_TICK) {
-				Result taken = board.invoke(source, method);
-				if (taken.failed() || taken.first() == null) {
+			int room = size - held.getOrDefault(source, 0);
+			while (method != null && room > 0 && spentNanos + (System.nanoTime() - start) < SERVER_NANOS_PER_TICK) {
+				Result result = board.invoke(source, method);
+				if (result.failed() || result.first() == null) {
 					break;
 				}
-				ring.add(new Staged(source, method, taken.first()));
+				Map<String, Object> item = new LinkedHashMap<>();
+				item.put("address", source);
+				item.put("method", method);
+				item.put("value", result.first());
+				taken.add(item);
+				room--;
 			}
 		}
+		return taken;
 	}
 
 	/** Server side: makes a board call and hands back its answer. */
@@ -455,11 +440,6 @@ public final class LuaRunner implements Runner {
 		// The VM is left to the collector: closing it would run the program's finalizers.
 	}
 
-	/** How much device data waits in the ring (tests). */
-	int staged() {
-		return ring.size();
-	}
-
 	/** Whether the computer's thread is still going (tests: it ends when stopped). */
 	public boolean alive() {
 		return thread != null && thread.isAlive();
@@ -467,8 +447,6 @@ public final class LuaRunner implements Runner {
 
 	/**
 	 * The computer's thread: runs the firmware, serving its requests, until it halts or is stopped.
-	 * Every resume hands the firmware first whether device data waits in the board's ring (it then
-	 * asks for it, {@code "take"}), then the answer.
 	 */
 	private void run() {
 		try {
@@ -479,12 +457,11 @@ public final class LuaRunner implements Runner {
 				}
 				int asked;
 				if (reply != null) {
-					luaL_checkstack(kernel, reply.size() + 2, new HostString("too many results"));
-					lua_pushboolean(kernel, ring.isEmpty() ? 0 : 1);
+					luaL_checkstack(kernel, reply.size() + 1, new HostString("too many results"));
 					for (Object value : reply) {
 						push(kernel, value);
 					}
-					lua_ResumeResult result = lua_resume(kernel, null, reply.size() + 1);
+					lua_ResumeResult result = lua_resume(kernel, null, reply.size());
 					if (result.status != LUA_YIELD) {
 						end(result);
 						return;
@@ -514,13 +491,8 @@ public final class LuaRunner implements Runner {
 					}
 					case "wait" -> {
 						honour();
-						List<String> pending = awaitWait(waitFor(said));
+						reply = awaitWait(waitFor(said)); // the sources ready, and the device data taken
 						lua_settop(kernel, top - asked);
-						reply = List.of(pending);
-					}
-					case "take" -> {
-						lua_settop(kernel, top - asked);
-						reply = List.of(take(said.size() > 1 ? said.get(1) : null));
 					}
 					case "halt" -> {
 						finish(State.HALTED, null);
@@ -555,34 +527,6 @@ public final class LuaRunner implements Runner {
 		return java.util.Collections.singletonList(answer);
 	}
 
-	/**
-	 * The firmware takes device data from the ring into its inbox: in the order it came, for each
-	 * device only as much as its inbox has room for ({@code used}: what it holds now, by address);
-	 * the rest stays in the ring.
-	 */
-	private List<Map<String, Object>> take(Object used) {
-		Map<String, Integer> held = new java.util.HashMap<>();
-		if (used instanceof Map<?, ?> map) {
-			map.forEach((address, count) -> held.put(String.valueOf(address), count instanceof Long n ? n.intValue() : 0));
-		}
-		List<Map<String, Object>> packet = new ArrayList<>();
-		for (var it = ring.iterator(); it.hasNext();) {
-			Staged staged = it.next();
-			int holds = held.getOrDefault(staged.address(), 0);
-			if (holds >= INBOX) {
-				continue;
-			}
-			it.remove();
-			held.put(staged.address(), holds + 1);
-			Map<String, Object> item = new LinkedHashMap<>();
-			item.put("address", staged.address());
-			item.put("method", staged.method());
-			item.put("value", staged.value());
-			packet.add(item);
-		}
-		return packet;
-	}
-
 	/** The kernel returned or failed: the EEPROM's code returned, its text didn't load, or it crashed. */
 	private void end(lua_ResumeResult result) {
 		if (result.status == LUA_OK) {
@@ -600,12 +544,12 @@ public final class LuaRunner implements Runner {
 	}
 
 	/** Waits for a wait's answer; a pinned save is honoured meanwhile (the kernel is at a safe point). */
-	private List<String> awaitWait(CompletableFuture<List<String>> answer) {
+	private List<Object> awaitWait(CompletableFuture<List<Object>> answer) {
 		while (true) {
 			try {
 				return answer.get(10, TimeUnit.MILLISECONDS);
 			} catch (TimeoutException e) {
-				honour();
+				honour(answer);
 			} catch (InterruptedException e) {
 				throw new Stopped();
 			} catch (ExecutionException e) {
@@ -622,19 +566,10 @@ public final class LuaRunner implements Runner {
 		}
 	}
 
-	/** A board call, as the server thread will make it; a read of data already in the ring is answered from it, at once. */
+	/** A board call, as the server thread will make it. */
 	private CompletableFuture<Object> serve(List<Object> said) {
 		String name = String.valueOf(said.size() > 1 ? said.get(1) : "");
 		List<Object> args = said.subList(Math.min(2, said.size()), said.size());
-		if (name.equals("invoke") && args.size() == 2 && args.get(0) instanceof String address) {
-			for (var it = ring.iterator(); it.hasNext();) {
-				Staged staged = it.next();
-				if (staged.address().equals(address) && staged.method().equals(args.get(1))) {
-					it.remove();
-					return CompletableFuture.completedFuture(Result.ok(staged.value()));
-				}
-			}
-		}
 		Function<Board, Object> call = switch (name) {
 			case "list" -> Board::list;
 			case "status" -> Board::status;
@@ -663,10 +598,15 @@ public final class LuaRunner implements Runner {
 		return i < args.size() && args.get(i) != null ? String.valueOf(args.get(i)) : "";
 	}
 
-	private CompletableFuture<List<String>> waitFor(List<Object> said) {
+	/** {@code "wait", ticks, held, sources...}: held is what the firmware's inbox holds now, by address. */
+	private CompletableFuture<List<Object>> waitFor(List<Object> said) {
 		long ticks = said.size() > 1 && said.get(1) instanceof Long l ? l : -1;
-		List<String> sources = said.stream().skip(2).map(String::valueOf).toList();
-		Wait request = new Wait(ticks < 0 ? Long.MAX_VALUE : now + ticks, sources, new CompletableFuture<>());
+		Map<String, Integer> held = new java.util.HashMap<>();
+		if (said.size() > 2 && said.get(2) instanceof Map<?, ?> map) {
+			map.forEach((address, count) -> held.put(String.valueOf(address), count instanceof Long n ? n.intValue() : 0));
+		}
+		List<String> sources = said.stream().skip(3).map(String::valueOf).toList();
+		Wait request = new Wait(ticks < 0 ? Long.MAX_VALUE : now + ticks, sources, held, new CompletableFuture<>());
 		wait = request;
 		serveSoon.run(); // it may be over already
 		return request.answer();

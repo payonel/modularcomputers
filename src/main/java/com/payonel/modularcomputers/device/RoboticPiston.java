@@ -14,7 +14,7 @@ import java.util.Locale;
  * A robotic piston on the bus (user design, 2026-10-13): it pushes on any of its six faces but the
  * one with its cable port, as a real piston pushes, by the side's name. {@code push} is a pulse: the
  * arm goes out and comes back on its own; {@code extend} leaves it out until {@code retract}. Every
- * move costs power, whether it moved anything or not.
+ * move costs power, whether it moved anything or not; extending an arm that's out already is free.
  */
 public final class RoboticPiston implements Device {
 	/** The sides, as programs name them (world directions). */
@@ -35,12 +35,24 @@ public final class RoboticPiston implements Device {
 		RETRACT
 	}
 
-	/** Moves an arm in the world: null when it did, else why not. */
-	public interface Arms {
-		String move(String side, Motion motion);
+	/** What a move came to. */
+	public enum Moved {
+		/** It moved. */
+		DONE,
+		/** Extend: the arm was out already (nothing moved, nothing to pay). */
+		ALREADY_OUT,
+		/** It couldn't push (the cable's side, an arm out there, what won't move). */
+		CANNOT_PUSH,
+		/** Retract: no arm out there. */
+		NOT_EXTENDED
 	}
 
-	private Arms arms = (side, motion) -> motion == Motion.RETRACT ? NOT_EXTENDED : CANNOT_PUSH;
+	/** Moves an arm in the world. */
+	public interface Arms {
+		Moved move(String side, Motion motion);
+	}
+
+	private Arms arms = (side, motion) -> motion == Motion.RETRACT ? Moved.NOT_EXTENDED : Moved.CANNOT_PUSH;
 
 	@Override
 	public DeviceType type() {
@@ -62,7 +74,7 @@ public final class RoboticPiston implements Device {
 		return move(args, Motion.PUSH);
 	}
 
-	@Method(doc = "extend(side): pushes on that side and leaves the arm out until retract(side); true (also when it's out already), or false and \"cannot push\"")
+	@Method(doc = "extend(side): pushes on that side and leaves the arm out until retract(side); true (also when it's out already: free), or false and \"cannot push\"")
 	public Result extend(Arguments args) {
 		return move(args, Motion.EXTEND);
 	}
@@ -77,8 +89,14 @@ public final class RoboticPiston implements Device {
 		if (!SIDES.contains(side)) {
 			return Result.fail("no such side: " + side);
 		}
-		power.charge(PUSH_COST);
-		String failed = arms.move(side, motion);
-		return failed == null ? Result.ok(true) : Result.fail(failed);
+		Moved moved = arms.move(side, motion);
+		if (moved != Moved.ALREADY_OUT) {
+			power.charge(PUSH_COST);
+		}
+		return switch (moved) {
+			case DONE, ALREADY_OUT -> Result.ok(true);
+			case CANNOT_PUSH -> Result.fail(CANNOT_PUSH);
+			case NOT_EXTENDED -> Result.fail(NOT_EXTENDED);
+		};
 	}
 }

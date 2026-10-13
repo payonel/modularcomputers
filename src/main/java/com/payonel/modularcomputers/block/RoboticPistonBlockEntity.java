@@ -29,7 +29,7 @@ public final class RoboticPistonBlockEntity extends CardHolderBlockEntity {
 		device.moveWith((side, motion) -> {
 			net.minecraft.core.Direction direction = net.minecraft.core.Direction.byName(side);
 			boolean retracting = motion == RoboticPiston.Motion.RETRACT;
-			String failed = retracting ? RoboticPiston.NOT_EXTENDED : RoboticPiston.CANNOT_PUSH;
+			RoboticPiston.Moved failed = retracting ? RoboticPiston.Moved.NOT_EXTENDED : RoboticPiston.Moved.CANNOT_PUSH;
 			if (level == null || level.isClientSide() || direction == null) {
 				return failed;
 			}
@@ -41,7 +41,7 @@ public final class RoboticPistonBlockEntity extends CardHolderBlockEntity {
 				armsOut.remove(direction);
 				RoboticPistonBlock.retract(level, worldPosition, direction);
 				setChanged();
-				return null;
+				return RoboticPiston.Moved.DONE;
 			}
 			if (out) {
 				if (motion != RoboticPiston.Motion.EXTEND) {
@@ -49,14 +49,14 @@ public final class RoboticPistonBlockEntity extends CardHolderBlockEntity {
 				}
 				armsOut.put(direction, HELD); // out already: now it stays
 				setChanged();
-				return null;
+				return RoboticPiston.Moved.ALREADY_OUT;
 			}
 			if (!RoboticPistonBlock.push(level, worldPosition, direction)) {
 				return failed;
 			}
 			armsOut.put(direction, motion == RoboticPiston.Motion.EXTEND ? HELD : level.getGameTime() + RoboticPistonBlock.ARM_TICKS);
 			setChanged();
-			return null;
+			return RoboticPiston.Moved.DONE;
 		});
 	}
 

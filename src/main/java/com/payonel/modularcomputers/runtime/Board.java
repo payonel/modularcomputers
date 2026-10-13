@@ -136,13 +136,12 @@ public interface Board {
 		return Optional.empty();
 	}
 
-	/** How much device data the board's ring holds, from its RAM (tier 1: none). */
-	default int ringCapacity() {
+	/**
+	 * How many pieces of each device's data the firmware's inbox keeps for the program, from the RAM
+	 * ({@code MemoryTier.inbox}, summed over the sticks): 0 with only tier 1 RAM, and every read of a
+	 * device is a call to it.
+	 */
+	default int inboxSize() {
 		return 0;
-	}
-
-	/** The sources with an interrupt pending now (the bus, the console, devices), as {@link #waitForInterrupt} sees them. */
-	default List<String> pending() {
-		return List.of();
 	}
 }

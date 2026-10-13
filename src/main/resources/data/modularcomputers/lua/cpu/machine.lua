@@ -12,18 +12,19 @@
 --   "call", name, args...         a board call (list, status, type, methods, doc, info, uptime,
 --                                 power, hardware, invoke), carried out on the server thread, where
 --                                 devices live; answered with its values
---   "wait", ticks, sources...     wait for an interrupt (sources: any when none; ticks -1: no
---                                 limit); answered with the pending sources, as a sequence
+--   "wait", ticks, held, sources...
+--                                 wait for an interrupt (sources: any when none; ticks -1: no
+--                                 limit; held: what the inbox holds, by address); answered with
+--                                 the pending sources, as a sequence, and the device data taken
+--                                 for the inbox: {address, method, value} each
 --   "halt"                        the CPU halts; never resumed
---   "take", held                  device data from the board's ring, for its inbox: held says what
---                                 the inbox holds per address (it holds at most 4 of each)
--- Every resume starts with whether device data waits in the board's ring (then it takes it).
 --
--- Device data (user design, 2026-10-13): the board takes what devices have (keys, sensor events)
--- into a ring in its RAM; this file keeps a few of each device's in its inbox, like an L1: tiny,
--- since it counts against the program's memory. A read of a device's stream (a terminal's read,
--- a sensor's pull) comes from the inbox with no syscall, and a wait for a device with data in the
--- inbox returns at once.
+-- Device data (user design, 2026-10-13): this file caches what devices have (keys, sensor events)
+-- in its inbox, a queue per device. As a wait is answered the host takes, from each device with
+-- data, as much as that device's queue has room for (its size comes from the RAM: none with only
+-- tier 1); a device keeps the rest, so nothing is dropped, and a full queue never crowds out
+-- another device's. A read of a device's stream (a terminal's read, a sensor's pull) comes from the
+-- inbox with no syscall.
 -- and what it ends with: "returned" (the EEPROM's code returned: a panic), "abort", why (the
 -- EEPROM's text didn't load), or an error (the EEPROM's code crashed).
 --
@@ -35,7 +36,7 @@
 -- This file never calls methods on strings ("s:sub()"): the string metatable is shared with user
 -- code.
 
-local _, image = ...
+local image = ...
 
 local coroutine_create, coroutine_resume, coroutine_status, coroutine_yield =
   coroutine.create, coroutine.resume, coroutine.status, coroutine.yield
@@ -52,29 +53,10 @@ local request -- the syscall waiting for the host, packed
 local answer  -- the host's answer to it, packed
 
 -- The inbox: a few of each device's data, by address: {method = ..., [1] = oldest, ...}.
-local INBOX = 4
 local inbox = {}
 
--- Asks the host (yields kernel_co); first takes in the device data the board has waiting.
-local function ask(...)
-  local reply = table_pack(coroutine_yield(...))
-  if reply[1] then
-    local held = {}
-    for address, queue in pairs(inbox) do
-      held[address] = #queue
-    end
-    local packet = table_pack(coroutine_yield("take", held))
-    for _, item in ipairs(packet[2] or {}) do
-      local queue = inbox[item.address]
-      if not queue or queue.method ~= item.method then
-        queue = {method = item.method}
-        inbox[item.address] = queue
-      end
-      queue[#queue + 1] = item.value
-    end
-  end
-  return table_unpack(reply, 2, reply.n)
-end
+-- Asks the host (yields kernel_co).
+local ask = coroutine_yield
 
 -- The budget's callback always freezes: where a freeze can't happen, the engine ends user_co's
 -- chain with an error instead, and the CPU shows it. Nothing runs on unfrozen past its slice.
@@ -150,27 +132,25 @@ sandbox.board = {
     if seconds ~= nil and type(seconds) ~= "number" then
       error("bad argument #1 to 'waitForInterrupt' (number expected, got " .. type(seconds) .. ")", 2)
     end
-    -- Data in the inbox is pending already: no need to ask.
-    local wanted, ready = table_pack(...), {}
-    for address, queue in pairs(inbox) do
-      if queue[1] ~= nil then
-        local want = wanted.n == 0
-        for i = 1, wanted.n do
-          want = want or wanted[i] == address
-        end
-        if want then
-          ready[#ready + 1] = address
-        end
-      end
-    end
-    if #ready > 0 then
-      return ready
-    end
     local ticks = (seconds == nil or seconds == math_huge) and -1 or math_floor(seconds * 20 + 0.5)
     if ticks < -1 then
       ticks = 0
     end
-    return syscall("wait", ticks, ...)
+    -- The host counts data in the inbox as pending, and tops each device's queue up as it answers.
+    local held = {}
+    for address, queue in pairs(inbox) do
+      held[address] = #queue
+    end
+    local ready, taken = syscall("wait", ticks, held, ...)
+    for _, item in ipairs(taken) do
+      local queue = inbox[item.address]
+      if not queue or queue.method ~= item.method then
+        queue = {method = item.method}
+        inbox[item.address] = queue
+      end
+      queue[#queue + 1] = item.value
+    end
+    return ready
   end,
   -- the CPU stops; power stays on. It never returns.
   halt = function()

@@ -3,20 +3,23 @@ package com.payonel.modularcomputers.machine;
 /** What a RAM tier brings (user design, 2026-10-11): more space. */
 public enum MemoryTier {
 	TIER_1(256 << 10, 0),
-	TIER_2(512 << 10, 16),
-	TIER_3(1 << 20, 64);
+	TIER_2(512 << 10, 2),
+	TIER_3(1 << 20, 4);
 
 	private final int bytes;
-	/** Device data it holds for the program (its ring, user design 2026-10-13): a tier 1 has none, so device reads go to the device, slowly. */
-	private final int ring;
+	/**
+	 * What a stick adds to the firmware's inbox, for each device (user design, 2026-10-13): pieces
+	 * of device data machine.lua keeps for the program. A tier 1 adds none.
+	 */
+	private final int inbox;
 
-	public int ring() {
-		return ring;
+	MemoryTier(int bytes, int inbox) {
+		this.bytes = bytes;
+		this.inbox = inbox;
 	}
 
-	MemoryTier(int bytes, int ring) {
-		this.ring = ring;
-		this.bytes = bytes;
+	public int inbox() {
+		return inbox;
 	}
 
 	public int bytes() {

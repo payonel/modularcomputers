@@ -65,8 +65,8 @@ Decided by the user:
 - **On the server tick** for now. Running machines off-thread, asynchronously, is a
   documented follow-up (TODO), not built.
 - **Addressing:** the motherboard API looks devices up by stable id and by bus order.
-- **Saving:** a running Lua computer is saved with Styx, with its board's ring and its devices'
-  data (built 2026-10-13); a Java mock program still isn't.
+- **Saving:** a running Lua computer is saved with Styx (its firmware's ring with it), and its
+  devices save their data (built 2026-10-13); a Java mock program still isn't.
 - **Device methods never kill the machine.** Every device failure is soft, like a status bit
   the driver reads and decides about. Only the motherboard's own supervision ends a run: the
   CPU and power (it should check them on a schedule too, not only on events).
@@ -238,19 +238,14 @@ Built in this order:
    - Four kinds of device traffic: events in (keys, redstone, sensors, messages) pushed; writes out
      (terminal text) batched; rarely-changing state (the bus list, types, methods, sizes) pushed as
      snapshots when it changes; synchronous request/response calls stay syscalls (the slow path).
-   - **Flow control by handshake, never silent drops**: a device keeps its data until the board's
-     ring has room; the board takes from the device only with room; the firmware takes from the
-     board only with room in its own ring. When a device's own buffer is full, what it does is the
+   - **Flow control by handshake, never silent drops**: a device keeps its data until the
+     firmware's ring has room for it. When a device's own buffer is full, what it does is the
      device's choice (a keyboard could beep, as a PC's does).
-   - **The board's ring lives in the RAM sticks** (Java, outside the VM): free, not counted against
-     the VM's memory cap (the cap is the host's, on the Lua thread; world events mustn't compete with
-     it). **Tier 1 RAM has no ring**: device data then stays in the device until the program asks,
-     a slow path that slows device reads, on purpose. Tier 2 has a ring, tier 3 a larger one (sizes to
-     settle; proposed 16 and 64 entries, summed over the sticks).
-     Pulling RAM from a running machine loses what's in its ring (fair, and interesting).
-   - **The firmware's ring is like an L1 cache**: in the VM, so it counts against the memory cap,
-     and so it's tiny and fixed: a few entries per device (fewer than 5), so it can never eat a
-     program's memory in a way the player can't see or debug.
+   - **Only the firmware caches** (user, 2026-10-13, revised the same day: the board's ring in the
+     RAM sticks was dropped): machine.lua keeps a queue per device, in the VM, filled straight from
+     the devices as a wait is answered, each up to its own room. **Its size comes from the RAM**:
+     tier 1 adds none (every device read is then a call, a slow path on purpose), tier 2 adds 2
+     packets per device, tier 3 adds 4, summed over the sticks.
    - Batched writes report errors late (as `fwrite`/`fsync`, sockets, ttys do).
    - Interrupts stay level-triggered: pending means the firmware's ring holds data for the source.
 

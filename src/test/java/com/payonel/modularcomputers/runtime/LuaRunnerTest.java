@@ -375,8 +375,7 @@ class LuaRunnerTest {
 	}
 
 	private static final String TYPED = """
-		local n = 0
-		for i = 1, 3000000 do n = n + 1 end -- busy while keys come in
+		board.waitForInterrupt(nil, "console")
 		local keys = ""
 		for i = 1, 3 do
 		  local _, key = board.invoke("console", "read")
@@ -387,63 +386,91 @@ class LuaRunnerTest {
 		""";
 
 	@Test
-	void withARingKeysLeaveTheTerminalAheadOfTheProgramAndReadsNeedNoCall() {
-		ram(2);
+	void aWaitFillsTheInboxSoReadsNeedNoCall() {
+		ram(3); // 4 a device
 		boot(TYPED);
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
 		screen.press("a");
 		screen.press("b");
 		screen.press("c");
-		settle(() -> !screen.interruptPending()); // the board took them, into its ring, while the program was busy
 		untilHalted();
 		assertThat(row(0)).isEqualTo("abc");
-		assertThat(runner.answered()).as("the reads came from memory: only the write reached the server").isEqualTo(1);
+		assertThat(runner.answered()).as("the reads came from the inbox: only the write reached the server").isEqualTo(1);
 	}
 
 	@Test
-	void whatsInTheRingIsSavedWithTheComputer() {
-		ram(2);
-		boot("""
-			local n = 0
-			for i = 1, 3000000 do n = n + 1 end -- busy while keys come in, and while it's saved
-			local keys = ""
-			for i = 1, 8 do
-			  local _, key = board.invoke("console", "read")
-			  keys = keys .. tostring(key)
-			end
-			board.invoke("console", "write", keys)
-			board.halt()
-			""");
-		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
-		for (String key : new String[] {"a", "b", "c", "d", "e", "f", "g", "h"}) {
-			screen.press(key);
-		}
-		// Four go on to the firmware's inbox (in the VM); the other four wait in the ring (the RAM).
-		settle(() -> !screen.interruptPending() && runner.staged() == 4);
-		byte[] saved = machine.persistProgram().orElseThrow();
-		machine.pressPower();
-		Machine again = reloaded(new Terminal(Resolution.DEFAULT));
-		again.resumeProgram(saved);
-		settle(again, () -> again.runner().isEmpty());
-		assertThat(again.board().virtualBus().console().screen().row(0).strip()).as("none lost, in order").isEqualTo("abcdefgh");
-		again.pressPower();
-	}
-
-	@Test
-	void withoutARingKeysWaitInTheTerminalAndEachReadIsACall() {
+	void withOnlyTier1RamTheresNoInboxAndEachReadIsACall() {
 		ram(1);
 		boot(TYPED);
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
 		screen.press("a");
 		screen.press("b");
 		screen.press("c");
-		for (int i = 0; i < 5; i++) {
-			machine.tick();
-		}
-		assertThat(screen.interruptPending()).as("tier 1 RAM: no ring, the keys stay in the terminal").isTrue();
 		untilHalted();
 		assertThat(row(0)).isEqualTo("abc");
 		assertThat(runner.answered()).as("each read went to the device").isEqualTo(4);
+	}
+
+	@Test
+	void eachDeviceHasItsOwnRoomInTheInbox() {
+		ram(2); // 2 a device
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		Map<String, Device> devices = new LinkedHashMap<>();
+		devices.put("id:screen", screen);
+		devices.put("id:redstone", card);
+		machine.setDevices(devices);
+		boot("""
+			board.waitForInterrupt() -- takes 2 keys and 2 events
+			board.invoke("console", "read") -- from the inbox: room for one more key
+			board.waitForInterrupt() -- tops up the keys only: the card's queue is full
+			board.invoke("console", "write", "waited")
+			board.waitForInterrupt(1000, "nothing")
+			""");
+		for (int i = 1; i <= 5; i++) {
+			screen.press("k" + i);
+			card.sense(0, i);
+		}
+		settle(() -> row(0).equals("waited"));
+		int keys = 0;
+		while (screen.interruptPending()) {
+			screen.read(new Arguments(java.util.List.of()));
+			keys++;
+		}
+		int events = 0;
+		while (card.pull(new Arguments(java.util.List.of())).first() != null) {
+			events++;
+		}
+		assertThat(events).as("the card keeps what its full queue had no room for").isEqualTo(3);
+		assertThat(keys).as("left in the terminal: 5, less 2, less the 1 more").isEqualTo(2);
+	}
+
+	@Test
+	void theInboxIsSavedWithTheComputerAndTheDevicesKeepTheRest() {
+		ram(2);
+		boot("""
+			board.waitForInterrupt(nil, "console") -- takes 2 keys
+			board.invoke("console", "write", "busy")
+			local n = 0
+			for i = 1, 3000000 do n = n + 1 end -- busy, and saved meanwhile
+			local keys = ""
+			for i = 1, 4 do
+			  local _, key = board.invoke("console", "read")
+			  keys = keys .. tostring(key)
+			end
+			board.invoke("console", "write", keys)
+			board.halt()
+			""");
+		for (String key : new String[] {"a", "b", "c", "d"}) {
+			screen.press(key);
+		}
+		settle(() -> row(0).equals("busy"));
+		byte[] saved = machine.persistProgram().orElseThrow();
+		machine.unload(); // frozen, not switched off: the terminal keeps its keys
+		Machine again = reloaded(screen);
+		again.resumeProgram(saved);
+		settle(again, () -> again.runner().isEmpty());
+		assertThat(again.board().virtualBus().console().screen().row(0).strip()).as("none lost, in order").isEqualTo("abcd");
+		again.pressPower();
 	}
 
 	@Test

@@ -24,6 +24,8 @@
 	"item.modularcomputers.tier2_ram": "Tier 2 RAM",
 	"item.modularcomputers.tier3_ram": "Tier 3 RAM",
 	"item.modularcomputers.memory.size": "Memory: %s",
+	"item.modularcomputers.memory.no_ring": "Adds no ring memory",
+	"item.modularcomputers.memory.ring": "Adds %s packets of ring memory per device",
 	"item.modularcomputers.tier1_hard_disk": "Tier 1 Hard Disk",
 	"item.modularcomputers.tier2_hard_disk": "Tier 2 Hard Disk",
 	"item.modularcomputers.tier3_hard_disk": "Tier 3 Hard Disk",

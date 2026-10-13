@@ -167,17 +167,12 @@ final class MotherboardApi implements Board {
 	}
 
 	@Override
-	public int ringCapacity() {
-		int capacity = 0;
+	public int inboxSize() {
+		int size = 0;
 		for (MemoryInfo stick : board.chassis().memory()) {
-			capacity += MemoryTier.values()[stick.tier() - 1].ring();
+			size += MemoryTier.values()[stick.tier() - 1].inbox();
 		}
-		return capacity;
-	}
-
-	@Override
-	public List<String> pending() {
-		return interrupts();
+		return size;
 	}
 
 	List<String> interrupts() {

@@ -101,7 +101,8 @@ same thing.
       **case view**'s 17 slots (`CaseMenu`):
       - CPU (three tiers, `CpuItem`/`CpuTier`: bus capacity 4/16/64; draw a tick 100/150/200
         running, 50/20/5 waiting, 0 halted; iron, gold and diamond lids), EEPROM (labeled ROM), 3 UPS battery bays, 4 RAM (three tiers, `MemoryItem`/`MemoryTier`:
-        256 KiB, 512 KiB, 1 MiB; not used by the machine yet), 4 SATA (hard disks, three tiers,
+        256 KiB, 512 KiB, 1 MiB; their sizes aren't enforced yet; they size the firmware's ring of
+        device data), 4 SATA (hard disks, three tiers,
         `DiskItem`/`DiskTier`: 1, 4, 16 MiB, drawing 8/5/2 a tick: bus-powered like terminals,
         `getCapacity()`; no data yet) and 4 expansion
         slots, which take any card (`ModItems.CARDS`, `device/CardKind`): WLAN, Bluetooth,
@@ -677,23 +678,23 @@ scripts/art/error_beep.py` into
     wherever it is (inside coroutines, a sort's comparison), the freeze lands in the firmware, which
     asks the host, and the thaw returns the answer. No user coroutine sees a yield; `pcall` can't
     catch it. The firmware never calls methods on strings (the string metatable is shared).
-  - **Device data in rings** (user design, 2026-10-13; DMA-like: the program reads memory, not the
-    device). Each device with a stream (`Device.streamMethod`: a terminal's or the console's
-    `read`, a card's `pull`) has its data taken ahead of the program: the server thread
-    (`LuaRunner.stage`, within the computer's server time) takes it, for the sources with an
-    interrupt pending, into **the board's ring** (in its RAM, Java side, not counted against the
-    program's memory: `MemoryTier.ring`, tier 1 none, tier 2 16, tier 3 64 entries, summed over the
-    sticks; `Board.ringCapacity`). **Handshake, no silent drops**: a device keeps its data until
-    the ring has room; the ring hands it on only when the firmware's inbox has room. **The firmware's
-    inbox** (machine.lua, its L1: at most `INBOX` 4 per device, in the VM's memory, so tiny) takes it
-    at its next resume (every resume says whether mail waits; the firmware asks with `"take", held`).
-    A read of a device's stream comes from the inbox with no syscall, or from the ring on the
-    computer's thread with no server call; a wait for a source with data in the inbox returns at
-    once, and a waiting computer wakes for data in the ring. **With tier 1 RAM there's no ring**:
-    data stays in the device and every read is a server call (slower, on purpose). **Nothing is lost
-    on a save** (user, 2026-10-13: "wholly unacceptable"): the ring goes with the program's state
-    (`LuaRunner.honour` puts it in the registry for Styx; a restore takes it back), the inbox is in
-    the VM, and devices save what they hold (below).
+  - **Device data in the firmware's ring** (user design, 2026-10-13; the user first had the ring
+    in the RAM, Java side, then moved it into the machine: only machine.lua caches, straight from
+    the devices). Each device with a stream (`Device.streamMethod`: a terminal's or the console's
+    `read`, a card's `pull`) gets **its own queue** in machine.lua's inbox (in the VM), so a full
+    queue never crowds out another device's: having read a key, the next wait tops up only the keys.
+    Its size comes from the RAM (`MemoryTier.inbox`, summed over the sticks, `Board.inboxSize`):
+    tier 1 adds none, tier 2 adds 2 packets per device, tier 3 adds 4; the RAM's Shift hint says so.
+    **The handshake:** a wait (`"wait", ticks, held, sources...`; held: what each queue holds) is
+    answered by the server thread with the sources ready (data in the inbox counts) and the data
+    taken (`LuaRunner.take`): from each device with data, as much as its queue has room for, within
+    the computer's server time; a device keeps the rest, so nothing is dropped. Data is taken only
+    as a wait is answered, straight into the answer. A read of a device's stream comes from the
+    inbox with no syscall; an empty queue, or **no inbox (only tier 1 RAM)**, makes it a call to the
+    device (slower, on purpose). **Nothing is lost on a save** (user, 2026-10-13: "wholly
+    unacceptable"): the inbox is in the VM, saved with it; a save pinned while a wait's answer is
+    on its way waits for it to reach the VM (`LuaRunner.honour(answered)`); devices save what they
+    hold (below).
   - **User code**: the EEPROM's text and what it runs, seen as untrusted. It gets `board` (`invoke`
     answers as `pcall` does), and user coroutines that yield normally. `debug` stays hidden until
     LungoLua has a sandboxed debug library (user's plan) that can't touch the firmware's budget.
@@ -748,7 +749,8 @@ scripts/art/error_beep.py` into
     template, our plate; no item, no drops, immovable) slides out with the piston sounds, and goes
     back after `ARM_TICKS` (6). `extend(side)` pushes the same way and leaves the arm out (true when
     it's out already), saved with the block, until `retract(side)` takes it back (false with `not
-    extended` when nothing's out); every call costs a push's power. **The robotic sticky piston** (slime ball over a robotic piston;
+    extended` when nothing's out); every call costs a push's power, except extending an arm that's
+    out already (free). **The robotic sticky piston** (slime ball over a robotic piston;
     a green slime pad on its plates) pulls back what's in front of its arm. It has one slot inside,
     for a Bluetooth card instead of a cable. It's a cabled device (`ACTUATOR`) and doesn't pass the
     connection on.
