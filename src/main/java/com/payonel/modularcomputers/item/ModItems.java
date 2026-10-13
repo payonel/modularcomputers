@@ -39,9 +39,9 @@ public final class ModItems {
 	public static final Item SILICON = register("silicon");
 	/** A die, printed from silicon through a photomask: the chip in every part. */
 	public static final Item CHIP = register("chip");
-	/** Comes from the factory flashed with Lua firmware, as real boards ship with firmware (crafting it alone wipes it). */
+	/** Comes from the factory flashed with a bootloader (eeprom/boot.lua), as real boards ship with firmware (crafting it alone wipes it). */
 	public static final Item EEPROM = register("eeprom", properties -> holdsData(properties)
-		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/hello")));
+		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/boot")));
 	/** Creative only, for the Java CPU: flashed with mcos's Java version (its class name). */
 	public static final Item JAVA_EEPROM = register("java_eeprom", properties -> holdsData(properties)
 		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.Mcos.class.getName()));
@@ -108,7 +108,9 @@ public final class ModItems {
 	}
 
 	private static DiskItem disk(String name, DiskTier tier) {
-		return (DiskItem) register(name, properties -> new DiskItem(properties, tier), ModItems::holdsData);
+		// A tier 1 disk comes with mcos (user, 2026-10-13): no trouble getting an OS once you can craft a computer.
+		return (DiskItem) register(name, properties -> new DiskItem(properties, tier),
+			properties -> tier == DiskTier.TIER_1 ? holdsData(properties).component(ModComponents.DISK_IMAGE, "mcos") : holdsData(properties));
 	}
 
 	private static CpuItem cpu(String name, CpuTier tier) {

@@ -35,6 +35,18 @@ public final class ModComponents {
 	public static final DataComponentType<UUID> SERIAL = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("serial"),
 		DataComponentType.<UUID>builder().persistent(UUIDUtil.CODEC).networkSynchronized(UUIDUtil.STREAM_CODEC).build());
 
+	/**
+	 * A disk's files to come (user design, 2026-10-13): the name of a set of the mod's Lua files
+	 * ({@code data/modularcomputers/lua/<name>/}), copied into the disk's folder the first time it's
+	 * made, then gone. A crafted tier 1 disk comes with mcos.
+	 */
+	public static final DataComponentType<String> DISK_IMAGE = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("disk_image"),
+		DataComponentType.<String>builder().persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.STRING_UTF8).build());
+
+	/** A disk just wiped by crafting it alone: the id whose files go when the player takes it (then gone). */
+	public static final DataComponentType<UUID> WIPED = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("wiped"),
+		DataComponentType.<UUID>builder().persistent(UUIDUtil.CODEC).networkSynchronized(UUIDUtil.STREAM_CODEC).build());
+
 	/** The board (a computer's, a hub's, ...) this Bluetooth card links to. */
 	public static final DataComponentType<UUID> BLUETOOTH_LINK = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("bluetooth_link"),
 		DataComponentType.<UUID>builder().persistent(UUIDUtil.CODEC).networkSynchronized(UUIDUtil.STREAM_CODEC).build());

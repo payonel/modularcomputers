@@ -57,8 +57,20 @@ public final class ClearIdRecipe extends CustomRecipe {
 			wiped.set(ModComponents.EEPROM_IMAGE, "");
 			return wiped;
 		}
+		if (found.getItem() instanceof DiskItem) {
+			// A disk alone is wiped (user, 2026-10-13): a new, blank disk; its old files go when it's taken (DiskItem.onCraftedBy).
+			if (!found.has(ModComponents.SERIAL) && !found.has(ModComponents.DISK_IMAGE)) {
+				return ItemStack.EMPTY;
+			}
+			ItemStack wiped = found.copyWithCount(1);
+			wiped.remove(ModComponents.SERIAL);
+			wiped.remove(ModComponents.DISK_IMAGE); // blank: not even the files it came with
+			if (found.has(ModComponents.SERIAL)) {
+				wiped.set(ModComponents.WIPED, found.get(ModComponents.SERIAL));
+			}
+			return wiped;
+		}
 		if (!found.has(ModComponents.SERIAL) || found.getMaxStackSize() == 1) {
-			// Disks keep their id: their files are kept by it.
 			return ItemStack.EMPTY;
 		}
 		ItemStack cleared = found.copyWithCount(1);

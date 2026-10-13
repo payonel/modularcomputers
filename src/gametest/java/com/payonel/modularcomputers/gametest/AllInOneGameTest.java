@@ -60,7 +60,7 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		computer.pressPower(); // the Lua CPU runs on its own thread; its calls are carried out on the server thread
 		helper.succeedWhen(() -> {
-			helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "hello world", "the EEPROM's Lua wrote to the console");
+			helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "boot: no bootable disk", "the EEPROM's bootloader, with no disk");
 			helper.assertTrue(computer.machine().isPowered() && computer.machine().runner().isEmpty(), "then halted, power on");
 		});
 	}
@@ -189,8 +189,9 @@ public class AllInOneGameTest {
 		for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
 			for (var part : parts) {
 				boolean placed = menu.slots.get(slot).mayPlace(new ItemStack(part));
-				helper.assertValueEqual(placed, takes(slot) == part || slot >= CaseMenu.EXP_SLOTS && ModItems.CARDS.containsKey(part)
-					|| CaseMenu.isBatteryBay(slot) && ModItems.BATTERIES.contains(part),
+				// (A slot the tier doesn't have takes nothing: tier 3 has 3 SATA slots of the board's 4.)
+				helper.assertValueEqual(placed, menu.slots.get(slot).isActive() && (takes(slot) == part || slot >= CaseMenu.EXP_SLOTS && ModItems.CARDS.containsKey(part)
+					|| CaseMenu.isBatteryBay(slot) && ModItems.BATTERIES.contains(part)),
 					"slot " + slot + " taking " + part);
 			}
 			helper.assertValueEqual(menu.slots.get(slot).getMaxStackSize(), 1, "slot " + slot + " holds one");

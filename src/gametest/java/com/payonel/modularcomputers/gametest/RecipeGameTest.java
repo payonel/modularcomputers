@@ -164,7 +164,7 @@ public class RecipeGameTest {
 
 	@GameTest
 	public void anEepromComesFlashedAndCraftingItAloneWipesIt(GameTestHelper helper) {
-		String os = com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/hello");
+		String os = com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/boot");
 		helper.assertValueEqual(new ItemStack(ModItems.EEPROM).get(ModComponents.EEPROM_IMAGE), os, "a new EEPROM holds its Lua firmware");
 		Craft eeprom = CRAFTS.stream().filter(craft -> craft.result().equals("eeprom")).findFirst().orElseThrow();
 		helper.assertValueEqual(craft(helper, grid(eeprom, ItemStack.EMPTY)).get(ModComponents.EEPROM_IMAGE), os, "so does a crafted one");
@@ -184,7 +184,8 @@ public class RecipeGameTest {
 		ItemStack disk = new ItemStack(ModItems.TIER1_HARD_DISK);
 		ModComponents.serial(disk);
 		alone.set(4, disk);
-		helper.assertTrue(craft(helper, alone).isEmpty(), "a disk keeps its id: its files go by it");
+		ItemStack wipedDisk = craft(helper, alone);
+		helper.assertTrue(wipedDisk.is(ModItems.TIER1_HARD_DISK) && !wipedDisk.has(ModComponents.SERIAL), "a disk alone is wiped (its files go when it's taken: DiskGameTest)");
 		helper.succeed();
 	}
 }

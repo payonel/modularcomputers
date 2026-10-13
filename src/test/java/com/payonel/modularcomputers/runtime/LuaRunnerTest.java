@@ -333,6 +333,28 @@ class LuaRunnerTest {
 	}
 
 	@Test
+	void theBootloaderRunsTheFirstDisksInit(@org.junit.jupiter.api.io.TempDir java.nio.file.Path world) throws Exception {
+		java.nio.file.Path folder = world.resolve("boot-disk");
+		java.nio.file.Files.createDirectories(folder);
+		java.nio.file.Files.writeString(folder.resolve("init.lua"), "board.invoke('console', 'write', 'booted from ' .. ...) board.halt()");
+		Map<String, Device> devices = new LinkedHashMap<>();
+		devices.put("id:screen", screen);
+		devices.put("sata:0", new com.payonel.modularcomputers.device.Disk(com.payonel.modularcomputers.device.DiskTier.TIER_1, world.resolve("empty-disk")));
+		devices.put("sata:1", new com.payonel.modularcomputers.device.Disk(com.payonel.modularcomputers.device.DiskTier.TIER_1, folder));
+		machine.setDevices(devices);
+		boot(com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/boot"));
+		untilHalted();
+		assertThat(row(0)).isEqualTo("booted from sata:1");
+	}
+
+	@Test
+	void theBootloaderWithNoBootableDiskSaysSo() {
+		boot(com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/boot"));
+		untilHalted();
+		assertThat(row(0)).isEqualTo("boot: no bootable disk");
+	}
+
+	@Test
 	void anErrorIsTheAbortScreen() {
 		boot("local x = nil\nx.y = 1\n");
 		untilHalted();

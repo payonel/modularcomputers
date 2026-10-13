@@ -84,6 +84,13 @@ public final class Disk implements Device {
 		}
 	}
 
+	/** It's out of its computer (taken out, or the computer unloaded): handles can't find it now, and it may be wiped. */
+	public void retire() {
+		if (storage != null) {
+			LIVE.remove(id(), this);
+		}
+	}
+
 	/** Its id: its folder's name in the world save. */
 	public String id() {
 		return storage.getFileName().toString();
@@ -313,6 +320,21 @@ public final class Disk implements Device {
 			used = -1;
 			return Result.ok();
 		});
+	}
+
+	/** A disk's data, gone from the host (its folder, its image, its scratch): it was wiped. Not while it's in a computer. */
+	public static void erase(Path storage) {
+		Path folder = storage.toAbsolutePath().normalize();
+		if (LIVE.containsKey(folder.getFileName().toString())) {
+			return; // in use: a copy of this disk is in a computer (a creative copy, say)
+		}
+		try {
+			wipe(folder);
+			wipe(folder.resolveSibling(folder.getFileName() + ".tmp"));
+			Files.deleteIfExists(folder.resolveSibling(folder.getFileName() + ".img"));
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 	}
 
 	private static void wipe(Path folder) throws IOException {

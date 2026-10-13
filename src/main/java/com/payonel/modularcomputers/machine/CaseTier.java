@@ -13,7 +13,7 @@ import com.payonel.modularcomputers.power.PowerUnits;
 public enum CaseTier {
 	TIER_1(1, 1, 1, 2, false, 0.0025),
 	TIER_2(2, 2, 2, 3, true, 0.005),
-	TIER_3(3, 4, 4, 4, true, 0.01);
+	TIER_3(3, 4, 3, 4, true, 0.01); // SATA: 1, 2, 3 (user, 2026-10-13)
 
 	private final int bays;
 	private final int ram;

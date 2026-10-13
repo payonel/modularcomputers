@@ -19,7 +19,44 @@ public final class LuaScripts {
 	private LuaScripts() {
 	}
 
-	/** {@code name}'s script ({@code "eeprom/hello"} is {@code eeprom/hello.lua}). A missing one is a bug in the mod. */
+	/**
+	 * Copies a set of the mod's Lua files ({@code <name>/} under {@link #ROOT}, mcos's say) into
+	 * {@code target}, as they are, folders and all: a disk that comes with files gets them this way.
+	 */
+	public static void copyTree(String name, java.nio.file.Path target) {
+		try {
+			java.net.URI uri = LuaScripts.class.getResource(ROOT + name).toURI();
+			java.nio.file.FileSystem jar = null;
+			if (uri.getScheme().equals("jar")) {
+				try {
+					jar = java.nio.file.FileSystems.newFileSystem(uri, java.util.Map.of());
+				} catch (java.nio.file.FileSystemAlreadyExistsException e) {
+					// open already (the game's)
+				}
+			}
+			try {
+				java.nio.file.Path source = java.nio.file.Path.of(uri);
+				try (var paths = java.nio.file.Files.walk(source)) {
+					for (java.nio.file.Path from : paths.toList()) {
+						java.nio.file.Path to = target.resolve(source.relativize(from).toString());
+						if (java.nio.file.Files.isDirectory(from)) {
+							java.nio.file.Files.createDirectories(to);
+						} else {
+							java.nio.file.Files.copy(from, to);
+						}
+					}
+				}
+			} finally {
+				if (jar != null) {
+					jar.close();
+				}
+			}
+		} catch (IOException | java.net.URISyntaxException | NullPointerException e) {
+			throw new IllegalStateException("no Lua files " + ROOT + name + " in the mod", e);
+		}
+	}
+
+		/** {@code name}'s script ({@code "eeprom/hello"} is {@code eeprom/hello.lua}). A missing one is a bug in the mod. */
 	public static String read(String name) {
 		String path = ROOT + name + ".lua";
 		try (InputStream in = LuaScripts.class.getResourceAsStream(path)) {

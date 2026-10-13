@@ -446,6 +446,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	public void setRemoved() {
 		super.setRemoved();
 		machine.unload(); // a running program isn't saved: it stops
+		for (int lane = 0; lane < disks.length; lane++) {
+			retireDisk(lane);
+		}
 		if (level != null) {
 			Bluetooth.remove(level, worldPosition);
 		}
@@ -756,6 +759,34 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	 * Where a disk's data lives: the world save's {@code modularcomputers/disks/<id>} (a folder
 	 * for hfs, with ".img" for raw), so it's the disk's wherever it goes.
 	 */
+	private void retireDisk(int lane) {
+		if (disks[lane] != null) {
+			disks[lane].retire();
+			disks[lane] = null;
+		}
+	}
+
+	/**
+	 * A disk that comes with files (a crafted tier 1's mcos, {@link ModComponents#DISK_IMAGE}) gets
+	 * them the first time its folder is made, from the mod's Lua files; then the mark goes.
+	 */
+	private void imageDisk(ItemStack stack, java.nio.file.Path folder) {
+		String image = stack.get(ModComponents.DISK_IMAGE);
+		if (image == null) {
+			return;
+		}
+		if (!java.nio.file.Files.exists(folder)) {
+			try {
+				com.payonel.modularcomputers.machine.LuaScripts.copyTree(image, folder);
+			} catch (RuntimeException e) {
+				com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A disk didn't get its {} files", image, e);
+				return;
+			}
+		}
+		stack.remove(ModComponents.DISK_IMAGE);
+		setChanged();
+	}
+
 	public static java.nio.file.Path diskFolder(net.minecraft.server.MinecraftServer server, UUID id) {
 		return server.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)
 			.resolve("modularcomputers").resolve("disks").resolve(id.toString());
@@ -786,11 +817,17 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
 			DiskTier diskTier = parts.getItem(CaseMenu.SATA_SLOTS + lane).getItem() instanceof DiskItem disk ? disk.tier() : null;
 			UUID diskSerial = serial(CaseMenu.SATA_SLOTS + lane);
+			ItemStack diskStack = parts.getItem(CaseMenu.SATA_SLOTS + lane);
 			if (diskTier == null) {
-				disks[lane] = null;
+				retireDisk(lane);
 			} else if (disks[lane] == null || disks[lane].tier() != diskTier || !java.util.Objects.equals(diskSerials[lane], diskSerial)) {
 				// Another disk: its own data, in the world save by its id (none on a client).
-				disks[lane] = new Disk(diskTier, level instanceof ServerLevel server && diskSerial != null ? diskFolder(server.getServer(), diskSerial) : null);
+				retireDisk(lane);
+				java.nio.file.Path folder = level instanceof ServerLevel server && diskSerial != null ? diskFolder(server.getServer(), diskSerial) : null;
+				if (folder != null) {
+					imageDisk(diskStack, folder);
+				}
+				disks[lane] = new Disk(diskTier, folder);
 			}
 			diskSerials[lane] = diskSerial;
 			if (disks[lane] != null) {

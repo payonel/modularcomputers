@@ -239,7 +239,7 @@ same thing.
       part's footprint as a dashed silkscreen outline and tinned pads, copied in over the
       missing slot (`CaseScreen.extractTierMarks`); nothing moves. Missing slots are inactive
       (`PartSlot.isActive`): no hover highlight, no clicks. A lower tier has the first slots
-      of each kind (`CaseMenu.available`): battery bays 1/2/3, RAM 1/2/4, SATA 1/2/4, expansion
+      of each kind (`CaseMenu.available`): battery bays 1/2/3, RAM 1/2/4, SATA 1/2/3 (user, 2026-10-13), expansion
       2/3/4 (the user's suggestion). The CPU socket and ROM are on every tier.
     - **Looks: each tier is an era of the PC** (user's pick, "direction C", 2026-10-12; drafts at
       a private draft page), and a case and a screen of one tier
@@ -430,8 +430,10 @@ scripts/art/error_beep.py` into
       - There are four block models (`all_in_one[_on][_faded]`) on two base models (emissive,
         and plain), and four frames in `textures/gui/power_button.png`.
   - **Boot results:**
-    - A (Lua) CPU and a new EEPROM: the EEPROM's Lua writes `hello world` to the console and
-      halts (`lua/eeprom/hello.lua`, see "Lua scripts").
+    - A (Lua) CPU and a new EEPROM: its **bootloader** (`lua/eeprom/boot.lua`, user, 2026-10-13), like a
+      BIOS, boots the first disk in bus order with `/init.lua`, handing it the disk's address;
+      with none, `boot: no bootable disk` and halt. A crafted **tier 1 disk comes with mcos**
+      (Lua), so a first computer boots an OS with no trouble (user).
     - The Java CPU and the Java EEPROM: **mcos** (`Mcos`; user's name, 2026-10-12: the Modular Computers OS, Java
       version, a Lua version to follow), which the user keeps changing
       to try things out). Today it's **a tiny OS and shell, after OpenOS and busybox, all in that
@@ -580,6 +582,10 @@ scripts/art/error_beep.py` into
   (`lua_setbudget`: a callback every n steps, which can `lua_freeze` the thread wherever it is;
   `lua_thaw` goes on) and **Styx**, persisting a whole state (`luaL_persiststate`), for saving
   running machines later.
+- **mcos in Lua** (`lua/mcos/`, the files a tier 1 disk comes with): a first, small OS until
+  OpenOS is ported: `init.lua` (paths, the boot disk's files, a line editor on the console,
+  `require` from `/lib`, programs from `/bin`), `bin/sh.lua` (a shell) and `ls`, `cat`, `echo`,
+  `clear`, `lsdev`, `help`, `halt`. Tests don't pin what it says.
 - **Lua scripts** (user design, 2026-10-13; `machine/LuaScripts`): the Lua that comes with the
   mod (firmware, mcos's Lua version, utilities; to be handed out by traders, loot chests and special
   crafting) lives as plain UTF-8 `.lua` files under `src/main/resources/data/modularcomputers/lua/`
@@ -785,7 +791,7 @@ scripts/art/error_beep.py` into
   as a `Program` class with a public no-argument constructor (`Cpu.load`; looked at before it's
   initialized, so naming anything else runs nothing). Blank: `ABRT: EEPROM is blank`; not a Java
   program on the Java CPU: `ABRT: EEPROM: exec format error` (Linux's ENOEXEC). A new EEPROM comes
-  flashed with Lua (`eeprom/hello.lua`); the Java EEPROM with `Mcos`'s class name. **Crafting one alone wipes it** (user): no id, blank
+  flashed with the bootloader (`eeprom/boot.lua`); the Java EEPROM with `Mcos`'s class name. **Crafting one alone wipes it** (user): no id, blank
   (`ClearIdRecipe`); its hint shows what it holds ("Holds: ...", "Blank"). Tests attach Java
   program objects with `Eeprom.flash(Program)`, like an in-circuit programmer; any CPU, Lua or
   Java, runs an attached program in place of the image.
@@ -923,8 +929,14 @@ scripts/art/error_beep.py` into
     nearest existing part is checked through links to be really inside. Space counts bytes plus 512
     for each file and directory. At most 16 open files a disk. **raw**: sectors of 512 bytes in one
     image file (`<id>.img`): `getSectorSize`, `readSector(n)`, `writeSector(n, data)`. A disk is
-    another device when its id changes; ids of things that hold data (EEPROMs, disks) can't be
-    cleared by crafting (their data goes by it). `Arguments.check*` converts like Lua (2.0 is an integer; numbers
+    another device when its id changes. **A disk crafted alone is wiped** (user, 2026-10-13): a blank
+    disk with no id (and no files to come); its old files are deleted from the world save when the
+    player takes it from the grid (`DiskItem.onCraftedBy`, which runs once, unlike the grid's
+    previews; the old id rides on the result as `modularcomputers:wiped` until then). Not when the
+    disk is in a computer (a creative copy). Item destruction isn't hooked: MC copies stacks too
+    freely to know when one is really gone. **Disks that come with files** (`modularcomputers:disk_image`,
+    a set of the mod's Lua files: a crafted tier 1's is `mcos`) get them copied into their folder
+    the first time it's made (`AllInOneBlockEntity.imageDisk`, `LuaScripts.copyTree`), then the mark goes. `Arguments.check*` converts like Lua (2.0 is an integer; numbers
     are strings).
   - **Interrupts** are per device and level-triggered (user design): `Device.interruptPending()`
     is on while the device has data for the program; the data stays in the device until read.
