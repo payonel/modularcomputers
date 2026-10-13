@@ -120,6 +120,50 @@ class LuaRunnerTest {
 	}
 
 	@Test
+	void anInterruptWakesItWithTheSourcesPending() {
+		boot("""
+			local pending = board.waitForInterrupt(nil, "console") -- a bound terminal's keys come through the console
+			local ok, key = board.invoke("console", "read")
+			board.invoke("console", "write", "woke " .. pending[1] .. " " .. key)
+			board.halt()
+			""");
+		assertThat(machine.runner().orElseThrow().state()).isEqualTo(Runner.State.WAITING);
+		machine.tick();
+		assertThat(machine.runner().orElseThrow().state()).as("nothing yet").isEqualTo(Runner.State.WAITING);
+		screen.press("x");
+		machine.tick();
+		assertThat(row(0)).isEqualTo("woke console x");
+	}
+
+	@Test
+	void waitingWhereItCantYieldIsAnErrorAndLeavesNoWaitBehind() {
+		boot("""
+			local ok, why = pcall(table.sort, {3, 1, 2}, function(a, b) board.waitForInterrupt(1) return a < b end)
+			local n = 0
+			for i = 1, 1000000 do n = n + 1 end -- frozen by its budget along the way: thawed, not resumed
+			board.invoke("console", "write", tostring(ok) .. " " .. n .. " " .. why)
+			board.halt()
+			""");
+		for (int i = 0; i < 100 && machine.runner().isPresent(); i++) {
+			machine.tick();
+		}
+		assertThat(row(0)).startsWith("false 1000000 eeprom:1: waitForInterrupt can't wai"); // (the row's 50 columns)
+		assertThat(machine.runner()).as("halted").isEmpty();
+	}
+
+	@Test
+	void aHaltThatCantYieldStillStopsIt() {
+		boot("""
+			pcall(table.sort, {3, 1, 2}, function(a, b) board.halt() return a < b end)
+			local ok, why = pcall(board.invoke, "console", "write", "still here")
+			while true do end
+			""");
+		assertThat(machine.runner()).as("halted at the end of its turn").isEmpty();
+		assertThat(row(0)).as("the board refused it after the halt").isEmpty();
+		assertThat(machine.isPowered()).isTrue();
+	}
+
+	@Test
 	void anErrorIsTheAbortScreen() {
 		boot("local x = nil\nx.y = 1\n");
 		assertThat(row(0)).startsWith(Cpu.ABORT + Cpu.CRASHED + "eeprom:2:");

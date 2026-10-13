@@ -114,9 +114,8 @@ public final class LuaRunner implements Runner {
 	private Board board;
 	private int calls;
 	private long now;
-	/** The program waits for an interrupt; what it got when it's over. */
+	/** Why the program yielded, when it was to wait for an interrupt. Never set unless that yield happened. */
 	private Wait wait;
-	private List<String> ready = List.of();
 
 	/** Compiles {@code image}; it runs from the first {@link #tick}. */
 	public LuaRunner(String image) throws LoadFailed {
@@ -176,26 +175,37 @@ public final class LuaRunner implements Runner {
 		this.now = now;
 		try {
 			while (true) {
+				// What the engine says the program is decides how it goes on; {@code wait} only says
+				// what a yield was for.
 				lua_ResumeResult result;
-				if (wait != null) {
-					List<String> pending = wait.ready(interrupts.get());
-					if (pending.isEmpty() && now < wait.until()) {
-						return state = State.WAITING;
-					}
-					ready = pending;
-					wait = null;
-					result = lua_resume(program, null, 0);
-				} else if (lua_isfrozen(program) != 0) {
+				if (lua_isfrozen(program) != 0) {
+					wait = null; // (a frozen program isn't in a wait)
 					lua_setbudget(program, STEPS_PER_TICK, TICK_SPENT); // a new tick's steps
 					result = lua_thaw(program, null);
-				} else {
-					if (!started) {
-						started = true;
-						lua_setbudget(program, STEPS_PER_TICK, TICK_SPENT);
+				} else if (lua_status(program) == LUA_YIELD) {
+					int answers = 0;
+					if (wait != null) {
+						List<String> pending = wait.ready(interrupts.get());
+						if (pending.isEmpty() && now < wait.until()) {
+							return state = State.WAITING;
+						}
+						wait = null;
+						luaL_checkstack(program, 3, new HostString("no room for the interrupts"));
+						push(program, pending); // waitForInterrupt's answer
+						answers = 1;
 					}
+					result = lua_resume(program, null, answers);
+				} else if (!started) {
+					started = true;
+					lua_setbudget(program, STEPS_PER_TICK, TICK_SPENT);
 					result = lua_resume(program, null, 0);
+				} else {
+					wait = null;
+					crash = new LuaException("the program is neither frozen nor suspended"); // the engine and the runner disagree
+					return state = State.CRASHED;
 				}
 				if (halted) {
+					wait = null;
 					return state = State.HALTED;
 				}
 				if (result.status == LUA_YIELD) {
@@ -204,6 +214,7 @@ public final class LuaRunner implements Runner {
 					}
 					return state = State.RUNNING; // out of calls, or the program gave up its turn
 				}
+				wait = null; // it didn't yield: no wait can be pending
 				if (result.status != LUA_OK) {
 					crash = new LuaException(text(program, -1));
 					return state = State.CRASHED;
@@ -232,6 +243,9 @@ public final class LuaRunner implements Runner {
 	 * comparison, say), the call goes ahead.
 	 */
 	private int call(lua_State L, lua_CFunction body) {
+		if (halted) {
+			return luaL_error(L, new HostString("halted")); // a halt that couldn't stop it here: nothing more reaches the board
+		}
 		if (calls <= 0 && lua_isyieldable(L) != 0) {
 			return lua_yieldk(L, 0, 0, (K, status, context) -> call(K, body));
 		}
@@ -263,25 +277,40 @@ public final class LuaRunner implements Runner {
 		return 1 + result.values().size();
 	}
 
-	/** {@code waitForInterrupt([seconds], sources...)}: yields to the host until one is pending, or time's up. */
+	/**
+	 * {@code waitForInterrupt([seconds], sources...)}: yields to the host until one is pending, or
+	 * time's up, and returns those pending, as a sequence. The wait is recorded only when the yield
+	 * can't fail: where a call that can't yield is in the way (a sort's comparison), it's an error.
+	 */
 	private int waitForInterrupt(lua_State L) {
+		if (halted) {
+			return luaL_error(L, new HostString("halted"));
+		}
+		if (lua_isyieldable(L) == 0) {
+			return luaL_error(L, new HostString("waitForInterrupt can't wait here: a call that can't yield is in the way"));
+		}
 		double seconds = luaL_optnumber(L, 1, Double.POSITIVE_INFINITY);
 		List<String> sources = new ArrayList<>();
 		for (int i = 2; i <= lua_gettop(L); i++) {
 			sources.add(string(L, i));
 		}
 		long ticks = Double.isInfinite(seconds) ? Long.MAX_VALUE / 2 : Math.max(0, Math.round(seconds * 20));
+		int base = lua_gettop(L);
 		wait = new Wait(now + ticks, List.copyOf(sources));
-		return lua_yieldk(L, 0, 0, (K, status, context) -> push(K, ready));
+		return lua_yieldk(L, 0, 0, (K, status, context) -> lua_gettop(K) - base); // the host's answer, on top
 	}
 
-	/** {@code halt()}: the CPU stops; power stays on. It never returns. */
+	/**
+	 * {@code halt()}: the CPU stops; power stays on. It never returns: it yields to the host, which
+	 * never resumes it. Where it can't yield, it raises an error; a {@code pcall} may catch that, but
+	 * the board refuses every call from then on, and the host stops the program when its turn ends.
+	 */
 	private int halt(lua_State L) {
 		halted = true;
 		if (lua_isyieldable(L) != 0) {
 			return lua_yieldk(L, 0, 0, (K, status, context) -> 0); // never resumed
 		}
-		return luaL_error(L, new HostString("halted")); // where it can't yield; the host stops it all the same
+		return luaL_error(L, new HostString("halted"));
 	}
 
 	private static String string(lua_State L, int arg) {

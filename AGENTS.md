@@ -580,7 +580,14 @@ scripts/art/error_beep.py` into
   thread of its own. Its budget (`STEPS_PER_TICK`, 100,000 steps) freezes it wherever it is, and
   the next tick thaws it, so loops that never call are preempted (unless a call that can't freeze
   is in the way: then it runs on to the next budget point; no hard stop yet). Board calls past the
-  tick's 20, `waitForInterrupt` and `halt` yield to the host. The program sees the global `board`
+  tick's 20, `waitForInterrupt` and `halt` yield to the host. **Each turn goes on by the engine's
+  own state, not the runner's notes** (user, 2026-10-13): frozen, it's thawed; suspended by a
+  yield, it's resumed (with the interrupts, when the yield was `waitForInterrupt`'s, passed as the
+  resume's value); new, it starts; anything else is a crash. A wait is recorded only once its
+  yield can't fail (`lua_isyieldable`; where a call that can't yield is in the way, it's an
+  error) and is cleared whenever a turn ends without yielding. A `halt` that can't yield raises an
+  error; whatever a `pcall` does with it, the board refuses every call from then on, and the host
+  stops the program when the turn ends. The program sees the global `board`
   (`list`, `status`, `type`, `methods`, `doc`, `info`, `uptime`, `power`, `hardware`, `invoke`,
   `waitForInterrupt([seconds], sources...)`, `halt`); `invoke` answers as `pcall` does (`true,
   ...` or `false, why`); handles are userdata; board records come as tables; strings cross as
