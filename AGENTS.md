@@ -557,11 +557,15 @@ scripts/art/error_beep.py` into
 - **Lua: LungoLua** (user, 2026-10-12): the user's own Lua 5.5 engine, a line-by-line Java port
   of their C++ fork (`~/code/lua-java`, branch `lua-java`, package `com.payonel.lungolua`; its
   docs are `docs/summary.md`, `docs/java-port.md`, `docs/styx.md`). It's the user's separate
-  project: don't edit it from here; report what it needs. **Built from its sources in place**: the
-  Gradle subproject `:lungolua` (`lungolua/build.gradle`) compiles `${lungolua_dir}/src`
-  (`gradle.properties`, `../lua-java/java`), leaving out its interpreter (`host`), its JLine line
-  editor (`platform/Readline`) and its test launchers, and the mod nests the jar (Loom `include`,
-  `META-INF/jars/lungolua-0.1.0.jar`). Its API is C's, by C's names (`lua_resume`,
+  project (another agent works on it): don't edit it from here; report what it needs. **The mod
+  takes its published jar** (user, 2026-10-13): `com.payonel:lungolua:${lungolua_version}`
+  (`gradle.properties`) from GitHub Packages, `https://maven.pkg.github.com/payonel/lua` (the repo
+  is public, and GitHub Actions builds and publishes it; versions are `0.1.0-<commit>`), nested in
+  the mod's jar (Loom `include`, `META-INF/jars/lungolua-<version>.jar`). **Reading GitHub Packages
+  needs a token even for a public repo**: `gpr.user` and `gpr.key` (a token with `read:packages`)
+  in `~/.gradle/gradle.properties` (set up on the dev host), or `GITHUB_ACTOR`/`GITHUB_TOKEN` in CI. The
+  jar also holds its interpreter (`host`) and JLine line editor (`platform/Readline`); the mod
+  never loads them, so JLine isn't a dependency. To take a newer engine, bump `lungolua_version`. Its API is C's, by C's names (`lua_resume`,
   `luaL_loadbufferx`, `HostString` for text crossing in). Beyond stock Lua it has **budgets**
   (`lua_setbudget`: a callback every n steps, which can `lua_freeze` the thread wherever it is;
   `lua_thaw` goes on) and **Styx**, persisting a whole state (`luaL_persiststate`), for saving
@@ -1253,7 +1257,10 @@ GitHub remote exists.
 - **Headless.** No X server runs, and `DISPLAY` is unset.
 - **`sudo` requires a password**, so agents cannot apt-install. Ask the user to run sudo
   commands if a system package is truly needed.
-- **Java:** the system has only OpenJDK 21/25 **JREs** (no `javac`). Gradle supplies the JDK.
+- **Java:** the system has OpenJDK 21/25 (a full 25 JDK came with Maven, `/usr/lib/jvm/java-25-openjdk-amd64`).
+  Builds don't use them: Gradle supplies its own Temurin 25.
+- **Maven:** `/usr/bin/mvn` (3.8.7), installed by the user 2026-10-13. The mod's build doesn't use
+  it (Gradle resolves dependencies itself).
 - **Xvfb:** the system `xvfb` package is installed (`/usr/bin/Xvfb`, `/usr/bin/xvfb-run`).
   The earlier unpacked copy in `~/.local` has been removed. `scripts/setup-headless-host.sh`
   keeps its `~/.local` fallback for hosts without sudo.

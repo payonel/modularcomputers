@@ -14,6 +14,17 @@ base {
 
 repositories {
 	mavenCentral()
+	maven {
+		name = 'LungoLua'
+		url = 'https://maven.pkg.github.com/payonel/lua'
+		credentials {
+			username = providers.gradleProperty('gpr.user').orElse(providers.environmentVariable('GITHUB_ACTOR')).getOrNull()
+			password = providers.gradleProperty('gpr.key').orElse(providers.environmentVariable('GITHUB_TOKEN')).getOrNull()
+		}
+		content {
+			includeModule 'com.payonel', 'lungolua'
+		}
+	}
 }
 
 loom {
@@ -49,9 +60,10 @@ dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-	// LungoLua, the Lua CPU's engine (./lungolua), nested in the mod's jar.
-	implementation project(':lungolua')
-	include project(':lungolua')
+	// LungoLua, the Lua CPU's engine, nested in the mod's jar. Its interpreter and JLine line editor
+	// are in the jar too; the mod never loads them, so JLine isn't needed.
+	implementation "com.payonel:lungolua:${project.lungolua_version}"
+	include "com.payonel:lungolua:${project.lungolua_version}"
 
 	// Unit tests: plain JUnit, with fabric-loader-junit so tests can bootstrap Minecraft registries.
 	testImplementation platform("org.junit:junit-bom:${project.junit_version}")
