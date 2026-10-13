@@ -19,7 +19,7 @@ remappedSrc/
 .settings/
 .classpath
 .project
-bin/
+/bin/
 
 # macos / misc
 *.DS_Store

@@ -1581,4 +1581,8 @@ src/gametest/resources/fabric.mod.json                                   test mo
   - Fabric API module jars are under `~/.gradle/caches/modules-2/files-2.1/net.fabricmc.fabric-api/`
 - Keep `gradle.properties` as the single place for versions.
 - Match the existing code style: tabs, `final` entrypoint classes, short doc comments.
+- **`.gitignore` patterns without a leading `/` match at any depth** (2026-10-13): `bin/` meant
+  for the IDE's output also hid `src/.../lua/mcos/bin/`, so mcos's programs were never committed
+  and the user's checkout booted without a shell. Anchor root-only rules (`/bin/`), and check
+  `git status --ignored src` after adding a folder with a common name.
 - Update this file when decisions are made or gotchas are discovered.
