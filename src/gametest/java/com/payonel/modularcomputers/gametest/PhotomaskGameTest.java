@@ -84,4 +84,29 @@ public class PhotomaskGameTest {
 		helper.assertTrue(drops.getFirst().has(DataComponents.CONTAINER), "with its silicon in it");
 		helper.succeed();
 	}
+
+	@GameTest(maxTicks = 200)
+	public void aRunningComputerPowersItOverTheBus(GameTestHelper helper) {
+		// A computer, a cable, and the photomask, its gear facing away from the cable.
+		helper.setBlock(new BlockPos(1, 1, 1), ModBlocks.TIER2_CASE.defaultBlockState()
+			.setValue(com.payonel.modularcomputers.block.AllInOneBlock.FACING, net.minecraft.core.Direction.SOUTH));
+		var computer = helper.getBlockEntity(new BlockPos(1, 1, 1), com.payonel.modularcomputers.block.AllInOneBlockEntity.class);
+		computer.parts().setItem(com.payonel.modularcomputers.menu.CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
+		computer.parts().setItem(com.payonel.modularcomputers.menu.CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
+		computer.parts().setItem(com.payonel.modularcomputers.menu.CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		TestPrograms.flash(computer, TestPrograms.HELLO);
+		helper.setBlock(new BlockPos(2, 1, 1), ModBlocks.CABLE);
+		helper.setBlock(new BlockPos(3, 1, 1), ModBlocks.PHOTOMASK.defaultBlockState().setValue(PhotomaskBlock.FACING, net.minecraft.core.Direction.EAST));
+		PhotomaskBlockEntity mask = helper.getBlockEntity(new BlockPos(3, 1, 1), PhotomaskBlockEntity.class);
+		mask.items().setItem(PhotomaskBlockEntity.INPUT, new ItemStack(ModItems.SILICON));
+		computer.pressPower();
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(computer.machine().board().bus().device("id:" + mask.id()).isPresent(), "on the computer's bus"))
+			.thenWaitUntil(() -> helper.assertTrue(mask.device().power().powered(), "with power from it"))
+			.thenWaitUntil(() -> helper.assertValueEqual(mask.items().getItem(PhotomaskBlockEntity.OUTPUT).getCount(), PhotomaskBlockEntity.CHIPS,
+				"it prints without a battery"))
+			.thenExecute(() -> computer.pressPower())
+			.thenExecute(() -> helper.assertTrue(!mask.device().power().powered(), "off: no power"))
+			.thenSucceed();
+	}
 }

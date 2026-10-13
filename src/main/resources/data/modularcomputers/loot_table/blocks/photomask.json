@@ -10,7 +10,8 @@
 						"type": "minecraft:copy_components",
 						"source": "block_entity",
 						"include": [
-							"minecraft:container"
+							"minecraft:container",
+							"modularcomputers:serial"
 						]
 					}
 				}

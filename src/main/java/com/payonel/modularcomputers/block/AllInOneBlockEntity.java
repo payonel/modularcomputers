@@ -611,6 +611,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 				addCabled(found, devices, new Cabled(Motherboard.id(piston.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.ROBOTIC_PISTON.asItem(), -1), piston.device());
 			} else if (block instanceof PaintGunBlockEntity gun) {
 				addCabled(found, devices, new Cabled(Motherboard.id(gun.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
+			} else if (block instanceof PhotomaskBlockEntity mask) {
+				addCabled(found, devices, new Cabled(Motherboard.id(mask.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PHOTOMASK.asItem(), -1), mask.device());
 			}
 		}
 		boolean sameDevices = found.equals(cabled) && devices.keySet().equals(cabledDevices.keySet())

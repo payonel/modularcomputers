@@ -4,7 +4,7 @@ import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.PhotomaskMenu;
-import com.payonel.modularcomputers.power.BatteryCharge;
+import com.payonel.modularcomputers.device.Photomask;
 import com.payonel.modularcomputers.power.PowerUnits;
 import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.minecraft.core.BlockPos;
@@ -35,12 +35,15 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import java.util.UUID;
 
 /**
  * A photomask's frame: silicon in, chips out, and a bay for a battery. Each wafer of silicon takes
  * {@link #WORK} turns of the crank and gives {@link #CHIPS} chips, as a wafer is printed and diced
- * into dies. A charged battery turns it every {@link #TICKS_PER_TURN} ticks, for {@link #TURN_COST}
- * units a turn. Broken, it keeps what's in it (like a shulker box).
+ * into dies. Powered, it turns every {@link #TICKS_PER_TURN} ticks, for {@link #TURN_COST} units a
+ * turn: from the bus, when a running computer has it on its bus (it's a device, wired by cable),
+ * or else from a charged battery in its bay. Broken, it keeps what's in it and its id (like a
+ * shulker box).
  */
 public final class PhotomaskBlockEntity extends BlockEntity implements ExtendedMenuProvider<BlockPos> {
 	public static final int INPUT = 0;
@@ -59,6 +62,7 @@ public final class PhotomaskBlockEntity extends BlockEntity implements ExtendedM
 	public static final int SPIN_EVENT = 1;
 	private static final float TURN_DEGREES = 45;
 	private static final String PROGRESS = "progress";
+	private static final String ID = "photomask_id";
 
 	private final SimpleContainer items = new SimpleContainer(SLOTS) {
 		@Override
@@ -73,6 +77,9 @@ public final class PhotomaskBlockEntity extends BlockEntity implements ExtendedM
 		}
 	};
 	private int progress;
+	/** Its id, its bus address ({@code id:<uuid>}); kept on its item when broken. */
+	private UUID id = UUID.randomUUID();
+	private final Photomask device = new Photomask();
 	/** The menu's view of the progress, in turns. */
 	private final ContainerData data = new ContainerData() {
 		@Override
@@ -105,6 +112,15 @@ public final class PhotomaskBlockEntity extends BlockEntity implements ExtendedM
 			case BATTERY -> stack.getItem() instanceof BatteryItem;
 			default -> false; // chips only come out
 		};
+	}
+
+	public UUID id() {
+		return id;
+	}
+
+	/** It on the bus. */
+	public Photomask device() {
+		return device;
 	}
 
 	public SimpleContainer items() {
@@ -167,14 +183,20 @@ public final class PhotomaskBlockEntity extends BlockEntity implements ExtendedM
 		return items.getItem(BATTERY).getItem() instanceof BatteryItem battery ? battery : null;
 	}
 
-	/** Server, every tick: a charged battery turns it, while there's work. */
+	/** Server, every tick: power from the bus, or else a charged battery, turns it while there's work. */
 	void serverTick() {
 		BatteryItem battery = battery();
 		ItemStack stack = items.getItem(BATTERY);
 		long now = level.getGameTime();
-		boolean powered = battery != null && !BatteryItem.charge(stack).isEmpty(battery.tier()) && canWork();
+		boolean bus = device.power().powered();
+		boolean charged = battery != null && !BatteryItem.charge(stack).isEmpty(battery.tier());
+		boolean powered = (bus || charged) && canWork();
 		if (powered && now % TICKS_PER_TURN == 0) {
-			stack.set(ModComponents.CHARGE, BatteryItem.charge(stack).run(battery.tier(), TURN_COST, now));
+			if (bus) {
+				device.power().charge(TURN_COST); // the computers supplying it pay
+			} else {
+				stack.set(ModComponents.CHARGE, BatteryItem.charge(stack).run(battery.tier(), TURN_COST, now));
+			}
 			turn();
 		}
 		if (getBlockState().getValue(PhotomaskBlock.WORKING) != powered) {
@@ -231,6 +253,7 @@ public final class PhotomaskBlockEntity extends BlockEntity implements ExtendedM
 	@Override
 	protected void collectImplicitComponents(DataComponentMap.Builder components) {
 		super.collectImplicitComponents(components);
+		components.set(ModComponents.SERIAL, id);
 		if (!items.isEmpty()) {
 			components.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(items.getItems()));
 		}
@@ -239,6 +262,10 @@ public final class PhotomaskBlockEntity extends BlockEntity implements ExtendedM
 	@Override
 	protected void applyImplicitComponents(DataComponentGetter components) {
 		super.applyImplicitComponents(components);
+		UUID serial = components.get(ModComponents.SERIAL);
+		if (serial != null) {
+			id = serial;
+		}
 		items.getItems().clear();
 		components.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(items.getItems());
 	}
@@ -247,12 +274,14 @@ public final class PhotomaskBlockEntity extends BlockEntity implements ExtendedM
 	public void removeComponentsFromTag(ValueOutput output) {
 		super.removeComponentsFromTag(output);
 		output.discard("Items");
+		output.discard(ID);
 	}
 
 	@Override
 	protected void saveAdditional(ValueOutput output) {
 		super.saveAdditional(output);
 		output.putInt(PROGRESS, progress);
+		output.store(ID, net.minecraft.core.UUIDUtil.CODEC, id);
 		ContainerHelper.saveAllItems(output, items.getItems());
 	}
 
@@ -260,6 +289,7 @@ public final class PhotomaskBlockEntity extends BlockEntity implements ExtendedM
 	protected void loadAdditional(ValueInput input) {
 		super.loadAdditional(input);
 		progress = input.getIntOr(PROGRESS, 0);
+		input.read(ID, net.minecraft.core.UUIDUtil.CODEC).ifPresent(saved -> id = saved);
 		items.getItems().clear();
 		ContainerHelper.loadAllItems(input, items.getItems());
 	}

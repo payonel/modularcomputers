@@ -13,4 +13,6 @@ public enum DeviceType {
 	SENSOR,
 	/** Something that moves things in the world (the robotic piston). */
 	ACTUATOR,
+	/** Something that makes things (the photomask, which prints chips). */
+	FABRICATOR,
 }

@@ -267,6 +267,9 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
   cities; memory, as a recovery compass remembers), a heart of the sea (power, as it powers a
   conduit), diamonds, a block of redstone. The user found Wither and End costs far too much.
 - Saved for later (user): shulker shells for a robot with deep internal storage.
+- Later (user, 2026-10-12): EEPROMs hold a small bootloader and the OS (mcos, Java and Lua
+  versions) is installed on a disk; programs come from ruins and traders (disks), and books with
+  programs in them; the photomask gets a device API (programs start and watch its work).
 - The player's introduction to the mod (silicon from quartz in a blast furnace, chips from the
   stonecutter, advancements, archaeology loot) is the next discussion.
 

@@ -473,7 +473,10 @@ scripts/art/error_beep.py` into
   (`PhotomaskRenderer`, a quad drawn with `submitCustomGeometry`, lit from the block in front;
   clients learn of a turn by a block event, `SPIN_EVENT`, and ease the gear round); a charged
   battery in its bay turns it every 5 ticks for 100 units a turn, gear spinning (block state
-  `working`). Right-click with silicon or a battery puts it in; sneak + right-click opens its
+  `working`). **It's also a bus device** (user, 2026-10-12; `device/Photomask`, type
+  `fabricator`, no methods yet: an API comes later): cabled on every side but its gear face, at
+  `id:<its id>`; while a running computer has it on its bus it runs on the bus's power first
+  (standby draw 2, plus 100 a turn charged to the computers supplying it), else on its battery. Right-click with silicon or a battery puts it in; sneak + right-click opens its
   slots. It keeps its contents when broken, like the holders. Its recipe needs chips (iron,
   glass pane, two chips, amethyst lens, copper, redstone): an intentional circle, so the first
   photomask is found (an ancient site) or bought (a villager), not yet built. Art:
