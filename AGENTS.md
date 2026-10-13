@@ -214,6 +214,10 @@ same thing.
       fills it. Explosions drop it too (no survives-explosion condition), so parts aren't lost.
       Screens, hubs, robotic pistons and paint guns do the same with their cards and ids. An
       empty one still has its id, so it stacks with new ones only once crafted alone.
+      Its hint lists what's inside, one line a part (`Hint.contents`): a computer's bus devices
+      in bus order ("ROM: EEPROM", "SATA 1: ...", "EXP 2: ..."), then "CPU", "RAM n", "UPS n";
+      a holder's cards by slot, then "Radio". Vanilla's own container list is hidden
+      (`TooltipDisplay` on the block items, `ModBlocks.holderProperties`).
   - **Case tiers** (user design, 2026-10-11; `machine/CaseTier`; blocks `tier1_case`..`tier3_case`,
     the same `AllInOneBlock`/`AllInOneBlockEntity` as the all-in-one). Case == board. **The
     all-in-one is now just a tier 3 case** (the dev kit; may become a creative pre-filled block):

@@ -71,6 +71,11 @@ public class KeepPartsGameTest {
 		helper.assertValueEqual(inside, List.of(ModItems.TIER2_CPU, ModItems.EEPROM, ModItems.TIER1_BATTERY, ModItems.TIER1_RAM, ModItems.WLAN_CARD),
 			"its parts are in the item");
 		helper.assertValueEqual(item.get(ModComponents.SERIAL), board, "its board id is the item's id");
+		// Its hint lists what's inside: the bus devices in bus order, then the rest.
+		List<String> hint = com.payonel.modularcomputers.hint.Hint.lines(com.payonel.modularcomputers.hint.Hint.of(item, false));
+		helper.assertValueEqual(hint.subList(0, 5), List.of("ROM: EEPROM", "EXP 2: WLAN Card", "CPU: Tier 2 CPU", "RAM 1: Tier 1 RAM",
+			"UPS 1: Tier 1 Battery"), "the hint's list of parts");
+		helper.assertTrue(!item.get(DataComponents.TOOLTIP_DISPLAY).shows(DataComponents.CONTAINER), "vanilla's own list is hidden");
 
 		placeBack(helper, item, POS);
 		AllInOneBlockEntity placed = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
@@ -102,6 +107,8 @@ public class KeepPartsGameTest {
 
 		List<ItemStack> dropped = breakBlock(helper, POS);
 		helper.assertValueEqual(dropped.size(), 1, "one item: " + dropped);
+		List<String> hint = com.payonel.modularcomputers.hint.Hint.lines(com.payonel.modularcomputers.hint.Hint.of(dropped.getFirst(), false));
+		helper.assertTrue(hint.contains("Radio: Bluetooth Card"), "its hint lists its radio: " + hint);
 		placeBack(helper, dropped.getFirst(), POS);
 		ScreenBlockEntity placed = helper.getBlockEntity(POS, ScreenBlockEntity.class);
 		helper.assertValueEqual(placed.id(), id, "the same screen (id:" + id + ")");

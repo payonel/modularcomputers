@@ -87,8 +87,15 @@ public final class ModBlocks {
 			BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(2.0f).sound(SoundType.METAL).setId(blockKey), tier));
 		ResourceKey<Item> itemKey = ResourceKey.create(Registries.ITEM, id(name));
 		Registry.register(BuiltInRegistries.ITEM, itemKey,
-			new ScreenItem(block, new Item.Properties().setId(itemKey).useBlockDescriptionPrefix()));
+			new ScreenItem(block, holderProperties(itemKey)));
 		return block;
+	}
+
+	/** A block item's properties; vanilla's list of a container's items is hidden, as the hint lists them in bus order. */
+	private static Item.Properties holderProperties(ResourceKey<Item> itemKey) {
+		return new Item.Properties().setId(itemKey).useBlockDescriptionPrefix()
+			.component(net.minecraft.core.component.DataComponents.TOOLTIP_DISPLAY,
+				net.minecraft.world.item.component.TooltipDisplay.DEFAULT.withHidden(net.minecraft.core.component.DataComponents.CONTAINER, true));
 	}
 
 	private static Block registerWithItem(String name, Function<BlockBehaviour.Properties, Block> factory, BlockBehaviour.Properties properties) {
@@ -96,7 +103,7 @@ public final class ModBlocks {
 		Block block = Registry.register(BuiltInRegistries.BLOCK, blockKey, factory.apply(properties.setId(blockKey)));
 		ResourceKey<Item> itemKey = ResourceKey.create(Registries.ITEM, id(name));
 		Registry.register(BuiltInRegistries.ITEM, itemKey,
-			new HintedBlockItem(block, new Item.Properties().setId(itemKey).useBlockDescriptionPrefix()));
+			new HintedBlockItem(block, holderProperties(itemKey)));
 		return block;
 	}
 }
