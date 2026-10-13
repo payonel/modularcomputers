@@ -22,6 +22,12 @@ import net.minecraft.world.level.block.Block;
 public class PhotomaskGameTest {
 	private static final BlockPos POS = new BlockPos(1, 1, 1);
 
+	/** A click on face {@code side}, at block-relative {@code x, y, z}. */
+	private static net.minecraft.world.phys.BlockHitResult hit(GameTestHelper helper, net.minecraft.core.Direction side, double x, double y, double z) {
+		BlockPos at = helper.absolutePos(POS);
+		return new net.minecraft.world.phys.BlockHitResult(new net.minecraft.world.phys.Vec3(at.getX() + x, at.getY() + y, at.getZ() + z), side, at, false);
+	}
+
 	private static PhotomaskBlockEntity place(GameTestHelper helper) {
 		helper.setBlock(POS, ModBlocks.PHOTOMASK.defaultBlockState());
 		return helper.getBlockEntity(POS, PhotomaskBlockEntity.class);
@@ -30,18 +36,26 @@ public class PhotomaskGameTest {
 	@GameTest
 	public void crankingPrintsAWaferIntoChips(GameTestHelper helper) {
 		PhotomaskBlockEntity mask = place(helper);
-		Player player = helper.makeMockServerPlayerInLevel(); // a server player: menus open for it
+		net.minecraft.server.level.ServerPlayer player = helper.makeMockServerPlayerInLevel(); // a server player: menus open for it
 		player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.SILICON, 2));
 		helper.useBlock(POS, player);
 		helper.assertValueEqual(mask.items().getItem(PhotomaskBlockEntity.INPUT).getCount(), 2, "right-click with silicon puts it in");
 		helper.assertTrue(player.getMainHandItem().isEmpty(), "out of the hand");
 
-		helper.useBlock(POS, player); // a plain right-click opens its slots
+		helper.useBlock(POS, player, hit(helper, net.minecraft.core.Direction.UP, 0.5, 1.0, 0.5)); // its top opens its slots
 		helper.assertTrue(player.containerMenu instanceof com.payonel.modularcomputers.menu.PhotomaskMenu, "its slots open, got " + player.containerMenu);
-		helper.assertValueEqual(mask.progress(), 0, "and the crank doesn't turn");
+		player.closeContainer();
+		helper.useBlock(POS, player, hit(helper, net.minecraft.core.Direction.NORTH, 0.05, 0.05, 0)); // the front, off the gear: opens too
+		helper.assertTrue(player.containerMenu instanceof com.payonel.modularcomputers.menu.PhotomaskMenu, "off the gear, its slots open");
+		player.closeContainer();
 		player.setShiftKeyDown(true);
+		helper.useBlock(POS, player, hit(helper, net.minecraft.core.Direction.NORTH, 0.5, 0.5, 0)); // crouching, even on the gear: opens
+		helper.assertTrue(player.containerMenu instanceof com.payonel.modularcomputers.menu.PhotomaskMenu, "crouching, its slots open");
+		player.closeContainer();
+		player.setShiftKeyDown(false);
+		helper.assertValueEqual(mask.progress(), 0, "and the gear hasn't turned");
 		for (int turn = 0; turn < PhotomaskBlockEntity.WORK; turn++) {
-			helper.useBlock(POS, player); // crouching, an empty hand turns the crank
+			helper.useBlock(POS, player, hit(helper, net.minecraft.core.Direction.NORTH, 0.5, 0.5, 0)); // right-clicking the gear turns it
 		}
 		helper.assertValueEqual(mask.items().getItem(PhotomaskBlockEntity.OUTPUT).getCount(), PhotomaskBlockEntity.CHIPS, "a wafer's chips");
 		helper.assertTrue(mask.items().getItem(PhotomaskBlockEntity.OUTPUT).is(ModItems.CHIP), "chips");

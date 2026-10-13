@@ -23,8 +23,9 @@ import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * A photomask (user design, 2026-10-12): the stencil chips are printed through, in a hand-cranked
- * lithography frame. Silicon goes in, chips come out. Right-click opens its slots; crouch and
- * right-click to turn its crank (its gear turns on the front) (user, 2026-10-12). Power (a battery
+ * lithography frame. Silicon goes in, chips come out. Right-click its gear to turn it; right-click
+ * anywhere else, or crouch and right-click, to open its slots (user, 2026-10-12: click the thing
+ * you mean, as with the case's power button). Power (a battery
  * in it, or a running computer on its bus) runs it on its own ({@link #WORKING}). Right-click
  * holding silicon or a battery puts it in.
  */
@@ -79,13 +80,27 @@ public final class PhotomaskBlock extends HorizontalDirectionalBlock implements 
 	@Override
 	protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
 		if (!level.isClientSide() && level.getBlockEntity(pos) instanceof PhotomaskBlockEntity mask) {
-			if (player.isShiftKeyDown()) {
-				mask.crank(); // crouching, the player turns the crank
+			if (!player.isShiftKeyDown() && onGear(state, pos, hit)) {
+				mask.crank(); // the player turns the gear they clicked
 			} else {
-				player.openMenu(mask);
+				player.openMenu(mask); // anywhere else, or crouching: its slots
 			}
 		}
 		return InteractionResult.SUCCESS;
+	}
+
+	/** Half the gear's width on the front, in blocks, with a little give around its teeth. */
+	public static final double GEAR_RADIUS = 6.5 / 16;
+
+	/** Whether a click landed on the gear: on the front face, within its circle. */
+	public static boolean onGear(BlockState state, BlockPos pos, BlockHitResult hit) {
+		net.minecraft.core.Direction front = state.getValue(FACING);
+		if (hit.getDirection() != front) {
+			return false;
+		}
+		net.minecraft.world.phys.Vec3 at = hit.getLocation().subtract(pos.getX(), pos.getY(), pos.getZ());
+		double across = front.getAxis() == net.minecraft.core.Direction.Axis.Z ? at.x : at.z;
+		return Math.hypot(across - 0.5, at.y - 0.5) <= GEAR_RADIUS;
 	}
 
 	@Override

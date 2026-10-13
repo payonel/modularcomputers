@@ -1,0 +1,68 @@
+{
+	"parent": "minecraft:block/block",
+	"textures": {
+		"particle": "modularcomputers:block/photomask_side",
+		"front": "modularcomputers:block/photomask_front",
+		"side": "modularcomputers:block/photomask_side",
+		"top": "modularcomputers:block/photomask_top",
+		"bottom": "modularcomputers:block/photomask_bottom",
+		"gear": "modularcomputers:block/photomask_gear"
+	},
+	"elements": [
+		{
+			"from": [
+				0,
+				0,
+				0
+			],
+			"to": [
+				16,
+				16,
+				16
+			],
+			"faces": {
+				"north": {
+					"texture": "#front"
+				},
+				"south": {
+					"texture": "#side"
+				},
+				"east": {
+					"texture": "#side"
+				},
+				"west": {
+					"texture": "#side"
+				},
+				"up": {
+					"texture": "#top"
+				},
+				"down": {
+					"texture": "#bottom"
+				}
+			}
+		},
+		{
+			"from": [
+				2,
+				2,
+				-0.1
+			],
+			"to": [
+				14,
+				14,
+				-0.1
+			],
+			"faces": {
+				"north": {
+					"uv": [
+						0,
+						0,
+						16,
+						16
+					],
+					"texture": "#gear"
+				}
+			}
+		}
+	]
+}

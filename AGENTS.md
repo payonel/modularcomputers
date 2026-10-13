@@ -471,8 +471,11 @@ scripts/art/error_beep.py` into
 - **Chips** (user design, 2026-10-12): nether quartz smelts to **silicon** in a blast furnace only
   (`recipe/silicon.json`); a **photomask** (`PhotomaskBlock`, `PhotomaskBlockEntity`, `PhotomaskMenu`,
   `PhotomaskScreen`) prints silicon into **chips**: a wafer takes `WORK` (8) turns and gives
-  `CHIPS` (4). **Right-click opens its slots; crouch + right-click turns its crank** (user,
-  2026-10-12), and its brass gear turns an eighth on its front
+  `CHIPS` (4). **Right-click the gear to turn it; right-click anywhere else, or crouch + right-click
+  anywhere (even on the gear), to open its slots** (user, 2026-10-12: click the thing you mean,
+  like the case's power button; `PhotomaskBlock.onGear` checks the front face within the gear's
+  circle). Its item model shows the gear on its front (the block's gear is drawn by the
+  renderer). Each turn, its brass gear turns an eighth on its front
   (`PhotomaskRenderer`, a quad drawn with `submitCustomGeometry`, lit from the block in front;
   clients learn of a turn by a block event, `SPIN_EVENT`, and ease the gear round); a charged
   battery in its bay runs it: with power it's on (gear spinning, block state `working`), idling
