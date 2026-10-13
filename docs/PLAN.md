@@ -244,7 +244,7 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
 ## Disks (built 2026-10-12; see AGENTS.md)
 
 - Built: hfs and raw modes, file handles, data in the world save by id, the OS's VFS and shell in
-  `HelloWorldProgram`.
+  `Mcos`.
 - Open: disks in expansion hubs; hfs labels set by programs; a Lua runtime's `__gc` closing
   handles; whether a mount table belongs on the board (a kernel's job) once there's a real OS.
 

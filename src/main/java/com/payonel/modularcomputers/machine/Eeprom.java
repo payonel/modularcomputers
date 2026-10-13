@@ -15,16 +15,14 @@ import java.util.function.Consumer;
  * to read or reflash it. Flashing takes effect at the next power-on.
  * <p>
  * Its contents (its image) are plain text, whatever the CPU's architecture: what {@code get} and
- * {@code set} read and write, like {@code flashrom -r} and {@code -w} on a board's SPI flash, up
- * to {@link #SIZE} bytes, kept on the chip (its item). The CPU loads its program from it (a Java
+ * {@code set} read and write, like {@code flashrom -r} and {@code -w} on a board's SPI flash, kept
+ * on the chip (its item). No size limit for now (user, 2026-10-12): the whole OS lives on it until
+ * EEPROMs hold a bootloader and the OS is installed on a disk. The CPU loads its program from it (a Java
  * CPU: the class it names, {@link Cpu#load}; a Lua CPU later: Lua source). Tests and tools can
  * also attach a Java program object directly ({@link #flash}), like an in-circuit programmer;
  * the CPU then runs that instead.
  */
 public final class Eeprom implements Device {
-	/** How many bytes it holds: 4 KiB. */
-	public static final int SIZE = 4096;
-
 	private Program attached;
 	private String image = "";
 	private String label;
@@ -79,20 +77,12 @@ public final class Eeprom implements Device {
 		return Result.ok(image);
 	}
 
-	@Method(doc = "set(data): writes the chip's contents (up to getSize() bytes); takes effect at the next power-on")
+	@Method(doc = "set(data): writes the chip's contents; takes effect at the next power-on")
 	public Result set(Arguments args) {
 		String data = args.checkString(0);
-		if (bytes(data) > SIZE) {
-			return Result.fail("not enough space: " + bytes(data) + " bytes, the chip holds " + SIZE);
-		}
 		image = data;
 		onWrite.accept(image);
 		return Result.ok();
-	}
-
-	@Method(doc = "getSize(): how many bytes it holds")
-	public Result getSize(Arguments args) {
-		return Result.ok(SIZE);
 	}
 
 	@Override
@@ -102,7 +92,7 @@ public final class Eeprom implements Device {
 
 	@Override
 	public Map<String, Object> info() {
-		return Map.of("capacity", (long) SIZE, "used", (long) bytes(image));
+		return Map.of("used", (long) bytes(image));
 	}
 
 	@Override

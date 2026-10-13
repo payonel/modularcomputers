@@ -11,9 +11,10 @@ import java.util.TreeMap;
 import java.util.function.Consumer;
 
 /**
- * Stand-in EEPROM contents until there's a Lua runtime, written as a mock program against the
- * motherboard API (the user changes it to try things out; tests never use it). Today it's a tiny
- * OS, after OpenOS and busybox, all in this one class (the user's wish):
+ * <b>mcos</b>, the Modular Computers OS, Java version (a Lua version will follow): a tiny OS after
+ * OpenOS and busybox, written as a program against the motherboard API, all in this one class
+ * (the user's wish). New EEPROMs come flashed with it (their text names this class). The user
+ * changes it to try things out; tests never use it.
  * <ul>
  * <li><b>Files:</b> a VFS with a mount table. The root, {@code /}, is a tmpfs in memory, like an
  * initramfs, with {@code /mnt} and {@code /tmp}. Disks in hfs mode are mounted from their files
@@ -27,7 +28,7 @@ import java.util.function.Consumer;
  * </ul>
  * Everything goes through the board: the OS is a program like any other.
  */
-public final class HelloWorldProgram implements Program {
+public final class Mcos implements Program {
 	private static final double WAIT_SECONDS = 3600;
 	private static final String CONSOLE = VirtualBus.CONSOLE;
 	private static final int CHUNK = 4096;
@@ -601,7 +602,7 @@ public final class HelloWorldProgram implements Program {
 			columns = width.intValue();
 		}
 		automount();
-		print("Modular Computers OS\nType help for commands.\n");
+		print("mcos (Java)\nType help for commands.\n");
 		while (true) {
 			print(prompt());
 			String line = readLine();

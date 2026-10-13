@@ -420,7 +420,8 @@ scripts/art/error_beep.py` into
       - There are four block models (`all_in_one[_on][_faded]`) on two base models (emissive,
         and plain), and four frames in `textures/gui/power_button.png`.
   - **Boot results:**
-    - CPU and EEPROM: the stand-in program (`HelloWorldProgram`, which the user keeps changing
+    - CPU and EEPROM: **mcos** (`Mcos`; user's name, 2026-10-12: the Modular Computers OS, Java
+      version, a Lua version to follow), which the user keeps changing
       to try things out). Today it's **a tiny OS and shell, after OpenOS and busybox, all in that
       one class** (user, 2026-10-12: "keep all functions for the os just in that one class"):
       - a VFS with a mount table; `/` is a tmpfs in memory (like an initramfs) with `/mnt` and
@@ -635,7 +636,7 @@ scripts/art/error_beep.py` into
   a public no-argument constructor, which the CPU loads (`Cpu.load`; looked at before it's
   initialized, so naming anything else runs nothing). A Lua CPU will read the same text as Lua.
   Blank: `ABRT: EEPROM is blank`; not a Java program: `ABRT: EEPROM: exec format error` (Linux's
-  ENOEXEC). A new EEPROM comes flashed with the stand-in OS (`HelloWorldProgram`'s class name is
+  ENOEXEC). A new EEPROM comes flashed with mcos (`Mcos`'s class name is
   the item's default `eeprom_image`). **Crafting one alone wipes it** (user): no id, blank
   (`ClearIdRecipe`); its hint shows what it holds ("Holds: ...", "Blank"). Tests attach Java
   program objects with `Eeprom.flash(Program)`, like an in-circuit programmer; the CPU runs an
@@ -799,12 +800,13 @@ scripts/art/error_beep.py` into
   - **Not saveable** (user): a running program lives in its thread. Unloading stops it
     (`Machine.unload`); after a load a powered machine's CPU is halted. Save/restore waits for
     the real Lua runtime.
-  - **Tests bring their own programs** (user, 2026-10-11): never assert on `HelloWorldProgram`,
+  - **Tests bring their own programs** (user, 2026-10-11): never assert on `Mcos`,
     which changes. Unit tests build their own `Program`s; game tests flash one onto the EEPROM
     after inserting it (`Eeprom.flash`, like reflashing firmware; `gametest/TestPrograms`).
   - Device methods so far: the console (`write`, `read`, `getSize`, `getModes`, `setMode`,
     `terminals`, `bind`, `unbind`), terminals (`write`, `read`, `getSize`), disks
-    (below) and the EEPROM (`get`, `set`, `getSize`: its image, up to 4 KiB, like
+    (below) and the EEPROM (`get`, `set`: its image, no size limit for now (user, 2026-10-12; EEPROMs will
+    later hold a bootloader, with the OS installed on a disk), like
     `flashrom -r`/`-w`; kept on the item as `ModComponents.EEPROM_IMAGE`; another chip is another
     `Eeprom`, by serial. The CPU still runs the Java stand-in whatever the image holds, until the
     Lua runtime).
@@ -1215,7 +1217,7 @@ src/main/java/.../sound/ModSounds.java   sound events (error_beep)
 .github/workflows/build.yml
 src/main/java/com/payonel/modularcomputers/
   ModularComputers.java            MOD_ID, LOGGER, id(), INIT_MARKER; registers content + packets
-  machine/                         plain Java: Machine (power), Cpu, Motherboard, Eeprom, Program, HelloWorldProgram, Hardware, Part, PartKind
+  machine/                         plain Java: Machine (power), Cpu, Motherboard, Eeprom, Program, Mcos, Hardware, Part, PartKind
   bus/                             plain Java: Bus (physical), VirtualBus, Device, DeviceType
   console/ConsoleSplitter.java     the always-present console on the virtual bus
   device/                          Terminal (screen + keyboard), Disk, Card, UpsBattery (bus devices)

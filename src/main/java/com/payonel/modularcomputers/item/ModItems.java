@@ -33,9 +33,9 @@ public final class ModItems {
 	public static final CpuItem TIER3_CPU = cpu("tier3_cpu", CpuTier.TIER_3);
 	public static final List<CpuItem> CPUS = List.of(TIER1_CPU, TIER2_CPU, TIER3_CPU);
 	/** Every EEPROM holds the stand-in program for now; programmable contents come with the Lua runtime. */
-	/** Comes from the factory flashed with the stand-in OS, as real boards ship with firmware (crafting it alone wipes it). */
+	/** Comes from the factory flashed with mcos, as real boards ship with firmware (crafting it alone wipes it). */
 	public static final Item EEPROM = register("eeprom", properties -> holdsData(properties)
-		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.HelloWorldProgram.class.getName()));
+		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.Mcos.class.getName()));
 	/** RAM sticks: the tier sets the size. */
 	public static final MemoryItem TIER1_RAM = ram("tier1_ram", MemoryTier.TIER_1);
 	public static final MemoryItem TIER2_RAM = ram("tier2_ram", MemoryTier.TIER_2);

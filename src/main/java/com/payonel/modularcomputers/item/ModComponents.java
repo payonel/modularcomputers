@@ -40,12 +40,12 @@ public final class ModComponents {
 		DataComponentType.<UUID>builder().persistent(UUIDUtil.CODEC).networkSynchronized(UUIDUtil.STREAM_CODEC).build());
 
 	/**
-	 * What an EEPROM holds (its image): plain text, up to {@code Eeprom.SIZE} bytes, whatever the
+	 * What an EEPROM holds (its image): plain text (no size limit for now), whatever the
 	 * CPU's architecture. A Java CPU reads it as the name of a program class; a Lua CPU will read
 	 * Lua. A new EEPROM comes flashed with the stand-in OS (the item's default); a wiped one holds "".
 	 */
 	public static final DataComponentType<String> EEPROM_IMAGE = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("eeprom_image"),
-		DataComponentType.<String>builder().persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.STRING_UTF8).build());
+		DataComponentType.<String>builder().persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.stringUtf8(Integer.MAX_VALUE)).build());
 
 	/**
 	 * A computer's bus order (external devices by id, and the ones unplugged), kept on its item

@@ -117,9 +117,8 @@ class BoardInfoTest {
 			seen.add(board.invoke("eeprom", "get").first());
 			seen.add(board.invoke("eeprom", "set", "print('hi')").failed());
 			seen.add(board.invoke("eeprom", "get").first());
-			seen.add(board.invoke("eeprom", "set", "x".repeat(Eeprom.SIZE + 1)).error());
-			seen.add(board.invoke("eeprom", "get").first());
-			seen.add(board.invoke("eeprom", "getSize").first());
+			seen.add(board.info("eeprom").orElseThrow().get("used"));
+			seen.add(board.invoke("eeprom", "set", "x".repeat(100_000)).failed()); // no size limit for now
 			seen.add(board.info("eeprom").orElseThrow().get("used"));
 			board.halt();
 		});
@@ -128,8 +127,7 @@ class BoardInfoTest {
 		machine.board().setEeprom(eeprom);
 		machine.setDevices(Map.of("eeprom", eeprom));
 		machine.pressPower();
-		assertThat(seen).containsExactly("", false, "print('hi')", "not enough space: 4097 bytes, the chip holds 4096", "print('hi')",
-			(long) Eeprom.SIZE, 11L);
-		assertThat(written).as("each write goes onto the chip").containsExactly("print('hi')");
+		assertThat(seen).containsExactly("", false, "print('hi')", 11L, false, 100_000L);
+		assertThat(written).as("each write goes onto the chip").containsExactly("print('hi')", "x".repeat(100_000));
 	}
 }
