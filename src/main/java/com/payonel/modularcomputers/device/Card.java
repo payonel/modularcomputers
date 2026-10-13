@@ -39,4 +39,18 @@ public class Card implements Device {
 	public DeviceType type() {
 		return kind.type();
 	}
+
+	/** Its block, told when what it saves changes ({@link Device#onChange}). */
+	private Runnable changed = () -> {
+	};
+
+	@Override
+	public void onChange(Runnable changed) {
+		this.changed = changed;
+	}
+
+	/** What it saves changed: its block marks itself. */
+	protected void changed() {
+		changed.run();
+	}
 }

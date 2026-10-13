@@ -19,7 +19,7 @@ public final class RedstoneCard extends Card {
 	private final InterruptLine line = new InterruptLine();
 	/** It works while a running computer has it on its bus (it draws nothing to speak of). */
 	private final com.payonel.modularcomputers.bus.BusPower power = new com.payonel.modularcomputers.bus.BusPower(0);
-	private final EventQueue events = new EventQueue(line);
+	private final EventQueue events = new EventQueue(line, this::changed);
 	private final int[] input = new int[6];
 	private final int[] output = new int[6];
 	/** Tells the world its outputs changed (the block it's in updates its neighbours). */
@@ -77,6 +77,7 @@ public final class RedstoneCard extends Card {
 		int was = output[side];
 		if (was != value) {
 			output[side] = value;
+			changed();
 			onOutput.run();
 		}
 		return Result.ok((long) was);
@@ -106,6 +107,7 @@ public final class RedstoneCard extends Card {
 		saved.put("output", java.util.Arrays.stream(output).mapToObj(v -> (Object) (long) v).toList());
 		return saved;
 	}
+
 
 	@Override
 	public void restore(Map<String, Object> saved) {
@@ -142,6 +144,7 @@ public final class RedstoneCard extends Card {
 		}
 		events.clear();
 		if (any) {
+			changed();
 			onOutput.run();
 		}
 	}

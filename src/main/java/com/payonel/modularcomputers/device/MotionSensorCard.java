@@ -23,7 +23,7 @@ public final class MotionSensorCard extends Card {
 	public static final int BASE_DRAW = 1;
 	public static final int DRAW_PER_RANGE = 1;
 	private final InterruptLine line = new InterruptLine();
-	private final EventQueue events = new EventQueue(line);
+	private final EventQueue events = new EventQueue(line, this::changed);
 	private final BusPower power = new BusPower(BASE_DRAW + 8 * DRAW_PER_RANGE);
 	private String mode = "all";
 	private int range = 8;
@@ -60,6 +60,7 @@ public final class MotionSensorCard extends Card {
 			return Result.fail("no such mode: " + wanted);
 		}
 		mode = wanted;
+		changed();
 		return Result.ok();
 	}
 
@@ -72,6 +73,7 @@ public final class MotionSensorCard extends Card {
 	public Result setRange(Arguments args) {
 		range = (int) Math.clamp(args.checkInteger(0), 1, MAX_RANGE);
 		power.setDraw(BASE_DRAW + range * DRAW_PER_RANGE);
+		changed();
 		return Result.ok((long) range);
 	}
 
@@ -104,6 +106,7 @@ public final class MotionSensorCard extends Card {
 		saved.put("range", (long) range);
 		return saved;
 	}
+
 
 	@Override
 	public void restore(Map<String, Object> saved) {

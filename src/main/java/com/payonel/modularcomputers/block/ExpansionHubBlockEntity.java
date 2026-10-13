@@ -64,6 +64,12 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 	/** A card that works here, at the hub: a redstone card's output changes update the hub's neighbours. */
 	private Card cardHere(com.payonel.modularcomputers.device.CardKind kind) {
 		Card card = com.payonel.modularcomputers.device.Cards.make(kind);
+		// Minecraft writes only chunks marked changed: its cards' events and settings change as they're used.
+		card.onChange(() -> {
+			if (level != null && !level.isClientSide()) {
+				level.blockEntityChanged(worldPosition);
+			}
+		});
 		if (card instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
 			redstone.onOutput(() -> {
 				if (level != null && !level.isClientSide()) {

@@ -244,9 +244,12 @@ public final class LuaRunner implements Runner {
 
 	/**
 	 * Server side: saves the computer as it runs. Pins a request the computer's thread honours at
-	 * its next safe point, carrying out its board calls meanwhile (it may be waiting on one), and
-	 * waits for it. Empty when it can't be saved now (it's not running, the state holds what can't
-	 * be persisted, or it took too long); the computer then comes back halted.
+	 * its next safe point, and waits for it. It carries out no calls meanwhile: a call queued but
+	 * not made is a safe point itself (the computer's thread takes it back, honours the pin with the
+	 * request still on the kernel's stack, then queues it again), so a save never moves data
+	 * between the program and its devices, and every block's saved copy agrees with the program's.
+	 * Empty when it can't be saved now (it's not running, the state holds what can't be persisted,
+	 * or it took too long); the computer then comes back halted.
 	 */
 	@Override
 	public Optional<byte[]> persist(Board board) {
@@ -255,19 +258,13 @@ public final class LuaRunner implements Runner {
 		}
 		CompletableFuture<byte[]> pin = new CompletableFuture<>();
 		persistPin.set(pin);
-		long end = System.nanoTime() + PERSIST_NANOS;
-		while (System.nanoTime() < end) {
-			Call call;
-			while ((call = calls.poll()) != null) {
-				answer(call, board);
-			}
-			try {
-				return Optional.ofNullable(pin.get(1, TimeUnit.MILLISECONDS));
-			} catch (TimeoutException e) {
-				// not at a safe point yet
-			} catch (InterruptedException | ExecutionException e) {
-				break;
-			}
+		try {
+			return Optional.ofNullable(pin.get(PERSIST_NANOS, TimeUnit.NANOSECONDS));
+		} catch (TimeoutException e) {
+			com.payonel.modularcomputers.ModularComputers.LOGGER.error(
+				"A running computer didn't reach a safe point to be saved in {} ms: it will come back halted, its program lost", PERSIST_NANOS / 1_000_000);
+		} catch (InterruptedException | ExecutionException e) {
+			com.payonel.modularcomputers.ModularComputers.LOGGER.error("A running computer couldn't be saved: it will come back halted", e);
 		}
 		persistPin.compareAndSet(pin, null);
 		return Optional.empty();
@@ -485,7 +482,7 @@ public final class LuaRunner implements Runner {
 					}
 					case "call" -> {
 						honour();
-						Object answer = await(serve(said));
+						Object answer = awaitCall(serve(said));
 						lua_settop(kernel, top - asked);
 						reply = values(answer);
 					}
@@ -572,7 +569,7 @@ public final class LuaRunner implements Runner {
 	}
 
 	/** A board call, as the server thread will make it. */
-	private CompletableFuture<Object> serve(List<Object> said) {
+	private Call serve(List<Object> said) {
 		String name = String.valueOf(said.size() > 1 ? said.get(1) : "");
 		List<Object> args = said.subList(Math.min(2, said.size()), said.size());
 		Function<Board, Object> call = switch (name) {
@@ -596,7 +593,35 @@ public final class LuaRunner implements Runner {
 		Call request = new Call(call, new CompletableFuture<>());
 		calls.add(request);
 		serveSoon.run();
-		return request.answer();
+		return request;
+	}
+
+	/**
+	 * Waits for a call's answer. A save pinned meanwhile, while the call isn't made yet, is honoured
+	 * here: the call comes back out of the queue (the server thread, saving, isn't taking from it),
+	 * the state is saved with the request still on the kernel's stack, and the call goes back in.
+	 */
+	private Object awaitCall(Call call) {
+		while (true) {
+			try {
+				return call.answer().get(10, TimeUnit.MILLISECONDS);
+			} catch (TimeoutException e) {
+				if (persistPin.get() != null && calls.remove(call)) {
+					honour();
+					calls.add(call);
+					serveSoon.run();
+				}
+			} catch (InterruptedException e) {
+				throw new Stopped();
+			} catch (ExecutionException e) {
+				throw new IllegalStateException(e.getCause());
+			}
+		}
+	}
+
+	/** How many calls wait for the server thread (tests). */
+	int queuedCalls() {
+		return calls.size();
 	}
 
 	private static String arg(List<Object> args, int i) {
@@ -619,17 +644,6 @@ public final class LuaRunner implements Runner {
 		wait = request;
 		serveSoon.run(); // it may be over already
 		return request.answer();
-	}
-
-	/** Waits for the server thread's answer; a stop ends the wait. */
-	private <T> T await(CompletableFuture<T> answer) {
-		try {
-			return answer.get();
-		} catch (InterruptedException e) {
-			throw new Stopped();
-		} catch (ExecutionException e) {
-			throw new IllegalStateException(e.getCause());
-		}
 	}
 
 	private static String string(lua_State L, int arg) {

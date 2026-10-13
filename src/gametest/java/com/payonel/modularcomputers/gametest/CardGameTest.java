@@ -96,6 +96,37 @@ public class CardGameTest {
 			.thenSucceed();
 	}
 
+	/**
+	 * Minecraft writes only chunks marked changed, even at an unload: a device's data changing (keys
+	 * typed or read, events, outputs) marks its block's chunk at once, or the old copy stays on disk.
+	 */
+	@GameTest
+	public void aDevicesDataChangingMarksItsChunkForTheNextSave(GameTestHelper helper) {
+		BlockPos screenPos = POS.east(2);
+		BlockPos hubPos = POS.west(2);
+		helper.setBlock(screenPos, ModBlocks.TIER3_SCREEN);
+		helper.setBlock(hubPos, ModBlocks.EXPANSION_HUB);
+		var screen = helper.getBlockEntity(screenPos, com.payonel.modularcomputers.block.ScreenBlockEntity.class);
+		var hub = helper.getBlockEntity(hubPos, com.payonel.modularcomputers.block.ExpansionHubBlockEntity.class);
+		hub.cards().setItem(0, new ItemStack(ModItems.REDSTONE_CARD));
+		RedstoneCard card = (RedstoneCard) hub.card(0).orElseThrow();
+		var chunk = helper.getLevel().getChunkAt(helper.absolutePos(screenPos));
+		helper.assertTrue(chunk == helper.getLevel().getChunkAt(helper.absolutePos(hubPos)), "one chunk for both (the test's)");
+		java.util.List<Runnable> changes = List.of(
+			() -> screen.terminal().press("a"),
+			() -> screen.terminal().read(args()),
+			() -> card.setOutput(args("up", 3L)),
+			() -> card.sense(0, 5),
+			() -> card.pull(args()));
+		for (Runnable change : changes) {
+			chunk.tryMarkSaved();
+			helper.assertTrue(!chunk.isUnsaved(), "saved");
+			change.run();
+			helper.assertTrue(chunk.isUnsaved(), "marked at once, for the next save");
+		}
+		helper.succeed();
+	}
+
 	@GameTest(maxTicks = 60)
 	public void aWeatherCardReportsTheWeatherAndItsChanges(GameTestHelper helper) {
 		WeatherCard card = computerWith(helper, ModItems.WEATHER_SENSOR_CARD, WeatherCard.class);

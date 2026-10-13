@@ -231,6 +231,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		this.tier = block.tier();
 		this.power = new PowerBuffer(tier.bufferCapacity());
 		display.setFlusher(this::syncDisplay);
+		display.onChange(this::markChanged);
 		machine.board().setChassis(new CaseChassis());
 	}
 
@@ -446,6 +447,17 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		updateBluetooth();
 	}
 
+	/**
+	 * Marks its chunk changed, so the next save or unload writes it (Minecraft writes only chunks
+	 * marked changed), at once when a device's data changes. Without {@link #setChanged}'s comparator
+	 * update, which nothing here needs, so it's cheap to do often.
+	 */
+	private void markChanged() {
+		if (level != null && !level.isClientSide()) {
+			level.blockEntityChanged(worldPosition);
+		}
+	}
+
 	@Override
 	public void preRemoveSideEffects(BlockPos pos, BlockState state) {
 		super.preRemoveSideEffects(pos, state);
@@ -518,6 +530,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 			if (card != null) {
 				CardWorld.tick(card, (ServerLevel) level, worldPosition, level.getGameTime()); // cards work where they're installed
 			}
+		}
+		// Minecraft writes only chunks marked changed (at a save, or an unload): an on machine changes
+		// every tick (its clock, its program). Its devices mark it themselves as their data changes.
+		if (machine.isPowered()) {
+			markChanged();
 		}
 		// The motherboard checks its CPU and power every tick, and the program gets its turn.
 		Machine.Supervision supervision = machine.tick();
@@ -780,6 +797,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	/** A card that works here, at the case: a redstone card's output changes update the case's neighbours. */
 	private Card cardHere(CardKind kind) {
 		Card card = com.payonel.modularcomputers.device.Cards.make(kind);
+		card.onChange(this::markChanged);
 		if (card instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
 			redstone.onOutput(() -> {
 				if (level != null && !level.isClientSide()) {
@@ -878,6 +896,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 				if (display.tier() != screenTier) {
 					display = new Terminal(Resolution.DEFAULT, screenTier);
 					display.setFlusher(this::syncDisplay);
+					display.onChange(this::markChanged);
 				}
 				cards[lane] = null;
 				display.labelFrom(() -> ModComponents.label(parts.getItem(CaseMenu.EXP_SLOTS))); // read from the screen itself

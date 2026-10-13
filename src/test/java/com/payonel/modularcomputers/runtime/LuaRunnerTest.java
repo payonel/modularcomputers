@@ -284,6 +284,55 @@ class LuaRunnerTest {
 		again.pressPower();
 	}
 
+	/** A device that counts its calls. */
+	public static final class Counter implements Device {
+		int hits;
+
+		@Override
+		public com.payonel.modularcomputers.bus.DeviceType type() {
+			return com.payonel.modularcomputers.bus.DeviceType.REDSTONE;
+		}
+
+		@Method(doc = "hit(): counts a call")
+		public Result hit(Arguments args) {
+			hits++;
+			return Result.ok((long) hits);
+		}
+	}
+
+	@Test
+	void aSaveCarriesOutNoCallsSoTheDevicesAndTheProgramAgree() {
+		Counter counter = new Counter();
+		Map<String, Device> devices = new LinkedHashMap<>();
+		devices.put("id:screen", screen);
+		devices.put("id:counter", counter);
+		machine.setDevices(devices);
+		boot("""
+			local _, n = board.invoke("id:counter", "hit")
+			board.invoke("console", "write", "hits " .. n)
+			board.halt()
+			""");
+		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
+		long end = System.nanoTime() + 5_000_000_000L;
+		while (runner.queuedCalls() == 0) { // its call is queued; the server thread (this test) hasn't made it
+			assertThat(System.nanoTime()).isLessThan(end);
+			Thread.onSpinWait();
+		}
+		byte[] saved = machine.persistProgram().orElseThrow();
+		assertThat(counter.hits).as("the save made no call: the device is as the save found it").isZero();
+		machine.unload();
+		Machine again = new Machine(new Motherboard(Hardware.allInOne(), new Bus(java.util.List.of())));
+		again.setDevices(devices);
+		again.board().setCpu(new Cpu(CpuTier.TIER_3));
+		again.setServer(server::add);
+		again.restorePowered(true);
+		again.resumeProgram(saved);
+		settle(again, () -> again.runner().isEmpty());
+		assertThat(counter.hits).as("the saved program makes its call, once").isEqualTo(1);
+		assertThat(again.board().virtualBus().console().screen().row(0).strip()).isEqualTo("hits 1");
+		again.pressPower();
+	}
+
 	@Test
 	void aWaitSavedPartwayEndsOnItsDeadlineOnTheSavedClock() {
 		boot("board.waitForInterrupt(4, \"nothing\") board.halt()"); // 80 ticks

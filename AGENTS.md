@@ -647,11 +647,16 @@ scripts/art/error_beep.py` into
     is only touched by the computer's thread.
   - **Saving a running computer** (user, 2026-10-13; Styx persists from the main thread only, so it's
     the host's): the case's `saveAdditional` (world saves, chunk unloads; not client syncs) asks
-    `Machine.persistProgram`, which pins a request (`LuaRunner.persist`) and blocks, carrying out the
-    computer's board calls meanwhile (no deadlock), until the computer's thread honours it at its
-    next safe point: the kernel suspended in a yield with its request still on its stack (a slice, a
-    call not yet made, or a wait, honoured at once), so no Lua runs while it persists. Up to 2 s,
-    else it isn't saved. The bytes go in the case's NBT (`program`). On load the case resumes it
+    `Machine.persistProgram`, which pins a request (`LuaRunner.persist`) and blocks until the
+    computer's thread honours it at its next safe point: the kernel suspended in a yield with its
+    request still on its stack (a slice, a call not yet made, or a wait, honoured at once), so no
+    Lua runs while it persists. **A save carries out no calls** (user, 2026-10-13): a call queued but
+    not made is taken back out of the queue, the state saved with it on the stack, and queued again
+    (`LuaRunner.awaitCall`), so nothing moves between the program and its devices during a save and
+    every block's saved copy agrees with the program's (an autosave writes all chunks in one pass,
+    with no ticks between). Up to 2 s, else it isn't saved (logged as an error: the program is lost,
+    it comes back halted). The user's open concern: the server thread blocking on a computer to
+    reach a safe point at a save or shutdown; to revisit. The bytes go in the case's NBT (`program`). On load the case resumes it
     (`Machine.resumeProgram`, `LuaRunner.restore`) at its first tick, after the bus is found again;
     the restored kernel's request is still on its stack, so the computer's thread carries on with it
     (a wait ends on its deadline: the firmware makes a wait's length a deadline on the machine's
@@ -664,9 +669,13 @@ scripts/art/error_beep.py` into
     the block they're in keeps them (case, screen, hub). **An unload freezes, it isn't a power cut**
     (`Machine.unload`): the computer stops supplying its devices but doesn't power them off, so a
     cabled screen or a hub's card in a chunk that stays loaded keeps what it shows and holds;
-    breaking the case is the power cut (`preRemoveSideEffects`, `Machine.removed`). Two blocks save
-    separately, so a call served while the case persists can, rarely, leave an event both in a hub
-    saved just before and in the program. Permanents (the standard library's C functions and userdata, named by path,
+    breaking the case is the power cut (`preRemoveSideEffects`, `Machine.removed`). **Gotcha:
+    Minecraft writes only chunks marked changed, even at an unload** (`ChunkMap.save`,
+    `tryMarkSaved`): a block whose data changes without marking keeps its old copy on disk. So a
+    device tells its block at once when what it saves or shows changes (`Device.onChange`), and the
+    block marks its chunk (`level.blockEntityChanged`: `setChanged` without the comparator update); a
+    powered case marks itself every tick. What's left is vanilla's own limit: after a crash, chunks
+    written at different times (unloads since the last autosave) can disagree. Permanents (the standard library's C functions and userdata, named by path,
     as LungoLua's gate does) are worked out the same way in a new state and a restored one. A state
     holding what can't be persisted (a userdata with no persist kind) isn't saved: the CPU comes back
     halted, as before.

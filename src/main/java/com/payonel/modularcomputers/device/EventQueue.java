@@ -14,10 +14,13 @@ final class EventQueue {
 	static final int CAPACITY = 32;
 	private final ArrayDeque<Map<String, Object>> events = new ArrayDeque<>();
 	private final InterruptLine line;
+	/** Its card, told when its contents change. */
+	private final Runnable changed;
 	private long lost;
 
-	EventQueue(InterruptLine line) {
+	EventQueue(InterruptLine line, Runnable changed) {
 		this.line = line;
+		this.changed = changed;
 	}
 
 	void add(Map<String, Object> event) {
@@ -32,12 +35,18 @@ final class EventQueue {
 			lost = 0;
 		}
 		events.addLast(event);
+		changed.run();
 		line.raise();
 	}
 
 	Map<String, Object> pull() {
-		return events.pollFirst();
+		Map<String, Object> event = events.pollFirst();
+		if (event != null) {
+			changed.run();
+		}
+		return event;
 	}
+
 
 	boolean pending() {
 		return !events.isEmpty();
@@ -46,6 +55,7 @@ final class EventQueue {
 	void clear() {
 		events.clear();
 		lost = 0;
+		changed.run();
 	}
 
 	/** What it holds, to save: the events waiting, and how many were lost since the last kept. */

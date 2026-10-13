@@ -76,6 +76,16 @@ public final class Terminal implements Device {
 	public void write(String text) {
 		power.charge(WRITE_COST);
 		decoder.write(text);
+		changed.run();
+	}
+
+	/** Its block, told when what it shows or holds changes ({@link Device#onChange}). */
+	private Runnable changed = () -> {
+	};
+
+	@Override
+	public void onChange(Runnable changed) {
+		this.changed = changed;
 	}
 
 	@Override
@@ -86,6 +96,7 @@ public final class Terminal implements Device {
 	/** A key typed at the terminal: it waits in the queue, and the interrupt line wakes its computers. */
 	public void press(String key) {
 		input.addLast(key);
+		changed.run();
 		interruptLine.raise();
 	}
 
@@ -111,7 +122,11 @@ public final class Terminal implements Device {
 
 	/** Takes the oldest key typed (or report), if any. */
 	public Optional<String> nextKey() {
-		return Optional.ofNullable(input.pollFirst());
+		String key = input.pollFirst();
+		if (key != null) {
+			changed.run();
+		}
+		return Optional.ofNullable(key);
 	}
 
 	public boolean hasKeys() {
@@ -172,6 +187,7 @@ public final class Terminal implements Device {
 		input.clear();
 		if (saved.get("input") instanceof java.util.List<?> keys) {
 			keys.forEach(key -> input.addLast(String.valueOf(key)));
+			changed.run();
 		}
 	}
 
@@ -180,5 +196,6 @@ public final class Terminal implements Device {
 	public void powerOff() {
 		decoder.reset();
 		input.clear();
+		changed.run();
 	}
 }

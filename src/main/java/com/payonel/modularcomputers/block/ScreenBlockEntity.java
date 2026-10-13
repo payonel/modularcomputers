@@ -31,6 +31,12 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 		// Its tier is its block's: tier 1 text only, tier 2 16 colors, tier 3 every color.
 		this.display = new Terminal(Resolution.DEFAULT, state.getBlock() instanceof ScreenBlock screen ? screen.tier() : TerminalTier.TIER_3);
 		display.setFlusher(this::serverTick); // right after a computer's turn changed it
+		// Minecraft writes only chunks marked changed: what it shows and the keys waiting change as it's used.
+		display.onChange(() -> {
+			if (level != null && !level.isClientSide()) {
+				level.blockEntityChanged(worldPosition);
+			}
+		});
 	}
 
 	@Override

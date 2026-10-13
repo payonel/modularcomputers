@@ -15,7 +15,7 @@ public final class WeatherCard extends Card {
 	private final InterruptLine line = new InterruptLine();
 	/** It works while a running computer has it on its bus (it draws nothing to speak of). */
 	private final com.payonel.modularcomputers.bus.BusPower power = new com.payonel.modularcomputers.bus.BusPower(0);
-	private final EventQueue events = new EventQueue(line);
+	private final EventQueue events = new EventQueue(line, this::changed);
 	private String weather;
 
 	public WeatherCard() {
@@ -31,8 +31,12 @@ public final class WeatherCard extends Card {
 			event.put("new", now);
 			events.add(event);
 		}
+		if (!now.equals(weather)) {
+			changed();
+		}
 		weather = now;
 	}
+
 
 	@Method(doc = "getWeather(): clear, rain, snow or thunder")
 	public Result getWeather(Arguments args) {

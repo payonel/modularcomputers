@@ -74,4 +74,12 @@ public interface Device {
 	/** Takes back what {@link #saved} gave, after a load. */
 	default void restore(java.util.Map<String, Object> saved) {
 	}
+
+	/**
+	 * Who to tell, at once, when what it saves ({@link #saved}) or shows changes: the block it's in,
+	 * which marks its chunk changed. Minecraft writes only chunks marked changed, at a save or an
+	 * unload, so an unmarked change would leave the old copy on disk. Server thread.
+	 */
+	default void onChange(Runnable changed) {
+	}
 }
