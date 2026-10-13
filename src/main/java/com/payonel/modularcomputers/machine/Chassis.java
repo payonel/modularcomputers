@@ -10,7 +10,7 @@ import java.util.List;
  * {@link Board#hardware}).
  */
 public interface Chassis {
-	/** A board on a bench: no case (tier 0), endless power, no load, no RAM sticks. */
+	/** A board on a bench: no case (tier 0), endless power, no load, one tier 3 RAM stick. */
 	Chassis BENCH = new Chassis() {
 		@Override
 		public int tier() {
@@ -22,9 +22,10 @@ public interface Chassis {
 			return new Board.PowerInfo(new Board.Store(0, 0, true), List.of(), 0);
 		}
 
+		/** A tier 3 stick: a bench has RAM, or nothing would run. */
 		@Override
 		public List<Board.MemoryInfo> memory() {
-			return List.of();
+			return List.of(new Board.MemoryInfo(0, 3, MemoryTier.TIER_3.bytes()));
 		}
 	};
 

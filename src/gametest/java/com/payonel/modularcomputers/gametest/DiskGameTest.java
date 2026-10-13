@@ -29,6 +29,7 @@ public class DiskGameTest {
 		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
 		TestPrograms.withScreen(computer);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		return computer;
 	}

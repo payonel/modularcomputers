@@ -233,6 +233,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		display.setFlusher(this::syncDisplay);
 		display.onChange(this::markChanged);
 		machine.board().setChassis(new CaseChassis());
+		// How a log names it: which board, where.
+		machine.describedBy(() -> "board " + boardId + " at " + worldPosition.toShortString()
+			+ (level != null ? " in " + level.dimension().identifier() : "") + ", chunk " + (worldPosition.getX() >> 4) + "," + (worldPosition.getZ() >> 4));
 	}
 
 	/** What the board's firmware reads from this case (ACPI and SMBIOS): its tier, power and RAM. */

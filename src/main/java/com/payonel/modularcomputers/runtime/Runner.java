@@ -47,9 +47,17 @@ public interface Runner {
 		return true;
 	}
 
-	/** Server side: the program's state as it runs, to save; empty when it can't be saved (it comes back halted). */
-	default java.util.Optional<byte[]> persist(Board board) {
+	/**
+	 * Server side: the program's state as it runs, to save; empty when it can't be saved (it comes
+	 * back halted). {@code who}: the computer, as a log names it (which board, where).
+	 */
+	default java.util.Optional<byte[]> persist(Board board, String who) {
 		return java.util.Optional.empty();
+	}
+
+	/** Bytes of memory the program holds now (a Lua CPU counts its VM's), for {@link Board#hardware}. */
+	default long memoryUsed() {
+		return 0;
 	}
 
 		/** Given how to ask the server thread to {@link #tick} it soon (a runner on its own thread asks when a request comes in). */

@@ -26,12 +26,15 @@ import java.util.function.LongSupplier;
 final class MotherboardApi implements Board {
 	private final Motherboard board;
 	private final LongSupplier uptime;
+	/** What the program holds of the memory (its runtime counts it). */
+	private final LongSupplier memoryUsed;
 	/** The bus's changes when the program last listed it: newer ones raise the bus's interrupt. */
 	private int listedChanges;
 
-	MotherboardApi(Motherboard board, LongSupplier uptime) {
+	MotherboardApi(Motherboard board, LongSupplier uptime, LongSupplier memoryUsed) {
 		this.board = board;
 		this.uptime = uptime;
+		this.memoryUsed = memoryUsed;
 		this.listedChanges = board.bus().changes();
 	}
 
@@ -62,8 +65,7 @@ final class MotherboardApi implements Board {
 		CpuInfo cpu = board.cpu().map(Cpu::tier).map(tier -> new CpuInfo(tier.number(), board.busCapacity())).orElse(null);
 		List<MemoryInfo> memory = chassis.memory();
 		long total = memory.stream().mapToLong(MemoryInfo::capacity).sum();
-		// Programs don't use memory yet: that's the Lua runtime's to count.
-		return new HardwareInfo(chassis.tier(), cpu, memory, total, 0);
+		return new HardwareInfo(chassis.tier(), cpu, memory, total, memoryUsed.getAsLong());
 	}
 
 	@Override

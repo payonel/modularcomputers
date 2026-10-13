@@ -81,6 +81,46 @@ class LuaRunnerTest {
 	}
 
 	@Test
+	void theProgramsMemoryIsTheRamInstalled() {
+		ram(1); // 256 KiB, the firmware's included
+		boot("""
+			local used = board.hardware().memoryUsed
+			local ok, err = pcall(function()
+			  local t = {}
+			  for i = 1, 1000000 do t[i] = string.rep("x", 1000) .. i end
+			end)
+			collectgarbage() -- (LungoLua's emergency collection leaves a coroutine's dead frames: reported)
+			board.invoke("console", "write", tostring(used > 0) .. " " .. tostring(ok) .. " " .. tostring(err))
+			board.halt()
+			""");
+		untilHalted();
+
+		assertThat(row(0)).as("counted, and past the RAM it's Lua's own error, in the program").isEqualTo("true false not enough memory");
+	}
+
+	@Test
+	void noRamNoBoot() {
+		machine.board().setChassis(new com.payonel.modularcomputers.machine.Chassis() {
+			@Override
+			public int tier() {
+				return 3;
+			}
+
+			@Override
+			public Board.PowerInfo power() {
+				return com.payonel.modularcomputers.machine.Chassis.BENCH.power();
+			}
+
+			@Override
+			public java.util.List<Board.MemoryInfo> memory() {
+				return java.util.List.of();
+			}
+		});
+		boot("board.halt()");
+		assertThat(row(0)).isEqualTo("ABRT: " + Cpu.NO_RAM);
+	}
+
+	@Test
 	void helloWorldOnTheConsoleThenHalt() {
 		boot("""
 			board.invoke("console", "write", "hello world\\n")

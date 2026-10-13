@@ -134,6 +134,7 @@ public class PhotomaskGameTest {
 			.setValue(com.payonel.modularcomputers.block.AllInOneBlock.FACING, net.minecraft.core.Direction.SOUTH));
 		var computer = helper.getBlockEntity(new BlockPos(1, 1, 1), com.payonel.modularcomputers.block.AllInOneBlockEntity.class);
 		computer.parts().setItem(com.payonel.modularcomputers.menu.CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
+		computer.parts().setItem(com.payonel.modularcomputers.menu.CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(com.payonel.modularcomputers.menu.CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 		computer.parts().setItem(com.payonel.modularcomputers.menu.CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		TestPrograms.flash(computer, TestPrograms.HELLO);

@@ -43,6 +43,9 @@ local image = ...
 local coroutine_create, coroutine_resume, coroutine_status, coroutine_yield =
   coroutine.create, coroutine.resume, coroutine.status, coroutine.yield
 local setbudget, freeze, thaw, isfrozen = debug.setbudget, debug.freeze, debug.thaw, debug.isfrozen
+-- The host's switch: while user code runs it may use the RAM less the firmware's reserve, so a
+-- program that fills its memory gets Lua's error and this file can still answer the host.
+local usermode = debug.getregistry()["modularcomputers.usermode"]
 local load, pairs, ipairs, select, type, error, tostring = load, pairs, ipairs, select, type, error, tostring
 local table_pack, table_unpack, table_remove = table.pack, table.unpack, table.remove
 local math_huge, math_floor = math.huge, math.floor
@@ -63,16 +66,30 @@ local ask = coroutine_yield
 -- The budget's callback always freezes: where a freeze can't happen, the engine ends user_co's
 -- chain with an error instead, and the CPU shows it. Nothing runs on unfrozen past its slice.
 local function spent(co)
+  usermode(false) -- the firmware's now: the freeze may need its reserve (user mode comes back with the thaw)
   freeze(user_co)
 end
 
+-- A syscall's bookkeeping runs on the firmware's reserve (usermode(false)), though it's in
+-- user_co: a program that's filled its memory (or left garbage a dead frame still holds) gets its
+-- error in its own code, never in this file's, and device data taken for the inbox is never lost.
+-- Returns the reply packed, still in firmware mode; the caller goes back to user mode.
 local function syscall(...)
+  usermode(false)
   request = table_pack(...)
   setbudget(user_co, 1, spent) -- the next step freezes the chain, in the loop below
   while answer == nil do
   end
+  usermode(false) -- (the thaw went back to user mode)
   local reply = answer
   answer = nil
+  return reply
+end
+
+-- A syscall answered as values, back in user mode.
+local function call(...)
+  local reply = syscall(...)
+  usermode(true)
   return table_unpack(reply, 1, reply.n)
 end
 
@@ -111,15 +128,15 @@ sandbox.collectgarbage = function(what, ...)
 end
 
 sandbox.board = {
-  list = function() return syscall("call", "list") end,
-  status = function() return syscall("call", "status") end,
-  type = function(address) return syscall("call", "type", address) end,
-  methods = function(address) return syscall("call", "methods", address) end,
-  doc = function(address, method) return syscall("call", "doc", address, method) end,
-  info = function(address) return syscall("call", "info", address) end,
-  uptime = function() return syscall("call", "uptime") end,
-  power = function() return syscall("call", "power") end,
-  hardware = function() return syscall("call", "hardware") end,
+  list = function() return call("call", "list") end,
+  status = function() return call("call", "status") end,
+  type = function(address) return call("call", "type", address) end,
+  methods = function(address) return call("call", "methods", address) end,
+  doc = function(address, method) return call("call", "doc", address, method) end,
+  info = function(address) return call("call", "info", address) end,
+  uptime = function() return call("call", "uptime") end,
+  power = function() return call("call", "power") end,
+  hardware = function() return call("call", "hardware") end,
   -- true and the method's values, or false and why it failed (a device never stops the machine);
   -- a read of a device's stream comes from the inbox when it has some
   invoke = function(target, method, ...)
@@ -127,7 +144,7 @@ sandbox.board = {
     if queue and queue.method == method and queue[1] ~= nil and select("#", ...) == 0 then
       return true, table_remove(queue, 1)
     end
-    return syscall("call", "invoke", target, method, ...)
+    return call("call", "invoke", target, method, ...)
   end,
   -- waits until one of the sources (any, when none) has an interrupt pending, or 'seconds' pass
   waitForInterrupt = function(seconds, ...)
@@ -143,8 +160,9 @@ sandbox.board = {
     for address, queue in pairs(inbox) do
       held[address] = #queue
     end
-    local ready, taken = syscall("wait", ticks, held, ...)
-    for _, item in ipairs(taken) do
+    local reply = syscall("wait", ticks, held, ...)
+    -- Still in firmware mode: the data's out of the devices now, so it must reach the inbox.
+    for _, item in ipairs(reply[2]) do
       local queue = inbox[item.address]
       if not queue or queue.method ~= item.method then
         queue = {method = item.method}
@@ -152,7 +170,8 @@ sandbox.board = {
       end
       queue[#queue + 1] = item.value
     end
-    return ready
+    usermode(true)
+    return reply[1]
   end,
   -- the CPU stops; power stays on. It never returns.
   halt = function()
@@ -167,7 +186,15 @@ end
 user_co = coroutine_create(main)
 setbudget(user_co, SLICE, spent)
 
-local result = table_pack(coroutine_resume(user_co))
+-- Runs user code (a resume or a thaw) in user mode; its results are packed back in the firmware's.
+local function user(run)
+  usermode(true)
+  local a, b, c = run(user_co)
+  usermode(false)
+  return a, b, c
+end
+
+local result = table_pack(user(coroutine_resume))
 while true do
   if isfrozen(user_co) then
     if request then
@@ -181,7 +208,7 @@ while true do
       ask("slice") -- the slice is spent
     end
     setbudget(user_co, SLICE, spent) -- a new slice
-    result = table_pack(thaw(user_co))
+    result = table_pack(user(thaw))
   elseif coroutine_status(user_co) == "dead" then
     if result[1] then
       return "returned"
@@ -190,6 +217,6 @@ while true do
   else
     ask("slice") -- the EEPROM's code yielded at its top: it gives up its turn
     setbudget(user_co, SLICE, spent)
-    result = table_pack(coroutine_resume(user_co))
+    result = table_pack(user(coroutine_resume))
   end
 end

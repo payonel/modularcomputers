@@ -34,6 +34,7 @@ public class CableGameTest {
 		helper.setBlock(pos, ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
 		AllInOneBlockEntity computer = helper.getBlockEntity(pos, AllInOneBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU)); // no CPU, no bus
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		TestPrograms.withScreen(computer); // its own screen, in the gold slot
 		if (parts) {
 			computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
@@ -229,6 +230,7 @@ public class CableGameTest {
 				helper.setBlock(holder[0] == first ? COMPUTER : new BlockPos(5, 1, 1), ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
 				AllInOneBlockEntity again = helper.getBlockEntity(holder[0] == first ? COMPUTER : new BlockPos(5, 1, 1), AllInOneBlockEntity.class);
 				again.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
+				again.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 				holder[0] = again;
 			})
 			.thenIdle(25)

@@ -76,6 +76,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 				var be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
 				var parts = be.parts();
 				parts.setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
+				parts.setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 				parts.setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 				parts.setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 				TestPrograms.flash(be, TestPrograms.HELLO);

@@ -101,8 +101,9 @@ same thing.
       **case view**'s 17 slots (`CaseMenu`):
       - CPU (three tiers, `CpuItem`/`CpuTier`: bus capacity 4/16/64; draw a tick 100/150/200
         running, 50/20/5 waiting, 0 halted; iron, gold and diamond lids), EEPROM (labeled ROM), 3 UPS battery bays, 4 RAM (three tiers, `MemoryItem`/`MemoryTier`:
-        256 KiB, 512 KiB, 1 MiB; their sizes aren't enforced yet; they size the firmware's ring of
-        device data), 4 SATA (hard disks, three tiers,
+        256 KiB, 512 KiB, 1 MiB: **the program's memory is the RAM installed**, and **no RAM, no
+        boot** (`ABRT: no RAM installed`, as a PC that won't POST); they also size the firmware's
+        ring of device data), 4 SATA (hard disks, three tiers,
         `DiskItem`/`DiskTier`: 1, 4, 16 MiB, drawing 8/5/2 a tick: bus-powered like terminals,
         `getCapacity()`; no data yet) and 4 expansion
         slots, which take any card (`ModItems.CARDS`, `device/CardKind`): WLAN, Bluetooth,
@@ -214,7 +215,7 @@ same thing.
       - It gives one of every item registered under the mod's namespace, so new items are
         included automatically (`ModCommands`).
       - The essentials go into free hotbar slots first, in order (user, 2026-10-11): all-in-one,
-        CPU, EEPROM, a charged tier 1 battery, screen, cable (`ModCommands.hotbarFirst`).
+        CPU, tier 3 RAM, EEPROM, a charged tier 1 battery, screen, cable (`ModCommands.hotbarFirst`).
       - It needs operator permission, like `/give`: cheats on in singleplayer.
     - **Breaking it doesn't spill its parts** (user, 2026-10-12): like a shulker box, it drops
       as one item that keeps them (`minecraft:container`), its board id (the item's
@@ -662,10 +663,14 @@ scripts/art/error_beep.py` into
     ones. **The computer's thread parks on one doorbell** (`LockSupport`, `LuaRunner.ring`), rung by
     whatever has news for it (a call's or a wait's answer, a save asked, a stop), like an interrupt
     pulling a CPU out of HLT: no polling. A thread that ends answers a save asked of it at once
-    (nothing to save). Up to 2 s, else it isn't saved (logged as an error: the program is lost, it
-    comes back halted). The user's open concern: the server thread blocking on a computer that's
-    deep in one long step (case 5: a library call with no budget checks, such as `string.rep`,
-    which LungoLua is fixing); to do better than 2 s. The bytes go in the case's NBT (`program`). On load the case resumes it
+    (nothing to save). **No timeouts, no kills** (user, 2026-10-13: the server must try; a Styx
+    persist that never ends is a real bug): a save waits as long as it takes, and past
+    `SLOW_SAVE_NANOS` (50 ms) it logs, naming the computer (`Machine.describedBy`: board id,
+    position, dimension, chunk): while it waits (at each doubling: reaching a safe point, or in
+    Styx), and once done, the freeze time and the Styx time. The remaining slow case is a program
+    deep in one long step (a library call with no budget checks, such as `string.rep`, which
+    LungoLua is fixing); the plan is an async "signal" in LungoLua that runs the budget out at the
+    next step. The bytes go in the case's NBT (`program`). On load the case resumes it
     (`Machine.resumeProgram`, `LuaRunner.restore`) at its first tick, after the bus is found again;
     the restored kernel's request is still on its stack, so the computer's thread carries on with it
     (a wait ends on its deadline: the firmware makes a wait's length a deadline on the machine's
@@ -723,7 +728,21 @@ scripts/art/error_beep.py` into
   - **User code**: the EEPROM's text and what it runs, seen as untrusted. It gets `board` (`invoke`
     answers as `pcall` does), and user coroutines that yield normally. `debug` stays hidden until
     LungoLua has a sandboxed debug library (user's plan) that can't touch the firmware's budget.
-  Memory isn't limited or counted yet (LungoLua's `lua_Alloc` permission hook is the way).
+  - **Memory** (user, 2026-10-13): the VM's memory is counted by LungoLua's allocator hook
+    (`LuaRunner.Memory`, a `lua_Alloc`: `permit(osize, nsize, tag)` for every allocation, growth
+    and free; the state is made with it from its first byte, and a restore counts as it's made), and
+    capped at the RAM installed (`HardwareInfo.memoryTotal`, set when the thread starts). Past it an
+    allocation is refused (after a full collection) and Lua raises "not enough memory" in the
+    program. Everything counts: the standard library, the firmware and its sandbox copies, the
+    permanents (about 118 KiB at rest, so one tier 1 stick leaves a program about 100 KiB). **The
+    firmware keeps a reserve** (`Memory.RESERVE`, 32 KiB): user code may use the RAM less it
+    (`usermode(true)`, a host function in the registry, switched by machine.lua around each resume
+    of user code and its syscalls' bookkeeping, and off in the budget callback), so a program that
+    fills its memory gets the error in its own code and the firmware can still answer the host and
+    keep device data. `board.hardware().memoryUsed` is the real count. Found while testing (for
+    LungoLua): garbage a dead frame left in a coroutine isn't freed by the emergency collection a
+    refused allocation runs (a main thread's is), and `collectgarbage("count")` reads far more than
+    the bytes `permit` saw.
 - **Screens and cables** (built 2026-10-11, the user's request):
   - **Screen** (`ScreenBlock`, `ScreenBlockEntity`): a monitor block, 50x16 like the built-in
     display. It faces the player who places it.
@@ -888,11 +907,11 @@ scripts/art/error_beep.py` into
     `invoke(address, method, args...)`, `waitForInterrupt(seconds)`, `uptime()`, and what the
     firmware reports (user, 2026-10-12): `power()` (ACPI: the case's store, each battery by bay
     and tier, the load: `PowerInfo`), `hardware()` (SMBIOS and `/proc/meminfo`: case tier, CPU
-    tier and bus capacity, each RAM stick's slot, tier and size, memory total and used; used is
-    0 until the Lua runtime counts it: `HardwareInfo`) and `info(address)` (like `udevadm info`:
+    tier and bus capacity, each RAM stick's slot, tier and size, memory total and used: the Lua
+    VM's count, `HardwareInfo`) and `info(address)` (like `udevadm info`:
     address, id, type, label, then what the kind adds: a tier, a size, a terminal's width, height
     and colors; `Device.info`). The board reads the case through `machine/Chassis` (the case's
-    `CaseChassis`; `Chassis.BENCH` for a bare board: tier 0, endless power). **Labels** are what
+    `CaseChassis`; `Chassis.BENCH` for a bare board: tier 0, endless power, one tier 3 stick). **Labels** are what
     the player named the item on an anvil (`ModComponents.label`), like a sticker; programs can't
     set them yet. Screen blocks have none yet. Addresses are
     the bus keys, three kinds as on a real system (user design, 2026-10-11):

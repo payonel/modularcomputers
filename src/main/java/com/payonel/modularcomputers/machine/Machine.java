@@ -76,7 +76,7 @@ public final class Machine {
 	public Machine(Motherboard board, BooleanSupplier power) {
 		this.board = board;
 		this.power = power;
-		this.api = new MotherboardApi(board, () -> uptime);
+		this.api = new MotherboardApi(board, () -> uptime, () -> runner == null ? 0 : runner.memoryUsed());
 	}
 
 	/** How a runner on its own thread gets the server thread to serve it soon (in a game, the server). */
@@ -368,7 +368,14 @@ public final class Machine {
 		if (!powered || runner == null) {
 			return Optional.empty();
 		}
-		return runner.persist(api);
+		return runner.persist(api, who.get());
+	}
+
+	/** The computer as a log names it (which board, where): read from the block it's in when needed. */
+	private java.util.function.Supplier<String> who = () -> "a computer";
+
+	public void describedBy(java.util.function.Supplier<String> who) {
+		this.who = who;
 	}
 
 	/** After a load: the saved program goes on where it was ({@link #persistProgram}). The machine must be on, with its CPU. */

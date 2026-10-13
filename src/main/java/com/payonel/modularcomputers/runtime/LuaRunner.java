@@ -14,6 +14,7 @@ import static com.payonel.lungolua.runtime.Ldo.lua_resume;
 import static com.payonel.lungolua.runtime.Lstate.lua_newthread;
 
 import com.payonel.lungolua.api.HostString;
+import com.payonel.lungolua.api.lua_Alloc;
 import com.payonel.lungolua.api.lua_ResumeResult;
 import com.payonel.lungolua.api.lua_UserObject;
 import com.payonel.lungolua.api.lua_Writer;
@@ -83,8 +84,13 @@ public final class LuaRunner implements Runner {
 	/** Registry keys: the kernel, and the permanents (object to name). */
 	private static final String KERNEL = "modularcomputers.kernel";
 	private static final String PERMANENTS = "modularcomputers.perms";
-	/** How long a save waits for the computer's thread to reach a safe point. */
-	private static final long PERSIST_NANOS = 2_000_000_000L;
+	/**
+	 * A save waits as long as it takes (user, 2026-10-13: no timeouts, no kills: the server must try;
+	 * a Styx persist that never ends is a real bug). Past this, it's logged, naming the computer:
+	 * while it waits (again at each doubling), and once it's done, how long the computer took to
+	 * reach a safe point (its freeze) and how long Styx took.
+	 */
+	private static final long SLOW_SAVE_NANOS = 50_000_000L;
 	/**
 	 * The permanents: every C function and userdata reachable from the registry and the string
 	 * metatable once the libraries are open, and each such userdata's metatable, named by its path
@@ -176,6 +182,50 @@ public final class LuaRunner implements Runner {
 		}
 	}
 
+	/**
+	 * The program's memory, counted by LungoLua's allocator hook ({@code lua_Alloc.permit}, asked
+	 * for every allocation, growth and free): everything in the VM, the firmware's and the standard
+	 * library's included. Past its cap, an allocation is refused (after a full collection) and Lua
+	 * raises "not enough memory", in the program.
+	 */
+	public static final class Memory implements lua_Alloc {
+		/** Bytes it may hold; 0 while unset (no limit). Set by the server thread at power-on. */
+		private volatile long cap;
+		/** Bytes held now. Written only by the thread running the VM. */
+		private volatile long used;
+		/**
+		 * User code is running (the firmware says so around each resume of it): it may use the RAM
+		 * less {@link #RESERVE}, which is the firmware's, so a program that fills its memory gets
+		 * Lua's error and the firmware can still answer the host.
+		 */
+		private boolean user;
+		/** What the firmware keeps for itself, as a kernel reserves memory. */
+		public static final long RESERVE = 32 << 10;
+
+		@Override
+		public boolean permit(long osize, long nsize, int tag) {
+			long grow = nsize - osize;
+			if (grow > 0 && cap > 0 && used + grow > (user ? cap - RESERVE : cap)) {
+				return false;
+			}
+			used += grow;
+			return true;
+		}
+
+		public long used() {
+			return used;
+		}
+
+		public long cap() {
+			return cap;
+		}
+
+		void cap(long cap) {
+			this.cap = cap;
+		}
+	}
+
+	private final Memory memory;
 	private final lua_State main;
 	private final lua_State kernel;
 	/** The EEPROM's text, for a fresh start; null for a restored one (its request is on the kernel's stack). */
@@ -187,7 +237,25 @@ public final class LuaRunner implements Runner {
 	 * can't be saved, or it ended). {@code servedAt}: what the server thread had handed it then
 	 * ({@link #served}); bytes taken after more was handed over would miss it, so they're not used.
 	 */
-	private record Snapshot(long servedAt, CompletableFuture<byte[]> bytes) {
+	private static final class Snapshot {
+		final long servedAt;
+		final CompletableFuture<byte[]> bytes = new CompletableFuture<>();
+		/** When it was asked for, when the computer's thread got to it, and how long Styx took (nanos). */
+		final long askedAt = System.nanoTime();
+		volatile long frozeAt;
+		volatile long styxNanos;
+
+		Snapshot(long servedAt) {
+			this.servedAt = servedAt;
+		}
+
+		long servedAt() {
+			return servedAt;
+		}
+
+		CompletableFuture<byte[]> bytes() {
+			return bytes;
+		}
 	}
 
 	/** The computer's thread has ended: set before it looks for a save asked, so one asked after sees it. */
@@ -215,7 +283,8 @@ public final class LuaRunner implements Runner {
 	/** A CPU about to run {@code image}, the EEPROM's text; the firmware loads it when the thread starts. */
 	public LuaRunner(String image) {
 		this.image = image;
-		main = luaL_newstate();
+		this.memory = new Memory();
+		main = com.payonel.lungolua.runtime.Lstate.lua_newstate(memory, com.payonel.lungolua.api.LuaAuxLib.luaL_makeseed(null)); // counted from its first byte
 		prepare(main);
 		lua_pop(main, 1); // (the inverse permanents: only a restore needs them)
 		kernel = lua_newthread(main);
@@ -227,17 +296,32 @@ public final class LuaRunner implements Runner {
 	}
 
 	/** A computer coming back from its saved state ({@link #persist}). */
-	private LuaRunner(lua_State main) {
+	private LuaRunner(lua_State main, Memory memory) {
 		this.image = null;
+		this.memory = memory;
 		this.main = main;
 		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(KERNEL));
 		this.kernel = lua_tothread(main, -1);
 		lua_pop(main, 1);
 	}
 
+	/**
+	 * The firmware's switch around user code ({@code usermode(true)} before resuming it, false after):
+	 * user code may use the RAM less the firmware's reserve ({@link Memory#user}). In the registry, so
+	 * it's a permanent Styx names by its path.
+	 */
+	private static final String USER_MODE = "modularcomputers.usermode";
+
+	private static int userMode(lua_State L) {
+		((Memory) lua_getallocf(L)).user = lua_toboolean(L, 1);
+		return 0;
+	}
+
 	/** The same libraries and permanents for a new state and a restored one; leaves the inverse permanents (name to object) on the stack. */
 	private static void prepare(lua_State L) {
 		luaL_openselectedlibs(L, LIBRARIES, 0);
+		lua_pushcfunction(L, LuaRunner::userMode);
+		lua_setfield(L, LUA_REGISTRYINDEX, new HostString(USER_MODE));
 		byte[] walk = PERMANENTS_WALK.getBytes(StandardCharsets.UTF_8);
 		if (luaL_loadbufferx(L, new ByteView(walk), new HostString("=permanents"), new HostString("t")) != LUA_OK) {
 			throw new IllegalStateException("the permanents don't load: " + text(L, -1));
@@ -247,13 +331,13 @@ public final class LuaRunner implements Runner {
 
 	/** Makes a saved computer again ({@link #persist}'s bytes); it carries on from where it was saved when its thread starts. */
 	public static LuaRunner restore(byte[] saved) {
-		lua_State scratch = luaL_newstate(); // (for the allocator)
-		luaL_Restored restored = luaL_restorestate(lua_getallocf(scratch), new ByteView(saved), LuaRunner::prepare);
+		Memory memory = new Memory(); // counts the restored state as it's made
+		luaL_Restored restored = luaL_restorestate(memory, new ByteView(saved), LuaRunner::prepare);
 		if (restored.L == null) {
 			throw new IllegalStateException("the computer's saved state doesn't restore: " + restored.msg);
 		}
 		lua_settop(restored.L, 0); // (nothing of the host's is left on it)
-		return new LuaRunner(restored.L);
+		return new LuaRunner(restored.L, memory);
 	}
 
 	/**
@@ -278,7 +362,7 @@ public final class LuaRunner implements Runner {
 		if (current != null && current.servedAt() == served) {
 			return current;
 		}
-		Snapshot fresh = new Snapshot(served, new CompletableFuture<>());
+		Snapshot fresh = new Snapshot(served);
 		pin.set(fresh);
 		ring();
 		if (thread == null || ended) {
@@ -298,22 +382,45 @@ public final class LuaRunner implements Runner {
 	 * comes back halted.
 	 */
 	@Override
-	public Optional<byte[]> persist(Board board) {
+	public Optional<byte[]> persist(Board board, String who) {
 		if (thread == null || !thread.isAlive() || state != State.RUNNING) {
 			return Optional.empty();
 		}
 		Snapshot snapshot = prepare();
 		try {
-			return Optional.ofNullable(snapshot.bytes().get(PERSIST_NANOS, TimeUnit.NANOSECONDS));
-		} catch (TimeoutException e) {
-			com.payonel.modularcomputers.ModularComputers.LOGGER.error(
-				"A running computer didn't reach a safe point to be saved in {} ms: it will come back halted, its program lost", PERSIST_NANOS / 1_000_000);
+			long waited = SLOW_SAVE_NANOS;
+			while (true) {
+				try {
+					byte[] bytes = snapshot.bytes().get(SLOW_SAVE_NANOS, TimeUnit.NANOSECONDS);
+					logSlow(snapshot, who);
+					return Optional.ofNullable(bytes);
+				} catch (TimeoutException e) {
+					long now = System.nanoTime() - snapshot.askedAt;
+					if (now >= waited) {
+						com.payonel.modularcomputers.ModularComputers.LOGGER.warn("Saving {}: still waiting after {} ms for it {}", who, now / 1_000_000,
+							snapshot.frozeAt == 0 ? "to reach a safe point (its program is in a long step)" : "to persist (Styx)");
+						waited *= 2;
+					}
+				}
+			}
 		} catch (InterruptedException | ExecutionException e) {
-			com.payonel.modularcomputers.ModularComputers.LOGGER.error("A running computer couldn't be saved: it will come back halted", e);
+			com.payonel.modularcomputers.ModularComputers.LOGGER.error("Saving {}: it couldn't be saved; it will come back halted", who, e);
+			return Optional.empty();
 		} finally {
 			pin.compareAndSet(snapshot, null);
 		}
-		return Optional.empty();
+	}
+
+	/** Logs a save that took long: how long to its safe point (the freeze), and how long Styx took. */
+	private static void logSlow(Snapshot snapshot, String who) {
+		if (snapshot.frozeAt == 0) {
+			return; // it ended, or was never frozen for this: nothing to time
+		}
+		long freeze = snapshot.frozeAt - snapshot.askedAt;
+		if (freeze >= SLOW_SAVE_NANOS || snapshot.styxNanos >= SLOW_SAVE_NANOS) {
+			com.payonel.modularcomputers.ModularComputers.LOGGER.warn("Saving {} took long: {} ms to reach a safe point, {} ms to persist",
+				who, freeze / 1_000_000, snapshot.styxNanos / 1_000_000);
+		}
 	}
 
 	/** Wakes the computer's thread: it has news (an answer, a save asked for, a stop), like an interrupt pulling a CPU out of HLT. */
@@ -346,6 +453,7 @@ public final class LuaRunner implements Runner {
 		if (asked == null || asked.bytes().isDone() || (answered != null && answered.isDone())) {
 			return;
 		}
+		asked.frozeAt = System.nanoTime();
 		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(PERMANENTS));
 		java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
 		lua_Writer writer = (L, bytes) -> {
@@ -356,6 +464,7 @@ public final class LuaRunner implements Runner {
 		};
 		luaL_StyxResult result = luaL_persiststate(main, lua_gettop(main), writer);
 		lua_pop(main, 1);
+		asked.styxNanos = System.nanoTime() - asked.frozeAt;
 		if (result.status != LUA_OK) {
 			com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A computer can't be saved as it runs: {}", result.msg);
 			asked.bytes().complete(null);
@@ -409,6 +518,7 @@ public final class LuaRunner implements Runner {
 	public State tick(Board board, int unused, long now, Supplier<List<String>> interrupts) {
 		this.now = now;
 		if (thread == null) {
+			memory.cap(board.hardware().memoryTotal()); // the RAM installed: the program's memory, at power-on
 			thread = Thread.ofPlatform().name("modularcomputers-cpu").daemon().priority(Thread.MIN_PRIORITY).unstarted(this::run);
 			LIVE.add(this);
 			thread.start();
@@ -497,6 +607,16 @@ public final class LuaRunner implements Runner {
 			thread.interrupt(); // out of a wait for an answer; a running slice sees 'stopping' at its next yield
 		}
 		// The VM is left to the collector: closing it would run the program's finalizers.
+	}
+
+	@Override
+	public long memoryUsed() {
+		return memory.used();
+	}
+
+	/** The program's memory: what it holds, and its cap. */
+	public Memory memory() {
+		return memory;
 	}
 
 	/** Whether the computer's thread is still going (tests: it ends when stopped). */

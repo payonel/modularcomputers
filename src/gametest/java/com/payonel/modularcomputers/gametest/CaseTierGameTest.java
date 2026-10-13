@@ -92,6 +92,7 @@ public class CaseTierGameTest {
 	public void aScreenInTheGoldSlotIsTheCasesTerminalOnItsFront(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		TestPrograms.flash(computer, TestPrograms.HELLO);
@@ -159,6 +160,7 @@ public class CaseTierGameTest {
 	public void aDisksFilesAreInTheWorldSaveByItsIdAndGoWithIt(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.TIER1_HARD_DISK));
@@ -182,6 +184,7 @@ public class CaseTierGameTest {
 		helper.setBlock(POS.east(), ModBlocks.TIER2_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
 		AllInOneBlockEntity other = helper.getBlockEntity(POS.east(), AllInOneBlockEntity.class);
 		other.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
+		other.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		other.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 		other.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		other.parts().setItem(CaseMenu.SATA_SLOTS, disk);

@@ -35,6 +35,7 @@ public class CardGameTest {
 		helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
 		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(card));
@@ -110,20 +111,21 @@ public class CardGameTest {
 		var hub = helper.getBlockEntity(hubPos, com.payonel.modularcomputers.block.ExpansionHubBlockEntity.class);
 		hub.cards().setItem(0, new ItemStack(ModItems.REDSTONE_CARD));
 		RedstoneCard card = (RedstoneCard) hub.card(0).orElseThrow();
-		var chunk = helper.getLevel().getChunkAt(helper.absolutePos(screenPos));
-		helper.assertTrue(chunk == helper.getLevel().getChunkAt(helper.absolutePos(hubPos)), "one chunk for both (the test's)");
-		java.util.List<Runnable> changes = List.of(
-			() -> screen.terminal().press("a"),
-			() -> screen.terminal().read(args()),
-			() -> card.setOutput(args("up", 3L)),
-			() -> card.sense(0, 5),
-			() -> card.pull(args()));
-		for (Runnable change : changes) {
-			chunk.tryMarkSaved();
+		var screenChunk = helper.getLevel().getChunkAt(helper.absolutePos(screenPos));
+		var hubChunk = helper.getLevel().getChunkAt(helper.absolutePos(hubPos));
+		java.util.Map<Runnable, net.minecraft.world.level.chunk.LevelChunk> changes = new java.util.LinkedHashMap<>();
+		changes.put(() -> screen.terminal().press("a"), screenChunk);
+		changes.put(() -> screen.terminal().read(args()), screenChunk);
+		changes.put(() -> card.setOutput(args("up", 3L)), hubChunk);
+		changes.put(() -> card.sense(0, 5), hubChunk);
+		changes.put(() -> card.pull(args()), hubChunk);
+		changes.forEach((change, chunk) -> {
+			screenChunk.tryMarkSaved();
+			hubChunk.tryMarkSaved();
 			helper.assertTrue(!chunk.isUnsaved(), "saved");
 			change.run();
 			helper.assertTrue(chunk.isUnsaved(), "marked at once, for the next save");
-		}
+		});
 		helper.succeed();
 	}
 

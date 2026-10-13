@@ -40,6 +40,7 @@ public class CaseTierClientGameTest implements FabricClientGameTest {
 			singleplayer.getServer().runOnServer(server -> {
 				var be = (AllInOneBlockEntity) server.overworld().getBlockEntity(tier2);
 				be.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
+				be.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 				be.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 				be.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 				be.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModBlocks.TIER2_SCREEN));

@@ -42,6 +42,8 @@ public final class Cpu {
 
 	public static final String ABORT = "ABRT: ";
 	public static final String NO_EEPROM = "no EEPROM installed";
+	/** No RAM: nothing to run in, as a real PC that won't POST (user, 2026-10-13: memory is the RAM installed). */
+	public static final String NO_RAM = "no RAM installed";
 	public static final String CRASHED = "EEPROM crashed: ";
 	public static final String RETURNED = "EEPROM returned without halting";
 	/** A wiped EEPROM: nothing to run, like a BIOS's "no bootable device". */
@@ -58,6 +60,10 @@ public final class Cpu {
 	 * to the EEPROM (a test's in-circuit programmer) runs on any CPU.
 	 */
 	public Optional<Runner> powerOn(Motherboard board) {
+		if (board.chassis().memory().isEmpty()) {
+			abort(board, NO_RAM);
+			return Optional.empty();
+		}
 		var installed = board.eeprom();
 		if (installed.isEmpty()) {
 			abort(board, NO_EEPROM);

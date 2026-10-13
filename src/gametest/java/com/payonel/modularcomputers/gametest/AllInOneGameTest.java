@@ -43,6 +43,7 @@ public class AllInOneGameTest {
 	private static AllInOneBlockEntity install(AllInOneBlockEntity computer, boolean cpu, boolean eeprom) {
 		TestPrograms.withScreen(computer);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, cpu ? new ItemStack(ModItems.TIER3_CPU) : ItemStack.EMPTY);
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, eeprom ? new ItemStack(ModItems.EEPROM) : ItemStack.EMPTY);
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		if (eeprom) {
@@ -56,6 +57,7 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = place(helper);
 		TestPrograms.withScreen(computer);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM)); // as crafted: its Lua, not a test's program
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		computer.pressPower(); // the Lua CPU runs on its own thread; its calls are carried out on the server thread
@@ -70,6 +72,7 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = place(helper);
 		TestPrograms.withScreen(computer);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		ItemStack eeprom = new ItemStack(ModItems.EEPROM);
 		eeprom.set(ModComponents.EEPROM_IMAGE, "board.waitForInterrupt(0.5, \"nothing\") board.halt()");
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, eeprom);
@@ -98,6 +101,7 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = place(helper);
 		TestPrograms.withScreen(computer);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		ItemStack chip = new ItemStack(ModItems.EEPROM);
 		chip.set(ModComponents.EEPROM_IMAGE, """
 			board.invoke("eeprom", "set", 'board.invoke("console", "write", "second script") board.halt()')
@@ -124,6 +128,7 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = place(helper);
 		TestPrograms.withScreen(computer);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		ItemStack eeprom = new ItemStack(ModItems.EEPROM);
 		eeprom.set(ModComponents.EEPROM_IMAGE, """
 			local total = 0
@@ -162,6 +167,7 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = place(helper);
 		TestPrograms.withScreen(computer);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.JAVA_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		computer.pressPower();
@@ -185,6 +191,7 @@ public class AllInOneGameTest {
 		helper.assertBlockProperty(POS, AllInOneBlock.READY, false);
 		helper.assertTrue(machine.board().bus().devices().isEmpty() && computer.busEntries().isEmpty(), "no CPU, no bus");
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		helper.assertTrue(machine.board().bus().devices().isEmpty(), "with a CPU and nothing else: an empty bus (no built-in terminal)");
 		helper.assertBlockProperty(POS, AllInOneBlock.SCREEN, false);
 		TestPrograms.withScreen(computer);
@@ -276,6 +283,7 @@ public class AllInOneGameTest {
 	public void drivesAndCardsJoinTheBusInTheirSlotsOrder(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.SATA_SLOTS + 1, new ItemStack(ModItems.TIER1_HARD_DISK));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.WLAN_CARD));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER1_RAM)); // RAM is not a bus device
@@ -302,6 +310,7 @@ public class AllInOneGameTest {
 	public void busEntriesNameEachDeviceAndWhereItIs(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.SATA_SLOTS + 2, new ItemStack(ModItems.TIER1_HARD_DISK));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 3, new ItemStack(ModItems.WLAN_CARD));
 		var entries = computer.busEntries();
@@ -319,6 +328,7 @@ public class AllInOneGameTest {
 	public void theCaseOrderIsItsSlotsOrderAfterAReloadToo(GameTestHelper helper) {
 		AllInOneBlockEntity computer = place(helper);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.WLAN_CARD));
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.TIER1_HARD_DISK));
 		var registries = helper.getLevel().registryAccess();
@@ -361,6 +371,7 @@ public class AllInOneGameTest {
 	public void insertingACpuDoesNotTurnTheComputerOn(GameTestHelper helper) {
 		AllInOneBlockEntity computer = install(place(helper), false, true);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		helper.assertTrue(!computer.machine().isPowered(), "a new CPU waits for the power button");
 		helper.assertBlockProperty(POS, AllInOneBlock.POWERED, false);
 		helper.assertBlockProperty(POS, AllInOneBlock.READY, true);
@@ -538,12 +549,14 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.UPS_SLOT + 2, ModItems.TIER1_BATTERY.charged());
 		helper.assertTrue(computer.machine().board().bus().devices().isEmpty(), "no CPU, no bus");
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		var bus = computer.machine().board().bus();
 		helper.assertValueEqual(bus.status().capacity(), 4, "a tier 1 CPU's bus");
 		helper.assertValueEqual(bus.devices().size(), 4, "the case's own count too: only the first 4 of its 9 fit");
 		helper.assertValueEqual(computer.busEntries().size(), 4, "and the bus order lists only those");
 		helper.assertTrue(bus.status().overflow(), "and it says so");
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		helper.assertValueEqual(bus.status().capacity(), 64, "a tier 3 CPU's bus");
 		helper.assertValueEqual(bus.devices().size(), 9, "everything fits (ROM, 4 disks, 4 cards; batteries aren't on the bus)");
 		helper.succeed();
