@@ -28,11 +28,8 @@ class LuaScriptsTest {
 		assertThat(scripts).isNotEmpty();
 		for (Path script : scripts) {
 			String name = root.relativize(script).toString().replace('\\', '/').replaceFirst("\\.lua$", "");
-			try {
-				new LuaRunner(LuaScripts.read(name));
-			} catch (LuaRunner.LoadFailed failed) {
-				throw new AssertionError(name + ".lua doesn't compile: " + failed.getMessage());
-			}
+			String error = LuaRunner.check(LuaScripts.read(name), name);
+			assertThat(error).as(name + ".lua compiles").isNull();
 		}
 	}
 }

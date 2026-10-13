@@ -136,49 +136,58 @@ class LuaRunnerTest {
 	}
 
 	@Test
-	void waitingWhereItCantYieldIsAnErrorAndLeavesNoWaitBehind() {
+	void aSyscallFreezesTheWholeChainFromWhereverItIs() {
 		boot("""
-			local ok, why = pcall(table.sort, {3, 1, 2}, function(a, b) board.waitForInterrupt(1) return a < b end)
+			local inner = coroutine.wrap(function()
+			  local t = {3, 1, 2}
+			  table.sort(t, function(a, b) board.waitForInterrupt(0.1) return a < b end) -- no yield could get out of here
+			  coroutine.yield("plain yield")
+			  return t[1] .. t[2] .. t[3]
+			end)
+			local first = inner()
+			local sorted = inner()
 			local n = 0
-			for i = 1, 1000000 do n = n + 1 end -- frozen by its budget along the way: thawed, not resumed
-			board.invoke("console", "write", tostring(ok) .. " " .. n .. " " .. why)
+			for i = 1, 1000000 do n = n + 1 end -- frozen by its budget along the way
+			board.invoke("console", "write", first .. " " .. sorted .. " " .. n)
 			board.halt()
 			""");
-		for (int i = 0; i < 100 && machine.runner().isPresent(); i++) {
+		for (int i = 0; i < 200 && machine.runner().isPresent(); i++) {
 			machine.tick();
 		}
-		assertThat(row(0)).startsWith("false 1000000 eeprom:1: waitForInterrupt can't wai"); // (the row's 50 columns)
+		assertThat(row(0)).isEqualTo("plain yield 123 1000000");
 		assertThat(machine.runner()).as("halted").isEmpty();
 	}
 
 	@Test
-	void aHaltThatCantYieldStillStopsIt() {
+	void aHaltFromInsideASortStopsIt() {
 		boot("""
 			pcall(table.sort, {3, 1, 2}, function(a, b) board.halt() return a < b end)
-			local ok, why = pcall(board.invoke, "console", "write", "still here")
-			while true do end
+			board.invoke("console", "write", "still here")
 			""");
-		assertThat(machine.runner()).as("halted at the end of its turn").isEmpty();
-		assertThat(row(0)).as("the board refused it after the halt").isEmpty();
+		assertThat(machine.runner()).as("halted").isEmpty();
+		assertThat(row(0)).as("nothing after the halt").isEmpty();
 		assertThat(machine.isPowered()).isTrue();
 	}
 
 	@Test
-	void aReflashedImageKeepsItsBytesAcrossAReboot() {
-		Eeprom eeprom = new Eeprom("""
-			local next = 'board.invoke("console", "write", "length " .. #"' .. string.char(233) .. '") board.halt()'
-			board.invoke("eeprom", "set", next)
+	void theProgramCantReachTheFirmwareOrTheHost() {
+		boot("""
+			board.invoke("console", "write", tostring(debug) .. tostring(host) .. tostring(rawget(_G, "host")) .. tostring(load("return host")()))
 			board.halt()
 			""");
-		Map<String, Device> devices = new LinkedHashMap<>();
-		devices.put("id:screen", screen);
-		devices.put("eeprom", eeprom);
-		machine.setDevices(devices);
-		machine.board().setEeprom(eeprom);
-		machine.pressPower();
-		machine.pressPower();
-		machine.pressPower();
-		assertThat(row(0)).as("one byte, still one byte").isEqualTo("length 1");
+		assertThat(row(0)).isEqualTo("nilnilnilnil");
+	}
+
+	@Test
+	void aLoopInAMetamethodIsPreemptedToo() {
+		boot("""
+			local evil = setmetatable({}, {__index = function() while true do end end})
+			board.invoke("console", "write", evil.x)
+			""");
+		for (int i = 0; i < 5; i++) {
+			machine.tick(); // each tick returns: its slice is spent, and it's frozen
+		}
+		assertThat(machine.runner().orElseThrow().state()).isEqualTo(Runner.State.RUNNING);
 	}
 
 	@Test

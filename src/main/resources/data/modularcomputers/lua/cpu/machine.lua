@@ -1,0 +1,159 @@
+-- machine.lua: the Lua CPU's firmware, between the host (the Java runner) and the EEPROM's code.
+--
+-- The host runs this as the kernel coroutine (kernel_co), with the whole standard library and a
+-- 'host' table of direct board calls, and resumes it once a tick. This file builds the sandbox,
+-- loads the EEPROM's text into it as the user coroutine (user_co), budgets user_co and freezes it
+-- when its slice is spent, and serves its syscalls. The EEPROM's code is user code: it never sees
+-- this file's locals, the real globals, 'debug' or 'host'.
+--
+-- What it asks the host, by yielding kernel_co:
+--   "tick"                        the slice is spent: go on next tick
+--   "wait", ticks, sources...     wait for an interrupt (sources: any when none); answered
+--                                 with the pending sources, as a sequence
+--   "halt"                        the CPU halts; never resumed
+-- and what it ends with: "returned" (the EEPROM's code returned: a panic), "abort", why (the
+-- EEPROM's text didn't load), or an error (the EEPROM's code crashed).
+--
+-- Syscalls freeze instead of yielding: a call that must wait for the host (a wait, a halt, a board
+-- call past the tick's share) records its request and cuts user_co's budget to one step; the budget
+-- callback then freezes user_co's whole chain, wherever it is (inside coroutines, a sort's
+-- comparison, a gsub callback), and the freeze lands here. The host answers, user_co thaws, and the
+-- syscall returns the answer. No user coroutine sees a yield, and pcall can't catch a freeze.
+--
+-- This file never calls methods on strings ("s:sub()"): the string metatable is shared with user
+-- code.
+
+local image = ...
+
+local host = host
+local coroutine_create, coroutine_resume, coroutine_status, coroutine_yield =
+  coroutine.create, coroutine.resume, coroutine.status, coroutine.yield
+local setbudget, freeze, thaw, isfrozen = debug.setbudget, debug.freeze, debug.thaw, debug.isfrozen
+local load, pairs, select, type, error, tostring = load, pairs, select, type, error, tostring
+local table_pack, table_unpack = table.pack, table.unpack
+local math_huge, math_floor = math.huge, math.floor
+
+-- Steps user_co runs each tick before its budget freezes it.
+local SLICE = 100000
+
+local user_co
+local request -- the syscall waiting for the host, packed
+local answer  -- the host's answer to it, packed
+
+-- The budget's callback always freezes: where a freeze can't happen, the engine ends user_co's
+-- chain with an error instead, and the CPU shows it. Nothing runs on unfrozen past its slice.
+local function spent(co)
+  freeze(user_co)
+end
+
+local function syscall(...)
+  request = table_pack(...)
+  setbudget(user_co, 1, spent) -- the next step freezes the chain, in the loop below
+  while answer == nil do
+  end
+  local reply = answer
+  answer = nil
+  return table_unpack(reply, 1, reply.n)
+end
+
+-- A direct board call: the tick's share of calls is the host's to count; past it, wait a tick.
+local function direct(f, ...)
+  while host.calls() <= 0 do
+    syscall("tick")
+  end
+  return f(...)
+end
+
+local function copy(t)
+  local c = {}
+  for k, v in pairs(t) do
+    c[k] = v
+  end
+  return c
+end
+
+-- The sandbox: what the EEPROM's code sees as its globals.
+local sandbox = {
+  assert = assert, error = error, getmetatable = getmetatable, ipairs = ipairs, next = next,
+  pairs = pairs, pcall = pcall, rawequal = rawequal, rawget = rawget, rawlen = rawlen,
+  rawset = rawset, select = select, setmetatable = setmetatable, tonumber = tonumber,
+  tostring = tostring, type = type, xpcall = xpcall, _VERSION = _VERSION,
+  coroutine = copy(coroutine), string = copy(string), table = copy(table), math = copy(math),
+  utf8 = copy(utf8),
+}
+sandbox._G = sandbox
+
+-- Text only (crafted bytecode is the classic way out of a VM), and the sandbox by default.
+sandbox.load = function(chunk, name, mode, env)
+  return load(chunk, name, "t", env or sandbox)
+end
+
+-- The collector is the VM's: a program may measure it and nudge it, not stop it.
+local collect = collectgarbage
+sandbox.collectgarbage = function(what, ...)
+  what = what or "collect"
+  if what == "count" or what == "step" or what == "collect" or what == "isrunning" then
+    return collect(what, ...)
+  end
+  error("collectgarbage: '" .. tostring(what) .. "' isn't allowed", 2)
+end
+
+sandbox.board = {
+  list = function() return direct(host.list) end,
+  status = function() return direct(host.status) end,
+  type = function(address) return direct(host.type, address) end,
+  methods = function(address) return direct(host.methods, address) end,
+  doc = function(address, method) return direct(host.doc, address, method) end,
+  info = function(address) return direct(host.info, address) end,
+  uptime = function() return direct(host.uptime) end,
+  power = function() return direct(host.power) end,
+  hardware = function() return direct(host.hardware) end,
+  -- true and the method's values, or false and why it failed (a device never stops the machine)
+  invoke = function(target, method, ...) return direct(host.invoke, target, method, ...) end,
+  -- waits until one of the sources (any, when none) has an interrupt pending, or 'seconds' pass
+  waitForInterrupt = function(seconds, ...)
+    if seconds ~= nil and type(seconds) ~= "number" then
+      error("bad argument #1 to 'waitForInterrupt' (number expected, got " .. type(seconds) .. ")", 2)
+    end
+    local ticks = (seconds == nil or seconds == math_huge) and -1 or math_floor(seconds * 20 + 0.5)
+    if ticks < -1 then
+      ticks = 0
+    end
+    return syscall("wait", ticks, ...)
+  end,
+  -- the CPU stops; power stays on. It never returns.
+  halt = function()
+    syscall("halt")
+  end,
+}
+
+local main, why = load(image, "=eeprom", "t", sandbox)
+if not main then
+  return "abort", "EEPROM: " .. why
+end
+user_co = coroutine_create(main)
+setbudget(user_co, SLICE, spent)
+
+local result = table_pack(coroutine_resume(user_co))
+while true do
+  if isfrozen(user_co) then
+    if request then
+      local asked = request
+      request = nil
+      answer = table_pack(coroutine_yield(table_unpack(asked, 1, asked.n)))
+    else
+      coroutine_yield("tick") -- the slice is spent
+    end
+    setbudget(user_co, SLICE, spent) -- a new slice
+    result = table_pack(thaw(user_co))
+  elseif coroutine_status(user_co) == "dead" then
+    if result[1] then
+      return "returned"
+    end
+    error(result[2], 0)
+  else
+    coroutine_yield("tick") -- the EEPROM's code yielded at its top: it gives up its turn
+    setbudget(user_co, SLICE, spent)
+    result = table_pack(coroutine_resume(user_co))
+  end
+end

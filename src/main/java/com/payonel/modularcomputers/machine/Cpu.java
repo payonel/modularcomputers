@@ -73,12 +73,7 @@ public final class Cpu {
 			return Optional.empty();
 		}
 		if (architecture == Architecture.LUA) {
-			try {
-				return Optional.of(new LuaRunner(image));
-			} catch (LuaRunner.LoadFailed failed) {
-				abort(board, EEPROM + failed.getMessage()); // it doesn't compile: Lua's own message says where
-				return Optional.empty();
-			}
+			return Optional.of(new LuaRunner(image)); // its firmware loads the image (and aborts when it doesn't compile)
 		}
 		Optional<Program> program = load(image);
 		if (program.isEmpty()) {
@@ -111,6 +106,10 @@ public final class Cpu {
 
 	/** The program threw: the abort screen. */
 	public void crashed(Motherboard board, Throwable error) {
+		if (error instanceof LuaRunner.Aborted aborted) {
+			abort(board, aborted.getMessage()); // the firmware's own reason, such as Lua's syntax error
+			return;
+		}
 		abort(board, CRASHED + error.getMessage());
 	}
 

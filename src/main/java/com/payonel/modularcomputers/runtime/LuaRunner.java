@@ -1,33 +1,23 @@
 package com.payonel.modularcomputers.runtime;
 
 import static com.payonel.lungolua.api.LuaApi.*;
-import static com.payonel.lungolua.api.LuaAuxLib.luaL_checkinteger;
 import static com.payonel.lungolua.api.LuaAuxLib.luaL_checklstring;
 import static com.payonel.lungolua.api.LuaAuxLib.luaL_checkstack;
 import static com.payonel.lungolua.api.LuaAuxLib.luaL_error;
 import static com.payonel.lungolua.api.LuaAuxLib.luaL_loadbufferx;
 import static com.payonel.lungolua.api.LuaAuxLib.luaL_newstate;
-import static com.payonel.lungolua.api.LuaAuxLib.luaL_optnumber;
 import static com.payonel.lungolua.lib.Linit.luaL_openselectedlibs;
 import static com.payonel.lungolua.lib.Lualib.*;
-import static com.payonel.lungolua.object.Lnames.lua_registerbudget;
-import static com.payonel.lungolua.runtime.Ldo.lua_freeze;
-import static com.payonel.lungolua.runtime.Ldo.lua_isfrozen;
-import static com.payonel.lungolua.runtime.Ldo.lua_isyieldable;
-import static com.payonel.lungolua.runtime.Ldo.lua_nofreeze;
 import static com.payonel.lungolua.runtime.Ldo.lua_resume;
-import static com.payonel.lungolua.runtime.Ldo.lua_thaw;
-import static com.payonel.lungolua.runtime.Ldo.lua_yieldk;
 import static com.payonel.lungolua.runtime.Lstate.lua_newthread;
-import static com.payonel.lungolua.vm.Ldebug.lua_setbudget;
 
 import com.payonel.lungolua.api.HostString;
-import com.payonel.lungolua.api.lua_Budget;
 import com.payonel.lungolua.api.lua_CFunction;
 import com.payonel.lungolua.api.lua_ResumeResult;
 import com.payonel.lungolua.api.lua_UserObject;
 import com.payonel.lungolua.bytes.ByteView;
 import com.payonel.lungolua.runtime.lua_State;
+import com.payonel.modularcomputers.machine.LuaScripts;
 import java.lang.reflect.RecordComponent;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -38,52 +28,35 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
- * A Lua CPU's program (user design, 2026-10-12): the EEPROM's text as a Lua chunk, run by LungoLua
- * (the user's Lua engine) on the server thread, as a coroutine the host resumes each tick. No
- * thread of its own: the engine's budget freezes the program after {@link #STEPS_PER_TICK} steps (a
- * step is about a VM instruction) wherever it is, and the next tick thaws it, so even a loop that
- * never calls the board is preempted. A board call past the tick's share, a wait for an interrupt
- * and a halt yield to the host. {@code coroutine.yield} at the top yields a turn.
+ * The Lua CPU's host (user design, 2026-10-13): a plain runner for a LungoLua VM, nothing more. It
+ * runs the CPU's firmware, {@code lua/cpu/machine.lua}, as the kernel coroutine, resuming it once a
+ * tick, and gives it a {@code host} table of direct board calls. Everything else is the firmware's:
+ * the sandbox the EEPROM's code runs in, its budget and freezes, and its syscalls, which reach the
+ * host as the kernel's yields:
+ * <ul>
+ * <li>{@code "tick"}: done for this tick;</li>
+ * <li>{@code "wait", ticks, sources...}: wait for an interrupt from one of the sources (any, when
+ * none) for {@code ticks} ({@code -1}: no limit); answered with those pending;</li>
+ * <li>{@code "halt"}: the CPU halts, and the kernel is never resumed.</li>
+ * </ul>
+ * The kernel ends with {@code "returned"} (the EEPROM's code returned: a panic) or {@code "abort",
+ * why} (its text didn't load), or an error (the EEPROM's code crashed).
  * <p>
- * The program sees the motherboard API as the global {@code board}, as a Java program sees
- * {@link Board}: {@code list}, {@code status}, {@code type}, {@code methods}, {@code doc},
- * {@code invoke}, {@code waitForInterrupt}, {@code uptime}, {@code power}, {@code hardware},
- * {@code info}, {@code halt}. {@code invoke} answers as {@code pcall} does: {@code true} and the
- * method's values, or {@code false} and why it failed (a device never stops the machine). Of
- * Lua's libraries it has the base library without files ({@code dofile}, {@code loadfile}) or
- * standard output ({@code print}), and coroutine, string, table, math and utf8: no io, os,
- * package or debug, which reach the server's own files and processes.
+ * The board calls answer right away, on the server thread, and never call back into Lua; each one
+ * is one of the tick's calls, and {@code host.calls()} tells the firmware how many are left. Values
+ * cross as {@link Values}: strings as bytes (ISO-8859-1), handles as userdata, the board's records
+ * as tables.
  * <p>
- * Not saveable yet: the engine can persist a frozen state, but the machine doesn't keep one.
+ * Only the host can persist the VM (LungoLua's Styx persists from the main thread), so saving a
+ * running machine will be done here. Not yet: power-off drops the VM.
  */
 public final class LuaRunner implements Runner {
-	/** Steps the program runs each tick before its budget freezes it. */
-	public static final long STEPS_PER_TICK = 100_000;
-	/** The chunk's name in Lua's messages: {@code eeprom:3: ...}. */
-	private static final String CHUNK = "=eeprom";
-	private static final int LIBRARIES = LUA_GLIBK | LUA_COLIBK | LUA_TABLIBK | LUA_STRLIBK | LUA_MATHLIBK | LUA_UTF8LIBK;
+	/** The chunk's name in Lua's messages: {@code machine:3: ...}. */
+	private static final String FIRMWARE = "cpu/machine";
+	/** What the VM opens: the firmware needs debug (budgets, freezing); it hands out what it chooses. */
+	private static final int LIBRARIES = LUA_GLIBK | LUA_COLIBK | LUA_TABLIBK | LUA_STRLIBK | LUA_MATHLIBK | LUA_UTF8LIBK | LUA_DBLIBK;
 	/** How deep tables nest between programs and devices. */
 	private static final int MAX_DEPTH = 16;
-
-	/** The budget's callback: freeze the program where it is, unless a call that can't freeze is in the way. */
-	private static void tickSpent(lua_State user, lua_State spender) {
-		if (lua_nofreeze(spender) == 0) {
-			lua_freeze(spender);
-		}
-	}
-
-	private static final lua_Budget TICK_SPENT = LuaRunner::tickSpent;
-
-	static {
-		lua_registerbudget("modularcomputers.tick", TICK_SPENT);
-	}
-
-	/** The EEPROM's text isn't a Lua chunk: Lua's own message says where. */
-	public static final class LoadFailed extends Exception {
-		LoadFailed(String message) {
-			super(message);
-		}
-	}
 
 	/** Lua's error, as the program left it. */
 	public static final class LuaException extends RuntimeException {
@@ -92,11 +65,18 @@ public final class LuaRunner implements Runner {
 		}
 	}
 
+	/** The EEPROM's text didn't load: the abort screen says why. */
+	public static final class Aborted extends RuntimeException {
+		Aborted(String why) {
+			super(why);
+		}
+	}
+
 	/** A handle (an open file, say) held by a program: Lua userdata. */
 	private record HandleObject(Handle handle) implements lua_UserObject {
 	}
 
-	/** A program asks the host for a wait: answered with the sources pending. */
+	/** The firmware asked to wait for an interrupt: answered with the sources pending. */
 	private record Wait(long until, List<String> sources) {
 		List<String> ready(List<String> pending) {
 			return sources.isEmpty() ? pending : pending.stream().filter(sources::contains).toList();
@@ -104,27 +84,24 @@ public final class LuaRunner implements Runner {
 	}
 
 	private final lua_State main;
-	private final lua_State program;
+	private final lua_State kernel;
+	private final String image;
 	private State state = State.RUNNING;
 	private Throwable crash;
 	private long answered;
 	private boolean started;
-	private boolean halted;
 	/** During a turn: the real board, the calls left and the tick. */
 	private Board board;
 	private int calls;
 	private long now;
-	/** Why the program yielded, when it was to wait for an interrupt. Never set unless that yield happened. */
+	/** The firmware's wait, while it waits. */
 	private Wait wait;
 
-	/** Compiles {@code image}; it runs from the first {@link #tick}. */
-	public LuaRunner(String image) throws LoadFailed {
+	/** A CPU about to run {@code image}, the EEPROM's text; the firmware loads it at the first {@link #tick}. */
+	public LuaRunner(String image) {
+		this.image = image;
 		main = luaL_newstate();
 		luaL_openselectedlibs(main, LIBRARIES, 0);
-		for (String unsafe : List.of("dofile", "loadfile", "print")) {
-			lua_pushnil(main);
-			lua_setglobal(main, new HostString(unsafe));
-		}
 		lua_createtable(main, 0, 12);
 		function("list", L -> push(L, board.list()));
 		function("status", L -> push(L, board.status()));
@@ -136,18 +113,23 @@ public final class LuaRunner implements Runner {
 		function("power", L -> push(L, board.power()));
 		function("hardware", L -> push(L, board.hardware()));
 		function("invoke", this::invoke);
-		lua_pushcfunction(main, this::waitForInterrupt);
-		lua_setfield(main, -2, new HostString("waitForInterrupt"));
-		lua_pushcfunction(main, this::halt);
-		lua_setfield(main, -2, new HostString("halt"));
-		lua_setglobal(main, new HostString("board"));
+		lua_pushcfunction(main, L -> push(L, (long) calls)); // not a call itself
+		lua_setfield(main, -2, new HostString("calls"));
+		lua_setglobal(main, new HostString("host"));
 
-		program = lua_newthread(main);
-		lua_setfield(main, LUA_REGISTRYINDEX, new HostString("modularcomputers.program")); // kept from the collector
-		byte[] code = image.getBytes(StandardCharsets.ISO_8859_1); // one character a byte, as the EEPROM holds it
-		if (luaL_loadbufferx(program, new ByteView(code), new HostString(CHUNK), new HostString("t")) != LUA_OK) {
-			throw new LoadFailed(text(program, -1));
+		kernel = lua_newthread(main);
+		lua_setfield(main, LUA_REGISTRYINDEX, new HostString("modularcomputers.kernel")); // kept from the collector
+		byte[] firmware = LuaScripts.read(FIRMWARE).getBytes(StandardCharsets.ISO_8859_1);
+		if (luaL_loadbufferx(kernel, new ByteView(firmware), new HostString("=machine"), new HostString("t")) != LUA_OK) {
+			throw new IllegalStateException("the CPU's firmware doesn't load: " + text(kernel, -1)); // a bug in the mod
 		}
+	}
+
+	/** Whether {@code source} compiles as Lua: null, or Lua's message. */
+	public static String check(String source, String name) {
+		lua_State L = luaL_newstate();
+		byte[] code = source.getBytes(StandardCharsets.ISO_8859_1);
+		return luaL_loadbufferx(L, new ByteView(code), new HostString("=" + name), new HostString("t")) == LUA_OK ? null : text(L, -1);
 	}
 
 	@Override
@@ -175,51 +157,53 @@ public final class LuaRunner implements Runner {
 		this.now = now;
 		try {
 			while (true) {
-				// What the engine says the program is decides how it goes on; {@code wait} only says
-				// what a yield was for.
-				lua_ResumeResult result;
-				if (lua_isfrozen(program) != 0) {
-					wait = null; // (a frozen program isn't in a wait)
-					lua_setbudget(program, STEPS_PER_TICK, TICK_SPENT); // a new tick's steps
-					result = lua_thaw(program, null);
-				} else if (lua_status(program) == LUA_YIELD) {
-					int answers = 0;
-					if (wait != null) {
-						List<String> pending = wait.ready(interrupts.get());
-						if (pending.isEmpty() && now < wait.until()) {
-							return state = State.WAITING;
-						}
-						wait = null;
-						luaL_checkstack(program, 3, new HostString("no room for the interrupts"));
-						push(program, pending); // waitForInterrupt's answer
-						answers = 1;
-					}
-					result = lua_resume(program, null, answers);
-				} else if (!started) {
+				int answers = 0;
+				if (!started) {
 					started = true;
-					lua_setbudget(program, STEPS_PER_TICK, TICK_SPENT);
-					result = lua_resume(program, null, 0);
-				} else {
+					push(kernel, image); // the EEPROM's text, as the CPU read it at power-on
+					answers = 1;
+				} else if (wait != null) {
+					List<String> pending = wait.ready(interrupts.get());
+					if (pending.isEmpty() && now < wait.until()) {
+						return state = State.WAITING;
+					}
 					wait = null;
-					crash = new LuaException("the program is neither frozen nor suspended"); // the engine and the runner disagree
-					return state = State.CRASHED;
+					push(kernel, pending);
+					answers = 1;
 				}
-				if (halted) {
-					wait = null;
-					return state = State.HALTED;
+				lua_ResumeResult result = lua_resume(kernel, null, answers);
+				List<Object> said = new ArrayList<>();
+				int top = lua_gettop(kernel);
+				if (result.status == LUA_YIELD || result.status == LUA_OK) {
+					for (int i = top - result.nres + 1; i <= top; i++) {
+						said.add(toJava(kernel, i, 0));
+					}
+					lua_settop(kernel, top - result.nres);
 				}
+				Object what = said.isEmpty() ? null : said.getFirst();
 				if (result.status == LUA_YIELD) {
-					if (wait != null) {
+					if ("tick".equals(what)) {
+						return state = State.RUNNING;
+					} else if ("halt".equals(what)) {
+						return state = State.HALTED;
+					} else if ("wait".equals(what)) {
+						long ticks = said.size() > 1 && said.get(1) instanceof Long l ? l : -1;
+						List<String> sources = said.stream().skip(2).map(String::valueOf).toList();
+						wait = new Wait(ticks < 0 ? Long.MAX_VALUE : now + ticks, sources);
 						continue; // it may be over already
 					}
-					return state = State.RUNNING; // out of calls, or the program gave up its turn
-				}
-				wait = null; // it didn't yield: no wait can be pending
-				if (result.status != LUA_OK) {
-					crash = new LuaException(text(program, -1));
+					crash = new LuaException("the firmware asked for '" + what + "'");
 					return state = State.CRASHED;
 				}
-				return state = lua_isfrozen(program) != 0 ? State.RUNNING : State.RETURNED;
+				if (result.status == LUA_OK) {
+					if ("abort".equals(what)) {
+						crash = new Aborted(String.valueOf(said.size() > 1 ? said.get(1) : "?"));
+						return state = State.CRASHED;
+					}
+					return state = State.RETURNED;
+				}
+				crash = new LuaException(text(kernel, -1));
+				return state = State.CRASHED;
 			}
 		} finally {
 			this.board = null;
@@ -228,30 +212,17 @@ public final class LuaRunner implements Runner {
 
 	@Override
 	public void stop() {
-		state = State.HALTED; // the state is left to the collector: closing it would run the program's finalizers
+		state = State.HALTED; // the VM is left to the collector: closing it would run the program's finalizers
 	}
 
-	/** A board function that answers right away: one of the tick's calls. */
+	/** A board call: answers right away, and is one of the tick's calls (the firmware checks how many are left). */
 	private void function(String name, lua_CFunction body) {
-		lua_pushcfunction(main, L -> call(L, body));
+		lua_pushcfunction(main, L -> {
+			calls--;
+			answered++;
+			return body.call(L);
+		});
 		lua_setfield(main, -2, new HostString(name));
-	}
-
-	/**
-	 * Out of calls this tick, the program yields and makes the call when the host resumes it, as
-	 * a Java program's call waits for the next tick. Where it can't yield (inside a sort's
-	 * comparison, say), the call goes ahead.
-	 */
-	private int call(lua_State L, lua_CFunction body) {
-		if (halted) {
-			return luaL_error(L, new HostString("halted")); // a halt that couldn't stop it here: nothing more reaches the board
-		}
-		if (calls <= 0 && lua_isyieldable(L) != 0) {
-			return lua_yieldk(L, 0, 0, (K, status, context) -> call(K, body));
-		}
-		calls--;
-		answered++;
-		return body.call(L);
 	}
 
 	/** {@code invoke(address or handle, method, ...)}: {@code true} and its values, or {@code false} and why not. */
@@ -275,42 +246,6 @@ public final class LuaRunner implements Runner {
 			push(L, value);
 		}
 		return 1 + result.values().size();
-	}
-
-	/**
-	 * {@code waitForInterrupt([seconds], sources...)}: yields to the host until one is pending, or
-	 * time's up, and returns those pending, as a sequence. The wait is recorded only when the yield
-	 * can't fail: where a call that can't yield is in the way (a sort's comparison), it's an error.
-	 */
-	private int waitForInterrupt(lua_State L) {
-		if (halted) {
-			return luaL_error(L, new HostString("halted"));
-		}
-		if (lua_isyieldable(L) == 0) {
-			return luaL_error(L, new HostString("waitForInterrupt can't wait here: a call that can't yield is in the way"));
-		}
-		double seconds = luaL_optnumber(L, 1, Double.POSITIVE_INFINITY);
-		List<String> sources = new ArrayList<>();
-		for (int i = 2; i <= lua_gettop(L); i++) {
-			sources.add(string(L, i));
-		}
-		long ticks = Double.isInfinite(seconds) ? Long.MAX_VALUE / 2 : Math.max(0, Math.round(seconds * 20));
-		int base = lua_gettop(L);
-		wait = new Wait(now + ticks, List.copyOf(sources));
-		return lua_yieldk(L, 0, 0, (K, status, context) -> lua_gettop(K) - base); // the host's answer, on top
-	}
-
-	/**
-	 * {@code halt()}: the CPU stops; power stays on. It never returns: it yields to the host, which
-	 * never resumes it. Where it can't yield, it raises an error; a {@code pcall} may catch that, but
-	 * the board refuses every call from then on, and the host stops the program when its turn ends.
-	 */
-	private int halt(lua_State L) {
-		halted = true;
-		if (lua_isyieldable(L) != 0) {
-			return lua_yieldk(L, 0, 0, (K, status, context) -> 0); // never resumed
-		}
-		return luaL_error(L, new HostString("halted"));
 	}
 
 	private static String string(lua_State L, int arg) {

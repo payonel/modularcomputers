@@ -590,27 +590,36 @@ scripts/art/error_beep.py` into
   package) runs Java programs, and the **Java EEPROM** (`java_eeprom`, creative only) comes flashed
   with mcos's class name. Creative-only items (`ModItems.CREATIVE_ONLY`) have no recipe; their hint
   says "Creative only". The EEPROM slot takes either EEPROM (`ModItems.isEeprom`).
-- **The Lua CPU** (`runtime/LuaRunner`, a `Runner` like `ProgramRunner`): the EEPROM's text is a
-  Lua chunk (`=eeprom`), run on the server thread as a coroutine the host resumes each tick: no
-  thread of its own. Its budget (`STEPS_PER_TICK`, 100,000 steps) freezes it wherever it is, and
-  the next tick thaws it, so loops that never call are preempted (unless a call that can't freeze
-  is in the way: then it runs on to the next budget point; no hard stop yet). Board calls past the
-  tick's 20, `waitForInterrupt` and `halt` yield to the host. **Each turn goes on by the engine's
-  own state, not the runner's notes** (user, 2026-10-13): frozen, it's thawed; suspended by a
-  yield, it's resumed (with the interrupts, when the yield was `waitForInterrupt`'s, passed as the
-  resume's value); new, it starts; anything else is a crash. A wait is recorded only once its
-  yield can't fail (`lua_isyieldable`; where a call that can't yield is in the way, it's an
-  error) and is cleared whenever a turn ends without yielding. A `halt` that can't yield raises an
-  error; whatever a `pcall` does with it, the board refuses every call from then on, and the host
-  stops the program when the turn ends. The program sees the global `board`
-  (`list`, `status`, `type`, `methods`, `doc`, `info`, `uptime`, `power`, `hardware`, `invoke`,
-  `waitForInterrupt([seconds], sources...)`, `halt`); `invoke` answers as `pcall` does (`true,
-  ...` or `false, why`); handles are userdata; board records come as tables; strings cross as
-  bytes (ISO-8859-1). Libraries: base (no `dofile`, `loadfile`, `print`), coroutine, string,
-  table, math, utf8; no io, os, package or debug (they reach the server). A syntax error is `ABRT:
-  EEPROM: eeprom:1: ...`; a runtime error the crash screen with Lua's message. Power-off drops the
-  state (closing it would run the program's finalizers). Not saved yet. Memory isn't limited or
-  counted yet.
+- **The Lua CPU** (user design, 2026-10-13): three layers, as a real CPU runs firmware under an OS.
+  - **The host, `runtime/LuaRunner`** (a `Runner`, like `ProgramRunner`): a plain VM runner only. It
+    makes the LungoLua state (base, coroutine, string, table, math, utf8, debug), runs the CPU's
+    firmware as the kernel coroutine (kernel_co), resumes it once a tick, and gives it a global
+    `host` table of direct board calls (`list`, `status`, `type`, `methods`, `doc`, `info`, `uptime`,
+    `power`, `hardware`, `invoke`, and `calls()`, what's left of the tick's 20). Board calls answer at
+    once on the server thread and never call back into Lua. The kernel's yields are its requests:
+    `"tick"` (done this tick), `"wait", ticks, sources...` (answered with the pending interrupts),
+    `"halt"`; it ends with `"returned"` (a panic), `"abort", why` (`LuaRunner.Aborted`: the CPU shows
+    `ABRT: why`) or an error (the crash screen). **Persistence will live here**: Styx persists from
+    the main thread only, so only the host can save a running machine (not built yet).
+  - **The firmware, `lua/cpu/machine.lua`** (after OC's `machine.lua`): all sandboxing, budgeting,
+    freezing and syscalls. It builds the sandbox (copies of coroutine, string, table, math, utf8;
+    no debug, io, os, package, print, dofile, loadfile; `load` text only, into the sandbox by
+    default; `collectgarbage` limited to count/step/collect/isrunning; the `board` table), loads the
+    EEPROM's text into it as the user coroutine (user_co, `=eeprom`), and budgets user_co
+    (`debug.setbudget`, `SLICE` 100,000 steps a tick). **Its budget callback always freezes**: where
+    a freeze can't happen, the engine ends the chain with an error (user, 2026-10-13: nothing runs
+    unfrozen). LungoLua makes the standard library freezable (the pattern matcher has check points),
+    and a user object's `__gc` runs in the user's budget group, so nothing in the sandbox can starve
+    the server; OC's plain-Lua pattern matcher and timeouts aren't needed. **Syscalls freeze instead of
+    yielding** (the user's "yield-all"): a wait, a halt or a board call past the tick's share records
+    its request and cuts user_co's budget to one step; the callback freezes user_co's whole chain
+    wherever it is (inside coroutines, a sort's comparison), the freeze lands in the firmware, which
+    asks the host, and the thaw returns the answer. No user coroutine sees a yield; `pcall` can't
+    catch it. The firmware never calls methods on strings (the string metatable is shared).
+  - **User code**: the EEPROM's text and what it runs, seen as untrusted. It gets `board` (`invoke`
+    answers as `pcall` does), and user coroutines that yield normally. `debug` stays hidden until
+    LungoLua has a sandboxed debug library (user's plan) that can't touch the firmware's budget.
+  Memory isn't limited or counted yet (LungoLua's `lua_Alloc` permission hook is the way).
 - **Screens and cables** (built 2026-10-11, the user's request):
   - **Screen** (`ScreenBlock`, `ScreenBlockEntity`): a monitor block, 50x16 like the built-in
     display. It faces the player who places it.
