@@ -1,8 +1,9 @@
 -- tty: a terminal line, as Linux's tty layer. A tty belongs to one input device (a terminal, or
--- the board's console) and holds its input buffer and termios flags, whatever process is running:
--- the kernel's input service hands it what the device sends (receive), its line discipline edits,
--- echoes and signals, and processes read what's ready (take). Output goes to the device after the
--- tty's output processing (onlcr).
+-- the board's console) and holds its input buffer and termios flags, whatever process is running.
+-- What the device sends arrives by itself in the tty's ring (board.ring: the firmware fills it, as
+-- a device fills its driver's ring by DMA; Linux's flip buffer), with no call; the line discipline
+-- (pump, receive) edits, echoes and signals as the ring is read, and processes read what's ready
+-- (take). Output goes to the device after the tty's output processing (onlcr).
 local tty = {}
 tty.__index = tty
 
@@ -14,6 +15,7 @@ local VERASE = "\127" -- Backspace (xterm sends DEL)
 local BS = "\b" -- Ctrl+H erases too
 local CR, NL, TAB, DEL = "\r", "\n", "\t", "\127"
 local CARET_OFFSET = 64 -- a control character echoes as ^ and the character this far on (\3 as ^C)
+local RING_SIZE = 64 -- packets of input the ring holds (each a few hundred bytes at most); past it the device keeps the rest
 
 -- In the ready queue: an end of file (Ctrl+D at the start of a line), read as nothing.
 local EOF = {}
@@ -25,6 +27,7 @@ tty.SIGINT = "SIGINT"
 function tty.new(device, signal)
   return setmetatable({
     device = device,
+    input = board.ring(device, RING_SIZE), -- what the device sends, as it sends it
     signal = signal,
     -- termios's flags, Linux's defaults for a terminal
     flags = {icanon = true, echo = true, echoe = true, echoctl = true, isig = true, icrnl = true, onlcr = true, iutf8 = true},
@@ -122,14 +125,28 @@ function tty:receive(bytes)
   end
 end
 
+-- The bytes the device sent, through the line discipline: read from the ring, no call.
+function tty:pump()
+  local input = self.input
+  while input.head < input.tail do
+    local slot = input.head % input.size + 1
+    local bytes = input[slot]
+    input[slot] = false
+    input.head = input.head + 1
+    self:receive(bytes)
+  end
+end
+
 -- Whether a read would get something.
 function tty:readable()
+  self:pump()
   return #self.ready > 0
 end
 
 -- A read: the next line (canonical mode), or every byte typed; "" at an end of file; nil when
 -- nothing is ready.
 function tty:take()
+  self:pump()
   if #self.ready == 0 then
     return nil
   end

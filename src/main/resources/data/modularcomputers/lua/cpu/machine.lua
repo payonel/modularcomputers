@@ -23,6 +23,15 @@
 --                                 for the inbox: {address, method, value} each
 --   "halt"                        the CPU halts; never resumed
 --
+-- Rings (user design, 2026-10-14): a program may give this file a ring for a source
+-- (board.ring(address, size)): a table it reads, {head, tail, size, [1..size] = packets}, which
+-- this file fills with what the device sends, without being asked, as a device writes into a ring
+-- its driver gave it by DMA. The host takes a device's data as it arrives, up to the room each
+-- ring has (its credit: this file reports the free slots at every resume), into a mailbox; at every
+-- resume of user code, this file moves the mailbox into the rings. The program reads packets
+-- between head and tail and moves head on; this file only ever writes slots and tail. A source
+-- with a ring isn't cached in the inbox.
+--
 -- Device data (user design, 2026-10-13): this file caches what devices have (keys, sensor events)
 -- in its inbox, a queue per device. As a wait is answered the host takes, from each device with
 -- data, as much as that device's queue has room for (its size comes from the RAM: none with only
@@ -51,13 +60,20 @@ local usermode = debug.getregistry()["modularcomputers.usermode"]
 -- The board's interrupt status, as the server thread published it the moment a line rose: the
 -- sources with an interrupt raised (the bus, devices with data they still hold). Read here, free.
 local pending = debug.getregistry()["modularcomputers.pending"]
+-- The host's mailbox of pushed device data (address, value, address, value...), nil when empty;
+-- and its ear for how much room each ring has.
+local drain = debug.getregistry()["modularcomputers.drain"]
+local credit = debug.getregistry()["modularcomputers.credit"]
 local load, pairs, ipairs, select, type, error, tostring = load, pairs, ipairs, select, type, error, tostring
 local table_pack, table_unpack, table_remove = table.pack, table.unpack, table.remove
-local setmetatable = setmetatable
-local math_huge, math_floor = math.huge, math.floor
+local setmetatable, rawget, rawset = setmetatable, rawget, rawset
+local math_huge, math_floor, math_type = math.huge, math.floor, math.type
+local table_create = table.create
 
 -- Steps user_co runs before its budget freezes it: how often the host gets a safe point.
 local SLICE = 100000
+-- The most packets a ring may hold.
+local RING_MAX = 1024
 
 local user_co
 -- Syscalls waiting for the host, oldest first; each request (packed) gets its own reply (.reply).
@@ -79,6 +95,61 @@ end}
 
 -- The inbox: a few of each device's data, by address: {method = ..., [1] = oldest, ...}.
 local inbox = {}
+
+-- The rings the program gave, by source: {ring = its table, size, tail (this file's own count; the
+-- ring's tail field is a copy for the program), overflow = what came and had no slot yet}.
+local rings = {}
+
+-- A ring's head as the program left it, trusted only within [tail - size, tail]: anything else
+-- reads as full, so this file never writes past the slots it made.
+local function head_of(r)
+  local head = rawget(r.ring, "head")
+  if math_type(head) ~= "integer" or head > r.tail or head < r.tail - r.size then
+    return r.tail - r.size
+  end
+  return head
+end
+
+-- Puts a packet in a ring's next slot, if it's free: no allocation (the slot and the fields exist).
+local function store(r, value)
+  if r.tail - head_of(r) >= r.size then
+    return false
+  end
+  rawset(r.ring, r.tail % r.size + 1, value)
+  r.tail = r.tail + 1
+  rawset(r.ring, "tail", r.tail)
+  return true
+end
+
+-- Packets waiting for the program in a source's ring, or in its inbox queue.
+local function unread(address)
+  local r = rings[address]
+  if r then
+    return r.tail - head_of(r) + #r.overflow
+  end
+  local queue = inbox[address]
+  return queue and #queue or 0
+end
+
+-- Before user code resumes (firmware mode): what the host pushed goes into the rings, and the host
+-- hears how much room each has now.
+local function deliver()
+  local got = drain()
+  if got then
+    for i = 1, #got, 2 do
+      local r = rings[got[i]]
+      if r then
+        r.overflow[#r.overflow + 1] = got[i + 1]
+      end
+    end
+  end
+  for address, r in pairs(rings) do
+    while r.overflow[1] ~= nil and store(r, r.overflow[1]) do
+      table_remove(r.overflow, 1)
+    end
+    credit(address, r.size - (r.tail - head_of(r)) - #r.overflow)
+  end
+end
 
 -- Asks the host (yields kernel_co).
 local ask = coroutine_yield
@@ -208,15 +279,19 @@ sandbox.board = {
     usermode(true)
     local news = false
     for _, address in ipairs(raised) do
-      local queue = inbox[address]
-      if (not queue or queue[1] == nil) and want(address) then
+      if unread(address) == 0 and want(address) then
         news = true
         break
       end
     end
     if not news then
-      for address, queue in pairs(inbox) do
-        if queue[1] ~= nil and want(address) then
+      for address in pairs(inbox) do
+        if not rings[address] and unread(address) > 0 and want(address) then
+          ready[#ready + 1] = address
+        end
+      end
+      for address in pairs(rings) do
+        if unread(address) > 0 and want(address) then
           ready[#ready + 1] = address
         end
       end
@@ -233,6 +308,9 @@ sandbox.board = {
     for address, queue in pairs(inbox) do
       held[address] = #queue
     end
+    for address in pairs(rings) do
+      held[address] = unread(address)
+    end
     local reply = syscall("wait", ticks, held, ...)
     -- Still in firmware mode: the data's out of the devices now, so it must reach the inbox.
     for _, item in ipairs(reply[2]) do
@@ -245,6 +323,26 @@ sandbox.board = {
     end
     usermode(true)
     return reply[1]
+  end,
+  -- gives this file a ring for a source's data, 'size' packets: it fills the ring as the device
+  -- sends, with no call (see "Rings" above); returns the ring, {head, tail, size, [1..size]}
+  ring = function(source, size)
+    if type(source) ~= "string" then
+      error("bad argument #1 to 'ring' (string expected, got " .. type(source) .. ")", 2)
+    end
+    if math_type(size) ~= "integer" or size < 1 or size > RING_MAX then
+      error("bad argument #2 to 'ring' (an integer from 1 to " .. RING_MAX .. " expected)", 2)
+    end
+    local ring = table_create(size, 3) -- the program's memory (user mode)
+    for i = 1, size do
+      ring[i] = false
+    end
+    ring.head, ring.tail, ring.size = 0, 0, size
+    usermode(false)
+    rings[source] = {ring = ring, size = size, tail = 0, overflow = {}}
+    credit(source, size)
+    usermode(true)
+    return ring
   end,
   -- the CPU stops; power stays on. It never returns.
   halt = function()
@@ -287,6 +385,7 @@ while true do
       ask("slice") -- the slice is spent
     end
     setbudget(user_co, SLICE, spent) -- a new slice
+    deliver()
     result = table_pack(user(thaw))
   elseif coroutine_status(user_co) == "dead" then
     if result[1] then
@@ -296,6 +395,7 @@ while true do
   else
     ask("slice") -- the EEPROM's code yielded at its top: it gives up its turn
     setbudget(user_co, SLICE, spent)
+    deliver()
     result = table_pack(user(coroutine_resume))
   end
 end

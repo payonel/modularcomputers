@@ -507,7 +507,15 @@ public final class Machine {
 	public void setDevices(Map<String, Device> addressed, Map<String, String> aliases) {
 		List<Device> devices = List.copyOf(addressed.values());
 		List<Device> before = board.bus().devices();
+		Map<String, Device> was = new java.util.HashMap<>();
+		board.bus().forEach(was::put);
 		board.bus().setDevices(addressed, aliases);
+		if (runner != null) {
+			List<String> left = was.entrySet().stream().filter(entry -> addressed.get(entry.getKey()) != entry.getValue()).map(Map.Entry::getKey).toList();
+			if (!left.isEmpty()) {
+				runner.devicesLeft(left);
+			}
+		}
 		var console = board.virtualBus().console();
 		console.busChanged();
 		if (!powered) {

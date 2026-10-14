@@ -731,6 +731,113 @@ class LuaRunnerTest {
 		assertThat(row(0)).isEqualTo("busy console,id:redstone");
 	}
 
+	/** Reads a ring's packets (between head and tail) as the program would, moving head on. */
+	private static final String READ_RING = """
+		local function take(ring)
+		  local got = {}
+		  while ring.head < ring.tail do
+		    local slot = ring.head % ring.size + 1
+		    got[#got + 1] = ring[slot]
+		    ring[slot] = false
+		    ring.head = ring.head + 1
+		  end
+		  return got
+		end
+		""";
+
+	@Test
+	void aRingFillsAsTheDeviceSendsWithNoCall() {
+		boot(READ_RING + """
+			local ring = board.ring("console", 4)
+			local typed = ""
+			while #typed < 3 do -- busy: no call, no wait; the firmware fills the ring as it resumes
+			  typed = typed .. table.concat(take(ring))
+			end
+			board.invoke("console", "write", typed)
+			board.halt()
+			""");
+		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
+		settle(() -> runner.state() == Runner.State.RUNNING && runner.queuedCalls() == 0);
+		screen.press("a");
+		screen.press("b");
+		screen.press("c");
+		untilHalted();
+		assertThat(row(0)).isEqualTo("abc");
+		assertThat(runner.answered()).as("the bytes came with no call: only the write reached the server").isEqualTo(1);
+	}
+
+	@Test
+	void aRingTakesOnlyWhatItHasRoomForAndTheDeviceKeepsTheRest() {
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		Map<String, Device> devices = new LinkedHashMap<>();
+		devices.put("id:screen", screen);
+		devices.put("id:redstone", card);
+		machine.setDevices(devices);
+		boot(READ_RING + """
+			local ring = board.ring("id:redstone", 2)
+			local n = 0
+			for i = 1, 3000000 do n = n + 1 end -- the events come meanwhile
+			local first = ring.tail - ring.head -- full: no more than its room
+			local got = #take(ring)
+			while got < 5 do -- room again: the rest comes
+			  for i = 1, 100000 do n = n + 1 end
+			  got = got + #take(ring)
+			end
+			board.invoke("console", "write", first .. " " .. got)
+			board.halt()
+			""");
+		settle(() -> machine.runner().map(runner -> runner.state() == Runner.State.RUNNING).orElse(false));
+		for (int i = 1; i <= 5; i++) {
+			card.sense(0, i);
+		}
+		untilHalted();
+		assertThat(row(0)).as("2 at first (its room), then all 5").isEqualTo("2 5");
+		assertThat(card.pull(new Arguments(java.util.List.of())).first()).as("none left in the card, none lost").isNull();
+	}
+
+	@Test
+	void whatsOnItsWayToARingIsSavedWithTheComputer() {
+		boot(READ_RING + """
+			local ring = board.ring("console", 8)
+			board.waitForInterrupt(0.5, "nothing") -- parked: what's typed meanwhile waits in the mailbox, not in the ring
+			local typed = ""
+			while #typed < 4 do
+			  local n = 0
+			  for i = 1, 100000 do n = n + 1 end
+			  typed = typed .. table.concat(take(ring))
+			end
+			board.invoke("console", "write", typed)
+			board.halt()
+			""");
+		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
+		long end = System.nanoTime() + 10_000_000_000L;
+		while (runner.state() != Runner.State.WAITING) { // (no ticks: the wait's half second doesn't pass)
+			assertThat(System.nanoTime()).isLessThan(end);
+			Runnable task;
+			while ((task = server.poll()) != null) {
+				task.run();
+			}
+			Thread.onSpinWait();
+		}
+		screen.press("a");
+		screen.press("b");
+		assertThat(runner.mailboxed()).as("pushed, not delivered: the program is parked").isPositive();
+		// Saved as the world is, the program then its devices' blocks, on the server thread: nothing comes in between.
+		byte[] saved = machine.persistProgram().orElseThrow(); // the mailbox goes with it
+		Map<String, Object> terminalSaved = screen.saved();
+		machine.unload();
+		Terminal loaded = new Terminal(Resolution.DEFAULT);
+		loaded.restore(terminalSaved);
+		Machine again = reloaded(loaded);
+		again.resumeProgram(saved);
+		settle(again, () -> again.runner().map(r -> r.state() == Runner.State.RUNNING).orElse(false));
+		loaded.press("c");
+		loaded.press("d");
+		settle(again, () -> again.runner().isEmpty());
+		assertThat(again.board().virtualBus().console().screen().row(0).strip()).as("none lost, in order").isEqualTo("abcd");
+		again.pressPower();
+	}
+
 	@Test
 	void withOnlyTier1RamTheresNoInboxAndEachReadIsACall() {
 		ram(1);

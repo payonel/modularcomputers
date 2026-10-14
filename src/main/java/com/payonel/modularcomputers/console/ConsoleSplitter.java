@@ -89,11 +89,15 @@ public final class ConsoleSplitter {
 		}
 	}
 
-	/** Takes every byte waiting at the group's terminals, merged in bus order (ConIn's), or nothing. */
-	public Optional<String> takeInput() {
+	/** Takes the bytes waiting at the group's terminals (at most {@code max}, in whole keys), merged in bus order (ConIn's), or nothing. */
+	public Optional<String> takeInput(long max) {
 		StringBuilder bytes = new StringBuilder();
 		for (Terminal terminal : terminals()) {
-			terminal.takeInput().ifPresent(bytes::append);
+			long room = max - bytes.length();
+			if (room <= 0) {
+				break;
+			}
+			terminal.takeInput(room, bytes.isEmpty()).ifPresent(bytes::append);
 		}
 		return bytes.isEmpty() ? Optional.empty() : Optional.of(bytes.toString());
 	}
@@ -130,9 +134,9 @@ public final class ConsoleSplitter {
 		return Result.ok();
 	}
 
-	@Method(doc = "read(): every byte waiting at the terminals in the console's group, merged, or nil")
+	@Method(doc = "read([max]): the bytes waiting at the terminals in the console's group (at most max), merged, or nil")
 	public Result read(Arguments args) {
-		return Result.ok(takeInput().orElse(null));
+		return Result.ok(takeInput(args.optInteger(0, Long.MAX_VALUE)).orElse(null));
 	}
 
 	@Method(doc = "getSize(): columns, rows; the smallest of the terminals in the console's group")

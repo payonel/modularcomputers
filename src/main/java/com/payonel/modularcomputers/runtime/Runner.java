@@ -67,6 +67,10 @@ public interface Runner {
 	default void interruptsRaised(List<String> raised) {
 	}
 
+	/** Server thread: these addresses' devices left the bus (or were replaced): what was taken from them for the program and not yet handed over goes. */
+	default void devicesLeft(java.util.Collection<String> addresses) {
+	}
+
 	/** The program's memory, which devices charge what they hold for it to ({@link Arguments#account}). */
 	default MemoryAccount memoryAccount() {
 		return MemoryAccount.UNLIMITED;

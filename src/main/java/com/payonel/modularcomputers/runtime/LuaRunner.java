@@ -202,6 +202,33 @@ public final class LuaRunner implements Runner {
 	 * library's included. Past its cap, an allocation is refused (after a full collection) and Lua
 	 * raises "not enough memory", in the program.
 	 */
+	/** The most bytes one packet of pushed device data holds (a terminal's read takes up to this, in whole keys). */
+	public static final int PUSH_PACKET_BYTES = 256;
+	/** What a pushed packet costs the program's memory beyond its bytes (a string's header, a ring slot), counted when the host checks room. */
+	public static final int PUSH_PACKET_OVERHEAD = 64;
+
+	/**
+	 * Device data pushed to the program as it arrives (user design, 2026-10-14), as a device writes
+	 * into a ring a driver gave it, by DMA, then interrupts: the program registers a ring for a source
+	 * with the firmware ({@code board.ring}), and the firmware tells the host how many slots each ring
+	 * has free (a credit, as PCIe flow control or a TCP window). On the computer's turns the
+	 * server thread takes from each such device up to its credit, a packet a slot, while the program's
+	 * memory has room, into the mailbox; the firmware moves the mailbox into the rings at every resume.
+	 * The host pushes on the computer's turns (each tick, and each turn that serves its calls or its
+	 * wait, as a key typed at a waiting computer runs one), not at every key: a push a key spent the
+	 * computer's server time and slowed a burst of typing down (measured, 2026-10-14).
+	 * No credit: the data stays in the device, which drops what it has no room for itself. All under
+	 * this object's lock (the server thread pushes; the computer's thread drains and gives credit).
+	 */
+	static final class Push {
+		/** Slots the host may still fill, by the ring's source: what the firmware last said is free, less what's taken since. */
+		final Map<String, Integer> credit = new java.util.HashMap<>();
+		/** Taken, not handed to the firmware yet: {address, value}, oldest first. */
+		final List<Object[]> mailbox = new ArrayList<>();
+		/** How many of the mailbox's are each source's. */
+		final Map<String, Integer> inFlight = new java.util.HashMap<>();
+	}
+
 	public static final class Memory implements lua_Alloc, MemoryAccount {
 		/** The RAM installed, in bytes: what user code may hold above the baseline; 0 while unset (no limit). Set by the server thread at power-on. */
 		private volatile long cap;
@@ -233,6 +260,16 @@ public final class LuaRunner implements Runner {
 		final ConcurrentLinkedQueue<Handle> abandoned = new ConcurrentLinkedQueue<>();
 		/** What devices hold for the program outside the VM (a file's buffered writes): any thread. */
 		private final java.util.concurrent.atomic.AtomicLong held = new java.util.concurrent.atomic.AtomicLong();
+		/** Device data on its way to the firmware's rings ({@link Push}); here, as the C functions find it from their state. */
+		final Push push = new Push();
+		/** Asks the server thread to serve the computer (a ring got room again): the runner's. */
+		volatile Runnable serveSoon = () -> {
+		};
+
+		/** Whether the program's memory has room for {@code bytes} more (no limit yet: yes). */
+		boolean roomFor(long bytes) {
+			return !limited() || used + held.get() + bytes <= baseline + cap;
+		}
 
 		/** Whether there's a limit yet: the RAM is known and the baseline measured. */
 		private boolean limited() {
@@ -409,9 +446,76 @@ public final class LuaRunner implements Runner {
 		return 1;
 	}
 
+	/**
+	 * The firmware's take of pushed device data ({@code drain()}): the mailbox, as a flat sequence
+	 * (address, value, address, value...), or nothing when it's empty (no allocation then). What a
+	 * save put in the registry comes first.
+	 */
+	private static final String DRAIN = "modularcomputers.drain";
+	/** What a save holds of the mailbox (it's out of the devices, not in the rings yet), in the registry so it's saved with the state. */
+	private static final String MAILBOX = "modularcomputers.mailbox";
+
+	private static int drain(lua_State L) {
+		Memory memory = (Memory) lua_getallocf(L);
+		List<Object[]> items;
+		synchronized (memory.push) {
+			items = memory.push.mailbox.isEmpty() ? List.of() : new ArrayList<>(memory.push.mailbox);
+			memory.push.mailbox.clear();
+			memory.push.inFlight.clear();
+		}
+		lua_getfield(L, LUA_REGISTRYINDEX, new HostString(MAILBOX));
+		boolean saved = lua_type(L, -1) == LUA_TTABLE;
+		if (!saved) {
+			lua_pop(L, 1);
+			if (items.isEmpty()) {
+				return 0;
+			}
+			lua_createtable(L, items.size() * 2, 0);
+		} else {
+			lua_pushnil(L);
+			lua_setfield(L, LUA_REGISTRYINDEX, new HostString(MAILBOX));
+		}
+		appendItems(L, items);
+		return 1;
+	}
+
+	/** Appends {address, value} items to the flat sequence on top of the stack. */
+	private static void appendItems(lua_State L, List<Object[]> items) {
+		long next = lua_rawlen(L, -1) + 1;
+		for (Object[] item : items) {
+			push(L, item[0]);
+			lua_rawseti(L, -2, next++);
+			push(L, item[1]);
+			lua_rawseti(L, -2, next++);
+		}
+	}
+
+	/** The firmware's report of a ring's room ({@code credit(address, free)}): slots free now, the drained mailbox already in. */
+	private static final String CREDIT = "modularcomputers.credit";
+
+	private static int credit(lua_State L) {
+		Memory memory = (Memory) lua_getallocf(L);
+		String address = luaL_checklstring(L, 1).toString();
+		long free = lua_tointegerx(L, 2).orElse(0);
+		boolean more;
+		synchronized (memory.push) {
+			int now = (int) Math.max(0, free - memory.push.inFlight.getOrDefault(address, 0));
+			Integer before = memory.push.credit.put(address, now);
+			more = now > 0 && (before == null || before <= 0);
+		}
+		if (more) {
+			memory.serveSoon.run(); // room again: the server takes what waits in the device
+		}
+		return 0;
+	}
+
 	/** The same libraries and permanents for a new state and a restored one; leaves the inverse permanents (name to object) on the stack. */
 	private static void prepare(lua_State L) {
 		luaL_openselectedlibs(L, LIBRARIES, 0);
+		lua_pushcfunction(L, LuaRunner::drain);
+		lua_setfield(L, LUA_REGISTRYINDEX, new HostString(DRAIN));
+		lua_pushcfunction(L, LuaRunner::credit);
+		lua_setfield(L, LUA_REGISTRYINDEX, new HostString(CREDIT));
 		lua_pushcfunction(L, LuaRunner::userMode);
 		lua_setfield(L, LUA_REGISTRYINDEX, new HostString(USER_MODE));
 		lua_pushcfunction(L, LuaRunner::pending);
@@ -548,6 +652,7 @@ public final class LuaRunner implements Runner {
 			return;
 		}
 		asked.frozeAt = System.nanoTime();
+		keepMailbox();
 		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(PERMANENTS));
 		java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
 		lua_Writer writer = (L, bytes) -> {
@@ -567,6 +672,29 @@ public final class LuaRunner implements Runner {
 		}
 	}
 
+	/**
+	 * Computer's thread, before a save: the mailbox (out of the devices, not in the rings yet) goes
+	 * into the registry, so it's saved with the state; the firmware's next drain takes it from there.
+	 */
+	private void keepMailbox() {
+		List<Object[]> items;
+		synchronized (memory.push) {
+			if (memory.push.mailbox.isEmpty()) {
+				return;
+			}
+			items = new ArrayList<>(memory.push.mailbox);
+			memory.push.mailbox.clear();
+			memory.push.inFlight.clear();
+		}
+		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(MAILBOX));
+		if (lua_type(main, -1) != LUA_TTABLE) {
+			lua_pop(main, 1);
+			lua_createtable(main, items.size() * 2, 0);
+		}
+		appendItems(main, items);
+		lua_setfield(main, LUA_REGISTRYINDEX, new HostString(MAILBOX));
+	}
+
 	/** Whether {@code source} compiles as Lua: null, or Lua's message. */
 	public static String check(String source, String name) {
 		lua_State L = luaL_newstate();
@@ -577,6 +705,7 @@ public final class LuaRunner implements Runner {
 	@Override
 	public void serveWith(Runnable serveSoon) {
 		this.serveSoon = serveSoon;
+		memory.serveSoon = serveSoon;
 	}
 
 	@Override
@@ -630,10 +759,18 @@ public final class LuaRunner implements Runner {
 		while (spentNanos + (System.nanoTime() - start) < SERVER_NANOS_PER_TICK && (call = calls.poll()) != null) {
 			answer(call, board);
 		}
+		push(board, start); // device data the rings have room for leaves the devices first
 		Wait waiting = wait;
 		if (waiting != null) {
 			List<String> raised = interrupts.get();
 			List<String> pending = new ArrayList<>(raised);
+			synchronized (memory.push) {
+				memory.push.inFlight.keySet().forEach(address -> {
+					if (!pending.contains(address)) {
+						pending.add(address); // pushed, on its way to its ring: pending for the program
+					}
+				});
+			}
 			waiting.held().forEach((address, held) -> {
 				if (held > 0 && !pending.contains(address)) {
 					pending.add(address); // its data's in the inbox: still pending for the program
@@ -661,6 +798,48 @@ public final class LuaRunner implements Runner {
 	}
 
 	/**
+	 * Server side: takes device data into the mailbox for the rings the firmware has room in (see
+	 * {@link Push}), a packet a slot, while the program's memory has room and within the tick's
+	 * server time. What isn't taken stays in the device.
+	 */
+	private void push(Board board, long start) {
+		Push push = memory.push;
+		boolean took = false;
+		synchronized (push) {
+			for (Map.Entry<String, Integer> entry : push.credit.entrySet()) {
+				String address = entry.getKey();
+				String method = board.streamMethod(address).orElse(null);
+				int credit = entry.getValue();
+				while (method != null && credit > 0 && memory.roomFor(PUSH_PACKET_BYTES + PUSH_PACKET_OVERHEAD)
+					&& spentNanos + (System.nanoTime() - start) < SERVER_NANOS_PER_TICK) {
+					Result result = board.invoke(address, method, (long) PUSH_PACKET_BYTES);
+					if (result.failed() || result.first() == null) {
+						break;
+					}
+					push.mailbox.add(new Object[] {address, result.first()});
+					push.inFlight.merge(address, 1, Integer::sum);
+					credit--;
+					took = true;
+				}
+				entry.setValue(credit);
+			}
+		}
+		if (took) {
+			served++; // handed over: a snapshot asked for before this would miss it
+			ring();
+		}
+	}
+
+	@Override
+	public void devicesLeft(java.util.Collection<String> addresses) {
+		Push push = memory.push;
+		synchronized (push) {
+			push.mailbox.removeIf(item -> addresses.contains(item[0])); // what a device that's gone sent is voided with it
+			addresses.forEach(push.inFlight::remove);
+		}
+	}
+
+	/**
 	 * Server side, as a wait is answered: takes device data for the firmware's inbox (machine.lua's
 	 * cache, in the VM; user design, 2026-10-13), from each source with data the program asked for
 	 * ({@link #wanted}), as much as the inbox has
@@ -674,6 +853,11 @@ public final class LuaRunner implements Runner {
 		for (String source : sources) {
 			if (!wanted.contains(source) && !held.containsKey(source)) {
 				continue; // never asked for by the program: its data stays in the device
+			}
+			synchronized (memory.push) {
+				if (memory.push.credit.containsKey(source)) {
+					continue; // it has a ring: its data is pushed there, not cached here
+				}
 			}
 			String method = board.streamMethod(source).orElse(null);
 			int room = size - held.getOrDefault(source, 0);
@@ -950,6 +1134,13 @@ public final class LuaRunner implements Runner {
 	}
 
 	/** How many calls wait for the server thread (tests). */
+	/** Pushed device data not handed to the firmware yet (for tests). */
+	int mailboxed() {
+		synchronized (memory.push) {
+			return memory.push.mailbox.size();
+		}
+	}
+
 	int queuedCalls() {
 		return calls.size();
 	}

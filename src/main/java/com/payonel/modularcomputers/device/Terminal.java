@@ -159,18 +159,19 @@ public final class Terminal implements Device {
 	}
 
 	/**
-	 * Takes everything waiting, as one string of bytes, as a read of a serial line's FIFO does: keys
-	 * aren't kept apart (an arrow is just its escape sequence's bytes among the others).
+	 * Takes what's waiting, as one string of bytes, as a read of a serial line's FIFO does: keys
+	 * aren't kept apart (an arrow is just its escape sequence's bytes among the others). At most
+	 * {@code max} bytes, in whole keys (a key is never split); with {@code atLeastOne}, one key even
+	 * if it's longer (a key is at most a few bytes; a read must make progress).
 	 */
-	public Optional<String> takeInput() {
-		if (input.isEmpty()) {
+	public Optional<String> takeInput(long max, boolean atLeastOne) {
+		StringBuilder bytes = new StringBuilder();
+		while (!input.isEmpty() && (bytes.length() + input.peekFirst().length() <= max || (atLeastOne && bytes.isEmpty()))) {
+			bytes.append(input.pollFirst());
+		}
+		if (bytes.isEmpty()) {
 			return Optional.empty();
 		}
-		StringBuilder bytes = new StringBuilder();
-		for (String key : input) {
-			bytes.append(key);
-		}
-		input.clear();
 		changed.run();
 		return Optional.of(bytes.toString());
 	}
@@ -187,9 +188,9 @@ public final class Terminal implements Device {
 		return Result.ok();
 	}
 
-	@Method(doc = "read(): every byte waiting, as a serial line sends them: what was typed at this terminal (and the reports it answered), or nil")
+	@Method(doc = "read([max]): the bytes waiting (at most max), as a serial line sends them: what was typed at this terminal (and the reports it answered), or nil")
 	public Result read(Arguments args) {
-		return Result.ok(takeInput().orElse(null));
+		return Result.ok(takeInput(args.optInteger(0, Long.MAX_VALUE), true).orElse(null));
 	}
 
 	@Method(doc = "getSize(): columns, rows")

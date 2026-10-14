@@ -626,8 +626,11 @@ scripts/art/error_beep.py` into
   - `init.lua`, the kernel: the bootloader hands it the boot disk's address and a command line
     (`console=<address>` picks the input device its tty is on; the board's `console` by default;
     the bootloader passes none yet). It loads its libraries from `/lib`, starts `/sh.lua` (by its
-    path, as Linux's `init=`) as a process on its tty, and runs the **input service**: when no
-    process can run, it waits for the tty's device and hands the tty every key it sent. When the
+    path, as Linux's `init=`) as a process on its tty, and idles: when no process can run, it waits
+    for the tty's device (the CPU's HLT) and runs the line discipline on what arrived. **It never
+    reads a device: the tty registers a ring for its device, and what's typed arrives there by
+    itself**; a process's `io.read` runs the line discipline on the ring itself (`tty:pump`), with
+    no call and no yield. When the
     shell ends (or dies of a signal) it starts another, giving up after 10 starts in 5 seconds
     (sysvinit's "respawning too fast").
   - **Processes** are coroutines, each with its own globals and **the tty it inherited** from its
@@ -644,8 +647,9 @@ scripts/art/error_beep.py` into
     foreground process**, which ends it (no handlers yet). Output goes through `onlcr`.
   - `sh.lua`: prints `$ `, reads a line and writes it back; `halt` halts the computer; `poweroff`
     or an end of file ends the shell (the kernel starts another: the board has no power-off yet).
-  - Ctrl+C reaches a program only once it waits for input: the kernel's input service runs only
-    then. The firmware interrupt vector (PLAN.md) will let it preempt a busy one.
+  - Ctrl+C reaches a program only once it reads or waits for input: the line discipline runs on
+    the ring only then (the bytes are in the ring already). The firmware interrupt vector (PLAN.md)
+    will let it preempt a busy one.
   - Tests check what it does (it halts on `halt`; after ^C, `poweroff`, ^D the computer still
     runs), never what it says.
 - **Lua scripts** (user design, 2026-10-13; `machine/LuaScripts`): the Lua that comes with the
@@ -786,6 +790,27 @@ scripts/art/error_beep.py` into
   - **User code**: the EEPROM's text and what it runs, seen as untrusted. It gets `board` (`invoke`
     answers as `pcall` does), and user coroutines that yield normally. `debug` stays hidden until
     LungoLua has a sandboxed debug library (user's plan) that can't touch the firmware's budget.
+  - **Rings: device data pushed with no call** (user design, 2026-10-14, worked back from "user code
+    reads its tty buffer with no syscall and no yield"): a program gives the firmware a ring for a
+    source, `board.ring(address, size)` (at most 1024 packets), and gets back a table
+    `{head, tail, size, [1..size]}`: it reads packets between `head` and `tail` and moves `head` on;
+    the firmware only ever writes slots and `tail`, with raw sets into slots that exist (made by
+    `table.create`), so filling a ring allocates nothing, and a `head` out of range reads as full. As a
+    device fills its driver's ring by DMA (Linux's tty flip buffer): **the firmware reports each ring's
+    free slots to the host at every resume of user code** (a credit, as PCIe flow control or a TCP
+    window; host function `credit`), **the host takes from each such device up to its credit**, a
+    packet a slot (a terminal's read takes up to `LuaRunner.PUSH_PACKET_BYTES`, 256, in whole keys), only
+    while the program's memory has room (`Memory.roomFor`, each packet counted with
+    `PUSH_PACKET_OVERHEAD`), into a mailbox (`LuaRunner.Push`), and **the firmware moves the mailbox into
+    the rings before every resume** (host function `drain`). No credit or no room: the data stays in
+    the device, which drops what it has no room for itself (a device acting out loses only its own).
+    The host pushes on the computer's turns (each tick, and each turn serving its calls or its wait),
+    not at every key press: a push a key spent the computer's server time and slowed a burst of
+    typing to 8x (measured in a real-time client test). A save puts the mailbox in the registry
+    (`modularcomputers.mailbox`), so it's saved with the state, and the next drain takes it from there;
+    a device leaving the bus takes its mailboxed data with it (`Runner.devicesLeft`). A source with a
+    ring isn't cached in the inbox. The program's choice decides the race: a ring for `console` takes
+    bound terminals' keys through the console.
   - **Memory** (user, 2026-10-13): the VM's memory is counted by LungoLua's allocator hook
     (`LuaRunner.Memory`, a `lua_Alloc`: `permit(osize, nsize, tag)` for every allocation, growth
     and free; the state is made with it from its first byte, and a restore counts as it's made), and
