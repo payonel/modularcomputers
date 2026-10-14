@@ -620,13 +620,33 @@ scripts/art/error_beep.py` into
     drops or blocks; `setRange(1..32)` costs power each tick, `1 + range`. Entities are looked
     at every 5 ticks; block changes come from a hook on the server's block updates
     (`mixin/ServerLevelBlockUpdates`, the mod's first mixin: Fabric has no block-change event).
-- **mcos in Lua** (`lua/mcos/`, the files a tier 1 disk comes with): a first, small OS until
-  OpenOS is ported: `init.lua` (paths, the boot disk's files, a line editor on the console,
-  `require` from `/lib`, programs from `/bin`), `bin/sh.lua` and `ls`, `cat`, `echo`, `clear`,
-  `lsdev`, `help`, `halt`. **`sh` is a basic echo for now** (user, 2026-10-13): it reads what's
-  typed at the console and echoes it (Enter a new line under a `$ ` prompt, Backspace back to the
-  prompt, other non-printable keys not echoed); it runs no commands, so the `/bin` programs wait
-  for a real shell. Tests don't pin what it says.
+- **mcos in Lua** (`lua/mcos/`, the files a tier 1 disk comes with; user design, 2026-10-13): a
+  kernel, a tty and one shell process, after Linux, not OpenOS (**no `term`, no OpenOS-style
+  libraries: programs use Lua's own `io`**; no `/bin`, no PATH, no file commands yet).
+  - `init.lua`, the kernel: the bootloader hands it the boot disk's address and a command line
+    (`console=<address>` picks the input device its tty is on; the board's `console` by default;
+    the bootloader passes none yet). It loads its libraries from `/lib`, starts `/sh.lua` (by its
+    path, as Linux's `init=`) as a process on its tty, and runs the **input service**: when no
+    process can run, it waits for the tty's device and hands the tty every key it sent. When the
+    shell ends (or dies of a signal) it starts another, giving up after 10 starts in 5 seconds
+    (sysvinit's "respawning too fast").
+  - **Processes** are coroutines, each with its own globals and **the tty it inherited** from its
+    parent (the kernel's, for the shell); a read with nothing ready yields to the kernel, which
+    resumes it when its tty has input. `lib/io.lua` gives each one Lua's `io` (`io.read` with
+    `l`, `L`, `a`, n; `io.write`; `io.stdin`/`stdout`/`stderr`) over that tty, so a program never
+    knows which device it's on: the command line can move it to another without changing it.
+  - `lib/tty.lua`, the tty: its input buffer and termios flags belong to the device, whatever
+    process runs (typeahead waits there). Its line discipline: canonical mode (Backspace and ^H
+    erase, a UTF-8 character at a time with `iutf8`; ^U the line; Enter (CR, with `icrnl`) ends
+    a line; ^D the line so far, or end of file at its start), echo (control characters as ^X,
+    `echoctl`), and `isig`: **^C flushes the input, echoes `^C` and sends SIGINT to the tty's
+    foreground process**, which ends it (no handlers yet). Output goes through `onlcr`.
+  - `sh.lua`: prints `$ `, reads a line and writes it back; `halt` halts the computer; `poweroff`
+    or an end of file ends the shell (the kernel starts another: the board has no power-off yet).
+  - Ctrl+C reaches a program only once it waits for input: the kernel's input service runs only
+    then. The firmware interrupt vector (PLAN.md) will let it preempt a busy one.
+  - Tests check what it does (it halts on `halt`; after ^C, `poweroff`, ^D the computer still
+    runs), never what it says.
 - **Lua scripts** (user design, 2026-10-13; `machine/LuaScripts`): the Lua that comes with the
   mod (firmware, mcos's Lua version, utilities; to be handed out by traders, loot chests and special
   crafting) lives as plain UTF-8 `.lua` files under `src/main/resources/data/modularcomputers/lua/`
@@ -1178,7 +1198,7 @@ scripts/art/error_beep.py` into
     decodes it at its own size.
   - **Its writes are literal** (user, 2026-10-13), as UEFI's `OutputString` is: a new line is
     `\r\n` written out. termios (`onlcr`, `echo`, `icanon`, `isig`) is the OS's line discipline,
-    on its own ttys, never the board's: mcos's `term.write` does `onlcr` (both versions). It had
+    on its own ttys, never the board's: mcos's tty does `onlcr` (the Java mcos's `print` too). It had
     `onlcr` and `setMode`/`getModes` before; they're gone. A terminal's own modes (new line mode,
     autowrap, the alternate screen) are escape sequences, multicast to every member like any write.
   - Its size is the smallest among its terminals. With none it reports `HEADLESS` (a real

@@ -37,7 +37,7 @@ class LuaScriptsTest {
 	void aSetOfFilesIsCopiedAsItIs(@org.junit.jupiter.api.io.TempDir Path target) throws Exception {
 		LuaScripts.copyTree("mcos", target.resolve("disk"));
 		assertThat(target.resolve("disk/init.lua")).isRegularFile();
-		assertThat(target.resolve("disk/bin/sh.lua")).isRegularFile();
+		assertThat(target.resolve("disk/sh.lua")).isRegularFile();
 		assertThat(Files.readString(target.resolve("disk/init.lua"))).isEqualTo(LuaScripts.read("mcos/init"));
 	}
 }

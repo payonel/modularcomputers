@@ -43,7 +43,7 @@ public class DiskGameTest {
 		ItemStack disk = computer.parts().getItem(CaseMenu.SATA_SLOTS);
 		UUID id = disk.get(ModComponents.SERIAL);
 		Path folder = AllInOneBlockEntity.diskFolder(helper.getLevel().getServer(), id);
-		helper.assertTrue(Files.isRegularFile(folder.resolve("init.lua")) && Files.isRegularFile(folder.resolve("bin/sh.lua")), "its files, in its folder");
+		helper.assertTrue(Files.isRegularFile(folder.resolve("init.lua")) && Files.isRegularFile(folder.resolve("sh.lua")), "its files, in its folder");
 		helper.assertTrue(!disk.has(ModComponents.DISK_IMAGE), "then the mark goes");
 		helper.succeed();
 	}
