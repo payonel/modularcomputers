@@ -11,9 +11,9 @@ import com.payonel.modularcomputers.power.PowerUnits;
  * case's front, as an AGP slot took graphics.
  */
 public enum CaseTier {
-	TIER_1(1, 1, 1, 2, false, 0.0025),
-	TIER_2(2, 2, 2, 3, true, 0.005),
-	TIER_3(3, 4, 3, 4, true, 0.01); // SATA: 1, 2, 3 (user, 2026-10-13)
+	TIER_1(1, 1, 2, 2, false, 0.0025),
+	TIER_2(2, 2, 3, 3, true, 0.005),
+	TIER_3(3, 4, 4, 4, true, 0.01); // SATA: 2, 3, 4 (user, 2026-10-14)
 
 	private final int bays;
 	private final int ram;

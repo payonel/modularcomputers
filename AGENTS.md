@@ -247,7 +247,7 @@ same thing.
       part's footprint as a dashed silkscreen outline and tinned pads, copied in over the
       missing slot (`CaseScreen.extractTierMarks`); nothing moves. Missing slots are inactive
       (`PartSlot.isActive`): no hover highlight, no clicks. A lower tier has the first slots
-      of each kind (`CaseMenu.available`): battery bays 1/2/3, RAM 1/2/4, SATA 1/2/3 (user, 2026-10-13), expansion
+      of each kind (`CaseMenu.available`): battery bays 1/2/3, RAM 1/2/4, SATA 2/3/4 (user, 2026-10-14), expansion
       2/3/4 (the user's suggestion). The CPU socket and ROM are on every tier.
     - **Looks: each tier is an era of the PC** (user's pick, "direction C", 2026-10-12; drafts at
       a private draft page), and a case and a screen of one tier
