@@ -767,22 +767,26 @@ scripts/art/error_beep.py` into
   - **Memory** (user, 2026-10-13): the VM's memory is counted by LungoLua's allocator hook
     (`LuaRunner.Memory`, a `lua_Alloc`: `permit(osize, nsize, tag)` for every allocation, growth
     and free; the state is made with it from its first byte, and a restore counts as it's made), and
-    capped at the RAM installed (`HardwareInfo.memoryTotal`, set when the thread starts). Past it an
-    allocation is refused (after a full collection) and Lua raises "not enough memory" in the
-    program. Everything counts: the standard library, the firmware and its sandbox copies, the
-    permanents (about 118 KiB at rest, so one tier 1 stick leaves a program about 100 KiB). **The
-    firmware keeps a reserve** (`Memory.RESERVE`, 32 KiB): user code may use the RAM less it
+    capped at the RAM installed (`HardwareInfo.memoryTotal`, set when the thread starts) **on top of
+    a baseline** (user, 2026-10-13, as OC's `kernelMemory`): once machine.lua has built its sandbox,
+    before it loads the EEPROM's code, it asks the host (`"baseline"`), which runs a full collection
+    and records what the VM holds (the standard library, the firmware, the permanents: about
+    118 KiB); user code gets the whole RAM above that, so what a stick means to a program doesn't
+    change when the firmware or the engine's accounting does. No limit until it's measured. It's
+    kept in the registry, so Styx saves it and a reload keeps it. Past the limit an allocation is
+    refused (after a full collection) and Lua raises "not enough memory" in the program. **The
+    firmware keeps a reserve above it** (`Memory.RESERVE`, 32 KiB): user code may use the RAM
     (`usermode(true)`, a host function in the registry, switched by machine.lua around each resume
-    of user code and its syscalls' bookkeeping, and off in the budget callback), so a program that
-    fills its memory gets the error in its own code and the firmware can still answer the host and
-    keep device data. **What devices hold for a program outside its VM is charged to it too**
+    of user code and its syscalls' bookkeeping, and off in the budget callback), the firmware the
+    reserve too, so a program that fills its memory gets the error in its own code and the
+    firmware can still answer the host and keep device data. **What devices hold for a program outside its VM is charged to it too**
     (user, 2026-10-13: not byte-exact, but nothing a program can grow goes without a cost):
     `runtime/MemoryAccount`, given to device methods with their arguments (`Arguments.account`); a
     file handle's buffered writes are charged as they're buffered (an overwrite of what's buffered
     costs nothing more), fail with ENOMEM ("Cannot allocate memory") past the program's share, and
     are given back at close or drop, or when Lua collects an unclosed handle (`lua_UserObject.freed`,
     handed to the server thread: `Handle.abandon`, which also frees its disk reservation); a restored
-    handle charges its writes again. `board.hardware().memoryUsed` is the real count, both. Found while testing (for
+    handle charges its writes again. `board.hardware().memoryUsed` is the real count above the baseline, both; `memoryTotal` the RAM. Found while testing (for
     LungoLua): a string buffer's growth skipped the emergency collection (fixed in
     `1.0.6560-8133ec8d`). **Stock Lua never collects while it grows a stack** (the collector walks
     stacks), so right after a memory error a call that needs a bigger stack can fail though the

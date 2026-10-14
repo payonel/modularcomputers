@@ -84,6 +84,8 @@ public final class LuaRunner implements Runner {
 	/** Registry keys: the kernel, and the permanents (object to name). */
 	private static final String KERNEL = "modularcomputers.kernel";
 	private static final String PERMANENTS = "modularcomputers.perms";
+	/** Where the memory baseline rides in the registry, so Styx keeps it with the computer. */
+	private static final String BASELINE = "modularcomputers.baseline";
 	/**
 	 * A save waits as long as it takes (user, 2026-10-13: no timeouts, no kills: the server must try;
 	 * a Styx persist that never ends is a real bug). Past this, it's logged, naming the computer:
@@ -199,17 +201,25 @@ public final class LuaRunner implements Runner {
 	 * raises "not enough memory", in the program.
 	 */
 	public static final class Memory implements lua_Alloc, MemoryAccount {
-		/** Bytes it may hold; 0 while unset (no limit). Set by the server thread at power-on. */
+		/** The RAM installed, in bytes: what user code may hold above the baseline; 0 while unset (no limit). Set by the server thread at power-on. */
 		private volatile long cap;
+		/**
+		 * What the firmware and the standard library hold at rest, measured once after a full
+		 * collection, before the EEPROM's code loads (as OC's kernelMemory; user, 2026-10-13): user
+		 * code gets the whole RAM on top of it, so what a stick means to a program doesn't change
+		 * when the firmware or the engine's accounting does. -1 until measured: no limit meanwhile.
+		 * Saved with the computer (in the registry), so a reload keeps it.
+		 */
+		private volatile long baseline = -1;
 		/** Bytes held now. Written only by the thread running the VM. */
 		private volatile long used;
 		/**
 		 * User code is running (the firmware says so around each resume of it): it may use the RAM
-		 * less {@link #RESERVE}, which is the firmware's, so a program that fills its memory gets
-		 * Lua's error and the firmware can still answer the host.
+		 * above the baseline; {@link #RESERVE} above that is the firmware's, so a program that fills
+		 * its memory gets Lua's error and the firmware can still answer the host.
 		 */
 		private boolean user;
-		/** What the firmware keeps for itself, as a kernel reserves memory. */
+		/** What the firmware keeps for itself above the program's RAM, as a kernel reserves memory. */
 		public static final long RESERVE = 32 << 10;
 		/**
 		 * The sources with an interrupt raised, as the server thread last published them (the
@@ -222,20 +232,25 @@ public final class LuaRunner implements Runner {
 		/** What devices hold for the program outside the VM (a file's buffered writes): any thread. */
 		private final java.util.concurrent.atomic.AtomicLong held = new java.util.concurrent.atomic.AtomicLong();
 
+		/** Whether there's a limit yet: the RAM is known and the baseline measured. */
+		private boolean limited() {
+			return cap > 0 && baseline >= 0;
+		}
+
 		@Override
 		public boolean permit(long osize, long nsize, int tag) {
 			long grow = nsize - osize;
-			if (grow > 0 && cap > 0 && used + held.get() + grow > (user ? cap - RESERVE : cap)) {
+			if (grow > 0 && limited() && used + held.get() + grow > baseline + cap + (user ? 0 : RESERVE)) {
 				return false;
 			}
 			used += grow;
 			return true;
 		}
 
-		/** Devices' charges: what the program may hold, user code's share (less the reserve). Not exact across threads, but bounded. */
+		/** Devices' charges: what the program may hold (user code's share). Not exact across threads, but bounded. */
 		@Override
 		public boolean charge(long bytes) {
-			if (cap > 0 && used + held.get() + bytes > cap - RESERVE) {
+			if (limited() && used + held.get() + bytes > baseline + cap) {
 				return false;
 			}
 			held.addAndGet(bytes);
@@ -252,9 +267,22 @@ public final class LuaRunner implements Runner {
 			held.addAndGet(-bytes);
 		}
 
-		/** All it holds: the VM's, and what devices hold for it. */
+		/** What the program holds: the VM's above the baseline, and what devices hold for it. */
 		public long used() {
-			return used + held.get();
+			return Math.max(0, used + held.get() - Math.max(0, baseline));
+		}
+
+		/** Measures the baseline: what the VM holds now (after a full collection). */
+		void measureBaseline() {
+			baseline = used;
+		}
+
+		long baseline() {
+			return baseline;
+		}
+
+		void restoreBaseline(long saved) {
+			baseline = saved;
 		}
 
 		public long cap() {
@@ -343,6 +371,11 @@ public final class LuaRunner implements Runner {
 		this.main = main;
 		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(KERNEL));
 		this.kernel = lua_tothread(main, -1);
+		lua_pop(main, 1);
+		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(BASELINE));
+		if (lua_isinteger(main, -1)) {
+			memory.restoreBaseline(lua_tointegerx(main, -1).getAsLong()); // measured at its first boot: the same limit after a reload
+		}
 		lua_pop(main, 1);
 	}
 
@@ -738,6 +771,16 @@ public final class LuaRunner implements Runner {
 						honour();
 						reply = awaitWait(waitFor(said)); // the sources ready, and the device data taken
 						lua_settop(kernel, top - asked);
+					}
+					case "baseline" -> {
+						// The firmware's built its sandbox: what's held now (after a full collection) is
+						// the baseline the program's RAM goes on top of. Kept in the registry for saves.
+						lua_settop(kernel, top - asked);
+						lua_gc(main, LUA_GCCOLLECT, 0, 0, 0);
+						memory.measureBaseline();
+						lua_pushinteger(main, memory.baseline());
+						lua_setfield(main, LUA_REGISTRYINDEX, new HostString(BASELINE));
+						reply = List.of();
 					}
 					case "clock" -> {
 						// The machine's clock, in ticks (uptime): the firmware makes a wait's deadline from it.

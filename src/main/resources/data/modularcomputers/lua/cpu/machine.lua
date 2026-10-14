@@ -12,6 +12,8 @@
 --   "call", name, args...         a board call (list, status, type, methods, doc, info, uptime,
 --                                 power, hardware, invoke), carried out on the server thread, where
 --                                 devices live; answered with its values
+--   "baseline"                    the sandbox is built: the host measures the memory held as the
+--                                 baseline the program's RAM goes on top of; asked once
 --   "clock"                       the machine's clock (uptime), in ticks; answered at once
 --   "wait", deadline, held, sources...
 --                                 wait for an interrupt (sources: any when none; deadline: on the
@@ -232,6 +234,10 @@ sandbox.board = {
     syscall("halt")
   end,
 }
+
+-- The sandbox is built: the host measures what's held now as the baseline the program's RAM goes
+-- on top of (so the RAM is all the program's, whatever this file and the libraries take).
+ask("baseline")
 
 local main, why = load(image, "=eeprom", "t", sandbox)
 if not main then

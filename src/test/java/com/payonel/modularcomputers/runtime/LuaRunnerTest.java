@@ -82,20 +82,26 @@ class LuaRunnerTest {
 
 	@Test
 	void theProgramsMemoryIsTheRamInstalled() {
-		ram(1); // 256 KiB, the firmware's included
+		ram(1); // 256 KiB: all the program's, on top of what the firmware and libraries take
 		boot("""
+			local total = board.hardware().memoryTotal
+			local big = string.rep("x", 200 * 1024) -- most of the stick: the firmware's memory isn't the program's
+			local fits = #big == 200 * 1024
+			big = nil
+			collectgarbage()
 			local used = board.hardware().memoryUsed
 			local ok, err = pcall(function()
 			  local t = {}
 			  for i = 1, 1000000 do t[i] = string.rep("x", 1000) .. i end
 			end)
 			collectgarbage() -- (as stock Lua: growing a stack never collects, so the next call may fail until something does)
-			board.invoke("console", "write", tostring(used > 0) .. " " .. tostring(ok) .. " " .. tostring(err))
+			board.invoke("console", "write", tostring(total == 256 * 1024) .. " " .. tostring(fits) .. " "
+			  .. tostring(used > 0 and used < 64 * 1024) .. " " .. tostring(ok) .. " " .. tostring(err))
 			board.halt()
 			""");
 		untilHalted();
-
-		assertThat(row(0)).as("counted, and past the RAM it's Lua's own error, in the program").isEqualTo("true false not enough memory");
+		assertThat(row(0)).as("the RAM is the program's; used is counted above the baseline; past it, Lua's own error")
+			.isEqualTo("true true true false not enough memory");
 	}
 
 	@Test
@@ -474,9 +480,12 @@ class LuaRunnerTest {
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
 		settle(runner::alive);
 		byte[] saved = machine.persistProgram().orElseThrow(); // at its next slice
+		long baseline = runner.memory().baseline();
 		machine.pressPower();
 		Machine again = reloaded(new Terminal(Resolution.DEFAULT));
 		again.resumeProgram(saved);
+		assertThat(baseline).as("measured at boot").isPositive();
+		assertThat(((LuaRunner) again.runner().orElseThrow()).memory().baseline()).as("kept with the save, not measured again").isEqualTo(baseline);
 		settle(again, () -> again.runner().isEmpty());
 		assertThat(again.board().virtualBus().console().screen().row(0).strip()).isEqualTo("counted 3000000");
 		again.pressPower();
