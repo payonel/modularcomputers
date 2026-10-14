@@ -621,11 +621,13 @@ class LuaRunnerTest {
 	}
 
 	private static final String TYPED = """
-		board.waitForInterrupt(nil, "console")
+		local n = 0
+		for i = 1, 3000000 do n = n + 1 end -- (the keys are typed meanwhile)
 		local keys = ""
-		for i = 1, 3 do
-		  local _, key = board.invoke("console", "read")
-		  keys = keys .. tostring(key)
+		while #keys < 3 do
+		  board.waitForInterrupt(nil, "console")
+		  local _, bytes = board.invoke("console", "read") -- every byte waiting
+		  keys = keys .. (bytes or "")
 		end
 		board.invoke("console", "write", keys)
 		board.halt()
@@ -641,7 +643,7 @@ class LuaRunnerTest {
 		screen.press("c");
 		untilHalted();
 		assertThat(row(0)).isEqualTo("abc");
-		assertThat(runner.answered()).as("the reads came from the inbox: only the write reached the server").isEqualTo(1);
+		assertThat(runner.answered()).as("the read came from the inbox: only the write reached the server").isEqualTo(1);
 	}
 
 	@Test
@@ -671,19 +673,24 @@ class LuaRunnerTest {
 	@Test
 	void aWaitTheInboxCanAnswerIsFree() {
 		ram(3);
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		Map<String, Device> devices = new LinkedHashMap<>();
+		devices.put("id:screen", screen);
+		devices.put("id:redstone", card);
+		machine.setDevices(devices);
 		boot("""
 			local n = 0
-			for i = 1, 3000000 do n = n + 1 end -- (both keys are typed meanwhile)
-			board.waitForInterrupt(nil, "console") -- cold: the server thread answers, and fills the inbox
-			board.invoke("console", "read")
-			board.waitForInterrupt(nil, "console") -- warm: answered on the computer's thread
-			board.invoke("console", "read")
+			for i = 1, 3000000 do n = n + 1 end -- (both events come meanwhile)
+			board.waitForInterrupt(nil, "id:redstone") -- cold: the server thread answers, and fills the inbox
+			board.invoke("id:redstone", "pull")
+			board.waitForInterrupt(nil, "id:redstone") -- warm: answered on the computer's thread
+			board.invoke("id:redstone", "pull")
 			board.invoke("console", "write", "done")
 			board.halt()
 			""");
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
-		screen.press("a");
-		screen.press("b");
+		card.sense(0, 1);
+		card.sense(0, 2);
 		untilHalted();
 		assertThat(row(0)).isEqualTo("done");
 		assertThat(runner.handedOver()).as("one wait and the write reached the server thread").isEqualTo(2);
@@ -734,7 +741,7 @@ class LuaRunnerTest {
 		screen.press("c");
 		untilHalted();
 		assertThat(row(0)).isEqualTo("abc");
-		assertThat(runner.answered()).as("each read went to the device").isEqualTo(4);
+		assertThat(runner.answered()).as("the read went to the device (taking every byte), and the write").isEqualTo(2);
 	}
 
 	@Test
@@ -746,10 +753,9 @@ class LuaRunnerTest {
 		devices.put("id:redstone", card);
 		machine.setDevices(devices);
 		boot("""
-			board.waitForInterrupt(nil, "console", "id:redstone") -- cold: takes 2 keys and 2 events
-			board.invoke("console", "read") -- from the inbox
-			board.invoke("console", "read") -- the keys' queue is empty now
-			board.waitForInterrupt(nil, "console") -- cold for the keys: tops them up; the card's queue is full
+			local n = 0
+			for i = 1, 3000000 do n = n + 1 end -- (the keys and events come meanwhile)
+			board.waitForInterrupt(nil, "console", "id:redstone") -- cold: every key in one read, and 2 events
 			board.invoke("console", "write", "waited")
 			board.waitForInterrupt(1000, "nothing")
 			""");
@@ -758,31 +764,27 @@ class LuaRunnerTest {
 			card.sense(0, i);
 		}
 		settle(() -> row(0).equals("waited"));
-		int keys = 0;
-		while (screen.interruptPending()) {
-			screen.read(new Arguments(java.util.List.of()));
-			keys++;
-		}
 		int events = 0;
 		while (card.pull(new Arguments(java.util.List.of())).first() != null) {
 			events++;
 		}
 		assertThat(events).as("the card keeps what its full queue had no room for").isEqualTo(3);
-		assertThat(keys).as("left in the terminal: 5, less 2, less 2 more").isEqualTo(1);
+		assertThat(screen.interruptPending()).as("the keys went in one read: a packet of the console's room").isFalse();
 	}
 
 	@Test
 	void theInboxIsSavedWithTheComputerAndTheDevicesKeepTheRest() {
 		ram(2);
 		boot("""
-			board.waitForInterrupt(nil, "console") -- takes 2 keys
+			board.waitForInterrupt(nil, "console") -- takes what's typed by then
 			board.invoke("console", "write", "busy")
 			local n = 0
 			for i = 1, 3000000 do n = n + 1 end -- busy, and saved meanwhile
 			local keys = ""
-			for i = 1, 4 do
-			  local _, key = board.invoke("console", "read")
-			  keys = keys .. tostring(key)
+			while #keys < 4 do
+			  board.waitForInterrupt(nil, "console")
+			  local _, bytes = board.invoke("console", "read")
+			  keys = keys .. (bytes or "")
 			end
 			board.invoke("console", "write", keys)
 			board.halt()
@@ -791,7 +793,7 @@ class LuaRunnerTest {
 			screen.press(key);
 		}
 		settle(() -> row(0).equals("busy"));
-		// Saved as the world is: the program (its inbox, 2 keys), then the terminal's block (2 more keys).
+		// Saved as the world is: the program (its inbox), then the terminal's block (what came after).
 		byte[] saved = machine.persistProgram().orElseThrow();
 		Map<String, Object> terminalSaved = screen.saved();
 		machine.unload();

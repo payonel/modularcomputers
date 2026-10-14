@@ -22,7 +22,7 @@ import java.util.Optional;
  * LF only moves down, unless the program sets new line mode ({@code ESC[20h}); the console's
  * tty settings don't apply to direct writes.
  * <p>
- * What it sends back waits in its queue until read: keys typed at it, and its answers to
+ * What it sends back waits in its queue until read (all of it at once, as bytes down a serial line): keys typed at it, and its answers to
  * reports (the cursor position for {@code ESC[6n}). While anything waits, its interrupt is on
  * (in the console's group, the console's is too, and both reads take from this one queue: whichever
  * reads first gets the key, as under UEFI's splitter). Typing comes from the screen
@@ -158,6 +158,23 @@ public final class Terminal implements Device {
 		return Optional.ofNullable(key);
 	}
 
+	/**
+	 * Takes everything waiting, as one string of bytes, as a read of a serial line's FIFO does: keys
+	 * aren't kept apart (an arrow is just its escape sequence's bytes among the others).
+	 */
+	public Optional<String> takeInput() {
+		if (input.isEmpty()) {
+			return Optional.empty();
+		}
+		StringBuilder bytes = new StringBuilder();
+		for (String key : input) {
+			bytes.append(key);
+		}
+		input.clear();
+		changed.run();
+		return Optional.of(bytes.toString());
+	}
+
 	public boolean hasKeys() {
 		return !input.isEmpty();
 	}
@@ -170,9 +187,9 @@ public final class Terminal implements Device {
 		return Result.ok();
 	}
 
-	@Method(doc = "read(): the oldest key typed at this terminal (or a report it answered), or nil")
+	@Method(doc = "read(): every byte waiting, as a serial line sends them: what was typed at this terminal (and the reports it answered), or nil")
 	public Result read(Arguments args) {
-		return Result.ok(nextKey().orElse(null));
+		return Result.ok(takeInput().orElse(null));
 	}
 
 	@Method(doc = "getSize(): columns, rows")

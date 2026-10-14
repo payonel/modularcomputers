@@ -639,6 +639,7 @@ scripts/art/error_beep.py` into
     process runs (typeahead waits there). Its line discipline: canonical mode (Backspace and ^H
     erase, a UTF-8 character at a time with `iutf8`; ^U the line; Enter (CR, with `icrnl`) ends
     a line; ^D the line so far, or end of file at its start), echo (control characters as ^X,
+    buffered while a read's bytes are handled and written once, as n_tty's echo buffer,
     `echoctl`), and `isig`: **^C flushes the input, echoes `^C` and sends SIGINT to the tty's
     foreground process**, which ends it (no handlers yet). Output goes through `onlcr`.
   - `sh.lua`: prints `$ `, reads a line and writes it back; `halt` halts the computer; `poweroff`
@@ -1036,7 +1037,11 @@ scripts/art/error_beep.py` into
         built yet) and it answers `?63;22c` (a VT340's level; it adds `;4`, sixel, once sixel is
         built, so programs never send pixels to a terminal that would drop them). The front's frame shows the tier as 1-3 dots, iron, gold and diamond. The
         all-in-one's built-in terminal is tier 3.
-      - **Input:** keys wait in its queue until `read()` (as do its answers to reports); while
+      - **Input:** keys wait in its queue until `read()` (as do its answers to reports). **A read
+        takes every byte waiting, as one string** (user, 2026-10-13: a key a read made a burst of
+        typing a server round trip a key, 200 keys in 10 seconds): as reading a serial line's FIFO,
+        keys aren't kept apart (an arrow is its escape sequence's bytes); the console's read merges
+        its members'. The Java mcos splits them back into keys. While
         any wait, its interrupt is on, and the console's too if it's in the console's group. **The queue
         has its own limit** (`Terminal.INPUT_CAPACITY`, 256; user, 2026-10-13: devices keep their
         own rings): past it a key is dropped, as a PC's keyboard buffer drops what it has no room

@@ -31,6 +31,7 @@ function tty.new(device, signal)
     line = {}, -- the line being typed (canonical mode), a byte each
     ready = {}, -- what processes can read: whole lines and EOF marks (canonical), or bytes as typed
     foreground = nil, -- the process its signals go to
+    echoes = {}, -- echo not written yet
   }, tty)
 end
 
@@ -50,9 +51,11 @@ local function echoed(flags, c)
   return c
 end
 
+-- Echo is buffered while a batch of input is handled and written once at its end, as n_tty's echo
+-- buffer is: one write for a burst of typing, not one a key.
 function tty:echo(c)
   if self.flags.echo then
-    self:write(echoed(self.flags, c))
+    self.echoes[#self.echoes + 1] = echoed(self.flags, c)
   end
 end
 
@@ -68,7 +71,7 @@ function tty:erase()
     c = table.remove(line) -- a continuation byte: on to the character's first
   end
   if self.flags.echo and self.flags.echoe then
-    self:write(string.rep("\b \b", #echoed(self.flags, c))) -- a column a character, two for ^X
+    self.echoes[#self.echoes + 1] = string.rep("\b \b", #echoed(self.flags, c)) -- a column a character, two for ^X
   end
 end
 
@@ -78,11 +81,11 @@ function tty:flush()
   self.ready = {}
 end
 
--- The line discipline: what the device sent, a byte at a time.
-function tty:receive(key)
+-- The line discipline: what the device sent (every byte it had), a byte at a time.
+function tty:receive(bytes)
   local flags = self.flags
-  for i = 1, #key do
-    local c = string.sub(key, i, i)
+  for i = 1, #bytes do
+    local c = string.sub(bytes, i, i)
     if flags.icrnl and c == CR then
       c = NL
     end
@@ -111,6 +114,11 @@ function tty:receive(key)
       self.line[#self.line + 1] = c
       self:echo(c)
     end
+  end
+  if #self.echoes > 0 then
+    local echoes = table.concat(self.echoes)
+    self.echoes = {}
+    self:write(echoes)
   end
 end
 

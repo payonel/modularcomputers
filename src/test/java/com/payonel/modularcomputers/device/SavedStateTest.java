@@ -23,8 +23,7 @@ class SavedStateTest {
 		Terminal loaded = new Terminal(Resolution.DEFAULT);
 		loaded.restore(terminal.saved());
 		assertThat(loaded.interruptPending()).isTrue();
-		assertThat(loaded.read(args()).first()).isEqualTo("a");
-		assertThat(loaded.read(args()).first()).isEqualTo("\u001b[A");
+		assertThat(loaded.read(args()).first()).as("a read takes every byte waiting").isEqualTo("a\u001b[A");
 		assertThat(loaded.interruptPending()).isFalse();
 	}
 
@@ -51,18 +50,15 @@ class SavedStateTest {
 	void aTerminalsKeyQueueHasItsOwnLimitAndDropsWhatHasNoRoom() {
 		Terminal terminal = new Terminal(Resolution.DEFAULT);
 		terminal.accepting(true); // on a running board\'s bus
+		StringBuilder expected = new StringBuilder();
 		for (int i = 0; i < Terminal.INPUT_CAPACITY + 10; i++) {
-			terminal.press("k" + i);
+			terminal.press("k" + i + ",");
+			if (i < Terminal.INPUT_CAPACITY) {
+				expected.append("k").append(i).append(",");
+			}
 		}
-		int kept = 0;
-		String last = null;
-		Object key;
-		while ((key = terminal.read(args()).first()) != null) {
-			kept++;
-			last = (String) key;
-		}
-		assertThat(kept).isEqualTo(Terminal.INPUT_CAPACITY);
-		assertThat(last).as("what waited stays; the newest are dropped").isEqualTo("k" + (Terminal.INPUT_CAPACITY - 1));
+		assertThat(terminal.read(args()).first()).as("what waited stays; the newest are dropped").isEqualTo(expected.toString());
+		assertThat(terminal.read(args()).first()).isNull();
 	}
 
 	@Test

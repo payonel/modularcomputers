@@ -89,15 +89,13 @@ public final class ConsoleSplitter {
 		}
 	}
 
-	/** Takes the oldest waiting key from the group's terminals, in bus order. */
-	public Optional<String> nextKey() {
+	/** Takes every byte waiting at the group's terminals, merged in bus order (ConIn's), or nothing. */
+	public Optional<String> takeInput() {
+		StringBuilder bytes = new StringBuilder();
 		for (Terminal terminal : terminals()) {
-			Optional<String> key = terminal.nextKey();
-			if (key.isPresent()) {
-				return key;
-			}
+			terminal.takeInput().ifPresent(bytes::append);
 		}
-		return Optional.empty();
+		return bytes.isEmpty() ? Optional.empty() : Optional.of(bytes.toString());
 	}
 
 	/** Keys wait at a terminal in the group: the console's interrupt. */
@@ -132,9 +130,9 @@ public final class ConsoleSplitter {
 		return Result.ok();
 	}
 
-	@Method(doc = "read(): the oldest key typed at any terminal in the console's group, or nil")
+	@Method(doc = "read(): every byte waiting at the terminals in the console's group, merged, or nil")
 	public Result read(Arguments args) {
-		return Result.ok(nextKey().orElse(null));
+		return Result.ok(takeInput().orElse(null));
 	}
 
 	@Method(doc = "getSize(): columns, rows; the smallest of the terminals in the console's group")

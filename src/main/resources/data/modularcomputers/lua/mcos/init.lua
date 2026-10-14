@@ -138,14 +138,15 @@ console:write("\27[0m\27[2J\27[H" .. "mcos " .. VERSION .. "\n")
 shell()
 while true do
   if not run() then
-    -- Nothing can run: the input service waits for the tty's device and hands the tty what it sent.
+    -- Nothing can run: the input service waits for the tty's device and hands the tty what it sent
+    -- (a read takes every byte waiting).
     board.waitForInterrupt(nil, console.device)
     while true do
-      local ok, key = board.invoke(console.device, "read")
-      if not ok or key == nil then
+      local ok, bytes = board.invoke(console.device, "read")
+      if not ok or bytes == nil then
         break
       end
-      console:receive(key)
+      console:receive(bytes)
     end
   end
 end

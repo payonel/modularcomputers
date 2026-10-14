@@ -548,45 +548,70 @@ public final class Mcos implements Program {
 			}
 			Object read;
 			while ((read = board.invoke(CONSOLE, "read").first()) != null) {
-				String key = read.toString();
-				switch (key) {
-					case "\r", "\n" -> {
-						print("\n");
-						return line.toString();
-					}
-					case "\u007F", "\b" -> {
-						if (!line.isEmpty()) {
-							line.setLength(line.length() - 1);
-							print("\b \b");
+				for (String key : keys(read.toString())) {
+					switch (key) {
+						case "\r", "\n" -> {
+							print("\n");
+							return line.toString();
 						}
-					}
-					case "\u0003" -> {
-						print("^C\n");
-						return null;
-					}
-					case "\u0015" -> {
-						line.setLength(0);
-						print("\r\u001B[K" + prompt());
-					}
-					case "\u000C" -> print("\u001B[2J\u001B[H" + prompt() + line);
-					case "\u001B[A", "\u001B[B" -> {
-						back = Math.clamp(back + (key.equals("\u001B[A") ? -1 : 1), 0, history.size());
-						line.setLength(0);
-						line.append(back < history.size() ? history.get(back) : "");
-						print("\r\u001B[K" + prompt() + line);
-					}
-					default -> {
-						if (key.startsWith("\u001B")) {
-							break; // other keys (arrows, Home, ...) aren't edited yet
+						case "\u007F", "\b" -> {
+							if (!line.isEmpty()) {
+								line.setLength(line.length() - 1);
+								print("\b \b");
+							}
 						}
-						StringBuilder typed = new StringBuilder();
-						key.chars().filter(c -> c >= 0x20 && c != 0x7F).forEach(typed::appendCodePoint);
-						line.append(typed);
-						print(typed.toString());
+						case "\u0003" -> {
+							print("^C\n");
+							return null;
+						}
+						case "\u0015" -> {
+							line.setLength(0);
+							print("\r\u001B[K" + prompt());
+						}
+						case "\u000C" -> print("\u001B[2J\u001B[H" + prompt() + line);
+						case "\u001B[A", "\u001B[B" -> {
+							back = Math.clamp(back + (key.equals("\u001B[A") ? -1 : 1), 0, history.size());
+							line.setLength(0);
+							line.append(back < history.size() ? history.get(back) : "");
+							print("\r\u001B[K" + prompt() + line);
+						}
+						default -> {
+							if (key.startsWith("\u001B")) {
+								break; // other keys (arrows, Home, ...) aren't edited yet
+							}
+							StringBuilder typed = new StringBuilder();
+							key.chars().filter(c -> c >= 0x20 && c != 0x7F).forEach(typed::appendCodePoint);
+							line.append(typed);
+							print(typed.toString());
+						}
 					}
 				}
 			}
 		}
+	}
+
+	/** What was read, as keys: an escape sequence (ESC [ ... final, or ESC O x) is one, any other character another. */
+	private static List<String> keys(String bytes) {
+		List<String> keys = new ArrayList<>();
+		int i = 0;
+		while (i < bytes.length()) {
+			int end = i + 1;
+			if (bytes.charAt(i) == '\u001B' && end < bytes.length()) {
+				char kind = bytes.charAt(end);
+				if (kind == '[') {
+					end++;
+					while (end < bytes.length() && (bytes.charAt(end) < 0x40 || bytes.charAt(end) > 0x7E)) {
+						end++; // parameters, up to the final byte
+					}
+					end = Math.min(end + 1, bytes.length());
+				} else if (kind == 'O') {
+					end = Math.min(end + 2, bytes.length());
+				}
+			}
+			keys.add(bytes.substring(i, end));
+			i = end;
+		}
+		return keys;
 	}
 
 	// ---- the shell ----------------------------------------------------------------------------
