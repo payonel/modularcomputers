@@ -731,7 +731,11 @@ scripts/art/error_beep.py` into
     its request and cuts user_co's budget to one step; the callback freezes user_co's whole chain
     wherever it is (inside coroutines, a sort's comparison), the freeze lands in the firmware, which
     asks the host, and the thaw returns the answer. No user coroutine sees a yield; `pcall` can't
-    catch it. The firmware never calls methods on strings (the string metatable is shared).
+    catch it. **Each syscall has its own reply** (the LungoLua agent's review, 2026-10-13):
+    requests wait in a queue the firmware answers in order at every freeze, so a finalizer (`__gc`)
+    making a board call inside another waiting syscall queues behind it (one shared slot swapped
+    their replies or spun forever), and a request left by an error before it's answered withdraws
+    itself (a to-be-closed variable), never carried out later. The firmware never calls methods on strings (the string metatable is shared).
   - **Device data in the firmware's ring** (user design, 2026-10-13; the user first had the ring
     in the RAM, Java side, then moved it into the machine: only machine.lua caches, straight from
     the devices). Each device with a stream (`Device.streamMethod`: a terminal's or the console's

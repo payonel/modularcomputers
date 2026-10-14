@@ -340,6 +340,48 @@ class LuaRunnerTest {
 		}
 	}
 
+	/** A device that answers with what it's given. */
+	public static final class Echo implements Device {
+		@Override
+		public com.payonel.modularcomputers.bus.DeviceType type() {
+			return com.payonel.modularcomputers.bus.DeviceType.REDSTONE;
+		}
+
+		@Method(doc = "echo(x): x")
+		public Result echo(Arguments args) {
+			return Result.ok(args.get(0));
+		}
+	}
+
+	@Test
+	void finalizersMakingBoardCallsNeverTakeAnotherCallsReply() {
+		Map<String, Device> devices = new LinkedHashMap<>();
+		devices.put("id:screen", screen);
+		devices.put("id:echo", new Echo());
+		machine.setDevices(devices);
+		boot("""
+			local bad = 0
+			local finalized = 0
+			for i = 1, 300 do
+			  -- garbage whose finalizers make board calls of their own, at whatever syscall they land in
+			  for j = 1, 5 do
+			    setmetatable({}, {__gc = function()
+			      local _, got = board.invoke("id:echo", "echo", "gc")
+			      if got ~= "gc" then bad = bad + 1 end
+			      finalized = finalized + 1
+			    end})
+			  end
+			  local _, got = board.invoke("id:echo", "echo", i)
+			  if got ~= i then bad = bad + 1 end
+			end
+			collectgarbage()
+			board.invoke("console", "write", "bad " .. bad .. (finalized > 0 and " finalized" or " none finalized"))
+			board.halt()
+			""");
+		untilHalted();
+		assertThat(row(0)).as("every reply its own call's, and no call left spinning").isEqualTo("bad 0 finalized");
+	}
+
 	@Test
 	void aSaveCarriesOutNoCallsSoTheDevicesAndTheProgramAgree() {
 		Counter counter = new Counter();

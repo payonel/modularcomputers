@@ -51,14 +51,29 @@ local usermode = debug.getregistry()["modularcomputers.usermode"]
 local pending = debug.getregistry()["modularcomputers.pending"]
 local load, pairs, ipairs, select, type, error, tostring = load, pairs, ipairs, select, type, error, tostring
 local table_pack, table_unpack, table_remove = table.pack, table.unpack, table.remove
+local setmetatable = setmetatable
 local math_huge, math_floor = math.huge, math.floor
 
 -- Steps user_co runs before its budget freezes it: how often the host gets a safe point.
 local SLICE = 100000
 
 local user_co
-local request -- the syscall waiting for the host, packed
-local answer  -- the host's answer to it, packed
+-- Syscalls waiting for the host, oldest first; each request (packed) gets its own reply (.reply).
+-- One slot shared by all wasn't enough (found by the LungoLua agent, 2026-10-13): a finalizer
+-- (__gc) can make a board call inside another syscall that's waiting, which then took its reply
+-- or spun forever; and a syscall left by an error after it was recorded was carried out anyway.
+local queue = {}
+-- A request left by an error before it was answered withdraws itself.
+local REQUEST = {__close = function(request, err)
+  if err ~= nil and request.reply == nil then
+    for i = 1, #queue do
+      if queue[i] == request then
+        table_remove(queue, i)
+        break
+      end
+    end
+  end
+end}
 
 -- The inbox: a few of each device's data, by address: {method = ..., [1] = oldest, ...}.
 local inbox = {}
@@ -79,14 +94,14 @@ end
 -- Returns the reply packed, still in firmware mode; the caller goes back to user mode.
 local function syscall(...)
   usermode(false)
-  request = table_pack(...)
-  setbudget(user_co, 1, spent) -- the next step freezes the chain, in the loop below
-  while answer == nil do
+  local request <close> = setmetatable(table_pack(...), REQUEST)
+  queue[#queue + 1] = request
+  while request.reply == nil do
+    -- The next step freezes the chain; armed again when a nested syscall (a finalizer's) took that freeze.
+    setbudget(user_co, 1, spent)
   end
   usermode(false) -- (the thaw went back to user mode)
-  local reply = answer
-  answer = nil
-  return reply
+  return request.reply
 end
 
 -- A syscall answered as values, back in user mode.
@@ -236,13 +251,15 @@ end
 local result = table_pack(user(coroutine_resume))
 while true do
   if isfrozen(user_co) then
-    if request then
-      local asked = request
-      request = nil
-      if asked[1] == "wait" and asked[2] >= 0 then
-        asked[2] = ask("clock") + asked[2] -- its length becomes a deadline
+    if #queue > 0 then
+      -- Every syscall waiting, answered in order (a finalizer's queues behind the call it ran inside).
+      while #queue > 0 do
+        local request = table_remove(queue, 1)
+        if request[1] == "wait" and request[2] >= 0 then
+          request[2] = ask("clock") + request[2] -- its length becomes a deadline
+        end
+        request.reply = table_pack(ask(table_unpack(request, 1, request.n)))
       end
-      answer = table_pack(ask(table_unpack(asked, 1, asked.n)))
     else
       ask("slice") -- the slice is spent
     end
