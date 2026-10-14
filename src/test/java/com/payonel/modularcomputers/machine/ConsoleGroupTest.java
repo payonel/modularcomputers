@@ -156,7 +156,7 @@ class ConsoleGroupTest {
 	}
 
 	@Test
-	void keysAtTerminalsInTheGroupReachTheConsoleMergedAndRaiseItsInterrupt() {
+	void keysAtTerminalsInTheGroupReachTheConsoleMergedAndRaiseItsInterruptAndTheirOwn() {
 		List<Object> keys = new ArrayList<>();
 		machine.board().setEeprom(new Eeprom(board -> {
 			board.list(); // nothing new on the bus
@@ -172,7 +172,25 @@ class ConsoleGroupTest {
 		first.press("a"); // each wakes the waiting program at once
 		second.press("b");
 		machine.tick();
-		assertThat(keys).containsExactly(List.of("console"), "a", List.of("console"), "b", null);
+		assertThat(keys).containsExactly(List.of("console", "id:first"), "a", List.of("console", "id:second"), "b", null);
+	}
+
+	@Test
+	void aTerminalInTheGroupCanBeReadDirectlyRacingTheConsole() {
+		List<Object> keys = new ArrayList<>();
+		machine.board().setEeprom(new Eeprom(board -> {
+			board.waitForInterrupt(60, "console");
+			keys.add(board.invoke("console", "read").first()); // the console takes the first key
+			board.waitForInterrupt(60, "id:first");
+			keys.add(board.invoke("id:first", "read").first()); // the terminal's own read the second
+			keys.add(board.invoke("console", "read").first()); // so the console finds nothing left
+			board.halt();
+		}));
+		machine.pressPower();
+		first.press("a");
+		first.press("b");
+		machine.tick();
+		assertThat(keys).containsExactly("a", "b", null);
 	}
 
 	@Test

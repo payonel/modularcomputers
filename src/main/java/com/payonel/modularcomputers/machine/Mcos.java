@@ -523,8 +523,9 @@ public final class Mcos implements Program {
 
 	// ---- the console --------------------------------------------------------------------------
 
+	/** The console's writes are literal: a new line going out as CR LF is the OS's (termios's onlcr). */
 	private void print(String text) {
-		board.invoke(CONSOLE, "write", text);
+		board.invoke(CONSOLE, "write", text.replace("\n", "\r\n"));
 	}
 
 	private String prompt() {

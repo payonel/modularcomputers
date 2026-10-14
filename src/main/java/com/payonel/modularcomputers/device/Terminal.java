@@ -24,7 +24,8 @@ import java.util.Optional;
  * <p>
  * What it sends back waits in its queue until read: keys typed at it, and its answers to
  * reports (the cursor position for {@code ESC[6n}). While anything waits, its interrupt is on
- * (when it's in the console's group, the console's is instead). Typing comes from the screen
+ * (in the console's group, the console's is too, and both reads take from this one queue: whichever
+ * reads first gets the key, as under UEFI's splitter). Typing comes from the screen
  * view: only the terminal a player has open gets the keys.
  * <p>
  * It's bus-powered ({@link #DRAW}, plus {@link #WRITE_COST} a write): with no running computer

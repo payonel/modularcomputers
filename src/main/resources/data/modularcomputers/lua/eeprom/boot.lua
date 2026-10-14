@@ -19,12 +19,12 @@ for _, device in ipairs(board.list()) do
       board.invoke(file, "close")
       local init, why = load(table.concat(parts), "=init.lua")
       if not init then
-        say("boot: " .. device.address .. ": " .. why .. "\n")
+        say("boot: " .. device.address .. ": " .. why .. "\r\n")
         board.halt()
       end
       return init(device.address)
     end
   end
 end
-say("boot: no bootable disk\n")
+say("boot: no bootable disk\r\n")
 board.halt()

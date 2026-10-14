@@ -1,3 +1,3 @@
 -- hello, world: on the console, then halt (power stays on)
-board.invoke("console", "write", "hello world\n")
+board.invoke("console", "write", "hello world\r\n")
 board.halt()

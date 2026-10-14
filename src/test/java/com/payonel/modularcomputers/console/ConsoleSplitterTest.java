@@ -30,22 +30,18 @@ class ConsoleSplitterTest {
 		Terminal one = new Terminal(new Resolution(6, 2));
 		Terminal two = new Terminal(new Resolution(6, 3));
 		ConsoleSplitter console = console(new Disk(DiskTier.TIER_1), one, two);
-		console.write("hi\nthere");
+		console.write("hi\r\nthere");
 		assertThat(one.buffer().rows()).containsExactly("hi    ", "there ");
 		assertThat(two.buffer().rows()).containsExactly("hi    ", "there ", "      ");
 		assertThat(console.size()).isEqualTo(new Resolution(6, 2));
 	}
 
 	@Test
-	void onlcrTurnsNewlinesIntoCrLfAndCanBeTurnedOff() {
+	void writesAreLiteralAsUefisOutputStringIs() {
 		Terminal terminal = new Terminal(new Resolution(6, 3));
 		ConsoleSplitter console = console(terminal);
-		assertThat(console.modes()).containsEntry(ConsoleSplitter.ONLCR, true);
-		console.write("ab\n");
-		assertThat(console.setMode(ConsoleSplitter.ONLCR, false)).isTrue();
-		console.write("cd\nef");
-		assertThat(terminal.buffer().rows()).containsExactly("ab    ", "cd    ", "  ef  ");
-		assertThat(console.setMode("nope", true)).isFalse();
+		console.write("ab\ncd\r\nef");
+		assertThat(terminal.buffer().rows()).containsExactly("ab    ", "  cd  ", "ef    ");
 	}
 
 	@Test
@@ -60,7 +56,7 @@ class ConsoleSplitterTest {
 	@Test
 	void aJoiningTerminalGetsTheConsoleRedrawnOnIt() {
 		ConsoleSplitter console = console(new Disk(DiskTier.TIER_1));
-		console.write("\u001B[32mgreen\nline two");
+		console.write("\u001B[32mgreen\r\nline two");
 		Terminal late = new Terminal(Resolution.DEFAULT);
 		late.write("old junk");
 		console.redraw(late);
@@ -71,13 +67,11 @@ class ConsoleSplitterTest {
 	}
 
 	@Test
-	void resetBlanksItsCopyAndRestoresTheModes() {
+	void resetBlanksItsCopy() {
 		ConsoleSplitter console = console(new Terminal(Resolution.DEFAULT));
-		console.setMode(ConsoleSplitter.ONLCR, false);
 		console.write("a");
 		console.reset();
 		assertThat(console.screen().isBlank()).isTrue();
 		assertThat(console.decoder().column()).isZero();
-		assertThat(console.modes()).containsEntry(ConsoleSplitter.ONLCR, true);
 	}
 }

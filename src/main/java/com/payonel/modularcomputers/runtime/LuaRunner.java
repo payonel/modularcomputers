@@ -26,10 +26,12 @@ import com.payonel.modularcomputers.machine.LuaScripts;
 import java.lang.reflect.RecordComponent;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
@@ -335,6 +337,14 @@ public final class LuaRunner implements Runner {
 	private static final java.util.Set<LuaRunner> LIVE = java.util.concurrent.ConcurrentHashMap.newKeySet();
 	private final ConcurrentLinkedQueue<Call> calls = new ConcurrentLinkedQueue<>();
 	private volatile Wait wait;
+	/**
+	 * Server side: the streams the program asked for, by reading them or naming them in a wait. The
+	 * inbox caches only those (and what it holds already, as after a load), so it never takes data from
+	 * a device the program doesn't use: a terminal in the console's group would lose its keys to a
+	 * queue nobody reads (and a program waiting on everything would spin on it), a race the program
+	 * never started. It may start one: reading a bound terminal and the console both race, as in UEFI.
+	 */
+	private final Set<String> wanted = new HashSet<>();
 	private volatile State state = State.RUNNING;
 	private volatile Throwable crash;
 	private volatile boolean stopping;
@@ -631,6 +641,7 @@ public final class LuaRunner implements Runner {
 			List<String> ready = waiting.ready(pending);
 			if (!ready.isEmpty() || now >= waiting.until()) {
 				// Only now is data taken from the devices: it goes straight into the answer.
+				wanted.addAll(waiting.sources()); // named in a wait: the program reads them
 				List<Map<String, Object>> taken = take(board, interrupts.get(), waiting.held(), start);
 				wait = null;
 				served++;
@@ -650,7 +661,8 @@ public final class LuaRunner implements Runner {
 
 	/**
 	 * Server side, as a wait is answered: takes device data for the firmware's inbox (machine.lua's
-	 * cache, in the VM; user design, 2026-10-13), from each source with data, as much as the inbox has
+	 * cache, in the VM; user design, 2026-10-13), from each source with data the program asked for
+	 * ({@link #wanted}), as much as the inbox has
 	 * room for that device: {@link Board#inboxSize} (from the RAM: each device has its own room, so a
 	 * full one never crowds out another) less what it {@code held}s, within the tick's server time.
 	 * Handshake: a device keeps what there's no room for, so nothing is dropped.
@@ -659,6 +671,9 @@ public final class LuaRunner implements Runner {
 		List<Map<String, Object>> taken = new ArrayList<>();
 		int size = board.inboxSize();
 		for (String source : sources) {
+			if (!wanted.contains(source) && !held.containsKey(source)) {
+				continue; // never asked for by the program: its data stays in the device
+			}
 			String method = board.streamMethod(source).orElse(null);
 			int room = size - held.getOrDefault(source, 0);
 			while (method != null && room > 0 && spentNanos + (System.nanoTime() - start) < SERVER_NANOS_PER_TICK) {
@@ -895,6 +910,9 @@ public final class LuaRunner implements Runner {
 				Object target = args.isEmpty() ? null : args.getFirst();
 				String method = arg(args, 1);
 				Object[] rest = args.size() > 2 ? args.subList(2, args.size()).toArray() : new Object[0];
+				if (rest.length == 0 && target instanceof String address && board.streamMethod(address).filter(method::equals).isPresent()) {
+					wanted.add(address); // the program reads this stream: the inbox may cache it from now on
+				}
 				return target instanceof Handle handle ? board.invoke(handle, method, rest) : board.invoke(String.valueOf(target), method, rest);
 			};
 			default -> board -> Result.fail("no board call '" + name + "'");

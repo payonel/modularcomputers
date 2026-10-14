@@ -73,8 +73,10 @@ end
 local term = {}
 mcos.term = term
 
+-- The console's writes are literal (the board's console is firmware's); a new line going out as
+-- CR LF is the OS's output processing, termios's onlcr.
 function term.write(text)
-  board.invoke("console", "write", text)
+  board.invoke("console", "write", (string.gsub(text, "\n", "\r\n")))
 end
 
 function term.readLine(prompt)

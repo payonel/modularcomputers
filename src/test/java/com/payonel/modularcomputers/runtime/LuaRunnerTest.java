@@ -615,11 +615,11 @@ class LuaRunnerTest {
 		machine.setDevices(devices);
 		boot("""
 			board.list() -- (so the bus has no interrupt raised: the key alone is news)
-			board.waitForInterrupt() -- cold: the card's events into the inbox
+			board.waitForInterrupt(nil, "console", "id:redstone") -- cold: the card's events into the inbox
 			board.invoke("console", "write", "busy")
 			local n = 0
 			for i = 1, 5000000 do n = n + 1 end -- a key is typed meanwhile
-			local ready = board.waitForInterrupt() -- the inbox has the card's events, but the key is news
+			local ready = board.waitForInterrupt(nil, "console", "id:redstone") -- the inbox has the card's events, but the key is news
 			table.sort(ready)
 			board.invoke("console", "write", " " .. table.concat(ready, ","))
 			board.halt()
@@ -662,7 +662,7 @@ class LuaRunnerTest {
 		devices.put("id:redstone", card);
 		machine.setDevices(devices);
 		boot("""
-			board.waitForInterrupt() -- cold: takes 2 keys and 2 events
+			board.waitForInterrupt(nil, "console", "id:redstone") -- cold: takes 2 keys and 2 events
 			board.invoke("console", "read") -- from the inbox
 			board.invoke("console", "read") -- the keys' queue is empty now
 			board.waitForInterrupt(nil, "console") -- cold for the keys: tops them up; the card's queue is full

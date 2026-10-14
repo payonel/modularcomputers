@@ -353,7 +353,17 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
 - **First version: the shell only.** No filesystem library and no threads or child processes yet;
   a shell in the real-world style, with readline a separate library from it (OpenOS's cursor
   library mixed the two, and echo with them).
-- Open (asked 2026-10-13): where the line discipline lives (echo, canonical mode, Ctrl+C: mcos, or
-  the console device beside `onlcr`); whether v1's shell runs `/bin` programs off the boot disk or
-  has built-ins only; whether Ctrl+C on a busy program waits for a sandboxed budget for user
-  coroutines (v1 interrupting reads only).
+- **The line discipline is mcos's** (user, 2026-10-13, as in Linux, where it's kernel code): a
+  terminal only sends bytes (`\3` for Ctrl+C) and raises its interrupt. Each tty (one per input
+  device mcos uses) owns its input buffer, its termios flags and its foreground program, whatever
+  process is running; processes inherit their tty, so a program never knows which one it is.
+  readline clears `icanon` and `echo` and keeps `isig`, so Ctrl+C is still SIGINT while it edits.
+- **Console mode is a boot option** (user, 2026-10-13), like Linux's `console=`: by default one tty
+  on the board's `console` (all terminals share one shell); or a tty, interrupt handler and shell
+  per terminal (`ttyS0`, `ttyS1`...), never reading `console` then. The bootloader hands init a
+  command line (e.g. from a file on the boot disk, like GRUB's config).
+- **To come: an interrupt vector in the firmware**, so a raised interrupt preempts a busy program
+  (at its next budget check) and runs mcos's handler, which feeds the line discipline as bytes
+  arrive: Ctrl+C then ends a program stuck in a loop, as in Linux.
+- Open (asked 2026-10-13): whether v1's shell runs `/bin` programs off the boot disk or
+  has built-ins only.

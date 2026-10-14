@@ -4,7 +4,7 @@ This file is the full context for any agent session working on this repo. `CLAUD
 (Claude Code reads `CLAUDE.md`, not `AGENTS.md`; other agent tools read `AGENTS.md`). Keep it
 current: when a decision is made or a gotcha is found, record it here.
 
-Last updated: 2026-10-13 (amber halted light, piston extend/retract, nothing lost on save or unload).
+Last updated: 2026-10-13 (the console is UEFI's splitter: literal writes, members raise their own interrupts and can race it).
 
 ---
 
@@ -984,9 +984,13 @@ scripts/art/error_beep.py` into
       ConSplitter, so it already is the "virtual multicast text buffer". **The console is the
       group's multicast device for input and output both** (user, 2026-10-11): it writes to
       every terminal's screen and reads key presses from every terminal, merged
-      (`console.read()`), as UEFI's ConSplitter does `ConOut` and `ConIn` and Linux's
-      `/dev/console` (`console=tty0 console=ttyS0`) does. Each terminal stays readable on its
-      own too.
+      (`console.read()`), as UEFI's ConSplitter does `ConOut` and `ConIn`. (Linux's
+      `/dev/console` doesn't merge: only kernel messages go to every `console=`; the tty is the
+      last one given.) **Each member stays a device of its own** (user, 2026-10-13, as each ConIn
+      device keeps its own protocol under the splitter): its keys raise its own interrupt as well
+      as the console's, and a program may read it directly, racing the console for them (one
+      queue, the terminal's: whichever reads first gets a key). The firmware's inbox caches only
+      the streams a program reads or names in a wait, so it never races on the program's behalf.
     - **Terminals** (`device/Terminal`, type `terminal`; user decision 2026-10-11): a screen and
       a keyboard are one device, like a VT100, so there's no separate keyboard device (the
       user left that complexity out). The screen block and the all-in-one's front are
@@ -1012,7 +1016,7 @@ scripts/art/error_beep.py` into
         built, so programs never send pixels to a terminal that would drop them). The front's frame shows the tier as 1-3 dots, iron, gold and diamond. The
         all-in-one's built-in terminal is tier 3.
       - **Input:** keys wait in its queue until `read()` (as do its answers to reports); while
-        any wait, its interrupt is on, or the console's if it's in the console's group. **The queue
+        any wait, its interrupt is on, and the console's too if it's in the console's group. **The queue
         has its own limit** (`Terminal.INPUT_CAPACITY`, 256; user, 2026-10-13: devices keep their
         own rings): past it a key is dropped, as a PC's keyboard buffer drops what it has no room
         for (it beeps; no bell here yet).
@@ -1133,7 +1137,7 @@ scripts/art/error_beep.py` into
   - **Tests bring their own programs** (user, 2026-10-11): never assert on `Mcos`,
     which changes. Unit tests build their own `Program`s; game tests flash one onto the EEPROM
     after inserting it (`Eeprom.flash`, like reflashing firmware; `gametest/TestPrograms`).
-  - Device methods so far: the console (`write`, `read`, `getSize`, `getModes`, `setMode`,
+  - Device methods so far: the console (`write`, `read`, `getSize`,
     `terminals`, `bind`, `unbind`), terminals (`write`, `read`, `getSize`), disks
     (below) and the EEPROM (`get`, `set`: its image, no size limit for now (user, 2026-10-12; EEPROMs will
     later hold a bootloader, with the OS installed on a disk), like
@@ -1167,15 +1171,16 @@ scripts/art/error_beep.py` into
   - `pressPower()` returns `ON`, `OFF` or `NO_CPU`; `NO_CPU` means refused.
   - `cpuRemoved()` cuts power if the CPU was pulled while running.
   - On means a CPU is installed and was handed control.
-- **Console (`console/ConsoleSplitter`):** modeled on UEFI's console splitter and Linux's tty
-  layer for `/dev/console`.
+- **Console (`console/ConsoleSplitter`):** the board's firmware console, UEFI's console splitter.
+  The board keeps it for the OS too (user, 2026-10-13: no ExitBootServices).
   - It's never null. It sends the same text to every terminal in its group (raw multicast,
     like `console=tty0 console=ttyS0`) and drops output when there are none. Each terminal
     decodes it at its own size.
-  - **Its modes are termios's, by name** (user, 2026-10-11): `onlcr` (on by default, as on
-    Linux) sends `\n` as `\r\n`; `setMode("onlcr", false)` makes it literal. Direct
-    `id:<terminal>` writes have no tty layer: always literal. Power-off restores the
-    defaults. Input-side modes (`icrnl`, `echo`, `icanon`) are undecided.
+  - **Its writes are literal** (user, 2026-10-13), as UEFI's `OutputString` is: a new line is
+    `\r\n` written out. termios (`onlcr`, `echo`, `icanon`, `isig`) is the OS's line discipline,
+    on its own ttys, never the board's: mcos's `term.write` does `onlcr` (both versions). It had
+    `onlcr` and `setMode`/`getModes` before; they're gone. A terminal's own modes (new line mode,
+    autowrap, the alternate screen) are escape sequences, multicast to every member like any write.
   - Its size is the smallest among its terminals. With none it reports `HEADLESS` (a real
     size, never 0×0, like Linux's dummycon).
   - Like a Linux virtual console, it keeps **its own copy of what it shows**: it decodes its

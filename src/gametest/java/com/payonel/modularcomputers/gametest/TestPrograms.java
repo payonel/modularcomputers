@@ -11,7 +11,7 @@ public final class TestPrograms {
 	public static final String GREETING = "hello world";
 	/** Prints the greeting to the console, then halts. */
 	public static final Program HELLO = board -> {
-		board.invoke("console", "write", GREETING + "\n");
+		board.invoke("console", "write", GREETING + "\r\n");
 		board.halt();
 	};
 
@@ -20,7 +20,7 @@ public final class TestPrograms {
 	 * console, forever (Enter starts a new line).
 	 */
 	public static final Program ECHO = board -> {
-		board.invoke("console", "write", GREETING + "\n");
+		board.invoke("console", "write", GREETING + "\r\n");
 		board.list();
 		while (true) {
 			for (String source : board.waitForInterrupt(3600)) {
@@ -30,7 +30,7 @@ public final class TestPrograms {
 				}
 				Object key;
 				while ((key = board.invoke(source, "read").first()) != null) {
-					board.invoke("console", "write", key.equals("\r") ? "\n" : key);
+					board.invoke("console", "write", key.equals("\r") ? "\r\n" : key);
 				}
 			}
 		}

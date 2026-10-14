@@ -10,37 +10,34 @@ import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * The console on the virtual bus: always there, so firmware can just write. It stands where
- * Linux's tty layer stands for {@code /dev/console}: programs write text, and it sends the same
- * text to every terminal in its group (as with {@code console=tty0 console=ttyS0}), after its
- * output processing; the terminals decode it themselves. With no terminals it drops output.
- * <p>
- * <b>Its modes</b> are termios's, by name. Only {@code onlcr} so far (on by default, as on
- * Linux): {@code \n} goes out as {@code \r\n}. Power-off sets them back.
+ * The console on the virtual bus: always there, so firmware can just write. It's the board's
+ * firmware console, UEFI's ConSplitter: it merges the terminals in its group, sending the same text
+ * to every one ({@code ConOut}) and reading the keys typed at any of them ({@code ConIn}). Its
+ * writes are literal, as {@code OutputString}'s are: a new line is {@code \r\n} written out
+ * (termios's {@code onlcr} and the rest of the line discipline are the OS's, on its own tty). With
+ * no terminals it drops output.
  * <p>
  * <b>Its copy:</b> it decodes its own output onto its own screen too ({@link #screen()}), like a
  * Linux virtual console's buffer, and redraws that onto a terminal that joins the group, as tmux
  * or screen redraws a terminal that attaches.
  * <p>
- * <b>Its group:</b> it's the multicast device for output and input both, like UEFI's splitter
- * for {@code ConOut} and {@code ConIn}: it writes to its terminals and reads the keys typed at
- * them, merged. Every terminal on the bus is in it (bound) by default, as fbcon binds every
- * framebuffer. A program can {@link #unbind} one to use it on its own: the console stops writing
- * to it and reading from it (what's on it stays), and takes it back with {@link #bind}, redrawing
- * itself onto it. An unbound terminal stays unbound while it's on the bus; one that leaves and
- * comes back is a new arrival and joins the group again, as a replugged framebuffer does in Linux.
+ * <b>Its group:</b> every terminal on the bus is in it (bound) by default. A member stays a device
+ * of its own, as each ConIn device keeps its own protocol under UEFI's splitter: its keys raise its
+ * own interrupt as well as the console's, and a program may read it directly, racing the console
+ * for its keys (each key goes to whichever reads first; user, 2026-10-13). A program can
+ * {@link #unbind} one to use it on its own: the console stops writing to it and reading from it
+ * (what's on it stays), and takes it back with {@link #bind}, redrawing itself onto it (names from
+ * Linux's vtconsole; UEFI sets its members from NVRAM instead). An unbound terminal stays unbound
+ * while it's on the bus; one that leaves and comes back is a new arrival and joins the group again.
  */
 public final class ConsoleSplitter {
 	/** The size reported when no terminal is attached; never 0x0, so callers need no special case. */
 	public static final Resolution HEADLESS = Resolution.DEFAULT;
-	public static final String ONLCR = "onlcr";
 
 	private final Bus bus;
 	/** What the console shows, decoded from what it wrote. */
@@ -50,7 +47,6 @@ public final class ConsoleSplitter {
 	});
 	/** The bus addresses of terminals taken out of the group. */
 	private final Set<String> unbound = new HashSet<>();
-	private boolean onlcr = true;
 
 	public ConsoleSplitter(Bus bus) {
 		this.bus = bus;
@@ -85,12 +81,11 @@ public final class ConsoleSplitter {
 		terminal.write(decoder.redraw());
 	}
 
-	/** Writes text to the console: its copy and every terminal in its group, after output processing. */
+	/** Writes text to the console, as it is: its copy and every terminal in its group. */
 	public void write(String text) {
-		String out = onlcr ? text.replace("\n", "\r\n") : text;
-		decoder.write(out);
+		decoder.write(text);
 		for (Terminal terminal : terminals()) {
-			terminal.write(out);
+			terminal.write(text);
 		}
 	}
 
@@ -110,22 +105,6 @@ public final class ConsoleSplitter {
 		return terminals().stream().anyMatch(Terminal::hasKeys);
 	}
 
-	/** Its modes by name, e.g. {@code onlcr}. */
-	public Map<String, Boolean> modes() {
-		Map<String, Boolean> modes = new LinkedHashMap<>();
-		modes.put(ONLCR, onlcr);
-		return modes;
-	}
-
-	/** Sets a mode by name. Returns false for one it doesn't have. */
-	public boolean setMode(String name, boolean on) {
-		if (name.equals(ONLCR)) {
-			onlcr = on;
-			return true;
-		}
-		return false;
-	}
-
 	/** Whether the device at {@code address} is in the group (terminals are, unless unbound). */
 	public boolean isBound(String address) {
 		return !unbound.contains(address);
@@ -139,11 +118,10 @@ public final class ConsoleSplitter {
 		unbound.retainAll(bus.addresses());
 	}
 
-	/** Power's gone: a blank copy, the cursor home, default modes, every terminal back in the group. */
+	/** Power's gone: a blank copy, the cursor home, every terminal back in the group. */
 	public void reset() {
 		unbound.clear();
 		decoder.reset();
-		onlcr = true;
 	}
 
 	// ---- device methods: the console as programs use it, by name on the virtual bus ----------
@@ -163,17 +141,6 @@ public final class ConsoleSplitter {
 	public Result getSize(Arguments args) {
 		Resolution size = size();
 		return Result.ok(size.columns(), size.rows());
-	}
-
-	@Method(doc = "getModes(): the console's tty modes, as a table of name = boolean (onlcr: \\n goes out as \\r\\n)")
-	public Result getModes(Arguments args) {
-		return Result.ok(modes());
-	}
-
-	@Method(doc = "setMode(name, on): sets a tty mode, e.g. setMode(\"onlcr\", false) for literal output")
-	public Result setMode(Arguments args) {
-		String name = args.checkString(0);
-		return setMode(name, args.checkBoolean(1)) ? Result.ok(true) : Result.fail("no such mode: " + name);
 	}
 
 	@Method(doc = "terminals(): the terminals in the console's group, by address, in bus order")
