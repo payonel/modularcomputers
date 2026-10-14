@@ -158,11 +158,28 @@ sandbox.board = {
   power = function() return call("call", "power") end,
   hardware = function() return call("call", "hardware") end,
   -- true and the method's values, or false and why it failed (a device never stops the machine);
-  -- a read of a device's stream comes from the inbox when it has some
+  -- a read of a device's stream comes from the inbox when it has some. An empty queue whose device
+  -- has no interrupt raised answers nil, free: interrupts are level-triggered, so the device has
+  -- nothing either (a key arriving meanwhile raises it, and the next wait or read sees it).
   invoke = function(target, method, ...)
     local queue = inbox[target]
-    if queue and queue.method == method and queue[1] ~= nil and select("#", ...) == 0 then
-      return true, table_remove(queue, 1)
+    if queue and queue.method == method and select("#", ...) == 0 then
+      if queue[1] ~= nil then
+        return true, table_remove(queue, 1)
+      end
+      usermode(false)
+      local raised = pending()
+      usermode(true)
+      local up = false
+      for i = 1, #raised do
+        if raised[i] == target then
+          up = true
+          break
+        end
+      end
+      if not up then
+        return true, nil
+      end
     end
     return call("call", "invoke", target, method, ...)
   end,

@@ -645,9 +645,35 @@ class LuaRunnerTest {
 	}
 
 	@Test
+	void readingPastTheLastKeyIsFreeWhenNothingIsRaised() {
+		ram(3);
+		boot("""
+			local n = 0
+			for i = 1, 3000000 do n = n + 1 end -- (both keys are typed meanwhile)
+			board.waitForInterrupt(nil, "console")
+			local keys = ""
+			while true do
+			  local _, key = board.invoke("console", "read") -- the last read finds the queue empty, the console quiet: nil
+			  if key == nil then break end
+			  keys = keys .. key
+			end
+			board.invoke("console", "write", keys)
+			board.halt()
+			""");
+		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
+		screen.press("a");
+		screen.press("b");
+		untilHalted();
+		assertThat(row(0)).isEqualTo("ab");
+		assertThat(runner.answered()).as("only the write reached the server: interrupts are level-triggered").isEqualTo(1);
+	}
+
+	@Test
 	void aWaitTheInboxCanAnswerIsFree() {
 		ram(3);
 		boot("""
+			local n = 0
+			for i = 1, 3000000 do n = n + 1 end -- (both keys are typed meanwhile)
 			board.waitForInterrupt(nil, "console") -- cold: the server thread answers, and fills the inbox
 			board.invoke("console", "read")
 			board.waitForInterrupt(nil, "console") -- warm: answered on the computer's thread

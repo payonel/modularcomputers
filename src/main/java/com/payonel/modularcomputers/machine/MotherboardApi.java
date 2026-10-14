@@ -188,14 +188,18 @@ final class MotherboardApi implements Board {
 		if (bus.changes() != listedChanges) {
 			pending.add(BUS);
 		}
-		if (console.interruptPending()) {
-			pending.add(VirtualBus.CONSOLE);
-		}
-		for (String address : bus.addresses()) {
-			Device device = bus.device(address).orElseThrow();
-			if (device.interruptPending()) { // a terminal in the console's group too: its keys raise both, as in UEFI
+		int consoleAt = pending.size();
+		boolean[] keys = {false}; // keys wait at a terminal in the console's group: the console's interrupt too
+		bus.forEach((address, device) -> {
+			if (device.interruptPending()) {
 				pending.add(address);
+				if (device instanceof Terminal && console.isBound(address)) {
+					keys[0] = true;
+				}
 			}
+		});
+		if (keys[0]) {
+			pending.add(consoleAt, VirtualBus.CONSOLE);
 		}
 		return pending;
 	}

@@ -768,7 +768,8 @@ scripts/art/error_beep.py` into
     taken (`LuaRunner.take`): from each device with data, as much as its queue has room for, within
     the computer's server time; a device keeps the rest, so nothing is dropped. Data is taken only
     as a wait is answered, straight into the answer. A read of a device's stream comes from the
-    inbox with no syscall, and **a wait the inbox can answer is free** (answered on the computer's
+    inbox with no syscall (and an empty queue whose device has no interrupt raised answers nil, free:
+    interrupts are level-triggered, so the device is empty too), and **a wait the inbox can answer is free** (answered on the computer's
     thread; user, 2026-10-13: only a cold cache goes to the server thread, which tops every device's
     queue up as it answers). **News goes cold** (design "D", user, 2026-10-13: a key's latency is a
     high bar): the server thread publishes which sources have an interrupt raised the moment a line

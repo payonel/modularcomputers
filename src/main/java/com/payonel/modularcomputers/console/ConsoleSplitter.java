@@ -166,20 +166,26 @@ public final class ConsoleSplitter {
 		}).orElseGet(() -> Result.fail("not a terminal on the bus: " + args.checkString(0)));
 	}
 
-	/** The terminals in the group, in bus order. */
+	/** The terminals in the group, in bus order (a plain pass: every key read and written looks). */
 	private List<Terminal> terminals() {
 		List<Terminal> terminals = new ArrayList<>();
-		for (String address : members()) {
-			bus.device(address).ifPresent(device -> terminals.add((Terminal) device));
-		}
+		bus.forEach((address, device) -> {
+			if (device instanceof Terminal terminal && isBound(address)) {
+				terminals.add(terminal);
+			}
+		});
 		return terminals;
 	}
 
 	/** The addresses of the group's terminals, in bus order. */
 	private List<String> members() {
-		return bus.addresses().stream()
-			.filter(address -> isBound(address) && bus.device(address).orElse(null) instanceof Terminal)
-			.toList();
+		List<String> members = new ArrayList<>();
+		bus.forEach((address, device) -> {
+			if (device instanceof Terminal && isBound(address)) {
+				members.add(address);
+			}
+		});
+		return members;
 	}
 
 	/** The address of a terminal on the bus, by any of its names. */

@@ -29,6 +29,11 @@ public final class Bus {
 		return List.copyOf(devices.values());
 	}
 
+	/** Each device with its address, in bus order, with no copy made (the interrupt check runs every turn). */
+	public void forEach(java.util.function.BiConsumer<String, Device> action) {
+		devices.forEach(action);
+	}
+
 	/** Addresses, in bus order. */
 	public List<String> addresses() {
 		return List.copyOf(devices.keySet());

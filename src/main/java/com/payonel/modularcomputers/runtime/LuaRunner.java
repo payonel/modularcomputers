@@ -632,7 +632,8 @@ public final class LuaRunner implements Runner {
 		}
 		Wait waiting = wait;
 		if (waiting != null) {
-			List<String> pending = new ArrayList<>(interrupts.get());
+			List<String> raised = interrupts.get();
+			List<String> pending = new ArrayList<>(raised);
 			waiting.held().forEach((address, held) -> {
 				if (held > 0 && !pending.contains(address)) {
 					pending.add(address); // its data's in the inbox: still pending for the program
@@ -642,7 +643,7 @@ public final class LuaRunner implements Runner {
 			if (!ready.isEmpty() || now >= waiting.until()) {
 				// Only now is data taken from the devices: it goes straight into the answer.
 				wanted.addAll(waiting.sources()); // named in a wait: the program reads them
-				List<Map<String, Object>> taken = take(board, interrupts.get(), waiting.held(), start);
+				List<Map<String, Object>> taken = take(board, raised, waiting.held(), start); // (nothing's moved since: the same sources)
 				wait = null;
 				served++;
 				waiting.answer().complete(List.of(ready, taken));
