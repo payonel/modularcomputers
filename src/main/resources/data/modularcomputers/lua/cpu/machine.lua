@@ -1,12 +1,12 @@
 -- machine.lua: the Lua CPU's firmware, between the host (the Java runner) and the EEPROM's code.
 --
--- The host runs this as the kernel coroutine (kernel_co), on the computer's own thread, with the
+-- The host runs this as the firmware coroutine (firmware_co), on the computer's own thread, with the
 -- standard library (debug included), and resumes it whenever it has an answer. This file builds the sandbox,
 -- loads the EEPROM's text into it as the user coroutine (user_co), budgets user_co and freezes it
 -- when its slice is spent, and serves its syscalls. The EEPROM's code is user code: it never sees
 -- this file's locals, the real globals or 'debug'.
 --
--- What it asks the host, by yielding kernel_co:
+-- What it asks the host, by yielding firmware_co:
 --   "slice"                       the slice is spent: a point where the host may save the machine;
 --                                 resumed at once
 --   "call", name, args...         a board call (list, status, type, methods, doc, info, uptime,
@@ -187,7 +187,7 @@ local function thaw_stopping(co)
   return thaw(co, stops)
 end
 
--- Asks the host (yields kernel_co).
+-- Asks the host (yields firmware_co).
 local ask = coroutine_yield
 
 -- The budget's callback always freezes: where a freeze can't happen, the engine ends user_co's

@@ -37,6 +37,13 @@ Last updated: 2026-10-15 (mcos: kernel and user space, syscalls by trap, preempt
 
 ## 2. Standing guidance from the user (follow always)
 
+**Vocabulary (Lua CPU, agreed with the user for both projects, 2026-10-15):** the **host** is outside
+the VM (the mod's Java); the **firmware** is layer 0, the code that runs with no budget in effect
+(`machine.lua`, on the firmware coroutine, `firmware_co`): it sets budgets, freezes, thaws, persists
+and sandboxes; a **user thread** is anything running under a budget (`user_co` is the root one: the
+EEPROM's code and all it runs). **"Kernel" is not an engine word**: in this project it means mcos's
+kernel, which runs in user threads.
+
 **Vocabulary:** the user calls viewing a screen through the full-window display GUI
 (`DisplayScreen`, opened by right-clicking a screen) **"modal mode"**. "Screen GUI" means the
 same thing.
@@ -723,8 +730,8 @@ scripts/art/error_beep.py` into
     **the computer's own thread** (a low-priority daemon platform thread, one per running computer;
     no pool; user, 2026-10-13: Java priorities do nothing on Linux by default, the real protection
     is the server-time budget). It makes the LungoLua state (base, coroutine, string, table, math,
-    utf8, debug), runs the firmware as the kernel coroutine (kernel_co) and lets it run freely, not
-    once a tick. The kernel's yields are its requests: `"slice"` (a safe point; resumed at once),
+    utf8, debug), runs the firmware as the firmware coroutine (firmware_co) and lets it run freely, not
+    once a tick. The firmware coroutine's yields are its requests: `"slice"` (a safe point; resumed at once),
     `"call", name, args...` (a board call: `list`, `status`, `type`, `methods`, `doc`, `info`,
     `uptime`, `power`, `hardware`, `invoke`), `"clock"` (the machine's uptime, answered at once), `"wait", deadline, held, sources...`,
     `"halt"`; it ends with
@@ -741,7 +748,7 @@ scripts/art/error_beep.py` into
   - **Saving a running computer** (user, 2026-10-13; Styx persists from the main thread only, so it's
     the host's): the case's `saveAdditional` (world saves, chunk unloads; not client syncs) asks
     `Machine.persistProgram`, which pins a request (`LuaRunner.persist`) and blocks until the
-    computer's thread honours it at its next safe point: the kernel suspended in a yield with its
+    computer's thread honours it at its next safe point: the firmware coroutine suspended in a yield with its
     request still on its stack (a slice, a call not yet made, or a wait, honoured at once), so no
     Lua runs while it persists. **A save carries out no calls** (user, 2026-10-13): a call queued but
     not made is taken back out of the queue, the state saved with it on the stack, and queued again
@@ -765,7 +772,7 @@ scripts/art/error_beep.py` into
     a slice (`SLICE`, 100,000 steps): an async "freeze now" signal was declined by the LungoLua agent
     (its runtime cost outweighs the gain). The bytes go in the case's NBT (`program`). On load the case resumes it
     (`Machine.resumeProgram`, `LuaRunner.restore`) at its first tick, after the bus is found again;
-    the restored kernel's request is still on its stack, so the computer's thread carries on with it
+    the restored firmware coroutine's request is still on its stack, so the computer's thread carries on with it
     (a wait ends on its deadline: the firmware makes a wait's length a deadline on the machine's
     clock, `Machine.uptime`, which is saved with the case and stands still while it's unloaded,
     like Linux's CLOCK_MONOTONIC across hibernation; user, 2026-10-13. Real time isn't the board's:

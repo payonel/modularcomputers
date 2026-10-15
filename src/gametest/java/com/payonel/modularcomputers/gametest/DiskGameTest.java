@@ -48,7 +48,7 @@ public class DiskGameTest {
 		helper.succeed();
 	}
 
-	@GameTest(maxTicks = 100)
+	@GameTest(maxTicks = 400) // (mcos reads its kernel, modules, interpreter and shell off the disk: a board call a read)
 	public void aNewEepromBootsMcosFromATier1Disk(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper);
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));

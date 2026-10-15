@@ -44,8 +44,8 @@ import java.util.function.Supplier;
 /**
  * The Lua CPU's host (user design, 2026-10-13): a plain runner for a LungoLua VM, on the computer's
  * own thread (a low-priority platform thread). It runs the CPU's firmware, {@code lua/cpu/machine.lua},
- * as the kernel coroutine and lets it run freely, not once a tick; everything else (the sandbox, the
- * budget and freezes, syscalls) is the firmware's. The kernel's yields are its requests:
+ * as the firmware coroutine and lets it run freely, not once a tick; everything else (the sandbox, the
+ * budget and freezes, syscalls) is the firmware's. The firmware coroutine's yields are its requests:
  * <ul>
  * <li>{@code "slice"}: its budget froze the EEPROM's code; a safe point. Resumed at once.</li>
  * <li>{@code "call", name, args...}: a board call. Devices live on the server thread, so the call is
@@ -56,7 +56,7 @@ import java.util.function.Supplier;
  * pending.</li>
  * <li>{@code "halt"}: the CPU halts; the thread ends.</li>
  * </ul>
- * The kernel ends with {@code "returned"} (the EEPROM's code returned: a panic), {@code "abort",
+ * The firmware coroutine ends with {@code "returned"} (the EEPROM's code returned: a panic), {@code "abort",
  * why} (its text didn't load), or an error (the EEPROM's code crashed).
  * <p>
  * <b>The server's tick is protected by time, not by counting calls</b>: each tick, a computer's calls
@@ -68,9 +68,9 @@ import java.util.function.Supplier;
  * <p>
  * <b>Saving a running computer</b> (Styx, LungoLua's persistence, which works from the main thread
  * only, so it's the host's): the server thread pins a request ({@link #persist}) and the computer's
- * thread honours it at its next safe point: the kernel suspended in a yield, its request still on its
+ * thread honours it at its next safe point: the firmware coroutine suspended in a yield, its request still on its
  * stack (a slice, a board call not yet made, or a wait, honoured at once). No Lua runs while it
- * persists. {@link #restore} makes the state again; the restored kernel's request is on its stack,
+ * persists. {@link #restore} makes the state again; the restored firmware coroutine's request is on its stack,
  * and the computer's thread carries on with it (a wait starts over). The permanents (the standard
  * library's functions and userdata, named by their path) are worked out the same way in both.
  */
@@ -83,8 +83,8 @@ public final class LuaRunner implements Runner {
 	private static final int LIBRARIES = LUA_GLIBK | LUA_COLIBK | LUA_TABLIBK | LUA_STRLIBK | LUA_MATHLIBK | LUA_UTF8LIBK | LUA_DBLIBK;
 	/** How deep tables nest between programs and devices. */
 	private static final int MAX_DEPTH = 16;
-	/** Registry keys: the kernel, and the permanents (object to name). */
-	private static final String KERNEL = "modularcomputers.kernel";
+	/** Registry keys: the firmware coroutine, and the permanents (object to name). */
+	private static final String FIRMWARE_CO = "modularcomputers.firmware";
 	private static final String PERMANENTS = "modularcomputers.perms";
 	/** Where the memory baseline rides in the registry, so Styx keeps it with the computer. */
 	private static final String BASELINE = "modularcomputers.baseline";
@@ -335,8 +335,8 @@ public final class LuaRunner implements Runner {
 
 	private final Memory memory;
 	private final lua_State main;
-	private final lua_State kernel;
-	/** The EEPROM's text, for a fresh start; null for a restored one (its request is on the kernel's stack). */
+	private final lua_State firmwareCo;
+	/** The EEPROM's text, for a fresh start; null for a restored one (its request is on the firmware coroutine's stack). */
 	private final String image;
 	/** A pinned request to persist, answered with the state's bytes (or null, when it can't be). */
 	private final AtomicReference<Snapshot> pin = new AtomicReference<>();
@@ -403,11 +403,11 @@ public final class LuaRunner implements Runner {
 		main = com.payonel.lungolua.runtime.Lstate.lua_newstate(memory, com.payonel.lungolua.api.LuaAuxLib.luaL_makeseed(null)); // counted from its first byte
 		prepare(main);
 		lua_pop(main, 1); // (the inverse permanents: only a restore needs them)
-		kernel = lua_newthread(main);
-		lua_setfield(main, LUA_REGISTRYINDEX, new HostString(KERNEL)); // kept from the collector, and found again after a restore
+		firmwareCo = lua_newthread(main);
+		lua_setfield(main, LUA_REGISTRYINDEX, new HostString(FIRMWARE_CO)); // kept from the collector, and found again after a restore
 		byte[] firmware = LuaScripts.read(FIRMWARE).getBytes(StandardCharsets.ISO_8859_1);
-		if (luaL_loadbufferx(kernel, new ByteView(firmware), new HostString("=machine"), new HostString("t")) != LUA_OK) {
-			throw new IllegalStateException("the CPU's firmware doesn't load: " + text(kernel, -1)); // a bug in the mod
+		if (luaL_loadbufferx(firmwareCo, new ByteView(firmware), new HostString("=machine"), new HostString("t")) != LUA_OK) {
+			throw new IllegalStateException("the CPU's firmware doesn't load: " + text(firmwareCo, -1)); // a bug in the mod
 		}
 	}
 
@@ -416,8 +416,8 @@ public final class LuaRunner implements Runner {
 		this.image = null;
 		this.memory = memory;
 		this.main = main;
-		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(KERNEL));
-		this.kernel = lua_tothread(main, -1);
+		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(FIRMWARE_CO));
+		this.firmwareCo = lua_tothread(main, -1);
 		lua_pop(main, 1);
 		lua_getfield(main, LUA_REGISTRYINDEX, new HostString(BASELINE));
 		if (lua_isinteger(main, -1)) {
@@ -573,7 +573,7 @@ public final class LuaRunner implements Runner {
 	 * Server side: saves the computer as it runs: the snapshot asked for as the save started
 	 * ({@link #prepareAll}), or one asked for now (a chunk unloading), taken by the computer's thread
 	 * at its next safe point. It carries out no calls meanwhile: a call queued but not made is a safe
-	 * point itself (the computer's thread takes it back, saves with the request still on the kernel's
+	 * point itself (the computer's thread takes it back, saves with the request still on the firmware coroutine's
 	 * stack, then queues it again), so a save never moves data between the program and its devices,
 	 * and every block's saved copy agrees with the program's. Empty when it can't be saved now (it's
 	 * not running, the state holds what can't be persisted, or it took too long); the computer then
@@ -935,47 +935,47 @@ public final class LuaRunner implements Runner {
 				}
 				int asked;
 				if (reply != null) {
-					luaL_checkstack(kernel, reply.size() + 1, new HostString("too many results"));
+					luaL_checkstack(firmwareCo, reply.size() + 1, new HostString("too many results"));
 					for (Object value : reply) {
-						push(kernel, value);
+						push(firmwareCo, value);
 					}
-					lua_ResumeResult result = lua_resume(kernel, null, reply.size());
+					lua_ResumeResult result = lua_resume(firmwareCo, null, reply.size());
 					if (result.status != LUA_YIELD) {
 						end(result);
 						return;
 					}
 					asked = result.nres;
 				} else {
-					asked = lua_gettop(kernel);
+					asked = lua_gettop(firmwareCo);
 				}
-				// The request stays on the kernel's stack until it's answered: a save now keeps it.
+				// The request stays on the firmware coroutine's stack until it's answered: a save now keeps it.
 				List<Object> said = new ArrayList<>();
-				int top = lua_gettop(kernel);
+				int top = lua_gettop(firmwareCo);
 				for (int i = top - asked + 1; i <= top; i++) {
-					said.add(toJava(kernel, i, 0));
+					said.add(toJava(firmwareCo, i, 0));
 				}
 				Object what = said.isEmpty() ? null : said.getFirst();
 				switch (String.valueOf(what)) {
 					case "slice" -> {
 						honour();
-						lua_settop(kernel, top - asked);
+						lua_settop(firmwareCo, top - asked);
 						reply = List.of();
 					}
 					case "call" -> {
 						honour();
 						Object answer = awaitCall(serve(said));
-						lua_settop(kernel, top - asked);
+						lua_settop(firmwareCo, top - asked);
 						reply = values(answer);
 					}
 					case "wait" -> {
 						honour();
 						reply = awaitWait(waitFor(said)); // the sources ready, and the device data taken
-						lua_settop(kernel, top - asked);
+						lua_settop(firmwareCo, top - asked);
 					}
 					case "baseline" -> {
 						// The firmware's built its sandbox: what's held now (after a full collection) is
 						// the baseline the program's RAM goes on top of. Kept in the registry for saves.
-						lua_settop(kernel, top - asked);
+						lua_settop(firmwareCo, top - asked);
 						lua_gc(main, LUA_GCCOLLECT, 0, 0, 0);
 						memory.measureBaseline();
 						lua_pushinteger(main, memory.baseline());
@@ -984,7 +984,7 @@ public final class LuaRunner implements Runner {
 					}
 					case "clock" -> {
 						// The machine's clock, in ticks (uptime): the firmware makes a wait's deadline from it.
-						lua_settop(kernel, top - asked);
+						lua_settop(firmwareCo, top - asked);
 						reply = List.of(now);
 					}
 					case "halt" -> {
@@ -1028,25 +1028,25 @@ public final class LuaRunner implements Runner {
 		return java.util.Collections.singletonList(answer);
 	}
 
-	/** The kernel returned or failed: the EEPROM's code returned, its text didn't load, or it crashed. */
+	/** The firmware coroutine returned or failed: the EEPROM's code returned, its text didn't load, or it crashed. */
 	private void end(lua_ResumeResult result) {
 		if (result.status == LUA_OK) {
-			int top = lua_gettop(kernel);
-			Object what = result.nres > 0 ? toJava(kernel, top - result.nres + 1, 0) : null;
+			int top = lua_gettop(firmwareCo);
+			Object what = result.nres > 0 ? toJava(firmwareCo, top - result.nres + 1, 0) : null;
 			if ("abort".equals(what)) {
-				Object why = result.nres > 1 ? toJava(kernel, top - result.nres + 2, 0) : "?";
+				Object why = result.nres > 1 ? toJava(firmwareCo, top - result.nres + 2, 0) : "?";
 				finish(State.CRASHED, new Aborted(String.valueOf(why)));
 			} else {
 				finish(State.RETURNED, null);
 			}
 		} else {
-			finish(State.CRASHED, new LuaException(text(kernel, -1)));
+			finish(State.CRASHED, new LuaException(text(firmwareCo, -1)));
 		}
 	}
 
 	/**
 	 * Waits for a wait's answer, parked until there's news ({@link #ring}): the answer, a save asked
-	 * for (honoured here: the kernel is at a safe point), or a stop.
+	 * for (honoured here: the firmware coroutine is at a safe point), or a stop.
 	 */
 	private List<Object> awaitWait(CompletableFuture<List<Object>> answer) {
 		while (true) {
@@ -1111,7 +1111,7 @@ public final class LuaRunner implements Runner {
 	/**
 	 * Waits for a call's answer. A save pinned meanwhile, while the call isn't made yet, is honoured
 	 * here: the call comes back out of the queue (the server thread, saving, isn't taking from it),
-	 * the state is saved with the request still on the kernel's stack, and the call goes back in.
+	 * the state is saved with the request still on the firmware coroutine's stack, and the call goes back in.
 	 */
 	private Object awaitCall(Call call) {
 		while (true) {
