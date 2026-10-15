@@ -605,9 +605,12 @@ scripts/art/error_beep.py` into
   going down the frozen chain, and the call that resumed that coroutine returns as if it had just
   frozen there (resume and thaw give `true` and no values); the stopped coroutine stays frozen
   (`debug.isfrozen` true) until its resumer thaws it. Budgeted code can thaw (it's a resume, on
-  what's left of the slice). Found here: `coroutine.status` says `"running"` for a stopped
-  coroutine, and `coroutine.close` refuses one ("cannot close a running coroutine"), so
-  `isfrozen` is the only test, and mcos drops a stopped process to kill it.
+  what's left of the slice). By design (the engine's spec, 7.6 and 7.7): a frozen coroutine keeps
+  the status it froze with (`coroutine.status` says `"running"` or `"normal"`), so `isfrozen` is the
+  only test; and it's read-only, so `coroutine.close` refuses it. **To kill a stopped coroutine,
+  drop it**: it's collected with everything frozen beneath it, objects' `__gc` still run (the
+  budget group drains them), and no pending `__close` runs (SIGKILL). A frozen chain lives and dies
+  as one: a reference kept to any thread in it (a grandchild in a table) keeps all of it alive.
 - **Cards that work** (user design, 2026-10-13; `device/Cards.make` by kind, the world glue in
   `block/CardWorld`, ticked by the block they're in, a case or a hub; a card works while a running
   computer powers it). Events wait in a bounded queue (32; when full the oldest goes and the next
