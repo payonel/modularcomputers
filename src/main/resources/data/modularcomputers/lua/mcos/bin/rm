@@ -1,0 +1,33 @@
+-- rm [-r] [-f] path...: removes files; -r directories and everything in them; -f no complaint
+-- about what isn't there.
+local fs = require("fs")
+local recursive, force = false, false
+local paths = {}
+for _, word in ipairs(arg) do
+  if string.sub(word, 1, 1) == "-" and #word > 1 then
+    recursive = recursive or string.find(word, "[rR]", 2) ~= nil
+    force = force or string.find(word, "f", 2, true) ~= nil
+  else
+    paths[#paths + 1] = word
+  end
+end
+local status = 0
+for _, path in ipairs(paths) do
+  local st = fs.stat(path)
+  if not st then
+    if not force then
+      io.stderr:write("rm: " .. path .. ": No such file or directory\n")
+      status = 1
+    end
+  elseif st.type == "directory" and not recursive then
+    io.stderr:write("rm: " .. path .. ": Is a directory\n")
+    status = 1
+  else
+    local ok, why = fs.remove(path, recursive)
+    if not ok then
+      io.stderr:write("rm: " .. why .. "\n")
+      status = 1
+    end
+  end
+end
+return status

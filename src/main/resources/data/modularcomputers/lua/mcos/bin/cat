@@ -1,0 +1,25 @@
+-- cat [file...]: the files' contents, one after another, to stdout; stdin with none (or "-").
+local status = 0
+local files = #arg > 0 and arg or {"-"}
+for _, path in ipairs(files) do
+  local file, why = io.stdin, nil
+  if path ~= "-" then
+    file, why = io.open(path, "r")
+  end
+  if not file then
+    io.stderr:write("cat: " .. why .. "\n")
+    status = 1
+  else
+    while true do
+      local data = file:read(4096)
+      if not data then
+        break
+      end
+      io.write(data)
+    end
+    if file ~= io.stdin then
+      file:close()
+    end
+  end
+end
+return status

@@ -540,64 +540,6 @@ class LuaRunnerTest {
 		assertThat(row(0)).isEqualTo("booted from sata:1");
 	}
 
-	/** Boots mcos (Lua) from a disk with its files, through the bootloader: tests check what it does, never what it says. */
-	private LuaRunner bootMcos(java.nio.file.Path world) throws Exception {
-		java.nio.file.Path folder = world.resolve("mcos-disk");
-		com.payonel.modularcomputers.machine.LuaScripts.copyTree("mcos", folder);
-		Map<String, Device> devices = new LinkedHashMap<>();
-		devices.put("id:screen", screen);
-		devices.put("sata:0", new com.payonel.modularcomputers.device.Disk(com.payonel.modularcomputers.device.DiskTier.TIER_1, folder));
-		machine.setDevices(devices);
-		boot(com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/boot"));
-		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
-		untilIdle(runner);
-		return runner;
-	}
-
-	/** Until the program has read every key and waits for more (still running). */
-	private void untilIdle(LuaRunner runner) {
-		settle(() -> machine.runner().isEmpty() || (!screen.hasKeys() && runner.state() == Runner.State.WAITING));
-		assertThat(machine.runner()).as("still running").isPresent();
-	}
-
-	private void type(String keys) {
-		for (int i = 0; i < keys.length(); i++) {
-			screen.press(keys.substring(i, i + 1));
-		}
-	}
-
-	@Test
-	void mcosHaltsWhenToldTo(@org.junit.jupiter.api.io.TempDir java.nio.file.Path world) throws Exception {
-		bootMcos(world);
-		type("halt\r");
-		untilHalted();
-		assertThat(row(0)).doesNotStartWith("ABRT");
-	}
-
-	@Test
-	void ctrlCEndsTheShellAndTheKernelStartsAnother(@org.junit.jupiter.api.io.TempDir java.nio.file.Path world) throws Exception {
-		LuaRunner runner = bootMcos(world);
-		type("hal\u0003"); // what was typed is dropped with the ^C
-		untilIdle(runner);
-		type("t\r"); // not "halt": the line was flushed
-		untilIdle(runner);
-		type("halt\r"); // a new shell reads it
-		untilHalted();
-		assertThat(row(0)).doesNotStartWith("ABRT");
-	}
-
-	@Test
-	void theShellEndingIsStartedAgain(@org.junit.jupiter.api.io.TempDir java.nio.file.Path world) throws Exception {
-		LuaRunner runner = bootMcos(world);
-		type("poweroff\r");
-		untilIdle(runner);
-		type("\u0004"); // end of file ends it too
-		untilIdle(runner);
-		type("halx\u007ft\r"); // Backspace erases
-		untilHalted();
-		assertThat(row(0)).doesNotStartWith("ABRT");
-	}
-
 	@Test
 	void theBootloaderWithNoBootableDiskSaysSo() {
 		boot(com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/boot"));
@@ -869,6 +811,9 @@ class LuaRunnerTest {
 			local child = coroutine.create(function() local n = 0 while true do n = n + 1 end end)
 			board.addstop(child)
 			coroutine.resume(child) -- busy forever: only a stop brings the scheduler back
+			while ring.head == ring.tail do
+			  debug.thaw(child) -- (the timer stops it too: on until the key's in the ring)
+			end
 			local typed = table.concat(take(ring))
 			board.invoke("console", "write", tostring(debug.isfrozen(child)) .. " " .. typed)
 			board.halt()
@@ -876,6 +821,50 @@ class LuaRunnerTest {
 		typeAt(200, Map.of(10, "k"));
 		untilHalted();
 		assertThat(row(0)).as("the child stopped where it was; the key in the ring").isEqualTo("true k");
+	}
+
+	@Test
+	void aTrapStopsAtTheNearestStopAndItsThawGoesOn() {
+		boot("""
+			local child = coroutine.create(function()
+			  local inner = coroutine.wrap(function()
+			    board.trap() -- (inside a coroutine of the child's own: the whole chain stops)
+			    return "back"
+			  end)
+			  return inner()
+			end)
+			board.addstop(child)
+			local ok, value = coroutine.resume(child)
+			local first = tostring(ok) .. " " .. tostring(value) .. " " .. tostring(debug.isfrozen(child))
+			local again, result = debug.thaw(child)
+			board.trap() -- no stop in the chain: returns at once
+			board.invoke("console", "write", first .. " | " .. tostring(again) .. " " .. tostring(result))
+			board.halt()
+			""");
+		untilHalted();
+		assertThat(row(0)).as("the resume returned as if frozen; the thaw ran on to the end").isEqualTo("true nil true | true back");
+	}
+
+	@Test
+	void aSpentSliceStopsABusyChild() {
+		boot("""
+			local child = coroutine.create(function()
+			  local n = 0
+			  for i = 1, 3000000 do n = n + 1 end -- many slices
+			  return n
+			end)
+			board.addstop(child)
+			local stops = 0
+			local ok, n = coroutine.resume(child)
+			while debug.isfrozen(child) do
+			  stops = stops + 1
+			  ok, n = debug.thaw(child)
+			end
+			board.invoke("console", "write", (stops > 1 and "stopped" or "ran through") .. " " .. tostring(n))
+			board.halt()
+			""");
+		untilHalted();
+		assertThat(row(0)).as("the timer: its scheduler got control back each slice").isEqualTo("stopped 3000000");
 	}
 
 	@Test

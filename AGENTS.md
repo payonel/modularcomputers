@@ -4,7 +4,7 @@ This file is the full context for any agent session working on this repo. `CLAUD
 (Claude Code reads `CLAUDE.md`, not `AGENTS.md`; other agent tools read `AGENTS.md`). Keep it
 current: when a decision is made or a gotcha is found, record it here.
 
-Last updated: 2026-10-15 (LungoLua 1.1: thaw with stops; new input stops a busy process, and its scheduler hears at once).
+Last updated: 2026-10-15 (mcos: kernel and user space, syscalls by trap, preemption, a VFS with mounts, /bin and a shell).
 
 ---
 
@@ -445,7 +445,7 @@ scripts/art/error_beep.py` into
     - A (Lua) CPU and a new EEPROM: its **bootloader** (`lua/eeprom/boot.lua`, user, 2026-10-13), like a
       BIOS, boots the first disk in bus order with `/init.lua`, handing it the disk's address;
       with none, `boot: no bootable disk` and halt. A crafted **tier 1 disk comes with mcos**
-      (Lua), so a first computer boots an OS with no trouble (user).
+      (Lua), so a first computer boots an OS with no trouble (user; it now needs a 512 KiB stick: see "mcos in Lua").
     - The Java CPU and the Java EEPROM: **mcos** (`Mcos`; user's name, 2026-10-12: the Modular Computers OS, Java
       version, a Lua version to follow), which the user keeps changing
       to try things out). Today it's **a tiny OS and shell, after OpenOS and busybox, all in that
@@ -630,43 +630,84 @@ scripts/art/error_beep.py` into
     drops or blocks; `setRange(1..32)` costs power each tick, `1 + range`. Entities are looked
     at every 5 ticks; block changes come from a hook on the server's block updates
     (`mixin/ServerLevelBlockUpdates`, the mod's first mixin: Fabric has no block-change event).
-- **mcos in Lua** (`lua/mcos/`, the files a tier 1 disk comes with; user design, 2026-10-13): a
-  kernel, a tty and one shell process, after Linux, not OpenOS (**no `term`, no OpenOS-style
-  libraries: programs use Lua's own `io`**; no `/bin`, no PATH, no file commands yet).
-  - `init.lua`, the kernel: the bootloader hands it the boot disk's address and a command line
-    (`console=<address>` picks the input device its tty is on; the board's `console` by default;
-    the bootloader passes none yet). It loads its libraries from `/lib`, starts `/sh.lua` (by its
-    path, as Linux's `init=`) as a process on its tty, and idles: when no process can run, it waits
-    for the tty's device (the CPU's HLT). **It never reads a device: the tty registers a ring for
-    its device, and what's typed arrives there by itself.** Drivers register **interrupt
-    handlers** with the kernel (the tty's runs its line discipline on the ring, `tty:pump`); the
-    kernel runs them when it wakes from idling, at each pass over its processes, and **when a
-    running process is stopped for new input**: every process is one of the firmware's stops
-    (`board.addstop`), so new input returns the kernel's resume of it at once, the handlers run (a
-    ^C marks SIGINT), and the kernel thaws it to go on, or drops it if a signal ends it (as SIGKILL
-    runs none of its code). Processes only read cooked lines. When the
-    shell ends (or dies of a signal) it starts another, giving up after 10 starts in 5 seconds
-    (sysvinit's "respawning too fast").
-  - **Processes** are coroutines, each with its own globals and **the tty it inherited** from its
-    parent (the kernel's, for the shell); a read with nothing ready yields to the kernel, which
-    resumes it when its tty has input. `lib/io.lua` gives each one Lua's `io` (`io.read` with
-    `l`, `L`, `a`, n; `io.write`; `io.stdin`/`stdout`/`stderr`) over that tty, so a program never
-    knows which device it's on: the command line can move it to another without changing it.
-  - `lib/tty.lua`, the tty: its input buffer and termios flags belong to the device, whatever
-    process runs (typeahead waits there). Its line discipline: canonical mode (Backspace and ^H
-    erase, a UTF-8 character at a time with `iutf8`; ^U the line; Enter (CR, with `icrnl`) ends
-    a line; ^D the line so far, or end of file at its start), echo (control characters as ^X,
-    buffered while a read's bytes are handled and written once, as n_tty's echo buffer,
+- **mcos in Lua** (`lua/mcos/`, the files a tier 1 disk comes with; user design, 2026-10-13; the
+  filesystem, processes and shell built 2026-10-15 while the user was away, for them to review: see
+  `docs/PLAN.md`, "mcos"). After Linux, not OpenOS (**no `term`, no OpenOS-style libraries: programs
+  use Lua's own `io`, `os` and `require`**). **Kernel and user space are kept apart**:
+  - **The kernel** (`init.lua`, its parts in `/lib/modules/`) owns every resource (open files,
+    pipes, ttys, mounts, processes) and runs only on its own coroutine. The bootloader hands it the
+    boot disk's address and a command line (`console=<address>`: the device its console tty is on,
+    the board's `console` by default; `init=<path>`: what it runs there, `/bin/sh` by default).
+    It mounts the boot disk at `/`, `devfs` at `/dev` (`console`, `tty`, `null`, `zero`), a `tmpfs`
+    (its memory) at `/tmp`, and every other hfs disk on the bus at `/mnt/<kind>/<name>` (`sata:1` at
+    `/mnt/sata/1`), mounting and unmounting as the bus changes (noticed when it idles; files open on
+    a disk that left fail with EIO). It starts init as a process group of its own, the console's
+    foreground, and starts it again when it ends (giving up after 10 starts in 5 seconds).
+  - **Processes** are coroutines, each with its own globals (Lua's base library and libraries,
+    copied; **no `board`**: the hardware is the kernel's) and `sys`, its syscalls. **A syscall
+    traps**: it leaves its request and calls `board.trap()`, which stops the process where it is and
+    returns to the kernel's resume of it (every process is one of the firmware's stops); the kernel
+    serves it on its own stack and thaws the process with the answer, or leaves it blocked (a read
+    with nothing typed, a full pipe, `waitpid`, `sleep`) and asks again each pass. A process is
+    also stopped by new input (the kernel runs its interrupt handlers: the tty's line discipline,
+    where ^C signals the foreground group) and when its slice is spent (the timer), so processes
+    are preempted, round robin. Since a process is only ever stopped in its own code, **the kernel
+    can end it at any time by dropping it** (SIGKILL: none of its code runs), and closes what it
+    held, as Linux's `exit_files` (a disk file's writes are committed at close, so what the process
+    had written to the kernel reaches the disk; what its own stdio buffered is lost, as in Linux).
+    Tables a process passes in (argv, spawn options, termios flags) are copied raw (`fromuser`,
+    `copy_from_user`), so none of their metamethods runs on the kernel's stack. Programs must not
+    make syscalls from `__gc` (a finalizer can run while another process or the kernel runs).
+  - **Syscalls** (Lua-shaped: errors as `nil, message, errno name`): `open` (fopen modes; a
+    directory opens for `getdents`), `read`, `write` (all of it, waiting for room), `lseek`, `close`,
+    `dup`, `dup2`, `pipe`, `ioctl` (`TCGETS`/`TCSETS` termios flags, `TIOCGWINSZ`, `TIOCGPGRP`/
+    `TIOCSPGRP`), `isatty`, `stat`, `mkdir`, `unlink`, `rmdir`, `rename` (EXDEV across mounts),
+    `chdir`, `getcwd`, `mount`, `umount`, `mounts`, `statfs`, `spawn` (posix_spawn: path, argv, opts
+    `fds`/`env`/`ignore`/`pgid`; fds 0-2 are inherited, others are close-on-exec), `waitpid` (luaposix's
+    `pid, "exited"|"killed", status|signal`; `"nohang"`), `exit`, `getpid`, `getppid`, `getpgid`,
+    `setpgid`, `kill` (a negative pid is a group), `signal` (a handler, `"ignore"` or `"default"`;
+    handlers run in the process when a syscall returns, a blocked one returning EINTR; ignored
+    signals stay ignored across spawn, handlers don't), `environ`, `processes`, `uptime`, `sleep`,
+    `reboot` (`"halt"`; `"poweroff"` halts too: the board has no soft-off, as Linux's "System
+    halted"). Signals: SIGHUP, SIGINT, SIGKILL, SIGPIPE, SIGTERM (end the process by default),
+    SIGCHLD (ignored).
+  - **Shared program images** (as the page cache shares a program's text): the kernel compiles a
+    Lua file once, as `function(_ENV, ...) <its text> end`, and every process running it calls that
+    with its own globals (`sys.image(path)`; the interpreter's `loadfile` and `require` use it), so
+    compiled code, most of a program's memory, is in memory once; kept while a process holds it,
+    compiled again when the file changes. **Memory (measured 2026-10-15): the kernel takes about 194
+    KiB above the firmware's baseline, the shell about 120, each small process about 16: mcos needs
+    a 512 KiB stick; one tier 1 stick (256 KiB) aborts the boot (`not enough memory`).** Open for
+    the user (`docs/PLAN.md`).
+  - **User space**: the kernel runs every program through `/bin/lua` (as if each began with
+    `#!/bin/lua`), the interpreter, which opens the rest of Lua's standard library over `sys`: `io`
+    (`lib/io.lua`, stdio in the process: buffered files, a tty's output line buffered, stderr not;
+    reading flushes stdout; `io.popen` through `sh -c`), `os` (`getenv`, `setenv`, `exit`, `remove`,
+    `rename`, `time` and `clock` as seconds since boot: no RTC, `tmpname` in `/tmp`), `print`,
+    `require`/`package` (`/lib/?.lua`...), `loadfile`, `dofile`, `arg`; `require("sys")` gives the
+    syscalls, `require("fs")` conveniences (paths, listing, mkdir -p, recursive remove and copy, move
+    across disks, glob). With no script it's a REPL. A program's exit status is what it returns (an
+    integer), 1 if it fails.
+  - **`/bin/sh`**: runs programs by path or from `PATH` (`/bin`); quotes, `\`, `$NAME`, `${NAME}`,
+    `$?` and `$$` (expanded as each command runs), `*`/`?` globs, `|`, `&&`, `||`, `;`, `&`
+    (background, ignoring SIGINT, as sh without job control), `<`, `>`, `>>`, `n>`, `n>&m`; builtins
+    `cd`, `pwd`, `exit`, `export`, `unset`; `sh -c` and `sh script`. Interactive on a tty, it catches
+    SIGINT: ^C drops the line (the tty flushes it), ends the foreground command (same group), and the
+    shell prompts again. **`/bin`**: `cat cp df echo halt kill ls lua mkdir mount mv poweroff ps rm
+    rmdir sh sleep touch umount`.
+  - `lib/modules/tty.lua`, the tty: its input buffer and termios flags belong to the device,
+    whatever process runs (typeahead waits there). **It never reads a device: it registers a ring
+    for its device, and what's typed arrives there by itself.** Its line discipline: canonical mode
+    (Backspace and ^H erase, a UTF-8 character at a time with `iutf8`; ^U the line; Enter (CR, with
+    `icrnl`) ends a line; ^D the line so far, or end of file at its start), echo (control characters
+    as ^X, buffered while a read's bytes are handled and written once, as n_tty's echo buffer,
     `echoctl`), and `isig`: **^C flushes the input, echoes `^C` and sends SIGINT to the tty's
-    foreground process**, which ends it (no handlers yet). Output goes through `onlcr`.
-  - `sh.lua`: prints `$ `, reads a line and writes it back; `halt` halts the computer; `poweroff`
-    or an end of file ends the shell (the kernel starts another: the board has no power-off yet).
-  - **Ctrl+C ends a busy process** too: the stop brings the kernel back as the key arrives. A busy
-    process that makes no board calls gets new input at the server's next turn for the computer
-    (each tick: within 50 ms); a turn asked at every key typed at a running computer was tried and
-    made a burst of typing 8 times slower (a turn a key while the shell's echo was answered).
-  - Tests check what it does (it halts on `halt`; after ^C, `poweroff`, ^D the computer still
-    runs), never what it says.
+    foreground process group**. Output goes through `onlcr`. Raw mode (`icanon` off) by `TCSETS`.
+  - Tests (`runtime/McosTest`) bring their own programs onto the disk and type commands; they check
+    files on the disks and whether the computer halts or runs, never what mcos says.
+  - **Gotcha (LungoLua 1.1.6565): a lowercase pattern class matches its own letter** (`"%s"` and
+    `"[%s]"` match `"s"`); reported to the lua thread 2026-10-15, fixed in its `135bc719`, not yet
+    published. mcos's Lua spells classes as explicit ranges (`[0-9]`, `[ \t\r\n\v\f]`) until then.
 - **Lua scripts** (user design, 2026-10-13; `machine/LuaScripts`): the Lua that comes with the
   mod (firmware, mcos's Lua version, utilities; to be handed out by traders, loot chests and special
   crafting) lives as plain UTF-8 `.lua` files under `src/main/resources/data/modularcomputers/lua/`
@@ -832,7 +873,10 @@ scripts/art/error_beep.py` into
     new input at once, as a scheduler names its children. When a resume delivers data into a ring
     the program had emptied (so a stop isn't repeated until it has taken what came before), the
     firmware thaws user code with those stops (`debug.thaw(user_co, stops)`); otherwise a thaw is
-    plain. User code never asks for input. Rule for programs: after any resume or thaw of a child,
+    plain. User code never asks for input. **Traps and the timer** (2026-10-15): `board.trap()` is
+    the syscall instruction: it freezes user code and thaws it with the stops, answered in the
+    firmware with no host call, on what was left of the slice; and a spent slice's thaw stops too
+    (the timer interrupt), so a scheduler gets control back from a busy child each slice. Rule for programs: after any resume or thaw of a child,
     check `debug.isfrozen(child)`, and thaw a frozen child instead of resuming it.
   - **Memory** (user, 2026-10-13): the VM's memory is counted by LungoLua's allocator hook
     (`LuaRunner.Memory`, a `lua_Alloc`: `permit(osize, nsize, tag)` for every allocation, growth

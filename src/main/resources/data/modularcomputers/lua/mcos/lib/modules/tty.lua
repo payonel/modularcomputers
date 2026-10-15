@@ -3,7 +3,8 @@
 -- What the device sends arrives by itself in the tty's ring (board.ring: the firmware fills it, as
 -- a device fills its driver's ring by DMA; Linux's flip buffer), with no call; the line discipline
 -- (pump, receive: the kernel runs it as the interrupt handler for the device) edits, echoes and
--- signals, and processes read what's ready (take). Output goes to the device after the tty's output processing (onlcr).
+-- signals, and the kernel's read(2) on it takes what's ready (read). Output goes to the device after
+-- the tty's output processing (onlcr).
 local tty = {}
 tty.__index = tty
 
@@ -23,7 +24,7 @@ local EOF = {}
 tty.SIGINT = "SIGINT"
 
 -- A tty on 'device'. 'signal(tty, name)' is the kernel's: it delivers a signal to the tty's
--- foreground process.
+-- foreground process group.
 function tty.new(device, signal)
   return setmetatable({
     device = device,
@@ -33,7 +34,7 @@ function tty.new(device, signal)
     flags = {icanon = true, echo = true, echoe = true, echoctl = true, isig = true, icrnl = true, onlcr = true, iutf8 = true},
     line = {}, -- the line being typed (canonical mode), a byte each
     ready = {}, -- what processes can read: whole lines and EOF marks (canonical), or bytes as typed
-    foreground = nil, -- the process its signals go to
+    foreground = nil, -- the process group its signals go to (tcsetpgrp)
     echoes = {}, -- echo not written yet
   }, tty)
 end
@@ -137,24 +138,67 @@ function tty:pump()
   end
 end
 
--- Whether a read would get something.
-function tty:readable()
-  return #self.ready > 0
-end
-
--- A read: the next line (canonical mode), or every byte typed; "" at an end of file; nil when
--- nothing is ready.
-function tty:take()
-  if #self.ready == 0 then
+-- A read of at most n bytes: the next line (canonical mode; what doesn't fit stays for the next
+-- read), or every byte typed; "" at an end of file; nil when nothing is ready (the reader blocks).
+function tty:read(n)
+  local ready = self.ready
+  if #ready == 0 then
     return nil
   end
   if self.flags.icanon then
-    local chunk = table.remove(self.ready, 1)
-    return chunk == EOF and "" or chunk
+    local chunk = ready[1]
+    if chunk == EOF then
+      table.remove(ready, 1)
+      return ""
+    elseif #chunk <= n then
+      table.remove(ready, 1)
+      return chunk
+    end
+    ready[1] = string.sub(chunk, n + 1)
+    return string.sub(chunk, 1, n)
   end
-  local bytes = table.concat(self.ready)
+  local bytes = table.concat(ready)
   self.ready = {}
+  if #bytes > n then
+    self.ready[1] = string.sub(bytes, n + 1)
+    bytes = string.sub(bytes, 1, n)
+  end
   return bytes
+end
+
+-- termios (tcgetattr, tcsetattr): its flags, as a copy; and set from one (unknown names are ignored).
+function tty:getattr()
+  local copy = {}
+  for name, on in pairs(self.flags) do
+    copy[name] = on
+  end
+  return copy
+end
+
+function tty:setattr(flags)
+  for name in pairs(self.flags) do
+    if flags[name] ~= nil then
+      self.flags[name] = flags[name] and true or false
+    end
+  end
+  if self.flags.icanon and #self.line == 0 then
+    return
+  end
+  if not self.flags.icanon and #self.line > 0 then
+    -- leaving canonical mode: what's been typed of a line is input now
+    for i = 1, #self.line do
+      self.ready[#self.ready + 1] = self.line[i]
+    end
+    self.line = {}
+  end
+end
+
+-- Its window size (TIOCGWINSZ): the device's.
+function tty:size()
+  local ok, width, height = board.invoke(self.device, "getSize")
+  if ok then
+    return width, height
+  end
 end
 
 return tty

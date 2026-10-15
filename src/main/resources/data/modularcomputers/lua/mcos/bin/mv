@@ -1,0 +1,23 @@
+-- mv from... to: moves (renames) files and directories; into 'to' if it's a directory. Across
+-- filesystems it copies and removes.
+local fs = require("fs")
+if #arg < 2 then
+  io.stderr:write("usage: mv from... to\n")
+  return 1
+end
+local target = arg[#arg]
+local into = fs.isdir(target)
+if #arg > 2 and not into then
+  io.stderr:write("mv: " .. target .. ": Not a directory\n")
+  return 1
+end
+local status = 0
+for i = 1, #arg - 1 do
+  local to = into and fs.join(target, fs.name(arg[i])) or target
+  local ok, why = fs.move(arg[i], to)
+  if not ok then
+    io.stderr:write("mv: " .. why .. "\n")
+    status = 1
+  end
+end
+return status

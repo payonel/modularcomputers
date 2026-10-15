@@ -1,0 +1,7 @@
+-- ps: the processes.
+local sys = require("sys")
+io.write(string.format("%5s %5s %5s %-8s %s\n", "PID", "PPID", "PGID", "STATE", "COMMAND"))
+for _, p in ipairs(sys.processes()) do
+  io.write(string.format("%5d %5d %5d %-8s %s\n", p.pid, p.ppid, p.pgid, p.state,
+    table.concat({p.path, table.unpack(p.argv)}, " ")))
+end

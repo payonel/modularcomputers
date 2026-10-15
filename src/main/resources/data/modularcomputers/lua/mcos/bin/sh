@@ -1,0 +1,488 @@
+-- sh: the shell, a small POSIX-style one. Commands are run by path ("/x/prog", "./prog") or found
+-- in PATH; words may be quoted ('...', "...", \x), expand $NAME, ${NAME} and $? and glob * and ?;
+-- commands join with |, &&, ||, ; and & (in the background, ignoring ^C, as without job control);
+-- redirections: < file, > file, >> file, n> file, n>> file, n>&m. Builtins: cd, pwd, exit, export,
+-- unset. Interactive on a tty (a prompt; ^C drops the line and kills the foreground command, not the
+-- shell); "sh -c command" and "sh script" run those.
+local sys = require("sys")
+local fs = require("fs")
+
+local PS1 = "$ "
+
+local status = 0 -- $?
+local interrupted = false
+local args = table.pack(...)
+
+-- ---- words --------------------------------------------------------------------------------------
+
+local function expand(name)
+  if name == "?" then
+    return tostring(status)
+  elseif name == "$" then
+    return tostring(sys.getpid())
+  end
+  return os.getenv(name) or ""
+end
+
+-- Splits a line into tokens: words, {parts = its text and its variables ({var = name}), expanded
+-- as each command runs (so $? is the last command's), glob = whether unquoted * or ? are in it},
+-- and {op = "|" ...}; nil and a message on a syntax error.
+local function tokenize(line)
+  local tokens = {}
+  local i, n = 1, #line
+  local word, glob, inword = {}, false, false
+  local function finish()
+    if inword then
+      tokens[#tokens + 1] = {parts = word, glob = glob}
+    end
+    word, glob, inword = {}, false, false
+  end
+  local function variable(at)
+    local name = string.match(line, "^{([A-Za-z0-9_]+)}", at)
+    if name then
+      return {var = name}, at + #name + 2
+    end
+    name = string.match(line, "^[A-Za-z0-9_]+", at) or string.match(line, "^[%?%$]", at)
+    if name then
+      return {var = name}, at + #name
+    end
+    return "$", at
+  end
+  while i <= n do
+    local c = string.sub(line, i, i)
+    if c == "\\" then
+      inword = true
+      word[#word + 1] = string.sub(line, i + 1, i + 1)
+      i = i + 2
+    elseif c == "'" then
+      local close = string.find(line, "'", i + 1, true)
+      if not close then
+        return nil, "unterminated quote"
+      end
+      inword = true
+      word[#word + 1] = string.sub(line, i + 1, close - 1)
+      i = close + 1
+    elseif c == '"' then
+      inword = true
+      i = i + 1
+      while true do
+        if i > n then
+          return nil, "unterminated quote"
+        end
+        local d = string.sub(line, i, i)
+        if d == '"' then
+          i = i + 1
+          break
+        elseif d == "\\" and string.find(string.sub(line, i + 1, i + 1), '[\\"$]') then
+          word[#word + 1] = string.sub(line, i + 1, i + 1)
+          i = i + 2
+        elseif d == "$" then
+          local value
+          value, i = variable(i + 1)
+          word[#word + 1] = value
+        else
+          word[#word + 1] = d
+          i = i + 1
+        end
+      end
+    elseif c == "$" then
+      inword = true
+      local value
+      value, i = variable(i + 1)
+      word[#word + 1] = value
+    elseif string.find(c, "[ \t\r\n\v\f]") then
+      finish()
+      i = i + 1
+    elseif c == "#" and not inword then
+      break
+    else
+      local fd, op = string.match(line, "^([0-9]?)(>>)", i)
+      if not op then
+        fd, op = string.match(line, "^([0-9]?)(>&[0-9])", i)
+      end
+      if not op then
+        fd, op = string.match(line, "^([0-9]?)([<>])", i)
+      end
+      if op and (fd == "" or not inword) then
+        finish()
+        tokens[#tokens + 1] = {op = op, fd = fd ~= "" and tonumber(fd) or nil}
+        i = i + #fd + #op
+      else
+        op = string.match(line, "^&&", i) or string.match(line, "^||", i) or string.match(line, "^[|;&]", i)
+        if op then
+          finish()
+          tokens[#tokens + 1] = {op = op}
+          i = i + #op
+        else
+          inword = true
+          if c == "*" or c == "?" then
+            glob = true
+          end
+          word[#word + 1] = c
+          i = i + 1
+        end
+      end
+    end
+  end
+  finish()
+  return tokens
+end
+
+-- A word's text, its variables expanded now.
+local function text(token)
+  local parts = {}
+  for i, part in ipairs(token.parts) do
+    parts[i] = type(part) == "table" and expand(part.var) or part
+  end
+  return table.concat(parts)
+end
+
+-- A command's words as it runs: expanded, and a word with * or ? as the paths matching it, sorted
+-- (the word itself when none do).
+local function expandwords(tokens)
+  local words = {}
+  for _, token in ipairs(tokens) do
+    local word = text(token)
+    local matches = token.glob and fs.glob(word) or {}
+    if #matches == 0 then
+      words[#words + 1] = word
+    end
+    for _, match in ipairs(matches) do
+      words[#words + 1] = match
+    end
+  end
+  return words
+end
+
+-- ---- parsing ------------------------------------------------------------------------------------
+-- A line is a list of and-or lists (each ended by ; or &), each of pipelines joined by && or ||,
+-- each of commands joined by |; a command is its words and redirections.
+
+local function parse(tokens)
+  local lists, i = {}, 1
+  local function command()
+    local cmd = {words = {}, redirects = {}}
+    while tokens[i] do
+      local t = tokens[i]
+      if t.parts then
+        cmd.words[#cmd.words + 1] = t
+        i = i + 1
+      elseif t.op == "<" or t.op == ">" or t.op == ">>" then
+        local target = tokens[i + 1]
+        if not (target and target.parts) then
+          return nil, "syntax error near '" .. t.op .. "'"
+        end
+        cmd.redirects[#cmd.redirects + 1] = {fd = t.fd or (t.op == "<" and 0 or 1), op = t.op, path = target}
+        i = i + 2
+      elseif string.sub(t.op, 1, 2) == ">&" then
+        cmd.redirects[#cmd.redirects + 1] = {fd = t.fd or 1, op = ">&", to = tonumber(string.sub(t.op, 3))}
+        i = i + 1
+      else
+        break
+      end
+    end
+    if #cmd.words == 0 and #cmd.redirects == 0 then
+      return nil, "syntax error" .. (tokens[i] and " near '" .. tokens[i].op .. "'" or "")
+    end
+    return cmd
+  end
+  while tokens[i] do
+    local list = {pipelines = {}}
+    while true do
+      local pipeline = {commands = {}}
+      while true do
+        local cmd, why = command()
+        if not cmd then
+          return nil, why
+        end
+        pipeline.commands[#pipeline.commands + 1] = cmd
+        if tokens[i] and tokens[i].op == "|" then
+          i = i + 1
+        else
+          break
+        end
+      end
+      list.pipelines[#list.pipelines + 1] = pipeline
+      local t = tokens[i]
+      if t and (t.op == "&&" or t.op == "||") then
+        pipeline.next = t.op
+        i = i + 1
+      else
+        break
+      end
+    end
+    local t = tokens[i]
+    if t and (t.op == ";" or t.op == "&") then
+      list.background = t.op == "&"
+      i = i + 1
+    elseif t then
+      return nil, "syntax error near '" .. t.op .. "'"
+    end
+    lists[#lists + 1] = list
+  end
+  return lists
+end
+
+-- ---- running ------------------------------------------------------------------------------------
+
+local function say(text)
+  io.stderr:write("sh: " .. text .. "\n")
+end
+
+-- Where a command's program is: its path if it names one, else the first in PATH.
+local function locate(name)
+  if string.find(name, "/", 1, true) then
+    return name
+  end
+  for dir in string.gmatch(os.getenv("PATH") or "", "[^:]+") do
+    local file = fs.join(dir, name)
+    local st = sys.stat(file)
+    if st and st.type ~= "directory" then
+      return file
+    end
+  end
+end
+
+local builtins = {}
+
+function builtins.cd(words, out)
+  local target = words[2] or os.getenv("HOME") or "/"
+  local ok, why = sys.chdir(target)
+  if not ok then
+    say("cd: " .. target .. ": " .. why)
+    return 1
+  end
+  os.setenv("PWD", sys.getcwd())
+  return 0
+end
+
+function builtins.pwd(words, out)
+  sys.write(out, sys.getcwd() .. "\n")
+  return 0
+end
+
+function builtins.exit(words)
+  io.flushall()
+  sys.exit(tonumber(words[2]) or status)
+end
+
+function builtins.export(words, out)
+  for i = 2, #words do
+    local name, value = string.match(words[i], "^([A-Za-z0-9_]+)=(.*)$")
+    if name then
+      os.setenv(name, value)
+    end
+  end
+  return 0
+end
+
+function builtins.unset(words)
+  for i = 2, #words do
+    os.setenv(words[i], nil)
+  end
+  return 0
+end
+
+-- The fds a command's redirections give it ({[child fd] = an fd of ours}), and those to close
+-- after it's started; nil and a message when a file won't open.
+local function redirect(cmd, fds, opened)
+  for _, r in ipairs(cmd.redirects) do
+    if r.op == ">&" then
+      fds[r.fd] = fds[r.to] or r.to
+    else
+      local mode = r.op == "<" and "r" or r.op == ">>" and "a" or "w"
+      local path = text(r.path)
+      local fd, why = sys.open(path, mode)
+      if not fd then
+        return nil, path .. ": " .. why
+      end
+      opened[#opened + 1] = fd
+      fds[r.fd] = fd
+    end
+  end
+  return true
+end
+
+-- How a child's end reads as a status: its code, or 128 and its signal's number.
+local function statusof(how, value)
+  if how == "exited" then
+    return value
+  end
+  return 128 + (sys.SIGNALS[value] or 0)
+end
+
+local function waitfor(pid)
+  while true do
+    local got, how, value = sys.waitpid(pid)
+    if got then
+      if how == "killed" and value == "SIGINT" then
+        io.stdout:write("\n") -- after the ^C, as a shell does when its job dies of one
+        io.stdout:flush()
+      end
+      return statusof(how, value)
+    elseif value ~= "EINTR" then
+      return 1
+    end
+    -- interrupted (our own ^C): the child gets it too; wait on
+  end
+end
+
+local function runpipeline(pipeline, background)
+  local commands = pipeline.commands
+  for _, cmd in ipairs(commands) do
+    cmd.argv = expandwords(cmd.words)
+  end
+  -- a lone builtin runs in the shell itself
+  local first = commands[1]
+  if #commands == 1 and first.argv[1] and builtins[first.argv[1]] then
+    local fds, opened = {}, {}
+    local ok, why = redirect(first, fds, opened)
+    local result = 1
+    if ok then
+      io.stdout:flush()
+      result = builtins[first.argv[1]](first.argv, fds[1] or 1)
+    else
+      say(why)
+    end
+    for _, fd in ipairs(opened) do
+      sys.close(fd)
+    end
+    return result
+  end
+  local pids, opened = {}, {}
+  local input
+  local result = 0
+  io.stdout:flush()
+  for index, cmd in ipairs(commands) do
+    local fds = {}
+    if input then
+      fds[0] = input
+    end
+    local r, w
+    if index < #commands then
+      r, w = sys.pipe()
+      fds[1] = w
+    end
+    local ok, why = redirect(cmd, fds, opened)
+    if not ok then
+      say(why)
+      result = 1
+    elseif #cmd.argv > 0 then
+      local name = cmd.argv[1]
+      local program = locate(name)
+      local argv = {table.unpack(cmd.argv, 2)}
+      local pid
+      if program then
+        pid, why = sys.spawn(program, argv, {fds = fds, env = io.environ(), ignore = background and {"SIGINT"} or nil})
+      end
+      if pid then
+        pids[#pids + 1] = pid
+      else
+        say(name .. ": " .. (program and why or "not found"))
+        result = 127
+      end
+    end
+    if input then
+      sys.close(input)
+    end
+    if w then
+      sys.close(w)
+    end
+    input = r
+  end
+  for _, fd in ipairs(opened) do
+    sys.close(fd)
+  end
+  if background then
+    for _, pid in ipairs(pids) do
+      io.stderr:write("[" .. pid .. "]\n")
+    end
+    return 0
+  end
+  for i, pid in ipairs(pids) do
+    local s = waitfor(pid)
+    if i == #pids and result == 0 then
+      result = s
+    end
+  end
+  return result
+end
+
+local function runline(line)
+  local tokens, why = tokenize(line)
+  if not tokens then
+    say(why)
+    status = 2
+    return
+  end
+  local lists
+  lists, why = parse(tokens)
+  if not lists then
+    say(why)
+    status = 2
+    return
+  end
+  for _, list in ipairs(lists) do
+    local skip = nil
+    for _, pipeline in ipairs(list.pipelines) do
+      if not skip then
+        status = runpipeline(pipeline, list.background)
+      end
+      if pipeline.next == "&&" then
+        skip = status ~= 0
+      elseif pipeline.next == "||" then
+        skip = status == 0
+      end
+    end
+  end
+end
+
+-- Background jobs that ended, reported before a prompt.
+local function reap()
+  while true do
+    local pid, how, value = sys.waitpid(-1, "nohang")
+    if not pid or pid == 0 then
+      return
+    end
+    io.stderr:write("[" .. pid .. "] " .. (how == "exited" and "Done" or value) .. "\n")
+  end
+end
+
+if args[1] == "-c" then
+  runline(args[2] or "")
+  return status
+elseif args[1] then
+  for line in io.lines(args[1]) do
+    runline(line)
+  end
+  return status
+end
+
+local interactive = sys.isatty(0)
+if interactive then
+  sys.signal("SIGINT", function()
+    interrupted = true
+  end)
+end
+while true do
+  if interactive then
+    reap()
+    io.stdout:write(PS1)
+    io.stdout:flush()
+  end
+  interrupted = false
+  local line, why, errno = io.read("l")
+  if line == nil then
+    if errno == "EINTR" then
+      io.stdout:write("\n") -- ^C: the line was dropped; a new prompt
+    else
+      if interactive then
+        io.stdout:write("\n")
+      end
+      break
+    end
+  else
+    runline(line)
+  end
+end
+return status

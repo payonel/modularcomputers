@@ -1,0 +1,31 @@
+-- cp [-r] from... to: copies files (-r directories too); into 'to' if it's a directory.
+local fs = require("fs")
+local recursive = false
+local paths = {}
+for _, word in ipairs(arg) do
+  if word == "-r" or word == "-R" then
+    recursive = true
+  else
+    paths[#paths + 1] = word
+  end
+end
+if #paths < 2 then
+  io.stderr:write("usage: cp [-r] from... to\n")
+  return 1
+end
+local target = paths[#paths]
+local into = fs.isdir(target)
+if #paths > 2 and not into then
+  io.stderr:write("cp: " .. target .. ": Not a directory\n")
+  return 1
+end
+local status = 0
+for i = 1, #paths - 1 do
+  local to = into and fs.join(target, fs.name(paths[i])) or target
+  local ok, why = fs.copy(paths[i], to, recursive)
+  if not ok then
+    io.stderr:write("cp: " .. why .. "\n")
+    status = 1
+  end
+end
+return status

@@ -1,0 +1,11 @@
+-- umount dir...: takes what's mounted there away.
+local sys = require("sys")
+local status = 0
+for _, path in ipairs(arg) do
+  local ok, why = sys.umount(path)
+  if not ok then
+    io.stderr:write("umount: " .. path .. ": " .. why .. "\n")
+    status = 1
+  end
+end
+return status

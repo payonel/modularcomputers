@@ -1,0 +1,6 @@
+-- halt: ends every process and halts the computer.
+local sys = require("sys")
+io.flushall()
+local ok, why = sys.reboot("halt")
+io.stderr:write("halt: " .. tostring(why) .. "\n")
+return 1

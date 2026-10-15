@@ -1,0 +1,11 @@
+-- df: each mounted filesystem's size, use and room, in KiB.
+local sys = require("sys")
+local KIB = 1024
+io.write(string.format("%-14s %8s %8s %8s %4s %s\n", "Filesystem", "1K-blocks", "Used", "Available", "Use%", "Mounted on"))
+for _, mount in ipairs(sys.mounts()) do
+  local st = sys.statfs(mount.path)
+  if st and st.size > 0 then
+    io.write(string.format("%-14s %8d %8d %8d %3d%% %s\n", mount.source, st.size // KIB, st.used // KIB,
+      (st.size - st.used) // KIB, math.floor(st.used * 100 / st.size + 0.5), mount.path))
+  end
+end

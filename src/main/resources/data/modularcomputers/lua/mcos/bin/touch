@@ -1,0 +1,15 @@
+-- touch file...: makes files that don't exist, empty.
+local fs = require("fs")
+local status = 0
+for _, path in ipairs(arg) do
+  if not fs.exists(path) then
+    local file, why = io.open(path, "a")
+    if file then
+      file:close()
+    else
+      io.stderr:write("touch: " .. why .. "\n")
+      status = 1
+    end
+  end
+end
+return status

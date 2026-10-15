@@ -1,0 +1,7 @@
+-- echo [-n] [word...]: the words, with a space between, and a new line (not with -n).
+local newline = true
+local first = 1
+if arg[1] == "-n" then
+  newline, first = false, 2
+end
+io.write(table.concat(arg, " ", first), newline and "\n" or "")

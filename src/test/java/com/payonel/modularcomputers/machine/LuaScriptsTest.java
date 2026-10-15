@@ -23,13 +23,13 @@ class LuaScriptsTest {
 		Path root = Path.of(LuaScripts.class.getResource(LuaScripts.ROOT).toURI());
 		List<Path> scripts;
 		try (Stream<Path> files = Files.walk(root)) {
-			scripts = files.filter(file -> file.toString().endsWith(".lua")).toList();
+			scripts = files.filter(Files::isRegularFile).toList(); // every file is Lua (mcos's programs have no .lua, as Linux's)
 		}
 		assertThat(scripts).isNotEmpty();
 		for (Path script : scripts) {
-			String name = root.relativize(script).toString().replace('\\', '/').replaceFirst("\\.lua$", "");
-			String error = LuaRunner.check(LuaScripts.read(name), name);
-			assertThat(error).as(name + ".lua compiles").isNull();
+			String name = root.relativize(script).toString().replace('\\', '/');
+			String error = LuaRunner.check(Files.readString(script, java.nio.charset.StandardCharsets.ISO_8859_1), name);
+			assertThat(error).as(name + " compiles").isNull();
 		}
 	}
 
@@ -37,7 +37,7 @@ class LuaScriptsTest {
 	void aSetOfFilesIsCopiedAsItIs(@org.junit.jupiter.api.io.TempDir Path target) throws Exception {
 		LuaScripts.copyTree("mcos", target.resolve("disk"));
 		assertThat(target.resolve("disk/init.lua")).isRegularFile();
-		assertThat(target.resolve("disk/sh.lua")).isRegularFile();
+		assertThat(target.resolve("disk/bin/sh")).isRegularFile();
 		assertThat(Files.readString(target.resolve("disk/init.lua"))).isEqualTo(LuaScripts.read("mcos/init"));
 	}
 }

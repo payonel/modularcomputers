@@ -1,0 +1,18 @@
+-- mount: what's mounted; mount source dir: a disk (by its bus address) on a directory.
+local sys = require("sys")
+if #arg == 0 then
+  for _, mount in ipairs(sys.mounts()) do
+    io.write(mount.source, " on ", mount.path, " type ", mount.type, "\n")
+  end
+  return 0
+end
+if #arg ~= 2 then
+  io.stderr:write("usage: mount [source dir]\n")
+  return 1
+end
+local ok, why = sys.mount(arg[1], arg[2])
+if not ok then
+  io.stderr:write("mount: " .. arg[2] .. ": " .. why .. "\n")
+  return 1
+end
+return 0

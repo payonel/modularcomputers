@@ -1,0 +1,54 @@
+-- ls [-a] [-l] [path...]: what's in directories (a file lists itself); -l with type and size, -a
+-- with names starting with a dot.
+local fs = require("fs")
+
+local all, long = false, false
+local paths = {}
+for _, word in ipairs(arg) do
+  if string.sub(word, 1, 1) == "-" and #word > 1 then
+    all = all or string.find(word, "a", 2, true) ~= nil
+    long = long or string.find(word, "l", 2, true) ~= nil
+  else
+    paths[#paths + 1] = word
+  end
+end
+if #paths == 0 then
+  paths[1] = "."
+end
+
+local function show(entries, dir)
+  for _, entry in ipairs(entries) do
+    if all or string.sub(entry.name, 1, 1) ~= "." then
+      if long then
+        local st = dir and fs.stat(fs.join(dir, entry.name)) or entry
+        local kind = ({directory = "d", device = "c", fifo = "p"})[st and st.type or entry.type] or "-"
+        io.write(string.format("%s %8d %s\n", kind, st and st.size or 0, entry.name))
+      else
+        io.write(entry.name, entry.type == "directory" and "/" or "", "\n")
+      end
+    end
+  end
+end
+
+local status = 0
+for i, path in ipairs(paths) do
+  local st, why = fs.stat(path)
+  if not st then
+    io.stderr:write("ls: " .. why .. "\n")
+    status = 2
+  elseif st.type == "directory" then
+    if #paths > 1 then
+      io.write(i > 1 and "\n" or "", path, ":\n")
+    end
+    local entries, err = fs.list(path)
+    if entries then
+      show(entries, path)
+    else
+      io.stderr:write("ls: " .. err .. "\n")
+      status = 2
+    end
+  else
+    show({{name = path, type = st.type, size = st.size}})
+  end
+end
+return status

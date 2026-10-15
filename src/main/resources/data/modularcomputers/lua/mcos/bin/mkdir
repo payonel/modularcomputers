@@ -1,0 +1,16 @@
+-- mkdir [-p] dir...: makes directories; -p their parents too, and no complaint if they exist.
+local fs = require("fs")
+local parents = false
+local status = 0
+for _, word in ipairs(arg) do
+  if word == "-p" then
+    parents = true
+  else
+    local ok, why = fs.mkdir(word, parents)
+    if not ok then
+      io.stderr:write("mkdir: " .. why .. "\n")
+      status = 1
+    end
+  end
+end
+return status

@@ -40,6 +40,13 @@
 -- debug.thaw), so the scheduler runs, sees the data in its ring, and decides. Otherwise a thaw is
 -- plain. Nothing in user code has to ask for input.
 --
+-- Traps and the timer (2026-10-15): board.trap() is the CPU's syscall instruction: it freezes user
+-- code where it is and thaws it with the stops, so the resume of the nearest named coroutine returns
+-- (its scheduler, a kernel, serves the request the coroutine left and thaws it); with no stop in the
+-- chain it returns at once. It's answered here, with no host call, and the slice goes on with what
+-- it had left. A spent slice is the timer interrupt: its thaw stops too, so a kernel gets control
+-- back from a busy process at least once a slice, as a timer tick preempts a real one.
+--
 -- Device data (user design, 2026-10-13): this file caches what devices have (keys, sensor events)
 -- in its inbox, a queue per device. As a wait is answered the host takes, from each device with
 -- data, as much as that device's queue has room for (its size comes from the RAM: none with only
@@ -61,7 +68,7 @@ local image = ...
 
 local coroutine_create, coroutine_resume, coroutine_status, coroutine_yield =
   coroutine.create, coroutine.resume, coroutine.status, coroutine.yield
-local setbudget, freeze, thaw, isfrozen = debug.setbudget, debug.freeze, debug.thaw, debug.isfrozen
+local setbudget, getbudget, freeze, thaw, isfrozen = debug.setbudget, debug.getbudget, debug.freeze, debug.thaw, debug.isfrozen
 -- The host's switch: while user code runs it may use the RAM less the firmware's reserve, so a
 -- program that fills its memory gets Lua's error and this file can still answer the host.
 local usermode = debug.getregistry()["modularcomputers.usermode"]
@@ -197,6 +204,10 @@ end
 local function syscall(...)
   usermode(false)
   local request <close> = setmetatable(table_pack(...), REQUEST)
+  if request[1] == "trap" then
+    local _, _, left = getbudget(user_co)
+    request.left = left -- what the slice had left: a trap doesn't start a new one
+  end
   queue[#queue + 1] = request
   while request.reply == nil do
     -- The next step freezes the chain; armed again when a nested syscall (a finalizer's) took that freeze.
@@ -396,6 +407,12 @@ sandbox.board = {
   removestop = function(co)
     stops[co] = nil
   end,
+  -- the syscall instruction: stops at the nearest stop, whose resumer serves what it was left
+  -- (see "Traps and the timer" above); returns when thawed, or at once with no stop in the chain
+  trap = function()
+    syscall("trap")
+    usermode(true)
+  end,
   -- the CPU stops; power stays on. It never returns.
   halt = function()
     syscall("halt")
@@ -421,23 +438,40 @@ local function user(run)
   return a, b, c
 end
 
+-- A trap's reply: nothing.
+local TRAPPED = {n = 0}
+
 local result = table_pack(user(coroutine_resume))
 while true do
   if isfrozen(user_co) then
+    local stop = false -- a trap or the timer: the thaw stops
+    local budget = SLICE
     if #queue > 0 then
       -- Every syscall waiting, answered in order (a finalizer's queues behind the call it ran inside).
+      local asked = false
       while #queue > 0 do
         local request = table_remove(queue, 1)
-        if request[1] == "wait" and request[2] >= 0 then
-          request[2] = ask("clock") + request[2] -- its length becomes a deadline
+        if request[1] == "trap" then
+          request.reply = TRAPPED
+          stop = true
+          if not asked and request.left and request.left > 0 then
+            budget = request.left
+          end
+        else
+          asked = true
+          budget = SLICE
+          if request[1] == "wait" and request[2] >= 0 then
+            request[2] = ask("clock") + request[2] -- its length becomes a deadline
+          end
+          request.reply = table_pack(ask(table_unpack(request, 1, request.n)))
         end
-        request.reply = table_pack(ask(table_unpack(request, 1, request.n)))
       end
     else
-      ask("slice") -- the slice is spent
+      ask("slice") -- the slice is spent: the timer
+      stop = true
     end
-    setbudget(user_co, SLICE, spent) -- a new slice
-    if deliver() then
+    setbudget(user_co, budget, spent) -- a new slice, or what a trap's had left
+    if deliver() or stop then
       result = table_pack(user(thaw_stopping)) -- new input: the program's scheduler hears at once
     else
       result = table_pack(user(thaw))

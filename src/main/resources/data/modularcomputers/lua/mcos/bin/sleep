@@ -1,0 +1,8 @@
+-- sleep seconds: waits.
+local sys = require("sys")
+local seconds = tonumber(arg[1])
+if not seconds then
+  io.stderr:write("usage: sleep seconds\n")
+  return 1
+end
+sys.sleep(seconds)

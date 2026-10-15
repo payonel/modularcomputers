@@ -350,9 +350,20 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
 - **No legacy compatibility:** OpenOS grew complex supporting old programs; mcos isn't tied to them.
 - **The terminal decodes VT100:** mcos writes bytes and escape sequences; none of OpenOS's VT
   parsing, software cursor blink, GPU windows or viewports.
-- **First version: the shell only.** No filesystem library and no threads or child processes yet;
-  a shell in the real-world style, with readline a separate library from it (OpenOS's cursor
-  library mixed the two, and echo with them).
+- **Built (2026-10-15): processes, syscalls, a VFS and a shell** (AGENTS.md, "mcos in Lua"). The
+  user asked for a filesystem and io built autonomously, to review; decisions taken without them,
+  each open to change:
+  - **`/bin` and `PATH` are back** (the user had said no `/bin` for the echo-only v1: it needs PATH).
+    With a filesystem the shell runs programs, so it looks commands up in `PATH` (`/bin`, set by the
+    kernel), as sh does; a path with a `/` runs as is. Programs have no `.lua` (as Linux's); every
+    file the kernel runs goes through `/bin/lua`, as if each began with `#!/bin/lua`.
+  - **Disks mount at `/mnt/<kind>/<name>`** (`sata:1` at `/mnt/sata/1`, `id:x` at `/mnt/id/x`), as the
+    Java mcos does; a mount point needs no directory on the disk beneath it (the VFS shows one).
+    Linux needs the directory; udisks makes it.
+  - **The syscall table is Lua-shaped**, not C's: fopen modes for `open`, errors as `nil, message,
+    errno name`, `spawn` (posix_spawn) instead of fork and exec (a coroutine can't be forked), wait
+    statuses as luaposix gives them. User space on top: Lua's own `io`, `os`, `require`, plus `fs`
+    (paths, listing, copy, glob), not OpenOS's `filesystem`, `term` or `shell` libraries.
 - **The line discipline is mcos's** (user, 2026-10-13, as in Linux, where it's kernel code): a
   terminal only sends bytes (`\3` for Ctrl+C) and raises its interrupt. Each tty (one per input
   device mcos uses) owns its input buffer, its termios flags and its foreground program, whatever
@@ -362,8 +373,26 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
   on the board's `console` (all terminals share one shell); or a tty, interrupt handler and shell
   per terminal (`ttyS0`, `ttyS1`...), never reading `console` then. The bootloader hands init a
   command line (e.g. from a file on the boot disk, like GRUB's config).
-- **To come: an interrupt vector in the firmware**, so a raised interrupt preempts a busy program
-  (at its next budget check) and runs mcos's handler, which feeds the line discipline as bytes
-  arrive: Ctrl+C then ends a program stuck in a loop, as in Linux.
-- Open (asked 2026-10-13): whether v1's shell runs `/bin` programs off the boot disk or
-  has built-ins only.
+- **Preemption is built** (2026-10-15): new input and a spent slice stop the running process and
+  return to the kernel (LungoLua 1.1's thaw with stops), and syscalls trap the same way
+  (`board.trap()`). Ctrl+C ends a program stuck in a loop.
+- **mcos no longer fits one tier 1 stick** (2026-10-15, for the user to decide): with processes, a
+  VFS and a real shell it takes about 400 KiB above the firmware (kernel 194, shell 120, a small
+  process 16; compiled code is most of it, shared between processes already). A first computer
+  with one 256 KiB stick won't boot it. Options: a smaller boot set (the kernel's modules and a
+  smaller shell), bigger RAM tiers, or asking LungoLua what a compiled prototype costs (its count
+  is about 1.4 times the C++ build's for the same file).
+- **To come in mcos:**
+  - **Signal handlers run only on the way back from a syscall** (a stopped process can't be made to
+    call one): a busy process with a handler sees its signal at its next syscall. Linux runs them on
+    any return to user mode.
+  - **Job control** (`setpgid`, `tcsetpgrp`, `fg`, `bg`, Ctrl+Z, SIGTTIN): background jobs share
+    the shell's group and ignore SIGINT, as sh without job control.
+  - **`/proc`**: `ps` and `mount` use syscalls (`processes`, `mounts`) instead.
+  - **Raw disks** have no filesystem driver (an mcos filesystem on sectors); **devices as files**
+    (`/dev/sata1`, terminals by address) aren't in devfs yet; **no permissions or users**.
+  - **readline** (line editing and history in the shell), **os.date** (no real-time clock: the time
+    is seconds since boot), **a page cache** (every program start reads `/bin/lua` and `/lib/io.lua`
+    off the disk), **the bus's hot-plug is noticed only when the kernel idles**.
+  - A console tty per terminal (the `console=` option names one device; several aren't started yet).
+- Answered for now (2026-10-15, for the user to review): the shell runs `/bin` programs (above).

@@ -1,0 +1,25 @@
+-- kill [-SIGNAL] pid...: sends a signal (SIGTERM by default; -9 or -KILL is SIGKILL).
+local sys = require("sys")
+local signal = "SIGTERM"
+local status = 0
+for _, word in ipairs(arg) do
+  local name = string.match(word, "^%-(.+)$")
+  if name then
+    if tonumber(name) then
+      for known, number in pairs(sys.SIGNALS) do
+        if number == tonumber(name) then
+          signal = known
+        end
+      end
+    else
+      signal = string.sub(name, 1, 3) == "SIG" and name or "SIG" .. name
+    end
+  else
+    local ok, why = sys.kill(math.tointeger(tonumber(word)) or 0, signal)
+    if not ok then
+      io.stderr:write("kill: " .. word .. ": " .. why .. "\n")
+      status = 1
+    end
+  end
+end
+return status
