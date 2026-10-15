@@ -38,11 +38,11 @@ local function tokenize(line)
     word, glob, inword = {}, false, false
   end
   local function variable(at)
-    local name = string.match(line, "^{([A-Za-z0-9_]+)}", at)
+    local name = string.match(line, "^{([%w_]+)}", at)
     if name then
       return {var = name}, at + #name + 2
     end
-    name = string.match(line, "^[A-Za-z0-9_]+", at) or string.match(line, "^[%?%$]", at)
+    name = string.match(line, "^[%w_]+", at) or string.match(line, "^[%?%$]", at)
     if name then
       return {var = name}, at + #name
     end
@@ -90,18 +90,18 @@ local function tokenize(line)
       local value
       value, i = variable(i + 1)
       word[#word + 1] = value
-    elseif string.find(c, "[ \t\r\n\v\f]") then
+    elseif string.find(c, "%s") then
       finish()
       i = i + 1
     elseif c == "#" and not inword then
       break
     else
-      local fd, op = string.match(line, "^([0-9]?)(>>)", i)
+      local fd, op = string.match(line, "^(%d?)(>>)", i)
       if not op then
-        fd, op = string.match(line, "^([0-9]?)(>&[0-9])", i)
+        fd, op = string.match(line, "^(%d?)(>&%d)", i)
       end
       if not op then
-        fd, op = string.match(line, "^([0-9]?)([<>])", i)
+        fd, op = string.match(line, "^(%d?)([<>])", i)
       end
       if op and (fd == "" or not inword) then
         finish()
@@ -268,7 +268,7 @@ end
 
 function builtins.export(words, out)
   for i = 2, #words do
-    local name, value = string.match(words[i], "^([A-Za-z0-9_]+)=(.*)$")
+    local name, value = string.match(words[i], "^([%w_]+)=(.*)$")
     if name then
       os.setenv(name, value)
     end

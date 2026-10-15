@@ -705,9 +705,6 @@ scripts/art/error_beep.py` into
     foreground process group**. Output goes through `onlcr`. Raw mode (`icanon` off) by `TCSETS`.
   - Tests (`runtime/McosTest`) bring their own programs onto the disk and type commands; they check
     files on the disks and whether the computer halts or runs, never what mcos says.
-  - **Gotcha (LungoLua 1.1.6565): a lowercase pattern class matches its own letter** (`"%s"` and
-    `"[%s]"` match `"s"`); reported to the lua thread 2026-10-15, fixed in its `135bc719`, not yet
-    published. mcos's Lua spells classes as explicit ranges (`[0-9]`, `[ \t\r\n\v\f]`) until then.
 - **Lua scripts** (user design, 2026-10-13; `machine/LuaScripts`): the Lua that comes with the
   mod (firmware, mcos's Lua version, utilities; to be handed out by traders, loot chests and special
   crafting) lives as plain UTF-8 `.lua` files under `src/main/resources/data/modularcomputers/lua/`

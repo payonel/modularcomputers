@@ -915,7 +915,7 @@ vfs.mount("/tmp", tmpfs(), "tmpfs")
 
 -- Disks on the bus, mounted as the kernel finds them (as udisks does) and unmounted as they go.
 local function mountpoint(address)
-  local kind, name = string.match(address, "^([A-Za-z0-9]+):(.+)$")
+  local kind, name = string.match(address, "^(%w+):(.+)$")
   return MOUNT_BASE .. "/" .. (kind or "id") .. "/" .. (name or address)
 end
 

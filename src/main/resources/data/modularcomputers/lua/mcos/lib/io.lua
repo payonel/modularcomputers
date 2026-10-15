@@ -169,7 +169,7 @@ local function readnumber(file)
     if start then
       file.rbuf = string.sub(file.rbuf, start)
       -- enough to see the whole numeral: it ends before the buffer does, or the file ends
-      if string.find(file.rbuf, "^[A-Za-z0-9%.%+%-]*[^A-Za-z0-9%.%+%-]") then
+      if string.find(file.rbuf, "^[%w%.%+%-]*[^%w%.%+%-]") then
         break
       end
     end
@@ -180,9 +180,9 @@ local function readnumber(file)
       break
     end
   end
-  local numeral = string.match(file.rbuf, "^[%+%-]?0[xX][0-9A-Fa-f%.]+[pP]?[%+%-]?[0-9]*")
-    or string.match(file.rbuf, "^[%+%-]?[0-9]*%.?[0-9]*[eE][%+%-]?[0-9]+")
-    or string.match(file.rbuf, "^[%+%-]?[0-9]*%.?[0-9]*")
+  local numeral = string.match(file.rbuf, "^[%+%-]?0[xX][%x%.]+[pP]?[%+%-]?%d*")
+    or string.match(file.rbuf, "^[%+%-]?%d*%.?%d*[eE][%+%-]?%d+")
+    or string.match(file.rbuf, "^[%+%-]?%d*%.?%d*")
   local value = numeral and tonumber(numeral)
   if value == nil then
     return nil
