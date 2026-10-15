@@ -362,6 +362,16 @@ class McosTest {
 	}
 
 	@Test
+	void redirectionsAreMadeBeforeTheCommandIsLookedFor() {
+		boot();
+		type("nosuch > /made 2> /err; echo $? > /st\r");
+		untilFile(root().resolve("st"), "127\n");
+		assertThat(root().resolve("made")).as("made (empty), though the command never ran").isRegularFile();
+		assertThat(read(root().resolve("made"))).isEmpty();
+		assertThat(read(root().resolve("err"))).as("not found: said on the command's own stderr").isNotEmpty();
+	}
+
+	@Test
 	void theShellGlobs() throws Exception {
 		for (String name : new String[] {"a.txt", "b.txt", "c.lua", ".hidden"}) {
 			file("g/" + name, "");

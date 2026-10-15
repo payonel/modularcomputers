@@ -709,7 +709,7 @@ scripts/art/error_beep.py` into
     (default `\w \$ `: the directory, `~` for HOME when HOME isn't `/`; `\W`, `\$`, `\n`, `\\`) and
     **PS2** (`> `) while a line goes on (an open quote or `$(`, a trailing `| && ||` or `\`); `sh -c
     'cmd' [name args]`, `sh script [args]`. **Errors** (OpenOS's cases, surveyed 2026-10-15, said the
-    Linux way: `sh: <what>: <why>` on stderr): not found 127; a directory 126; a redirection that
+    Linux way: `sh: <what>: <why>` on stderr): not found 127 (said on the command's own stderr: a command's redirections are made before it's looked for, as in a forked child before exec, so `nosuch > f 2> /dev/null` makes `f` and says nothing); a directory 126; a redirection that
     fails or is ambiguous 1 (the command doesn't run; a bad `>&N`: Bad file descriptor); syntax errors
     2 as bash words them (`` syntax error near unexpected token `|' ``; nothing on the line runs; a
     script stops); bad substitution; a command ended by a signal 128 + its number (a newline after a

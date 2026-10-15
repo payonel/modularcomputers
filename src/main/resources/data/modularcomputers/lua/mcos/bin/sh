@@ -827,7 +827,13 @@ local function runpipeline(pipeline, background)
           result = nil -- its status comes from waiting for it
         end
       else
-        say(err)
+        -- said where the command's own stderr goes: its redirections are made before it's looked
+        -- for (as in a forked child before exec), so "cmd 2> /dev/null" hides "not found" too
+        local stderr = spawnfds[2] or (fds[2] == nil and 2 or nil)
+        if stderr then
+          io.stdout:flush()
+          sys.write(stderr, "sh: " .. err .. "\n")
+        end
         result = code
       end
     end
