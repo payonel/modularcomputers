@@ -17,9 +17,18 @@ final class ScreenSave {
 	}
 
 	static void save(ValueOutput output, String name, TextBuffer buffer, VtDecoder decoder) {
-		output.store(name, Codec.STRING.listOf(), buffer.rows());
-		output.putIntArray(name + "_foreground", buffer.foregrounds());
-		output.putIntArray(name + "_background", buffer.backgrounds());
+		save(output, name, new VtDecoder.Screen(buffer.rows(), buffer.foregrounds(), buffer.backgrounds()), decoder);
+	}
+
+	/** A terminal: its screen as it is, even while its glass is scrolled back (the scrollback isn't saved). */
+	static void save(ValueOutput output, String name, com.payonel.modularcomputers.device.Terminal terminal) {
+		save(output, name, terminal.screen(), terminal.decoder());
+	}
+
+	private static void save(ValueOutput output, String name, VtDecoder.Screen screen, VtDecoder decoder) {
+		output.store(name, Codec.STRING.listOf(), screen.rows());
+		output.putIntArray(name + "_foreground", screen.foregrounds());
+		output.putIntArray(name + "_background", screen.backgrounds());
 		output.putIntArray(name + "_state", decoder.state());
 		output.putString(name + "_params", decoder.pendingParams());
 		VtDecoder.Screen main = decoder.mainScreen();

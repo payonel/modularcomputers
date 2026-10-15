@@ -134,6 +134,7 @@ public final class TextBuffer {
 			return;
 		}
 		changes++;
+		dirty.set(row);
 		text.getChars(0, columns, chars[row], 0);
 		System.arraycopy(foreground, 0, foregrounds[row], 0, columns);
 		System.arraycopy(background, 0, backgrounds[row], 0, columns);

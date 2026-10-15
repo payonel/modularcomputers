@@ -723,7 +723,7 @@ scripts/art/error_beep.py` into
     `false, "why"` (or `nil, "why"`) exits 1 with `why` on stderr, as OpenOS took it; an integer it
     returns is its status. Processes get `debug.traceback` (the firmware's sandbox gives it; it reads
     the stack raw).
-  - **`/bin`**: `cat cp df echo grep halt head kill ls lua mkdir mount mv poweroff ps rm rmdir sh
+  - **`/bin`**: `cat clear cp df echo grep halt head kill ls lua mkdir mount mv poweroff ps rm rmdir sh
     sleep tail touch umount`. `grep [-ivnclqhHFE] [-e p]`: POSIX basic or (`-E`) extended regular
     expressions as far as Lua patterns say them (`. * ^ $ [...]`, `\` escapes, `+ ?` with -E,
     `[:class:]`; no groups, alternation or intervals: refused with a message), status 0/1/2.
@@ -1171,6 +1171,19 @@ scripts/art/error_beep.py` into
         has its own limit** (`Terminal.INPUT_CAPACITY`, 256; user, 2026-10-13: devices keep their
         own rings): past it a key is dropped, as a PC's keyboard buffer drops what it has no room
         for (it beeps; no bell here yet).
+      - **Scrollback** (user, 2026-10-15: "shift page up"): lines that scroll off the top of its main
+        screen are kept, `Terminal.SCROLLBACK_LINES` (200), and **Shift+PageUp/PageDown** (a screen) or
+        the **mouse wheel** (3 lines) in the screen view scroll its glass back over them
+        (`ScrollTerminalPayload`, `Terminal.scrollView`). Where it lives, as in the real world: in the
+        terminal, where the screen is drawn: xterm and other emulators (holding a pty's master side)
+        keep it in their own memory and never send those keys down the line; Linux's own VT console
+        kept it in the kernel only because there the kernel *is* the terminal (fbcon/vgacon soft
+        scrollback, removed in 5.9); the tty layer (n_tty) keeps no output at all, and hardware
+        VT100s kept none. So mcos and programs know nothing of it. One view per terminal (it's one
+        physical glass, whoever looks); a key typed or anything written brings it back to the bottom
+        (xterm's scrollKey, scrollTtyOutput); the alternate screen saves no lines; `ESC[3J` (xterm's
+        E3) clears them, not the screen (`/bin/clear` sends it). A save keeps the screen as it is
+        (`Terminal.screen()`), not the scrolled glass; the scrollback isn't saved.
       - **Only the terminal the player has open gets the keys** (user, 2026-10-11): typing in a
         screen view (`DisplayScreen`) sends `TerminalInputPayload` to that terminal.
         Characters come from `charTyped`; other keys send what an xterm keyboard sends

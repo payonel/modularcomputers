@@ -76,6 +76,7 @@ public final class ModularComputers implements ModInitializer {
 		OpenDisplayPayload.register();
 		PressPowerPayload.register();
 		TerminalInputPayload.register();
+		com.payonel.modularcomputers.network.ScrollTerminalPayload.register();
 		ScreenRowsPayload.register();
 		SwitchViewPayload.register();
 		ReorderBusPayload.register();

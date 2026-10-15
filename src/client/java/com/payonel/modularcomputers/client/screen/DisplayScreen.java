@@ -8,7 +8,9 @@ import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.display.TextBuffer;
 import com.payonel.modularcomputers.display.Viewport;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
+import com.payonel.modularcomputers.network.ScrollTerminalPayload;
 import com.payonel.modularcomputers.network.TerminalInputPayload;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import java.util.Optional;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -49,6 +51,8 @@ public final class DisplayScreen extends Screen {
 		}
 	}
 
+	/** Lines a notch of the mouse wheel scrolls the terminal's glass. */
+	private static final int WHEEL_LINES = 3;
 	private final BlockPos pos;
 	private final Resolution resolution;
 	/** The computer whose power button shows, if any. */
@@ -122,6 +126,12 @@ public final class DisplayScreen extends Screen {
 		if (event.isEscape()) {
 			return super.keyPressed(event);
 		}
+		if (event.hasShiftDown() && (event.key() == InputConstants.KEY_PAGEUP || event.key() == InputConstants.KEY_PAGEDOWN)) {
+			// the terminal's own: its glass scrolls over its scrollback, a screen at a time; nothing goes down the line
+			int page = resolution.rows();
+			ClientPlayNetworking.send(new ScrollTerminalPayload(pos, event.key() == InputConstants.KEY_PAGEUP ? page : -page));
+			return true;
+		}
 		var sequence = TerminalKeys.sequence(event.key(), event.hasControlDown());
 		sequence.ifPresent(this::send);
 		return true;
@@ -131,6 +141,16 @@ public final class DisplayScreen extends Screen {
 	public boolean charTyped(CharacterEvent event) {
 		if (event.isAllowedChatCharacter()) {
 			send(event.codepointAsString());
+		}
+		return true;
+	}
+
+	/** The wheel scrolls the terminal's glass over its scrollback, as in a terminal emulator. */
+	@Override
+	public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
+		int lines = (int) Math.signum(scrollY) * WHEEL_LINES;
+		if (lines != 0) {
+			ClientPlayNetworking.send(new ScrollTerminalPayload(pos, lines));
 		}
 		return true;
 	}

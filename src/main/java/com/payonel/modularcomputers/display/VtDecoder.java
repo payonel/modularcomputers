@@ -64,6 +64,33 @@ public final class VtDecoder {
 	/** The main screen while the alternate one shows: characters, then foregrounds, backgrounds. */
 	private Screen mainScreen;
 
+	/**
+	 * Where lines go that scroll off the top of the main screen: the terminal's scrollback (its
+	 * saved lines, as xterm calls them). The alternate screen saves none, and ED 3 ({@code ESC[3J})
+	 * clears them.
+	 */
+	public interface History {
+		History NONE = new History() {
+			@Override
+			public void scrolledOff(String text, int[] foregrounds, int[] backgrounds) {
+			}
+
+			@Override
+			public void clear() {
+			}
+		};
+
+		void scrolledOff(String text, int[] foregrounds, int[] backgrounds);
+
+		void clear();
+	}
+
+	private History history = History.NONE;
+
+	public void setHistory(History history) {
+		this.history = history;
+	}
+
 	/** A screen's cells, as saved: the main screen while the alternate one shows. */
 	public record Screen(List<String> rows, int[] foregrounds, int[] backgrounds) {
 	}
@@ -419,7 +446,8 @@ public final class VtDecoder {
 				buffer.fill(0, 0, columns, y, foreground(), blankBackground());
 				erase(0, y, x + 1);
 			}
-			case 2, 3 -> buffer.fill(0, 0, columns, rows, foreground(), blankBackground());
+			case 2 -> buffer.fill(0, 0, columns, rows, foreground(), blankBackground());
+			case 3 -> history.clear(); // (xterm's E3: the saved lines, not the screen)
 			default -> {
 			}
 		}
@@ -468,6 +496,11 @@ public final class VtDecoder {
 	/** Moves rows {@code first..last} up by {@code n}, blanking at the bottom. */
 	private void scrollUp(int first, int last, int n) {
 		n = Math.min(n, last - first + 1);
+		if (first == 0 && last == rows - 1 && mainScreen == null) {
+			for (int row = 0; row < n; row++) {
+				history.scrolledOff(buffer.row(row), buffer.rowForegrounds(row), buffer.rowBackgrounds(row));
+			}
+		}
 		for (int row = first; row <= last - n; row++) {
 			copyRow(row + n, row);
 		}

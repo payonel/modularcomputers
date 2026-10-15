@@ -30,6 +30,15 @@ import java.util.Optional;
  * <p>
  * It's bus-powered ({@link #DRAW}, plus {@link #WRITE_COST} a write): with no running computer
  * supplying it, it's dark.
+ * <p>
+ * <b>Scrollback</b> (user, 2026-10-15): lines that scroll off the top of its main screen are kept
+ * ({@link #SCROLLBACK_LINES}), and Shift+PageUp/PageDown (or the mouse wheel) in the screen view
+ * scroll its glass back over them ({@link #scrollView}), as a terminal emulator does: the history
+ * is the terminal's, never the tty's or the program's (Linux's tty layer keeps no output; xterm,
+ * or the kernel's own VT for its console, keep it where the screen is drawn), and those keys never
+ * go down the line. A key typed or anything written brings the view back to the bottom (xterm's
+ * scrollKey and scrollTtyOutput). The alternate screen saves no lines; {@code ESC[3J} clears them.
+ * They're not saved with the block (lost when it unloads, as a terminal's memory at power-off).
  */
 public final class Terminal implements Device {
 	/** What a terminal draws each tick it has power: a tenth of a running CPU. */
@@ -52,6 +61,17 @@ public final class Terminal implements Device {
 	public static final int INPUT_CAPACITY = 256;
 	private final VtDecoder decoder;
 
+	/** Lines kept as they scroll off the top: four screens or so. */
+	public static final int SCROLLBACK_LINES = 200;
+	/** A line of the scrollback: its characters and colors. */
+	private record Line(String text, int[] foregrounds, int[] backgrounds) {
+	}
+	private final Deque<Line> history = new ArrayDeque<>();
+	/** How many lines back the glass shows (0: the screen as it is). */
+	private int viewOffset;
+	/** The screen as it is while the glass shows the scrollback; null at the bottom. */
+	private VtDecoder.Screen live;
+
 	private final TerminalTier tier;
 	/** Where its label is (its item's anvil name), read when asked: no copy of it here. */
 	private java.util.function.Supplier<String> label = () -> null;
@@ -65,14 +85,91 @@ public final class Terminal implements Device {
 		this.tier = tier;
 		this.buffer = new TextBuffer(resolution);
 		this.decoder = new VtDecoder(buffer, this::queue, tier.depth(), tier.attributes());
+		decoder.setHistory(new VtDecoder.History() {
+			@Override
+			public void scrolledOff(String text, int[] foregrounds, int[] backgrounds) {
+				history.addLast(new Line(text, foregrounds, backgrounds));
+				while (history.size() > SCROLLBACK_LINES) {
+					history.removeFirst();
+				}
+			}
+
+			@Override
+			public void clear() {
+				history.clear();
+			}
+		});
 	}
 
 	public TerminalTier tier() {
 		return tier;
 	}
 
+	/** What its glass shows: the screen, or the scrollback while it's scrolled back. */
 	public TextBuffer buffer() {
 		return buffer;
+	}
+
+	/** The screen as it is, scrolled back or not (what a save keeps). */
+	public VtDecoder.Screen screen() {
+		return live != null ? live : new VtDecoder.Screen(buffer.rows(), buffer.foregrounds(), buffer.backgrounds());
+	}
+
+	/** Lines kept in its scrollback. */
+	public int scrollbackLines() {
+		return history.size();
+	}
+
+	/** How many lines back its glass shows (0: the screen as it is). */
+	public int viewOffset() {
+		return viewOffset;
+	}
+
+	/**
+	 * Scrolls its glass back over the scrollback ({@code lines} positive: back, older; negative: on
+	 * toward the screen), as far as there are lines; at 0 it shows the screen as it is again.
+	 */
+	public void scrollView(int lines) {
+		int target = Math.max(0, Math.min(history.size(), viewOffset + lines));
+		if (target == viewOffset) {
+			return;
+		}
+		if (viewOffset == 0) {
+			live = screen();
+		}
+		viewOffset = target;
+		if (viewOffset == 0) {
+			showLive();
+			return;
+		}
+		int columns = buffer.resolution().columns();
+		int rows = buffer.resolution().rows();
+		Line[] saved = history.toArray(new Line[0]);
+		for (int row = 0; row < rows; row++) {
+			int index = saved.length - viewOffset + row;
+			if (index < saved.length) {
+				buffer.setRow(row, saved[index].text(), saved[index].foregrounds(), saved[index].backgrounds());
+			} else {
+				int screenRow = index - saved.length;
+				int[] foregrounds = java.util.Arrays.copyOfRange(live.foregrounds(), screenRow * columns, (screenRow + 1) * columns);
+				int[] backgrounds = java.util.Arrays.copyOfRange(live.backgrounds(), screenRow * columns, (screenRow + 1) * columns);
+				buffer.setRow(row, live.rows().get(screenRow), foregrounds, backgrounds);
+			}
+		}
+	}
+
+	/** Back to the bottom: the glass shows the screen as it is. */
+	public void scrollToBottom() {
+		if (viewOffset != 0) {
+			viewOffset = 0;
+			showLive();
+		}
+	}
+
+	private void showLive() {
+		buffer.setRows(live.rows());
+		buffer.setColors(live.foregrounds(), live.backgrounds());
+		live = null;
 	}
 
 	public VtDecoder decoder() {
@@ -82,6 +179,7 @@ public final class Terminal implements Device {
 	/** Text down the line to the terminal, decoded as it arrives. Each write costs power. */
 	public void write(String text) {
 		power.charge(WRITE_COST);
+		scrollToBottom();
 		decoder.write(text);
 		changed.run();
 	}
@@ -102,6 +200,7 @@ public final class Terminal implements Device {
 
 	/** A key typed at the terminal: it waits in the queue, and the interrupt line wakes its computers. */
 	public void press(String key) {
+		scrollToBottom();
 		if (queue(key)) {
 			interruptLine.raise();
 		}
@@ -241,6 +340,8 @@ public final class Terminal implements Device {
 	/** Power's gone: a blank screen, the cursor home, default modes, nothing waiting. */
 	@Override
 	public void powerOff() {
+		scrollToBottom();
+		history.clear();
 		decoder.reset();
 		input.clear();
 		changed.run();

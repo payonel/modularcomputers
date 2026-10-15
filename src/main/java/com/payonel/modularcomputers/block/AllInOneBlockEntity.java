@@ -1111,7 +1111,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 				}
 			}
 		}
-		ScreenSave.save(output, DISPLAY, display.buffer(), display.decoder());
+		ScreenSave.save(output, DISPLAY, display);
 		ConsoleSplitter console = machine.board().virtualBus().console();
 		ScreenSave.save(output, CONSOLE, console.screen(), console.decoder());
 	}

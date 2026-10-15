@@ -1,0 +1,2 @@
+-- clear: clears the terminal, and its scrollback (ESC[3J, as ncurses' clear does).
+io.write("\27[H\27[2J\27[3J")
