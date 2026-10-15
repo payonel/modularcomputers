@@ -323,6 +323,109 @@ class McosTest {
 	}
 
 	@Test
+	void theShellExpandsAndSubstitutesAndKeepsStatus() {
+		file("t.sh", """
+			X=hello
+			echo "$X world" > /o1
+			echo $(echo inner $(echo nested)) `echo back` > /o2
+			Y="a   b"
+			echo $Y > /o3
+			echo "$Y" >> /o3
+			echo ${UNSET:-dflt} ${#X} ${X:+set} "${UNSET}" > /o4
+			false; echo $? > /o5
+			true && echo and >> /o5
+			false || echo or >> /o5
+			false && echo no >> /o5
+			false && echo no || echo yes >> /o5
+			! false && echo negated >> /o5
+			nosuchcmd 2> /dev/null; echo $? >> /o5
+			/bin 2> /dev/null; echo $? >> /o5
+			cat /missing 2> /dev/null; echo $? >> /o5
+			cd /tmp; pwd > /o6; cd / ; pwd >> /o6
+			A=1 sh -c 'echo $A' > /o7
+			echo "[$A]" >> /o7
+			sh -c 'echo $0 $# $1 "$2"' name one "two words" > /o8
+			echo one | cat | wc 2> /dev/null; echo $? > /o9
+			""");
+		boot();
+		type("sh /t.sh; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("o1"))).isEqualTo("hello world\n");
+		assertThat(read(root().resolve("o2"))).as(() -> screen()).isEqualTo("inner nested back\n");
+		assertThat(read(root().resolve("o3"))).as("unquoted: split into fields; quoted: as it is").isEqualTo("a b\na   b\n");
+		assertThat(read(root().resolve("o4"))).isEqualTo("dflt 5 set \n");
+		assertThat(read(root().resolve("o5"))).as(() -> screen()).isEqualTo("1\nand\nor\nyes\nnegated\n127\n126\n1\n");
+		assertThat(read(root().resolve("o6"))).isEqualTo("/tmp\n/\n");
+		assertThat(read(root().resolve("o7"))).as("A=1 cmd: that command's only").isEqualTo("1\n[]\n");
+		assertThat(read(root().resolve("o8"))).isEqualTo("name 2 one two words\n");
+		assertThat(read(root().resolve("o9"))).as("a pipeline's status is its last command's").isEqualTo("127\n");
+	}
+
+	@Test
+	void theShellGlobs() throws Exception {
+		for (String name : new String[] {"a.txt", "b.txt", "c.lua", ".hidden"}) {
+			file("g/" + name, "");
+		}
+		boot();
+		type("cd /g; echo * > /r1; echo *.txt ?.lua > /r2; echo [!a]* [[:alpha:]].lua > /r3;"
+			+ " echo \"*.txt\" '*' \\*.txt none* .h* > /r4; echo /g/*.lua > /r5\r");
+		untilFile(root().resolve("r5"), "/g/c.lua\n");
+		assertThat(read(root().resolve("r1"))).as("no dot files").isEqualTo("a.txt b.txt c.lua\n");
+		assertThat(read(root().resolve("r2"))).isEqualTo("a.txt b.txt c.lua\n");
+		assertThat(read(root().resolve("r3"))).isEqualTo("b.txt c.lua c.lua\n");
+		assertThat(read(root().resolve("r4"))).as("quoted: no glob; no match: the word").isEqualTo("*.txt * *.txt none* .hidden\n");
+	}
+
+	@Test
+	void grepHeadAndTail() {
+		file("f", "alpha\nbeta\nGamma\ndelta\nepsilon\nbbc\n");
+		boot();
+		type("grep -n a /f > /r1; grep -c b /f > /r2; grep -v a /f > /r3; cat /f | grep -i GAMMA > /r4;"
+			+ " grep -E '^b+c$' /f > /r5; grep zzz /f; echo $? > /r6; head -n 2 /f > /r7; tail -n 2 /f > /r8;"
+			+ " tail -n +5 /f > /r9; grep -l eta /f /f > /r10\r");
+		untilFile(root().resolve("r10"), "/f\n/f\n");
+		assertThat(read(root().resolve("r1"))).isEqualTo("1:alpha\n2:beta\n3:Gamma\n4:delta\n");
+		assertThat(read(root().resolve("r2"))).isEqualTo("2\n");
+		assertThat(read(root().resolve("r3"))).isEqualTo("epsilon\nbbc\n");
+		assertThat(read(root().resolve("r4"))).isEqualTo("Gamma\n");
+		assertThat(read(root().resolve("r5"))).isEqualTo("bbc\n");
+		assertThat(read(root().resolve("r6"))).as("no line selected").isEqualTo("1\n");
+		assertThat(read(root().resolve("r7"))).isEqualTo("alpha\nbeta\n");
+		assertThat(read(root().resolve("r8"))).isEqualTo("epsilon\nbbc\n");
+		assertThat(read(root().resolve("r9"))).isEqualTo("epsilon\nbbc\n");
+	}
+
+	@Test
+	void aProgramsErrorIsReportedWithItsStackTraceback() {
+		file("crash.lua", """
+			local function inner()
+			  error("boom")
+			end
+			inner()
+			""");
+		file("refuse.lua", """
+			return false, "nope"
+			""");
+		boot();
+		type("/crash.lua 2> /err; echo $? > /st; /refuse.lua 2> /err2; echo $? >> /st\r");
+		untilFile(root().resolve("st"), "1\n1\n");
+		assertThat(read(root().resolve("err")))
+			.contains("/crash.lua:2: boom", "stack traceback:", "/crash.lua:2: in", "/crash.lua:4: in")
+			.as("the interpreter's own frames are cut").doesNotContain("/bin/lua");
+		assertThat(read(root().resolve("err2"))).isEqualTo("nope\n");
+	}
+
+	@Test
+	void aLineThatGoesOnIsReadOnAndThePromptShowsTheDirectory() {
+		boot();
+		type("echo 'a\rb' |\r cat > /q\r");
+		untilFile(root().resolve("q"), "a\nb\n");
+		type("export PS1='[\\w]# '; cd /tmp\r");
+		untilIdle();
+		assertThat(screen()).contains("[/tmp]#");
+	}
+
+	@Test
 	void ioPopenReadsACommandsOutput() {
 		file("t.lua", """
 			local p = assert(io.popen("echo piped through"))

@@ -287,6 +287,7 @@ local function environment(p)
   env.load = function(chunk, name, mode, scope)
     return load(chunk, name, mode, scope or env)
   end
+  env.debug = {traceback = debug.traceback} -- (for error reports; the rest of debug is the kernel's)
   env._G = env
   env.sys = systable(p)
   return env
@@ -327,6 +328,19 @@ local function image(path)
   return cached
 end
 
+-- Memory: a new process's stack is made without the emergency collection other allocations get
+-- (Lua's), so with garbage about a spawn could fail though there's room. Past half the RAM, the
+-- kernel collects before it makes one (as Linux reclaims memory before a fork would fail).
+local RECLAIM_SHARE = 0.5 -- of the RAM in use (counted with the firmware's own) before a spawn collects
+local KIB = 1024
+local ram = board.hardware().memoryTotal or 0
+
+local function reclaim()
+  if collectgarbage("count") * KIB > ram * RECLAIM_SHARE then
+    collectgarbage("collect")
+  end
+end
+
 -- posix_spawn: a new process running 'path' (through the interpreter) with 'argv', as the parent's
 -- child. opts: fds (the child's descriptors: {[0] = a parent fd, ...}; 0, 1 and 2 are inherited
 -- when not given, the others aren't: close-on-exec), env (its environment; the parent's when not
@@ -334,6 +348,7 @@ end
 -- own), cwd.
 local function spawn(parent, path, argv, opts)
   opts = opts or {}
+  reclaim()
   path = vfs.normalize(path, parent.cwd)
   local st, why, errno = vfs.stat(path)
   if not st then

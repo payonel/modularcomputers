@@ -1,0 +1,81 @@
+-- tail [-n [+]lines] [-c [+]bytes] [file...]: the last lines (10) or bytes of each file, or of
+-- stdin; with +N, from line (or byte) N on.
+local lines, bytes, from = 10, nil, false
+local files = {}
+local i = 1
+while i <= #arg do
+  local word = arg[i]
+  local flag, value = string.match(word, "^%-([nc])(.*)$")
+  if flag then
+    if value == "" then
+      i = i + 1
+      value = arg[i] or ""
+    end
+    local plus = string.sub(value, 1, 1) == "+"
+    local number = math.tointeger(tonumber(plus and string.sub(value, 2) or value))
+    if not number or number < 0 then
+      io.stderr:write("tail: invalid number of " .. (flag == "n" and "lines" or "bytes") .. ": '" .. value .. "'\n")
+      return 1
+    end
+    from = plus
+    if flag == "n" then
+      lines, bytes = number, nil
+    else
+      bytes = number
+    end
+  elseif string.match(word, "^%-%d+$") then
+    lines = tonumber(string.sub(word, 2))
+  else
+    files[#files + 1] = word
+  end
+  i = i + 1
+end
+if #files == 0 then
+  files[1] = "-"
+end
+
+local function last(file)
+  if bytes then
+    local data = file:read("a") or ""
+    if from then
+      return string.sub(data, math.max(bytes, 1))
+    end
+    return bytes == 0 and "" or string.sub(data, -bytes)
+  end
+  local kept, n = {}, 0
+  for line in file:lines("L") do
+    n = n + 1
+    if from then
+      if n >= lines then
+        io.write(line)
+      end
+    else
+      kept[#kept + 1] = line
+      if #kept > lines then
+        table.remove(kept, 1) -- (a ring would be cheaper; the lines kept are few)
+      end
+    end
+  end
+  return table.concat(kept)
+end
+
+local status = 0
+for index, path in ipairs(files) do
+  local file, why = io.stdin, nil
+  if path ~= "-" then
+    file, why = io.open(path)
+  end
+  if not file then
+    io.stderr:write("tail: " .. why .. "\n")
+    status = 1
+  else
+    if #files > 1 then
+      io.write(index > 1 and "\n" or "", "==> ", path == "-" and "standard input" or path, " <==\n")
+    end
+    io.write(last(file))
+    if file ~= io.stdin then
+      file:close()
+    end
+  end
+end
+return status

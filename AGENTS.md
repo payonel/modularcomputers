@@ -695,13 +695,42 @@ scripts/art/error_beep.py` into
     syscalls, `require("fs")` conveniences (paths, listing, mkdir -p, recursive remove and copy, move
     across disks, glob). With no script it's a REPL. A program's exit status is what it returns (an
     integer), 1 if it fails.
-  - **`/bin/sh`**: runs programs by path or from `PATH` (`/bin`); quotes, `\`, `$NAME`, `${NAME}`,
-    `$?` and `$$` (expanded as each command runs), `*`/`?` globs, `|`, `&&`, `||`, `;`, `&`
-    (background, ignoring SIGINT, as sh without job control), `<`, `>`, `>>`, `n>`, `n>&m`; builtins
-    `cd`, `pwd`, `exit`, `export`, `unset`; `sh -c` and `sh script`. Interactive on a tty, it catches
-    SIGINT: ^C drops the line (the tty flushes it), ends the foreground command (same group), and the
-    shell prompts again. **`/bin`**: `cat cp df echo halt kill ls lua mkdir mount mv poweroff ps rm
-    rmdir sh sleep touch umount`.
+  - **`/bin/sh`** (rewritten 2026-10-15 to the user's list: OpenOS's error cases, substitutions,
+    globs, PS1): only shell behavior; commands are programs. Quotes, `\`, `~`; `$NAME`, `${NAME}`,
+    `$? $$ $! $# $@ $* $0..$9`, `${NAME:-w}`, `${NAME-w}`, `${NAME:=w}`, `${NAME:+w}`, `${NAME:?w}`,
+    `${#NAME}`; **`$(command)` and backticks** (a child `sh -c`, its output with the trailing new lines
+    dropped; nested); unquoted results split on `IFS`; **POSIX globs** (`*`, `?`, `[...]`, `[!...]`,
+    ranges, `[:class:]`; quoted characters never glob; no dot files unless the pattern's part starts
+    with a dot; no match keeps the word: `fs.glob`, `fs.pattern`); `NAME=value` (the shell's, or one
+    command's environment), `!`, `|`, `&&`, `||`, `;`, `&` (background, ignoring SIGINT, `$!`), new
+    lines (and after `| && ||` the line goes on); redirections `< > >> n< n> n>> n>&m n<&m n>&-`;
+    builtins `cd [-]`, `pwd`, `exit [n]`, `export`, `unset`, `.`/`source`, `alias`, `unalias`, `read`,
+    `set`, `type`, `true`, `false`, `:` (a builtin in a pipeline runs in a child shell). **PS1**
+    (default `\w \$ `: the directory, `~` for HOME when HOME isn't `/`; `\W`, `\$`, `\n`, `\\`) and
+    **PS2** (`> `) while a line goes on (an open quote or `$(`, a trailing `| && ||` or `\`); `sh -c
+    'cmd' [name args]`, `sh script [args]`. **Errors** (OpenOS's cases, surveyed 2026-10-15, said the
+    Linux way: `sh: <what>: <why>` on stderr): not found 127; a directory 126; a redirection that
+    fails or is ambiguous 1 (the command doesn't run; a bad `>&N`: Bad file descriptor); syntax errors
+    2 as bash words them (`` syntax error near unexpected token `|' ``; nothing on the line runs; a
+    script stops); bad substitution; a command ended by a signal 128 + its number (a newline after a
+    ^C'd job); `cd` (HOME/OLDPWD not set, the error), `alias`/`unalias`/`export` errors; `exit` with a
+    bad number 2. Interactive: ^C drops the line (the tty flushes it) or ends the job in front; ^D
+    exits ("exit").
+  - **A program's error is reported with its stack traceback** (the user: OpenOS's was very
+    helpful): `/bin/lua` prints `lua: <message>` (a string; `__tostring`; else `(error object is a
+    <type> value)`), then `stack traceback:` from the frame that raised it, cut at the interpreter's
+    own `xpcall` (its frames and the kernel's aren't the program's), status 1. A script that returns
+    `false, "why"` (or `nil, "why"`) exits 1 with `why` on stderr, as OpenOS took it; an integer it
+    returns is its status. Processes get `debug.traceback` (the firmware's sandbox gives it; it reads
+    the stack raw).
+  - **`/bin`**: `cat cp df echo grep halt head kill ls lua mkdir mount mv poweroff ps rm rmdir sh
+    sleep tail touch umount`. `grep [-ivnclqhHFE] [-e p]`: POSIX basic or (`-E`) extended regular
+    expressions as far as Lua patterns say them (`. * ^ $ [...]`, `\` escapes, `+ ?` with -E,
+    `[:class:]`; no groups, alternation or intervals: refused with a message), status 0/1/2.
+    `head`/`tail` `-n`, `-c`, `tail -n +N`.
+  - **The kernel collects before a spawn past half the RAM** (`reclaim`): a new coroutine's stack is
+    made without the emergency collection other allocations get, so with garbage about (a few nested
+    shells) a spawn failed with `not enough memory` though there was room.
   - `lib/modules/tty.lua`, the tty: its input buffer and termios flags belong to the device,
     whatever process runs (typeahead waits there). **It never reads a device: it registers a ring
     for its device, and what's typed arrives there by itself.** Its line discipline: canonical mode

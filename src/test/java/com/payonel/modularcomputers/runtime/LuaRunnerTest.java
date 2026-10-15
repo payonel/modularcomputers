@@ -261,8 +261,8 @@ class LuaRunnerTest {
 			board.halt()
 			""");
 		untilHalted();
-		assertThat(row(0)).as("the sandbox's debug has only what a program needs for its own frozen coroutines")
-			.isEqualTo("isfrozen,thaw nil true nil");
+		assertThat(row(0)).as("the sandbox's debug has only what a program needs for its own frozen coroutines, and a traceback")
+			.isEqualTo("isfrozen,thaw,traceback nil true nil");
 	}
 
 	@Test

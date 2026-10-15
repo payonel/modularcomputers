@@ -250,8 +250,10 @@ end
 
 -- The collector is the VM's: a program may measure it and nudge it, not stop it.
 local collect = collectgarbage
--- A program's own frozen coroutines (a stop left one so): whether one is, and going on with it.
+-- A program's own frozen coroutines (a stop left one so): whether one is, and going on with it; and
+-- a traceback, for reporting errors (LungoLua's reads the stack raw: no metamethod of the program's runs).
 sandbox.debug = {
+  traceback = debug.traceback,
   isfrozen = function(co)
     return isfrozen(co)
   end,

@@ -1,0 +1,62 @@
+-- head [-n lines] [-c bytes] [file...]: the first lines (10) or bytes of each file, or of stdin.
+local lines, bytes = 10, nil
+local files = {}
+local i = 1
+while i <= #arg do
+  local word = arg[i]
+  local flag, value = string.match(word, "^%-([nc])(%d*)$")
+  if flag then
+    if value == "" then
+      i = i + 1
+      value = arg[i]
+    end
+    value = math.tointeger(tonumber(value))
+    if not value or value < 0 then
+      io.stderr:write("head: invalid number of " .. (flag == "n" and "lines" or "bytes") .. "\n")
+      return 1
+    end
+    if flag == "n" then
+      lines, bytes = value, nil
+    else
+      bytes = value
+    end
+  elseif string.match(word, "^%-%d+$") then
+    lines = tonumber(string.sub(word, 2))
+  else
+    files[#files + 1] = word
+  end
+  i = i + 1
+end
+if #files == 0 then
+  files[1] = "-"
+end
+local status = 0
+for index, path in ipairs(files) do
+  local file, why = io.stdin, nil
+  if path ~= "-" then
+    file, why = io.open(path)
+  end
+  if not file then
+    io.stderr:write("head: " .. why .. "\n")
+    status = 1
+  else
+    if #files > 1 then
+      io.write(index > 1 and "\n" or "", "==> ", path == "-" and "standard input" or path, " <==\n")
+    end
+    if bytes then
+      io.write(file:read(bytes) or "")
+    else
+      for _ = 1, lines do
+        local line = file:read("L")
+        if not line then
+          break
+        end
+        io.write(line)
+      end
+    end
+    if file ~= io.stdin then
+      file:close()
+    end
+  end
+end
+return status

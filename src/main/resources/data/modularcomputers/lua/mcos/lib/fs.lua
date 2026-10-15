@@ -238,22 +238,88 @@ function fs.move(from, to)
   return fs.remove(from, true)
 end
 
--- ---- globbing -----------------------------------------------------------------------------------
+-- ---- globbing ---------------------------------------------------------------------------------
 
--- A shell pattern as a Lua pattern: * any run, ? any one character; the rest as itself.
-local function pattern(glob)
-  return "^" .. string.gsub(glob, "[%^%$%(%)%%%.%[%]%*%+%-%?]", function(c)
-    if c == "*" then
-      return "[^/]*"
+local CLASSES = {alpha = "%a", digit = "%d", alnum = "%w", space = "%s", upper = "%u", lower = "%l",
+  punct = "%p", xdigit = "%x", cntrl = "%c", print = "\32-\126", graph = "\33-\126", blank = " \t"}
+
+-- A shell pattern (one part of a path) as a Lua pattern, as POSIX fnmatch reads it: * any run of
+-- characters, ? any one, [...] one of a set ([!...] or [^...] one not in it; ranges, [:class:]),
+-- and a backslash makes the next character itself. Nil if it has nothing special (no glob).
+function fs.pattern(glob)
+  local out, at, n, special = {"^"}, 1, #glob, false
+  while at <= n do
+    local c = string.sub(glob, at, at)
+    if c == "\\" and at < n then
+      out[#out + 1] = "%" .. string.sub(glob, at + 1, at + 1)
+      at = at + 2
+    elseif c == "*" then
+      out[#out + 1] = ".*"
+      special = true
+      at = at + 1
     elseif c == "?" then
-      return "[^/]"
+      out[#out + 1] = "."
+      special = true
+      at = at + 1
+    elseif c == "[" then
+      -- a set ends at the first ] after its first character (so []] and [!]] hold a ])
+      local start = at + 1
+      local negate = string.sub(glob, start, start) == "!" or string.sub(glob, start, start) == "^"
+      if negate then
+        start = start + 1
+      end
+      local close = string.find(glob, "]", start + 1, true)
+      while close and string.find(string.sub(glob, start, close - 1), "%[:%a*:$") do
+        close = string.find(glob, "]", close + 1, true) -- (inside a [:class:])
+      end
+      if not close then
+        out[#out + 1] = "%["
+        at = at + 1
+      else
+        local body = string.sub(glob, start, close - 1)
+        local set = {}
+        local k = 1
+        while k <= #body do
+          local class = string.match(body, "^%[:(%a+):%]", k)
+          local d = string.sub(body, k, k)
+          if class and CLASSES[class] then
+            set[#set + 1] = CLASSES[class]
+            k = k + #class + 4
+          elseif d == "\\" and k < #body then
+            set[#set + 1] = "%" .. string.sub(body, k + 1, k + 1)
+            k = k + 2
+          elseif string.sub(body, k + 1, k + 1) == "-" and k + 2 <= #body then
+            local a, b = d, string.sub(body, k + 2, k + 2)
+            set[#set + 1] = (string.find(a, "%W") and "%" .. a or a) .. "-" .. (string.find(b, "%W") and "%" .. b or b)
+            k = k + 3
+          else
+            set[#set + 1] = string.find(d, "%W") and "%" .. d or d
+            k = k + 1
+          end
+        end
+        out[#out + 1] = "[" .. (negate and "^" or "") .. table.concat(set) .. "]"
+        special = true
+        at = close + 1
+      end
+    else
+      out[#out + 1] = string.find(c, "%W") and "%" .. c or c
+      at = at + 1
     end
-    return "%" .. c
-  end) .. "$"
+  end
+  if not special then
+    return nil
+  end
+  out[#out + 1] = "$"
+  return table.concat(out)
 end
 
--- The paths matching a shell pattern (* and ? in any part), sorted; names starting with . only
--- when the pattern's part does.
+-- What a pattern part without anything special names (its backslashes taken off).
+local function literal(part)
+  return (string.gsub(part, "\\(.)", "%1"))
+end
+
+-- The paths matching a shell pattern (special characters in any part), sorted; a name starting with
+-- a dot only when its part of the pattern does. None: an empty list (the shell then keeps the word).
 function fs.glob(glob)
   local absolute = string.sub(glob, 1, 1) == "/"
   local parts = {}
@@ -261,25 +327,33 @@ function fs.glob(glob)
     parts[#parts + 1] = part
   end
   local found = {absolute and "/" or ""}
-  for _, part in ipairs(parts) do
+  for index, part in ipairs(parts) do
     local next = {}
+    local pattern = fs.pattern(part)
     for _, base in ipairs(found) do
-      if string.find(part, "[%*%?]") then
+      if pattern then
         local entries = fs.list(base == "" and "." or base)
         for _, entry in ipairs(entries or {}) do
-          if string.find(entry.name, pattern(part))
-            and (string.sub(entry.name, 1, 1) ~= "." or string.sub(part, 1, 1) == ".") then
+          local hidden = string.sub(entry.name, 1, 1) == "."
+          if string.find(entry.name, pattern) and (not hidden or string.sub(part, 1, 1) == ".")
+            and (index == #parts or entry.type == "directory") then
             next[#next + 1] = base == "" and entry.name or fs.join(base, entry.name)
           end
         end
       else
-        local path = base == "" and part or fs.join(base, part)
-        if fs.exists(path) then
+        local name = literal(part)
+        local path = base == "" and name or fs.join(base, name)
+        if index == #parts or fs.isdir(path) then
           next[#next + 1] = path
         end
       end
     end
     found = next
+  end
+  if string.sub(glob, -1) == "/" then
+    for i, path in ipairs(found) do
+      found[i] = path .. "/"
+    end
   end
   table.sort(found)
   return found

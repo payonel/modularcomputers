@@ -1,0 +1,170 @@
+-- grep [-ivnclqhHFE] [-e pattern] pattern [file...]: the lines matching a pattern (stdin with no
+-- files, or "-"). Patterns are POSIX regular expressions, basic (BRE) or with -E extended (ERE),
+-- as far as Lua's patterns can say them: . * ^ $ [...] [^...], \ escapes, and with -E also + and ?;
+-- groups, alternation (|) and intervals ({n,m}) aren't supported. -F matches the text as it is.
+-- -i ignores case, -v selects lines that don't match, -n numbers them, -c counts them, -l names
+-- the files with a match, -q says nothing, -h/-H leave out/put in file names. Exit status: 0 a line
+-- was selected, 1 none was, 2 an error.
+local USAGE = "usage: grep [-ivnclqhHFE] [-e pattern] pattern [file...]\n"
+
+local options, patterns, files = {}, {}, {}
+local i = 1
+while i <= #arg do
+  local word = arg[i]
+  if word == "--" then
+    for j = i + 1, #arg do
+      files[#files + 1] = arg[j]
+    end
+    break
+  elseif word == "-e" then
+    patterns[#patterns + 1] = arg[i + 1]
+    i = i + 1
+  elseif string.sub(word, 1, 1) == "-" and #word > 1 then
+    for c in string.gmatch(string.sub(word, 2), ".") do
+      if not string.find("ivnclqhHFE", c, 1, true) then
+        io.stderr:write("grep: invalid option -- '" .. c .. "'\n", USAGE)
+        return 2
+      end
+      options[c] = true
+    end
+  elseif #patterns == 0 and not options.e then
+    patterns[1] = word
+    options.e = true
+  else
+    files[#files + 1] = word
+  end
+  i = i + 1
+end
+if #patterns == 0 then
+  io.stderr:write(USAGE)
+  return 2
+end
+
+-- A regular expression as a Lua pattern; nil and why when it can't be one.
+local function translate(re)
+  local out, n, at = {}, #re, 1
+  local extended = options.E
+  while at <= n do
+    local c = string.sub(re, at, at)
+    if c == "\\" then
+      local d = string.sub(re, at + 1, at + 1)
+      if d == "" then
+        return nil, "trailing backslash (\\)"
+      elseif not extended and (d == "(" or d == ")" or d == "{" or d == "}" or d == "|") then
+        return nil, "\\" .. d .. " isn't supported"
+      end
+      out[#out + 1] = string.find(d, "%w") and d or "%" .. d
+      at = at + 2
+    elseif c == "[" then
+      local close = string.find(re, "]", at + (string.sub(re, at + 1, at + 1) == "^" and 3 or 2), true)
+      if not close then
+        return nil, "Unmatched [, [^, [:, [., or [="
+      end
+      local set = string.sub(re, at + 1, close - 1)
+      set = string.gsub(set, "%[:(%a+):%]", {alpha = "%a", digit = "%d", alnum = "%w", space = "%s",
+        upper = "%u", lower = "%l", punct = "%p", xdigit = "%x", cntrl = "%c"})
+      set = string.gsub(set, "%%", "%%%%")
+      out[#out + 1] = "[" .. set .. "]"
+      at = close + 1
+    elseif c == "^" then
+      out[#out + 1] = at == 1 and "^" or "%^"
+      at = at + 1
+    elseif c == "$" then
+      out[#out + 1] = at == n and "$" or "%$"
+      at = at + 1
+    elseif c == "." or c == "*" then
+      out[#out + 1] = c
+      at = at + 1
+    elseif c == "+" or c == "?" then
+      out[#out + 1] = extended and c or "%" .. c
+      at = at + 1
+    elseif extended and (c == "(" or c == ")" or c == "|" or c == "{" or c == "}") then
+      return nil, c .. " isn't supported"
+    elseif string.find(c, "%W") then
+      out[#out + 1] = "%" .. c
+      at = at + 1
+    else
+      out[#out + 1] = c
+      at = at + 1
+    end
+  end
+  return table.concat(out)
+end
+
+local matchers = {}
+for _, pattern in ipairs(patterns) do
+  if options.i then
+    pattern = string.lower(pattern)
+  end
+  if options.F then
+    matchers[#matchers + 1] = function(line)
+      return string.find(line, pattern, 1, true) ~= nil
+    end
+  else
+    local lua, why = translate(pattern)
+    if not lua or not pcall(string.find, "", lua) then
+      io.stderr:write("grep: " .. (why or "invalid pattern: " .. pattern) .. "\n")
+      return 2
+    end
+    matchers[#matchers + 1] = function(line)
+      return string.find(line, lua) ~= nil
+    end
+  end
+end
+
+local function selected(line)
+  if options.i then
+    line = string.lower(line)
+  end
+  local hit = false
+  for _, match in ipairs(matchers) do
+    if match(line) then
+      hit = true
+      break
+    end
+  end
+  return hit ~= (options.v == true)
+end
+
+if #files == 0 then
+  files[1] = "-"
+end
+local named = (#files > 1 or options.H) and not options.h
+local any, failed = false, false
+for _, path in ipairs(files) do
+  local file, why = io.stdin, nil
+  if path ~= "-" then
+    file, why = io.open(path)
+  end
+  if not file then
+    io.stderr:write("grep: " .. why .. "\n")
+    failed = true
+  else
+    local count, number = 0, 0
+    for line in file:lines() do
+      number = number + 1
+      if selected(line) then
+        count = count + 1
+        any = true
+        if options.q then
+          return 0
+        elseif options.l then
+          io.write(path == "-" and "(standard input)" or path, "\n")
+          break
+        elseif not options.c then
+          io.write(named and path .. ":" or "", options.n and number .. ":" or "", line, "\n")
+        end
+      end
+    end
+    if options.c then
+      io.write(named and path .. ":" or "", count, "\n")
+    end
+    if file ~= io.stdin then
+      file:close()
+    end
+  end
+end
+if failed and not (any and options.q) then
+  return 2
+end
+return any and 0 or 1

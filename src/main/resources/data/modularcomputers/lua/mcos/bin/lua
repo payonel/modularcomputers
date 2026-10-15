@@ -7,6 +7,7 @@ local sys = sys
 _G.sys = nil -- programs ask for it: require("sys")
 
 local LIB = "/lib/" -- where the standard library's own parts are
+local INTERPRETER = "/bin/lua" -- (its own frames end a traceback)
 local PROMPT, PROMPT2 = "> ", ">> "
 
 -- A file as a function, as Lua's loadfile: its text is the kernel's shared image of it (compiled
@@ -165,17 +166,52 @@ function require(name)
   return value, extra
 end
 
--- Runs a function as the script, reporting an error on stderr; true if it didn't fail, and its results.
+-- What an error object says: a string as it is, an object with __tostring through it, else
+-- "(error object is a <type> value)", as Lua's interpreter says.
+local function message(err)
+  if type(err) == "string" or math.type(err) then
+    return tostring(err)
+  end
+  local meta = getmetatable(err)
+  if type(meta) == "table" and meta.__tostring then
+    local ok, text = pcall(tostring, err)
+    if ok and type(text) == "string" then
+      return text
+    end
+  end
+  return "(error object is a " .. type(err) .. " value)"
+end
+
+-- The stack where an error happened, as debug.traceback gives it (from the frame that raised it,
+-- as Lua's interpreter shows it), cut at the interpreter's xpcall: what's below is the interpreter's
+-- and the kernel's, not the program's.
+local function traceback()
+  local lines = {}
+  for line in string.gmatch(debug.traceback("", 3), "[^\n]+") do
+    lines[#lines + 1] = line
+  end
+  local cut = #lines + 1
+  for k = #lines, 1, -1 do
+    if string.find(lines[k], "'xpcall'", 1, true) then
+      cut = k
+      break
+    end
+  end
+  while cut > 2 and string.find(lines[cut - 1], "(...tail calls...)", 1, true) do
+    cut = cut - 1
+  end
+  return "\n" .. table.concat(lines, "\n", 1, cut - 1)
+end
+
+-- Runs a function as the script; an error is reported on stderr as Lua's interpreter does it,
+-- "lua: <message>" and the stack traceback. True if it didn't fail, and its results.
 local function protected(f, ...)
   local results = table.pack(xpcall(f, function(err)
-    return err
+    return {message(err) .. traceback()}
   end, ...))
   if not results[1] then
-    local err = results[2]
-    if type(err) ~= "string" and not (getmetatable(err) and getmetatable(err).__tostring) then
-      err = "(error object is a " .. type(err) .. " value)"
-    end
-    io.stderr:write("lua: " .. tostring(err) .. "\n")
+    io.stdout:flush()
+    io.stderr:write("lua: " .. results[2][1] .. "\n")
   end
   return table.unpack(results, 1, results.n)
 end
@@ -235,12 +271,18 @@ else
     io.stderr:write("lua: " .. err .. "\n")
     status = 1
   else
+    -- its status: an integer it returns; false (or nil) and a message: 1, the message on stderr
+    -- (as OpenOS took "return false, why"); else 0
     local results = table.pack(protected(main, table.unpack(args, 1, args.n)))
     if not results[1] then
       status = 1
     elseif math.type(results[2]) == "integer" then
       status = results[2]
-    elseif results[2] == false then
+    elseif results[2] == false or (results[2] == nil and results.n >= 3 and results[3] ~= nil) then
+      if results[3] ~= nil then
+        io.stdout:flush()
+        io.stderr:write(message(results[3]), "\n")
+      end
       status = 1
     else
       status = 0
