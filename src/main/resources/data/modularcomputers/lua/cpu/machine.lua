@@ -32,6 +32,14 @@
 -- between head and tail and moves head on; this file only ever writes slots and tail. A source
 -- with a ring isn't cached in the inbox.
 --
+-- Stops (user design, 2026-10-15; LungoLua 1.1's thaw with stops): a program may name coroutines
+-- (board.addstop) whose resumer should hear of new input at once, as a scheduler names its
+-- children. When a ring gets data the program had nothing left of (it had taken all before), this
+-- file thaws user code with those stops: the resume of a named coroutine returns as if it had just
+-- frozen there (debug.isfrozen is then true; the program thaws it to go on, with the sandbox's
+-- debug.thaw), so the scheduler runs, sees the data in its ring, and decides. Otherwise a thaw is
+-- plain. Nothing in user code has to ask for input.
+--
 -- Device data (user design, 2026-10-13): this file caches what devices have (keys, sensor events)
 -- in its inbox, a queue per device. As a wait is answered the host takes, from each device with
 -- data, as much as that device's queue has room for (its size comes from the RAM: none with only
@@ -97,8 +105,13 @@ end}
 local inbox = {}
 
 -- The rings the program gave, by source: {ring = its table, size, tail (this file's own count; the
--- ring's tail field is a copy for the program), overflow = what came and had no slot yet}.
+-- ring's tail field is a copy for the program), overflow = what came and had no slot yet, armed =
+-- the program had taken everything: new data is news, and stops the thaw}.
 local rings = {}
+
+-- The coroutines whose resumer hears of new input (board.addstop): weak, so a stop that's
+-- dropped by the program goes with it.
+local stops = setmetatable({}, {__mode = "k"})
 
 -- A ring's head as the program left it, trusted only within [tail - size, tail]: anything else
 -- reads as full, so this file never writes past the slots it made.
@@ -132,7 +145,8 @@ local function unread(address)
 end
 
 -- Before user code resumes (firmware mode): what the host pushed goes into the rings, and the host
--- hears how much room each has now.
+-- hears how much room each has now. Whether a ring got news: data where the program had taken
+-- everything (so a stop isn't repeated until it has taken what came before).
 local function deliver()
   local got = drain()
   if got then
@@ -143,12 +157,27 @@ local function deliver()
       end
     end
   end
+  local news = false
   for address, r in pairs(rings) do
+    if head_of(r) == r.tail and r.overflow[1] == nil then
+      r.armed = true -- all taken: the next data is news
+    end
+    local before = r.tail
     while r.overflow[1] ~= nil and store(r, r.overflow[1]) do
       table_remove(r.overflow, 1)
     end
+    if r.tail > before and r.armed then
+      r.armed = false
+      news = true
+    end
     credit(address, r.size - (r.tail - head_of(r)) - #r.overflow)
   end
+  return news
+end
+
+-- A thaw that stops at the program's stops (the resume of a named coroutine returns).
+local function thaw_stopping(co)
+  return thaw(co, stops)
 end
 
 -- Asks the host (yields kernel_co).
@@ -210,6 +239,16 @@ end
 
 -- The collector is the VM's: a program may measure it and nudge it, not stop it.
 local collect = collectgarbage
+-- A program's own frozen coroutines (a stop left one so): whether one is, and going on with it.
+sandbox.debug = {
+  isfrozen = function(co)
+    return isfrozen(co)
+  end,
+  thaw = function(co)
+    return thaw(co)
+  end,
+}
+
 sandbox.collectgarbage = function(what, ...)
   what = what or "collect"
   if what == "count" or what == "step" or what == "collect" or what == "isrunning" then
@@ -339,10 +378,23 @@ sandbox.board = {
     end
     ring.head, ring.tail, ring.size = 0, 0, size
     usermode(false)
-    rings[source] = {ring = ring, size = size, tail = 0, overflow = {}}
+    rings[source] = {ring = ring, size = size, tail = 0, overflow = {}, armed = true}
     credit(source, size)
     usermode(true)
     return ring
+  end,
+  -- names a coroutine whose resumer hears of new input at once (see "Stops" above); removestop
+  -- takes it back
+  addstop = function(co)
+    if type(co) ~= "thread" then
+      error("bad argument #1 to 'addstop' (coroutine expected, got " .. type(co) .. ")", 2)
+    end
+    usermode(false)
+    stops[co] = true
+    usermode(true)
+  end,
+  removestop = function(co)
+    stops[co] = nil
   end,
   -- the CPU stops; power stays on. It never returns.
   halt = function()
@@ -385,8 +437,11 @@ while true do
       ask("slice") -- the slice is spent
     end
     setbudget(user_co, SLICE, spent) -- a new slice
-    deliver()
-    result = table_pack(user(thaw))
+    if deliver() then
+      result = table_pack(user(thaw_stopping)) -- new input: the program's scheduler hears at once
+    else
+      result = table_pack(user(thaw))
+    end
   elseif coroutine_status(user_co) == "dead" then
     if result[1] then
       return "returned"

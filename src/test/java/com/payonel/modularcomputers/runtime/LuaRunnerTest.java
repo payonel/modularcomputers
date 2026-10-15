@@ -253,11 +253,16 @@ class LuaRunnerTest {
 	@Test
 	void theProgramCantReachTheFirmware() {
 		boot("""
-			board.invoke("console", "write", tostring(debug) .. tostring(host) .. tostring(load("return debug")()))
+			local names = {}
+			for name in pairs(debug) do names[#names + 1] = name end
+			table.sort(names)
+			board.invoke("console", "write", table.concat(names, ",") .. " " .. tostring(host) .. " "
+			  .. tostring(load("return debug")() == debug) .. " " .. tostring(debug.getregistry))
 			board.halt()
 			""");
 		untilHalted();
-		assertThat(row(0)).isEqualTo("nilnilnil");
+		assertThat(row(0)).as("the sandbox's debug has only what a program needs for its own frozen coroutines")
+			.isEqualTo("isfrozen,thaw nil true nil");
 	}
 
 	@Test
@@ -836,6 +841,64 @@ class LuaRunnerTest {
 		settle(again, () -> again.runner().isEmpty());
 		assertThat(again.board().virtualBus().console().screen().row(0).strip()).as("none lost, in order").isEqualTo("abcd");
 		again.pressPower();
+	}
+
+	/** Plays the server thread for {@code ticks} ticks, pressing keys at the ticks given. */
+	private void typeAt(int ticks, Map<Integer, String> keys) {
+		for (int tick = 0; tick < ticks && machine.runner().isPresent(); tick++) {
+			Runnable task;
+			while ((task = server.poll()) != null) {
+				task.run();
+			}
+			machine.tick();
+			if (keys.containsKey(tick)) {
+				screen.press(keys.get(tick));
+			}
+			try {
+				Thread.sleep(2);
+			} catch (InterruptedException e) {
+				throw new IllegalStateException(e);
+			}
+		}
+	}
+
+	@Test
+	void newInputStopsABusyChildAndItsSchedulerHearsAtOnce() {
+		boot(READ_RING + """
+			local ring = board.ring("console", 4)
+			local child = coroutine.create(function() local n = 0 while true do n = n + 1 end end)
+			board.addstop(child)
+			coroutine.resume(child) -- busy forever: only a stop brings the scheduler back
+			local typed = table.concat(take(ring))
+			board.invoke("console", "write", tostring(debug.isfrozen(child)) .. " " .. typed)
+			board.halt()
+			""");
+		typeAt(200, Map.of(10, "k"));
+		untilHalted();
+		assertThat(row(0)).as("the child stopped where it was; the key in the ring").isEqualTo("true k");
+	}
+
+	@Test
+	void aStopIsntRepeatedUntilTheProgramHasTakenTheData() {
+		boot(READ_RING + """
+			local ring = board.ring("console", 4)
+			local child = coroutine.create(function()
+			  local start = board.uptime()
+			  while board.uptime() < start + 40 do end -- busy for 40 ticks
+			end)
+			board.addstop(child)
+			local stops = 0
+			local ok = coroutine.resume(child)
+			while debug.isfrozen(child) do
+			  stops = stops + 1 -- (the data isn't taken: the next key isn't news)
+			  debug.thaw(child)
+			end
+			board.invoke("console", "write", stops .. " " .. (ring.tail - ring.head))
+			board.halt()
+			""");
+		typeAt(400, Map.of(5, "a", 20, "b"));
+		untilHalted();
+		assertThat(row(0)).as("one stop; both keys came").isEqualTo("1 2");
 	}
 
 	@Test

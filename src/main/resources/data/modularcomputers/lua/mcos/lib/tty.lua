@@ -2,8 +2,8 @@
 -- the board's console) and holds its input buffer and termios flags, whatever process is running.
 -- What the device sends arrives by itself in the tty's ring (board.ring: the firmware fills it, as
 -- a device fills its driver's ring by DMA; Linux's flip buffer), with no call; the line discipline
--- (pump, receive) edits, echoes and signals as the ring is read, and processes read what's ready
--- (take). Output goes to the device after the tty's output processing (onlcr).
+-- (pump, receive: the kernel runs it as the interrupt handler for the device) edits, echoes and
+-- signals, and processes read what's ready (take). Output goes to the device after the tty's output processing (onlcr).
 local tty = {}
 tty.__index = tty
 
@@ -139,14 +139,12 @@ end
 
 -- Whether a read would get something.
 function tty:readable()
-  self:pump()
   return #self.ready > 0
 end
 
 -- A read: the next line (canonical mode), or every byte typed; "" at an end of file; nil when
 -- nothing is ready.
 function tty:take()
-  self:pump()
   if #self.ready == 0 then
     return nil
   end

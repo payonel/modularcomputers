@@ -4,7 +4,7 @@ This file is the full context for any agent session working on this repo. `CLAUD
 (Claude Code reads `CLAUDE.md`, not `AGENTS.md`; other agent tools read `AGENTS.md`). Keep it
 current: when a decision is made or a gotcha is found, record it here.
 
-Last updated: 2026-10-13 (the console is UEFI's splitter: literal writes, members raise their own interrupts and can race it).
+Last updated: 2026-10-15 (LungoLua 1.1: thaw with stops; new input stops a busy process, and its scheduler hears at once).
 
 ---
 
@@ -600,7 +600,14 @@ scripts/art/error_beep.py` into
   `luaL_loadbufferx`, `HostString` for text crossing in). Beyond stock Lua it has **budgets**
   (`lua_setbudget`: a callback every n steps, which can `lua_freeze` the thread wherever it is;
   `lua_thaw` goes on) and **Styx**, persisting a whole state (`luaL_persiststate`), for saving
-  running machines later.
+  running machines later. **Since `1.1`, a thaw can stop** (`debug.thaw(co, stops)`, the lua
+  thread's design for the user, 2026-10-15): it stops above the first coroutine in `stops` it meets
+  going down the frozen chain, and the call that resumed that coroutine returns as if it had just
+  frozen there (resume and thaw give `true` and no values); the stopped coroutine stays frozen
+  (`debug.isfrozen` true) until its resumer thaws it. Budgeted code can thaw (it's a resume, on
+  what's left of the slice). Found here: `coroutine.status` says `"running"` for a stopped
+  coroutine, and `coroutine.close` refuses one ("cannot close a running coroutine"), so
+  `isfrozen` is the only test, and mcos drops a stopped process to kill it.
 - **Cards that work** (user design, 2026-10-13; `device/Cards.make` by kind, the world glue in
   `block/CardWorld`, ticked by the block they're in, a case or a hub; a card works while a running
   computer powers it). Events wait in a bounded queue (32; when full the oldest goes and the next
@@ -627,10 +634,14 @@ scripts/art/error_beep.py` into
     (`console=<address>` picks the input device its tty is on; the board's `console` by default;
     the bootloader passes none yet). It loads its libraries from `/lib`, starts `/sh.lua` (by its
     path, as Linux's `init=`) as a process on its tty, and idles: when no process can run, it waits
-    for the tty's device (the CPU's HLT) and runs the line discipline on what arrived. **It never
-    reads a device: the tty registers a ring for its device, and what's typed arrives there by
-    itself**; a process's `io.read` runs the line discipline on the ring itself (`tty:pump`), with
-    no call and no yield. When the
+    for the tty's device (the CPU's HLT). **It never reads a device: the tty registers a ring for
+    its device, and what's typed arrives there by itself.** Drivers register **interrupt
+    handlers** with the kernel (the tty's runs its line discipline on the ring, `tty:pump`); the
+    kernel runs them when it wakes from idling, at each pass over its processes, and **when a
+    running process is stopped for new input**: every process is one of the firmware's stops
+    (`board.addstop`), so new input returns the kernel's resume of it at once, the handlers run (a
+    ^C marks SIGINT), and the kernel thaws it to go on, or drops it if a signal ends it (as SIGKILL
+    runs none of its code). Processes only read cooked lines. When the
     shell ends (or dies of a signal) it starts another, giving up after 10 starts in 5 seconds
     (sysvinit's "respawning too fast").
   - **Processes** are coroutines, each with its own globals and **the tty it inherited** from its
@@ -647,9 +658,10 @@ scripts/art/error_beep.py` into
     foreground process**, which ends it (no handlers yet). Output goes through `onlcr`.
   - `sh.lua`: prints `$ `, reads a line and writes it back; `halt` halts the computer; `poweroff`
     or an end of file ends the shell (the kernel starts another: the board has no power-off yet).
-  - Ctrl+C reaches a program only once it reads or waits for input: the line discipline runs on
-    the ring only then (the bytes are in the ring already). The firmware interrupt vector (PLAN.md)
-    will let it preempt a busy one.
+  - **Ctrl+C ends a busy process** too: the stop brings the kernel back as the key arrives. A busy
+    process that makes no board calls gets new input at the server's next turn for the computer
+    (each tick: within 50 ms); a turn asked at every key typed at a running computer was tried and
+    made a burst of typing 8 times slower (a turn a key while the shell's echo was answered).
   - Tests check what it does (it halts on `halt`; after ^C, `poweroff`, ^D the computer still
     runs), never what it says.
 - **Lua scripts** (user design, 2026-10-13; `machine/LuaScripts`): the Lua that comes with the
@@ -744,7 +756,8 @@ scripts/art/error_beep.py` into
     halted, as before.
   - **The firmware, `lua/cpu/machine.lua`** (after OC's `machine.lua`): all sandboxing, budgeting,
     freezing and syscalls. It builds the sandbox (copies of coroutine, string, table, math, utf8;
-    no debug, io, os, package, print, dofile, loadfile; `load` text only, into the sandbox by
+    no io, os, package, print, dofile, loadfile; a `debug` with only `isfrozen` and `thaw`, for a
+    program's own stopped coroutines; `load` text only, into the sandbox by
     default; `collectgarbage` limited to count/step/collect/isrunning; the `board` table), loads the
     EEPROM's text into it as the user coroutine (user_co, `=eeprom`), and budgets user_co
     (`debug.setbudget`, `SLICE` 100,000 steps a tick). **Its budget callback always freezes**: where
@@ -788,8 +801,9 @@ scripts/art/error_beep.py` into
     on its way waits for it to reach the VM (`LuaRunner.honour(answered)`); devices save what they
     hold (below).
   - **User code**: the EEPROM's text and what it runs, seen as untrusted. It gets `board` (`invoke`
-    answers as `pcall` does), and user coroutines that yield normally. `debug` stays hidden until
-    LungoLua has a sandboxed debug library (user's plan) that can't touch the firmware's budget.
+    answers as `pcall` does), and user coroutines that yield normally. Of `debug` it gets only
+    `isfrozen` and `thaw` (for coroutines a stop left frozen); the rest stays hidden until LungoLua
+    has a sandboxed debug library (user's plan) that can't touch the firmware's budget.
   - **Rings: device data pushed with no call** (user design, 2026-10-14, worked back from "user code
     reads its tty buffer with no syscall and no yield"): a program gives the firmware a ring for a
     source, `board.ring(address, size)` (at most 1024 packets), and gets back a table
@@ -810,7 +824,13 @@ scripts/art/error_beep.py` into
     (`modularcomputers.mailbox`), so it's saved with the state, and the next drain takes it from there;
     a device leaving the bus takes its mailboxed data with it (`Runner.devicesLeft`). A source with a
     ring isn't cached in the inbox. The program's choice decides the race: a ring for `console` takes
-    bound terminals' keys through the console.
+    bound terminals' keys through the console. **Stops** (2026-10-15): a program names coroutines
+    (`board.addstop(co)`, `board.removestop(co)`; weak in the firmware) whose resumer should hear of
+    new input at once, as a scheduler names its children. When a resume delivers data into a ring
+    the program had emptied (so a stop isn't repeated until it has taken what came before), the
+    firmware thaws user code with those stops (`debug.thaw(user_co, stops)`); otherwise a thaw is
+    plain. User code never asks for input. Rule for programs: after any resume or thaw of a child,
+    check `debug.isfrozen(child)`, and thaw a frozen child instead of resuming it.
   - **Memory** (user, 2026-10-13): the VM's memory is counted by LungoLua's allocator hook
     (`LuaRunner.Memory`, a `lua_Alloc`: `permit(osize, nsize, tag)` for every allocation, growth
     and free; the state is made with it from its first byte, and a restore counts as it's made), and

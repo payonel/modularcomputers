@@ -45,10 +45,23 @@ end
 local tty = assert(loadfile("/lib/tty.lua"))()
 local newio = assert(loadfile("/lib/io.lua"))()
 
+-- Interrupts: the handlers drivers register (a tty's line discipline for its device's ring), run
+-- when input arrives: when a running process is stopped for it (the firmware's stops: each process
+-- is one), and when the kernel wakes from idling.
+local handlers = {}
+
+local function interrupt()
+  for i = 1, #handlers do
+    handlers[i]()
+  end
+end
+
 -- Processes: each a coroutine with its own globals, and the tty it inherited from its parent. A
--- process waiting for input yields BLOCKED; the kernel resumes it when its tty has some.
+-- process waiting for input yields BLOCKED; the kernel resumes it when its tty has some. A process
+-- stopped for new input (frozen where it was) is thawed to go on, or dropped if a signal ends it.
 local BLOCKED = {}
 local processes = {}
+local isfrozen, thaw = debug.isfrozen, debug.thaw
 
 local function block()
   coroutine.yield(BLOCKED)
@@ -64,6 +77,7 @@ local function spawn(path, parent)
     return nil, why
   end
   process.co = coroutine.create(main)
+  board.addstop(process.co) -- new input stops it and comes here
   processes[#processes + 1] = process
   return process
 end
@@ -76,6 +90,9 @@ local function signal(t, name)
 end
 
 local console = tty.new(options.console or CONSOLE, signal)
+handlers[#handlers + 1] = function()
+  console:pump()
+end
 local kernel = {tty = console} -- the parent of what the kernel starts
 
 local starts = {}
@@ -107,25 +124,39 @@ local function ended(process, killed)
   end
 end
 
--- Runs every process that can run, until each waits or ends; whether any ran.
+-- Runs every process that can run, until each waits, ends or is stopped for input; whether any ran.
 local function run()
+  interrupt() -- input that came while the kernel itself ran
   local ran = false
   for i = #processes, 1, -1 do
     local process = processes[i]
+    local co = process.co
     if process.signal then
-      coroutine.close(process.co)
+      board.removestop(co)
+      if not isfrozen(co) then
+        coroutine.close(co) -- (a stopped one is dropped where it froze, as SIGKILL runs none of its code)
+      end
       table.remove(processes, i)
       ended(process, true)
       ran = true
-    elseif not process.waiting or process.tty:readable() then
-      local ok, why = coroutine.resume(process.co)
-      if not ok then
+    elseif isfrozen(co) or not process.waiting or process.tty:readable() then
+      local ok, why
+      if isfrozen(co) then
+        ok, why = thaw(co)
+      else
+        ok, why = coroutine.resume(co)
+      end
+      if isfrozen(co) then
+        process.waiting = false
+        interrupt() -- stopped for new input: handle it now (a ^C marks the signal)
+      elseif not ok then
         process.tty:write(process.path .. ": " .. tostring(why) .. "\n")
       end
-      if coroutine.status(process.co) == "dead" then
+      if coroutine.status(co) == "dead" then
+        board.removestop(co)
         table.remove(processes, i)
         ended(process, false)
-      else
+      elseif not isfrozen(co) then
         process.waiting = true
       end
       ran = true
@@ -139,8 +170,7 @@ shell()
 while true do
   if not run() then
     -- Nothing can run: idle (the CPU's HLT) until the tty's device sends something; it arrives in
-    -- the tty's ring by itself, and the line discipline takes it from there.
+    -- the tty's ring by itself, and the next run's handlers take it from there.
     board.waitForInterrupt(nil, console.device)
-    console:pump()
   end
 end
