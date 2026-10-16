@@ -649,7 +649,8 @@ scripts/art/error_beep.py` into
     (its memory) at `/tmp`, and every other hfs disk on the bus at `/mnt/<kind>/<name>` (`sata:1` at
     `/mnt/sata/1`), mounting and unmounting as the bus changes (noticed when it idles; files open on
     a disk that left fail with EIO). It starts init as a process group of its own, the console's
-    foreground, and starts it again when it ends (giving up after 10 starts in 5 seconds).
+    foreground, and starts it again whenever it ends (user, 2026-10-15: no giving up and halting;
+    if it can't be started at all, the kernel says why and tries again every 5 seconds).
   - **Processes** are coroutines, each with its own globals (Lua's base library and libraries,
     copied; **no `board`**: the hardware is the kernel's) and `sys`, its syscalls. **A syscall
     traps**: it leaves its request and calls `board.trap()`, which stops the process where it is and
@@ -675,8 +676,8 @@ scripts/art/error_beep.py` into
     `setpgid`, `kill` (a negative pid is a group), `signal` (a handler, `"ignore"` or `"default"`;
     handlers run in the process when a syscall returns, a blocked one returning EINTR; ignored
     signals stay ignored across spawn, handlers don't), `environ`, `processes`, `uptime`, `sleep`,
-    `reboot` (`"halt"`; `"poweroff"` halts too: the board has no soft-off, as Linux's "System
-    halted"). Signals: SIGHUP, SIGINT, SIGKILL, SIGPIPE, SIGTERM (end the process by default),
+    `reboot` (`"halt"`, `"poweroff"`, `"restart"`: every process ends, its files closed, then
+    `board.halt`, `board.poweroff` or `board.reboot`), `sysinfo` (the RAM and what's in use). Signals: SIGHUP, SIGINT, SIGKILL, SIGPIPE, SIGTERM (end the process by default),
     SIGCHLD (ignored).
   - **Shared program images** (as the page cache shares a program's text): the kernel compiles a
     Lua file once, as `function(_ENV, ...) <its text> end`, and every process running it calls that
@@ -723,8 +724,25 @@ scripts/art/error_beep.py` into
     `false, "why"` (or `nil, "why"`) exits 1 with `why` on stderr, as OpenOS took it; an integer it
     returns is its status. Processes get `debug.traceback` (the firmware's sandbox gives it; it reads
     the stack raw).
-  - **`/bin`**: `cat clear cp df echo grep halt head kill ls lua mkdir mount mv poweroff ps rm rmdir sh
-    sleep tail touch umount`. `grep [-ivnclqhHFE] [-e p]`: POSIX basic or (`-E`) extended regular
+  - **`/bin`**: `cat clear cp df echo edit free grep halt head kill ls lua mkdir mount mv poweroff
+    ps reboot rm rmdir sh sleep tail touch umount`. `ls` (user: like real ls, not `ls -1`): on a
+    terminal, names in columns down then across, as wide as the terminal (`TIOCGWINSZ`), directories
+    in bold blue; into a pipe or file, one a line (as GNU ls); `-1 -a -C -l -F`. `free [-b|-k|-m|-h]`:
+    collects garbage 20 times first (the user: that gets Lua's collector to finish), then `sysinfo`.
+    **`edit [file]`, after nano** (user: "a basic editor, make it nano like"; named as OpenOS's was):
+    a title bar, the text, a status line, two shortcut lines; ^O write out (asks the name), ^X exit
+    (asks to save changes), ^W search, ^K cut lines, ^U paste, ^C position, ^A/^E line start/end,
+    ^Y/^V page; arrows, Home/End, PgUp/PgDn, Delete; long lines scroll on the cursor's line with `$`
+    marks. It runs on the alternate screen with the tty raw (`TCSETS`: no icanon, echo, isig, icrnl)
+    and puts both back however it ends.
+  - **`/dev` lists the bus** (user, 2026-10-15): besides `console`, `tty`, `null`, `zero`, every device
+    `board.list()` has, named by type and its place among those of its type in bus order
+    (`terminal0`, `storage0`, `storage1`, as Linux's `sda`, `ttyS0`). Reading one gives `path:` (the
+    slot address `board.invoke` takes: `sata:0`; "(none: not in a slot)" for cabled ones), `id:` (the
+    id address it also takes: `id:<uuid>`), `type:`, `label:`, and what `board.info` adds (tier,
+    capacity...). Bus positions (the case view's numbers) aren't addresses: `board.invoke` takes
+    paths and ids only (and virtual names, `console`).
+  - `grep`: `[-ivnclqhHFE] [-e p]`: POSIX basic or (`-E`) extended regular
     expressions as far as Lua patterns say them (`. * ^ $ [...]`, `\` escapes, `+ ?` with -E,
     `[:class:]`; no groups, alternation or intervals: refused with a message), status 0/1/2.
     `head`/`tail` `-n`, `-c`, `tail -n +N`.
@@ -1171,6 +1189,14 @@ scripts/art/error_beep.py` into
         has its own limit** (`Terminal.INPUT_CAPACITY`, 256; user, 2026-10-13: devices keep their
         own rings): past it a key is dropped, as a PC's keyboard buffer drops what it has no room
         for (it beeps; no bell here yet).
+      - **The cursor** (user, 2026-10-15: "we want a blinking cursor"): drawn on the glass and in
+        the screen view where the decoder's cursor is, while it shows (`ESC[?25h`/`l`), the terminal
+        has power and its glass isn't scrolled back (`Terminal.cursor()`). Its shape is DECSCUSR's
+        (`CSI Ps SP q`): 0/1 a blinking block (the default), 2 a steady block, 3/4 an underline, 5/6 a
+        bar; a block is its cell in reverse video, the others a stroke in the text's color; blinking
+        600 ms on, 300 off (xterm's). Players get it with the changed rows (`ScreenRowsPayload`
+        carries it; sent when it moved even with no row changed), and with the block's data
+        (`_cursor_shown`); `Terminal.shownCursor()` is what they were last shown.
       - **Scrollback** (user, 2026-10-15: "shift page up"): lines that scroll off the top of its main
         screen are kept, `Terminal.SCROLLBACK_LINES` (200), and **Shift+PageUp/PageDown** (a screen) or
         the **mouse wheel** (3 lines) in the screen view scroll its glass back over them
@@ -1208,6 +1234,10 @@ scripts/art/error_beep.py` into
       and gets the console's copy drawn on it. Unbinding lasts only while the device stays on
       the bus (`ConsoleSplitter.busChanged`); power-off rebinds everything. GPUs may come later
       (then a screen's picture would live on the board and survive a replug).
+  - **`Board.poweroff()` and `Board.reboot()`** (user, 2026-10-15): ACPI soft-off (the machine is
+    off, as its power button does) and a restart (off and on again: the EEPROM boots afresh). Both
+    end the program (`Runner.State.POWERED_OFF`, `REBOOTING`; the firmware's `"poweroff"`, `"reboot"`
+    requests); the machine acts on them (`Machine.run`), and the case's block state follows.
   - **A program ends with `Board.halt()`** (user, 2026-10-11), like `cli; hlt` or Linux's
     `reboot(HALT)`: it never returns, the CPU stops, **power stays on** and the screens keep
     what they show (and the console still redraws onto screens plugged in later). **Falling off
