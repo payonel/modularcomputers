@@ -1,4 +1,4 @@
--- poweroff: ends every process and powers off (the board has no soft-off yet: it halts).
+-- poweroff: ends every process and turns the computer off.
 local sys = require("sys")
 io.flushall()
 local ok, why = sys.reboot("poweroff")

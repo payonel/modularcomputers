@@ -251,6 +251,36 @@ class LuaRunnerTest {
 	}
 
 	@Test
+	void aProgramCanTurnTheMachineOff() {
+		boot("board.invoke('console', 'write', 'bye') board.poweroff()");
+		settle(() -> !machine.isPowered());
+		assertThat(machine.runner()).isEmpty();
+	}
+
+	@Test
+	void aProgramCanRestartTheMachine() {
+		// a reboot runs the EEPROM afresh: the first boot marks the EEPROM, the second sees the mark
+		Eeprom eeprom = new Eeprom("""
+			local _, image = board.invoke("eeprom", "get")
+			if string.match(image, "%-%- rebooted$") then
+			  board.invoke("console", "write", "again")
+			  board.halt()
+			end
+			board.invoke("eeprom", "set", image .. string.char(10) .. "-- rebooted")
+			board.reboot()
+			""");
+		machine.board().setEeprom(eeprom);
+		Map<String, Device> devices = new LinkedHashMap<>();
+		devices.put("id:screen", screen);
+		devices.put("eeprom", eeprom);
+		machine.setDevices(devices);
+		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
+		settle(() -> row(0).equals("again") || row(0).startsWith("ABRT"));
+		assertThat(row(0)).isEqualTo("again");
+		assertThat(machine.isPowered()).isTrue();
+	}
+
+	@Test
 	void theProgramCantReachTheFirmware() {
 		boot("""
 			local names = {}

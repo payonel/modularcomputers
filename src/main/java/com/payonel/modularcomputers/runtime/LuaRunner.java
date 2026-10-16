@@ -55,6 +55,7 @@ import java.util.function.Supplier;
  * has an interrupt pending, or {@code ticks} pass ({@code -1}: no limit); answered with those
  * pending.</li>
  * <li>{@code "halt"}: the CPU halts; the thread ends.</li>
+ * <li>{@code "poweroff"}, {@code "reboot"}: the machine turns off (ACPI soft-off), or off and on again; the thread ends.</li>
  * </ul>
  * The firmware coroutine ends with {@code "returned"} (the EEPROM's code returned: a panic), {@code "abort",
  * why} (its text didn't load), or an error (the EEPROM's code crashed).
@@ -989,6 +990,14 @@ public final class LuaRunner implements Runner {
 					}
 					case "halt" -> {
 						finish(State.HALTED, null);
+						return;
+					}
+					case "poweroff" -> {
+						finish(State.POWERED_OFF, null);
+						return;
+					}
+					case "reboot" -> {
+						finish(State.REBOOTING, null);
 						return;
 					}
 					default -> {

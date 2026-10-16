@@ -182,7 +182,7 @@ public final class DisplayScreen extends Screen {
 		var depth = host != null ? host.terminal().tier().depth() : com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR;
 		graphics.fill(display.x(), display.y(), display.right(), display.bottom(), BLACK | depth.glass());
 		if (host != null) {
-			extractText(graphics, host.terminal().buffer(), depth);
+			extractText(graphics, host.terminal().buffer(), host.terminal().shownCursor(), depth);
 		}
 		if (minecraft.level != null && computer.isPresent() && minecraft.level.getBlockEntity(computer.get()) instanceof AllInOneBlockEntity machine) {
 			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.CASE, machine.getBlockState(), powerHeld);
@@ -206,10 +206,18 @@ public final class DisplayScreen extends Screen {
 		graphics.fill(d.x() - 1, d.y() - 1, d.right(), d.bottom(), colors.dark());
 	}
 
-	private void extractText(GuiGraphicsExtractor graphics, TextBuffer buffer, com.payonel.modularcomputers.display.ColorDepth depth) {
-		if (buffer.isBlank()) {
+	private void extractText(GuiGraphicsExtractor graphics, TextBuffer buffer, com.payonel.modularcomputers.device.Terminal.Cursor cursor,
+		com.payonel.modularcomputers.display.ColorDepth depth) {
+		boolean lit = com.payonel.modularcomputers.client.render.CursorBlink.lit(cursor);
+		if (buffer.isBlank() && !lit) {
 			return;
 		}
+		// A block cursor is its cell in reverse video.
+		boolean block = lit && cursor.block();
+		java.util.function.BiFunction<Integer, Integer, Integer> background = (column, row) ->
+			block && column == cursor.column() && row == cursor.row() ? depth.glow(buffer.foreground(column, row)) : buffer.background(column, row);
+		java.util.function.BiFunction<Integer, Integer, Integer> foreground = (column, row) ->
+			block && column == cursor.column() && row == cursor.row() ? buffer.background(column, row) : depth.glow(buffer.foreground(column, row));
 		Viewport area = layout.display();
 		TextGrid grid = TextGrid.of(area.width(), area.height(), resolution, font);
 		// Backgrounds first, in runs of equal color; the display is already black.
@@ -218,11 +226,11 @@ public final class DisplayScreen extends Screen {
 			int bottom = area.y() + Math.round((row + 1) * grid.cellHeight());
 			int start = 0;
 			for (int column = 1; column <= resolution.columns(); column++) {
-				if (column == resolution.columns() || buffer.background(column, row) != buffer.background(start, row)) {
-					int background = buffer.background(start, row);
-					if (background != TextBuffer.DEFAULT_BACKGROUND) {
+				if (column == resolution.columns() || !background.apply(column, row).equals(background.apply(start, row))) {
+					int color = background.apply(start, row);
+					if (color != TextBuffer.DEFAULT_BACKGROUND || (block && row == cursor.row() && start == cursor.column())) {
 						graphics.fill(area.x() + Math.round(start * grid.cellWidth()), top,
-							area.x() + Math.round(column * grid.cellWidth()), bottom, 0xFF000000 | background);
+							area.x() + Math.round(column * grid.cellWidth()), bottom, 0xFF000000 | color);
 					}
 					start = column;
 				}
@@ -237,11 +245,26 @@ public final class DisplayScreen extends Screen {
 				char c = buffer.get(column, row);
 				if (c != ' ') {
 					graphics.text(font, String.valueOf(c), (int) grid.x(column, c, font), (int) grid.y(row),
-						0xFF000000 | depth.glow(buffer.foreground(column, row)), false);
+						0xFF000000 | foreground.apply(column, row), false);
 				}
 			}
 		}
 		pose.popMatrix();
+		if (lit && !block && cursor.row() < resolution.rows() && cursor.column() < resolution.columns()) {
+			// an underline along the cell's bottom, or a bar at its left, in the text's color
+			int left = area.x() + Math.round(cursor.column() * grid.cellWidth());
+			int top = area.y() + Math.round(cursor.row() * grid.cellHeight());
+			int right = area.x() + Math.round((cursor.column() + 1) * grid.cellWidth());
+			int bottom = area.y() + Math.round((cursor.row() + 1) * grid.cellHeight());
+			int stroke = Math.max(1, Math.round((cursor.underline() ? grid.cellHeight() : grid.cellWidth())
+				* com.payonel.modularcomputers.client.render.CursorBlink.STROKE));
+			int color = 0xFF000000 | depth.glow(buffer.foreground(cursor.column(), cursor.row()));
+			if (cursor.underline()) {
+				graphics.fill(left, bottom - stroke, right, bottom, color);
+			} else {
+				graphics.fill(left, top, left + stroke, bottom, color);
+			}
+		}
 	}
 
 	@Override

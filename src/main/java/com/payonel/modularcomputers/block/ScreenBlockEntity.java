@@ -57,7 +57,7 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 	/** Sends what the screen shows to clients when a computer changed it. */
 	void serverTick() {
 		if (level instanceof ServerLevel server) {
-			ScreenRows.send(server, this, display.buffer());
+			ScreenRows.send(server, this, display);
 		}
 	}
 
@@ -71,7 +71,7 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 	@Override
 	protected void loadAdditional(ValueInput input) {
 		super.loadAdditional(input);
-		ScreenSave.load(input, DISPLAY, display.buffer(), display.decoder());
+		ScreenSave.load(input, DISPLAY, display);
 		DeviceSave.load(input, DISPLAY + "_device", display);
 	}
 }

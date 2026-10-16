@@ -131,6 +131,15 @@ public interface Board {
 	 */
 	void halt();
 
+	/**
+	 * Turns the machine off, as ACPI's soft-off (S5): the program ends here, and the computer is
+	 * off as if its power button were pressed. Never returns.
+	 */
+	void poweroff();
+
+	/** Restarts the machine: power off and on again, the CPU booting its EEPROM afresh. Never returns. */
+	void reboot();
+
 	/** The method that takes the next piece of a device's data, when it has a stream (see {@code Device.streamMethod}). */
 	default Optional<String> streamMethod(String address) {
 		return Optional.empty();

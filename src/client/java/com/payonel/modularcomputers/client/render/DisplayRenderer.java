@@ -58,6 +58,10 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 		String[] rows;
 		int[] foregrounds;
 		int[] backgrounds;
+		/** The cursor's cell when it's lit now (-1: not drawn), and its shape. */
+		int cursorColumn = -1;
+		int cursorRow;
+		com.payonel.modularcomputers.device.Terminal.Cursor cursor;
 	}
 
 	@Override
@@ -74,7 +78,9 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 		state.bluetooth = BluetoothTarget.isTarget(host.getBlockPos());
 		TextBuffer display = host.terminal().buffer();
 		state.resolution = display.resolution();
-		if (display.isBlank() || !host.showsScreen()) {
+		var cursor = host.terminal().shownCursor();
+		boolean lit = CursorBlink.lit(cursor) && cursor.row() < display.resolution().rows();
+		if ((display.isBlank() && !lit) || !host.showsScreen()) {
 			state.rows = null; // nothing on it, or no screen on the front (a case without one)
 			return;
 		}
@@ -83,6 +89,19 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 		var depth = host.terminal().tier().depth();
 		state.foregrounds = java.util.Arrays.stream(display.foregrounds()).map(depth::glow).toArray();
 		state.backgrounds = display.backgrounds();
+		state.cursor = cursor;
+		state.cursorColumn = -1;
+		if (lit) {
+			int cell = cursor.row() * display.resolution().columns() + cursor.column();
+			state.cursorColumn = cursor.column();
+			state.cursorRow = cursor.row();
+			if (cursor.block()) {
+				// a block cursor: its cell in reverse video
+				int foreground = state.foregrounds[cell];
+				state.foregrounds[cell] = state.backgrounds[cell];
+				state.backgrounds[cell] = foreground;
+			}
+		}
 	}
 
 	@Override
@@ -120,7 +139,8 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 			for (int column = 1; column <= columns; column++) {
 				if (column == columns || state.backgrounds[row * columns + column] != state.backgrounds[row * columns + start]) {
 					int background = state.backgrounds[row * columns + start];
-					if (background != TextBuffer.DEFAULT_BACKGROUND) {
+					boolean cursorCell = state.cursorColumn >= 0 && state.cursor.block() && row == state.cursorRow && start == state.cursorColumn;
+					if (background != TextBuffer.DEFAULT_BACKGROUND || cursorCell) {
 						collector.submitTextBackground(pose, start * cellWidth, row * cellHeight, column * cellWidth, (row + 1) * cellHeight,
 							0xFF000000 | background, Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT);
 					}
@@ -136,6 +156,19 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 					collector.submitText(pose, grid.x(column, c, font), grid.y(row), FormattedCharSequence.codepoint(c, Style.EMPTY), false,
 						Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT, 0xFF000000 | state.foregrounds[row * columns + column], 0, 0);
 				}
+			}
+		}
+		if (state.cursorColumn >= 0 && !state.cursor.block()) {
+			// an underline along the cell's bottom, or a bar at its left, in the text's color
+			float cellLeft = state.cursorColumn * cellWidth;
+			float cellTop = state.cursorRow * cellHeight;
+			int color = 0xFF000000 | state.foregrounds[state.cursorRow * columns + state.cursorColumn];
+			if (state.cursor.underline()) {
+				collector.submitTextBackground(pose, cellLeft, cellTop + cellHeight * (1 - CursorBlink.STROKE), cellLeft + cellWidth, cellTop + cellHeight,
+					color, Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT);
+			} else {
+				collector.submitTextBackground(pose, cellLeft, cellTop, cellLeft + cellWidth * CursorBlink.STROKE, cellTop + cellHeight,
+					color, Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT);
 			}
 		}
 		pose.popPose();

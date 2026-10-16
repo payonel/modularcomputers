@@ -201,6 +201,14 @@ public final class Machine {
 		} else if (state == Runner.State.RETURNED) {
 			board.cpu().ifPresent(cpu -> cpu.returned(board));
 		}
+		if (state == Runner.State.POWERED_OFF || state == Runner.State.REBOOTING) {
+			runner = null;
+			cutPower(); // ACPI soft-off: as the power button does
+			if (state == Runner.State.REBOOTING) {
+				pressPower(); // and on again: the CPU boots its EEPROM afresh
+			}
+			return;
+		}
 		if (state != Runner.State.RUNNING && state != Runner.State.WAITING) {
 			runner = null; // the CPU is halted; power stays on, and the screens keep what they show
 			setAccepting(false);

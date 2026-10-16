@@ -1,0 +1,44 @@
+-- free [-b|-k|-m|-h]: the computer's memory: its RAM, what's in use, what's free (KiB by default).
+-- It collects garbage first (a few times: Lua's collector frees some things only on a later
+-- cycle, such as objects with finalizers), so "used" is what's really held.
+local sys = require("sys")
+
+local COLLECTIONS = 20
+local UNITS = {b = 1, k = 1024, m = 1024 * 1024}
+
+local unit, human = UNITS.k, false
+for _, word in ipairs(arg) do
+  local flag = string.match(word, "^%-(%a)$")
+  if flag == "h" then
+    human = true
+  elseif flag and UNITS[flag] then
+    unit = UNITS[flag]
+  else
+    io.stderr:write("usage: free [-b|-k|-m|-h]\n")
+    return 1
+  end
+end
+
+for _ = 1, COLLECTIONS do
+  collectgarbage("collect")
+end
+local info, why = sys.sysinfo()
+if not info then
+  io.stderr:write("free: " .. tostring(why) .. "\n")
+  return 1
+end
+
+local function amount(bytes)
+  if not human then
+    return tostring(bytes // unit)
+  end
+  for _, suffix in ipairs({"B", "Ki", "Mi", "Gi"}) do
+    if bytes < 1024 or suffix == "Gi" then
+      return (suffix == "B" and tostring(bytes) or string.format("%.1f", bytes)) .. suffix
+    end
+    bytes = bytes / 1024
+  end
+end
+
+io.write(string.format("%-6s %10s %10s %10s\n", "", "total", "used", "free"))
+io.write(string.format("%-6s %10s %10s %10s\n", "Mem:", amount(info.totalram), amount(info.usedram), amount(info.freeram)))

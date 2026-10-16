@@ -159,6 +159,16 @@ final class MotherboardApi implements Board {
 		throw new UnsupportedOperationException("halt() is handled by the program runner");
 	}
 
+	@Override
+	public void poweroff() {
+		throw new UnsupportedOperationException("poweroff() is handled by the program runner");
+	}
+
+	@Override
+	public void reboot() {
+		throw new UnsupportedOperationException("reboot() is handled by the program runner");
+	}
+
 	/**
 	 * The interrupts pending now: the bus's (it changed since last listed), the console's (keys
 	 * wait at a terminal in its group), then each device's, in bus order. A terminal in the

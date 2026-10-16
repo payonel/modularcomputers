@@ -60,6 +60,8 @@ public final class VtDecoder {
 	private boolean newLineMode;
 	private boolean autowrap = true;
 	private boolean cursorVisible = true;
+	/** The cursor's shape, as DECSCUSR ({@code CSI Ps SP q}) sets it: 0 or 1 a blinking block (the default), 2 a steady block, 3/4 an underline, 5/6 a bar (odd ones blink). */
+	private int cursorStyle;
 	private int[] saved;
 	/** The main screen while the alternate one shows: characters, then foregrounds, backgrounds. */
 	private Screen mainScreen;
@@ -127,6 +129,10 @@ public final class VtDecoder {
 		return y;
 	}
 
+	public int cursorStyle() {
+		return cursorStyle;
+	}
+
 	public boolean cursorVisible() {
 		return cursorVisible;
 	}
@@ -155,6 +161,7 @@ public final class VtDecoder {
 		newLineMode = false;
 		autowrap = true;
 		cursorVisible = true;
+		cursorStyle = 0;
 		saved = null;
 		mainScreen = null;
 		buffer.clear();
@@ -263,7 +270,11 @@ public final class VtDecoder {
 
 	private void execute(char command, boolean privateMode, boolean intermediate, List<Integer> args) {
 		if (intermediate) {
-			return; // e.g. CSI SP q (cursor style): ignored
+			if (command == 'q') {
+				int style = argOrZero(args, 0);
+				cursorStyle = style <= 6 ? style : 0; // DECSCUSR (CSI Ps SP q): the cursor's shape
+			}
+			return; // (other sequences with intermediates are ignored)
 		}
 		int n = arg(args, 0, 1);
 		switch (command) {
@@ -664,7 +675,7 @@ public final class VtDecoder {
 	 */
 	public int[] state() {
 		int flags = (bold ? 1 : 0) | (reverse ? 2 : 0) | (newLineMode ? 4 : 0) | (autowrap ? 8 : 0)
-			| (cursorVisible ? 16 : 0) | (pendingWrap ? 32 : 0) | (stringEscape ? 64 : 0);
+			| (cursorVisible ? 16 : 0) | (pendingWrap ? 32 : 0) | (stringEscape ? 64 : 0) | (cursorStyle << 8);
 		int[] state = new int[STATE];
 		int[] registers = {x, y, fgIndex, fgRgb, bgIndex, bgRgb, flags, top, bottom, parse.ordinal(), saved != null ? 1 : 0};
 		System.arraycopy(registers, 0, state, 0, registers.length);
@@ -702,6 +713,7 @@ public final class VtDecoder {
 		cursorVisible = (flags & 16) != 0;
 		pendingWrap = (flags & 32) != 0;
 		stringEscape = (flags & 64) != 0;
+		cursorStyle = Math.min((flags >> 8) & 7, 6);
 		if (state[7] >= 0 && state[7] < state[8] && state[8] < rows) {
 			top = state[7];
 			bottom = state[8];

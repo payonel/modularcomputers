@@ -61,6 +61,44 @@ public final class Terminal implements Device {
 	public static final int INPUT_CAPACITY = 256;
 	private final VtDecoder decoder;
 
+	/**
+	 * The cursor as players see it: where it is, whether it shows (the program hasn't hidden it,
+	 * the terminal has power, its glass isn't scrolled back), and its shape (DECSCUSR's: even
+	 * styles are steady, odd ones blink; 0-2 a block, 3-4 an underline, 5-6 a bar).
+	 */
+	public record Cursor(int column, int row, boolean shown, int style) {
+		public static final Cursor HIDDEN = new Cursor(0, 0, false, 0);
+
+		public boolean blinks() {
+			return style == 0 || style % 2 == 1;
+		}
+
+		public boolean block() {
+			return style <= 2;
+		}
+
+		public boolean underline() {
+			return style == 3 || style == 4;
+		}
+	}
+
+	/** What players were last shown of the cursor: on the server, what was last sent; on a client, what came. */
+	private Cursor shownCursor = Cursor.HIDDEN;
+
+	/** The cursor as it is now (on the server, where the terminal decodes). */
+	public Cursor cursor() {
+		int column = Math.min(decoder.column(), buffer.resolution().columns() - 1);
+		return new Cursor(column, decoder.row(), decoder.cursorVisible() && power.powered() && viewOffset == 0, decoder.cursorStyle());
+	}
+
+	public Cursor shownCursor() {
+		return shownCursor;
+	}
+
+	public void showCursor(Cursor cursor) {
+		shownCursor = cursor;
+	}
+
 	/** Lines kept as they scroll off the top: four screens or so. */
 	public static final int SCROLLBACK_LINES = 200;
 	/** A line of the scrollback: its characters and colors. */

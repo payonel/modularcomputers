@@ -175,10 +175,56 @@ class McosTest {
 	}
 
 	@Test
-	void poweroffHaltsABoardWithNoSoftOff() {
+	void poweroffTurnsTheComputerOff() {
 		boot();
 		type("poweroff\r");
-		untilHalted();
+		settle(() -> !machine.isPowered());
+	}
+
+	@Test
+	void rebootStartsItAgain() {
+		boot();
+		Runner first = machine.runner().orElseThrow();
+		type("touch /before; reboot\r");
+		settle(() -> machine.runner().isPresent() && machine.runner().get() != first);
+		assertThat(machine.isPowered()).isTrue();
+		untilIdle(); // booted again, at a new shell
+		assertThat(root().resolve("before")).as("written before it went down").isRegularFile();
+	}
+
+	@Test
+	void devListsTheBusAndEachFileSaysBothAddresses() {
+		dataDisk();
+		boot();
+		type("ls /dev > /ld; cat /dev/storage* > /d\r");
+		settle(() -> Files.isRegularFile(root().resolve("d")) && read(root().resolve("d")).contains("sata:1"));
+		assertThat(read(root().resolve("ld"))).contains("console\n", "null\n", "storage0\n", "storage1\n", "terminal0\n");
+		assertThat(read(root().resolve("d"))).contains("path: sata:0", "path: sata:1", "type: storage", "id: ");
+	}
+
+	@Test
+	void lsIntoAFileIsOneNameALineAndFreeSaysTheMemory() {
+		boot();
+		type("ls / > /listing; free > /mem\r");
+		settle(() -> Files.isRegularFile(root().resolve("mem")) && read(root().resolve("mem")).contains("Mem:"));
+		assertThat(read(root().resolve("listing"))).contains("bin\n", "dev\n", "lib\n");
+		assertThat(read(root().resolve("mem")).lines().toList()).hasSize(2);
+	}
+
+	@Test
+	void theEditorWritesWhatsTyped() {
+		boot();
+		type("edit /notes.txt\r");
+		untilIdle();
+		type("first\rsecond\rthird"); // three lines
+		type("\u001B[A\u000B"); // up, ^K: "second" cut
+		type("\u001B[B\u0015"); // down (past the end: the last line), ^U: pasted above it
+		type("\u000F\r"); // ^O, Enter: written under its name
+		type("\u0018"); // ^X
+		untilFile(root().resolve("notes.txt"), "first\nsecond\nthird\n");
+		untilIdle();
+		type("touch /back\r"); // the shell has the terminal again
+		untilFile(root().resolve("back"), "");
 	}
 
 	@Test
@@ -209,7 +255,7 @@ class McosTest {
 		boot();
 		type("echo hello  world | cat | cat > /piped; ls / > /listing; cat /nothing 2> /err; echo $? >> /piped\r");
 		untilFile(root().resolve("piped"), "hello world\n1\n");
-		assertThat(read(root().resolve("listing"))).contains("bin/\n").contains("dev/\n").contains("tmp/\n");
+		assertThat(read(root().resolve("listing"))).contains("bin\n").contains("dev\n").contains("tmp\n");
 		assertThat(read(root().resolve("err"))).contains("No such file or directory");
 	}
 

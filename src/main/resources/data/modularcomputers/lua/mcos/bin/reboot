@@ -1,0 +1,6 @@
+-- reboot: ends every process and restarts the computer.
+local sys = require("sys")
+io.flushall()
+local ok, why = sys.reboot("restart")
+io.stderr:write("reboot: " .. tostring(why) .. "\n")
+return 1

@@ -18,6 +18,10 @@ public interface Runner {
 		WAITING,
 		/** The program halted the CPU; power stays on. */
 		HALTED,
+		/** The program turned the machine off (ACPI soft-off): the board cuts its power. */
+		POWERED_OFF,
+		/** The program asked for a restart: the board turns off and on again. */
+		REBOOTING,
 		/** The program returned instead of halting: a panic, like Linux's init exiting. */
 		RETURNED,
 		/** The program threw; see {@link #crash()}. */

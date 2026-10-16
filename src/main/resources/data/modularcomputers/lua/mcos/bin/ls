@@ -1,13 +1,26 @@
--- ls [-a] [-l] [path...]: what's in directories (a file lists itself); -l with type and size, -a
--- with names starting with a dot.
+-- ls [-1aClF] [path...]: what's in directories (a file lists itself). On a terminal, names go in
+-- columns down then across, as wide as the terminal (as GNU ls), directories in blue; into a pipe or
+-- a file, one a line. -1 one a line, -C columns anyway, -l long (type, size, name), -a names starting
+-- with a dot too, -F a / after directories.
+local sys = require("sys")
 local fs = require("fs")
 
-local all, long = false, false
+local GAP = 2 -- spaces between columns
+local DEFAULT_WIDTH = 80 -- columns, when the terminal doesn't say
+local DIRECTORY_COLOR = "\27[1;34m" -- (dircolors' default for directories)
+local RESET = "\27[0m"
+
+local flags = {}
 local paths = {}
 for _, word in ipairs(arg) do
   if string.sub(word, 1, 1) == "-" and #word > 1 then
-    all = all or string.find(word, "a", 2, true) ~= nil
-    long = long or string.find(word, "l", 2, true) ~= nil
+    for c in string.gmatch(string.sub(word, 2), ".") do
+      if not string.find("1aClF", c, 1, true) then
+        io.stderr:write("ls: invalid option -- '" .. c .. "'\n")
+        return 2
+      end
+      flags[c] = true
+    end
   else
     paths[#paths + 1] = word
   end
@@ -16,39 +29,112 @@ if #paths == 0 then
   paths[1] = "."
 end
 
-local function show(entries, dir)
-  for _, entry in ipairs(entries) do
-    if all or string.sub(entry.name, 1, 1) ~= "." then
-      if long then
-        local st = dir and fs.stat(fs.join(dir, entry.name)) or entry
-        local kind = ({directory = "d", device = "c", fifo = "p"})[st and st.type or entry.type] or "-"
-        io.write(string.format("%s %8d %s\n", kind, st and st.size or 0, entry.name))
-      else
-        io.write(entry.name, entry.type == "directory" and "/" or "", "\n")
+local tty = sys.isatty(1)
+local columns = flags.C or (tty and not flags["1"] and not flags.l)
+local width = tty and sys.ioctl(1, "TIOCGWINSZ") or DEFAULT_WIDTH
+
+-- An entry as shown: its text, and how wide it is on the screen (colors take no room).
+local function shown(entry)
+  local text = entry.name .. ((flags.F and entry.type == "directory") and "/" or "")
+  if tty and entry.type == "directory" then
+    return DIRECTORY_COLOR .. text .. RESET, utf8.len(text) or #text
+  end
+  return text, utf8.len(text) or #text
+end
+
+-- Names in columns: as many columns as fit, filled down first.
+local function grid(entries)
+  local texts, widths = {}, {}
+  for i, entry in ipairs(entries) do
+    texts[i], widths[i] = shown(entry)
+  end
+  local n = #entries
+  if n == 0 then
+    return
+  end
+  local rows, colwidths
+  for tried = n, 1, -1 do
+    rows = math.ceil(n / tried)
+    local cols = math.ceil(n / rows)
+    colwidths = {}
+    local total = 0
+    for c = 1, cols do
+      local widest = 0
+      for r = 1, rows do
+        local i = (c - 1) * rows + r
+        if i <= n and widths[i] > widest then
+          widest = widths[i]
+        end
       end
+      colwidths[c] = widest
+      total = total + widest + (c < cols and GAP or 0)
+    end
+    if total <= width or cols == 1 then
+      break
+    end
+  end
+  for r = 1, rows do
+    local line = {}
+    for c = 1, #colwidths do
+      local i = (c - 1) * rows + r
+      if i <= n then
+        local last = (c == #colwidths) or ((c * rows + r) > n)
+        line[#line + 1] = texts[i] .. (last and "" or string.rep(" ", colwidths[c] - widths[i] + GAP))
+      end
+    end
+    io.write(table.concat(line), "\n")
+  end
+end
+
+local function show(entries, dir)
+  local visible = {}
+  for _, entry in ipairs(entries) do
+    if flags.a or string.sub(entry.name, 1, 1) ~= "." then
+      visible[#visible + 1] = entry
+    end
+  end
+  if flags.l then
+    for _, entry in ipairs(visible) do
+      local st = dir and fs.stat(fs.join(dir, entry.name)) or entry
+      local kind = ({directory = "d", device = "c", fifo = "p"})[st and st.type or entry.type] or "-"
+      local text = shown(entry)
+      io.write(string.format("%s %8d %s\n", kind, st and st.size or 0, text))
+    end
+  elseif columns then
+    grid(visible)
+  else
+    for _, entry in ipairs(visible) do
+      io.write((shown(entry)), "\n")
     end
   end
 end
 
 local status = 0
-for i, path in ipairs(paths) do
+local files, dirs = {}, {}
+for _, path in ipairs(paths) do
   local st, why = fs.stat(path)
   if not st then
-    io.stderr:write("ls: " .. why .. "\n")
+    io.stderr:write("ls: cannot access '" .. path .. "': " .. string.gsub(why, "^.-: ", "") .. "\n")
     status = 2
   elseif st.type == "directory" then
-    if #paths > 1 then
-      io.write(i > 1 and "\n" or "", path, ":\n")
-    end
-    local entries, err = fs.list(path)
-    if entries then
-      show(entries, path)
-    else
-      io.stderr:write("ls: " .. err .. "\n")
-      status = 2
-    end
+    dirs[#dirs + 1] = path
   else
-    show({{name = path, type = st.type, size = st.size}})
+    files[#files + 1] = {name = path, type = st.type, size = st.size}
+  end
+end
+if #files > 0 then
+  show(files)
+end
+for i, path in ipairs(dirs) do
+  if #paths > 1 then
+    io.write((#files > 0 or i > 1) and "\n" or "", path, ":\n")
+  end
+  local entries, err = fs.list(path)
+  if entries then
+    show(entries, path)
+  else
+    io.stderr:write("ls: " .. err .. "\n")
+    status = 2
   end
 end
 return status

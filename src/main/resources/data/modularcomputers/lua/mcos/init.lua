@@ -20,9 +20,8 @@ local CONSOLE = "console" -- the device the console tty is on, unless the comman
 local INIT = "/bin/sh" -- what runs on the console, unless the command line says (init=); started again when it ends
 local INTERPRETER = "/bin/lua" -- what runs a program (every program is Lua, as if each began with #!/bin/lua)
 local MODULES = "/lib/modules/" -- the kernel's own parts
--- Starts within the window before the kernel gives up on it, as sysvinit's "respawning too fast".
-local RESPAWN_LIMIT = 10
-local RESPAWN_WINDOW_TICKS = 100 -- 5 seconds
+-- When init can't be started (its file missing or broken), how long before the kernel tries again.
+local RESPAWN_RETRY_TICKS = 100 -- 5 seconds
 local READ_SIZE = 4096 -- the most one read(2) of a file takes (a disk's most)
 local MAX_FDS = 64 -- file descriptors a process may hold (RLIMIT_NOFILE)
 local TICKS_PER_SECOND = 20
@@ -845,6 +844,15 @@ function syscalls.uptime()
   return board.uptime() / TICKS_PER_SECOND
 end
 
+-- sysinfo: the memory (the board's: the RAM installed, and what the VM holds of it), in bytes,
+-- and the seconds since boot.
+function syscalls.sysinfo()
+  local hardware = board.hardware()
+  local total, used = hardware.memoryTotal or 0, hardware.memoryUsed or 0
+  return {totalram = total, usedram = used, freeram = math.max(0, total - used),
+    uptime = board.uptime() / TICKS_PER_SECOND, procs = #order}
+end
+
 -- nanosleep: waits 'seconds'.
 function syscalls.sleep(p, request, seconds)
   if type(seconds) ~= "number" or seconds < 0 then
@@ -869,18 +877,19 @@ local function shutdown()
   end
 end
 
--- reboot("halt" | "poweroff"): the board has no soft-off yet, so poweroff halts too, as Linux does
--- on a machine with no way to cut its power ("System halted").
+-- reboot("halt" | "poweroff" | "restart"), as Linux's reboot(2) with LINUX_REBOOT_CMD_HALT,
+-- _POWER_OFF and _RESTART: every process ends (its files closed: the disks get what was written),
+-- then the board halts the CPU, turns the machine off, or restarts it.
+local REBOOT = {halt = "halt", poweroff = "poweroff", restart = "reboot"}
+
 function syscalls.reboot(p, request, how)
-  if how ~= "halt" and how ~= "poweroff" then
+  local board_call = REBOOT[how]
+  if not board_call then
     return fail("EINVAL")
   end
   kernel.respawning = false
   shutdown()
-  if how == "poweroff" then
-    printk("no soft-off on this board: halted")
-  end
-  board.halt()
+  board[board_call]()
 end
 
 -- Serves a process's syscall: it's answered (and runs on), or still blocked.
@@ -959,25 +968,20 @@ local function hotplug()
   end
 end
 
-local starts = {}
+-- init runs on the console as long as the machine does: when it ends it's started again (as
+-- init respawns a getty). If it can't be started, the kernel says why and tries again later.
+local retryat = nil -- when to try starting it again (ticks), while it can't be
 function respawn()
   if kernel.respawning == false then
     return
   end
-  local now = board.uptime()
-  while starts[1] and now - starts[1] > RESPAWN_WINDOW_TICKS do
-    table.remove(starts, 1)
-  end
-  if #starts >= RESPAWN_LIMIT then
-    printk((options.init or INIT) .. " respawning too fast: halted")
-    board.halt()
-  end
-  starts[#starts + 1] = now
   local p, why = spawn(kernel, options.init or INIT, {}, {pgid = 0})
   if not p then
     printk((options.init or INIT) .. ": " .. tostring(why))
-    board.halt()
+    retryat = board.uptime() + RESPAWN_RETRY_TICKS
+    return
   end
+  retryat = nil
   p.respawn = true
   console.foreground = p.pgid
 end
@@ -1028,6 +1032,9 @@ local function idle()
       wake = p.wakeat
     end
   end
+  if retryat and (not wake or retryat < wake) then
+    wake = retryat
+  end
   local seconds
   if wake then
     seconds = math.max(0, wake - board.uptime()) / TICKS_PER_SECOND
@@ -1037,6 +1044,9 @@ local function idle()
     if source == "bus" then
       hotplug()
     end
+  end
+  if retryat and board.uptime() >= retryat then
+    respawn()
   end
 end
 

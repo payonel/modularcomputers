@@ -22,6 +22,7 @@
 --                                 the pending sources, as a sequence, and the device data taken
 --                                 for the inbox: {address, method, value} each
 --   "halt"                        the CPU halts; never resumed
+--   "poweroff", "reboot"          the machine turns off, or off and on again; never resumed
 --
 -- Rings (user design, 2026-10-14): a program may give this file a ring for a source
 -- (board.ring(address, size)): a table it reads, {head, tail, size, [1..size] = packets}, which
@@ -418,6 +419,14 @@ sandbox.board = {
   -- the CPU stops; power stays on. It never returns.
   halt = function()
     syscall("halt")
+  end,
+  -- the machine turns off (ACPI soft-off), as its power button does. It never returns.
+  poweroff = function()
+    syscall("poweroff")
+  end,
+  -- the machine turns off and on again: the EEPROM boots afresh. It never returns.
+  reboot = function()
+    syscall("reboot")
   end,
 }
 

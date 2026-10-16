@@ -1,0 +1,487 @@
+-- edit [file]: a text editor, after nano: a title bar, the text, a status line and two lines of
+-- shortcuts. Typing inserts; the arrows, Home/End, PageUp/PageDown move; Backspace and Delete
+-- erase. ^O writes the file out, ^X exits (asking to save changes), ^W searches, ^K cuts the line
+-- (one after another: together), ^U pastes what was cut, ^C says where the cursor is, ^A/^E go to
+-- the line's start/end, ^Y/^V a page up/down. Runs on the terminal's alternate screen, with the tty
+-- in raw mode (its termios as it was when it exits).
+local sys = require("sys")
+
+local VERSION = "1.0"
+local TAB_TEXT = "  " -- what Tab inserts
+local DEFAULT_COLUMNS, DEFAULT_ROWS = 80, 24
+local READ_SIZE = 256
+local SHORTCUTS = {
+  {"^O", "Write Out", "^W", "Where Is", "^K", "Cut", "^C", "Location"},
+  {"^X", "Exit", "^U", "Paste", "^A", "Home", "^E", "End"},
+}
+
+local ESC = "\27"
+local CSI = ESC .. "["
+
+local path = arg[1]
+local columns, rows = sys.ioctl(1, "TIOCGWINSZ")
+columns, rows = columns or DEFAULT_COLUMNS, rows or DEFAULT_ROWS
+local textrows = math.max(1, rows - 4) -- title, status and two lines of shortcuts
+
+-- ---- the text -----------------------------------------------------------------------------------
+-- Lines (UTF-8 strings); the cursor as a line and a character in it (1-based, characters, not
+-- bytes); the first line shown; whether it changed since it was read or written.
+
+local lines = {""}
+local line, col = 1, 1
+local top = 1
+local modified = false
+local status = ""
+local cut, cutting = {}, false -- the lines cut (^K), and whether the last key was a cut
+
+local function len(text)
+  return utf8.len(text) or #text
+end
+
+-- The byte where character 'i' of a line starts (one past its end for len + 1).
+local function byte(text, i)
+  return utf8.offset(text, i) or #text + 1
+end
+
+local function sub(text, i, j)
+  local from = byte(text, i)
+  local to = j and (byte(text, j + 1) - 1) or #text
+  return string.sub(text, from, to)
+end
+
+local function load(file)
+  local handle, why = io.open(file)
+  if not handle then
+    return nil, why
+  end
+  local text = handle:read("a") or ""
+  handle:close()
+  local read = {}
+  for l in string.gmatch(text, "([^\n]*)\n") do
+    read[#read + 1] = string.gsub(l, "\r$", "")
+  end
+  local rest = string.match(text, "([^\n]*)$")
+  if rest ~= "" or #read == 0 then
+    read[#read + 1] = rest
+  end
+  return read
+end
+
+local function save(file)
+  local handle, why = io.open(file, "w")
+  if not handle then
+    return nil, why
+  end
+  local ok, err = handle:write(table.concat(lines, "\n"), "\n")
+  local closed, cerr = handle:close()
+  if not ok or not closed then
+    return nil, err or cerr
+  end
+  return true
+end
+
+if path then
+  local read, why = load(path)
+  if read then
+    lines = read
+    status = "[ Read " .. #lines .. " line" .. (#lines == 1 and "" or "s") .. " ]"
+  elseif sys.stat(path) then
+    io.stderr:write("edit: " .. tostring(why) .. "\n")
+    return 1
+  else
+    status = "[ New File ]"
+  end
+end
+
+-- ---- the screen ---------------------------------------------------------------------------------
+
+local function at(row, column)
+  return CSI .. row .. ";" .. column .. "H"
+end
+
+local function clip(text, width)
+  if len(text) <= width then
+    return text
+  end
+  return sub(text, 1, width)
+end
+
+-- What a line shows: all of it if it fits; the cursor's line scrolled so the cursor shows; a $ where
+-- text goes on past the edge (as nano marks it).
+local function shown(text, current)
+  local n = len(text)
+  if n <= columns then
+    return text, 0
+  end
+  local shift = 0
+  if current and col > columns - 1 then
+    shift = ((col - 1) // (columns - 2)) * (columns - 2)
+  end
+  local visible = sub(text, shift + 1, shift + columns - 1)
+  if shift > 0 then
+    visible = "$" .. sub(visible, 2)
+  end
+  if shift + columns - 1 < n then
+    visible = visible .. "$"
+  end
+  return visible, shift
+end
+
+local function bar(text)
+  return CSI .. "7m" .. text .. string.rep(" ", math.max(0, columns - len(text))) .. CSI .. "0m"
+end
+
+local function draw()
+  if line < top then
+    top = line
+  elseif line >= top + textrows then
+    top = line - textrows + 1
+  end
+  local out = {CSI .. "?25l", at(1, 1)}
+  local name = path or "New Buffer"
+  local title = "  edit " .. VERSION
+  local middle = math.max(len(title) + 2, (columns - len(name)) // 2)
+  local head = title .. string.rep(" ", middle - len(title)) .. name
+  head = clip(head, columns - 10)
+  head = head .. string.rep(" ", math.max(0, columns - len(head) - 9)) .. (modified and "Modified " or "")
+  out[#out + 1] = bar(clip(head, columns))
+  local cursorcolumn = col
+  for r = 1, textrows do
+    local index = top + r - 1
+    out[#out + 1] = at(r + 1, 1) .. CSI .. "K"
+    if lines[index] then
+      local text, shift = shown(lines[index], index == line)
+      out[#out + 1] = text
+      if index == line then
+        cursorcolumn = col - shift
+      end
+    end
+  end
+  out[#out + 1] = at(rows - 2, 1) .. CSI .. "K"
+  if status ~= "" then
+    local message = clip(status, columns)
+    out[#out + 1] = at(rows - 2, math.max(1, (columns - len(message)) // 2 + 1)) .. CSI .. "7m" .. message .. CSI .. "0m"
+  end
+  local width = columns // 4
+  for k, help in ipairs(SHORTCUTS) do
+    local parts = {}
+    for i = 1, #help, 2 do
+      local item = CSI .. "7m" .. help[i] .. CSI .. "0m " .. help[i + 1]
+      parts[#parts + 1] = item .. string.rep(" ", math.max(1, width - len(help[i]) - 1 - len(help[i + 1])))
+    end
+    out[#out + 1] = at(rows - 2 + k, 1) .. CSI .. "K" .. table.concat(parts)
+  end
+  out[#out + 1] = at(line - top + 2, math.min(columns, cursorcolumn)) .. CSI .. "?25h"
+  io.write(table.concat(out))
+  io.flush()
+end
+
+-- ---- keys ---------------------------------------------------------------------------------------
+
+local pending = ""
+
+-- The next key: a control character, an escape sequence ("up", "home", ...), or text typed.
+local function key()
+  while true do
+    if pending ~= "" then
+      local c = string.sub(pending, 1, 1)
+      if c == ESC then
+        local seq = string.match(pending, "^\27%[[%d;]*[%a~]") or string.match(pending, "^\27O%a")
+        if seq then
+          pending = string.sub(pending, #seq + 1)
+          local final = string.sub(seq, -1)
+          local number = string.match(seq, "^\27%[(%d+)~$")
+          if final == "A" then return "up"
+          elseif final == "B" then return "down"
+          elseif final == "C" then return "right"
+          elseif final == "D" then return "left"
+          elseif final == "H" or number == "1" or number == "7" then return "home"
+          elseif final == "F" or number == "4" or number == "8" then return "end"
+          elseif number == "5" then return "pageup"
+          elseif number == "6" then return "pagedown"
+          elseif number == "3" then return "delete"
+          end
+          return nil -- (one we don't know)
+        elseif #pending >= 8 or not string.find(pending, "^\27%[?[%d;]*$") then
+          pending = string.sub(pending, 2)
+          return "escape"
+        end
+      else
+        local b = string.byte(c)
+        if b < 32 or b == 127 then
+          pending = string.sub(pending, 2)
+          return c
+        end
+        -- text: a whole UTF-8 character
+        local char = string.match(pending, "^[\1-\127\194-\244][\128-\191]*")
+        if char and (#char > 1 or b < 128) then
+          pending = string.sub(pending, #char + 1)
+          return {text = char}
+        end
+        pending = string.sub(pending, 2)
+      end
+    end
+    local data = sys.read(0, READ_SIZE)
+    if not data or data == "" then
+      return "eof"
+    end
+    pending = pending .. data
+  end
+end
+
+-- A line typed at the status line (a file name, a search), starting with 'initial'; nil if ^C.
+local function prompt(question, initial)
+  local answer = initial or ""
+  while true do
+    status = ""
+    draw()
+    local shown = clip(question .. answer, columns - 1)
+    io.write(at(rows - 2, 1), CSI, "K", CSI, "7m", shown, string.rep(" ", columns - len(shown)), CSI, "0m",
+      at(rows - 2, len(shown) + 1))
+    io.flush()
+    local k = key()
+    if k == "\r" or k == "\n" then
+      return answer
+    elseif k == "\3" or k == "eof" or k == "escape" then
+      return nil
+    elseif k == "\127" or k == "\8" then
+      answer = sub(answer, 1, len(answer) - 1)
+    elseif type(k) == "table" then
+      answer = answer .. k.text
+    end
+  end
+end
+
+local function writeout()
+  local name = prompt("File Name to Write: ", path or "")
+  if not name or name == "" then
+    status = "[ Cancelled ]"
+    return false
+  end
+  local ok, why = save(name)
+  if not ok then
+    status = "[ Error writing " .. name .. ": " .. tostring(why) .. " ]"
+    return false
+  end
+  path = name
+  modified = false
+  status = "[ Wrote " .. #lines .. " line" .. (#lines == 1 and "" or "s") .. " ]"
+  return true
+end
+
+local lastsearch = ""
+
+local function search()
+  local text = prompt("Search" .. (lastsearch ~= "" and " [" .. lastsearch .. "]" or "") .. ": ")
+  if text == nil then
+    status = "[ Cancelled ]"
+    return
+  end
+  if text == "" then
+    text = lastsearch
+  end
+  if text == "" then
+    return
+  end
+  lastsearch = text
+  for step = 0, #lines do
+    local index = (line - 1 + step) % #lines + 1
+    local from = step == 0 and byte(lines[index], col + 1) or 1
+    local found = string.find(lines[index], text, from, true)
+    if found then
+      line = index
+      col = len(string.sub(lines[index], 1, found - 1)) + 1
+      return
+    end
+  end
+  status = "[ \"" .. text .. "\" not found ]"
+end
+
+local function insert(text)
+  local current = lines[line]
+  lines[line] = sub(current, 1, col - 1) .. text .. sub(current, col)
+  col = col + len(text)
+  modified = true
+end
+
+local function newline()
+  local current = lines[line]
+  table.insert(lines, line + 1, sub(current, col))
+  lines[line] = sub(current, 1, col - 1)
+  line, col = line + 1, 1
+  modified = true
+end
+
+local function backspace()
+  if col > 1 then
+    local current = lines[line]
+    lines[line] = sub(current, 1, col - 2) .. sub(current, col)
+    col = col - 1
+    modified = true
+  elseif line > 1 then
+    col = len(lines[line - 1]) + 1
+    lines[line - 1] = lines[line - 1] .. lines[line]
+    table.remove(lines, line)
+    line = line - 1
+    modified = true
+  end
+end
+
+local function delete()
+  local current = lines[line]
+  if col <= len(current) then
+    lines[line] = sub(current, 1, col - 1) .. sub(current, col + 1)
+    modified = true
+  elseif line < #lines then
+    lines[line] = current .. lines[line + 1]
+    table.remove(lines, line + 1)
+    modified = true
+  end
+end
+
+local function cutline(continuing)
+  if not continuing then
+    cut = {}
+  end
+  cut[#cut + 1] = lines[line]
+  if #lines > 1 then
+    table.remove(lines, line)
+    if line > #lines then
+      line = #lines
+    end
+  else
+    lines[1] = ""
+  end
+  col = 1
+  modified = true
+end
+
+local function paste()
+  for i, text in ipairs(cut) do
+    table.insert(lines, line + i - 1, text)
+  end
+  line = line + #cut
+  col = 1
+  if #cut > 0 then
+    modified = true
+  end
+end
+
+local function clamp()
+  line = math.max(1, math.min(line, #lines))
+  col = math.max(1, math.min(col, len(lines[line]) + 1))
+end
+
+-- Exits: true when it may (saved, or changes thrown away).
+local function exit()
+  if not modified then
+    return true
+  end
+  while true do
+    local answer = prompt("Save modified buffer? (Y/N, ^C cancels) ")
+    if answer == nil then
+      status = "[ Cancelled ]"
+      return false
+    end
+    answer = string.lower(answer)
+    if answer == "y" or answer == "yes" then
+      return writeout()
+    elseif answer == "n" or answer == "no" then
+      return true
+    end
+  end
+end
+
+-- ---- the loop -----------------------------------------------------------------------------------
+
+local function run()
+  while true do
+    clamp()
+    draw()
+    status = ""
+    local k = key()
+    local wascut = cutting
+    cutting = false
+    if type(k) == "table" then
+      insert(k.text)
+    elseif k == "\r" or k == "\n" then
+      newline()
+    elseif k == "\127" or k == "\8" then
+      backspace()
+    elseif k == "delete" then
+      delete()
+    elseif k == "\t" then
+      insert(TAB_TEXT)
+    elseif k == "up" then
+      line = line - 1
+    elseif k == "down" then
+      line = line + 1
+    elseif k == "left" then
+      if col > 1 then
+        col = col - 1
+      elseif line > 1 then
+        line = line - 1
+        col = len(lines[line]) + 1
+      end
+    elseif k == "right" then
+      if col <= len(lines[line]) then
+        col = col + 1
+      elseif line < #lines then
+        line, col = line + 1, 1
+      end
+    elseif k == "home" or k == "\1" then
+      col = 1
+    elseif k == "end" or k == "\5" then
+      col = len(lines[line]) + 1
+    elseif k == "pageup" or k == "\25" then
+      line = line - textrows
+      top = math.max(1, top - textrows)
+    elseif k == "pagedown" or k == "\22" then
+      line = line + textrows
+      top = top + textrows
+    elseif k == "\11" then -- ^K
+      cutline(wascut)
+      cutting = true
+    elseif k == "\21" then -- ^U
+      paste()
+    elseif k == "\15" then -- ^O
+      writeout()
+    elseif k == "\23" then -- ^W
+      search()
+    elseif k == "\3" then -- ^C
+      clamp()
+      status = string.format("[ line %d/%d (%d%%), col %d/%d ]", line, #lines, line * 100 // #lines,
+        col, len(lines[line]) + 1)
+    elseif k == "\24" then -- ^X
+      if exit() then
+        return 0
+      end
+    elseif k == "eof" then
+      return 0
+    end
+  end
+end
+
+-- The tty raw (no line editing, echo or signals: ^C is the editor's) on the alternate screen, and as
+-- it was afterwards, however the editor ends.
+local saved = sys.ioctl(0, "TCGETS")
+if saved then
+  local raw = {}
+  for name, on in pairs(saved) do
+    raw[name] = on
+  end
+  raw.icanon, raw.echo, raw.isig, raw.icrnl = false, false, false, false
+  sys.ioctl(0, "TCSETS", raw)
+end
+io.stdout:setvbuf("full")
+io.write(CSI .. "?1049h")
+local ok, result = pcall(run)
+io.write(CSI .. "?1049l")
+io.flush()
+if saved then
+  sys.ioctl(0, "TCSETS", saved)
+end
+if not ok then
+  error(result, 0)
+end
+return result

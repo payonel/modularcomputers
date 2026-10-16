@@ -545,8 +545,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		if (supervision != Machine.Supervision.OK) {
 			playAtCase(dyingSound(supervision));
 			setPowerState();
-		} else if (machine.isHalted() != getBlockState().getValue(AllInOneBlock.HALTED)) {
-			setPowerState(); // the CPU stopped (or started): the light turns amber (or green)
+		} else if (machine.isHalted() != getBlockState().getValue(AllInOneBlock.HALTED)
+			|| machine.isPowered() != getBlockState().getValue(AllInOneBlock.POWERED)) {
+			setPowerState(); // the CPU stopped (or started): the light turns amber (or green); or the program turned it off
 		}
 		if (seenCableChanges != Cabling.changes() || ticks % RESCAN_TICKS == 0) {
 			seenCableChanges = Cabling.changes();
@@ -572,7 +573,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 	 */
 	private void syncDisplay() {
 		if (level instanceof ServerLevel server) {
-			ScreenRows.send(server, this, display.buffer());
+			ScreenRows.send(server, this, display);
 		}
 	}
 
@@ -1133,7 +1134,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements ExtendedMe
 		input.read(KNOWN, Cabled.CODEC.listOf()).orElse(List.of()).forEach(device -> known.put(device.key(), device));
 		installParts();
 		rememberParts(); // loading isn't inserting: no sounds
-		ScreenSave.load(input, DISPLAY, display.buffer(), display.decoder());
+		ScreenSave.load(input, DISPLAY, display);
 		DeviceSave.load(input, DISPLAY + "_device", display);
 		for (int lane = 0; lane < cards.length; lane++) {
 			if (cards[lane] != null) {

@@ -60,7 +60,7 @@ public final class ModularComputersClient implements ClientModInitializer {
 		ClientPlayNetworking.registerGlobalReceiver(SettingsPayload.TYPE, (payload, context) -> payload.apply());
 		ClientPlayNetworking.registerGlobalReceiver(ScreenRowsPayload.TYPE, (payload, context) -> {
 			if (context.client().level != null && context.client().level.getBlockEntity(payload.pos()) instanceof DisplayHost host) {
-				payload.apply(host.terminal().buffer());
+				payload.apply(host.terminal());
 			}
 		});
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {

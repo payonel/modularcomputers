@@ -46,6 +46,10 @@ public final class ProgramRunner implements Runner {
 	private record Halt() implements Request {
 	}
 
+	/** The program turned the machine off, or asked for a restart. */
+	private record Power(State end) implements Request {
+	}
+
 	/** The program threw: the CPU's abort screen. */
 	private record Crashed(Throwable error) implements Request {
 	}
@@ -131,6 +135,10 @@ public final class ProgramRunner implements Runner {
 				case Halt halt -> {
 					thread.interrupt(); // its halt() never returns: the thread unwinds
 					return state = State.HALTED;
+				}
+				case Power power -> {
+					thread.interrupt(); // as halt(): never returns
+					return state = power.end();
 				}
 				case Crashed crashed -> {
 					crash = crashed.error();
@@ -261,6 +269,18 @@ public final class ProgramRunner implements Runner {
 		public void halt() {
 			runner.request(new Halt());
 			throw new Stopped(); // not reached: the host stops the thread
+		}
+
+		@Override
+		public void poweroff() {
+			runner.request(new Power(State.POWERED_OFF));
+			throw new Stopped();
+		}
+
+		@Override
+		public void reboot() {
+			runner.request(new Power(State.REBOOTING));
+			throw new Stopped();
 		}
 	}
 }
