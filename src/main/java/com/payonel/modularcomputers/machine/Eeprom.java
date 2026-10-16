@@ -112,6 +112,6 @@ public final class Eeprom implements Device {
 
 	@Override
 	public DeviceType type() {
-		return DeviceType.FIRMWARE;
+		return DeviceType.EEPROM;
 	}
 }

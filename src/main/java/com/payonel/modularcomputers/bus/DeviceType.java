@@ -6,8 +6,12 @@ public enum DeviceType {
 	TERMINAL,
 	STORAGE,
 	NETWORK,
-	/** Firmware (the EEPROM), listed so programs can read or reflash it. */
-	FIRMWARE,
+	/**
+	 * The EEPROM: the chip the CPU boots, its code user code (the user can change it), listed so
+	 * programs can read or reflash it. Not "firmware": that's the CPU's own layer, machine.lua,
+	 * which programs can't reach (user, 2026-10-15).
+	 */
+	EEPROM,
 	REDSTONE,
 	AUDIO,
 	SENSOR,

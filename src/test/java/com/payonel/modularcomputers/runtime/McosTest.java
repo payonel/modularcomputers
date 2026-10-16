@@ -164,6 +164,20 @@ class McosTest {
 	}
 
 	@Test
+	void backspaceErasesBackAcrossAWrappedLine() {
+		boot();
+		type("x".repeat(60)); // past the screen's 50 columns: the line wraps
+		untilIdle();
+		type("\u007f".repeat(15)); // back across the wrap
+		untilIdle();
+		long shown = screen().chars().filter(c -> c == 'x').count();
+		assertThat(shown).as("what's left of the line, and nothing erased still showing").isEqualTo(45);
+		type("\u007f".repeat(45) + "y\r");
+		untilIdle();
+		assertThat(screen().chars().filter(c -> c == 'x').count()).as("all of it erased").isZero();
+	}
+
+	@Test
 	void theShellEndingIsStartedAgain() {
 		boot();
 		type("exit\r");
@@ -338,13 +352,13 @@ class McosTest {
 		assertThat(root().resolve("tmp")).as("/tmp is the kernel's memory, not the disk").doesNotExist();
 	}
 
-	/** 512 KiB: mcos takes about 400 KiB with its shell and two more processes (one tier 1 stick, 256 KiB, isn't enough). */
+	/** One tier 3 stick (1 MiB): what mcos needs for now, with its shell and a pipeline (the user: memory is optimized later). */
 	@Test
-	void aPipelineRunsOnOneTier2Stick() {
+	void aPipelineRunsOnOneTier3Stick() {
 		machine.board().setChassis(new com.payonel.modularcomputers.machine.Chassis() {
 			@Override
 			public int tier() {
-				return 2;
+				return 3;
 			}
 
 			@Override
@@ -354,7 +368,7 @@ class McosTest {
 
 			@Override
 			public java.util.List<Board.MemoryInfo> memory() {
-				return java.util.List.of(new Board.MemoryInfo(0, 2, com.payonel.modularcomputers.machine.MemoryTier.TIER_2.bytes()));
+				return java.util.List.of(new Board.MemoryInfo(0, 3, com.payonel.modularcomputers.machine.MemoryTier.TIER_3.bytes()));
 			}
 		});
 		file("count.lua", """

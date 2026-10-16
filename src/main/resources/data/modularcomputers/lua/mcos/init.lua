@@ -292,6 +292,20 @@ local function environment(p)
   return env
 end
 
+-- Memory: a new process's stack is made without the emergency collection other allocations get
+-- (Lua's), and a compile needs a lot for a moment, so with garbage about either could fail though
+-- there's room. Past half the RAM, the kernel collects first (as Linux reclaims memory before a fork
+-- or a big allocation would fail).
+local RECLAIM_SHARE = 0.5 -- of the RAM in use (counted with the firmware's own) before a spawn collects
+local KIB = 1024
+local ram = board.hardware().memoryTotal or 0
+
+local function reclaim()
+  if collectgarbage("count") * KIB > ram * RECLAIM_SHARE then
+    collectgarbage("collect")
+  end
+end
+
 -- Program images, shared (as the page cache shares a program's text between the processes running
 -- it): a Lua file is compiled once, as function(_ENV, ...) around its text, and each process runs it
 -- with its own globals, so the compiled code (the most of a program's memory) is in memory once.
@@ -311,6 +325,7 @@ local function image(path)
   if cached and versions[path] == version then
     return cached
   end
+  reclaim() -- (compiling takes far more for a moment than the image keeps)
   local code
   code, why, errno = vfs.readfile(path)
   if not code then
@@ -325,19 +340,6 @@ local function image(path)
   cached = chunk()
   images[path], versions[path] = cached, version
   return cached
-end
-
--- Memory: a new process's stack is made without the emergency collection other allocations get
--- (Lua's), so with garbage about a spawn could fail though there's room. Past half the RAM, the
--- kernel collects before it makes one (as Linux reclaims memory before a fork would fail).
-local RECLAIM_SHARE = 0.5 -- of the RAM in use (counted with the firmware's own) before a spawn collects
-local KIB = 1024
-local ram = board.hardware().memoryTotal or 0
-
-local function reclaim()
-  if collectgarbage("count") * KIB > ram * RECLAIM_SHARE then
-    collectgarbage("collect")
-  end
 end
 
 -- posix_spawn: a new process running 'path' (through the interpreter) with 'argv', as the parent's

@@ -376,7 +376,8 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
 - **Preemption is built** (2026-10-15): new input and a spent slice stop the running process and
   return to the kernel (LungoLua 1.1's thaw with stops), and syscalls trap the same way
   (`board.trap()`). Ctrl+C ends a program stuck in a loop.
-- **mcos no longer fits one tier 1 stick** (2026-10-15, for the user to decide): with processes, a
+- **mcos no longer fits one tier 1 stick** (2026-10-15; the user: optimize later, maybe raise tier 1's
+  capacity; for now it needs a tier 3 stick, 1 MiB, see AGENTS.md): with processes, a
   VFS and a real shell it takes about 400 KiB above the firmware (kernel 194, shell 120, a small
   process 16; compiled code is most of it, shared between processes already). A first computer
   with one 256 KiB stick won't boot it. Options: a smaller boot set (the kernel's modules and a

@@ -120,7 +120,7 @@ same thing.
         Redstone, Audio, Motion Sensor, Audio Sensor, Weather Sensor. **Redstone, weather and motion
         cards work** (see "Cards that work"); the others are placeholders.
       - Only the CPU and EEPROM affect the machine so far.
-      - On the bus: the **EEPROM** (`Eeprom` is a `Device`, `FIRMWARE`, row "ROM"), hard
+      - On the bus: the **EEPROM** (`Eeprom` is a `Device`, type `EEPROM` ("eeprom"; not "firmware": that word is machine.lua's, user 2026-10-15), row "ROM"), hard
         disks (`Disk`) and cards (`Card`, typed by kind). The CPU still loads from the EEPROM
         slot directly. **Batteries aren't on the bus** (user, 2026-10-11, reversing an earlier
         choice): on real machines the firmware reports a battery (ACPI), so if programs need
@@ -683,10 +683,10 @@ scripts/art/error_beep.py` into
     Lua file once, as `function(_ENV, ...) <its text> end`, and every process running it calls that
     with its own globals (`sys.image(path)`; the interpreter's `loadfile` and `require` use it), so
     compiled code, most of a program's memory, is in memory once; kept while a process holds it,
-    compiled again when the file changes. **Memory (measured 2026-10-15): the kernel takes about 194
-    KiB above the firmware's baseline, the shell about 120, each small process about 16: mcos needs
-    a 512 KiB stick; one tier 1 stick (256 KiB) aborts the boot (`not enough memory`).** Open for
-    the user (`docs/PLAN.md`).
+    compiled again when the file changes. **Memory (measured 2026-10-15, after the shell rewrite): with
+    its shell and a two-process pipeline mcos holds 584 KiB of the VM (the firmware's ~118 KiB
+    baseline included); each nested shell about 60 more. mcos needs a tier 3 stick (1 MiB) for now;
+    the user: memory is optimized later, and tier 1's capacity may be revisited** (`docs/PLAN.md`).
   - **User space**: the kernel runs every program through `/bin/lua` (as if each began with
     `#!/bin/lua`), the interpreter, which opens the rest of Lua's standard library over `sys`: `io`
     (`lib/io.lua`, stdio in the process: buffered files, a tty's output line buffered, stderr not;
@@ -757,6 +757,10 @@ scripts/art/error_beep.py` into
     as ^X, buffered while a read's bytes are handled and written once, as n_tty's echo buffer,
     `echoctl`), and `isig`: **^C flushes the input, echoes `^C` and sends SIGINT to the tty's
     foreground process group**. Output goes through `onlcr`. Raw mode (`icanon` off) by `TCSETS`.
+    **It tracks the terminal's cursor column** from everything written through it (as n_tty does,
+    with the VT100's wait-to-wrap in the last column), so erasing works back across a line that
+    wrapped (user, 2026-10-15: Backspace didn't reach the row above): at a row's start it moves up to
+    the end of the row above (`CSI A`, `CSI n G`), where a backspace stops at the left margin.
   - Tests (`runtime/McosTest`) bring their own programs onto the disk and type commands; they check
     files on the disks and whether the computer halts or runs, never what mcos says.
 - **Lua scripts** (user design, 2026-10-13; `machine/LuaScripts`): the Lua that comes with the
