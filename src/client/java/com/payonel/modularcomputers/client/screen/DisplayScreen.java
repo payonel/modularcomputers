@@ -51,6 +51,8 @@ public final class DisplayScreen extends Screen {
 		}
 	}
 
+	/** The keys held down in this view (a press seen, no release yet): a press while held is a repeat. */
+	private final java.util.Set<Integer> held = new java.util.HashSet<>();
 	/** Lines a notch of the mouse wheel scrolls the terminal's glass. */
 	private static final int WHEEL_LINES = 3;
 	private final BlockPos pos;
@@ -118,8 +120,10 @@ public final class DisplayScreen extends Screen {
 	}
 
 	/**
-	 * Typing goes to this terminal, and only this one: keys that don't type a character as their
-	 * escape sequences, here; characters through {@link #charTyped}. Escape still closes the view.
+	 * Typing goes to this terminal, and only this one: every key, its press, repeats (a press while
+	 * held) and release ({@link #keyReleased}), with the modifiers, and the terminal sends what its
+	 * mode says (by default a VT100's: the characters typed come through {@link #charTyped}). Escape
+	 * still closes the view, and Shift+PageUp/PageDown scroll the glass (the terminal's own).
 	 */
 	@Override
 	public boolean keyPressed(KeyEvent event) {
@@ -132,8 +136,25 @@ public final class DisplayScreen extends Screen {
 			ClientPlayNetworking.send(new ScrollTerminalPayload(pos, event.key() == InputConstants.KEY_PAGEUP ? page : -page));
 			return true;
 		}
-		var sequence = TerminalKeys.sequence(event.key(), event.hasControlDown());
-		sequence.ifPresent(this::send);
+		int code = TerminalKeys.code(event);
+		if (code != 0) {
+			// every key goes to the terminal (press, or repeat while it's held); it decides what to send
+			int kind = held.add(event.key()) ? com.payonel.modularcomputers.device.TerminalKeyboard.PRESS
+				: com.payonel.modularcomputers.device.TerminalKeyboard.REPEAT;
+			ClientPlayNetworking.send(new com.payonel.modularcomputers.network.TerminalKeyPayload(pos, code, TerminalKeys.modifiers(event), kind));
+		}
+		return true;
+	}
+
+	@Override
+	public boolean keyReleased(KeyEvent event) {
+		if (held.remove(event.key())) {
+			int code = TerminalKeys.code(event);
+			if (code != 0) {
+				ClientPlayNetworking.send(new com.payonel.modularcomputers.network.TerminalKeyPayload(pos, code, TerminalKeys.modifiers(event),
+					com.payonel.modularcomputers.device.TerminalKeyboard.RELEASE));
+			}
+		}
 		return true;
 	}
 

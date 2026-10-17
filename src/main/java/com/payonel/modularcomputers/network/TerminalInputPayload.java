@@ -11,10 +11,9 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 /**
- * Client to server: the player typed at the terminal at {@code pos}, in its screen view. Only
- * the terminal the player has open gets the keys. {@code keys} is what the key sends down the
- * line, as a VT100/xterm keyboard would: a character, a control character, or an escape sequence
- * (the arrows' {@code ESC[A}...).
+ * Client to server: text the player typed at the terminal at {@code pos}, in its screen view (as
+ * the keyboard's layout makes it). Only the terminal the player has open gets it. Keys themselves
+ * (presses, repeats, releases) come as {@link TerminalKeyPayload}.
  */
 public record TerminalInputPayload(BlockPos pos, String keys) implements CustomPacketPayload {
 	public static final Type<TerminalInputPayload> TYPE = new Type<>(ModularComputers.id("terminal_input"));
@@ -33,7 +32,7 @@ public record TerminalInputPayload(BlockPos pos, String keys) implements CustomP
 			var player = context.player();
 			if (!payload.keys().isEmpty() && player.isWithinBlockInteractionRange(payload.pos(), 1.0)
 				&& player.level().getBlockEntity(payload.pos()) instanceof DisplayHost host) {
-				host.terminal().press(payload.keys());
+				host.terminal().type(payload.keys());
 			}
 		});
 	}

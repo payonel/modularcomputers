@@ -1225,6 +1225,25 @@ scripts/art/error_beep.py` into
         (xterm's scrollKey, scrollTtyOutput); the alternate screen saves no lines; `ESC[3J` (xterm's
         E3) clears them, not the screen (`/bin/clear` sends it). A save keeps the screen as it is
         (`Terminal.screen()`), not the scrolled glass; the scrollback isn't saved.
+      - **Its keyboard reports every key** (user, 2026-10-16: "all key codes, up and down, control
+        keys too"): the screen view sends each key's press, repeats and release with the modifiers
+        (`TerminalKeyPayload`; `client/screen/TerminalKeys` numbers keys as the kitty keyboard
+        protocol does: a text key by its character from SDL's keycode, others by kitty's codes from
+        the scancode), and typed text apart (`TerminalInputPayload`, the layout's characters). The
+        terminal decides what goes down the line (`device/TerminalKeyboard`), by the mode programs
+        set with escape sequences, as on real terminals (the tty's raw mode is another thing:
+        termios): **by default a VT100's/xterm's** (typed text; Ctrl+letter a control character;
+        arrows `CSI A`, or `ESC O A` in DECCKM, `CSI ?1h`; `CSI 1;5D` with modifiers; Insert/Delete/
+        PgUp/PgDn/F5+ `CSI n~`; F1-F4 `ESC O P..S`; Shift+Tab `CSI Z`; nothing on release); **the
+        kitty keyboard protocol on request** (what modern emulators do for full keyboards: `CSI >
+        flags u` pushes, `CSI < n u` pops, `CSI = flags;mode u` sets, `CSI ? u` asks): 1
+        disambiguates (Escape `CSI 27u`, Ctrl/Alt+text keys `CSI code;mods u`), 2 reports repeats and
+        releases (`:2`, `:3`), 8 reports every key, text keys, modifiers (Shift `CSI 57441u`) and
+        locks included, as escape codes (typed text then isn't sent); 4 and 16 are taken, not
+        reported. The current flags and DECCKM are saved with the decoder's state. Linux's own
+        console does this in its kernel instead (`KDSKBMODE`, medium-raw) only because there the
+        kernel is the terminal. Escape still closes the screen view (so a program never gets a bare
+        Escape key there), and Shift+PageUp/PageDown scroll the glass.
       - **Only the terminal the player has open gets the keys** (user, 2026-10-11): typing in a
         screen view (`DisplayScreen`) sends `TerminalInputPayload` to that terminal.
         Characters come from `charTyped`; other keys send what an xterm keyboard sends

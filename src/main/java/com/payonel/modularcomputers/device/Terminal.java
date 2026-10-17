@@ -236,7 +236,26 @@ public final class Terminal implements Device {
 		return power;
 	}
 
-	/** A key typed at the terminal: it waits in the queue, and the interrupt line wakes its computers. */
+	/**
+	 * A key event at the terminal's keyboard ({@link TerminalKeyboard}'s numbering, modifiers and
+	 * events): what it sends down the line, by the mode programs set (legacy, or the kitty protocol's
+	 * flags), if anything.
+	 */
+	public void key(int key, int modifiers, int event) {
+		String sent = TerminalKeyboard.encode(key, modifiers, event, decoder.keyboardFlags(), decoder.cursorKeysApplication());
+		if (sent != null) {
+			press(sent);
+		}
+	}
+
+	/** Text typed at it (as the keyboard's layout makes it): sent, unless every key is reported as an escape code. */
+	public void type(String text) {
+		if (TerminalKeyboard.sendsText(decoder.keyboardFlags())) {
+			press(text);
+		}
+	}
+
+	/** Bytes from its keyboard: they wait in the queue, and the interrupt line wakes its computers. */
 	public void press(String key) {
 		scrollToBottom();
 		if (queue(key)) {

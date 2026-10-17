@@ -62,6 +62,21 @@ public final class VtDecoder {
 	private boolean cursorVisible = true;
 	/** The cursor's shape, as DECSCUSR ({@code CSI Ps SP q}) sets it: 0 or 1 a blinking block (the default), 2 a steady block, 3/4 an underline, 5/6 a bar (odd ones blink). */
 	private int cursorStyle;
+	/** DECCKM ({@code CSI ?1h}): the cursor keys send {@code ESC O A}... (application mode), not {@code CSI A}. */
+	private boolean cursorKeysApplication;
+	/**
+	 * The kitty keyboard protocol's flags (what keys report: 1 disambiguate, 2 event types, 4
+	 * alternate keys, 8 all keys as escape codes, 16 associated text), set by {@code CSI > f u}
+	 * (pushed), {@code CSI < n u} (popped), {@code CSI = f ; m u}; asked by {@code CSI ? u}.
+	 */
+	private int keyboardFlags;
+	private final java.util.ArrayDeque<Integer> keyboardStack = new java.util.ArrayDeque<>();
+	/** How many pushed keyboard modes are kept (kitty's stack, bounded). */
+	private static final int KEYBOARD_STACK = 16;
+	/** The kitty flags this terminal acts on (1, 2 and 8; 4 and 16 are acknowledged, not reported). */
+	public static final int KEYBOARD_FLAGS = 31;
+	/** The CSI sequence being run's private prefix ('?', '>', '<', '='), or 0. */
+	private char prefix;
 	private int[] saved;
 	/** The main screen while the alternate one shows: characters, then foregrounds, backgrounds. */
 	private Screen mainScreen;
@@ -133,6 +148,15 @@ public final class VtDecoder {
 		return cursorStyle;
 	}
 
+	public boolean cursorKeysApplication() {
+		return cursorKeysApplication;
+	}
+
+	/** The kitty keyboard protocol's flags in effect (0: legacy, as a VT100's keyboard). */
+	public int keyboardFlags() {
+		return keyboardFlags;
+	}
+
 	public boolean cursorVisible() {
 		return cursorVisible;
 	}
@@ -162,6 +186,9 @@ public final class VtDecoder {
 		autowrap = true;
 		cursorVisible = true;
 		cursorStyle = 0;
+		cursorKeysApplication = false;
+		keyboardFlags = 0;
+		keyboardStack.clear();
 		saved = null;
 		mainScreen = null;
 		buffer.clear();
@@ -247,6 +274,7 @@ public final class VtDecoder {
 			parse = Parse.GROUND;
 			String raw = params.toString();
 			boolean privateMode = !raw.isEmpty() && "?<=>".indexOf(raw.charAt(0)) >= 0;
+			prefix = privateMode ? raw.charAt(0) : 0;
 			String body = raw.replaceAll("[^0-9;:]", "");
 			List<Integer> args = new ArrayList<>();
 			for (String part : body.split("[;:]", -1)) {
@@ -307,7 +335,32 @@ public final class VtDecoder {
 				}
 			}
 			case 's' -> saveCursor();
-			case 'u' -> restoreCursor();
+			case 'u' -> {
+				switch (prefix) {
+					case '>' -> {
+						if (keyboardStack.size() >= KEYBOARD_STACK) {
+							keyboardStack.removeLast();
+						}
+						keyboardStack.push(keyboardFlags);
+						keyboardFlags = argOrZero(args, 0) & KEYBOARD_FLAGS;
+					}
+					case '<' -> {
+						for (int i = 0; i < arg(args, 0, 1); i++) {
+							keyboardFlags = keyboardStack.isEmpty() ? 0 : keyboardStack.pop();
+						}
+					}
+					case '=' -> {
+						int flags = argOrZero(args, 0) & KEYBOARD_FLAGS;
+						keyboardFlags = switch (arg(args, 1, 1)) {
+							case 2 -> keyboardFlags | flags;
+							case 3 -> keyboardFlags & ~flags;
+							default -> flags;
+						};
+					}
+					case '?' -> reply.accept("\u001B[?" + keyboardFlags + "u");
+					default -> restoreCursor();
+				}
+			}
 			case 'h', 'l' -> setModes(privateMode, command == 'h', args);
 			case 'n' -> {
 				if (!privateMode && argOrZero(args, 0) == 5) {
@@ -336,6 +389,7 @@ public final class VtDecoder {
 				continue;
 			}
 			switch (mode) {
+				case 1 -> cursorKeysApplication = on;
 				case 7 -> autowrap = on;
 				case 25 -> cursorVisible = on;
 				case 47, 1047, 1049 -> alternateScreen(on, mode == 1049);
@@ -675,7 +729,8 @@ public final class VtDecoder {
 	 */
 	public int[] state() {
 		int flags = (bold ? 1 : 0) | (reverse ? 2 : 0) | (newLineMode ? 4 : 0) | (autowrap ? 8 : 0)
-			| (cursorVisible ? 16 : 0) | (pendingWrap ? 32 : 0) | (stringEscape ? 64 : 0) | (cursorStyle << 8);
+			| (cursorVisible ? 16 : 0) | (pendingWrap ? 32 : 0) | (stringEscape ? 64 : 0) | (cursorStyle << 8)
+			| (cursorKeysApplication ? 1 << 11 : 0) | (keyboardFlags << 12);
 		int[] state = new int[STATE];
 		int[] registers = {x, y, fgIndex, fgRgb, bgIndex, bgRgb, flags, top, bottom, parse.ordinal(), saved != null ? 1 : 0};
 		System.arraycopy(registers, 0, state, 0, registers.length);
@@ -714,6 +769,8 @@ public final class VtDecoder {
 		pendingWrap = (flags & 32) != 0;
 		stringEscape = (flags & 64) != 0;
 		cursorStyle = Math.min((flags >> 8) & 7, 6);
+		cursorKeysApplication = (flags & (1 << 11)) != 0;
+		keyboardFlags = (flags >> 12) & KEYBOARD_FLAGS;
 		if (state[7] >= 0 && state[7] < state[8] && state[8] < rows) {
 			top = state[7];
 			bottom = state[8];
