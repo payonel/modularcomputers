@@ -690,12 +690,23 @@ scripts/art/error_beep.py` into
   - **User space**: the kernel runs every program through `/bin/lua` (as if each began with
     `#!/bin/lua`), the interpreter, which opens the rest of Lua's standard library over `sys`: `io`
     (`lib/io.lua`, stdio in the process: buffered files, a tty's output line buffered, stderr not;
-    reading flushes stdout; `io.popen` through `sh -c`), `os` (`getenv`, `setenv`, `exit`, `remove`,
+    reading flushes stdout; end of file is sticky, as glibc's; `io.popen` through `sh -c`), `os` (`getenv`, `setenv`, `exit`, `remove`,
     `rename`, `time` and `clock` as seconds since boot: no RTC, `tmpname` in `/tmp`), `print`,
     `require`/`package` (`/lib/?.lua`...), `loadfile`, `dofile`, `arg`; `require("sys")` gives the
     syscalls, `require("fs")` conveniences (paths, listing, mkdir -p, recursive remove and copy, move
     across disks, glob). With no script it's a REPL. A program's exit status is what it returns (an
     integer), 1 if it fails.
+  - **The shell's line editor** (user, 2026-10-16, option 2 of "tty or shell?": bash's split, and
+    code is shared anyway, so no memory saved either way): at a terminal `sh` reads its lines itself,
+    the tty raw (`TCSETS`: no icanon, echo, icrnl; isig stays, so ^C is SIGINT) only while a line is
+    typed, back as it was before a command runs. It draws the line, so it edits across rows the line
+    wrapped onto (moving by `CSI A`/`B`/`G`, with a VT100's wait-to-wrap in mind): Left/Right,
+    Home/End (^A/^E), Backspace, Delete (^D), ^U/^K/^W cut, Up/Down history (100 lines), ^L clears,
+    ^D on an empty line ends input, ^C drops the line. Keys it read past the line are its next line's,
+    or given back to the tty (`TIOCSTI`) before a command runs, so what was typed ahead reaches the
+    command. **`stty`**: lists the flags; `raw`/`-raw`/`cooked`, `sane`, `size`, `[-]flag`. Raw mode is
+    the tty's (termios), not the terminal's: the terminal's own modes are escape sequences (cursor
+    shape, alternate screen), as on a real system.
   - **`/bin/sh`** (rewritten 2026-10-15 to the user's list: OpenOS's error cases, substitutions,
     globs, PS1): only shell behavior; commands are programs. Quotes, `\`, `~`; `$NAME`, `${NAME}`,
     `$? $$ $! $# $@ $* $0..$9`, `${NAME:-w}`, `${NAME-w}`, `${NAME:=w}`, `${NAME:+w}`, `${NAME:?w}`,
@@ -725,7 +736,7 @@ scripts/art/error_beep.py` into
     returns is its status. Processes get `debug.traceback` (the firmware's sandbox gives it; it reads
     the stack raw).
   - **`/bin`**: `cat clear cp df echo edit free grep halt head kill ls lua mkdir mount mv poweroff
-    ps reboot rm rmdir sh sleep tail touch umount`. `ls` (user: like real ls, not `ls -1`): on a
+    ps reboot rm rmdir sh sleep stty tail touch umount`. `ls` (user: like real ls, not `ls -1`): on a
     terminal, names in columns down then across, as wide as the terminal (`TIOCGWINSZ`), directories
     in bold blue; into a pipe or file, one a line (as GNU ls); `-1 -a -C -l -F`. `free [-b|-k|-m|-h]`:
     collects garbage 20 times first (the user: that gets Lua's collector to finish), then `sysinfo`.
@@ -757,10 +768,10 @@ scripts/art/error_beep.py` into
     as ^X, buffered while a read's bytes are handled and written once, as n_tty's echo buffer,
     `echoctl`), and `isig`: **^C flushes the input, echoes `^C` and sends SIGINT to the tty's
     foreground process group**. Output goes through `onlcr`. Raw mode (`icanon` off) by `TCSETS`.
-    **It tracks the terminal's cursor column** from everything written through it (as n_tty does,
-    with the VT100's wait-to-wrap in the last column), so erasing works back across a line that
-    wrapped (user, 2026-10-15: Backspace didn't reach the row above): at a row's start it moves up to
-    the end of the row above (`CSI A`, `CSI n G`), where a backspace stops at the left margin.
+    Its erase is Linux's (`\b \b`: it stops at a row's start; user, 2026-10-16: the wrap-aware editor
+    is the shell's, as bash's readline, not the tty's). Turning `icanon` back on makes what's waiting
+    unread into lines again (as n_tty rescans its buffer: input typed while it was raw);
+    `TIOCSTI` puts input in as if typed.
   - Tests (`runtime/McosTest`) bring their own programs onto the disk and type commands; they check
     files on the disks and whether the computer halts or runs, never what mcos says.
 - **Lua scripts** (user design, 2026-10-13; `machine/LuaScripts`): the Lua that comes with the

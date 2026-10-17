@@ -1,0 +1,61 @@
+-- stty [setting...]: the terminal's line settings (termios), as Linux's stty. With none, they're
+-- listed. A setting turns a flag on (echo) or off (-echo); "raw" turns line editing, echo, signals
+-- and CR to NL off (-raw or "cooked" back on); "sane" puts Linux's defaults back; "size" prints the
+-- rows and columns. The flags: icanon (line editing), echo, echoe (erase on the screen), echoctl
+-- (^X for control characters), isig (^C signals), icrnl (Enter as a new line), onlcr (a new line
+-- out as CR LF), iutf8 (erase a UTF-8 character at a time).
+local sys = require("sys")
+
+local SANE = {icanon = true, echo = true, echoe = true, echoctl = true, isig = true, icrnl = true, onlcr = true, iutf8 = true}
+local RAW = {"icanon", "echo", "isig", "icrnl"}
+
+local flags, why = sys.ioctl(0, "TCGETS")
+if not flags then
+  io.stderr:write("stty: standard input: " .. tostring(why) .. "\n")
+  return 1
+end
+
+if #arg == 0 then
+  local names = {}
+  for name in pairs(flags) do
+    names[#names + 1] = name
+  end
+  table.sort(names)
+  local shown = {}
+  for i, name in ipairs(names) do
+    shown[i] = (flags[name] and "" or "-") .. name
+  end
+  io.write(table.concat(shown, " "), "\n")
+  return 0
+end
+
+for _, word in ipairs(arg) do
+  local off, name = string.match(word, "^(%-?)(%w+)$")
+  if word == "size" then
+    local columns, rows = sys.ioctl(0, "TIOCGWINSZ")
+    io.write(tostring(rows), " ", tostring(columns), "\n")
+  elseif word == "raw" or word == "-cooked" then
+    for _, flag in ipairs(RAW) do
+      flags[flag] = false
+    end
+  elseif word == "-raw" or word == "cooked" then
+    for _, flag in ipairs(RAW) do
+      flags[flag] = true
+    end
+  elseif word == "sane" then
+    for flag, on in pairs(SANE) do
+      flags[flag] = on
+    end
+  elseif name and flags[name] ~= nil then
+    flags[name] = off == ""
+  else
+    io.stderr:write("stty: invalid argument '" .. word .. "'\n")
+    return 1
+  end
+end
+local ok, err = sys.ioctl(0, "TCSETS", flags)
+if not ok then
+  io.stderr:write("stty: " .. tostring(err) .. "\n")
+  return 1
+end
+return 0

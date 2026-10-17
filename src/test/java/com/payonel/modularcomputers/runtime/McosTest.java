@@ -178,6 +178,28 @@ class McosTest {
 	}
 
 	@Test
+	void theShellEditsItsLineAndKeepsAHistory() {
+		boot();
+		type("echo bc > /h1\r");
+		untilFile(root().resolve("h1"), "bc\n");
+		type("\u001B[A"); // up: the last line again
+		type("\u001B[D\u001B[D\u001B[D\u001B[D\u001B[D\u001B[D\u001B[D\u001B[D"); // left, onto "c > /h1"... back to "bc"
+		type("a"); // inserted mid-line: echo abc > /h1 ... with the file name left to fix
+		type("\u0005\u007f2\r"); // ^E, erase the 1, a 2: echo abc > /h2
+		untilFile(root().resolve("h2"), "abc\n");
+		type("stty -echo; stty > /flags; stty sane\r");
+		settle(() -> Files.isRegularFile(root().resolve("flags")) && read(root().resolve("flags")).contains("-echo"));
+		assertThat(read(root().resolve("flags"))).as("while the shell isn't reading, the tty is as programs set it").contains("icanon");
+	}
+
+	@Test
+	void whatsTypedAheadGoesToTheCommand() {
+		boot();
+		type("cat > /typed\rhello\r\u0004"); // at once: the shell's line, then cat's input and its end
+		untilFile(root().resolve("typed"), "hello\n");
+	}
+
+	@Test
 	void theShellEndingIsStartedAgain() {
 		boot();
 		type("exit\r");

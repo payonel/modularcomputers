@@ -17,9 +17,6 @@ local BS = "\b" -- Ctrl+H erases too
 local CR, NL, TAB, DEL = "\r", "\n", "\t", "\127"
 local CARET_OFFSET = 64 -- a control character echoes as ^ and the character this far on (\3 as ^C)
 local RING_SIZE = 64 -- packets of input the ring holds (each a few hundred bytes at most); past it the device keeps the rest
-local DEFAULT_WIDTH = 80 -- columns, if the device doesn't say
-local TAB_STOP = 8
-local CSI = "\27["
 
 -- In the ready queue: an end of file (Ctrl+D at the start of a line), read as nothing.
 local EOF = {}
@@ -29,14 +26,7 @@ tty.SIGINT = "SIGINT"
 -- A tty on 'device'. 'signal(tty, name)' is the kernel's: it delivers a signal to the tty's
 -- foreground process group.
 function tty.new(device, signal)
-  local ok, width = board.invoke(device, "getSize")
   return setmetatable({
-    -- Where the terminal's cursor is, as worked out from everything written through the tty (n_tty
-    -- tracks its column the same way, for tabs and erasing): the column, and whether it's waiting
-    -- in the last column to wrap (as a VT100 does after printing there).
-    column = 0,
-    pending = false,
-    width = ok and math.type(width) == "integer" and width > 0 and width or DEFAULT_WIDTH,
     device = device,
     input = board.ring(device, RING_SIZE), -- what the device sends, as it sends it
     signal = signal,
@@ -49,100 +39,12 @@ function tty.new(device, signal)
   }, tty)
 end
 
--- Output processing (opost): with onlcr, a new line goes out as CR LF.
-local function opost(self, text)
+-- Output: to the device, after output processing.
+function tty:write(text)
   if self.flags.onlcr then
     text = string.gsub(text, NL, CR .. NL)
   end
-  return text
-end
-
--- Printable characters from the cursor: where it ends, as the terminal wraps them.
-local function printed(self, n)
-  if n == 0 then
-    return
-  end
-  local column = self.column
-  if self.pending then
-    column, self.pending = 0, false -- the first wraps to the next row
-  end
-  local total = column + n
-  if total < self.width then
-    self.column = total
-  elseif total % self.width == 0 then
-    self.column, self.pending = self.width - 1, true
-  else
-    self.column = total % self.width
-  end
-end
-
--- The cursor after 'text' is written (as the terminal will move it).
-function tty:advance(text)
-  local at, n = 1, #text
-  while at <= n do
-    local special = string.find(text, "[\0-\31\127]", at)
-    local run = string.sub(text, at, (special or n + 1) - 1)
-    printed(self, utf8.len(run) or #run)
-    if not special then
-      return
-    end
-    local c = string.sub(text, special, special)
-    at = special + 1
-    if c == "\27" then
-      local params, final = string.match(text, "^%[([%d;?]*)[ -/]*([@-~])", at)
-      if final then
-        at = at + #string.match(text, "^%[[%d;?]*[ -/]*[@-~]", at)
-        local first = tonumber(string.match(params, "^(%d+)")) or 1
-        if final == "G" or final == "`" then
-          self.column, self.pending = math.min(first, self.width) - 1, false
-        elseif final == "H" or final == "f" then
-          self.column, self.pending = math.min(tonumber(string.match(params, ";(%d+)")) or 1, self.width) - 1, false
-        elseif final == "C" then
-          self.column, self.pending = math.min(self.column + first, self.width - 1), false
-        elseif final == "D" then
-          self.column, self.pending = math.max(self.column - first, 0), false
-        elseif final == "A" or final == "B" then
-          self.pending = false
-        end
-      end
-    elseif c == CR then
-      self.column, self.pending = 0, false
-    elseif c == NL then
-      self.pending = false
-    elseif c == BS then
-      self.column, self.pending = math.max(self.column - 1, 0), false
-    elseif c == TAB then
-      self.column, self.pending = math.min(self.width - 1, (self.column // TAB_STOP + 1) * TAB_STOP), false
-    end
-  end
-end
-
--- Output: to the device, after output processing.
-function tty:write(text)
-  text = opost(self, text)
-  self:advance(text)
   board.invoke(self.device, "write", text)
-end
-
--- Rubs out the 'columns' before the cursor on the screen: back a column, a blank, back again; at a
--- row's start, up to the end of the row above (a line typed past the screen's width wrapped there),
--- which a backspace can't reach (a VT100's stops at the left margin). Moves by column number (CHA)
--- where the cursor may wait to wrap, as a backspace there is ambiguous between terminals.
-function tty:rubout(columns)
-  for _ = 1, columns do
-    local sequence
-    if self.pending then
-      sequence = CSI .. (self.column + 1) .. "G " .. CSI .. (self.column + 1) .. "G"
-      self.pending = false
-    elseif self.column == 0 then
-      sequence = CSI .. "A" .. CSI .. self.width .. "G " .. CSI .. self.width .. "G"
-      self.column = self.width - 1
-    else
-      sequence = "\b \b"
-      self.column = self.column - 1
-    end
-    self.echoes[#self.echoes + 1] = sequence
-  end
 end
 
 -- How a byte echoes: control characters as ^X with echoctl (not a tab or a new line).
@@ -157,9 +59,7 @@ end
 -- buffer is: one write for a burst of typing, not one a key.
 function tty:echo(c)
   if self.flags.echo then
-    local text = opost(self, echoed(self.flags, c))
-    self:advance(text)
-    self.echoes[#self.echoes + 1] = text
+    self.echoes[#self.echoes + 1] = echoed(self.flags, c)
   end
 end
 
@@ -175,7 +75,7 @@ function tty:erase()
     c = table.remove(line) -- a continuation byte: on to the character's first
   end
   if self.flags.echo and self.flags.echoe then
-    self:rubout(#echoed(self.flags, c)) -- a column a character, two for ^X
+    self.echoes[#self.echoes + 1] = string.rep("\b \b", #echoed(self.flags, c)) -- a column a character, two for ^X
   end
 end
 
@@ -222,7 +122,7 @@ function tty:receive(bytes)
   if #self.echoes > 0 then
     local echoes = table.concat(self.echoes)
     self.echoes = {}
-    board.invoke(self.device, "write", echoes) -- (output processing and the cursor done as each was made)
+    self:write(echoes)
   end
 end
 
@@ -276,30 +176,34 @@ function tty:getattr()
 end
 
 function tty:setattr(flags)
+  local wascanonical = self.flags.icanon
   for name in pairs(self.flags) do
     if flags[name] ~= nil then
       self.flags[name] = flags[name] and true or false
     end
   end
-  if self.flags.icanon and #self.line == 0 then
-    return
-  end
-  if not self.flags.icanon and #self.line > 0 then
+  if wascanonical and not self.flags.icanon and #self.line > 0 then
     -- leaving canonical mode: what's been typed of a line is input now
     for i = 1, #self.line do
       self.ready[#self.ready + 1] = self.line[i]
     end
     self.line = {}
+  elseif not wascanonical and self.flags.icanon and #self.ready > 0 then
+    -- back to canonical mode: what's waiting unread is typed input again, made into lines (as n_tty
+    -- rescans its buffer); it was echoed, or not, as it came
+    local waiting = table.concat(self.ready)
+    self.ready = {}
+    local echo = self.flags.echo
+    self.flags.echo = false
+    self:receive(waiting)
+    self.flags.echo = echo
   end
 end
 
--- Its window size (TIOCGWINSZ): the device's (and the tty's own idea of its width follows it).
+-- Its window size (TIOCGWINSZ): the device's.
 function tty:size()
   local ok, width, height = board.invoke(self.device, "getSize")
   if ok then
-    if math.type(width) == "integer" and width > 0 then
-      self.width = width
-    end
     return width, height
   end
 end

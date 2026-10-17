@@ -93,8 +93,13 @@ function FILE:write(...)
   return self
 end
 
--- One read(2) into the read buffer: whether it got anything (false at end of file).
+-- One read(2) into the read buffer: whether it got anything (false at end of file). End of file is
+-- sticky, as in C's stdio (glibc since 2.28): once seen, reads don't ask again (a tty's ^D is
+-- read once; a second read would wait for more) until a seek.
 local function fill(file)
+  if file.eof then
+    return false
+  end
   if file ~= io.stdout and io.stdout and not io.stdout.closed then
     io.stdout:flush()
   end
@@ -103,6 +108,7 @@ local function fill(file)
     return nil, why, errno
   end
   if data == "" then
+    file.eof = true
     return false
   end
   file.rbuf = file.rbuf .. data
@@ -253,6 +259,7 @@ function FILE:seek(whence, offset)
     offset = (offset or 0) - #self.rbuf -- what's buffered hasn't been read yet
   end
   self.rbuf = ""
+  self.eof = false
   local at, why, errno = sys.lseek(self.fd, offset or 0, whence)
   if at == nil then
     return nil, why, errno

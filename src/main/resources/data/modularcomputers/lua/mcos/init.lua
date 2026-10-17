@@ -569,7 +569,8 @@ function syscalls.pipe(p)
 end
 
 -- isatty, and the terminal's ioctls by their Linux names: TCGETS and TCSETS (termios flags, as a
--- table), TIOCGWINSZ (columns, rows), TIOCGPGRP and TIOCSPGRP (its foreground process group).
+-- table), TIOCGWINSZ (columns, rows), TIOCGPGRP and TIOCSPGRP (its foreground process group),
+-- TIOCSTI (bytes put in as if typed).
 function syscalls.ioctl(p, request, fd, op, arg)
   local d, why, errno = description(p, fd)
   if not d then
@@ -589,6 +590,9 @@ function syscalls.ioctl(p, request, fd, op, arg)
     return t.foreground
   elseif op == "TIOCSPGRP" and math.type(arg) == "integer" then
     t.foreground = arg
+    return true
+  elseif op == "TIOCSTI" and type(arg) == "string" then
+    t:receive(arg) -- input, as if typed (Linux's TIOCSTI): a shell gives back what it read ahead
     return true
   end
   return fail("EINVAL")

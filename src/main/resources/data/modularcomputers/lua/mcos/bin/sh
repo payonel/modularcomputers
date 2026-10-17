@@ -1175,6 +1175,211 @@ local function prompt(ps)
   end))
 end
 
+-- ---- line editing ------------------------------------------------------------------------------
+-- At a terminal the shell edits the line itself, as bash does with readline: the tty goes raw (no
+-- canonical editing or echo; ^C still signals) while a line is typed, and back before a command
+-- runs. The shell draws the line, so it's edited anywhere in it, across rows it wrapped onto (the
+-- tty's own erase, as Linux's, stops at a row's start), with a history.
+--   Left/Right, Home/End (^A/^E) move; Backspace, Delete (^D) erase; ^U, ^K cut before/after the
+--   cursor, ^W the word before it; Up/Down go through the history; ^L clears the screen; ^D on an
+--   empty line is the end of input; ^C drops the line.
+
+local HISTORY_SIZE = 100 -- lines kept for Up and Down
+local DEFAULT_COLUMNS = 80
+local READ_SIZE = 256
+local CSI = "\27["
+local history = {}
+-- Keys read past the end of a line: the next line's (the editor reads all that's waiting), or given
+-- back to the tty before a command runs (TIOCSTI), so it gets what was typed for it.
+local typeahead = ""
+
+-- How many columns text takes on the screen (escape sequences take none).
+local function columns(text)
+  text = string.gsub(text, "\27%[[%d;?]*[ -/]*[@-~]", "")
+  return utf8.len(text) or #text
+end
+
+-- A string's characters (UTF-8), one a slot.
+local function characters(text)
+  local list = {}
+  for c in string.gmatch(text, "[\0-\127\194-\244][\128-\191]*") do
+    list[#list + 1] = c
+  end
+  return list
+end
+
+-- Reads a line at a terminal, after 'shown' (the prompt): the line; or nil and "EINTR" (^C), or nil
+-- at the end of input.
+local function readline(shown)
+  local saved = sys.ioctl(0, "TCGETS")
+  if not saved then
+    io.stdout:write(shown)
+    io.stdout:flush()
+    local line, _, errno = io.read("l")
+    return line, errno
+  end
+  local raw = {}
+  for name, on in pairs(saved) do
+    raw[name] = on
+  end
+  raw.icanon, raw.echo, raw.icrnl = false, false, false -- (isig stays: ^C is still SIGINT)
+  sys.ioctl(0, "TCSETS", raw)
+  local width = sys.ioctl(1, "TIOCGWINSZ") or DEFAULT_COLUMNS
+
+  -- The screen as a line of cells from the prompt's last line's start: the text starts after the
+  -- prompt; 'at' is where the terminal's cursor is.
+  local start = columns(string.match(shown, "[^\n]*$"))
+  local buffer, cursor = {}, 0
+  local pending = typeahead -- keys read and not yet handled
+  typeahead = ""
+  local at = start
+  local out = {shown}
+  if start > 0 and start % width == 0 then
+    out[#out + 1] = " \r" -- (a cursor waiting to wrap: make it wrap)
+  end
+  local function moveto(target)
+    local from, to = at // width, target // width
+    if to < from then
+      out[#out + 1] = CSI .. (from - to) .. "A"
+    elseif to > from then
+      out[#out + 1] = CSI .. (to - from) .. "B"
+    end
+    out[#out + 1] = CSI .. (target % width + 1) .. "G"
+    at = target
+  end
+  -- Draws the line from character 'from' on, clears what's after it, and puts the cursor back.
+  local function redraw(from)
+    moveto(start + from)
+    local tail = table.concat(buffer, "", from + 1)
+    out[#out + 1] = tail
+    at = start + #buffer
+    if #tail > 0 and at % width == 0 then
+      out[#out + 1] = " \r" -- (it ended in the last column: on to the next row, as the model has it)
+    end
+    out[#out + 1] = CSI .. "J"
+    moveto(start + cursor)
+  end
+  local function set(text)
+    buffer = characters(text)
+    cursor = #buffer
+    redraw(0)
+  end
+  local function finish(line, why)
+    typeahead = why == "EINTR" and "" or pending -- (^C flushes what was typed, as the tty does)
+    moveto(start + #buffer)
+    out[#out + 1] = why == "EINTR" and "^C\r\n" or "\r\n"
+    io.stdout:write(table.concat(out))
+    io.stdout:flush()
+    sys.ioctl(0, "TCSETS", saved)
+    if line and line ~= "" and line ~= history[#history] then
+      history[#history + 1] = line
+      if #history > HISTORY_SIZE then
+        table.remove(history, 1)
+      end
+    end
+    return line, why
+  end
+
+  local entry, stash = #history + 1, ""
+  while true do
+    io.stdout:write(table.concat(out))
+    io.stdout:flush()
+    out = {}
+    if pending == "" then
+      local data, _, errno = sys.read(0, READ_SIZE)
+      if data == nil then
+        return finish(nil, errno)
+      elseif data == "" then
+        return finish(nil)
+      end
+      pending = data
+    end
+    -- the next key: an escape sequence, a control character, or a character typed
+    local key = string.match(pending, "^\27%[[%d;]*[%a~]") or string.match(pending, "^\27O%a")
+      or string.match(pending, "^[\0-\127\194-\244][\128-\191]*") or string.sub(pending, 1, 1)
+    pending = string.sub(pending, #key + 1)
+    if key == "\r" or key == "\n" then
+      return finish(table.concat(buffer))
+    elseif key == "\4" and #buffer == 0 then
+      return finish(nil)
+    elseif key == "\127" or key == "\8" then
+      if cursor > 0 then
+        table.remove(buffer, cursor)
+        cursor = cursor - 1
+        redraw(cursor)
+      end
+    elseif key == "\27[3~" or key == "\4" then
+      if cursor < #buffer then
+        table.remove(buffer, cursor + 1)
+        redraw(cursor)
+      end
+    elseif key == "\27[D" or key == "\27OD" then
+      if cursor > 0 then
+        cursor = cursor - 1
+        moveto(start + cursor)
+      end
+    elseif key == "\27[C" or key == "\27OC" then
+      if cursor < #buffer then
+        cursor = cursor + 1
+        moveto(start + cursor)
+      end
+    elseif key == "\1" or key == "\27[H" or key == "\27[1~" or key == "\27OH" then
+      cursor = 0
+      moveto(start)
+    elseif key == "\5" or key == "\27[F" or key == "\27[4~" or key == "\27OF" then
+      cursor = #buffer
+      moveto(start + cursor)
+    elseif key == "\21" then -- ^U
+      for _ = 1, cursor do
+        table.remove(buffer, 1)
+      end
+      cursor = 0
+      redraw(0)
+    elseif key == "\11" then -- ^K
+      for _ = cursor + 1, #buffer do
+        table.remove(buffer)
+      end
+      redraw(cursor)
+    elseif key == "\23" then -- ^W: the word before the cursor (and the spaces after it)
+      local from = cursor
+      while from > 0 and buffer[from] == " " do
+        from = from - 1
+      end
+      while from > 0 and buffer[from] ~= " " do
+        from = from - 1
+      end
+      for _ = from + 1, cursor do
+        table.remove(buffer, from + 1)
+      end
+      cursor = from
+      redraw(cursor)
+    elseif key == "\12" then -- ^L
+      out[#out + 1] = CSI .. "H" .. CSI .. "2J" .. shown
+      at = start
+      redraw(0)
+    elseif key == "\27[A" or key == "\27OA" then
+      if entry > 1 then
+        if entry == #history + 1 then
+          stash = table.concat(buffer)
+        end
+        entry = entry - 1
+        set(history[entry])
+      end
+    elseif key == "\27[B" or key == "\27OB" then
+      if entry <= #history then
+        entry = entry + 1
+        set(entry == #history + 1 and stash or history[entry])
+      end
+    elseif #key > 1 and string.sub(key, 1, 1) == "\27" then
+      -- (a key it has no use for)
+    elseif string.byte(key) >= 32 and key ~= "\127" then
+      table.insert(buffer, cursor + 1, key)
+      cursor = cursor + 1
+      redraw(cursor - 1)
+    end
+  end
+end
+
 -- Background jobs that ended, reported before a prompt.
 local function reap()
   while true do
@@ -1217,17 +1422,21 @@ local function main(...)
   if interactive then
     sys.signal("SIGINT", function() end) -- ^C: a read returns EINTR; the command in front ends
   end
+  -- A line: at a terminal the shell's own editor, else the input's next line; and why not (EINTR).
+  local function nextline(ps)
+    if interactive then
+      return readline(prompt(ps))
+    end
+    local line, _, errno = io.read("l")
+    return line, errno
+  end
   while true do
     if interactive then
       reap()
-      io.stdout:write(prompt(vars.PS1))
-      io.stdout:flush()
     end
-    local line, _, errno = io.read("l")
+    local line, errno = nextline(vars.PS1)
     if line == nil then
-      if errno == "EINTR" then
-        io.stdout:write("\n") -- ^C: the line was dropped; a new prompt
-      else
+      if errno ~= "EINTR" then -- (^C: the line was dropped; a new prompt)
         if interactive then
           io.stdout:write("exit\n")
         end
@@ -1236,21 +1445,18 @@ local function main(...)
     else
       -- a line that goes on: read more (PS2) until it's whole; ^C drops it, end of file ends it
       while lex(line) == INCOMPLETE do
-        if interactive then
-          io.stdout:write(prompt(vars.PS2))
-          io.stdout:flush()
-        end
-        local more, _, code = io.read("l")
+        local more = nextline(vars.PS2)
         if more == nil then
-          if code == "EINTR" then
-            io.stdout:write("\n")
-            line = nil
-          end
+          line = nil
           break
         end
         line = line .. "\n" .. more
       end
       if line then
+        if typeahead ~= "" then
+          sys.ioctl(0, "TIOCSTI", typeahead) -- what was typed ahead is the command's to read
+          typeahead = ""
+        end
         runline(line)
       end
     end
