@@ -356,7 +356,8 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
   - **`/bin` and `PATH` are back** (the user had said no `/bin` for the echo-only v1: it needs PATH).
     With a filesystem the shell runs programs, so it looks commands up in `PATH` (`/bin`, set by the
     kernel), as sh does; a path with a `/` runs as is. Programs have no `.lua` (as Linux's); every
-    file the kernel runs goes through `/bin/lua`, as if each began with `#!/bin/lua`.
+    process starts in `/lib/ld.lua` (the loader, as ld.so and crt1), which calls the program: all of
+    them are Lua, native to the CPU; `/bin/lua` is just Lua's standalone interpreter (2026-10-19).
   - **Disks mount at `/mnt/<kind>/<name>`** (`sata:1` at `/mnt/sata/1`, `id:x` at `/mnt/id/x`), as the
     Java mcos does; a mount point needs no directory on the disk beneath it (the VFS shows one).
     Linux needs the directory; udisks makes it.
@@ -393,7 +394,7 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
   - **Raw disks** have no filesystem driver (an mcos filesystem on sectors); **devices as files**
     (`/dev/sata1`, terminals by address) aren't in devfs yet; **no permissions or users**.
   - **readline** (line editing and history in the shell), **os.date** (no real-time clock: the time
-    is seconds since boot), **a page cache** (every program start reads `/bin/lua` and `/lib/io.lua`
+    is seconds since boot), **a page cache** (every program start reads `/lib/ld.lua` and `/lib/io.lua`
     off the disk), **the bus's hot-plug is noticed only when the kernel idles**.
   - A console tty per terminal (the `console=` option names one device; several aren't started yet).
 - Answered for now (2026-10-15, for the user to review): the shell runs `/bin` programs (above).

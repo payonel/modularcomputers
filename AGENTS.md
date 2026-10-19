@@ -687,15 +687,23 @@ scripts/art/error_beep.py` into
     its shell and a two-process pipeline mcos holds 584 KiB of the VM (the firmware's ~118 KiB
     baseline included); each nested shell about 60 more. mcos needs a tier 3 stick (1 MiB) for now;
     the user: memory is optimized later, and tier 1's capacity may be revisited** (`docs/PLAN.md`).
-  - **User space**: the kernel runs every program through `/bin/lua` (as if each began with
-    `#!/bin/lua`), the interpreter, which opens the rest of Lua's standard library over `sys`: `io`
+  - **User space**: every process starts in **`/lib/ld.lua`, the loader** (user, 2026-10-19: `/bin/lua`
+    should be a real-world `lua`, not every program's start): as an ELF program's `PT_INTERP` (ld.so)
+    and libc's start (`crt1`, `__libc_start_main`), the kernel calls its image with the program's path
+    and arguments; every program is Lua, native to this CPU (no `#!`, and nothing is interpreted
+    twice: the loader calls the program's compiled image on the same VM). It opens the rest of Lua's
+    standard library over `sys` (taking `sys` out of the globals): `io`
     (`lib/io.lua`, stdio in the process: buffered files, a tty's output line buffered, stderr not;
     reading flushes stdout; end of file is sticky, as glibc's; `io.popen` through `sh -c`), `os` (`getenv`, `setenv`, `exit`, `remove`,
     `rename`, `time` and `clock` as seconds since boot: no RTC, `tmpname` in `/tmp`), `print`,
     `require`/`package` (`/lib/?.lua`...), `loadfile`, `dofile`, `arg`; `require("sys")` gives the
     syscalls, `require("fs")` conveniences (paths, listing, mkdir -p, recursive remove and copy, move
-    across disks, glob). With no script it's a REPL. A program's exit status is what it returns (an
-    integer), 1 if it fails.
+    across disks, glob). A program's exit status is what it returns (an integer), 1 if it fails.
+    **`/bin/lua` is Lua's standalone interpreter, as `lua.c`**, a program like any other: `lua [-e stat]
+    [-l [g=]mod] [-i] [-v] [-E] [-W] [--] [script|-] [args]`; `arg` with the interpreter and its options
+    at negative indices; what the script returns is ignored (as lua.c); errors `lua: <message>` and the
+    traceback, 1; with no script, the REPL at a terminal (`> `, `>> `; an expression prints its
+    values; errors without `lua: `), else stdin as a script.
   - **The shell's line editor** (user, 2026-10-16, option 2 of "tty or shell?": bash's split, and
     code is shared anyway, so no memory saved either way): at a terminal `sh` reads its lines itself,
     the tty raw (`TCSETS`: no icanon, echo, icrnl; isig stays, so ^C is SIGINT) only while a line is
@@ -729,9 +737,10 @@ scripts/art/error_beep.py` into
     bad number 2. Interactive: ^C drops the line (the tty flushes it) or ends the job in front; ^D
     exits ("exit").
   - **A program's error is reported with its stack traceback** (the user: OpenOS's was very
-    helpful): `/bin/lua` prints `lua: <message>` (a string; `__tostring`; else `(error object is a
-    <type> value)`), then `stack traceback:` from the frame that raised it, cut at the interpreter's
-    own `xpcall` (its frames and the kernel's aren't the program's), status 1. A script that returns
+    helpful): the loader prints `<program>: <message>` (its name, as a program's own messages start; a
+    string; `__tostring`; else `(error object is a <type> value)`), then `stack traceback:` from the
+    frame that raised it, cut at the loader's own `xpcall` (its frames and the kernel's aren't the
+    program's), status 1. A script that returns
     `false, "why"` (or `nil, "why"`) exits 1 with `why` on stderr, as OpenOS took it; an integer it
     returns is its status. Processes get `debug.traceback` (the firmware's sandbox gives it; it reads
     the stack raw).

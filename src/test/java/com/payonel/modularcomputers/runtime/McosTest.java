@@ -503,8 +503,33 @@ class McosTest {
 		untilFile(root().resolve("st"), "1\n1\n");
 		assertThat(read(root().resolve("err")))
 			.contains("/crash.lua:2: boom", "stack traceback:", "/crash.lua:2: in", "/crash.lua:4: in")
-			.as("the interpreter's own frames are cut").doesNotContain("/bin/lua");
+			.as("the loader's own frames are cut").doesNotContain("/lib/ld.lua");
 		assertThat(read(root().resolve("err2"))).isEqualTo("nope\n");
+	}
+
+	@Test
+	void binLuaIsLuasStandaloneInterpreter() {
+		file("s.lua", """
+			local out = assert(io.open("/r1", "w"))
+			out:write(arg[0], " ", arg[-1], " ", table.concat({...}, ","), " ", tostring(greeting))
+			out:close()
+			return 7
+			""");
+		file("lib/greet.lua", """
+			return "hi"
+			""");
+		file("in.lua", """
+			io.open("/r3", "w"):write("from stdin"):close()
+			""");
+		boot();
+		type("lua -l greeting=greet /s.lua a b; echo $? > /st;"
+			+ " lua -e 'io.open(\"/r2\", \"w\"):write(1 + 1):close()'; lua - < /in.lua;"
+			+ " lua -e 'error(\"x\")' 2> /dev/null; echo $? >> /st\r");
+		untilFile(root().resolve("st"), "0\n1\n");
+		assertThat(read(root().resolve("r1"))).as("arg, ... and -l; what it returns is ignored")
+			.isEqualTo("/s.lua greeting=greet a,b hi");
+		assertThat(read(root().resolve("r2"))).isEqualTo("2");
+		assertThat(read(root().resolve("r3"))).isEqualTo("from stdin");
 	}
 
 	@Test

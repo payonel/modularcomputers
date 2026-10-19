@@ -18,7 +18,7 @@ local root, cmdline = ...
 local VERSION = "0.2"
 local CONSOLE = "console" -- the device the console tty is on, unless the command line says (console=)
 local INIT = "/bin/sh" -- what runs on the console, unless the command line says (init=); started again when it ends
-local INTERPRETER = "/bin/lua" -- what runs a program (every program is Lua, as if each began with #!/bin/lua)
+local LOADER = "/lib/ld.lua" -- where every process starts (an ELF program's PT_INTERP): every program is Lua, native to this CPU
 local MODULES = "/lib/modules/" -- the kernel's own parts
 -- When init can't be started (its file missing or broken), how long before the kernel tries again.
 local RESPAWN_RETRY_TICKS = 100 -- 5 seconds
@@ -269,7 +269,7 @@ local function fromuser(t, deeper)
 end
 
 -- A new process's globals: Lua's base library (no board: the hardware is the kernel's) and its
--- syscalls; the interpreter adds the rest (io, os, require).
+-- syscalls; the loader (/lib/ld.lua) adds the rest (io, os, require).
 local BASE = {"assert", "error", "getmetatable", "ipairs", "next", "pairs", "pcall", "rawequal", "rawget",
   "rawlen", "rawset", "select", "setmetatable", "tonumber", "tostring", "type", "xpcall", "_VERSION",
   "collectgarbage"}
@@ -342,7 +342,7 @@ local function image(path)
   return cached
 end
 
--- posix_spawn: a new process running 'path' (through the interpreter) with 'argv', as the parent's
+-- posix_spawn: a new process running 'path' (through the loader) with 'argv', as the parent's
 -- child. opts: fds (the child's descriptors: {[0] = a parent fd, ...}; 0, 1 and 2 are inherited
 -- when not given, the others aren't: close-on-exec), env (its environment; the parent's when not
 -- given), ignore (signals it starts ignoring, as an async list's SIGINT), pgid (0: a group of its
@@ -357,9 +357,9 @@ local function spawn(parent, path, argv, opts)
   elseif st.type == "directory" then
     return fail("EACCES")
   end
-  local interpreter
-  interpreter, why, errno = image(INTERPRETER)
-  if not interpreter then
+  local loader
+  loader, why, errno = image(LOADER)
+  if not loader then
     return nil, why, errno
   end
   local p = {
@@ -395,9 +395,8 @@ local function spawn(parent, path, argv, opts)
     end
     p.fds[fd] = hold(description)
   end
-  local args = path == INTERPRETER and p.argv or {path, table.unpack(p.argv)}
   p.co = coroutine.create(function()
-    return interpreter(env, table.unpack(args))
+    return loader(env, path, table.unpack(p.argv))
   end)
   board.addstop(p.co)
   nextpid = nextpid + 1
