@@ -41,6 +41,15 @@ import java.util.stream.Stream;
  * outside it ({@link #resolve}). Data
  * is bytes: strings carry one character per byte (ISO-8859-1), as Lua's do. Space counts each
  * file's bytes plus {@link #ENTRY} for each file and directory, so empty files aren't free.
+ * <p>
+ * <b>Symbolic links</b> (user, 2026-10-19: the filesystem on the device keeps them, as a real one
+ * does) are kept as CIFS's Minshall+French symlinks are on a server that has none: an ordinary
+ * file of exactly {@link #LINK_SIZE} bytes, {@code XSym}, the target's length and MD5, then the
+ * target ({@link #symlink}). The host never gets a real link (one could point out of the folder). The
+ * disk never follows a link itself: a path that meets one (on its way, or at its end, for a call
+ * that follows it) fails with {@link #REPARSE}, the link's path and its target, and the OS's VFS
+ * goes on from there (as a Windows filesystem answers STATUS_REPARSE): a target can be anywhere in
+ * the OS's tree, on another disk too.
  */
 public final class Disk implements Device {
 	public static final String HFS = "hfs";
@@ -58,6 +67,16 @@ public final class Disk implements Device {
 	public static final String NO_SPACE = "No space left on device";
 	/** A write the program's memory has no room for (ENOMEM): a handle's buffered writes are charged to it. */
 	public static final String NO_MEMORY = "Cannot allocate memory";
+	/** A symbolic link's file: its size, exactly (as CIFS's mfsymlinks). */
+	public static final int LINK_SIZE = 1067;
+	/** A link's file starts with this. */
+	private static final String LINK_MAGIC = "XSym\n";
+	/** What a link's header takes before its target: the magic, the length (4 digits and a new line), the MD5 (32 hex digits and a new line). */
+	private static final int LINK_HEADER = LINK_MAGIC.length() + 5 + 33;
+	/** The longest target a link holds (the rest of its file, less the new line after it). */
+	public static final int LINK_MAX = LINK_SIZE - LINK_HEADER - 1;
+	/** How a call that met a link fails: this, the link's path on the disk, a NUL and its target ({@code "symbolic link\0/a/b\0../c"}). */
+	public static final String REPARSE = "symbolic link\0";
 	/** Live disks by id (their folder's name): a handle finds its disk by it, also after a restore. */
 	private static final Map<String, Disk> LIVE = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -187,9 +206,24 @@ public final class Disk implements Device {
 	 * result is checked to be inside the folder, through any link on the host too.
 	 */
 	Path resolve(String path) {
+		return resolve(path, true);
+	}
+
+	/**
+	 * As {@link #resolve(String)}; a link met on the way, or at the end when {@code follow}, fails the
+	 * call with {@link #REPARSE} (the OS follows it).
+	 */
+	Path resolve(String path, boolean follow) {
 		Path root = root();
 		Path at = root;
-		for (String name : path.split("/")) {
+		String[] names = path.split("/");
+		int last = names.length - 1;
+		while (last >= 0 && (names[last].isEmpty() || names[last].equals("."))) {
+			last--;
+		}
+		StringBuilder walked = new StringBuilder();
+		for (int i = 0; i < names.length; i++) {
+			String name = names[i];
 			if (name.isEmpty() || name.equals(".")) {
 				continue;
 			}
@@ -204,6 +238,13 @@ public final class Disk implements Device {
 				throw new Refused("bad name: " + name);
 			}
 			at = at.resolve(name);
+			walked.append('/').append(name);
+			if (i < last || follow) {
+				String target = linkTarget(at);
+				if (target != null) {
+					throw new Reparse(walked.toString(), target);
+				}
+			}
 		}
 		if (!at.normalize().startsWith(root)) {
 			throw new Refused("outside the disk: " + path);
@@ -222,6 +263,59 @@ public final class Disk implements Device {
 			throw new UncheckedIOException(e);
 		}
 		return at;
+	}
+
+	/** A link's target, if {@code at} is a link's file (see the class's doc); null for anything else. */
+	static String linkTarget(Path at) {
+		try {
+			if (!Files.isRegularFile(at, java.nio.file.LinkOption.NOFOLLOW_LINKS) || Files.size(at) != LINK_SIZE) {
+				return null;
+			}
+			String text = new String(Files.readAllBytes(at), StandardCharsets.ISO_8859_1);
+			if (!text.startsWith(LINK_MAGIC) || text.charAt(LINK_MAGIC.length() + 4) != '\n') {
+				return null;
+			}
+			int length = Integer.parseInt(text.substring(LINK_MAGIC.length(), LINK_MAGIC.length() + 4));
+			if (length < 1 || length > LINK_MAX) {
+				return null;
+			}
+			String target = text.substring(LINK_HEADER, LINK_HEADER + length);
+			return text.substring(LINK_MAGIC.length() + 5, LINK_HEADER - 1).equals(md5(target)) ? target : null;
+		} catch (IOException | NumberFormatException e) {
+			return null;
+		}
+	}
+
+	/** A link's file for a target (see the class's doc). */
+	static byte[] linkFile(String target) {
+		StringBuilder text = new StringBuilder(LINK_SIZE);
+		text.append(LINK_MAGIC).append(String.format(Locale.ROOT, "%04d\n", target.length())).append(md5(target)).append('\n');
+		text.append(target).append('\n');
+		while (text.length() < LINK_SIZE) {
+			text.append(' ');
+		}
+		return text.toString().getBytes(StandardCharsets.ISO_8859_1);
+	}
+
+	private static String md5(String text) {
+		try {
+			byte[] digest = java.security.MessageDigest.getInstance("MD5").digest(text.getBytes(StandardCharsets.ISO_8859_1));
+			return java.util.HexFormat.of().formatHex(digest);
+		} catch (java.security.NoSuchAlgorithmException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
+	/** A call met a link: the OS goes on from it. */
+	private static final class Reparse extends RuntimeException {
+		final String at;
+		final String target;
+
+		Reparse(String at, String target) {
+			super(at, null, false, false);
+			this.at = at;
+			this.target = target;
+		}
 	}
 
 	/** Where a handle builds what it commits: beside the disk's folder, never in it (not visible, not counted). */
@@ -274,6 +368,8 @@ public final class Disk implements Device {
 			return action.get();
 		} catch (Refused e) {
 			return Result.fail(e.getMessage());
+		} catch (Reparse e) {
+			return Result.fail(REPARSE + e.at + "\0" + e.target);
 		} catch (NoSuchFileRuntime e) {
 			return Result.fail("no such file: " + e.getMessage());
 		} catch (UncheckedIOException e) {
@@ -394,15 +490,20 @@ public final class Disk implements Device {
 		});
 	}
 
-	@Method(doc = "list(path): the names in a directory, sorted; directories end in /")
+	@Method(doc = "list(path[, typed]): the names in a directory, sorted; directories end in /; typed: {name, type} each, type file, directory or link")
 	public Result list(Arguments args) {
 		String path = args.optString(0, "/");
+		boolean typed = args.optBoolean(1, false);
 		return run(() -> {
 			Path dir = resolve(path);
 			if (!Files.isDirectory(dir)) {
 				throw new NoSuchFileRuntime(path);
 			}
 			try (Stream<Path> paths = Files.list(dir)) {
+				if (typed) {
+					return Result.ok(paths.sorted().map(entry -> (Object) Map.of("name", entry.getFileName().toString(),
+						"type", Files.isDirectory(entry) ? "directory" : linkTarget(entry) != null ? "link" : "file")).toList());
+				}
 				return Result.ok(paths.map(entry -> entry.getFileName() + (Files.isDirectory(entry) ? "/" : "")).sorted().toList());
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
@@ -410,11 +511,12 @@ public final class Disk implements Device {
 		});
 	}
 
-	@Method(doc = "stat(path): {size, directory, modified} (modified in milliseconds since 1970), or nil if there's nothing there")
+	@Method(doc = "stat(path[, nofollow]): {size, directory, modified} (modified in milliseconds since 1970), or nil if there's nothing there; nofollow: a link itself, with link = its target (and size its length)")
 	public Result stat(Arguments args) {
 		String path = args.checkString(0);
+		boolean nofollow = args.optBoolean(1, false);
 		return run(() -> {
-			Path at = resolve(path);
+			Path at = resolve(path, !nofollow);
 			if (at.equals(storage)) {
 				return Result.ok(Map.of("size", 0L, "directory", true, "modified", 0L));
 			}
@@ -423,6 +525,14 @@ public final class Disk implements Device {
 			}
 			try {
 				Map<String, Object> stat = new LinkedHashMap<>();
+				String target = nofollow ? linkTarget(at) : null;
+				if (target != null) {
+					stat.put("size", (long) target.length());
+					stat.put("directory", false);
+					stat.put("link", target);
+					stat.put("modified", Files.getLastModifiedTime(at).toMillis());
+					return Result.ok(stat);
+				}
 				stat.put("size", size(at));
 				stat.put("directory", Files.isDirectory(at));
 				stat.put("modified", Files.getLastModifiedTime(at).toMillis());
@@ -437,7 +547,7 @@ public final class Disk implements Device {
 	public Result mkdir(Arguments args) {
 		String path = args.checkString(0);
 		return run(() -> {
-			Path dir = resolve(path);
+			Path dir = resolve(path, false);
 			if (Files.exists(dir)) {
 				throw new Refused("already exists: " + path);
 			}
@@ -454,11 +564,11 @@ public final class Disk implements Device {
 		});
 	}
 
-	@Method(doc = "remove(path): removes a file, or an empty directory")
+	@Method(doc = "remove(path): removes a file, a link (not what it points to), or an empty directory")
 	public Result remove(Arguments args) {
 		String path = args.checkString(0);
 		return run(() -> {
-			Path at = resolve(path);
+			Path at = resolve(path, false);
 			if (at.equals(storage)) {
 				throw new Refused("can't remove the root");
 			}
@@ -483,8 +593,8 @@ public final class Disk implements Device {
 		String from = args.checkString(0);
 		String to = args.checkString(1);
 		return run(() -> {
-			Path source = resolve(from);
-			Path target = resolve(to);
+			Path source = resolve(from, false);
+			Path target = resolve(to, false);
 			if (!Files.exists(source) || source.equals(storage)) {
 				throw new NoSuchFileRuntime(from);
 			}
@@ -502,6 +612,50 @@ public final class Disk implements Device {
 				throw new UncheckedIOException(e);
 			}
 			return Result.ok();
+		});
+	}
+
+	@Method(doc = "symlink(target, path): makes a symbolic link at path to target (any text: the OS follows it); path must not exist")
+	public Result symlink(Arguments args) {
+		String target = args.checkString(0);
+		String path = args.checkString(1);
+		return run(() -> {
+			if (target.isEmpty() || target.indexOf('\0') >= 0) {
+				throw new Refused("bad target");
+			}
+			if (target.length() > LINK_MAX) {
+				throw new Refused("name too long: " + target.length() + " bytes, at most " + LINK_MAX);
+			}
+			Path at = resolve(path, false);
+			if (Files.exists(at)) {
+				throw new Refused("already exists: " + path);
+			}
+			if (!Files.isDirectory(at.getParent())) {
+				throw new NoSuchFileRuntime(path);
+			}
+			try {
+				grow(ENTRY + LINK_SIZE);
+				Files.write(at, linkFile(target));
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
+			}
+			return Result.ok();
+		});
+	}
+
+	@Method(doc = "readlink(path): a symbolic link's target")
+	public Result readlink(Arguments args) {
+		String path = args.checkString(0);
+		return run(() -> {
+			Path at = resolve(path, false);
+			if (!Files.exists(at)) {
+				throw new NoSuchFileRuntime(path);
+			}
+			String target = linkTarget(at);
+			if (target == null) {
+				throw new Refused("not a link: " + path);
+			}
+			return Result.ok(target);
 		});
 	}
 
@@ -706,7 +860,7 @@ public final class Disk implements Device {
 		/** Reads a window of the file around {@code at}: the host file is open only for this. */
 		private void fill(Disk disk, long at) throws IOException {
 			windowStart = at - at % WINDOW;
-			try (RandomAccessFile file = new RandomAccessFile(disk.resolve(path).toFile(), "r")) {
+			try (RandomAccessFile file = new RandomAccessFile(disk.resolve(path, false).toFile(), "r")) {
 				file.seek(windowStart);
 				byte[] bytes = new byte[(int) Math.max(0, Math.min(WINDOW, file.length() - windowStart))];
 				file.readFully(bytes);
@@ -848,7 +1002,7 @@ public final class Disk implements Device {
 
 		/** Builds the new file beside the disk's folder and renames it over the old one, in one step. */
 		private void commit(Disk disk) throws IOException {
-			Path target = disk.resolve(path);
+			Path target = disk.resolve(path, false);
 			long current = Files.isRegularFile(target) ? Files.size(target) : 0;
 			// The space it takes now (the file may have changed meanwhile); its own reservation is given back as it goes.
 			long reservation = reservation();

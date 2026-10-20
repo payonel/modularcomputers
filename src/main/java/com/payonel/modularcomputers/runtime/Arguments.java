@@ -90,6 +90,10 @@ public final class Arguments {
 		return get(index) == null ? fallback : checkString(index);
 	}
 
+	public boolean optBoolean(int index, boolean fallback) {
+		return get(index) == null ? fallback : checkBoolean(index);
+	}
+
 	private static ArgumentError bad(int index, String why) {
 		return new ArgumentError("bad argument #" + (index + 1) + " (" + why + ")");
 	}

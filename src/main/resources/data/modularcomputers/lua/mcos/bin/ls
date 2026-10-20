@@ -1,13 +1,14 @@
 -- ls [-1aClF] [path...]: what's in directories (a file lists itself). On a terminal, names go in
 -- columns down then across, as wide as the terminal (as GNU ls), directories in blue; into a pipe or
--- a file, one a line. -1 one a line, -C columns anyway, -l long (type, size, name), -a names starting
--- with a dot too, -F a / after directories.
+-- a file, one a line. -1 one a line, -C columns anyway, -l long (type, size, name; a link's target
+-- after ->), -a names starting with a dot too, -F a / after directories, an @ after links.
 local sys = require("sys")
 local fs = require("fs")
 
 local GAP = 2 -- spaces between columns
 local DEFAULT_WIDTH = 80 -- columns, when the terminal doesn't say
 local DIRECTORY_COLOR = "\27[1;34m" -- (dircolors' default for directories)
+local LINK_COLOR = "\27[1;36m" -- (and for links)
 local RESET = "\27[0m"
 
 local flags = {}
@@ -35,9 +36,11 @@ local width = tty and sys.ioctl(1, "TIOCGWINSZ") or DEFAULT_WIDTH
 
 -- An entry as shown: its text, and how wide it is on the screen (colors take no room).
 local function shown(entry)
-  local text = entry.name .. ((flags.F and entry.type == "directory") and "/" or "")
-  if tty and entry.type == "directory" then
-    return DIRECTORY_COLOR .. text .. RESET, utf8.len(text) or #text
+  local mark = flags.F and (entry.type == "directory" and "/" or entry.type == "link" and "@") or ""
+  local text = entry.name .. mark
+  local color = entry.type == "directory" and DIRECTORY_COLOR or entry.type == "link" and LINK_COLOR
+  if tty and color then
+    return color .. text .. RESET, utf8.len(text) or #text
   end
   return text, utf8.len(text) or #text
 end
@@ -95,10 +98,11 @@ local function show(entries, dir)
   end
   if flags.l then
     for _, entry in ipairs(visible) do
-      local st = dir and fs.stat(fs.join(dir, entry.name)) or entry
-      local kind = ({directory = "d", device = "c", fifo = "p"})[st and st.type or entry.type] or "-"
+      local st = dir and fs.lstat(fs.join(dir, entry.name)) or entry
+      local kind = ({directory = "d", device = "c", fifo = "p", link = "l"})[st and st.type or entry.type] or "-"
       local text = shown(entry)
-      io.write(string.format("%s %8d %s\n", kind, st and st.size or 0, text))
+      local target = st and st.target and " -> " .. st.target or ""
+      io.write(string.format("%s %8d %s%s\n", kind, st and st.size or 0, text, target))
     end
   elseif columns then
     grid(visible)
@@ -113,13 +117,17 @@ local status = 0
 local files, dirs = {}, {}
 for _, path in ipairs(paths) do
   local st, why = fs.stat(path)
+  local link = fs.lstat(path)
+  if link and link.type == "link" and (flags.l or not st) then
+    st = link -- (-l shows a link named on the command line as itself, as does a link to nothing)
+  end
   if not st then
     io.stderr:write("ls: cannot access '" .. path .. "': " .. string.gsub(why, "^.-: ", "") .. "\n")
     status = 2
   elseif st.type == "directory" then
     dirs[#dirs + 1] = path
   else
-    files[#files + 1] = {name = path, type = st.type, size = st.size}
+    files[#files + 1] = {name = path, type = st.type, size = st.size, target = st.target}
   end
 end
 if #files > 0 then

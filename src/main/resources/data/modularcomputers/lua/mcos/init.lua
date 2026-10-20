@@ -320,6 +320,7 @@ local function image(path)
   elseif st.type == "directory" then
     return fail("EISDIR")
   end
+  path = st.path -- (by where links lead: one image for every name of a file)
   local version = st.size .. ":" .. tostring(st.modified)
   local cached = images[path]
   if cached and versions[path] == version then
@@ -610,6 +611,51 @@ function syscalls.stat(p, request, file)
   return vfs.stat(at)
 end
 
+-- lstat: a link itself, not what it points to (type "link", its target).
+function syscalls.lstat(p, request, file)
+  local at = path(p, file)
+  if not at then
+    return fail("EINVAL")
+  end
+  return vfs.lstat(at)
+end
+
+-- symlink(target, path): a symbolic link at path; the target is kept as given (relative: from the
+-- link's directory, when it's followed).
+function syscalls.symlink(p, request, target, file)
+  local at = path(p, file)
+  if type(target) ~= "string" or not at then
+    return fail("EINVAL")
+  end
+  return vfs.symlink(target, at)
+end
+
+-- link(from, to): a hard link.
+function syscalls.link(p, request, from, to)
+  local a, b = path(p, from), path(p, to)
+  if not (a and b) then
+    return fail("EINVAL")
+  end
+  return vfs.link(a, b)
+end
+
+function syscalls.readlink(p, request, file)
+  local at = path(p, file)
+  if not at then
+    return fail("EINVAL")
+  end
+  return vfs.readlink(at)
+end
+
+-- realpath: an absolute path with every link followed.
+function syscalls.realpath(p, request, file)
+  local at = path(p, file)
+  if not at then
+    return fail("EINVAL")
+  end
+  return vfs.realpath(at)
+end
+
 function syscalls.mkdir(p, request, file)
   local at = path(p, file)
   if not at then
@@ -653,7 +699,7 @@ function syscalls.chdir(p, request, file)
   elseif st.type ~= "directory" then
     return fail("ENOTDIR")
   end
-  p.cwd = at
+  p.cwd = st.path -- where links led (getcwd gives the real path, as Linux's does)
   return true
 end
 
@@ -684,7 +730,7 @@ function syscalls.mount(p, request, source, target, fstype)
     end
     fs = hfs(source)
   end
-  return vfs.mount(at, fs, source)
+  return vfs.mount(vfs.realpath(at) or at, fs, source)
 end
 
 function syscalls.umount(p, request, target)

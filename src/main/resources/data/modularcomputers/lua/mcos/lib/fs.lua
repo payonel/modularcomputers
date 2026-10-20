@@ -62,6 +62,40 @@ function fs.stat(path)
   return st
 end
 
+-- lstat: a link itself (type "link", target), not what it points to.
+function fs.lstat(path)
+  local st, why, errno = sys.lstat(path)
+  if not st then
+    return nil, path .. ": " .. why, errno
+  end
+  return st
+end
+
+function fs.readlink(path)
+  local target, why, errno = sys.readlink(path)
+  if not target then
+    return nil, path .. ": " .. why, errno
+  end
+  return target
+end
+
+-- A symbolic link at 'path' to 'target'.
+function fs.symlink(target, path)
+  local ok, why, errno = sys.symlink(target, path)
+  if not ok then
+    return nil, path .. ": " .. why, errno
+  end
+  return true
+end
+
+function fs.realpath(path)
+  local real, why, errno = sys.realpath(path)
+  if not real then
+    return nil, path .. ": " .. why, errno
+  end
+  return real
+end
+
 function fs.exists(path)
   return sys.stat(path) ~= nil
 end
@@ -123,9 +157,10 @@ function fs.mkdir(path, parents)
   return true
 end
 
--- Removes a file or an empty directory; 'recursive' a directory and all in it.
+-- Removes a file, a link (never what it points to) or an empty directory; 'recursive' a directory
+-- and all in it (links in it are removed, never followed).
 function fs.remove(path, recursive)
-  local st, why, errno = fs.stat(path)
+  local st, why, errno = fs.lstat(path)
   if not st then
     return nil, why, errno
   end
@@ -160,13 +195,16 @@ function fs.remove(path, recursive)
 end
 
 -- Copies a file (or, 'recursive', a directory and all in it) to a path that doesn't exist yet or
--- a file to replace.
+-- a file to replace. A link is followed, except in a recursive copy, which copies links as links
+-- (as cp -R does: -P).
 function fs.copy(from, to, recursive)
-  local st, why, errno = fs.stat(from)
+  local st, why, errno = (recursive and fs.lstat or fs.stat)(from)
   if not st then
     return nil, why, errno
   end
-  if st.type == "directory" then
+  if st.type == "link" then
+    return fs.symlink(st.target, to)
+  elseif st.type == "directory" then
     if not recursive then
       return nil, from .. ": Is a directory", "EISDIR"
     end
@@ -336,7 +374,8 @@ function fs.glob(glob)
         for _, entry in ipairs(entries or {}) do
           local hidden = string.sub(entry.name, 1, 1) == "."
           if string.find(entry.name, pattern) and (not hidden or string.sub(part, 1, 1) == ".")
-            and (index == #parts or entry.type == "directory") then
+            and (index == #parts or entry.type == "directory"
+              or (entry.type == "link" and fs.isdir(fs.join(base == "" and "." or base, entry.name)))) then
             next[#next + 1] = base == "" and entry.name or fs.join(base, entry.name)
           end
         end

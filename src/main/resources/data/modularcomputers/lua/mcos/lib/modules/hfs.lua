@@ -21,10 +21,18 @@ local FAILURES = {
   {"^closed handle", "EBADF"},
   {"^not open for", "EBADF"},
   {"^no such device", "ENODEV"},
+  {"^name too long", "ENAMETOOLONG"},
+  {"^not a link", "EINVAL"},
 }
+
+local REPARSE = "symbolic link\0" -- the disk met a link: its path, a NUL, its target
 
 local function failed(why)
   why = tostring(why)
+  if string.sub(why, 1, #REPARSE) == REPARSE then
+    local at, target = string.match(why, "^([^%z]*)%z(.*)$", #REPARSE + 1)
+    return nil, {at = at, target = target}, "REPARSE"
+  end
   for _, failure in ipairs(FAILURES) do
     if string.find(why, failure[1]) then
       return fail(failure[2])
@@ -83,26 +91,24 @@ function fs:open(path, mode)
   return file(handle, mode)
 end
 
-function fs:stat(path)
-  local st, why, errno = call(self.address, "stat", path)
+function fs:stat(path, nofollow)
+  local st, why, errno = call(self.address, "stat", path, nofollow or nil)
   if st == nil then
     if why then
       return nil, why, errno
     end
     return fail("ENOENT")
   end
+  if st.link then
+    return {type = "link", size = st.size, modified = st.modified, target = st.link}
+  end
   return {type = st.directory and "directory" or "file", size = st.size, modified = st.modified}
 end
 
 function fs:list(path)
-  local names, why, errno = call(self.address, "list", path)
-  if not names then
+  local entries, why, errno = call(self.address, "list", path, true)
+  if not entries then
     return nil, why, errno
-  end
-  local entries = {}
-  for i, name in ipairs(names) do
-    local dir = string.sub(name, -1) == "/"
-    entries[i] = {name = dir and string.sub(name, 1, -2) or name, type = dir and "directory" or "file"}
   end
   return entries
 end
@@ -125,6 +131,14 @@ end
 
 function fs:rename(from, to)
   local ok, why, errno = call(self.address, "rename", from, to)
+  if why then
+    return nil, why, errno
+  end
+  return true
+end
+
+function fs:symlink(target, path)
+  local ok, why, errno = call(self.address, "symlink", target, path)
   if why then
     return nil, why, errno
   end

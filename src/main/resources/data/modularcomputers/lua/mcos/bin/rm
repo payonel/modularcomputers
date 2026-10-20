@@ -13,7 +13,7 @@ for _, word in ipairs(arg) do
 end
 local status = 0
 for _, path in ipairs(paths) do
-  local st = fs.stat(path)
+  local st = fs.lstat(path) -- (a link is removed itself, never what it points to)
   if not st then
     if not force then
       io.stderr:write("rm: " .. path .. ": No such file or directory\n")

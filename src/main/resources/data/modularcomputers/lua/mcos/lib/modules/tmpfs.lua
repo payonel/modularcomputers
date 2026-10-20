@@ -7,20 +7,41 @@ local fail = vfs.fail
 local fs = {}
 fs.__index = fs
 
--- A node: a directory ({dir = {name = node}}) or a file ({data = "..."}).
-local function walk(root, path)
+-- A node: a directory ({dir = {name = node}}), a file ({data = "..."}) or a symbolic link
+-- ({link = "target"}: the VFS follows it).
+local function kind(node)
+  return node.dir and "directory" or node.link and "link" or "file"
+end
+
+-- The node at a path, its parent and its name; a link met on the way (or at the end, with 'follow')
+-- is a reparse: nil, {at, target}, "REPARSE" (vfs.lua).
+local function walk(root, path, follow)
   local node, parent, name = root, nil, nil
+  local walked = ""
+  local rest = path
   for part in string.gmatch(path, "[^/]+") do
-    if not node.dir then
+    if node.link then
+      return nil, {at = walked, target = node.link}, "REPARSE"
+    elseif not node.dir then
       return nil -- through a file: nothing there
     end
     parent, name = node, part
     node = node.dir[part]
+    walked = walked .. "/" .. part
     if not node then
       return nil, parent, name
     end
   end
+  if node.link and follow then
+    return nil, {at = walked, target = node.link}, "REPARSE"
+  end
   return node, parent, name
+end
+
+local function reparse(parent, errno)
+  if errno == "REPARSE" then
+    return nil, parent, errno
+  end
 end
 
 local function file(node, mode)
@@ -63,7 +84,10 @@ local function file(node, mode)
 end
 
 function fs:open(path, mode)
-  local node, parent, name = walk(self.root, path)
+  local node, parent, name = walk(self.root, path, true)
+  if name == "REPARSE" then
+    return reparse(parent, name)
+  end
   if not node and not parent then
     return fail("ENOENT")
   end
@@ -82,30 +106,38 @@ function fs:open(path, mode)
   return file(node, mode)
 end
 
-function fs:stat(path)
-  local node = walk(self.root, path)
-  if not node then
+function fs:stat(path, nofollow)
+  local node, link, errno = walk(self.root, path, not nofollow)
+  if errno == "REPARSE" then
+    return reparse(link, errno)
+  elseif not node then
     return fail("ENOENT")
   end
-  return {type = node.dir and "directory" or "file", size = node.data and #node.data or 0, modified = 0}
+  local size = node.data and #node.data or node.link and #node.link or 0
+  return {type = kind(node), size = size, modified = 0, target = node.link}
 end
 
 function fs:list(path)
-  local node = walk(self.root, path)
-  if not node then
+  local node, link, errno = walk(self.root, path, true)
+  if errno == "REPARSE" then
+    return reparse(link, errno)
+  elseif not node then
     return fail("ENOENT")
   elseif not node.dir then
     return fail("ENOTDIR")
   end
   local entries = {}
   for name, child in pairs(node.dir) do
-    entries[#entries + 1] = {name = name, type = child.dir and "directory" or "file"}
+    entries[#entries + 1] = {name = name, type = kind(child)}
   end
   return entries
 end
 
 function fs:mkdir(path)
   local node, parent, name = walk(self.root, path)
+  if name == "REPARSE" then
+    return reparse(parent, name)
+  end
   if node then
     return fail("EEXIST")
   elseif not parent then
@@ -117,6 +149,9 @@ end
 
 function fs:remove(path)
   local node, parent, name = walk(self.root, path)
+  if name == "REPARSE" then
+    return reparse(parent, name)
+  end
   if not node then
     return fail("ENOENT")
   elseif node.dir and next(node.dir) then
@@ -128,11 +163,15 @@ end
 
 function fs:rename(from, to)
   local node, parent, name = walk(self.root, from)
-  if not node then
+  if name == "REPARSE" then
+    return reparse(parent, name)
+  elseif not node then
     return fail("ENOENT")
   end
   local there, toparent, toname = walk(self.root, to)
-  if there then
+  if toname == "REPARSE" then
+    return reparse(toparent, toname)
+  elseif there then
     return fail("EEXIST")
   elseif not toparent then
     return fail("ENOENT")
@@ -145,9 +184,22 @@ function fs:rename(from, to)
   return true
 end
 
+function fs:symlink(target, path)
+  local node, parent, name = walk(self.root, path)
+  if name == "REPARSE" then
+    return reparse(parent, name)
+  elseif node then
+    return fail("EEXIST")
+  elseif not parent then
+    return fail("ENOENT")
+  end
+  parent.dir[name] = {link = target}
+  return true
+end
+
 local function used(node)
-  if node.data then
-    return #node.data
+  if node.data or node.link then
+    return #(node.data or node.link)
   end
   local total = 0
   for _, child in pairs(node.dir) do

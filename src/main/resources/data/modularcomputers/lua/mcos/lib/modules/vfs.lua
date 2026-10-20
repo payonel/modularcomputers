@@ -5,6 +5,12 @@
 -- answer BLOCK: the caller (the kernel's syscall) waits and asks again.
 --
 -- Errors are Lua's convention, as io.open's: nil, the message (strerror) and the errno's name.
+--
+-- Symbolic links: the VFS follows them, as Linux's does (a target can be on any filesystem). A
+-- filesystem never follows one itself: a call that meets one (on the way, or at the end for a call
+-- that follows it) fails with errno REPARSE and {at = the link's path in it, target = its text},
+-- and the VFS goes on from the target, at most MAX_LINKS times (ELOOP). '..' is taken lexically,
+-- before links are (as a shell's logical paths do; Linux takes it from where a link led).
 local k = ...
 
 local vfs = {}
@@ -34,6 +40,8 @@ local ERRNO = {
   ENOSYS = "Function not implemented",
   ENOTEMPTY = "Directory not empty",
   ENOEXEC = "Exec format error",
+  ELOOP = "Too many levels of symbolic links",
+  ENAMETOOLONG = "File name too long",
 }
 vfs.ERRNO = ERRNO
 
@@ -41,6 +49,9 @@ function vfs.fail(name)
   return nil, ERRNO[name] or name, name
 end
 local fail = vfs.fail
+
+local MAX_LINKS = 40 -- links followed in one lookup (Linux's MAXSYMLINKS)
+local REPARSE = "REPARSE" -- a filesystem's errno for a call that met a link
 
 -- Mounts, longest path first: {path, fs, source, auto (mounted by the kernel for a disk it found)}.
 local mounts = {}
@@ -118,33 +129,96 @@ local function mountpoints(path)
   return names
 end
 
--- stat: {type = "file" | "directory" | "device" | "fifo", size, modified, mount = its mount's path}.
+-- Runs 'attempt(mount, relative path, path)' on the filesystem holding 'path', going on from the
+-- target of each link it meets: the path it ended on (links followed), then what attempt gave.
+local function lookup(path, attempt)
+  for _ = 0, MAX_LINKS do
+    local mount, rel = vfs.resolve(path)
+    if not mount then
+      return path, fail("ENOENT")
+    end
+    local results = table.pack(attempt(mount, rel, path))
+    if results[1] ~= nil or results[3] ~= REPARSE then
+      return path, table.unpack(results, 1, results.n)
+    end
+    local link = results[2]
+    local at = mount.path == "/" and link.at or mount.path .. link.at
+    local rest = string.sub(rel, #link.at + 1)
+    local target = link.target
+    if string.sub(target, 1, 1) ~= "/" then
+      target = (string.match(at, "^(.*)/[^/]*$") or "") .. "/" .. target
+    end
+    path = vfs.normalize(target .. rest)
+  end
+  return path, fail("ELOOP")
+end
+
+-- The path with its directory's links followed and its last name kept (for calls on a name itself:
+-- unlink, rename, mkdir, symlink, lstat); nil and the error if the directory isn't there.
+local function parentfollowed(path)
+  if path == "/" then
+    return path
+  end
+  local dir, name = string.match(path, "^(.*)/([^/]+)$")
+  local real, st, why, errno = vfs.locate(dir == "" and "/" or dir)
+  if not st then
+    return nil, why, errno
+  elseif st.type ~= "directory" then
+    return fail("ENOTDIR")
+  end
+  return (real == "/" and "" or real) .. "/" .. name
+end
+
+-- stat: {type = "file" | "directory" | "link" | "device" | "fifo", size, modified, target (a link's),
+-- mount = its mount's path, path = where it is with links followed}. 'nofollow': a link itself (lstat).
+local function stat(path, nofollow)
+  return lookup(path, function(mount, rel, at)
+    local st, why, errno = mount.fs:stat(rel, nofollow)
+    if not st and errno ~= REPARSE and next(mountpoints(at)) then
+      st = {type = "directory", size = 0, modified = 0}
+    end
+    if st then
+      st.mount = mount.path
+      st.path = at
+    end
+    return st, why, errno
+  end)
+end
+
+-- Where a path leads (links followed), and its stat (or the error); the path is given either way.
+function vfs.locate(path)
+  return stat(path)
+end
+
 function vfs.stat(path)
-  local mount, rel = vfs.resolve(path)
-  if not mount then
-    return fail("ENOENT")
+  return select(2, stat(path))
+end
+
+function vfs.lstat(path)
+  local at, why, errno = parentfollowed(path)
+  if not at then
+    return nil, why, errno
   end
-  local st, why, errno = mount.fs:stat(rel)
-  if not st and next(mountpoints(path)) then
-    st = {type = "directory", size = 0, modified = 0}
+  return select(2, stat(at, true))
+end
+
+-- realpath: the path with every link followed; it must exist.
+function vfs.realpath(path)
+  local real, st, why, errno = stat(path)
+  if not st then
+    return nil, why, errno
   end
-  if st then
-    st.mount = mount.path
-    return st
-  end
-  return nil, why, errno
+  return real
 end
 
 -- A directory's entries, sorted: {name, type} each.
 function vfs.list(path)
-  local mount, rel = vfs.resolve(path)
-  local entries, why, errno
-  if mount then
-    entries, why, errno = mount.fs:list(rel)
-  end
-  local extra = mountpoints(path)
+  local real, entries, why, errno = lookup(path, function(mount, rel)
+    return mount.fs:list(rel)
+  end)
+  local extra = mountpoints(real)
   if not entries then
-    if not next(extra) then
+    if errno == "ELOOP" or not next(extra) then
       return nil, why, errno
     end
     entries = {}
@@ -178,30 +252,33 @@ local function directory(entries)
 end
 
 -- open: an open file description; mode is fopen's (r, w, a, r+, w+, a+). Its 'mount' counts it.
+-- Links are followed (a link to nothing yet makes its target, as O_CREAT does).
 function vfs.open(path, mode, process)
-  local mount, rel = vfs.resolve(path)
-  if not mount then
-    return fail("ENOENT")
+  local real, st, why, errno = stat(path)
+  if not st and errno ~= "ENOENT" then
+    return nil, why, errno
   end
-  local st = vfs.stat(path)
-  local description, why, errno
+  local description, mount
   if st and st.type == "directory" then
     if mode ~= "r" then
       return fail("EISDIR")
     end
     local entries
-    entries, why, errno = vfs.list(path)
+    entries, why, errno = vfs.list(real)
     if not entries then
       return nil, why, errno
     end
-    description = directory(entries)
+    description, mount = directory(entries), vfs.resolve(real)
   else
-    description, why, errno = mount.fs:open(rel, mode, process)
+    real, description, why, errno = lookup(real, function(m, rel)
+      mount = m
+      return m.fs:open(rel, mode, process)
+    end)
     if not description then
       return nil, why, errno
     end
   end
-  description.path = path
+  description.path = real
   description.mount = mount
   mount.open = (mount.open or 0) + 1
   return description
@@ -228,21 +305,42 @@ local function isroot(path)
   return false
 end
 
+-- A call on a name itself (its directory's links followed, not a link it names): its filesystem
+-- and the path in it, or nil and the error.
+local function named(path)
+  local at, why, errno = parentfollowed(path)
+  if not at then
+    return nil, why, errno
+  end
+  local mount, rel = vfs.resolve(at)
+  if not mount then
+    return fail("ENOENT")
+  end
+  return mount, rel, at
+end
+
 function vfs.mkdir(path)
-  if vfs.stat(path) then
+  local mount, rel, at = named(path)
+  if not mount then
+    return nil, rel, at
+  end
+  if select(2, stat(at, true)) then
     return fail("EEXIST")
   end
-  local mount, rel = vfs.resolve(path)
   return mount.fs:mkdir(rel)
 end
 
--- unlink (a file) or rmdir (a directory: 'directory' true).
+-- unlink (a file or a link: not what it points to) or rmdir (a directory: 'directory' true).
 function vfs.remove(path, directory)
-  local st, why, errno = vfs.stat(path)
+  local mount, rel, at = named(path)
+  if not mount then
+    return nil, rel, at
+  end
+  local _, st, why, errno = stat(at, true)
   if not st then
     return nil, why, errno
   end
-  if isroot(path) then
+  if isroot(at) then
     return fail("EBUSY")
   end
   if directory and st.type ~= "directory" then
@@ -250,29 +348,85 @@ function vfs.remove(path, directory)
   elseif not directory and st.type == "directory" then
     return fail("EISDIR")
   end
-  local mount, rel = vfs.resolve(path)
   return mount.fs:remove(rel)
 end
 
+-- rename: moves a name (a link moves as itself).
 function vfs.rename(from, to)
-  local st, why, errno = vfs.stat(from)
+  local a, relfrom, atfrom = named(from)
+  if not a then
+    return nil, relfrom, atfrom
+  end
+  local b, relto, atto = named(to)
+  if not b then
+    return nil, relto, atto
+  end
+  local _, st, why, errno = stat(atfrom, true)
   if not st then
     return nil, why, errno
   end
-  if isroot(from) or isroot(to) then
+  if isroot(atfrom) or isroot(atto) then
     return fail("EBUSY")
   end
-  local a, relfrom = vfs.resolve(from)
-  local b, relto = vfs.resolve(to)
   if a ~= b then
     return fail("EXDEV") -- mv copies, as across filesystems in Linux
   end
   return a.fs:rename(relfrom, relto)
 end
 
+-- symlink: a link at 'path' to 'target' (any text: it's followed when used, so it may lead nowhere).
+function vfs.symlink(target, path)
+  if target == "" then
+    return fail("ENOENT")
+  end
+  local mount, rel, at = named(path)
+  if not mount then
+    return nil, rel, at
+  end
+  if select(2, stat(at, true)) then
+    return fail("EEXIST")
+  end
+  if not mount.fs.symlink then
+    return fail("EPERM") -- (a filesystem with no links)
+  end
+  return mount.fs:symlink(target, rel)
+end
+
+-- link: a hard link (another name for the same file); no filesystem here has them (as FAT).
+function vfs.link(from, to)
+  local mount, rel, at = named(to)
+  if not mount then
+    return nil, rel, at
+  end
+  local st, why, errno = vfs.stat(from)
+  if not st then
+    return nil, why, errno
+  elseif select(2, stat(at, true)) then
+    return fail("EEXIST")
+  elseif st.type == "directory" then
+    return fail("EPERM")
+  elseif st.mount ~= mount.path then
+    return fail("EXDEV")
+  elseif not mount.fs.link then
+    return fail("EPERM")
+  end
+  return mount.fs:link(select(2, vfs.resolve(st.path)), rel)
+end
+
+-- readlink: a link's target.
+function vfs.readlink(path)
+  local st, why, errno = vfs.lstat(path)
+  if not st then
+    return nil, why, errno
+  elseif st.type ~= "link" then
+    return fail("EINVAL")
+  end
+  return st.target
+end
+
 -- statfs: {type, size, used} of the filesystem holding a path.
 function vfs.statfs(path)
-  local mount = vfs.resolve(path)
+  local mount = vfs.resolve(vfs.realpath(path) or path)
   if not mount then
     return fail("ENOENT")
   end

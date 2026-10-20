@@ -1,0 +1,64 @@
+-- ln [-sfnv] target [link], ln [-sfnv] target... directory: makes links. -s symbolic links (the
+-- target kept as given: a relative one is followed from the link's directory); without it a hard
+-- link, which no filesystem here has (as on FAT: "Operation not permitted"). -f removes what's
+-- there first, -n takes a link to a directory as a name, not a directory to put links in, -v says
+-- what it made.
+local fs = require("fs")
+local sys = require("sys")
+
+local flags, words = {}, {}
+for _, word in ipairs(arg) do
+  if string.sub(word, 1, 1) == "-" and #word > 1 and #words == 0 then
+    for c in string.gmatch(string.sub(word, 2), ".") do
+      if not string.find("sfnv", c, 1, true) then
+        io.stderr:write("ln: invalid option -- '" .. c .. "'\n")
+        return 1
+      end
+      flags[c] = true
+    end
+  else
+    words[#words + 1] = word
+  end
+end
+if #words == 0 then
+  io.stderr:write("ln: missing file operand\n")
+  return 1
+end
+
+-- Where the links go: a directory named last (with more than one target, it must be one), else the
+-- last word itself (or, with one target, the target's name here).
+local targets, dir, single = words, nil, nil
+local last = words[#words]
+local lastst = #words > 1 and (flags.n and fs.lstat(last) or fs.stat(last))
+if #words == 1 then
+  single = fs.name(words[1])
+elseif lastst and lastst.type == "directory" then
+  targets, dir = {table.unpack(words, 1, #words - 1)}, last
+elseif #words == 2 then
+  targets, single = {words[1]}, last
+else
+  io.stderr:write("ln: target '" .. last .. "' is not a directory\n")
+  return 1
+end
+
+local status = 0
+for _, target in ipairs(targets) do
+  local name = single or fs.join(dir, fs.name(target))
+  if flags.f and fs.lstat(name) then
+    sys.unlink(name)
+  end
+  local ok, why
+  if flags.s then
+    ok, why = sys.symlink(target, name)
+  else
+    ok, why = sys.link(target, name)
+  end
+  if not ok then
+    io.stderr:write("ln: failed to create ", flags.s and "symbolic" or "hard", " link '", name, "'",
+      flags.s and "" or " => '" .. target .. "'", ": ", why, "\n")
+    status = 1
+  elseif flags.v then
+    io.write("'", name, "' -> '", target, "'\n")
+  end
+end
+return status

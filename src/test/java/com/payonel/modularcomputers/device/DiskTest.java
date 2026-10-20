@@ -57,6 +57,51 @@ class DiskTest {
 	}
 
 	@Test
+	void aSymbolicLinkIsAFileOnTheDiskInCifssFormatAndCallsThatMeetOneReparse() throws Exception {
+		run(DiskTier.TIER_1, board -> {
+			board.invoke("sata:0", "mkdir", "/real");
+			seen.add(board.invoke("sata:0", "symlink", "/real", "/to").failed());
+			seen.add(board.invoke("sata:0", "readlink", "/to").first());
+			seen.add(board.invoke("sata:0", "stat", "/to", true).first());
+			seen.add(board.invoke("sata:0", "list", "/", true).first());
+			seen.add(board.invoke("sata:0", "open", "/to/f", "w").error()); // on the way: the OS follows it
+			seen.add(board.invoke("sata:0", "stat", "/to").error()); // at the end, following
+			seen.add(board.invoke("sata:0", "symlink", "x", "/to").error());
+			seen.add(board.invoke("sata:0", "readlink", "/real").error());
+			seen.add(board.invoke("sata:0", "rename", "/to", "/moved").failed());
+			seen.add(board.invoke("sata:0", "remove", "/moved").failed()); // the link, not what it points to
+			seen.add(board.invoke("sata:0", "stat", "/real").first() != null);
+			board.halt();
+		});
+		assertThat(seen.get(0)).isEqualTo(false);
+		assertThat(seen.get(1)).isEqualTo("/real");
+		assertThat(seen.get(2)).isEqualTo(Map.of("size", 5L, "directory", false, "link", "/real",
+			"modified", ((Map<?, ?>) seen.get(2)).get("modified")));
+		assertThat(seen.get(3)).isEqualTo(List.of(Map.of("name", "real", "type", "directory"), Map.of("name", "to", "type", "link")));
+		assertThat(seen.get(4)).isEqualTo(Disk.REPARSE + "/to\0/real");
+		assertThat(seen.get(5)).isEqualTo(Disk.REPARSE + "/to\0/real");
+		assertThat((String) seen.get(6)).startsWith("already exists");
+		assertThat((String) seen.get(7)).startsWith("not a link");
+		assertThat(seen.subList(8, 11)).containsExactly(false, false, true);
+		assertThat(Files.exists(storage().resolve("moved"))).isFalse();
+	}
+
+	@Test
+	void aLinksFileIsCifssMinshallFrenchSymlink() throws Exception {
+		run(DiskTier.TIER_1, board -> {
+			board.invoke("sata:0", "symlink", "a/b", "/l");
+			board.halt();
+		});
+		byte[] bytes = Files.readAllBytes(storage().resolve("l"));
+		String text = new String(bytes, java.nio.charset.StandardCharsets.ISO_8859_1);
+		assertThat(bytes).hasSize(Disk.LINK_SIZE);
+		// XSym, the length, the target's MD5, the target, padding (md5("a/b"))
+		assertThat(text).startsWith("XSym\n0003\n" + java.util.HexFormat.of().formatHex(
+			java.security.MessageDigest.getInstance("MD5").digest("a/b".getBytes())) + "\na/b\n ");
+		assertThat(Files.isSymbolicLink(storage().resolve("l"))).as("never a host link").isFalse();
+	}
+
+	@Test
 	void aFileWrittenThroughItsHandleIsARealFileOnTheHost() throws Exception {
 		run(DiskTier.TIER_1, board -> {
 			seen.add(board.invoke("sata:0", "getMode").first());

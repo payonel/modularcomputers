@@ -508,6 +508,37 @@ class McosTest {
 	}
 
 	@Test
+	void symbolicLinksAreKeptByTheDiskAndFollowedByTheKernel() {
+		file("real/a.txt", "through\n");
+		file("t.lua", """
+			local sys = require("sys")
+			local out = assert(io.open("/r", "w"))
+			out:write(tostring(sys.readlink("/rel")), "|", sys.lstat("/rel").type, "|", sys.stat("/rel").type, "|",
+			  tostring(select(3, sys.stat("/loop"))), "|", sys.realpath("/rel/a.txt"), "|", tostring(select(3, sys.link("/real/a.txt", "/hard"))))
+			out:close()
+			""");
+		boot();
+		type("ln -s real /rel; ln -s /tmp /tmplink; ln -s loop /loop; echo new > /rel/b.txt\r");
+		untilIdle();
+		type("echo over /tmplink > /tmplink/c; cat /tmp/c > /r2; cat /rel/a.txt > /r3; ln -s gone /dangle\r");
+		untilIdle();
+		type("echo made > /dangle; ls -l / > /r4; /t.lua; cd /rel; pwd > /r5; cd /\r");
+		untilIdle();
+		type("mkdir /d; ln -s /real /d/in; rm -r /d; rm /rel; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("real/b.txt"))).as("written through a link").isEqualTo("new\n");
+		assertThat(read(root().resolve("r2"))).as("a link to another filesystem").isEqualTo("over /tmplink\n");
+		assertThat(read(root().resolve("r3"))).isEqualTo("through\n");
+		assertThat(read(root().resolve("gone"))).as("a link to nothing makes its target").isEqualTo("made\n");
+		assertThat(read(root().resolve("r4"))).contains("dangle -> gone", "tmplink -> /tmp");
+		assertThat(read(root().resolve("r"))).isEqualTo("real|link|directory|ELOOP|/real/a.txt|EPERM");
+		assertThat(read(root().resolve("r5"))).as("cd through a link: the real path").isEqualTo("/real\n");
+		assertThat(root().resolve("real/a.txt")).as("rm -r never follows a link").exists();
+		assertThat(root().resolve("rel")).as("rm takes the link, not what it points to").doesNotExist();
+		assertThat(root().resolve("real")).exists();
+	}
+
+	@Test
 	void binLuaIsLuasStandaloneInterpreter() {
 		file("s.lua", """
 			local out = assert(io.open("/r1", "w"))
