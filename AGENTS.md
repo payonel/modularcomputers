@@ -148,7 +148,8 @@ what's written goes to `set` in one call at close, and **the device decides what
 (replace, append). Descriptions of devices aren't data: they come from the kernel (`sys.devices`,
 for `lsdev`), and a `/sys` tree is postponed. **The kernel caches the bus list, eventually
 correct** (as udev fills `/dev` in after a hot-plug): it's read again on the bus's hot-plug
-interrupt and when a call fails because the device is gone, so no `/dev` lookup ever makes a board
+interrupt (when the kernel idles) and when a call fails because the device is gone; being late is
+intended (user, 2026-10-20), not a gap to close. So no `/dev` lookup ever makes a board
 call (each costs a thread hop, about 50 times a trap). That's safe because **an open file holds the
 device's id, never its name**: a stale name can't send a write to another device; a gone one fails
 with ENODEV. Why not `board` in user space: it would save only the traps (the board calls stay) and
@@ -271,9 +272,6 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   (cards, terminals' own methods) can't be reached from a program yet. The REPL as a workbench for
   trying devices without writing a script waits on that. A `/sys` tree (one file per attribute) is
   postponed (user, 2026-10-20).
-- **A busy kernel learns of a hot-plug late:** its view of the bus is read again when it idles or a
-  call fails. To make it prompt with no polling: the host pushes the new bus list into a kernel ring
-  when it changes, as a terminal's keys are pushed.
 - **A tty per terminal:** the boot option (`console=`) names one device; a tty, interrupt handler
   and shell per terminal isn't started yet.
 - **Signal handlers run only on the way back from a syscall** (a stopped process can't be made to
