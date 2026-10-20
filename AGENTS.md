@@ -105,6 +105,13 @@ computer's own thread), the firmware (sandbox, budgets, freezing, device data), 
   syscall instruction; a spent slice stops the same way (the timer).
 - **Interrupts are level-triggered**; device data is pushed into rings by credit (DMA-like) so input
   needs no call; news "goes cold" at once so a key's latency is one round trip (the user's high bar).
+  Flow control is a handshake, never a silent drop: a device keeps its data until there's room,
+  and what a full device does is its own business (a keyboard could beep). Only the firmware caches
+  device data; with tier 1 RAM there's no cache, and every read is a call (slow, on purpose).
+- **Device failures are soft**: no device can stop the machine (a status the driver reads); only the
+  program's own error, or the board's supervision (CPU gone, power gone), ends a run. External
+  devices are hot-plugged by design: one that isn't there isn't on the bus, and calls to it fail at
+  once (never deferred until it "comes online", OC's race and timeout hacks).
 - **Saving a running computer** (Styx) happens at a safe point with no call in flight, so a save
   never splits a program from its devices; no timeouts, no kills (a persist that never ends is a
   real bug to fix, not to paper over).
@@ -132,7 +139,9 @@ reach it only by syscalls (`sys`), and never get `board`. Every process starts i
 loader, as ld.so and crt1); `/bin/lua` is just Lua's standalone interpreter (user: not every
 program's start). Commands are programs in `/bin`; the shell holds only shell behavior. Line editing
 is a library (`/lib/readline.lua`), as GNU readline is for bash and lua. When choosing behavior,
-copy Linux/POSIX/GNU (and say where it can't). Not decided yet: how user programs reach devices
+copy Linux/POSIX/GNU (and say where it can't). From OpenOS's experience: **no lazy loading** (OpenOS
+split libraries to fit OC's RAM; it cost speed, complexity and more memory than loading whole) and
+**no legacy compatibility** (supporting old programs made OpenOS complex). Not decided yet: how user programs reach devices
 (`/dev` files and `ioctl` is the plan; the user has concerns to discuss first).
 
 ## 4. Easy to miss (a change that needs another)
