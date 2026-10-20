@@ -185,6 +185,17 @@ end
 
 local respawn
 
+-- A zombie reaped: gone from the table and the run order.
+local function reap(p)
+  processes[p.pid] = nil
+  for i, pid in ipairs(order) do
+    if pid == p.pid then
+      table.remove(order, i)
+      return
+    end
+  end
+end
+
 -- A process ends: everything it held is let go (its files closed, as Linux's exit_files: data it
 -- wrote reaches the disk), its children go to the kernel, and it waits as a zombie for its parent.
 local function exit(p, how, value)
@@ -208,14 +219,7 @@ local function exit(p, how, value)
     child.ppid = 0
   end
   if p.ppid == 0 then
-    -- the kernel's own child: reaped at once
-    processes[p.pid] = nil
-    for i, pid in ipairs(order) do
-      if pid == p.pid then
-        table.remove(order, i)
-        break
-      end
-    end
+    reap(p) -- the kernel's own child: reaped at once
     if p.respawn then
       respawn()
     end
@@ -468,6 +472,17 @@ local function description(p, fd)
   return d
 end
 
+-- A syscall on a file descriptor: f(p, request, description, fd, args...), given an open one.
+local function withfd(f)
+  return function(p, request, fd, ...)
+    local d, why, errno = description(p, fd)
+    if not d then
+      return nil, why, errno
+    end
+    return f(p, request, d, fd, ...)
+  end
+end
+
 local function path(p, given)
   if type(given) ~= "string" then
     return nil
@@ -493,32 +508,21 @@ function syscalls.open(p, request, file, mode)
   return fd
 end
 
-function syscalls.close(p, request, fd)
-  local d, why, errno = description(p, fd)
-  if not d then
-    return nil, why, errno
-  end
+syscalls.close = withfd(function(p, request, d, fd)
   p.fds[fd] = nil
   return release(d)
-end
+end)
 
-function syscalls.read(p, request, fd, n)
-  local d, why, errno = description(p, fd)
-  if not d then
-    return nil, why, errno
-  elseif not d.read then
+syscalls.read = withfd(function(p, request, d, fd, n)
+  if not d.read then
     return fail(d.type == "directory" and "EISDIR" or "EBADF")
   end
-  n = math.type(n) == "integer" and n > 0 and n or READ_SIZE
-  return d:read(n)
-end
+  return d:read(math.type(n) == "integer" and n > 0 and n or READ_SIZE)
+end)
 
 -- Writes all of 'data', waiting for room as long as it takes (a pipe's reader); the count written.
-function syscalls.write(p, request, fd, data)
-  local d, why, errno = description(p, fd)
-  if not d then
-    return nil, why, errno
-  elseif not d.write then
+syscalls.write = withfd(function(p, request, d, fd, data)
+  if not d.write then
     return fail("EBADF")
   end
   if type(data) == "number" then
@@ -528,8 +532,7 @@ function syscalls.write(p, request, fd, data)
   end
   request.done = request.done or 0
   while request.done < #data do
-    local count
-    count, why, errno = d:write(request.done == 0 and data or string.sub(data, request.done + 1))
+    local count, why, errno = d:write(request.done == 0 and data or string.sub(data, request.done + 1))
     if count == k.BLOCK then
       return k.BLOCK
     elseif not count then
@@ -541,46 +544,33 @@ function syscalls.write(p, request, fd, data)
     request.done = request.done + count
   end
   return request.done
-end
+end)
 
-function syscalls.lseek(p, request, fd, offset, whence)
-  local d, why, errno = description(p, fd)
-  if not d then
-    return nil, why, errno
-  elseif not d.seek then
+syscalls.lseek = withfd(function(p, request, d, fd, offset, whence)
+  if not d.seek then
     return fail("ESPIPE")
   end
   return d:seek(whence or "set", offset or 0)
-end
+end)
 
-function syscalls.getdents(p, request, fd)
-  local d, why, errno = description(p, fd)
-  if not d then
-    return nil, why, errno
-  elseif not d.getdents then
+syscalls.getdents = withfd(function(p, request, d)
+  if not d.getdents then
     return fail("ENOTDIR")
   end
   return d:getdents()
-end
+end)
 
-function syscalls.dup(p, request, fd, from)
-  local d, why, errno = description(p, fd)
-  if not d then
-    return nil, why, errno
-  end
+syscalls.dup = withfd(function(p, request, d, fd, from)
   local new = lowestfd(p, from)
   if not new then
     return fail("EMFILE")
   end
   p.fds[new] = hold(d)
   return new
-end
+end)
 
-function syscalls.dup2(p, request, fd, to)
-  local d, why, errno = description(p, fd)
-  if not d then
-    return nil, why, errno
-  elseif math.type(to) ~= "integer" or to < 0 or to >= MAX_FDS then
+syscalls.dup2 = withfd(function(p, request, d, fd, to)
+  if math.type(to) ~= "integer" or to < 0 or to >= MAX_FDS then
     return fail("EBADF")
   end
   if fd ~= to then
@@ -591,7 +581,7 @@ function syscalls.dup2(p, request, fd, to)
     p.fds[to] = d
   end
   return to
-end
+end)
 
 function syscalls.pipe(p)
   local r = lowestfd(p)
@@ -612,11 +602,8 @@ end
 -- isatty, and the terminal's ioctls by their Linux names: TCGETS and TCSETS (termios flags, as a
 -- table), TIOCGWINSZ (columns, rows), TIOCGPGRP and TIOCSPGRP (its foreground process group),
 -- TIOCSTI (bytes put in as if typed).
-function syscalls.ioctl(p, request, fd, op, arg)
-  local d, why, errno = description(p, fd)
-  if not d then
-    return nil, why, errno
-  elseif d.type ~= "tty" then
+syscalls.ioctl = withfd(function(p, request, d, fd, op, arg)
+  if d.type ~= "tty" then
     return fail("ENOTTY")
   end
   local t = d.tty
@@ -637,28 +624,42 @@ function syscalls.ioctl(p, request, fd, op, arg)
     return true
   end
   return fail("EINVAL")
-end
+end)
 
 function syscalls.isatty(p, request, fd)
   local d = description(p, fd)
   return d ~= nil and d.type == "tty"
 end
 
-function syscalls.stat(p, request, file)
-  local at = path(p, file)
-  if not at then
-    return fail("EINVAL")
+-- Syscalls on paths (made absolute from the process's working directory), answered by the VFS:
+-- stat, lstat (a link itself: type "link", its target), readlink, realpath (every link followed),
+-- mkdir, unlink, rmdir, umount, image (a Lua file's shared image: see images; a compile's error is
+-- ENOEXEC), and with two paths rename and link (a hard link).
+local ONE_PATH = {stat = vfs.stat, lstat = vfs.lstat, readlink = vfs.readlink, realpath = vfs.realpath,
+  mkdir = vfs.mkdir, umount = vfs.umount, image = image,
+  unlink = function(at)
+    return vfs.remove(at, false)
+  end,
+  rmdir = function(at)
+    return vfs.remove(at, true)
+  end}
+for name, f in pairs(ONE_PATH) do
+  syscalls[name] = function(p, request, file)
+    local at = path(p, file)
+    if not at then
+      return fail("EINVAL")
+    end
+    return f(at)
   end
-  return vfs.stat(at)
 end
-
--- lstat: a link itself, not what it points to (type "link", its target).
-function syscalls.lstat(p, request, file)
-  local at = path(p, file)
-  if not at then
-    return fail("EINVAL")
+for name, f in pairs({rename = vfs.rename, link = vfs.link}) do
+  syscalls[name] = function(p, request, from, to)
+    local a, b = path(p, from), path(p, to)
+    if not (a and b) then
+      return fail("EINVAL")
+    end
+    return f(a, b)
   end
-  return vfs.lstat(at)
 end
 
 -- symlink(target, path): a symbolic link at path; the target is kept as given (relative: from the
@@ -669,64 +670,6 @@ function syscalls.symlink(p, request, target, file)
     return fail("EINVAL")
   end
   return vfs.symlink(target, at)
-end
-
--- link(from, to): a hard link.
-function syscalls.link(p, request, from, to)
-  local a, b = path(p, from), path(p, to)
-  if not (a and b) then
-    return fail("EINVAL")
-  end
-  return vfs.link(a, b)
-end
-
-function syscalls.readlink(p, request, file)
-  local at = path(p, file)
-  if not at then
-    return fail("EINVAL")
-  end
-  return vfs.readlink(at)
-end
-
--- realpath: an absolute path with every link followed.
-function syscalls.realpath(p, request, file)
-  local at = path(p, file)
-  if not at then
-    return fail("EINVAL")
-  end
-  return vfs.realpath(at)
-end
-
-function syscalls.mkdir(p, request, file)
-  local at = path(p, file)
-  if not at then
-    return fail("EINVAL")
-  end
-  return vfs.mkdir(at)
-end
-
-function syscalls.unlink(p, request, file)
-  local at = path(p, file)
-  if not at then
-    return fail("EINVAL")
-  end
-  return vfs.remove(at, false)
-end
-
-function syscalls.rmdir(p, request, file)
-  local at = path(p, file)
-  if not at then
-    return fail("EINVAL")
-  end
-  return vfs.remove(at, true)
-end
-
-function syscalls.rename(p, request, from, to)
-  local a, b = path(p, from), path(p, to)
-  if not (a and b) then
-    return fail("EINVAL")
-  end
-  return vfs.rename(a, b)
 end
 
 function syscalls.chdir(p, request, file)
@@ -774,14 +717,6 @@ function syscalls.mount(p, request, source, target, fstype)
   return vfs.mount(vfs.realpath(at) or at, fs, source)
 end
 
-function syscalls.umount(p, request, target)
-  local at = path(p, target)
-  if not at then
-    return fail("EINVAL")
-  end
-  return vfs.umount(at)
-end
-
 -- What's mounted (Linux's /proc/mounts): {source, path, type} each.
 function syscalls.mounts()
   local list = {}
@@ -826,13 +761,7 @@ function syscalls.waitpid(p, request, pid, option)
     if pid == -1 or child.pid == pid then
       any = true
       if child.zombie then
-        processes[child.pid] = nil
-        for i, id in ipairs(order) do
-          if id == child.pid then
-            table.remove(order, i)
-            break
-          end
-        end
+        reap(child)
         return child.pid, child.status[1], child.status[2]
       end
     end
@@ -902,27 +831,17 @@ function syscalls.signal(p, request, signal, disposition)
   return old
 end
 
--- The environment it was started with (execve's envp); the process keeps its own copy.
--- A Lua file's shared image (see images): call it with the globals to run it in, and its arguments.
--- Its errors are a compile's: nil, the message and ENOEXEC.
-function syscalls.image(p, request, file)
-  local at = path(p, file)
-  if not at then
-    return fail("EINVAL")
-  end
-  return image(at)
-end
-
 -- The devices on the bus, as the kernel knows them (it may be a moment behind): {name, id, path,
--- type, label} each, in bus order (lsdev).
+-- type, label, get, set} each, in bus order (lsdev).
 function syscalls.devices()
   local list = {}
   for i, device in ipairs(devices.list) do
-    list[i] = {name = device.name, id = device.id, path = device.path, type = device.type, label = device.label}
+    list[i] = copy(device)
   end
   return list
 end
 
+-- The environment it was started with (execve's envp); the process keeps its own copy.
 function syscalls.environ(p)
   return copy(p.environ)
 end
@@ -1046,18 +965,15 @@ local function mountpoint(address)
 end
 
 local function hotplug()
-  local present = {[root] = true}
+  local present, mounted = {[root] = true}, {}
+  for _, mount in ipairs(vfs.mounts) do
+    mounted[mount.source] = true
+  end
   for _, device in ipairs(k.refreshdevices()) do
     local address = device.path or device.id
     if device.type == "storage" and address ~= root and device.id ~= root then
       present[address] = true
-      local mounted = false
-      for _, mount in ipairs(vfs.mounts) do
-        if mount.source == address then
-          mounted = true
-        end
-      end
-      if not mounted then
+      if not mounted[address] then
         local _, mode = board.invoke(address, "getMode")
         if mode == "hfs" then
           vfs.mount(mountpoint(address), hfs(address), address, true)

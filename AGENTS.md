@@ -261,6 +261,15 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
 - **mcos needs a 1 MiB stick** (the user: optimize later; maybe raise tier 1's capacity): the shell is
   the biggest cost. Options: a smaller boot set, bigger RAM tiers, asking LungoLua what a compiled
   prototype costs (about 1.4 times the C++ build's).
+- **Stripping debug info from system code** (user, 2026-10-20): debug info is about 30% of compiled
+  code (bytecode measured). Lua has no switch for it at compile time; only `string.dump(f, true)`
+  strips, and loading that back takes bytecode mode, which the sandbox refuses (crafted bytecode
+  escapes VMs). Plan: the firmware strips on request, from text only (compile, dump stripped, drop
+  the full function and collect, load the VM's own bytecode back), so text stays the only way in.
+  The kernel strips the system set (the boot path to the shell, or `/lib` and `/bin`, as a distro
+  ships stripped binaries), user scripts keep their line numbers, and a boot option (`debug=1`)
+  turns it off for chasing a system bug. Watch the compile's peak (drop the full function before
+  reloading). Alternative to ask the lua thread about: a compile flag that never records it.
 - **Server time across many computers:** each computer gets its own server time a tick, with no
   overall management; later, round robin which machines get time each tick, if many busy
   computers starve the tick.
