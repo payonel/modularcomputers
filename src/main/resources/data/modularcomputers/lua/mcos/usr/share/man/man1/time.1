@@ -1,0 +1,41 @@
+.TH TIME 1 "" "" "mcos Manual"
+.SH NAME
+time \- time a command
+.SH SYNOPSIS
+.B time
+.I command
+.RI [ arg ...]
+.SH DESCRIPTION
+.B time
+runs
+.I command
+with its arguments, waits for it, and then writes how long it took to
+standard error, after a blank line:
+.PP
+.nf
+real    0m1.250s
+.fi
+.PP
+.I command
+is found as the shell finds it: a name with a
+.B /
+is a path, else the first match in
+.BR PATH .
+It runs with
+.BR time 's
+standard input, output and error.
+.SH EXIT STATUS
+The command's exit status; 128 +
+.I n
+if a signal
+.I n
+ended it; 127 if it isn't found; 126 if it can't be started; 2 (with a
+usage message) when no command is given.
+.SH NOTES
+Only the real (elapsed) time is reported, from the computer's uptime: the
+kernel doesn't count user or system time. There are no options. It is a
+program, not a shell keyword, so it times one command, not a pipeline.
+.SH SEE ALSO
+.BR sh (1),
+.BR uptime (1),
+.BR sleep (1)

@@ -1,0 +1,24 @@
+.TH SLEEP 1 "" "" "mcos Manual"
+.SH NAME
+sleep \- wait for a time
+.SH SYNOPSIS
+.B sleep
+.I seconds
+.SH DESCRIPTION
+.B sleep
+waits
+.I seconds
+seconds, then exits. The number may have a fraction
+.RB ( "sleep 0.5" ).
+.SH EXIT STATUS
+0 after the wait; 1, with a usage message, when
+.I seconds
+is missing or isn't a number.
+.SH NOTES
+Only one argument is read; there are no unit suffixes
+.RB ( s ,
+.BR m ,
+.BR h ).
+.SH SEE ALSO
+.BR sh (1),
+.BR time (1)

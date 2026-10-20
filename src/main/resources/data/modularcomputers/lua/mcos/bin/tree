@@ -55,9 +55,9 @@ local function draw(path, prefix, level)
       text = text .. " -> " .. (fs.readlink(full) or "?")
     end
     io.write(prefix, last and LAST or BRANCH, text, "\n")
-    if entry.type == "directory" then
-      ndirs = ndirs + 1
-      if level < levels then
+    if entry.type == "directory" or (entry.type == "link" and fs.isdir(full)) then
+      ndirs = ndirs + 1 -- (a link to a directory counts as one, as tree counts it; it isn't followed)
+      if entry.type == "directory" and level < levels then
         draw(full, prefix .. (last and SPACE or PIPE), level + 1)
       end
     else

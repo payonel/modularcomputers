@@ -1,0 +1,173 @@
+.TH LUA 1 "" "" "mcos Manual"
+.SH NAME
+lua \- Lua interpreter
+.SH SYNOPSIS
+.B lua
+.RI [ options ]
+.RI [ script
+.RI [ args ...]]
+.SH DESCRIPTION
+.B lua
+is Lua's standalone interpreter, as
+.I lua.c
+is. It runs Lua given as text: statements from
+.BR \-e ,
+a
+.I script
+file, standard input, or lines typed at its interactive prompt (the
+REPL).
+.PP
+Every mcos program is already Lua: the kernel starts each process through
+the loader,
+.IR /lib/ld.lua ,
+which opens the standard library and runs the program, so programs do not
+need
+.B lua
+to run.
+.B lua
+is a program like any other.
+.PP
+Options are handled in order:
+.B \-e
+and
+.B \-l
+run as they are met, then the
+.I script
+runs with
+.I args
+as its
+.B ...
+and in the global table
+.BR arg :
+.B arg[0]
+is the script,
+.B arg[1]
+on its arguments, and the interpreter and its options at negative indices.
+What the script returns is ignored.
+.PP
+With no script and no
+.B \-e
+or
+.BR \-v ,
+.B lua
+starts the REPL if standard input is a terminal, and otherwise runs
+standard input as a script.
+.PP
+An error is reported on standard error as
+.BI "lua: " message
+followed by a stack traceback (the interpreter's own frames left out).
+.SH OPTIONS
+.TP
+.BI \-e " stat"
+Run the statement
+.IR stat .
+.TP
+.BI \-l " mod"
+Require module
+.I mod
+into the global
+.IR mod .
+.TP
+.BI \-l " g" = mod
+Require module
+.I mod
+into the global
+.IR g .
+.TP
+.B \-i
+Enter the REPL after running
+.I script
+(and print the version first).
+.TP
+.B \-v
+Print the version.
+.TP
+.B "\-E \-W"
+Accepted, and do nothing.
+.TP
+.B \-\-
+Stop handling options.
+.TP
+.B \-
+Stop handling options and run standard input.
+.PP
+The argument of
+.B \-e
+and
+.B \-l
+may also be joined to it
+.RB ( \-lfs ).
+.SH THE REPL
+The prompt is
+.BR "> " ;
+a line that is an incomplete statement goes on at
+.BR ">> " .
+A line is first tried as an expression; its values are printed,
+separated by tabs, a table as its contents (readably, through
+.IR /lib/serialization.lua ),
+other values as
+.B print
+shows them.
+.PP
+Lines are read with
+.I /lib/readline.lua
+and its keys:
+.TP
+.B "Left Right Home End ^A ^E"
+Move the cursor.
+.TP
+.B "Backspace Delete ^D"
+Erase the character before or under the cursor.
+.TP
+.B "^U ^K ^W"
+Cut the line before the cursor, after it, or the word before it.
+.TP
+.B "Up Down"
+Go through the history (100 lines).
+.TP
+.B ^L
+Clear the screen.
+.TP
+.B Tab
+Complete a Lua name: a global, or a field of the table named before the
+last
+.B .
+or
+.B :
+(methods through
+.B __index
+too). A table's name gets a
+.BR . ,
+a function's a
+.BR ( .
+A second Tab lists the choices.
+.TP
+.B ^C
+Drop the line being typed; while code runs, end it with
+.B interrupted!
+at its next system call (code that makes none runs on).
+.TP
+.B ^D
+On an empty line, leave the REPL.
+.SH EXIT STATUS
+0 on success; 1 on a bad option, or if a chunk given by
+.BR \-e ,
+.BR \-l ,
+the script or standard input fails to load or raises an error.
+.SH EXAMPLES
+.nf
+lua \-e "print(2^10)"
+lua \-l fs \-e 'print(fs.isdir("/tmp"))'
+lua script.lua one two
+echo "print(1+1)" | lua
+.fi
+.SH NOTES
+.B \-E
+and
+.B \-W
+have no effect: there are no
+.B LUA_INIT
+variables and warnings go nowhere.
+.SH SEE ALSO
+.BR sh (1),
+.BR edit (1)

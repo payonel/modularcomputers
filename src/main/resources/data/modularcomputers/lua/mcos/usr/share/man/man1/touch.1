@@ -1,0 +1,27 @@
+.TH TOUCH 1 "" "" "mcos Manual"
+.SH NAME
+touch \- make empty files
+.SH SYNOPSIS
+.B touch
+.IR file ...
+.SH DESCRIPTION
+.B touch
+makes each
+.I file
+that doesn't exist yet, empty. A file that exists already is left as it is.
+A file that can't be made is reported on standard error as
+.BI "touch: " reason
+and the rest are still tried.
+.SH EXIT STATUS
+0 if every file exists afterwards, 1 if any could not be made.
+.SH NOTES
+Unlike GNU touch, it never changes the times of a file that exists (there
+is no call to set them), and it has no options
+.RB ( \-a ,
+.BR \-m ,
+.BR \-c ,
+.BR \-d ).
+.SH SEE ALSO
+.BR ls (1),
+.BR mkdir (1),
+.BR rm (1)

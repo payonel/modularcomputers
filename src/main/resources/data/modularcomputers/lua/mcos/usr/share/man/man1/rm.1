@@ -1,0 +1,43 @@
+.TH RM 1 "" "" "mcos Manual"
+.SH NAME
+rm \- remove files and directories
+.SH SYNOPSIS
+.B rm
+.RB [ \-r ]
+.RB [ \-f ]
+.IR path ...
+.SH DESCRIPTION
+.B rm
+removes each file named. A symbolic link is removed itself, never what it
+points to. A directory is removed only with
+.BR \-r .
+.SH OPTIONS
+Options may be combined
+.RB ( \-rf )
+and may come anywhere among the paths.
+.TP
+.B "\-r \-R"
+Remove directories and everything in them. Links inside are removed,
+never followed.
+.TP
+.B \-f
+Say nothing about paths that do not exist.
+.SH EXIT STATUS
+0 if everything named was removed (or, with
+.BR \-f ,
+was not there); 1 otherwise, or for an unknown option.
+.SH NOTES
+Any other option letter is refused (status 1, nothing removed). Any word
+starting with
+.B \-
+is taken as options, so a file whose name starts with
+.B \-
+must be named as
+.BR ./\-name .
+There is no
+.B \-i
+(no prompting).
+.SH SEE ALSO
+.BR rmdir (1),
+.BR mv (1),
+.BR find (1)

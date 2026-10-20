@@ -1,0 +1,35 @@
+.TH MV 1 "" "" "mcos Manual"
+.SH NAME
+mv \- move or rename files
+.SH SYNOPSIS
+.B mv
+.I from to
+.br
+.B mv
+.IR from ...
+.I directory
+.SH DESCRIPTION
+.B mv
+renames
+.I from
+to
+.IR to .
+If the last operand is a directory, each
+.I from
+is moved into it, keeping its name; with more than two operands, the last
+must be a directory.
+.PP
+Files and directories (with everything in them) can be moved. Across
+filesystems (between disks, or to
+.IR /tmp ),
+.B mv
+copies, then removes the original; symbolic links are copied as links.
+.SH EXIT STATUS
+0 if everything was moved; 1 on too few operands, a last operand that is
+not a directory when it must be, or if anything could not be moved.
+.SH NOTES
+There are no options: every word is a file name.
+.SH SEE ALSO
+.BR cp (1),
+.BR rm (1),
+.BR ln (1)

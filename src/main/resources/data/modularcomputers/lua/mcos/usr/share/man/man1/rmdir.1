@@ -1,0 +1,23 @@
+.TH RMDIR 1 "" "" "mcos Manual"
+.SH NAME
+rmdir \- remove empty directories
+.SH SYNOPSIS
+.B rmdir
+.IR dir ...
+.SH DESCRIPTION
+.B rmdir
+removes each
+.I dir
+named, which must be empty. A directory that can't be removed is reported
+on standard error as
+.BI "rmdir: " dir ": " reason
+and the rest are still tried.
+.SH EXIT STATUS
+0 if every directory was removed (or none was named), 1 if any could not be.
+.SH NOTES
+There are no options: no
+.B \-p
+to remove parent directories too.
+.SH SEE ALSO
+.BR mkdir (1),
+.BR rm (1)

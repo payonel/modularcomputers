@@ -1,0 +1,320 @@
+-- man [section] name: a manual page, formatted for the terminal and shown through the pager
+-- ($MANPAGER, else $PAGER, else less). Pages are man(7) source, as Linux's are, in /usr/share/man/man<section>/<name>.<section>
+-- (MANPATH can name other trees, : between). Into a pipe or a file: the text, plain.
+--
+-- The man(7) it reads: .TH (the title), .SH and .SS (headings), .PP .P .LP (a paragraph), .TP (a
+-- tagged paragraph: its next line is the tag), .IP tag (the same, the tag given), .RS/.RE (indent
+-- more, less), .B .I (a line in bold, in italics), .BR .RB .BI .IB .IR .RI (words in alternating
+-- fonts), .nf/.fi (lines as they are, filled again), .br, .sp, .\" (a comment); in the text, \fB
+-- \fI \fR \fP (fonts), \- (a minus), \e and \\ (a backslash), \(em (a dash), \& (nothing). Italics
+-- show underlined, as on a terminal.
+local sys = require("sys")
+local fs = require("fs")
+
+local DEFAULT_MANPATH = "/usr/share/man"
+local DEFAULT_WIDTH = 80
+local INDENT = 7 -- columns text is in from the left (man's default)
+local SUBHEADING = 3 -- columns a .SS heading is in
+local TAG_INDENT = 7 -- columns a .TP or .IP body is in past its tag
+local SECTIONS = {"1", "8", "5", "7"} -- where to look, in order, when no section is given
+local BOLD, ITALIC, ROMAN = "\27[1m", "\27[4m", "\27[0m"
+
+local section, name
+if #arg == 2 then
+  section, name = arg[1], arg[2]
+elseif #arg == 1 then
+  name = arg[1]
+else
+  io.stderr:write("What manual page do you want?\nFor example, try 'man man'.\n")
+  return 1
+end
+
+local function find()
+  for tree in string.gmatch(os.getenv("MANPATH") or DEFAULT_MANPATH, "[^:]+") do
+    for _, s in ipairs(section and {section} or SECTIONS) do
+      local path = fs.join(tree, "man" .. s, name .. "." .. s)
+      if fs.exists(path) then
+        return path
+      end
+    end
+  end
+end
+
+local path = find()
+if not path then
+  io.stderr:write("No manual entry for ", name, section and " in section " .. section or "", "\n")
+  return 16 -- (as man-db says nothing was found)
+end
+local file = assert(io.open(path))
+local source = file:read("a")
+file:close()
+
+local tty = sys.isatty(1)
+local width = (tty and sys.ioctl(1, "TIOCGWINSZ")) or DEFAULT_WIDTH
+local fonts = tty and {B = BOLD, I = ITALIC, R = ROMAN} or {B = "", I = "", R = ""}
+
+-- ---- text: escapes and fonts --------------------------------------------------------------------
+
+-- A line's text with its escapes made characters and fonts escape sequences (or nothing).
+local function inline(text)
+  local previous, current = "R", "R"
+  text = string.gsub(text, "\\(%(..)", {["(em"] = "--", ["(en"] = "-", ["(bu"] = "*", ["(co"] = "(c)"})
+  text = string.gsub(text, "\\f([BIRP])", function(f)
+    if f == "P" then
+      f = previous
+    end
+    previous, current = current, f
+    return "\0" .. f -- (a font change: made a sequence once the text is cut into lines)
+  end)
+  text = string.gsub(text, "\\([%-e\\&])", {["-"] = "-", e = "\\", ["\\"] = "\\", ["&"] = ""})
+  return text
+end
+
+-- Words in fonts taking turns (.BR and the like), as text with \f changes.
+local function alternating(a, b, words)
+  local out = {}
+  for k, word in ipairs(words) do
+    out[k] = "\\f" .. (k % 2 == 1 and a or b) .. word
+  end
+  return table.concat(out) .. "\\fR"
+end
+
+-- A macro's arguments: words, a "quoted one" kept whole.
+local function arguments(rest)
+  local words = {}
+  local at = 1
+  while at <= #rest do
+    local s = string.match(rest, "^%s*()", at)
+    if s > #rest then
+      break
+    end
+    if string.sub(rest, s, s) == '"' then
+      local e = string.find(rest, '"', s + 1, true) or #rest + 1
+      words[#words + 1] = string.sub(rest, s + 1, e - 1)
+      at = e + 1
+    else
+      local e = string.find(rest, "%s", s) or #rest + 1
+      words[#words + 1] = string.sub(rest, s, e - 1)
+      at = e
+    end
+  end
+  return words
+end
+
+-- How many columns text takes (font marks take none).
+local function length(text)
+  local bare = string.gsub(text, "%z.", "")
+  return utf8.len(bare) or #bare
+end
+
+-- Font marks made sequences; a font still on at a line's end is put back to roman there and on
+-- again at the next line's start (a bold phrase that wraps stays bold).
+local font = "R"
+local function rendered(text)
+  local start = font ~= "R" and fonts[font] or ""
+  text = string.gsub(text, "%z(.)", function(f)
+    font = f
+    return fonts[f]
+  end)
+  return start .. text .. (font ~= "R" and fonts.R or "")
+end
+
+-- ---- layout --------------------------------------------------------------------------------------
+
+local out = {}
+local indent = INDENT -- where paragraphs start
+local base = INDENT -- (.RS moves it)
+local words = {} -- the paragraph being filled
+local fill = true
+local tag = nil -- a .TP/.IP tag waiting for its paragraph
+local tagnext = false -- .TP: the next line is the tag
+local blank = true -- the last line out was blank (no doubled blank lines)
+local heading = false -- the last line out was a heading (a paragraph right after one has no space before it)
+
+local function emit(line)
+  out[#out + 1] = rendered(line)
+  blank, heading = line == "", false
+end
+
+local function space()
+  if not blank and not heading then
+    emit("")
+  end
+end
+
+-- The words waiting, filled into lines between the indent and the width.
+local function flush()
+  if #words == 0 and not tag then
+    return
+  end
+  local lines, line, used = {}, {}, 0
+  local room = math.max(10, width - indent - 1)
+  local first = string.rep(" ", indent)
+  if tag then
+    local taglen = length(tag)
+    if taglen < indent - base - 1 then
+      first = string.rep(" ", base) .. tag .. string.rep(" ", indent - base - taglen)
+    else
+      lines[#lines + 1] = string.rep(" ", base) .. tag
+    end
+    tag = nil
+  end
+  for _, word in ipairs(words) do
+    local n = length(word)
+    if used > 0 and used + 1 + n > room then
+      lines[#lines + 1] = table.concat(line, " ")
+      line, used = {}, 0
+    end
+    line[#line + 1] = word
+    used = used + (used > 0 and 1 or 0) + n
+  end
+  if #line > 0 then
+    lines[#lines + 1] = table.concat(line, " ")
+  end
+  for k, text in ipairs(lines) do
+    if k == 1 and not string.find(text, "^ ") then
+      emit(first .. text)
+    elseif string.find(text, "^ ") then
+      emit(text)
+    else
+      emit(string.rep(" ", indent) .. text)
+    end
+  end
+  words = {}
+end
+
+-- Text into the paragraph (or, not filling, a line as it is).
+local function text(line)
+  line = inline(line)
+  if tagnext then
+    tagnext = false
+    flush()
+    tag = line
+    return
+  end
+  if not fill then
+    flush()
+    emit(string.rep(" ", indent) .. line)
+    return
+  end
+  for word in string.gmatch(line, "%S+") do
+    words[#words + 1] = word
+  end
+end
+
+local title, sectionno = string.upper(name), section or "1"
+local MACROS = {
+  TH = function(args)
+    title, sectionno = args[1] or title, args[2] or sectionno
+    local left = title .. "(" .. sectionno .. ")"
+    local middle = args[5] or "mcos Manual"
+    local gap = math.max(1, (width - #left * 2 - #middle) // 2)
+    emit(left .. string.rep(" ", gap) .. middle .. string.rep(" ", math.max(1, width - #left * 2 - #middle - gap)) .. left)
+    emit("")
+  end,
+  SH = function(args)
+    flush()
+    space()
+    emit("\0B" .. inline(table.concat(args, " ")) .. "\0R")
+    heading = true
+    indent, base = INDENT, INDENT
+  end,
+  SS = function(args)
+    flush()
+    space()
+    emit(string.rep(" ", SUBHEADING) .. "\0B" .. inline(table.concat(args, " ")) .. "\0R")
+    heading = true
+    indent, base = INDENT, INDENT
+  end,
+  PP = function()
+    flush()
+    space()
+    indent = base
+  end,
+  TP = function()
+    flush()
+    space()
+    indent = base + TAG_INDENT
+    tagnext = true
+  end,
+  IP = function(args)
+    flush()
+    space()
+    indent = base + TAG_INDENT
+    if args[1] and args[1] ~= "" then
+      tag = inline(args[1])
+    end
+  end,
+  RS = function()
+    flush()
+    base = base + TAG_INDENT
+    indent = base
+  end,
+  RE = function()
+    flush()
+    base = math.max(INDENT, base - TAG_INDENT)
+    indent = base
+  end,
+  B = function(args)
+    text("\\fB" .. table.concat(args, " ") .. "\\fR")
+  end,
+  I = function(args)
+    text("\\fI" .. table.concat(args, " ") .. "\\fR")
+  end,
+  nf = function()
+    flush()
+    fill = false
+  end,
+  fi = function()
+    flush()
+    fill = true
+  end,
+  br = function()
+    flush()
+  end,
+  sp = function()
+    flush()
+    emit("")
+  end,
+}
+MACROS.P, MACROS.LP = MACROS.PP, MACROS.PP
+for _, pair in ipairs({"BR", "RB", "BI", "IB", "IR", "RI"}) do
+  local a, b = string.sub(pair, 1, 1), string.sub(pair, 2, 2)
+  MACROS[pair] = function(args)
+    text(alternating(a, b, args))
+  end
+end
+
+for line in string.gmatch(source .. "\n", "([^\n]*)\n") do
+  if string.sub(line, 1, 3) == ".\\\"" or string.sub(line, 1, 3) == "'\\\"" then
+    -- (a comment)
+  elseif string.sub(line, 1, 1) == "." then
+    local macro, rest = string.match(line, "^%.(%S*)%s*(.*)$")
+    local handler = MACROS[macro]
+    if handler then
+      handler(arguments(rest))
+    end
+  elseif line == "" then
+    MACROS.PP()
+  else
+    text(line)
+  end
+end
+flush()
+space()
+local footer = title .. "(" .. sectionno .. ")"
+emit(string.rep(" ", math.max(0, width - #footer)) .. footer)
+
+local page = table.concat(out, "\n") .. "\n"
+if not tty then
+  io.write(page)
+  return 0
+end
+local pager = io.popen(os.getenv("MANPAGER") or os.getenv("PAGER") or "less", "w")
+if not pager then
+  io.write(page)
+  return 0
+end
+pager:write(page)
+pager:close()
+return 0

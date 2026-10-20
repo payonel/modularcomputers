@@ -1,0 +1,22 @@
+.TH UMOUNT 1 "" "" "mcos Manual"
+.SH NAME
+umount \- unmount filesystems
+.SH SYNOPSIS
+.B umount
+.IR dir ...
+.SH DESCRIPTION
+.B umount
+takes away the filesystem mounted at each
+.I dir
+named. A failure is reported on standard error as
+.BI "umount: " dir ": " reason
+and the rest are still tried.
+.SH EXIT STATUS
+0 if every one was unmounted (or none was named), 1 if any could not be.
+.SH NOTES
+Only a mount point is taken, not a device, and there are no options.
+The kernel mounts and unmounts the bus's disks by itself as they come
+and go.
+.SH SEE ALSO
+.BR mount (1),
+.BR df (1)

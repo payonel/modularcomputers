@@ -23,7 +23,8 @@ class LuaScriptsTest {
 		Path root = Path.of(LuaScripts.class.getResource(LuaScripts.ROOT).toURI());
 		List<Path> scripts;
 		try (Stream<Path> files = Files.walk(root)) {
-			scripts = files.filter(Files::isRegularFile).toList(); // every file is Lua (mcos's programs have no .lua, as Linux's)
+			// every file is Lua (mcos's programs have no .lua, as Linux's), but data: man pages, under share/
+			scripts = files.filter(Files::isRegularFile).filter(file -> !root.relativize(file).toString().replace('\\', '/').contains("/share/")).toList();
 		}
 		assertThat(scripts).isNotEmpty();
 		for (Path script : scripts) {

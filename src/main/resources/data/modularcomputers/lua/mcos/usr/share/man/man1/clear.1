@@ -1,0 +1,18 @@
+.TH CLEAR 1 "" "" "mcos Manual"
+.SH NAME
+clear \- clear the terminal screen
+.SH SYNOPSIS
+.B clear
+.SH DESCRIPTION
+.B clear
+moves the cursor home, erases the screen, and erases the terminal's
+scrollback, by writing the escape sequences
+.B ESC[H ESC[2J ESC[3J
+to standard output, as ncurses'
+.B clear
+does.
+Any arguments are ignored.
+.SH EXIT STATUS
+Always 0.
+.SH SEE ALSO
+.BR stty (1)

@@ -1,0 +1,104 @@
+.TH MAN 1 "" "" "mcos Manual"
+.SH NAME
+man \- show a manual page
+.SH SYNOPSIS
+.B man
+.RI [ section ]
+.I name
+.SH DESCRIPTION
+.B man
+finds the manual page for
+.IR name ,
+formats it for the terminal and shows it through a pager. Pages are
+man(7) source, as on Linux, kept as
+.IR /usr/share/man/man section / name . section .
+With no
+.IR section ,
+sections 1, 8, 5 and 7 are searched, in that order.
+.PP
+On a terminal, the page is laid out to the terminal's width, with bold
+and italic text (italics show underlined), and piped to
+.B $MANPAGER
+or
+.BR $PAGER ,
+else
+.BR less (1).
+Into a pipe or a file, the plain text is written, 80 columns wide.
+.SH ENVIRONMENT
+.TP
+.B MANPATH
+The manual trees to search, separated by
+.BR : ;
+.I /usr/share/man
+by default.
+.TP
+.B "MANPAGER PAGER"
+The pager, run with
+.BR "sh \-c" ;
+the first set is used.
+.SH PAGE FORMAT
+The formatter understands this part of man(7), and ignores other
+requests:
+.TP
+.BI .TH " title section"
+The page's title, shown in its header and footer.
+.TP
+.B ".SH .SS"
+A section heading, a subsection heading.
+.TP
+.B ".PP .P .LP"
+A new paragraph (so does a blank line).
+.TP
+.B .TP
+A tagged paragraph: the next line is the tag, the lines after it the
+indented body.
+.TP
+.BI .IP " tag"
+A tagged paragraph with the tag given.
+.TP
+.B ".RS .RE"
+Indent further, and back.
+.TP
+.B ".B .I"
+The line in bold, in italics.
+.TP
+.B ".BR .RB .BI .IB .IR .RI"
+Words in fonts taking turns, with no spaces between them (quote a word to
+keep spaces in it).
+.TP
+.B ".nf .fi"
+Lines as they are (no filling), and filled again.
+.TP
+.B ".br .sp"
+A line break, a blank line.
+.TP
+.B .\e"
+A comment.
+.PP
+In text:
+.B \efB \efI \efR \efP
+change the font (bold, italic, roman, the previous one);
+.B \e\-
+is a minus,
+.B \ee
+and
+.B \e\e
+a backslash,
+.B \e(em
+a dash, and
+.B \e&
+nothing.
+.SH EXIT STATUS
+0 on success; 1 with no name given; 16 if no page was found.
+.SH EXAMPLES
+.nf
+man ls
+man 1 sh
+man less > less.txt
+.fi
+.SH NOTES
+There are no options and no
+.BR \-k ;
+tables, other macros and other escapes are not supported.
+.SH SEE ALSO
+.BR less (1)

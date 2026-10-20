@@ -1,0 +1,74 @@
+.TH MOUNT 1 "" "" "mcos Manual"
+.SH NAME
+mount \- list or mount filesystems
+.SH SYNOPSIS
+.B mount
+.br
+.B mount
+.I source dir
+.SH DESCRIPTION
+With no arguments,
+.B mount
+lists what is mounted, sorted by path, one a line:
+.PP
+.nf
+\fIsource\fR on \fIpath\fR type \fItype\fR
+.fi
+.PP
+The types are
+.B hfs
+(a disk),
+.B tmpfs
+(a filesystem in memory) and
+.BR devfs .
+.PP
+With two arguments,
+.B mount
+mounts
+.I source
+on
+.IR dir .
+.I source
+is a disk's bus address (its slot path, as
+.BR sata:1 ,
+or its id,
+.BI id: uuid ;
+see
+.BR lsdev (1)),
+which must be a storage device in hfs mode; or
+.B tmpfs
+for a new, empty filesystem in memory; or
+.B devfs
+for the device files.
+.I dir
+need not exist: a mount point shows up as a directory.
+.PP
+The kernel mounts the boot disk on
+.IR / ,
+devfs on
+.IR /dev ,
+a tmpfs on
+.IR /tmp ,
+and every other hfs disk on the bus under
+.I /mnt
+.RI ( /mnt/sata/1
+for
+.BR sata:1 )
+by itself, as disks come and go.
+.SH EXIT STATUS
+0 on success; 1 with the wrong number of arguments, or if the mount
+failed (something is mounted there already: busy; not a storage device:
+no such device; a raw disk: invalid argument).
+.SH EXAMPLES
+.nf
+mount sata:2 /mnt/backup
+mount tmpfs /scratch
+.fi
+.SH NOTES
+There are no options and no
+.IR /etc/fstab ;
+a filesystem type cannot be given apart from the source.
+.SH SEE ALSO
+.BR umount (1),
+.BR df (1),
+.BR lsdev (1)

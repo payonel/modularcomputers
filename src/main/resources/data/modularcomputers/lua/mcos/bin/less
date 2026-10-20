@@ -1,0 +1,239 @@
+-- less [file]: shows a file (or what comes on stdin) a screen at a time, as less does: on the
+-- alternate screen, the tty raw, keys read from the terminal (/dev/tty, so the text can come down a
+-- pipe). Long lines wrap; a tab goes to the next multiple of 8. Into a pipe or a file it's cat.
+--   q             quit
+--   Space f ^F ^V PageDown     a screen on;   b ^B PageUp    a screen back
+--   Enter j e ^N Down          a line on;     k y ^P Up      a line back
+--   d             half a screen on;           u             half a screen back
+--   g < Home      the start;                  G > End       the end
+--   /text Enter   the next line with text;    n N           the next, the one before
+--   ^D ^U         half a screen on, back (as d and u)
+--   ^L r          draws the screen again
+local sys = require("sys")
+
+local TAB = 8 -- columns a tab stop is
+local READ_SIZE = 4096
+local DEFAULT_WIDTH, DEFAULT_HEIGHT = 80, 24
+local CSI = "\27["
+local ALTERNATE_ON, ALTERNATE_OFF = CSI .. "?1049h", CSI .. "?1049l"
+local REVERSE, RESET = CSI .. "7m", CSI .. "0m"
+
+local name = arg[1]
+local input = io.stdin
+if name and name ~= "-" then
+  local file, why = io.open(name)
+  if not file then
+    io.stderr:write("less: ", why, "\n")
+    return 1
+  end
+  input = file
+elseif sys.isatty(0) then
+  io.stderr:write("Missing filename (\"less --help\" for help)\n")
+  return 1
+end
+local text = input:read("a") or ""
+if input ~= io.stdin then
+  input:close()
+end
+
+-- Not at a terminal: just the text, as less does into a pipe.
+if not sys.isatty(1) then
+  io.write(text)
+  return 0
+end
+
+local keys = sys.open("/dev/tty", "r")
+if not keys then
+  io.write(text)
+  return 0
+end
+local width, height = sys.ioctl(1, "TIOCGWINSZ")
+width, height = width or DEFAULT_WIDTH, height or DEFAULT_HEIGHT
+local page = height - 1 -- (the last row is the prompt)
+
+-- The text as screen rows: each line cut into rows the screen's width (tabs expanded), and for each
+-- row the line it's part of (searches find lines; the screen shows rows).
+local rows, lineof = {}, {}
+local lines = {}
+for line in string.gmatch(text .. (string.sub(text, -1) == "\n" and "" or "\n"), "([^\n]*)\n") do
+  lines[#lines + 1] = line
+end
+if text == "" then
+  lines = {}
+end
+for index, line in ipairs(lines) do
+  local row, col = {}, 0
+  for ch in string.gmatch(line, "[\0-\127\194-\244][\128-\191]*") do
+    local c = ch
+    if c == "\t" then
+      local stop = TAB - col % TAB
+      c, col = string.rep(" ", stop), col + stop
+    elseif c < " " or c == "\127" then
+      c, col = "^" .. string.char((string.byte(c) + 64) % 128), col + 2 -- (as less shows control characters)
+    else
+      col = col + 1
+    end
+    if col > width then
+      rows[#rows + 1], lineof[#rows + 1] = table.concat(row), index
+      row, col = {}, utf8.len(c) or #c
+    end
+    row[#row + 1] = c
+  end
+  rows[#rows + 1], lineof[#rows + 1] = table.concat(row), index
+end
+
+local saved = sys.ioctl(0, "TCGETS") or sys.ioctl(keys, "TCGETS")
+local raw = {}
+for flag, on in pairs(saved or {}) do
+  raw[flag] = on
+end
+raw.icanon, raw.echo, raw.icrnl = false, false, false -- (isig stays: ^C ends it, as in less)
+sys.ioctl(keys, "TCSETS", raw)
+
+local function restore()
+  io.write(ALTERNATE_OFF)
+  io.flush()
+  if saved then
+    sys.ioctl(keys, "TCSETS", saved)
+  end
+end
+sys.signal("SIGINT", function()
+  restore()
+  os.exit(130) -- (128 + SIGINT, as if ended by it)
+end)
+
+local top = 1 -- the first row shown
+local last = math.max(1, #rows - page + 1) -- the furthest top goes
+local message = nil -- what the prompt says once, instead of the usual
+local found = nil -- the last search
+
+local function draw()
+  local out = {CSI .. "H"}
+  for r = top, top + page - 1 do
+    out[#out + 1] = (rows[r] or "~") .. CSI .. "K\r\n"
+  end
+  local prompt = message or (top >= last and "(END)") or (top == 1 and name and name ~= "-" and name) or ":"
+  out[#out + 1] = REVERSE .. prompt .. RESET .. CSI .. "K"
+  message = nil
+  io.write(table.concat(out))
+  io.flush()
+end
+
+local function moveby(n)
+  top = math.max(1, math.min(last, top + n))
+end
+
+-- The next row (from 'from', going 'step') whose line has the text; nil if none.
+local function search(textfound, from, step)
+  local r = from
+  while r >= 1 and r <= #rows do
+    if (r == 1 or lineof[r] ~= lineof[r - 1]) and string.find(lines[lineof[r]], textfound, 1, true) then
+      return r
+    end
+    r = r + step
+  end
+end
+
+local function jump(step)
+  if not found then
+    message = "No previous search"
+    return
+  end
+  local at = search(found, top + step, step)
+  if at then
+    top = math.min(at, last)
+  else
+    message = "Pattern not found"
+  end
+end
+
+-- Keys read and not yet handled (a read takes all that's waiting).
+local pending = ""
+
+-- The next byte typed: what's pending first.
+local function nextbyte()
+  if pending == "" then
+    pending = sys.read(keys, READ_SIZE) or ""
+  end
+  local byte = string.sub(pending, 1, 1)
+  pending = string.sub(pending, 2)
+  return byte
+end
+
+-- Reads a line typed at the prompt (after its first character): what was typed; nil if dropped.
+local function prompted(first)
+  local typed = ""
+  io.write("\r", first, CSI .. "K")
+  io.flush()
+  while true do
+    local data = nextbyte()
+    if data == "\27" then
+      -- (Escape, or a key's sequence: dropped whole, so its bytes aren't taken as commands)
+      local rest = string.match(pending, "^%[[%d;]*[%a~]") or string.match(pending, "^O%a") or ""
+      pending = string.sub(pending, #rest + 1)
+      return nil
+    elseif not data or data == "" then
+      return nil
+    elseif data == "\r" or data == "\n" then
+      return typed
+    elseif data == "\127" or data == "\8" then
+      if typed == "" then
+        return nil
+      end
+      typed = string.sub(typed, 1, -2)
+      io.write("\b \b")
+    elseif data >= " " then
+      typed = typed .. data
+      io.write(data)
+    end
+    io.flush()
+  end
+end
+
+io.write(ALTERNATE_ON)
+draw()
+while true do
+  if pending == "" then
+    local data = sys.read(keys, READ_SIZE)
+    if not data or data == "" then
+      break
+    end
+    pending = data
+  end
+  local key = string.match(pending, "^\27%[[%d;]*[%a~]") or string.match(pending, "^\27O%a") or string.sub(pending, 1, 1)
+  pending = string.sub(pending, #key + 1)
+  if key == "q" or key == "Q" then
+    break
+  elseif key == " " or key == "f" or key == "\6" or key == "\22" or key == "\27[6~" then
+    moveby(page)
+  elseif key == "b" or key == "\2" or key == "\27[5~" then
+    moveby(-page)
+  elseif key == "\r" or key == "\n" or key == "j" or key == "e" or key == "\14" or key == "\27[B" or key == "\27OB" then
+    moveby(1)
+  elseif key == "k" or key == "y" or key == "\16" or key == "\27[A" or key == "\27OA" then
+    moveby(-1)
+  elseif key == "d" or key == "\4" then
+    moveby(page // 2)
+  elseif key == "u" or key == "\21" then
+    moveby(-(page // 2))
+  elseif key == "g" or key == "<" or key == "\27[H" or key == "\27[1~" or key == "\27OH" then
+    top = 1
+  elseif key == "G" or key == ">" or key == "\27[F" or key == "\27[4~" or key == "\27OF" then
+    top = last
+  elseif key == "/" then
+    local typed = prompted("/")
+    if typed and typed ~= "" then
+      found = typed
+      jump(1)
+    elseif typed == "" and found then
+      jump(1)
+    end
+  elseif key == "n" then
+    jump(1)
+  elseif key == "N" then
+    jump(-1)
+  end
+  draw()
+end
+restore()
+return 0

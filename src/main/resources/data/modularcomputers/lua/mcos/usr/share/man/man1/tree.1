@@ -1,0 +1,62 @@
+.TH TREE 1 "" "" "mcos Manual"
+.SH NAME
+tree \- list directories as a tree
+.SH SYNOPSIS
+.B tree
+.RB [ \-a ]
+.RB [ \-d ]
+.RB [ \-L
+.IR level ]
+.RB [ \-\-noreport ]
+.RI [ dir ...]
+.SH DESCRIPTION
+.B tree
+prints each
+.I dir
+(the working directory when none is named), then its contents as a tree,
+drawn with lines, descending into every directory. A symbolic link is
+shown as
+.I name
+.B \->
+.I target
+and is not followed. Names starting with a dot are left out.
+.PP
+At the end it reports how many directories and files it showed, for all
+the dirs together.
+.SH OPTIONS
+.TP
+.B \-a
+Shows names starting with a dot too.
+.TP
+.B \-d
+Shows directories only; the report then counts only directories.
+.TP
+.BI \-L " level"
+Descends at most
+.I level
+levels (1: only the directory's own entries). It must be greater than 0.
+.TP
+.B \-\-noreport
+Leaves the report out.
+.PP
+.B \-a
+and
+.B \-d
+can be joined
+.RB ( \-ad ).
+.SH EXIT STATUS
+0 on success; 1 for an invalid option or level; 2 if a
+.I dir
+isn't a directory (it is shown as
+.IB dir " [error opening dir]"
+and the others are still listed).
+.SH EXAMPLES
+.nf
+tree
+tree \-L 1 /
+tree \-d /lib
+.fi
+.SH SEE ALSO
+.BR ls (1),
+.BR find (1),
+.BR du (1)

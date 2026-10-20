@@ -1,0 +1,105 @@
+.TH FIND 1 "" "" "mcos Manual"
+.SH NAME
+find \- search for files in a directory tree
+.SH SYNOPSIS
+.B find
+.RI [ path ...]
+.RI [ expression ]
+.SH DESCRIPTION
+.B find
+walks the directory tree under each
+.I path
+and prints, one a line, every path that matches all the tests in the
+.IR expression ,
+the starting point included.
+With no
+.IR path ,
+it starts at
+.BR . ;
+with no tests, it prints everything.
+.PP
+The paths are the arguments before the first one that starts with
+.B \-
+or is
+.BR ! .
+Symbolic links are never followed (as GNU
+.BR find 's
+.BR \-P ):
+a link is listed as a link, and not walked into.
+.SH EXPRESSION
+All the tests must hold, as if joined by
+.BR \-a .
+.TP
+.BI \-name " pattern"
+The last part of the path matches the shell
+.I pattern
+(\fB*\fR, \fB?\fR, \fB[...]\fR, as
+.BR sh (1)
+globs).
+.TP
+.BI \-iname " pattern"
+Like
+.BR \-name ,
+ignoring case.
+.TP
+.BI \-path " pattern"
+The whole path, as printed, matches the shell
+.IR pattern ;
+here
+.B *
+matches
+.B /
+too.
+.TP
+.BI \-type " c"
+The file is of type
+.IR c :
+.B f
+a regular file,
+.B d
+a directory,
+.B l
+a symbolic link.
+.TP
+.BR \-not ", " !
+Turns the next test around.
+.TP
+.BI \-maxdepth " n"
+Descend at most
+.I n
+levels below the starting points (0: the starting points only).
+It applies wherever it appears.
+.TP
+.BI \-mindepth " n"
+Print nothing less than
+.I n
+levels below the starting points.
+.TP
+.B \-print
+Print the path; what
+.B find
+does anyway.
+.SH EXIT STATUS
+0 on success; 1 if a path could not be read, or for a bad expression.
+.SH EXAMPLES
+.nf
+find /lib \-name "*.lua"
+find . \-type d \-maxdepth 2
+find /home ! \-iname "*.txt"
+.fi
+.SH NOTES
+There is no
+.BR \-o ,
+no parentheses, and no actions besides
+.B \-print
+(no
+.B \-exec
+or
+.BR \-delete ).
+A starting point cannot begin with
+.BR \- .
+.SH SEE ALSO
+.BR ls (1),
+.BR du (1),
+.BR tree (1),
+.BR grep (1)

@@ -14,16 +14,24 @@ local directory, dir, template = false, nil, nil
 local i = 1
 while i <= #arg do
   local word = arg[i]
-  if word == "-d" then
-    directory = true
-  elseif word == "-t" then
-    dir = dir or os.getenv("TMPDIR") or "/tmp"
-  elseif word == "-p" then
-    i = i + 1
-    dir = arg[i]
-  elseif string.sub(word, 1, 1) == "-" and #word > 1 then
-    io.stderr:write("mktemp: invalid option -- '", string.sub(word, 2, 2), "'\n")
-    return 1
+  if string.sub(word, 1, 1) == "-" and #word > 1 then
+    for c in string.gmatch(string.sub(word, 2), ".") do
+      if c == "d" then
+        directory = true
+      elseif c == "t" then
+        dir = dir or os.getenv("TMPDIR") or "/tmp"
+      elseif c == "p" then
+        i = i + 1
+        dir = arg[i]
+        if not dir then
+          io.stderr:write("mktemp: option requires an argument -- 'p'\n")
+          return 1
+        end
+      else
+        io.stderr:write("mktemp: invalid option -- '", c, "'\n")
+        return 1
+      end
+    end
   else
     template = word
   end

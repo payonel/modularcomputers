@@ -1,0 +1,25 @@
+.TH YES 1 "" "" "mcos Manual"
+.SH NAME
+yes \- output a line again and again
+.SH SYNOPSIS
+.B yes
+.RI [ string ...]
+.SH DESCRIPTION
+.B yes
+writes its arguments, joined by spaces, as a line, again and again, until
+a write fails (for instance when the reader of its pipe is gone, which
+also sends it SIGPIPE). With no arguments the line is
+.BR y .
+.PP
+Lines are written many at a time, about 4096 bytes in each write, as GNU
+yes does.
+.SH EXIT STATUS
+1 when a write fails (it never ends on its own).
+.SH EXAMPLES
+.nf
+yes | head \-n 3
+yes no | head \-n 2
+.fi
+.SH SEE ALSO
+.BR head (1),
+.BR sh (1)

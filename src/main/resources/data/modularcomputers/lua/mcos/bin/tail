@@ -64,6 +64,11 @@ for index, path in ipairs(files) do
   local file, why = io.stdin, nil
   if path ~= "-" then
     file, why = io.open(path)
+    local st = require("sys").stat(path)
+    if file and st and st.type == "directory" then
+      file:close()
+      file, why = nil, path .. ": Is a directory" -- (its reads would fail: EISDIR)
+    end
   end
   if not file then
     io.stderr:write("tail: " .. why .. "\n")

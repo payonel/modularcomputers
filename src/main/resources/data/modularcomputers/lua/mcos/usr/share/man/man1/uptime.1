@@ -1,0 +1,31 @@
+.TH UPTIME 1 "" "" "mcos Manual"
+.SH NAME
+uptime \- tell how long the computer has been running
+.SH SYNOPSIS
+.B uptime
+.RB [ \-p ]
+.SH DESCRIPTION
+.B uptime
+prints how long the computer has been running since it booted, as
+procps's uptime does:
+.PP
+.nf
+ up 5 min
+ up  1:05
+ up 2 days,  1:05
+.fi
+.SH OPTIONS
+.TP
+.BR \-p ", " \-\-pretty
+Says it in words:
+.BR "up 1 hour, 5 minutes" .
+.SH EXIT STATUS
+0; 1, with a usage message, for any other argument.
+.SH NOTES
+mcos has no real-time clock, so there is no time of day; and no load
+average or user count either. The uptime is the machine's own clock, which
+stands still while its chunk is unloaded.
+.SH SEE ALSO
+.BR ps (1),
+.BR free (1),
+.BR time (1)

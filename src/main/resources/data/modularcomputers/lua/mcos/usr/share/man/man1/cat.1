@@ -1,0 +1,39 @@
+.TH CAT 1 "" "" "mcos Manual"
+.SH NAME
+cat \- concatenate files and print them
+.SH SYNOPSIS
+.B cat
+.RI [ file ...]
+.SH DESCRIPTION
+.B cat
+writes the contents of each
+.I file
+to standard output, one after another.
+With no
+.IR file ,
+or where a
+.I file
+is
+.BR \- ,
+it reads standard input.
+.PP
+A file that cannot be opened is reported on standard error, and
+.B cat
+goes on with the next one.
+.SH OPTIONS
+None.
+.SH EXIT STATUS
+0 if every file was read; 1 if any could not be opened.
+.SH EXAMPLES
+.nf
+cat notes.txt
+cat head.txt \- tail.txt > all.txt
+.fi
+.SH NOTES
+GNU
+.BR cat 's
+options (\fB\-n\fR, \fB\-A\fR and the others) are not supported.
+.SH SEE ALSO
+.BR head (1),
+.BR tail (1),
+.BR less (1)

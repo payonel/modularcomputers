@@ -1,0 +1,78 @@
+.TH MKTEMP 1 "" "" "mcos Manual"
+.SH NAME
+mktemp \- make a file or directory with a unique name
+.SH SYNOPSIS
+.B mktemp
+.RB [ \-d ]
+.RB [ \-p
+.IR dir ]
+.RB [ \-t ]
+.RI [ template ]
+.SH DESCRIPTION
+.B mktemp
+makes a new, empty file (or, with
+.BR \-d ,
+a directory) with a name nothing else has, and prints its name.
+.PP
+The trailing
+.BR X s
+of
+.I template
+(there must be at least 3) are replaced by random letters and digits;
+names are tried until one is free (up to 100 tries). With no
+.IR template ,
+.B tmp.XXXXXXXXXX
+is used, in the directory given by
+.BR \-p ,
+else in
+.B $TMPDIR
+or, if that is not set,
+.IR /tmp .
+A
+.I template
+that is given is taken as a path from the current directory, unless
+.B \-p
+or
+.B \-t
+names a directory for it.
+.SH OPTIONS
+.TP
+.B \-d
+Make a directory, not a file.
+.TP
+.BI \-p " dir"
+Put a
+.I template
+that has no
+.B /
+in
+.IR dir .
+.TP
+.B \-t
+Put a
+.I template
+that has no
+.B /
+in
+.B $TMPDIR
+or
+.IR /tmp .
+.SH EXIT STATUS
+0 on success; 1 on a bad option, too few
+.BR X s,
+or if nothing could be made.
+.SH EXAMPLES
+.nf
+f=$(mktemp)
+dir=$(mktemp \-d)
+mktemp \-t build.XXXXXX
+.fi
+.SH NOTES
+There is no
+.B \-u
+or
+.BR \-q .
+.SH SEE ALSO
+.BR mkdir (1),
+.BR touch (1),
+.BR rm (1)

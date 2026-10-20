@@ -1,0 +1,146 @@
+.TH GREP 1 "" "" "mcos Manual"
+.SH NAME
+grep \- print lines that match a pattern
+.SH SYNOPSIS
+.B grep
+.RB [ \-ivnclqhHFE ]
+.I pattern
+.RI [ file ...]
+.br
+.B grep
+.RB [ \-ivnclqhHFE ]
+.B \-e
+.I pattern
+.RB [ \-e
+.IR pattern ]...
+.RI [ file ...]
+.SH DESCRIPTION
+.B grep
+reads each
+.I file
+and prints the lines that match any
+.IR pattern .
+With no
+.IR file ,
+or where a
+.I file
+is
+.BR \- ,
+it reads standard input.
+With more than one file, each line printed starts with its file's name
+and a colon.
+.PP
+A
+.I pattern
+is a POSIX basic regular expression (BRE), or with
+.B \-E
+an extended one (ERE), as far as Lua's patterns can express them:
+.TP
+.B .
+any character
+.TP
+.B *
+the item before it, any number of times
+.TP
+.BR ^ " and " $
+the start of the line (first in the pattern) and its end (last)
+.TP
+.BR [...] " and " [^...]
+a set of characters, or any character not in it; ranges such as
+.B a\-z
+and the classes
+.BR [:alpha:] ,
+.BR [:digit:] ,
+.BR [:alnum:] ,
+.BR [:space:] ,
+.BR [:upper:] ,
+.BR [:lower:] ,
+.BR [:punct:] ,
+.B [:xdigit:]
+and
+.B [:cntrl:]
+work inside it
+.TP
+.BI \e c
+the character
+.I c
+itself
+.TP
+.BR + " and " ?
+with
+.B \-E
+only: one or more, zero or one of the item before; in a BRE they are
+plain characters
+.PP
+Groups, alternation and intervals (\fB\e( \e)\fR, \fB\e|\fR,
+\fB\e{n,m\e}\fR, or with
+.B \-E
+\fB( ) | { }\fR) are not supported: such a pattern is refused with a
+message.
+.SH OPTIONS
+.TP
+.BI \-e " pattern"
+Use
+.I pattern
+as a pattern; may be given more than once.
+Every argument that is not an option is then a
+.IR file .
+.TP
+.B \-E
+Patterns are extended regular expressions.
+.TP
+.B \-F
+Patterns are fixed strings, matched as they are.
+.TP
+.B \-i
+Ignore case.
+.TP
+.B \-v
+Select the lines that do not match.
+.TP
+.B \-n
+Put each line's number (and a colon) before it.
+.TP
+.B \-c
+Print only a count of the selected lines, for each file.
+.TP
+.B \-l
+Print only the names of the files with a selected line
+(\fB(standard input)\fR for standard input).
+.TP
+.B \-q
+Print nothing; exit 0 at the first selected line.
+.TP
+.B \-h
+Never put file names before lines.
+.TP
+.B \-H
+Always put file names before lines.
+.TP
+.B \-\-
+The arguments after it are all files.
+.PP
+Single\-letter options may be combined, as in
+.BR \-in .
+.SH EXIT STATUS
+0 if a line was selected, 1 if none was, 2 for an error (a bad
+option or pattern, or a file that could not be opened), unless
+.B \-q
+found a line.
+.SH EXAMPLES
+.nf
+grep \-n require /bin/ls
+grep \-ic "^local" *.lua
+ps | grep \-v sh
+grep \-E "ab+c?" notes.txt
+.fi
+.SH NOTES
+There are no context options (\fB\-A\fR, \fB\-B\fR, \fB\-C\fR), no
+.B \-r
+and no
+.BR \-o .
+.SH SEE ALSO
+.BR find (1),
+.BR head (1),
+.BR tail (1),
+.BR sh (1)

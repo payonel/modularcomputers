@@ -596,6 +596,72 @@ class McosTest {
 	}
 
 	@Test
+	void lessPagesAndQuitsAndIntoAFileIsCat() {
+		file("f", "one\ntwo\n");
+		boot();
+		type("less /f > /r1; cat /f | less > /r2\r");
+		untilFile(root().resolve("r2"), "one\ntwo\n");
+		assertThat(read(root().resolve("r1"))).isEqualTo("one\ntwo\n");
+		type("less /f\r");
+		untilIdle();
+		type("G/two\rq");
+		untilIdle();
+		type("touch /done\r");
+		untilFile(root().resolve("done"), "");
+	}
+
+	@Test
+	void manFormatsAManPage() {
+		file("usr/share/man/man1/t.1", """
+			.TH T 1
+			.SH NAME
+			t \\- a test
+			.SH OPTIONS
+			.TP
+			.B \\-x
+			does x
+			.PP
+			Some words that are filled into one line.
+			.nf
+			kept   as is
+			.fi
+			""");
+		boot();
+		type("man t > /r; man nosuch 2> /dev/null; echo $? > /st\r");
+		untilFile(root().resolve("st"), "16\n");
+		assertThat(read(root().resolve("r"))).contains("NAME\n       t - a test\n", "OPTIONS\n       -x     does x\n",
+			"       Some words that are filled into one line.\n", "       kept   as is\n", "T(1)");
+	}
+
+	@Test
+	void anAssignmentsStatusIsItsSubstitutions() {
+		boot();
+		type("false; x=$(false); echo $? > /r; true; y=1; echo $? >> /r\r");
+		untilFile(root().resolve("r"), "1\n0\n");
+	}
+
+	@Test
+	void everyCommandHasAManPageThatRenders() {
+		file("t.lua", """
+			local fs = require("fs")
+			local out = assert(io.open("/r", "w"))
+			for _, entry in ipairs(assert(fs.list("/bin"))) do
+			  local pipe = assert(io.popen("man " .. entry.name))
+			  local text = pipe:read("a")
+			  local ok = pipe:close()
+			  if not ok or not string.find(text, "NAME\\n       " .. entry.name, 1, true) then
+			    out:write(entry.name, " ")
+			  end
+			end
+			out:write("done")
+			out:close()
+			""");
+		boot();
+		type("/t.lua\r");
+		untilFile(root().resolve("r"), "done");
+	}
+
+	@Test
 	void binLuaIsLuasStandaloneInterpreter() {
 		file("s.lua", """
 			local out = assert(io.open("/r1", "w"))

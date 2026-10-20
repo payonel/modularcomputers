@@ -135,6 +135,10 @@ end
 -- name in the directories of PATH (the environment's, unless given).
 function fs.command(name, path)
   if string.find(name, "/", 1, true) then
+    local st = sys.stat(name)
+    if not st then
+      return nil, name .. ": No such file or directory", "ENOENT"
+    end
     return name
   end
   for dir in string.gmatch(path or os.getenv("PATH") or "/bin", "[^:]+") do

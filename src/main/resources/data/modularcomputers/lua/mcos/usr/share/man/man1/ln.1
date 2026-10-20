@@ -1,0 +1,77 @@
+.TH LN 1 "" "" "mcos Manual"
+.SH NAME
+ln \- make links between files
+.SH SYNOPSIS
+.B ln
+.RB [ \-sfnv ]
+.I target
+.RI [ link ]
+.br
+.B ln
+.RB [ \-sfnv ]
+.IR target ...
+.I directory
+.SH DESCRIPTION
+In the first form,
+.B ln
+makes a link named
+.I link
+to
+.IR target .
+With no
+.IR link ,
+the link is made in the current directory with the target's last name.
+If
+.I link
+is an existing directory, the link goes inside it, as in the second form.
+.PP
+In the second form,
+.B ln
+makes a link to each
+.I target
+inside
+.IR directory ,
+each named after its target's last name.
+.PP
+Without
+.BR \-s ,
+.B ln
+makes a hard link, which no filesystem in mcos supports: it always fails
+with "Operation not permitted".
+.SH OPTIONS
+Options must come before the first operand; they may be combined
+.RB ( \-sf ).
+.TP
+.B \-s
+Make symbolic links. The target is stored as given; a relative target is
+followed from the link's directory, not from where
+.B ln
+ran.
+.TP
+.B \-f
+Remove an existing file or link of the link's name first.
+.TP
+.B \-n
+Treat a last operand that is a symbolic link to a directory as a name,
+not as a directory to put links in (with
+.BR \-f ,
+it is replaced).
+.TP
+.B \-v
+Print each link made, as
+.IR link " \-> " target ,
+each name in single quotes.
+.SH EXIT STATUS
+0 if every link was made; 1 if any failed, on a bad option, a missing
+operand, or several targets and a last operand that is not a directory.
+.SH EXAMPLES
+.nf
+ln \-s /mnt/sata/1/notes notes
+ln \-sf ../lib/new.lua lib.lua
+ln \-s /bin/ls /bin/cat /tmp
+.fi
+.SH SEE ALSO
+.BR ls (1),
+.BR rm (1),
+.BR cp (1),
+.BR mv (1)

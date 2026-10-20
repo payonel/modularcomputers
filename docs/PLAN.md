@@ -393,8 +393,18 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
   - **`/proc`**: `ps` and `mount` use syscalls (`processes`, `mounts`) instead.
   - **Raw disks** have no filesystem driver (an mcos filesystem on sectors); **devices as files**
     (`/dev/sata1`, terminals by address) aren't in devfs yet; **no permissions or users**.
-  - **readline** (line editing and history in the shell), **os.date** (no real-time clock: the time
+  - **os.date** (no real-time clock: the time
     is seconds since boot), **a page cache** (every program start reads `/lib/ld.lua` and `/lib/io.lua`
     off the disk), **the bus's hot-plug is noticed only when the kernel idles**.
   - A console tty per terminal (the `console=` option names one device; several aren't started yet).
+  - **Devices for user programs** (user, 2026-10-19: "skip anything that further develops /dev", they
+    have concerns to discuss first): programs can't reach devices yet (`board` is the kernel's); the
+    plan so far is `/dev` files and `ioctl`. Waiting on it: the EEPROM edited through a `/dev` file
+    (the user: not a `flash` command), and the REPL as a device workbench.
+  - **Later, by the user's review of OpenOS (2026-10-19):** `type -a` (the user, "when we support
+    alias": `sh` has `alias` and `type` already), `install` (once loot software is worked out), `rc`
+    (no start-up services yet), `sides` (with the redstone card's API), the shell's language (`if`,
+    `for`, `while`, `case`, functions), profile/`.shrc`/motd; maybe `label`, `primary`, `resolution`,
+    `address`. Not wanted: `which` (`command -v`), `lshw`, `dmesg`, `useradd`/`userdel`, OpenOS's
+    `transforms`, `event`/`keyboard`; the internet card's commands will be its device's API.
 - Answered for now (2026-10-15, for the user to review): the shell runs `/bin` programs (above).

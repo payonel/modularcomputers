@@ -1,0 +1,19 @@
+.TH POWEROFF 1 "" "" "mcos Manual"
+.SH NAME
+poweroff \- turn the computer off
+.SH SYNOPSIS
+.B poweroff
+.SH DESCRIPTION
+.B poweroff
+ends every process, closing their files (so what they wrote reaches the
+disks), and turns the computer off, as its power button does. It takes
+no arguments.
+.SH EXIT STATUS
+It does not return when it works. If the kernel refuses, the reason is
+printed and the status is 1.
+.SH NOTES
+What a process had buffered in its own standard I/O and not yet written
+is lost, as on Linux; programs should close their files first.
+.SH SEE ALSO
+.BR reboot (1),
+.BR halt (1)

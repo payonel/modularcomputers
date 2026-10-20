@@ -1,0 +1,35 @@
+.TH PS 1 "" "" "mcos Manual"
+.SH NAME
+ps \- list the processes
+.SH SYNOPSIS
+.B ps
+.SH DESCRIPTION
+.B ps
+lists every process, one a line, under a header:
+.TP
+.B PID
+The process's id.
+.TP
+.B PPID
+Its parent's id.
+.TP
+.B PGID
+Its process group.
+.TP
+.B STATE
+.B running
+(it can run),
+.B sleeping
+(blocked in a system call: waiting for input, a child or a timer), or
+.B zombie
+(it has ended and its parent has not waited for it).
+.TP
+.B COMMAND
+The program's path, then its arguments.
+.SH NOTES
+There are no options; arguments are ignored. There are no users, times
+or memory figures to show.
+.SH SEE ALSO
+.BR kill (1),
+.BR free (1),
+.BR uptime (1)

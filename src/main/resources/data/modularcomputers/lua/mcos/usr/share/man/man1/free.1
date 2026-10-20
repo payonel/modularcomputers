@@ -1,0 +1,49 @@
+.TH FREE 1 "" "" "mcos Manual"
+.SH NAME
+free \- display the amount of memory in use and free
+.SH SYNOPSIS
+.B free
+.RB [ \-b | \-k | \-m | \-h ]
+.SH DESCRIPTION
+.B free
+prints the computer's memory: the total (the RAM installed), what is
+in use, and what is free.
+.PP
+Before measuring it runs a full garbage collection 20 times, since
+Lua's collector frees some objects (those with finalizers, for one)
+only on a later cycle; so
+.I used
+is what is really held, not garbage waiting to be collected.
+.SH OPTIONS
+.TP
+.B \-b
+Show amounts in bytes.
+.TP
+.B \-k
+Show amounts in KiB (the default).
+.TP
+.B \-m
+Show amounts in MiB.
+.TP
+.B \-h
+Show amounts in human\-readable form, with a unit after each:
+.BR B ,
+.BR Ki ,
+.B Mi
+or
+.BR Gi .
+.PP
+Each option is a separate argument; the last unit given wins, and
+.B \-h
+wins over any unit.
+.SH EXIT STATUS
+0 on success; 1 for an unknown option or if the memory could not be
+read.
+.SH NOTES
+There is no swap, so there is no
+.B Swap:
+line, and no buffer or cache columns.
+The total is the RAM installed above what the firmware itself holds.
+.SH SEE ALSO
+.BR df (1),
+.BR ps (1)

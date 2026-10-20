@@ -1,0 +1,597 @@
+.TH SH 1 "" "" "mcos Manual"
+.SH NAME
+sh \- the shell
+.SH SYNOPSIS
+.B sh
+.br
+.B sh \-c
+.I command
+.RI [ name
+.RI [ arg ...]]
+.br
+.B sh
+.I script
+.RI [ arg ...]
+.SH DESCRIPTION
+.B sh
+is mcos's command interpreter, after POSIX sh. It reads commands, expands
+their words and runs them. Only shell behavior lives in it: commands are
+programs (in
+.BR /bin ,
+found through
+.BR PATH ,
+or named by a path), and the builtins are only what has to change the
+shell itself.
+.PP
+With no arguments it reads commands from standard input. When that is a
+terminal it is interactive: it shows a prompt and reads each line with
+its line editor (see
+.BR "LINE EDITING" ).
+Otherwise it reads lines as they come, with no prompt.
+.PP
+With
+.BR \-c ,
+it runs
+.I command
+and exits;
+.I name
+becomes
+.B $0
+(else
+.BR sh )
+and the
+.IR arg s
+.BR $1 ,
+.BR $2 ,
+and so on. With a
+.IR script ,
+it runs the file's commands (a first line starting with
+.B #!
+is skipped), with
+.B $0
+the script's name and the
+.IR arg s
+the positional parameters.
+.PP
+There are no
+.BR if ,
+.BR for ,
+.BR while ,
+.B case
+or functions yet: a command line is simple commands joined by the
+operators below.
+.SH WORDS AND QUOTING
+A line is split into words at spaces and tabs. A
+.B #
+at the start of a word starts a comment, to the end of the line.
+.TP
+.BI \e c
+The character
+.I c
+taken literally. A
+.B \e
+at the end of a line joins the next line to it.
+.TP
+\fB'\fItext\fB'\fR
+Everything inside taken literally; no expansions.
+.TP
+\fB"\fItext\fB"\fR
+Taken literally but for
+.B $
+expansions and
+.B `
+substitutions. Inside,
+.B \e
+quotes only \fB\e\fR, \fB"\fR, \fB$\fR, \fB`\fR and a new line;
+before anything else it stays a backslash.
+.TP
+.B ~
+A word that is just
+.BR ~ ,
+or starts with
+.BR ~/ ,
+begins with
+.B HOME
+(or
+.B /
+if it isn't set).
+.PP
+Quoted text is never split into fields or globbed.
+.SH EXPANSION
+Each word is expanded in this order: parameters and command
+substitutions; then field splitting of what they gave, where unquoted;
+then globs, where unquoted.
+.SS Parameters
+.TP
+\fB$\fINAME\fR, \fB${\fINAME\fB}\fR
+The variable's value; nothing if it isn't set. A name is letters, digits
+and underscores, not starting with a digit.
+.TP
+.B $?
+The status of the last command.
+.TP
+.B $$
+The shell's process id.
+.TP
+.B $!
+The process id of the last command started in the background.
+.TP
+.B $#
+How many positional parameters there are.
+.TP
+.BR $@ ", " $*
+The positional parameters, joined by spaces. Inside double quotes,
+\fB"$@"\fR gives each parameter as a field of its own, and \fB"$*"\fR
+gives them all as one.
+.TP
+.BR $0 ", " $1 " ... " $9
+The shell's (or script's) name, and the positional parameters. Only one
+digit is read:
+.B $10
+is
+.B $1
+and a
+.BR 0 .
+.TP
+.BI ${ NAME :\- word }
+.I word
+if
+.I NAME
+is unset or empty, else its value.
+.B ${NAME\-word}
+does the same only when it's unset.
+.TP
+.BI ${ NAME := word }
+As
+.BR :\- ,
+and
+.I word
+is also assigned to
+.IR NAME .
+.B ${NAME=word}
+only when it's unset.
+.TP
+.BI ${ NAME :+ word }
+.I word
+if
+.I NAME
+is set and not empty, else nothing.
+.B ${NAME+word}
+whenever it's set.
+.TP
+.BI ${ NAME :? word }
+The value; if it is unset or empty, an error instead:
+.BI "sh: " NAME ": " word
+(or
+.BR "parameter not set" ),
+and the command doesn't run (status 1).
+.B ${NAME?word}
+only when it's unset.
+.TP
+.BI ${# NAME }
+The length of the value, in bytes.
+.PP
+Anything else in
+.B ${...}
+is a bad substitution: a syntax error.
+.SS Command substitution
+.BI $( command )
+and
+.BI ` command `
+run
+.I command
+in a child shell
+.RB ( "sh \-c" )
+and are replaced by its output, the new lines at its end dropped. They
+nest, and set
+.BR $? .
+.SS Field splitting
+The result of an unquoted expansion is split into fields at runs of the
+characters in
+.B IFS
+(space, tab and new line when it isn't set). An empty
+.B IFS
+splits nothing. Unlike POSIX, every run of
+.B IFS
+characters is one separator, so splitting never makes empty fields.
+.SS Globs
+After splitting, a field with an unquoted
+.BR * ,
+.B ?
+or
+.B [
+is a pattern, matched against file names, a path part at a time, and
+replaced by the names that match, sorted:
+.TP
+.B *
+Any string, including the empty one.
+.TP
+.B ?
+Any one character.
+.TP
+.BI [ ... ]
+Any one character in the set: characters, ranges
+.RB ( a\-z )
+and classes
+.RB ( [:digit:] ,
+.BR [:alpha:] ,
+and so on).
+.B [!...]
+or
+.B [^...]
+is any character not in it.
+.PP
+A name starting with a dot matches only a pattern part that starts with a
+dot. A pattern that matches nothing is kept as it is.
+.SH COMMANDS
+A simple command is words, with assignments before them and redirections
+anywhere among them. The first word names the command: an alias, a
+builtin, or a program (a name with a
+.B /
+is a path; else the first file of that name in the directories of
+.BR PATH ,
+separated by
+.BR : ).
+.TP
+.IB NAME = value
+Before a command, sets
+.I NAME
+in that command's environment only. Alone, sets the shell's variable. The
+value is expanded but not split or globbed. Every shell variable is in the
+environment of the commands it runs.
+.TP
+.IB command1 " | " command2
+A pipeline: the first's standard output is the second's input. Its status
+is the last command's.
+.TP
+.BI "! " pipeline
+The pipeline's status negated: 0 becomes 1, anything else 0. The
+.B !
+must be a word of its own.
+.TP
+.IB pipeline1 " && " pipeline2
+Runs the second only if the first's status was 0.
+.TP
+.IB pipeline1 " || " pipeline2
+Runs the second only if the first's status wasn't 0.
+.TP
+.IB list " ; " list
+One after the other. A new line does the same; after
+.BR | ,
+.B &&
+or
+.B ||
+a new line just goes on to the next line.
+.TP
+.IB list " &"
+Runs in the background, without waiting for it, ignoring SIGINT (^C). At
+a terminal each process id started is printed as
+\fB[\fIpid\fB]\fR,
+and before the next prompt each one that has ended is reported as
+.BI [ pid "] Done" ,
+.BI [ pid "] Exit " status
+or the signal that ended it.
+.B $!
+is the last one's id.
+.PP
+A builtin in a pipeline or in the background runs in a child shell, so it
+can't change this one (a
+.B cd
+there has no effect here).
+.SH REDIRECTION
+Redirections are done before the command runs, left to right. A number
+.I n
+right before the operator (no space) names the file descriptor; else it is
+0 for
+.B <
+and 1 for
+.BR > .
+.TP
+.BI < file
+Reads from
+.IR file .
+.TP
+.BI > file
+Writes to
+.IR file ,
+made or emptied first.
+.TP
+.BI >> file
+Appends to
+.IR file .
+.TP
+\fIn\fB>&\fIm\fR, \fIn\fB<&\fIm\fR
+Makes
+.I n
+a copy of descriptor
+.I m
+.RB ( 2>&1 ).
+.TP
+.IB n >&\-
+Closes
+.IR n .
+.PP
+The file's word is expanded, and must give exactly one field (else
+"ambiguous redirect"). If a redirection fails, the command doesn't run and
+its status is 1. A redirection alone
+.RB ( "> file" )
+makes or empties the file.
+.SH BUILTINS
+.TP
+\fBcd\fR [\fB\-\fR | \fIdir\fR]
+Changes the working directory to
+.IR dir ,
+or to
+.B HOME
+with none. With
+.BR \- ,
+to
+.B OLDPWD
+(printing it). Sets
+.B PWD
+and
+.BR OLDPWD .
+.TP
+.B pwd
+Prints the working directory.
+.TP
+\fBexit\fR [\fIn\fR]
+Exits the shell with status
+.IR n ,
+or that of the last command. A non-numeric
+.I n
+is an error, and the shell exits with 2.
+.TP
+\fBexport\fR [\fINAME\fR[\fB=\fIvalue\fR]...]
+Sets each
+.I NAME
+given a value. Every variable is exported already, so a bare
+.I NAME
+changes nothing. With no arguments, lists every variable as
+\fBexport \fINAME\fB='\fIvalue\fB'\fR.
+.TP
+\fBunset\fR \fINAME\fR...
+Removes the variables.
+.TP
+.B set
+Lists every variable as
+\fINAME\fB='\fIvalue\fB'\fR.
+It takes no options.
+.TP
+\fB.\fR \fIfile\fR, \fBsource\fR \fIfile\fR
+Runs the commands in
+.I file
+in this shell (the file is named by its path; PATH isn't searched). Its
+status is the last command's; 1 if the file can't be read, 2 if none is
+named.
+.TP
+\fBalias\fR [\fIname\fR[\fB=\fIvalue\fR]...]
+Defines
+.I name
+as standing for
+.IR value ,
+or with no
+.BR = ,
+prints its definition. With no arguments, lists every alias. An alias is
+replaced in a command's first word only, once (an alias may name the
+command it stands for). Its value is words only: operators in it, such as
+.B |
+or
+.BR ; ,
+are ignored.
+.TP
+\fBunalias\fR \fIname\fR...
+Removes the aliases.
+.TP
+\fBread\fR [\fINAME\fR...]
+Reads a line from standard input into the variables: a word into each, at
+spaces and tabs, the last taking the rest of the line. With none, the line
+goes into
+.BR REPLY .
+Backslashes are not special. Status 1 at end of file.
+.TP
+\fBtype\fR \fIname\fR...
+Says what each
+.I name
+is: an alias (and what it stands for), a shell builtin, or a program's
+path.
+.TP
+\fBcommand\fR [\fB\-p\fR] \fIname\fR [\fIarg\fR...]
+Runs
+.I name
+as a builtin or a program, ignoring aliases.
+.B \-p
+changes nothing (the default PATH is the shell's).
+.TP
+\fBcommand \-v\fR \fIname\fR...
+Prints how each
+.I name
+would be run: an alias's definition, a builtin's name, or a program's
+path; status 1 if any is not found.
+.TP
+\fBcommand \-V\fR \fIname\fR...
+Says it in words, as
+.B type
+does.
+.TP
+.BR true ", " :
+Does nothing, with status 0.
+.TP
+.B false
+Does nothing, with status 1.
+.SH PROMPTS
+An interactive shell prompts with
+.B PS1
+(default
+.BR "\ew \e$ " ),
+and with
+.B PS2
+(default
+.BR "> " )
+while a line goes on: an open quote,
+.B $(
+or
+.BR ${ ,
+a trailing
+.BR | ,
+.B &&
+or
+.BR || ,
+or a trailing
+.BR \e .
+In the prompts:
+.TP
+.B \ew
+The working directory, with
+.B ~
+for
+.B HOME
+(unless
+.B HOME
+is
+.BR / ).
+.TP
+.B \eW
+Its last part.
+.TP
+.B \e$
+A
+.BR $ .
+.TP
+.B \en
+A new line.
+.TP
+.B \e\e
+A backslash.
+.SH LINE EDITING
+At a terminal the shell reads its lines with readline, which puts the tty
+in raw mode while a line is typed and back before the command runs. The
+line can be edited anywhere, across the rows it wraps onto:
+.TP
+.BR Left ", " Right
+Move a character.
+.TP
+.BR Home ", " ^A ", " End ", " ^E
+Move to the line's start or end.
+.TP
+.BR Backspace ", " ^H
+Erase the character before the cursor.
+.TP
+.BR Delete ", " ^D
+Erase the character under the cursor. ^D on an empty line is end of
+input: the shell prints
+.B exit
+and exits.
+.TP
+.BR ^U ", " ^K
+Cut the line before or after the cursor.
+.TP
+.B ^W
+Cut the word before the cursor.
+.TP
+.BR Up ", " Down
+Go through the history (the last 100 lines).
+.TP
+.B ^L
+Clear the screen and draw the line again.
+.TP
+.B ^C
+Drop the line, and prompt again.
+.TP
+.B Tab
+Complete the word before the cursor. In a command's first word, to the
+builtins, aliases and programs in
+.BR PATH ;
+in any other word, or one with a
+.BR / ,
+to file names (directories end in
+.BR / ).
+One match is put in, followed by a space; several put in what they all
+start with, and a second Tab lists them.
+.PP
+Keys typed ahead while a command starts are handed to that command.
+While a command runs, ^C sends SIGINT to it (the shell itself carries
+on).
+.SH EXIT STATUS
+A command's status is its program's exit status, and:
+.TP
+.B 127
+The command wasn't found.
+.TP
+.B 126
+It was found but can't be run (a directory).
+.TP
+.B 2
+A syntax error, such as
+.BR "syntax error near unexpected token `|'" ,
+or a bad substitution: nothing on that line runs, and a script stops
+there. Also a builtin's usage error.
+.TP
+.B 1
+A redirection failed, or a builtin failed.
+.TP
+.BI 128+ n
+Signal
+.I n
+ended the command (130 for ^C).
+.PP
+Errors are written to standard error as
+\fBsh: \fIwhat\fB: \fIwhy\fR.
+A command not found is reported on the command's own standard error
+(its redirections are made first), so
+.B "nosuch 2> /dev/null"
+says nothing.
+.PP
+The shell exits with the status
+.B exit
+gave, or the last command's; 127 if
+.I script
+can't be opened.
+.SH ENVIRONMENT
+.TP
+.B PATH
+Where commands are looked for.
+.TP
+.B HOME
+For
+.BR cd ,
+.B ~
+and the prompt.
+.TP
+.B IFS
+Field separators.
+.TP
+.BR PS1 ", " PS2
+The prompts.
+.TP
+.BR PWD ", " OLDPWD
+Set by
+.BR cd .
+.SH EXAMPLES
+.nf
+ls /bin | grep s > names
+echo "$HOME" ${USER:\-nobody}
+n=$(ls | head \-n 1); echo $n
+cat *.lua 2> /dev/null || echo none
+sleep 5 &
+sh \-c 'echo $0 $1' me hi
+.fi
+.SH NOTES
+No
+.BR if ,
+.BR for ,
+.BR while ,
+.BR case ,
+functions, here-documents or job control
+.RB ( jobs ,
+.BR fg ).
+.B set
+takes no options, and
+.B read
+splits at spaces and tabs only.
+.SH SEE ALSO
+.BR lua (1),
+.BR stty (1),
+.BR kill (1),
+.BR ps (1),
+.BR time (1)

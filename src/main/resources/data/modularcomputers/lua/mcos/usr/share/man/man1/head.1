@@ -1,0 +1,57 @@
+.TH HEAD 1 "" "" "mcos Manual"
+.SH NAME
+head \- output the first part of files
+.SH SYNOPSIS
+.B head
+.RB [ \-n
+.IR lines ]
+.RB [ \-c
+.IR bytes ]
+.RI [ file ...]
+.SH DESCRIPTION
+.B head
+writes the first 10 lines of each
+.I file
+to standard output.
+With no
+.IR file ,
+or where a
+.I file
+is
+.BR \- ,
+it reads standard input.
+.PP
+With more than one
+.IR file ,
+each one's output is preceded by a header,
+.BI "==> " name " <=="
+(\fBstandard input\fR for \fB\-\fR), with a blank line between files.
+.SH OPTIONS
+.TP
+\fB\-n\fR \fIlines\fR, \fB\-n\fIlines\fR, \fB\-\fIlines\fR
+Print the first
+.I lines
+lines instead of 10.
+.B \-n
+also turns off an earlier
+.BR \-c .
+.TP
+\fB\-c\fR \fIbytes\fR, \fB\-c\fIbytes\fR
+Print the first
+.I bytes
+bytes instead of lines.
+.SH EXIT STATUS
+0 on success; 1 if a file could not be opened or a number was invalid.
+.SH EXAMPLES
+.nf
+head \-n 3 /init.lua
+ls \-1 | head \-5
+.fi
+.SH NOTES
+Negative counts (GNU's "all but the last
+.IR n ")
+are not supported.
+.SH SEE ALSO
+.BR tail (1),
+.BR cat (1),
+.BR less (1)

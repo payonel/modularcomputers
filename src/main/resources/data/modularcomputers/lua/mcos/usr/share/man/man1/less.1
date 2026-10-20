@@ -1,0 +1,100 @@
+.TH LESS 1 "" "" "mcos Manual"
+.SH NAME
+less \- show text a screen at a time
+.SH SYNOPSIS
+.B less
+.RI [ file ]
+.SH DESCRIPTION
+.B less
+shows
+.I file
+(or, with no file or with
+.BR \- ,
+what comes on standard input) one screen at a time. It draws on the
+terminal's alternate screen, with the tty in raw mode, and reads its keys
+from
+.IR /dev/tty ,
+so the text can come down a pipe. The whole input is read before anything
+is shown.
+.PP
+Long lines wrap at the terminal's width; a tab goes to the next multiple
+of 8 columns, and other control characters show as
+.BR ^X .
+Rows past the end show as
+.BR ~ .
+The last row is the prompt: the file's name on the first screen,
+.B (END)
+on the last, else
+.BR : .
+.PP
+When standard output is not a terminal,
+.B less
+copies the text to it, as
+.BR cat (1)
+does. With no file named and standard input a terminal, it says
+"Missing filename" and exits 1.
+.SH COMMANDS
+.TP
+.B q Q
+Quit.
+.TP
+.B Space f ^F ^V PageDown
+Forward one screen.
+.TP
+.B b ^B PageUp
+Back one screen.
+.TP
+.B Enter j e ^N Down
+Forward one line.
+.TP
+.B k y ^P Up
+Back one line.
+.TP
+.B d ^D
+Forward half a screen.
+.TP
+.B u ^U
+Back half a screen.
+.TP
+.B g < Home
+Go to the start.
+.TP
+.B G > End
+Go to the end.
+.TP
+.BI / text
+Go to the next line containing
+.I text
+(a plain string, not a pattern), typed at the prompt and ended by Enter.
+Backspace edits it; Escape, or Backspace on an empty line, cancels. An
+empty
+.I text
+repeats the last search.
+.TP
+.B n
+Repeat the last search forward.
+.TP
+.B N
+Repeat the last search backward.
+.TP
+.B ^L r
+Draw the screen again.
+.PP
+Other keys are ignored. ^C ends
+.BR less ,
+restoring the screen and the tty, with status 130.
+.SH EXIT STATUS
+0 on success; 1 if the file cannot be opened or no input was given;
+130 if ended by ^C.
+.SH NOTES
+There are no options; a word starting with
+.B \-
+other than
+.B \-
+itself is taken as a file name. The terminal's size is read once, at
+start.
+.SH SEE ALSO
+.BR cat (1),
+.BR head (1),
+.BR tail (1),
+.BR man (1)

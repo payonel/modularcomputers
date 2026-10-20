@@ -1,0 +1,68 @@
+.TH KILL 1 "" "" "mcos Manual"
+.SH NAME
+kill \- send a signal to a process
+.SH SYNOPSIS
+.B kill
+.RB [ \-s
+.IR signal " | "
+.BI \- signal ]
+.RB [ \-\- ]
+.IR pid ...
+.br
+.B kill \-l
+.SH DESCRIPTION
+.B kill
+sends a signal to each
+.IR pid ,
+.B SIGTERM
+unless another is given.
+A negative
+.I pid
+is a process group: every process in it gets the signal.
+Give it after
+.B \-\-
+so it isn't read as a signal.
+.PP
+A signal is a name, with or without its
+.B SIG
+prefix, in any case (\fB\-KILL\fR, \fB\-sigint\fR), or its number
+(\fB\-9\fR).
+The signals mcos knows are
+.B SIGHUP
+(1),
+.B SIGINT
+(2),
+.B SIGKILL
+(9),
+.B SIGPIPE
+(13),
+.B SIGTERM
+(15) and
+.B SIGCHLD
+(17).
+.B SIGKILL
+cannot be caught or ignored: the process ends at once and runs none of
+its code.
+.SH OPTIONS
+.TP
+\fB\-s\fR \fIsignal\fR, \fB\-\fIsignal\fR
+The signal to send.
+.TP
+.B \-l
+Lists the signals, by number.
+.TP
+.B \-\-
+Ends the options: what follows is pids.
+.SH EXIT STATUS
+0 if every signal was sent; 1 if any failed (no such process, a pid
+that isn't a number, an unknown signal); 2 with no pid.
+.SH EXAMPLES
+.nf
+kill 12
+kill \-9 12 13
+kill \-s INT 7
+kill \-TERM \-\- \-5
+.fi
+.SH SEE ALSO
+.BR ps (1),
+.BR sh (1)

@@ -1,0 +1,37 @@
+.TH ECHO 1 "" "" "mcos Manual"
+.SH NAME
+echo \- display a line of text
+.SH SYNOPSIS
+.B echo
+.RB [ \-n ]
+.RI [ word ...]
+.SH DESCRIPTION
+.B echo
+writes its
+.IR word s
+to standard output, separated by single spaces, followed by a new line.
+.SH OPTIONS
+.TP
+.B \-n
+Do not write the trailing new line.
+Only a first argument of
+.B \-n
+is taken as the option; anywhere else it is a word.
+.SH EXIT STATUS
+Always 0.
+.SH EXAMPLES
+.nf
+echo hello world
+echo \-n "no new line"
+echo $PATH
+.fi
+.SH NOTES
+.B echo
+is a program, not a shell builtin.
+It does not interpret backslash escapes, and has no
+.B \-e
+or
+.BR \-E .
+.SH SEE ALSO
+.BR sh (1),
+.BR cat (1)

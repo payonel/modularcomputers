@@ -1,0 +1,68 @@
+.TH TAIL 1 "" "" "mcos Manual"
+.SH NAME
+tail \- output the last part of files
+.SH SYNOPSIS
+.B tail
+.RB [ \-n
+.RI [ + ] lines ]
+.RB [ \-c
+.RI [ + ] bytes ]
+.RI [ file ...]
+.SH DESCRIPTION
+.B tail
+writes the last 10 lines of each
+.I file
+to standard output. With no file, or for a file named
+.BR \- ,
+it reads standard input. With more than one file, each is headed by
+.BI "==> " name " <=="
+(standard input is named
+.BR "standard input" ),
+with a blank line before every heading but the first.
+.SH OPTIONS
+.TP
+.BI \-n " lines"
+The last
+.I lines
+lines.
+.RI + lines
+starts at line
+.I lines
+instead (1 is the first), and goes on to the end.
+.TP
+.BI \-c " bytes"
+The last
+.I bytes
+bytes;
+.RI + bytes
+starts at that byte and goes on to the end.
+.TP
+.BI \- number
+The same as
+.B \-n
+.IR number .
+.PP
+The number may be joined to its option
+.RB ( \-n5 )
+or follow it as the next argument. A later
+.B \-n
+undoes an earlier
+.BR \-c .
+.SH EXIT STATUS
+0 on success; 1 if a number is invalid or a file can't be opened (the
+other files are still shown).
+.SH EXAMPLES
+.nf
+tail \-n 3 /init.lua
+tail \-n +2 list.txt
+ps | tail \-c 100
+.fi
+.SH NOTES
+There is no
+.B \-f
+(follow). An argument that isn't one of these options is taken as a file
+name.
+.SH SEE ALSO
+.BR head (1),
+.BR cat (1),
+.BR grep (1)

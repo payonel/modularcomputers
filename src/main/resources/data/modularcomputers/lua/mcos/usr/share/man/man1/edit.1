@@ -1,0 +1,96 @@
+.TH EDIT 1 "" "" "mcos Manual"
+.SH NAME
+edit \- a simple text editor, after nano
+.SH SYNOPSIS
+.B edit
+.RI [ file ]
+.SH DESCRIPTION
+.B edit
+is a full\-screen text editor, in the style of
+.BR nano .
+It shows a title bar (with the file's name, and
+.B Modified
+once it has changed), the text, a status line, and two lines of
+shortcuts.
+.PP
+It opens
+.I file
+if it exists, and says
+.B [ New File ]
+if not; with no
+.I file
+it starts an empty buffer, and asks for a name when it is written
+out.
+.PP
+Typing inserts text at the cursor; Tab inserts two spaces.
+A line too long for the terminal scrolls sideways on the cursor's line,
+with a
+.B $
+where it goes on past either edge.
+.PP
+.B edit
+runs on the terminal's alternate screen with the tty in raw mode, and
+puts both back however it ends.
+.SH KEYS
+.TP
+.BR "Arrow keys" ", " Home ", " End
+Move the cursor.
+Left and Right go on to the next or the previous line.
+.TP
+.BR PageUp ", " PageDown ", " ^Y ", " ^V
+Move a screen up or down.
+.TP
+.BR ^A ", " ^E
+Go to the start or the end of the line.
+.TP
+.BR Enter
+Split the line at the cursor.
+.TP
+.BR Backspace ", " Delete
+Erase the character before or under the cursor, joining lines at either
+end.
+.TP
+.B ^K
+Cut the cursor's line.
+Cuts one after another go together.
+.TP
+.B ^U
+Paste the lines last cut, above the cursor's line.
+.TP
+.B ^W
+Search for text (case matters), from the cursor on, wrapping round at the
+end.
+An empty answer searches for the last text again.
+.TP
+.B ^C
+Show the cursor's position: line, column, and how far through the file.
+.TP
+.B ^O
+Write the file out, asking for its name (the current one is offered).
+.TP
+.B ^X
+Exit.
+With unsaved changes it asks whether to save them first:
+.B Y
+saves (and exits only if that worked),
+.B N
+throws them away, and
+.B ^C
+cancels.
+.PP
+At a question on the status line, Enter answers it, Backspace erases,
+and
+.B ^C
+or Escape cancels.
+.SH EXIT STATUS
+0 when it exits normally, including at the end of its input; 1 if
+.I file
+exists but cannot be read.
+.SH NOTES
+A file is written with a new line after its last line; a carriage
+return at the end of a line is dropped when the file is read.
+There is no undo, no syntax highlighting, and no mouse support.
+.SH SEE ALSO
+.BR less (1),
+.BR cat (1),
+.BR stty (1)

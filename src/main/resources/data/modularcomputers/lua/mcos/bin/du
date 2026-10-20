@@ -12,8 +12,8 @@ while i <= #arg do
   local word = arg[i]
   if word == "-d" or word == "--max-depth" then
     i = i + 1
-    depth = math.tointeger(tonumber(arg[i]))
-    if not depth then
+    depth = math.tointeger(tonumber(arg[i] or ""))
+    if not depth or depth < 0 then
       io.stderr:write("du: invalid maximum depth '", tostring(arg[i]), "'\n")
       return 1
     end

@@ -1,0 +1,95 @@
+.TH STTY 1 "" "" "mcos Manual"
+.SH NAME
+stty \- show or change the terminal's line settings
+.SH SYNOPSIS
+.B stty
+.br
+.B stty
+.IR setting ...
+.SH DESCRIPTION
+.B stty
+reads and changes the line settings (termios flags) of the tty on its
+standard input, as Linux's stty does. With no arguments it lists every
+flag on one line, sorted, a flag that is off with a
+.B \-
+before it.
+.PP
+Each
+.I setting
+is applied in order; the flags are written back to the tty once all have
+been read. An invalid setting stops it before anything is changed.
+.SH SETTINGS
+.TP
+.I flag
+Turns
+.I flag
+on.
+.TP
+.BI \- flag
+Turns
+.I flag
+off.
+.TP
+.BR raw " or " \-cooked
+Turns off
+.BR icanon ,
+.BR echo ,
+.B isig
+and
+.BR icrnl .
+.TP
+.BR \-raw " or " cooked
+Turns those four back on.
+.TP
+.B sane
+Puts every flag below back on (Linux's defaults).
+.TP
+.B size
+Prints the terminal's rows and columns, as two numbers on a line.
+.SH FLAGS
+.TP
+.B icanon
+Line editing: input is read a line at a time, with Backspace, ^U and ^D.
+.TP
+.B echo
+Typed characters are shown.
+.TP
+.B echoe
+Backspace erases the character on the screen.
+.TP
+.B echoctl
+Control characters are echoed as
+.BR ^X .
+.TP
+.B isig
+^C sends SIGINT to the terminal's foreground process group.
+.TP
+.B icrnl
+Enter (a carriage return) comes in as a new line.
+.TP
+.B onlcr
+A new line goes out as carriage return and new line.
+.TP
+.B iutf8
+Backspace erases a whole UTF-8 character.
+.SH EXIT STATUS
+0 on success; 1 when standard input isn't a tty, a setting is invalid, or
+the settings can't be set.
+.SH EXAMPLES
+.nf
+stty \-echo
+stty raw
+stty sane
+stty size
+.fi
+.SH NOTES
+These are the tty's settings, kept by the kernel. A terminal's own modes
+(cursor keys, the alternate screen) are set with escape sequences, not
+with
+.BR stty .
+There are no special-character settings (such as
+.BR "intr ^C" )
+and no speeds.
+.SH SEE ALSO
+.BR sh (1),
+.BR clear (1)

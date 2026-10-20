@@ -273,7 +273,11 @@ if script then
     return 1
   end
 elseif stdin then
-  if not dochunk(load(io.read("a"), "=stdin")) then
+  local chunk, err = load(io.read("a"), "=stdin")
+  if not chunk then
+    report(err)
+    return 1
+  elseif not docall(chunk, false, table.unpack(argv, i + 1, argv.n)) then
     return 1
   end
 end

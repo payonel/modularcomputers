@@ -5,6 +5,11 @@ local recursive, force = false, false
 local paths = {}
 for _, word in ipairs(arg) do
   if string.sub(word, 1, 1) == "-" and #word > 1 then
+    local bad = string.match(word, "[^rRf]", 2)
+    if bad then
+      io.stderr:write("rm: invalid option -- '" .. bad .. "'\n")
+      return 1
+    end
     recursive = recursive or string.find(word, "[rR]", 2) ~= nil
     force = force or string.find(word, "f", 2, true) ~= nil
   else

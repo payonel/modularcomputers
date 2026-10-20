@@ -1,0 +1,85 @@
+.TH DU 1 "" "" "mcos Manual"
+.SH NAME
+du \- estimate file space usage
+.SH SYNOPSIS
+.B du
+.RB [ \-asbhc ]
+.RB [ \-d
+.IR n ]
+.RI [ path ...]
+.SH DESCRIPTION
+.B du
+prints how much each directory under each
+.I path
+holds, everything inside it counted, deepest first and the
+.I path
+itself last.
+Each line is a size, a tab, and the path.
+With no
+.IR path ,
+it uses
+.BR . .
+.PP
+Sizes are in 1 KiB blocks: each file takes its size rounded up to
+whole blocks.
+Symbolic links are counted as themselves and never followed (as GNU
+.BR du 's
+.BR \-P ).
+A file given as a
+.I path
+is always printed.
+.SH OPTIONS
+.TP
+.B \-a
+Print each file too, not only directories.
+.TP
+.B \-s
+Print only a total for each
+.I path
+given (the same as
+.BR "\-d 0" ).
+.TP
+.B \-h
+Print sizes in human\-readable form, in powers of 1024 (for example
+.BR 1.5K ,
+.BR 2M ).
+.TP
+.B \-b
+Print sizes in bytes, the files' real sizes, not rounded to blocks.
+It takes precedence over
+.BR \-h .
+.TP
+.B \-c
+Print a grand total of all the
+.IR path s
+at the end, labeled
+.BR total .
+.TP
+\fB\-d\fR \fIn\fR, \fB\-\-max\-depth\fR \fIn\fR
+Print directories (and with
+.BR \-a ,
+files) only down to
+.I n
+levels below each
+.IR path ;
+everything deeper is still counted.
+.PP
+Single\-letter options may be combined, as in
+.BR \-sh .
+.SH EXIT STATUS
+0 on success; 1 if a path could not be read or an option was invalid.
+.SH EXAMPLES
+.nf
+du \-sh /home
+du \-ad 1 /lib
+du \-sc /bin /lib
+.fi
+.SH NOTES
+The
+.B \-\-max\-depth=n
+form is not supported; give the number as the next argument.
+.SH SEE ALSO
+.BR df (1),
+.BR ls (1),
+.BR find (1),
+.BR tree (1)

@@ -1,0 +1,75 @@
+.TH LS 1 "" "" "mcos Manual"
+.SH NAME
+ls \- list directory contents
+.SH SYNOPSIS
+.B ls
+.RB [ \-1aClF ]
+.RI [ path ...]
+.SH DESCRIPTION
+.B ls
+lists what is in each directory named, and names each file named (a file
+lists itself). With no
+.IR path ,
+it lists the current directory. Files named on the command line come
+first, then each directory; with more than one
+.IR path ,
+each directory's list is headed by its name and a colon. Names are listed
+in the order the directory gives them (sorted).
+.PP
+Names starting with a dot are left out unless
+.B \-a
+is given.
+.PP
+When standard output is a terminal, names are laid out in columns, filled
+down then across, as many as fit the terminal's width; directories show in
+bold blue and symbolic links in bold cyan. Into a pipe or a file, names
+go one a line, without colors.
+.SH OPTIONS
+Options may be combined
+.RB ( \-la )
+and may come anywhere among the paths.
+.TP
+.B \-1
+One name a line.
+.TP
+.B \-a
+Include names starting with a dot.
+.TP
+.B \-C
+Columns, even when output is not a terminal (then 80 columns wide).
+.TP
+.B \-l
+Long format: a type letter
+.RB ( d
+directory,
+.B l
+symbolic link,
+.B c
+device,
+.B p
+pipe,
+.B \-
+file), the size in bytes, and the name; a link's target follows
+.BR \-> .
+A link named on the command line is shown as itself, not as what it
+points to.
+.TP
+.B \-F
+Append
+.B /
+to directories and
+.B @
+to symbolic links.
+.SH EXIT STATUS
+0 on success; 2 on a bad option, or if any path could not be read.
+.SH NOTES
+There are no owners, permissions or times to show, so
+.B \-l
+gives only the type, the size and the name. A symbolic link to nothing
+is listed as the link.
+.SH SEE ALSO
+.BR tree (1),
+.BR find (1),
+.BR du (1),
+.BR df (1),
+.BR ln (1)

@@ -1,0 +1,30 @@
+.TH DF 1 "" "" "mcos Manual"
+.SH NAME
+df \- report file system space usage
+.SH SYNOPSIS
+.B df
+.SH DESCRIPTION
+.B df
+lists every mounted file system with its size, the space used and the
+space available, in 1 KiB blocks, the share in use as a percentage,
+and where it is mounted.
+The first column names its source (a disk's address, or
+.BR tmpfs ).
+.PP
+File systems that report no size, such as
+.IR /dev ,
+are left out.
+Arguments are ignored.
+.SH EXAMPLES
+.nf
+$ df
+Filesystem     1K-blocks  Used ...
+.fi
+.SH NOTES
+Sizes are always in KiB; there is no
+.B \-h
+and no file system or path argument.
+.SH SEE ALSO
+.BR du (1),
+.BR mount (1),
+.BR free (1)

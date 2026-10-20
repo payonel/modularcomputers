@@ -1,0 +1,63 @@
+.TH LSDEV 1 "" "" "mcos Manual"
+.SH NAME
+lsdev \- list the devices on the bus
+.SH SYNOPSIS
+.B lsdev
+.RB [ \-i ]
+.SH DESCRIPTION
+.B lsdev
+lists the devices on the computer's bus, as a table with a header row:
+.TP
+.B NAME
+The device's file in
+.IR /dev ,
+named by its type and its place among devices of that type in bus order
+.RB ( terminal0 ,
+.BR storage1 ).
+.TP
+.B TYPE
+What kind of device it is.
+.TP
+.B PATH
+Its slot address, as
+.B sata:0
+or
+.BR exp:2 ;
+.B \-
+for a device that is not in a slot (a cabled screen, a card in a hub).
+.TP
+.B ID
+Its id address,
+.BI id: uuid ,
+which names it however it is connected. Shown only with
+.BR \-i .
+.TP
+.B LABEL
+The name the player gave its item, if any.
+.PP
+Rows are sorted by type, then number. The information comes from reading
+each device's file in
+.IR /dev ;
+the kernel's own files there
+.RB ( console ,
+.BR tty ,
+.BR null ,
+.BR zero )
+are not listed.
+.SH OPTIONS
+.TP
+.B \-i
+Add the
+.B ID
+column.
+.SH EXIT STATUS
+0 on success; 1 on any other argument, or if
+.I /dev
+cannot be read.
+.SH NOTES
+Bus positions (the numbers in the case view) are not addresses; programs
+name devices by their path or id.
+.SH SEE ALSO
+.BR ls (1),
+.BR mount (1),
+.BR df (1)

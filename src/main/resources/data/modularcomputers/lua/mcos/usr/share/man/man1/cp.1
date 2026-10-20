@@ -1,0 +1,62 @@
+.TH CP 1 "" "" "mcos Manual"
+.SH NAME
+cp \- copy files and directories
+.SH SYNOPSIS
+.B cp
+.RB [ \-r ]
+.I source dest
+.br
+.B cp
+.RB [ \-r ]
+.IR source ...
+.I directory
+.SH DESCRIPTION
+.B cp
+copies
+.I source
+to
+.IR dest .
+If the last argument is an existing directory, each
+.I source
+is copied into it under its own name.
+With more than one
+.IR source ,
+the last argument must be a directory.
+.PP
+An existing file is overwritten.
+Without
+.BR \-r ,
+a symbolic link given as a
+.I source
+is followed, and its target's contents are copied; a directory is
+refused.
+.SH OPTIONS
+.TP
+.BR \-r ", " \-R
+Copy directories and everything in them.
+Directories are created as needed (an existing one is copied into),
+and symbolic links inside are copied as links, never followed.
+.PP
+Options may appear anywhere among the arguments.
+.SH EXIT STATUS
+0 on success; 1 if any copy failed or the arguments were wrong.
+.SH EXAMPLES
+.nf
+cp notes.txt notes.bak
+cp \-r /home /mnt/sata/1/backup
+cp a.lua b.lua /tmp
+.fi
+.SH NOTES
+Copying stops at the first error inside a directory tree.
+There is no
+.BR \-i ,
+.BR \-n ,
+.B \-p
+or
+.BR \-v ,
+and copies keep no attributes of the original.
+.SH SEE ALSO
+.BR mv (1),
+.BR rm (1),
+.BR ln (1),
+.BR mkdir (1)

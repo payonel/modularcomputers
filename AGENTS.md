@@ -4,7 +4,7 @@ This file is the full context for any agent session working on this repo. `CLAUD
 (Claude Code reads `CLAUDE.md`, not `AGENTS.md`; other agent tools read `AGENTS.md`). Keep it
 current: when a decision is made or a gotcha is found, record it here.
 
-Last updated: 2026-10-15 (mcos: kernel and user space, syscalls by trap, preemption, a VFS with mounts, /bin and a shell).
+Last updated: 2026-10-19 (mcos: the loader, symbolic links, readline with completion, man and more tools).
 
 ---
 
@@ -669,8 +669,9 @@ scripts/art/error_beep.py` into
   - **Syscalls** (Lua-shaped: errors as `nil, message, errno name`): `open` (fopen modes; a
     directory opens for `getdents`), `read`, `write` (all of it, waiting for room), `lseek`, `close`,
     `dup`, `dup2`, `pipe`, `ioctl` (`TCGETS`/`TCSETS` termios flags, `TIOCGWINSZ`, `TIOCGPGRP`/
-    `TIOCSPGRP`), `isatty`, `stat`, `mkdir`, `unlink`, `rmdir`, `rename` (EXDEV across mounts),
-    `chdir`, `getcwd`, `mount`, `umount`, `mounts`, `statfs`, `spawn` (posix_spawn: path, argv, opts
+    `TIOCSPGRP`), `isatty`, `stat`, `lstat`, `mkdir`, `unlink`, `rmdir`, `rename` (EXDEV across mounts),
+    `symlink`, `readlink`, `realpath`, `link` (EPERM: no filesystem here has hard links, as FAT),
+    `chdir` (the cwd is the real path, links followed, as Linux's getcwd), `getcwd`, `mount`, `umount`, `mounts`, `statfs`, `spawn` (posix_spawn: path, argv, opts
     `fds`/`env`/`ignore`/`pgid`; fds 0-2 are inherited, others are close-on-exec), `waitpid` (luaposix's
     `pid, "exited"|"killed", status|signal`; `"nohang"`), `exit`, `getpid`, `getppid`, `getpgid`,
     `setpgid`, `kill` (a negative pid is a group), `signal` (a handler, `"ignore"` or `"default"`;
@@ -703,16 +704,42 @@ scripts/art/error_beep.py` into
     [-l [g=]mod] [-i] [-v] [-E] [-W] [--] [script|-] [args]`; `arg` with the interpreter and its options
     at negative indices; what the script returns is ignored (as lua.c); errors `lua: <message>` and the
     traceback, 1; with no script, the REPL at a terminal (`> `, `>> `; an expression prints its
-    values; errors without `lua: `), else stdin as a script.
+    values, **a table as its contents**, through `lib/serialization.lua`'s readable form (user,
+    2026-10-19: users like it, as OpenOS's); errors without `lua: `), else stdin as a script. The REPL
+    reads with readline (history; **Tab completes Lua names**: globals, a table's fields after `.` or
+    `:`, a table's with a `.` after it, a function's with a `(`); ^C drops the line, or ends a running
+    chunk with `interrupted!` at its next syscall (a loop making none runs on). The user wants it for
+    quick tests of devices without writing a script (needs user-space device access: being discussed).
+  - **Symbolic links** (user, 2026-10-19: OpenOS kept links in the OS; "store some data in the disk
+    device, as in real life the fs on the device stores this data"): on an hfs disk a link is an
+    ordinary host file in **CIFS's Minshall+French symlink format** (`mfsymlinks`, Samba's way on a
+    server without links: exactly 1067 bytes, `XSym`, the target's length and MD5, the target;
+    `Disk.symlink`, `readlink`, `stat(path, nofollow)` with `link`, `list(path, true)` typed), so
+    they're on the disk, move with renames and survive copying a world, and the host never gets a
+    real link (which could point out of the save). The disk never follows one: a call that meets one
+    on its way (or at its end, for a call that follows it) fails with `Disk.REPARSE` and the link's
+    path and target, and **the kernel's VFS follows links** (`vfs.lua` `lookup`, as a Windows
+    filesystem answers STATUS_REPARSE), so a target can be on any mount; ELOOP after 40 (Linux's
+    MAXSYMLINKS); `..` is lexical (a drift: Linux takes `..` from where a link led). tmpfs keeps
+    links in memory. Calls on a name itself (unlink, rename, mkdir, symlink, lstat) follow their
+    directory's links, not the last one. `fs.remove` (and `rm -r`) never follows a link; `cp -R`
+    copies links as links; `ls` shows them (cyan, `-l` `l ... name -> target`, `-F` `@`).
   - **The shell's line editor** (user, 2026-10-16, option 2 of "tty or shell?": bash's split, and
-    code is shared anyway, so no memory saved either way): at a terminal `sh` reads its lines itself,
+    code is shared anyway, so no memory saved either way), **now `/lib/readline.lua`** (2026-10-19, as
+    GNU readline is a library both bash and lua.c use; the shell and the REPL read with it): at a
+    terminal `sh` reads its lines with it,
     the tty raw (`TCSETS`: no icanon, echo, icrnl; isig stays, so ^C is SIGINT) only while a line is
     typed, back as it was before a command runs. It draws the line, so it edits across rows the line
     wrapped onto (moving by `CSI A`/`B`/`G`, with a VT100's wait-to-wrap in mind): Left/Right,
     Home/End (^A/^E), Backspace, Delete (^D), ^U/^K/^W cut, Up/Down history (100 lines), ^L clears,
     ^D on an empty line ends input, ^C drops the line. Keys it read past the line are its next line's,
     or given back to the tty (`TIOCSTI`) before a command runs, so what was typed ahead reaches the
-    command. **`stty`**: lists the flags; `raw`/`-raw`/`cooked`, `sane`, `size`, `[-]flag`. Raw mode is
+    command. **Tab completion** (user, 2026-10-19: "in the right place, like Linux would"): readline's,
+    with the program's completer (file names by default; `readline.filenames`, escaping special
+    characters as it puts a name in): one match is put in (a space after it, a `/` after a
+    directory), several put in what they share, and a second Tab lists them in columns. `sh`'s
+    completer gives commands for a command's first word (builtins, aliases, programs in PATH) and
+    file names otherwise. **`stty`**: lists the flags; `raw`/`-raw`/`cooked`, `sane`, `size`, `[-]flag`. Raw mode is
     the tty's (termios), not the terminal's: the terminal's own modes are escape sequences (cursor
     shape, alternate screen), as on a real system.
   - **`/bin/sh`** (rewritten 2026-10-15 to the user's list: OpenOS's error cases, substitutions,
@@ -725,7 +752,9 @@ scripts/art/error_beep.py` into
     command's environment), `!`, `|`, `&&`, `||`, `;`, `&` (background, ignoring SIGINT, `$!`), new
     lines (and after `| && ||` the line goes on); redirections `< > >> n< n> n>> n>&m n<&m n>&-`;
     builtins `cd [-]`, `pwd`, `exit [n]`, `export`, `unset`, `.`/`source`, `alias`, `unalias`, `read`,
-    `set`, `type`, `true`, `false`, `:` (a builtin in a pipeline runs in a child shell). **PS1**
+    `set`, `type`, `command` (`command name args` runs it past aliases; `-v` how it would run: an
+    alias's definition, a builtin's name, a program's path; `-V` as `type`; user, 2026-10-19: not
+    `which`), `true`, `false`, `:` (a builtin in a pipeline runs in a child shell). **PS1**
     (default `\w \$ `: the directory, `~` for HOME when HOME isn't `/`; `\W`, `\$`, `\n`, `\\`) and
     **PS2** (`> `) while a line goes on (an open quote or `$(`, a trailing `| && ||` or `\`); `sh -c
     'cmd' [name args]`, `sh script [args]`. **Errors** (OpenOS's cases, surveyed 2026-10-15, said the
@@ -744,8 +773,21 @@ scripts/art/error_beep.py` into
     `false, "why"` (or `nil, "why"`) exits 1 with `why` on stderr, as OpenOS took it; an integer it
     returns is its status. Processes get `debug.traceback` (the firmware's sandbox gives it; it reads
     the stack raw).
-  - **`/bin`**: `cat clear cp df echo edit free grep halt head kill ls lua mkdir mount mv poweroff
-    ps reboot rm rmdir sh sleep stty tail touch umount`. `ls` (user: like real ls, not `ls -1`): on a
+  - **`/bin`**: `cat clear cp df du echo edit false find free grep halt head kill less ln ls lsdev
+    lua man mkdir mktemp mount mv poweroff ps reboot rm rmdir sh sleep stty tail time touch tree true
+    umount uptime yes` (the user's list, 2026-10-19: also find, du, tree, ln, less, yes, time, uptime,
+    mktemp, man, lsdev; not which, lshw, label, primary, resolution, address, dmesg, useradd/userdel,
+    the internet ones; install and rc later). `find [path...] [-name -iname -path -type f|d|l
+    -maxdepth -mindepth -not/!]` (never into links), `du [-ashbc] [-d n]` (1 KiB blocks), `tree [-a]
+    [-d] [-L n]`, `ln [-sfnv]` (without -s a hard link: EPERM), `less` (the alternate screen, keys
+    from `/dev/tty`, wraps, `/` search; into a pipe it's cat), `yes`, `time cmd` (bash's `real` line;
+    no user/sys times), `uptime [-p]` (no clock: " up 5 min"), `mktemp [-d] [-p dir] [-t]
+    [template]`, `lsdev [-i]` (reads `/dev`'s bus files), `true`, `false`. **`man [section] name`**:
+    pages are man(7) source in `/usr/share/man/man1/<name>.1`, one for every command (written from
+    each program's source), formatted by `/bin/man` itself (a subset of man(7): .TH .SH .SS .PP .TP
+    .IP .RS/.RE .B .I .BR and kin, .nf/.fi, .br, .sp, \f fonts; bold, italics underlined) to the
+    terminal's width and shown through `$MANPAGER`/`$PAGER`/less; plain into a pipe; 16 when there's
+    no page. `LuaScriptsTest` skips files under `share/` (data, not Lua). `ls` (user: like real ls, not `ls -1`): on a
     terminal, names in columns down then across, as wide as the terminal (`TIOCGWINSZ`), directories
     in bold blue; into a pipe or file, one a line (as GNU ls); `-1 -a -C -l -F`. `free [-b|-k|-m|-h]`:
     collects garbage 20 times first (the user: that gets Lua's collector to finish), then `sysinfo`.
@@ -1326,7 +1368,8 @@ scripts/art/error_beep.py` into
     (`Disk.resolve`): relative or absolute, a path starts at the disk's root (`/` is
     `modularcomputers/disks/<id>/`); `..` at the root stays there; names with a backslash, a colon,
     a NUL, a trailing dot or space, or a Windows device name (`nul`, `con.txt`) are refused; and the
-    nearest existing part is checked through links to be really inside. Space counts bytes plus 512
+    nearest existing part is checked through links to be really inside (the host's; a disk's own
+    symbolic links are files, never followed by the disk: see mcos's symbolic links). Space counts bytes plus 512
     for each file and directory. At most 16 open files a disk. **raw**: sectors of 512 bytes in one
     image file (`<id>.img`): `getSectorSize`, `readSector(n)`, `writeSector(n, data)`. A disk is
     another device when its id changes. **A disk crafted alone is wiped** (user, 2026-10-13): a blank

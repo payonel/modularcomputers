@@ -432,6 +432,9 @@ end
 
 -- $(command): its output, as a child shell writes it, with the new lines at its end dropped; $? is
 -- its status.
+-- Command substitutions run so far (an assignment's status is its last one's).
+local substitutions = 0
+
 local function substitute(text)
   local r, w = sys.pipe()
   if not r then
@@ -455,6 +458,7 @@ local function substitute(text)
   sys.close(r)
   local _, how, value = sys.waitpid(pid)
   status = how == "exited" and value or SIGNALED + (sys.SIGNALS[value] or 0)
+  substitutions = substitutions + 1
   return (string.gsub(table.concat(out), "\n+$", ""))
 end
 
@@ -758,7 +762,7 @@ local function runpipeline(pipeline, background)
   local first = commands[1]
   -- assignments alone set the shell's variables; a lone redirection makes (or empties) its file
   if #commands == 1 and #first.argv == 0 then
-    local before = status
+    local before = substitutions
     for _, assign in ipairs(first.assigns) do
       vars[assign.name] = expandword(assign.word, true)[1]
     end
@@ -771,7 +775,7 @@ local function runpipeline(pipeline, background)
       say(why)
       return 1
     end
-    return status ~= before and status or 0 -- (a $(...) in it sets the status)
+    return substitutions ~= before and status or 0 -- (a $(...) in it sets the status: its own)
   end
   if #commands == 1 and builtins[first.argv[1]] and not background then
     return runbuiltin(first, first.argv)

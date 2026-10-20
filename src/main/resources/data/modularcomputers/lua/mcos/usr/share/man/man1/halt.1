@@ -1,0 +1,28 @@
+.TH HALT 1 "" "" "mcos Manual"
+.SH NAME
+halt \- stop the computer
+.SH SYNOPSIS
+.B halt
+.SH DESCRIPTION
+.B halt
+flushes its output and asks the kernel to halt the system.
+Every process ends and its open files are closed, so what was written
+reaches the disks; then the CPU stops.
+The machine's power stays on, and the screens keep what they show.
+Arguments are ignored.
+.PP
+To turn the machine off, use
+.BR poweroff (1);
+to start again, use
+.BR reboot (1)
+or the power button.
+.SH EXIT STATUS
+On success
+.B halt
+does not return.
+If the kernel refuses, it prints the reason on standard error and
+exits with 1.
+.SH SEE ALSO
+.BR poweroff (1),
+.BR reboot (1),
+.BR kill (1)

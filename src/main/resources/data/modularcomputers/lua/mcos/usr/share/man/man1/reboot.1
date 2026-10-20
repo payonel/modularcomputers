@@ -1,0 +1,16 @@
+.TH REBOOT 1 "" "" "mcos Manual"
+.SH NAME
+reboot \- restart the computer
+.SH SYNOPSIS
+.B reboot
+.SH DESCRIPTION
+.B reboot
+ends every process, closing their files (so what they wrote reaches the
+disks), and restarts the computer: it goes off and on again, and the
+EEPROM boots afresh. It takes no arguments.
+.SH EXIT STATUS
+It does not return when it works. If the kernel refuses, the reason is
+printed and the status is 1.
+.SH SEE ALSO
+.BR poweroff (1),
+.BR halt (1)

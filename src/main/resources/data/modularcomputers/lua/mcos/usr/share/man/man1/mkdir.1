@@ -1,0 +1,27 @@
+.TH MKDIR 1 "" "" "mcos Manual"
+.SH NAME
+mkdir \- make directories
+.SH SYNOPSIS
+.B mkdir
+.RB [ \-p ]
+.IR dir ...
+.SH DESCRIPTION
+.B mkdir
+makes each directory named. It is an error if one exists already, or if
+its parent does not.
+.SH OPTIONS
+.TP
+.B \-p
+Make missing parent directories too, and say nothing about directories
+that exist. It applies to the directories named after it.
+.SH EXIT STATUS
+0 if every directory was made; 1 if any could not be.
+.SH NOTES
+.B \-p
+is the only option; any other word, even one starting with
+.BR \- ,
+is a directory name.
+.SH SEE ALSO
+.BR rmdir (1),
+.BR rm (1),
+.BR mktemp (1)
