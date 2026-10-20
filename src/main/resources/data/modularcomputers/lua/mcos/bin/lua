@@ -5,7 +5,14 @@
 -- options, - runs stdin. The script gets the arguments after it as arg (arg[0] the script, the
 -- interpreter and its options at negative indices) and as its ...; what it returns is ignored, as
 -- lua.c ignores it. With no script, the REPL when stdin is a terminal, else stdin as a script.
+--
+-- The REPL reads with readline (/lib/readline.lua: history, and Tab completes Lua names: globals, a
+-- table's fields after . or :), prints what an expression gives (a table as its contents:
+-- serialization's readable form), and ^C drops the line being typed, or ends what's running with
+-- "interrupted!" (at its next syscall: code that makes none runs on).
 local sys = require("sys")
+
+local readline, serialization -- (the REPL's: loaded only when it runs)
 
 local PROGNAME = "lua"
 local PROMPT, PROMPT2 = "> ", ">> "
@@ -85,33 +92,99 @@ local function dochunk(chunk, err)
   return (docall(chunk))
 end
 
-local function repl()
-  while true do
-    io.stdout:write(PROMPT)
-    local line = io.read("L")
-    if not line then
-      io.stdout:write("\n")
-      return
-    end
-    local chunk, err = load("return " .. line, "=stdin")
-    if not chunk then
-      chunk, err = load(line, "=stdin")
-      while not chunk and string.find(err, "<eof>$") do
-        io.stdout:write(PROMPT2)
-        local more = io.read("L")
-        if not more then
-          break
-        end
-        line = line .. more
-        chunk, err = load(line, "=stdin")
+-- Tab: the Lua names a word could be (a global, or a field of the table the words before the last
+-- . or : name), each the whole word; a table's gets a ., a function's a (.
+local function luanames(_, word)
+  local path, sep, prefix = string.match(word, "^(.*)([%.:])([%w_]*)$")
+  local scope = _G
+  if path then
+    for name in string.gmatch(path, "[^%.:]+") do
+      local ok, value = pcall(function()
+        return scope[name]
+      end)
+      scope = ok and value or nil
+      if scope == nil then
+        return {}
       end
     end
-    if not chunk then
-      report(err, true)
+  else
+    path, sep, prefix = "", "", word
+  end
+  local found, seen = {}, {}
+  while scope ~= nil do
+    if type(scope) == "table" then
+      for key, value in next, scope do
+        if type(key) == "string" and string.find(key, "^[%a_][%w_]*$") and string.sub(key, 1, #prefix) == prefix and not seen[key] then
+          seen[key] = true
+          local kind = type(value)
+          found[#found + 1] = path .. sep .. key .. (kind == "table" and sep ~= ":" and "." or kind == "function" and "(" or "")
+        end
+      end
+    end
+    local meta = getmetatable(scope)
+    scope = type(meta) == "table" and meta.__index or nil -- (a string's methods, an object's class)
+  end
+  table.sort(found)
+  return found, false
+end
+
+-- What an expression gave, as the REPL prints it: a table as its contents, the rest as print does.
+local function shown(value)
+  if type(value) == "table" then
+    local ok, text = pcall(serialization.serialize, value, true)
+    if ok then
+      return text
+    end
+  end
+  return tostring(value)
+end
+
+local function repl()
+  readline, serialization = require("readline"), require("serialization")
+  local editor = readline.new({complete = luanames, breaks = "[^%w_%.:]"})
+  local function interrupted()
+    error("interrupted!", 0) -- (as lua.c's ^C: the running chunk fails)
+  end
+  local function nextline(prompt)
+    sys.signal("SIGINT", function() end) -- (^C while typing: the line is dropped)
+    local line, why = editor:read(prompt)
+    sys.signal("SIGINT", interrupted)
+    return line, why
+  end
+  while true do
+    local line, why = nextline(PROMPT)
+    if not line then
+      if why ~= "EINTR" then
+        io.stdout:write("\n")
+        return
+      end
     else
-      local results = table.pack(docall(chunk, true))
-      if results[1] and results.n > 1 then
-        print(table.unpack(results, 2, results.n))
+      local chunk, err = load("return " .. line, "=stdin")
+      if not chunk then
+        chunk, err = load(line, "=stdin")
+        while not chunk and string.find(err, "<eof>$") do
+          local more
+          more, why = nextline(PROMPT2)
+          if not more then
+            break
+          end
+          line = line .. "\n" .. more
+          chunk, err = load(line, "=stdin")
+        end
+      end
+      if why == "EINTR" then
+        -- (^C on a line that went on: dropped)
+      elseif not chunk then
+        report(err, true)
+      else
+        local results = table.pack(docall(chunk, true))
+        if results[1] and results.n > 1 then
+          local texts = {}
+          for k = 2, results.n do
+            texts[#texts + 1] = shown(results[k])
+          end
+          io.stdout:write(table.concat(texts, "\t"), "\n")
+        end
       end
     end
   end

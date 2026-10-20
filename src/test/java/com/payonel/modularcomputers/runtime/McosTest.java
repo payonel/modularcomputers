@@ -577,6 +577,25 @@ class McosTest {
 	}
 
 	@Test
+	void tabCompletesCommandsAndFileNamesInTheShellAndLuaNamesInTheRepl() {
+		file("w/long name.txt", "spaced\n");
+		file("w/other", "");
+		boot();
+		type("ec\t hi > /r1; cat /w/lo\t > /r2\r");
+		untilFile(root().resolve("r2"), "spaced\n");
+		assertThat(read(root().resolve("r1"))).as("the command completed").isEqualTo("hi\n");
+		type("lua\r");
+		untilIdle();
+		type("t = {3, 1, k = \"v\"}\r");
+		untilIdle();
+		type("io.op\t'/r3', 'w'):write(require('serialization').serialize(t)):close()\r");
+		untilIdle();
+		type("\4");
+		untilIdle();
+		assertThat(read(root().resolve("r3"))).as("io.op completed to io.open(; tables serialize").isEqualTo("{3, 1, k = \"v\"}");
+	}
+
+	@Test
 	void binLuaIsLuasStandaloneInterpreter() {
 		file("s.lua", """
 			local out = assert(io.open("/r1", "w"))
