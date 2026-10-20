@@ -1,6 +1,13 @@
--- tail [-n [+]lines] [-c [+]bytes] [file...]: the last lines (10) or bytes of each file, or of
--- stdin; with +N, from line (or byte) N on.
+-- tail [-f] [-n [+]lines] [-c [+]bytes] [-N] [file...]: the last lines (10) or bytes of each file,
+-- or of stdin; with +N, from line (or byte) N on. -f follows: once they're shown, it waits and shows
+-- what's added to the files, until it's stopped (^C); not on stdin when it's a pipe, as tail.
+local sys = require("sys")
+
+local FOLLOW_SECONDS = 1 -- how long -f waits between looks (tail's --sleep-interval)
+local READ_SIZE = 4096
+
 local lines, bytes, from = 10, nil, false
+local follow = false
 local files = {}
 local i = 1
 while i <= #arg do
@@ -25,6 +32,11 @@ while i <= #arg do
     end
   elseif string.match(word, "^%-%d+$") then
     lines = tonumber(string.sub(word, 2))
+  elseif word == "-f" then
+    follow = true
+  elseif string.sub(word, 1, 1) == "-" and #word > 1 then
+    io.stderr:write("tail: invalid option -- '" .. string.sub(word, 2, 2) .. "'\n")
+    return 1
   else
     files[#files + 1] = word
   end
@@ -60,6 +72,7 @@ local function last(file)
 end
 
 local status = 0
+local followed = {} -- {path, file} each file to follow, left open
 for index, path in ipairs(files) do
   local file, why = io.stdin, nil
   if path ~= "-" then
@@ -78,9 +91,32 @@ for index, path in ipairs(files) do
       io.write(index > 1 and "\n" or "", "==> ", path == "-" and "standard input" or path, " <==\n")
     end
     io.write(last(file))
-    if file ~= io.stdin then
+    if follow and file ~= io.stdin then
+      followed[#followed + 1] = {path = path, file = file}
+    elseif file ~= io.stdin then
       file:close()
     end
   end
 end
-return status
+if #followed == 0 then
+  return status
+end
+-- -f: what the files grow by, as it comes (a header when it's another file's than the last shown)
+io.stdout:flush()
+local shown = followed[#followed].path
+while true do
+  sys.sleep(FOLLOW_SECONDS)
+  for _, entry in ipairs(followed) do
+    -- (the descriptor itself: a FILE's end of file is sticky, as glibc's is; tail reads past it)
+    local data = sys.read(entry.file.fd, READ_SIZE)
+    while data and data ~= "" do
+      if #files > 1 and shown ~= entry.path then
+        io.write("\n==> ", entry.path, " <==\n")
+        shown = entry.path
+      end
+      io.write(data)
+      data = sys.read(entry.file.fd, READ_SIZE)
+    end
+  end
+  io.stdout:flush()
+end

@@ -120,9 +120,11 @@ The process id of the last command started in the background.
 How many positional parameters there are.
 .TP
 .BR $@ ", " $*
-The positional parameters, joined by spaces. Inside double quotes,
+The positional parameters. Inside double quotes,
 \fB"$@"\fR gives each parameter as a field of its own, and \fB"$*"\fR
-gives them all as one.
+gives them all as one, joined by the first character of
+.B IFS
+(a space when it isn't set, nothing when it's empty).
 .TP
 .BR $0 ", " $1 " ... " $9
 The shell's (or script's) name, and the positional parameters. Only one
@@ -164,7 +166,11 @@ The value; if it is unset or empty, an error instead:
 .BI "sh: " NAME ": " word
 (or
 .BR "parameter not set" ),
-and the command doesn't run (status 1).
+and the command doesn't run (status 1). A shell that isn't interactive
+(a script, or
+.BR "sh \-c" )
+exits then, with status 1, as POSIX has it; at the prompt the shell goes
+on.
 .B ${NAME?word}
 only when it's unset.
 .TP
@@ -232,11 +238,26 @@ is a path; else the first file of that name in the directories of
 .BR PATH ,
 separated by
 .BR : ).
+.PP
+An alias is replaced as the line is read: when a command's first word
+(after any assignments) is an unquoted alias, the alias's text takes its
+place in the line and is read there, so it may hold operators
+.RB ( "alias l='ls | head'" ).
+An alias isn't replaced again inside its own text (so it may name the
+command it stands for), and one whose text ends in a blank makes the
+next word a command's first word too. A quoted name
+.RB ( "'ll'" )
+is never an alias. As in POSIX, an alias defined on a line counts from the
+next line read.
 .TP
 .IB NAME = value
 Before a command, sets
 .I NAME
-in that command's environment only. Alone, sets the shell's variable. The
+in that command's environment only; before a builtin, only while the
+builtin runs (\fBIFS=: read a b\fR), but for the special builtins
+(\fB:\fR, \fB.\fR, \fBsource\fR, \fBexit\fR, \fBexport\fR,
+\fBset\fR, \fBunset\fR), after which it stays set. Alone, sets the
+shell's variable. The
 value is expanded but not split or globbed. Every shell variable is in the
 environment of the commands it runs.
 .TP
@@ -264,7 +285,10 @@ or
 a new line just goes on to the next line.
 .TP
 .IB list " &"
-Runs in the background, without waiting for it, ignoring SIGINT (^C). At
+Runs in the background, without waiting for it, ignoring SIGINT (^C).
+A list of more than one pipeline
+.RB ( "a && b &" )
+runs as a whole in a child shell. At
 a terminal each process id started is printed as
 \fB[\fIpid\fB]\fR,
 and before the next prompt each one that has ended is reported as
@@ -372,23 +396,27 @@ as standing for
 .IR value ,
 or with no
 .BR = ,
-prints its definition. With no arguments, lists every alias. An alias is
-replaced in a command's first word only, once (an alias may name the
-command it stands for). Its value is words only: operators in it, such as
-.B |
-or
-.BR ; ,
-are ignored.
+prints its definition. With no arguments, lists every alias. How aliases
+are replaced is under COMMANDS.
 .TP
 \fBunalias\fR \fIname\fR...
 Removes the aliases.
 .TP
-\fBread\fR [\fINAME\fR...]
-Reads a line from standard input into the variables: a word into each, at
-spaces and tabs, the last taking the rest of the line. With none, the line
-goes into
+\fBread\fR [\fB\-r\fR] [\fINAME\fR...]
+Reads a line from standard input (or its redirection) into the variables,
+split as POSIX has it: runs of the blanks in
+.B IFS
+separate fields, each other character of
+.B IFS
+ends one (blanks about it and all), and blanks at the line's ends are
+dropped; each
+.I NAME
+gets a field, the last the rest of the line. With none, the line goes into
 .BR REPLY .
-Backslashes are not special. Status 1 at end of file.
+A backslash keeps the character after it from splitting and is dropped,
+and one at the line's end joins the next line to it; with
+.BR \-r ,
+backslashes are just characters. Status 1 at end of file.
 .TP
 \fBtype\fR \fIname\fR...
 Says what each
@@ -586,9 +614,7 @@ functions, here-documents or job control
 .RB ( jobs ,
 .BR fg ).
 .B set
-takes no options, and
-.B read
-splits at spaces and tabs only.
+takes no options.
 .SH SEE ALSO
 .BR lua (1),
 .BR stty (1),

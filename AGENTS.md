@@ -749,10 +749,18 @@ scripts/art/error_beep.py` into
     dropped; nested); unquoted results split on `IFS`; **POSIX globs** (`*`, `?`, `[...]`, `[!...]`,
     ranges, `[:class:]`; quoted characters never glob; no dot files unless the pattern's part starts
     with a dot; no match keeps the word: `fs.glob`, `fs.pattern`); `NAME=value` (the shell's, or one
-    command's environment), `!`, `|`, `&&`, `||`, `;`, `&` (background, ignoring SIGINT, `$!`), new
-    lines (and after `| && ||` the line goes on); redirections `< > >> n< n> n>> n>&m n<&m n>&-`;
+    command's environment; before a builtin only while it runs, but for POSIX's special builtins
+    `: . source exit export set unset`), `!`, `|`, `&&`, `||`, `;`, `&` (background, ignoring SIGINT,
+    `$!`; a list of more than one pipeline, `a && b &`, runs whole in a child `sh -c` of its text, as a
+    real shell forks for it), new lines (and after `| && ||` the line goes on); **aliases are expanded
+    in the lexer, as POSIX has it** (2026-10-20): a command's unquoted first word that's an alias is
+    replaced in the line by its text, lexed there (operators work: `alias l='ls | head'`), not again
+    inside itself, a trailing blank making the next word a name too; a definition counts from the
+    next line read; `"$*"` joins with IFS's first character; `${NAME:?w}` ends a non-interactive
+    shell (status 1); redirections `< > >> n< n> n>> n>&m n<&m n>&-`;
     builtins `cd [-]`, `pwd`, `exit [n]`, `export`, `unset`, `.`/`source`, `alias`, `unalias`, `read`,
-    `set`, `type`, `command` (`command name args` runs it past aliases; `-v` how it would run: an
+    `set`, `type`, `read [-r]` (POSIX's IFS splitting; `\` quotes unless -r; reads its redirection a
+    byte at a time), `command` (`command name args` runs it past aliases; `-v` how it would run: an
     alias's definition, a builtin's name, a program's path; `-V` as `type`; user, 2026-10-19: not
     `which`), `true`, `false`, `:` (a builtin in a pipeline runs in a child shell). **PS1**
     (default `\w \$ `: the directory, `~` for HOME when HOME isn't `/`; `\W`, `\$`, `\n`, `\\`) and
@@ -807,7 +815,9 @@ scripts/art/error_beep.py` into
   - `grep`: `[-ivnclqhHFE] [-e p]`: POSIX basic or (`-E`) extended regular
     expressions as far as Lua patterns say them (`. * ^ $ [...]`, `\` escapes, `+ ?` with -E,
     `[:class:]`; no groups, alternation or intervals: refused with a message), status 0/1/2.
-    `head`/`tail` `-n`, `-c`, `tail -n +N`.
+    `head`/`tail` `-n`, `-c`, `tail -n +N`, `tail -f` (follows each second, reading the descriptor
+    past end of file; a disk's read-only handle that reaches its end looks at the file's size again,
+    so it sees another handle's commit, as a reader on Linux sees a file grow).
   - **The kernel collects before a spawn past half the RAM** (`reclaim`): a new coroutine's stack is
     made without the emergency collection other allocations get, so with garbage about (a few nested
     shells) a spawn failed with `not enough memory` though there was room.

@@ -38,6 +38,7 @@ local positional = {n = 0}
 local name0 = "sh"
 local status = 0 -- $?
 local lastbg = nil -- $!
+local interactive = false -- reading commands at a terminal (not -c, not a script)
 
 local function say(text)
   io.stdout:flush()
@@ -54,9 +55,15 @@ end
 
 -- ---- lexing -------------------------------------------------------------------------------------
 -- A line becomes tokens: words, each a list of parts ({text, quoted} literal text, {var, op, arg,
--- quoted}, {cmd = text, quoted}, {tilde}), redirections ({redirect, fd, to}) and operators ({op}).
--- An incomplete line (an open quote, an open $(, a trailing | && || or \) is INCOMPLETE, so the
--- caller can read more.
+-- quoted}, {cmd = text, quoted}, {tilde}), redirections ({redirect, fd, to}) and operators ({op}),
+-- each with where it is in the line (from, last). An incomplete line (an open quote, an open $(, a
+-- trailing | && || or \) is INCOMPLETE, so the caller can read more.
+--
+-- Aliases are expanded here, as POSIX has it: a command's name (its first word, after any
+-- assignments), unquoted, that's an alias is replaced in the line by the alias's text, which is
+-- lexed in its place (so it may hold operators: alias l='ls | head'); an alias isn't expanded again
+-- inside its own text, and one whose text ends in a blank makes the next word a command name too.
+-- The lexer gives back the line as it ended up (aliases in it), which the tokens' places refer to.
 
 local INCOMPLETE = setmetatable({}, {__name = "INCOMPLETE"})
 
@@ -142,10 +149,39 @@ local function dollar(line, at, quoted)
   end
 end
 
-local function lex(line)
+local function lex(line, noalias)
   local tokens = {}
   local parts, inword = {}, false
   local i, n = 1, #line
+  local wordstart = 1
+  local active = {} -- aliases being expanded: {name, upto (where its text ends)}
+  local after = nil -- where an alias ending in a blank ends: the word there is a command name too
+  -- Whether the word being finished is a command's name: first since an operator, past assignments.
+  local function commandname()
+    if after and wordstart >= after then
+      after = nil
+      return true
+    end
+    for k = #tokens, 1, -1 do
+      local t = tokens[k]
+      if t.op then
+        return true
+      end
+      local first = t.word and t.word[1]
+      if not (first and first.text and not first.quoted and string.match(first.text, "^[%a_][%w_]*=")) then
+        return false
+      end
+    end
+    return true
+  end
+  local function expanding(name)
+    for _, a in ipairs(active) do
+      if a.name == name and wordstart <= a.upto then
+        return true
+      end
+    end
+    return false
+  end
   local function text(t, quoted)
     local last = parts[#parts]
     if last and last.text and last.quoted == quoted then
@@ -155,14 +191,35 @@ local function lex(line)
     end
     inword = true
   end
+  -- Ends the word being read; true if it was an alias, put in its place (lexing goes on from there).
   local function finish()
     if inword then
-      tokens[#tokens + 1] = {word = parts}
+      local only = parts[1]
+      local name = #parts == 1 and only.text and not only.quoted and only.text
+      local value = name and not noalias and aliases[name]
+      if value and commandname() and not expanding(name) then
+        line = string.sub(line, 1, wordstart - 1) .. value .. string.sub(line, i)
+        local delta = #value - (i - wordstart)
+        for _, a in ipairs(active) do
+          if a.upto >= wordstart then
+            a.upto = a.upto + delta
+          end
+        end
+        active[#active + 1] = {name = name, upto = wordstart + #value - 1}
+        after = string.find(value, "[ \t]$") and wordstart + #value or nil
+        n, i = #line, wordstart
+        parts, inword = {}, false
+        return true
+      end
+      tokens[#tokens + 1] = {word = parts, from = wordstart, last = i - 1}
     end
     parts, inword = {}, false
   end
   while i <= n do
     local c = string.sub(line, i, i)
+    if not inword then
+      wordstart = i
+    end
     if c == "\\" then
       if i == n then
         return INCOMPLETE -- a line ending in \ goes on
@@ -245,13 +302,17 @@ local function lex(line)
       inword = true
       i = i + 1
     elseif c == " " or c == "\t" then
-      finish()
+      if finish() then
+        goto continue
+      end
       i = i + 1
     elseif c == "\n" then
-      finish()
+      if finish() then
+        goto continue
+      end
       local last = tokens[#tokens]
       if not (last and (last.op == "|" or last.op == "&&" or last.op == "||")) then
-        tokens[#tokens + 1] = {op = ";"} -- (after | && || a new line just goes on)
+        tokens[#tokens + 1] = {op = ";", from = i, last = i} -- (after | && || a new line just goes on)
       end
       i = i + 1
     elseif c == "#" and not inword then
@@ -267,20 +328,25 @@ local function lex(line)
       end
       if op and (not inword or digits) then
         local fd
+        local start = digits and wordstart or i
         if digits then
           fd = tonumber(digits)
           parts, inword = {}, false
         end
-        finish()
+        if finish() then
+          goto continue
+        end
         if target then
-          tokens[#tokens + 1] = {redirect = op .. "&", fd = fd, to = target}
+          tokens[#tokens + 1] = {redirect = op .. "&", fd = fd, to = target, from = start, last = i + #op + #target}
           i = i + #op + 1 + #target
         else
-          tokens[#tokens + 1] = {redirect = op, fd = fd}
+          tokens[#tokens + 1] = {redirect = op, fd = fd, from = start, last = i + #op - 1}
           i = i + #op
         end
       elseif op then
-        finish() -- a>b: the word, then the redirection
+        if finish() then -- a>b: the word, then the redirection
+          goto continue
+        end
       else
         local found
         for _, candidate in ipairs(OPERATORS) do
@@ -294,8 +360,10 @@ local function lex(line)
           found = nil
         end
         if found then
-          finish()
-          tokens[#tokens + 1] = {op = found}
+          if finish() then
+            goto continue
+          end
+          tokens[#tokens + 1] = {op = found, from = i, last = i + #found - 1}
           i = i + #found
         else
           text(c, false)
@@ -303,13 +371,17 @@ local function lex(line)
         end
       end
     end
+    ::continue::
+    if i > n and inword then
+      finish() -- (a word at the line's end: if it was an alias, its text is lexed next)
+    end
   end
   finish()
   local last = tokens[#tokens]
   if last and (last.op == "|" or last.op == "&&" or last.op == "||") then
     return INCOMPLETE -- a line ending in | && || goes on
   end
-  return tokens
+  return tokens, nil, line
 end
 
 -- ---- parsing ------------------------------------------------------------------------------------
@@ -368,7 +440,7 @@ local function parse(tokens)
     if tokens[i].op == ";" and (i == 1 or tokens[i - 1].op == ";") then
       i = i + 1 -- (empty lines)
     else
-      local list = {pipelines = {}}
+      local list = {pipelines = {}, from = tokens[i].from}
       while true do
         local pipeline = {commands = {}}
         if tokens[i] and tokens[i].op == "!" then
@@ -397,6 +469,7 @@ local function parse(tokens)
         end
       end
       local t = tokens[i]
+      list.last = tokens[i - 1].last
       if t and (t.op == ";" or t.op == "&") then
         list.background = t.op == "&"
         i = i + 1
@@ -421,7 +494,9 @@ local function variable(name)
   elseif name == "#" then
     return tostring(positional.n)
   elseif name == "@" or name == "*" then
-    return table.concat(positional, " ", 1, positional.n)
+    -- (joined with IFS's first character, as "$*" is: a space with IFS unset, nothing with it empty)
+    local ifs = vars.IFS
+    return table.concat(positional, ifs == nil and " " or string.sub(ifs, 1, 1), 1, positional.n)
   elseif name == "0" then
     return name0
   elseif string.match(name, "^%d$") then
@@ -466,7 +541,7 @@ local expandword
 
 -- A ${NAME op word}'s word, expanded as one string.
 local function argument(arg)
-  local tokens = lex(arg)
+  local tokens = lex(arg, true)
   if tokens == INCOMPLETE or not tokens then
     return arg
   end
@@ -501,7 +576,7 @@ local function parameter(part)
     return unset and "" or argument(part.arg)
   elseif kind == "?" then
     if unset then
-      error({shell = part.var .. ": " .. (part.arg ~= "" and argument(part.arg) or "parameter not set")}, 0)
+      error({shell = part.var .. ": " .. (part.arg ~= "" and argument(part.arg) or "parameter not set"), fatal = true}, 0)
     end
     return value
   end
@@ -693,8 +768,26 @@ local function waitfor(pid)
   end
 end
 
--- A builtin, run in the shell itself (its redirections only while it runs).
+-- POSIX's special builtins: assignments before one stay set; before any other builtin they last
+-- only while it runs (IFS=: read a b).
+local SPECIAL = {[":"] = true, ["."] = true, exit = true, export = true, set = true, unset = true, source = true}
+
+-- A builtin, run in the shell itself (its redirections, and the assignments before it, only while it
+-- runs, but for a special builtin's assignments).
 local function runbuiltin(cmd, argv)
+  local saved = {}
+  for _, assign in ipairs(cmd.assigns) do
+    local name = assign.name
+    if not SPECIAL[argv[1]] and saved[name] == nil then
+      saved[name] = {vars[name]}
+    end
+    vars[name] = expandword(assign.word, true)[1]
+  end
+  local function restore()
+    for name, old in pairs(saved) do
+      vars[name] = old[1]
+    end
+  end
   local fds, opened = {}, {}
   local ok, why = redirect(cmd, fds, opened)
   local result = 1
@@ -703,7 +796,8 @@ local function runbuiltin(cmd, argv)
     local out = fds[1] == nil and 1 or fds[1]
     local err = fds[2] == nil and 2 or fds[2]
     io.stdout:flush()
-    local done, value = pcall(builtins[argv[1]], argv, out or nil, err or nil)
+    local input = fds[0] == nil and 0 or fds[0]
+    local done, value = pcall(builtins[argv[1]], argv, out or nil, err or nil, input or nil)
     if done then
       result = value or 0
     elseif type(value) == "table" and value.exit then
@@ -717,6 +811,7 @@ local function runbuiltin(cmd, argv)
   for _, fd in ipairs(opened) do
     sys.close(fd)
   end
+  restore()
   if raised then
     error(raised, 0)
   end
@@ -730,25 +825,6 @@ local function runpipeline(pipeline, background)
     for _, word in ipairs(cmd.words) do
       for _, field in ipairs(expandword(word)) do
         cmd.argv[#cmd.argv + 1] = field
-      end
-    end
-    -- an alias stands for the first word (once: an alias naming itself runs the command)
-    local alias = cmd.argv[1] and aliases[cmd.argv[1]]
-    if alias then
-      local tokens = lex(alias)
-      if tokens and tokens ~= INCOMPLETE then
-        local replaced = {}
-        for _, t in ipairs(tokens) do
-          if t.word then
-            for _, field in ipairs(expandword(t.word)) do
-              replaced[#replaced + 1] = field
-            end
-          end
-        end
-        for k = 2, #cmd.argv do
-          replaced[#replaced + 1] = cmd.argv[k]
-        end
-        cmd.argv = replaced
       end
     end
     -- command name [args]: the command itself, past any alias (-p: the default PATH, as ours is)
@@ -880,10 +956,29 @@ end
 
 local runscript
 
+-- A list in the background (a && b &): all of it in a child shell, as a real shell forks one for
+-- it; its pid is $!. True.
+local function background(text)
+  io.stdout:flush()
+  local pid, why = sys.spawn("/bin/sh", {"-c", text, name0, table.unpack(positional, 1, positional.n)},
+    {env = environment(), ignore = {"SIGINT"}})
+  if not pid then
+    say("/bin/sh: " .. tostring(why))
+    status = 1
+    return true
+  end
+  lastbg = pid
+  if sys.isatty(0) then
+    io.stderr:write("[" .. pid .. "]\n")
+  end
+  status = 0
+  return true
+end
+
 -- Runs a line (or a script's text): its status, and whether it was a syntax error (nothing on the
 -- line runs then).
 local function runline(line)
-  local tokens, why = lex(line)
+  local tokens, why, source = lex(line)
   if tokens == INCOMPLETE then
     why = "syntax error: unexpected end of file"
   end
@@ -897,8 +992,9 @@ local function runline(line)
     return status, true
   end
   for _, list in ipairs(lists) do
+    local child = #list.pipelines > 1 and list.background and background(string.sub(source, list.from, list.last))
     local run = true
-    for _, pipeline in ipairs(list.pipelines) do
+    for _, pipeline in ipairs(child and {} or list.pipelines) do
       if run then
         local ok, result = pcall(runpipeline, pipeline, list.background)
         if not ok then
@@ -906,6 +1002,9 @@ local function runline(line)
             error(result, 0)
           end
           say(type(result) == "table" and result.shell or tostring(result))
+          if type(result) == "table" and result.fatal and not interactive then
+            error({exit = 1}, 0) -- (as POSIX has a non-interactive shell do for ${NAME:?word})
+          end
           result = 1
         end
         if pipeline.negate then
@@ -1079,26 +1178,97 @@ function builtins.unalias(argv)
   return result
 end
 
--- read [NAME...]: a line from stdin into the variables, split on IFS (the last takes the rest);
--- REPLY with none. Status 1 at end of file.
-function builtins.read(argv)
-  io.stdout:flush()
-  local line = io.stdin:read("l")
-  if not line then
-    return 1
-  end
-  local names = {table.unpack(argv, 2)}
+-- read [-r] [NAME...]: a line from stdin into the variables, as POSIX's read: split into fields on
+-- IFS (runs of its blanks separate, and each of its other characters ends a field, blanks about it
+-- and all; blanks at the ends are dropped), each name a field, the last the rest of the line; REPLY
+-- with none. Without -r a backslash keeps the next character from splitting (and a backslash at
+-- the line's end joins the next line). Status 1 at end of file.
+function builtins.read(argv, out, err, input)
+  local raw = argv[2] == "-r"
+  local names = {table.unpack(argv, raw and 3 or 2)}
   if #names == 0 then
     names[1] = "REPLY"
   end
-  for k, name in ipairs(names) do
-    if k == #names then
-      vars[name] = string.match(line, "^[ \t]*(.-)[ \t]*$")
+  io.stdout:flush()
+  -- A line: from the shell's stdin, or a byte at a time from a redirection (so no more is taken).
+  local function nextline()
+    if not input or input == 0 then
+      return io.stdin:read("l")
+    end
+    local bytes = {}
+    while true do
+      local c = sys.read(input, 1)
+      if not c or c == "" then
+        return #bytes > 0 and table.concat(bytes) or nil
+      elseif c == "\n" then
+        return table.concat(bytes)
+      end
+      bytes[#bytes + 1] = c
+    end
+  end
+  -- the line's characters, and which were quoted by a backslash
+  local chars, quoted = {}, {}
+  while true do
+    local line = nextline()
+    if not line then
+      if #chars == 0 then
+        return 1
+      end
       break
     end
-    local word, rest = string.match(line, "^[ \t]*([^ \t]*)(.*)$")
-    vars[name] = word
-    line = rest
+    local k, joined = 1, false
+    while k <= #line do
+      local c = string.sub(line, k, k)
+      if c == "\\" and not raw then
+        if k == #line then
+          joined = true
+          break
+        end
+        chars[#chars + 1], quoted[#chars + 1] = string.sub(line, k + 1, k + 1), true
+        k = k + 2
+      else
+        chars[#chars + 1] = c
+        k = k + 1
+      end
+    end
+    if not joined then
+      break
+    end
+  end
+  local ifs = vars.IFS or DEFAULT_IFS
+  local function blank(k)
+    return not quoted[k] and chars[k] and string.find(" \t\n", chars[k], 1, true) and string.find(ifs, chars[k], 1, true)
+  end
+  local function delimiter(k)
+    return not quoted[k] and chars[k] and string.find(ifs, chars[k], 1, true) and not blank(k)
+  end
+  local at = 1
+  while blank(at) do
+    at = at + 1
+  end
+  for index, name in ipairs(names) do
+    if index == #names then
+      local last = #chars
+      while last >= at and blank(last) do
+        last = last - 1
+      end
+      vars[name] = table.concat(chars, "", at, last)
+      break
+    end
+    local from = at
+    while chars[at] and not blank(at) and not delimiter(at) do
+      at = at + 1
+    end
+    vars[name] = table.concat(chars, "", from, at - 1)
+    while blank(at) do
+      at = at + 1
+    end
+    if delimiter(at) then
+      at = at + 1
+      while blank(at) do
+        at = at + 1
+      end
+    end
   end
   return 0
 end
@@ -1301,7 +1471,7 @@ local function main(...)
     file:close()
     return runscript((string.gsub(text, "^#![^\n]*", "")))
   end
-  local interactive = sys.isatty(0)
+  interactive = sys.isatty(0)
   if interactive then
     sys.signal("SIGINT", function() end) -- ^C: a read returns EINTR; the command in front ends
   end

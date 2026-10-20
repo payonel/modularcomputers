@@ -737,8 +737,8 @@ public final class Disk implements Device {
 		private final String diskId;
 		private final String path;
 		private final String mode;
-		/** The file's size when it was opened (the base the writes go over). */
-		private final long base;
+		/** The file's size when it was opened (the base the writes go over); a reader's grows as the file does. */
+		private long base;
 		/** The size it will have: the base, truncated by "w", grown by writes. */
 		private long length;
 		private long position;
@@ -857,6 +857,18 @@ public final class Disk implements Device {
 			return out;
 		}
 
+		/**
+		 * At its end, a reader looks again: what another handle added since is there to read (as a
+		 * file read on Linux sees it grow; tail -f).
+		 */
+		private void grown(Disk disk) throws IOException {
+			Path file = disk.resolve(path, false);
+			long size = Files.isRegularFile(file) ? Files.size(file) : length;
+			if (size > length) {
+				base = length = size;
+			}
+		}
+
 		/** Reads a window of the file around {@code at}: the host file is open only for this. */
 		private void fill(Disk disk, long at) throws IOException {
 			windowStart = at - at % WINDOW;
@@ -876,6 +888,9 @@ public final class Disk implements Device {
 			int count = (int) Math.clamp(args.checkInteger(0), 0, MAX_READ);
 			try {
 				Disk disk = disk();
+				if (position >= length && mode.equals("r")) {
+					grown(disk);
+				}
 				if (position >= length) {
 					return Result.ok();
 				}

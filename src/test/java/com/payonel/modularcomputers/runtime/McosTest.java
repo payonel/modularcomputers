@@ -570,7 +570,9 @@ class McosTest {
 	void commandRunsPastAliasesAndSaysHowNamesWouldRun() {
 		file("w/f", "");
 		boot();
-		type("alias ls='echo aliased'; ls > /r1; command ls /w > /r2; command -v ls cd sh nosuch > /r3; echo $? >> /r3\r");
+		type("alias ls='echo aliased'\r"); // (an alias counts from the next line read, as POSIX has it)
+		untilIdle();
+		type("ls > /r1; command ls /w > /r2; command -v ls cd sh nosuch > /r3; echo $? >> /r3\r");
 		untilFile(root().resolve("r3"), "alias ls='echo aliased'\ncd\n/bin/sh\n1\n");
 		assertThat(read(root().resolve("r1"))).isEqualTo("aliased\n");
 		assertThat(read(root().resolve("r2"))).isEqualTo("f\n");
@@ -638,6 +640,67 @@ class McosTest {
 		boot();
 		type("false; x=$(false); echo $? > /r; true; y=1; echo $? >> /r\r");
 		untilFile(root().resolve("r"), "1\n0\n");
+	}
+
+	@Test
+	void backgroundListsAliasesBuiltinAssignmentsReadAndDollarStarAsPosixHasThem() {
+		file("in1", "a:b:c\n");
+		file("in2", "  one   two  three  \n");
+		file("in3", "a\\ b c\n");
+		boot();
+		// a whole && || list in the background; y runs (x failed)
+		type("true && echo a > /b1 &\r");
+		untilIdle();
+		type("false || echo y > /b2 &\r");
+		untilFile(root().resolve("b2"), "y\n");
+		untilFile(root().resolve("b1"), "a\n");
+		// an alias's operators; a quoted name isn't one; a blank at its end makes the next word a name
+		type("alias c='echo hi | cat > /a1'; alias e='echo '; alias w=world\r");
+		untilIdle();
+		type("c; 'c' 2> /dev/null; echo $? > /a2; e w > /a3\r");
+		untilFile(root().resolve("a3"), "world\n");
+		assertThat(read(root().resolve("a1"))).isEqualTo("hi\n");
+		assertThat(read(root().resolve("a2"))).isEqualTo("127\n");
+		// assignments before a builtin: only while it runs, but for a special builtin
+		type("X=old; X=new cd /; echo $X > /c1; X=b export Z=1; echo $X > /c2\r");
+		untilFile(root().resolve("c2"), "b\n");
+		assertThat(read(root().resolve("c1"))).isEqualTo("old\n");
+		// read splits on IFS (IFS=: just for it), trims blanks, the last takes the rest; \ quotes
+		type("IFS=: read x y < /in1; echo \"$x|$y\" > /d1; read p q < /in2; echo \"[$p][$q]\" > /d2\r");
+		untilFile(root().resolve("d2"), "[one][two  three]\n");
+		assertThat(read(root().resolve("d1"))).isEqualTo("a|b:c\n");
+		type("read u v < /in3; echo \"[$u][$v]\" > /d3; read -r u v < /in3; echo \"[$u][$v]\" > /d4\r");
+		untilFile(root().resolve("d4"), "[a\\][b c]\n");
+		assertThat(read(root().resolve("d3"))).isEqualTo("[a b][c]\n");
+		// "$*" joins with IFS's first character
+		type("sh -c 'IFS=:; echo \"$*\" > /f1' x a b c\r");
+		untilFile(root().resolve("f1"), "a:b:c\n");
+	}
+
+	@Test
+	void anUnsetParameterWithColonQuestionEndsAScriptButNotAnInteractiveShell() {
+		boot();
+		type("sh -c 'echo ${NOPE:?gone}; touch /e1' 2> /dev/null; echo $? > /e2\r");
+		untilFile(root().resolve("e2"), "1\n");
+		assertThat(root().resolve("e1")).doesNotExist();
+		type("echo ${NOPE:?x} 2> /dev/null; touch /e3\r");
+		untilFile(root().resolve("e3"), "");
+	}
+
+	@Test
+	void grepCaseClassesWithIAndTailFollows() {
+		file("log", "first\n");
+		boot();
+		type("echo Hello | grep -i '[[:upper:]]ello' > /g1; echo a1 | grep '[[:digit:]]' >> /g1; tail -x 2> /dev/null; echo $? > /h1\r");
+		untilFile(root().resolve("h1"), "1\n");
+		assertThat(read(root().resolve("g1"))).isEqualTo("Hello\na1\n");
+		// (into /tmp: a file on a disk shows its writes at close, and tail -f keeps it open)
+		type("tail -f /log > /tmp/out &\r");
+		untilIdle();
+		type("echo more >> /log; sleep 2; cp /tmp/out /h2\r");
+		untilFile(root().resolve("h2"), "first\nmore\n");
+		type("kill $!\r");
+		untilIdle();
 	}
 
 	@Test

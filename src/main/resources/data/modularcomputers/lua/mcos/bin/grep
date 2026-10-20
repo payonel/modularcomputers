@@ -56,14 +56,24 @@ local function translate(re)
       out[#out + 1] = string.find(d, "%w") and d or "%" .. d
       at = at + 2
     elseif c == "[" then
-      local close = string.find(re, "]", at + (string.sub(re, at + 1, at + 1) == "^" and 3 or 2), true)
-      if not close then
+      -- its ] is the first after its first character (so []] and [^]] hold a ]), past any [:class:]
+      local first = at + (string.sub(re, at + 1, at + 1) == "^" and 2 or 1)
+      local close = string.sub(re, first, first) == "]" and first + 1 or first
+      while close <= n and string.sub(re, close, close) ~= "]" do
+        if string.sub(re, close, close + 1) == "[:" then
+          local e = string.find(re, ":]", close + 2, true)
+          close = e and e + 2 or n + 1
+        else
+          close = close + 1
+        end
+      end
+      if close > n then
         return nil, "Unmatched [, [^, [:, [., or [="
       end
-      local set = string.sub(re, at + 1, close - 1)
+      local set = string.gsub(string.sub(re, at + 1, close - 1), "%%", "%%%%") -- (a % in it is itself)
+      -- (with -i the line is in lower case: a case class is any letter, as -i makes it)
       set = string.gsub(set, "%[:(%a+):%]", {alpha = "%a", digit = "%d", alnum = "%w", space = "%s",
-        upper = "%u", lower = "%l", punct = "%p", xdigit = "%x", cntrl = "%c"})
-      set = string.gsub(set, "%%", "%%%%")
+        upper = options.i and "%a" or "%u", lower = options.i and "%a" or "%l", punct = "%p", xdigit = "%x", cntrl = "%c"})
       out[#out + 1] = "[" .. set .. "]"
       at = close + 1
     elseif c == "^" then
