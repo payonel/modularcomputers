@@ -1,8 +1,8 @@
 # Plan
 
-The user's roadmap and the design ideas discussed so far. Items move from here into
-`AGENTS.md` ("Current state") as they're built. Design approach: abstract how real PCs work,
-skip steps freely, never invent false steps (see `AGENTS.md` section 1).
+The user's roadmap and the design ideas discussed so far. Once an item is built, the code is its
+record (and its why, if not obvious, goes in `AGENTS.md`). Design approach: abstract how real PCs
+work, skip steps freely, never invent false steps (see `AGENTS.md`).
 
 ## Done
 
@@ -35,7 +35,7 @@ skip steps freely, never invent false steps (see `AGENTS.md` section 1).
   - RAM sizes the machine's memory (and none is a boot error).
   - Disks hold data.
   - WLAN cards network.
-  - Batteries are built (three tiers; see AGENTS.md). Still open: mains power, with the
+  - Batteries are built (three tiers; see the code). Still open: mains power, with the
     UPS as a real backup that takes over when it drops, and the battery's bus API.
   - Battery ideas not decided: refusing overflow when charging (today extra material is
     wasted), a range or rate for tier 2's self-charging, and whether the power light should
@@ -53,7 +53,7 @@ skip steps freely, never invent false steps (see `AGENTS.md` section 1).
   - The EEPROM item gets contents.
   - The CPU runs Lua from it instead of the Java stand-in.
 
-## Mock runtime: programs calling devices (built 2026-10-11; see AGENTS.md)
+## Mock runtime: programs calling devices (built 2026-10-11; see the code)
 
 The Lua runtime is the user's own project and will take time. A mock layer pretends to be it,
 so the machine can be built and tested as if Lua code were calling devices. Modeled on how OC
@@ -212,10 +212,10 @@ of letting the player order them:
   console (hard-coded hello world). The plan is a virtual device from the motherboard
   (virtual bus) that the EEPROM uses to choose where the console goes.
 - **Several computers on one screen:** settled (user, 2026-10-13): a device is on one bus at a
-  time (`BusHolds`, see AGENTS.md); the first board to have it holds it. Screens have no power
+  time (`BusHolds`, see the code); the first board to have it holds it. Screens have no power
   button: only the case does (user).
 
-## The Lua CPU on its own thread, and device data in rings (user design, 2026-10-13; built 2026-10-13, see AGENTS.md)
+## The Lua CPU on its own thread, and device data in rings (user design, 2026-10-13; built 2026-10-13, see the code)
 
 Built in this order:
 
@@ -249,7 +249,7 @@ Built in this order:
    - Batched writes report errors late (as `fwrite`/`fsync`, sockets, ttys do).
    - Interrupts stay level-triggered: pending means the firmware's ring holds data for the source.
 
-## Disk files without open file descriptors (user design, 2026-10-13; built 2026-10-13, see AGENTS.md)
+## Disk files without open file descriptors (user design, 2026-10-13; built 2026-10-13, see the code)
 
 An open handle never keeps a host file open while user code runs. Open reads the file's size and
 a window of it into the handle's userdata (its path kept), and closes the host file; reads past the
@@ -276,23 +276,23 @@ The user's answer to "a device can be on only one bus": deciding an owner at run
 wins, last wins) is a race that chunk loading reshuffles, especially when the owner's chunk
 isn't loaded. So ownership is explicit and saved. A device's radio (the Bluetooth card in its
 radio slot), when linked, pairs it with that board, a computer or a hub; hubs daisy-chain.
-Unpaired devices stay shared, and racy (undefined behavior, accepted). Details are in
-AGENTS.md.
+Unpaired devices stay shared, and racy (undefined behavior, accepted). Details are in the code
+(`block/Bluetooth`).
 
 ## Bluetooth (built 2026-10-11)
 
 Linking, resetting, daisy-chaining, distances and the held-card highlight are built (see
-AGENTS.md). Open: range limits, whether links should show in the bus order differently, and
+the code). Open: range limits, whether links should show in the bus order differently, and
 what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` device).
 
-## Disks (built 2026-10-12; see AGENTS.md)
+## Disks (built 2026-10-12; see the code)
 
 - Built: hfs and raw modes, file handles, data in the world save by id, the OS's VFS and shell in
   `Mcos`.
 - Open: disks in expansion hubs; hfs labels set by programs; a Lua runtime's `__gc` closing
   handles; whether a mount table belongs on the board (a kernel's job) once there's a real OS.
 
-## Recipes (built 2026-10-12; see AGENTS.md)
+## Recipes (built 2026-10-12; see the code)
 
 - Draft page: a private draft page (private to the user).
 - Theme (user): vanilla ores, minerals and drops, few custom components; real computer materials
@@ -350,7 +350,7 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
 - **No legacy compatibility:** OpenOS grew complex supporting old programs; mcos isn't tied to them.
 - **The terminal decodes VT100:** mcos writes bytes and escape sequences; none of OpenOS's VT
   parsing, software cursor blink, GPU windows or viewports.
-- **Built (2026-10-15): processes, syscalls, a VFS and a shell** (AGENTS.md, "mcos in Lua"). The
+- **Built (2026-10-15): processes, syscalls, a VFS and a shell** (see the code). The
   user asked for a filesystem and io built autonomously, to review; decisions taken without them,
   each open to change:
   - **`/bin` and `PATH` are back** (the user had said no `/bin` for the echo-only v1: it needs PATH).
@@ -378,7 +378,7 @@ what a Bluetooth card does on the bus itself (it's a placeholder `NETWORK` devic
   return to the kernel (LungoLua 1.1's thaw with stops), and syscalls trap the same way
   (`board.trap()`). Ctrl+C ends a program stuck in a loop.
 - **mcos no longer fits one tier 1 stick** (2026-10-15; the user: optimize later, maybe raise tier 1's
-  capacity; for now it needs a tier 3 stick, 1 MiB, see AGENTS.md): with processes, a
+  capacity; for now it needs a tier 3 stick, 1 MiB, see the code): with processes, a
   VFS and a real shell it takes about 400 KiB above the firmware (kernel 194, shell 120, a small
   process 16; compiled code is most of it, shared between processes already). A first computer
   with one 256 KiB stick won't boot it. Options: a smaller boot set (the kernel's modules and a
