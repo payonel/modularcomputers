@@ -10,7 +10,8 @@
 5. nothing the code already says: **read the code for trusted information** (names, behavior,
    values, file lists, what a command does); the code and its comments are the truth, this file only
    says why;
-6. this list.
+6. processes that aren't intuitive or are easy to miss (one change that needs another with it);
+7. this list.
 
 Plans and decided-but-unbuilt ideas go in `docs/PLAN.md`.
 
@@ -134,7 +135,23 @@ is a library (`/lib/readline.lua`), as GNU readline is for bash and lua. When ch
 copy Linux/POSIX/GNU (and say where it can't). Not decided yet: how user programs reach devices
 (`/dev` files and `ioctl` is the plan; the user has concerns to discuss first).
 
-## 4. Lessons (record new ones here)
+## 4. Easy to miss (a change that needs another)
+
+- **A change to an mcos program (`lua/mcos/bin/<name>`) updates its man page**
+  (`lua/mcos/usr/share/man/man1/<name>.1`), and a new program gets one: options, behavior, exit
+  statuses, NOTES where it differs from GNU. A test renders every page and fails for a program
+  without one. Pages use only the man(7) macros `/bin/man` supports (its header lists them).
+- **A program's header comment is its spec**: keep it true when its behavior changes.
+- **Data files under `lua/` that aren't Lua go under a `share/` folder**: `LuaScriptsTest` compiles
+  every other file there as Lua.
+- **The mcos files are copied onto a disk once**, when the disk is first made: a world's existing
+  disks keep their old mcos. Tests copy afresh each run.
+- **Textures and sounds come from `scripts/`**: change the script and regenerate; never edit the
+  committed PNG/OGG by hand.
+- **New plans and decided-but-unbuilt ideas go in `docs/PLAN.md`**, and come out of it once built.
+- **A design decision or a time-costly mistake goes in this file** (sections 3 and 5), at once.
+
+## 5. Lessons (record new ones here)
 
 - **Run one simple test before a long suite after a risky change.** A shell change once made every
   mcos test wait out its timeout (the suite ran past 10 minutes) when the bug (no command ran at all)
