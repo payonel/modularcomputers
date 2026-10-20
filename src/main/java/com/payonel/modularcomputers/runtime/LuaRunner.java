@@ -411,7 +411,14 @@ public final class LuaRunner implements Runner {
 			throw new IllegalStateException("the CPU's firmware doesn't load: " + text(firmwareCo, -1)); // a bug in the mod
 		}
 		trace("machine", firmware.length, memory);
+		// The EEPROM's text, for the firmware to take (and let go of once compiled: a chunk's arguments
+		// would stay in its frame for as long as it runs).
+		push(main, image);
+		lua_setfield(main, LUA_REGISTRYINDEX, new HostString(IMAGE));
 	}
+
+	/** The EEPROM's text, in the registry until the firmware has taken it. */
+	private static final String IMAGE = "modularcomputers.image";
 
 	/**
 	 * Debugging (tests): told of every chunk the VM compiles, from the firmware on (its name, its size
@@ -954,7 +961,7 @@ public final class LuaRunner implements Runner {
 	 */
 	private void run() {
 		try {
-			List<Object> reply = image != null ? List.of(image) : null; // (restored: its request is on its stack)
+			List<Object> reply = image != null ? List.of() : null; // (restored: its request is on its stack)
 			while (true) {
 				if (stopping) {
 					return;

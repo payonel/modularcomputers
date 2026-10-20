@@ -65,7 +65,11 @@
 -- This file never calls methods on strings ("s:sub()"): the string metatable is shared with user
 -- code.
 
-local image = ...
+-- The EEPROM's text, taken from the registry, where the host put it: dropped once it's compiled, as
+-- is the bootloader's function once user code has it (a chunk's arguments, or this chunk's locals,
+-- would keep both for as long as the machine runs).
+local image = debug.getregistry()["modularcomputers.image"]
+debug.getregistry()["modularcomputers.image"] = nil
 
 local coroutine_create, coroutine_resume, coroutine_status, coroutine_yield =
   coroutine.create, coroutine.resume, coroutine.status, coroutine.yield
@@ -447,10 +451,12 @@ local main, why = load(image, "=eeprom", "t", sandbox)
 if loadtrace then
   loadtrace("eeprom", #image)
 end
+image = nil
 if not main then
   return "abort", "EEPROM: " .. why
 end
 user_co = coroutine_create(main)
+main = nil
 setbudget(user_co, SLICE, spent)
 
 -- Runs user code (a resume or a thaw) in user mode; its results are packed back in the firmware's.

@@ -727,6 +727,58 @@ class McosTest {
 	}
 
 	@Test
+	void fixesFoundByTheFootprintAudit() {
+		file("t.lua", """
+			local sys, fs = require("sys"), require("fs")
+			local out = {}
+			local function say(...) out[#out + 1] = table.concat({...}, " ") end
+			-- a file under a directory that isn't there: ENOENT, and nothing made (tmpfs)
+			local _, _, e1 = sys.open("/tmp/nodir/file", "w")
+			say("nodir", tostring(e1), tostring(sys.stat("/tmp/nodir") ~= nil))
+			-- the open's mode is enforced for every file, devices too
+			local r = sys.open("/dev/null", "r")
+			local w = sys.open("/dev/null", "w")
+			say("modes", tostring(select(3, sys.write(r, "x"))), tostring(select(3, sys.read(w, 1))))
+			-- a glob's \\d is the letter d
+			say("glob", tostring(string.find("d", fs.pattern([[\\d*]])) ~= nil), tostring(string.find("1", fs.pattern([[\\d*]])) ~= nil))
+			-- os.remove takes a link, never what it points to
+			sys.symlink("/tmp", "/lk")
+			say("remove", tostring(os.remove("/lk")), tostring(sys.stat("/tmp") ~= nil))
+			-- io.lines with several formats gives them all
+			io.open("/two", "w"):write("a\\nb\\n"):close()
+			for x, y in io.lines("/two", "l", "l") do say("lines", x, y) end
+			-- an orphan that had ended is reaped (no zombie left)
+			local zombies = 0
+			for _, p in ipairs(sys.processes()) do
+			  if p.state == "zombie" then zombies = zombies + 1 end
+			end
+			say("zombies", zombies)
+			io.open("/r", "w"):write(table.concat(out, "\\n")):close()
+			""");
+		file("orphan.lua", """
+			require("sys").spawn("/bin/true", {})
+			require("sys").sleep(0.3) -- (the child ends: a zombie, never waited for)
+			""");
+		file("fd1.lua", """
+			io.stderr:write(tostring(select(3, require("sys").write(1, "x"))))
+			""");
+		file("crash.lua", "local function f() error('boom') end f()\n");
+		boot();
+		type("/orphan.lua; /t.lua 2> /terr; /fd1.lua >&- 2> /r2; pwd >&- 2> /r3; echo $? >> /r3\r");
+		settle(() -> Files.isRegularFile(root().resolve("r3")) && read(root().resolve("r3")).endsWith("1\n"));
+		type("lua /crash.lua 2> /r4; echo \"a\\\r");
+		untilIdle();
+		type("b\" > /r5\r");
+		untilFile(root().resolve("r5"), "ab\n");
+		assertThat(root().resolve("r")).as(() -> read(root().resolve("terr"))).exists();
+		assertThat(read(root().resolve("r"))).isEqualTo(String.join("\n", "nodir ENOENT false", "modes EBADF EBADF",
+			"glob true false", "remove true true", "lines a b", "zombies 0"));
+		assertThat(read(root().resolve("r2"))).as("n>&- closes it in the child").isEqualTo("EBADF");
+		assertThat(read(root().resolve("r3"))).as("a builtin's closed stdout").contains("write error: Bad file descriptor").endsWith("1\n");
+		assertThat(read(root().resolve("r4"))).as("lua's own frames are cut").contains("/crash.lua:1").doesNotContain("/bin/lua:");
+	}
+
+	@Test
 	void everyCommandHasAManPageThatRenders() {
 		file("t.lua", """
 			local fs = require("fs")

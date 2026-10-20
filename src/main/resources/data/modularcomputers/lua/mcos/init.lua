@@ -42,31 +42,20 @@ local k = {
   BLOCK = setmetatable({}, {__name = "BLOCK"}), -- a description's answer: try again when things change
 }
 
--- The boot disk's files, before the VFS is up: the kernel's modules.
-local function bootfile(path)
-  local opened, file = board.invoke(root, "open", path)
-  if not opened then
-    return nil, file
-  end
-  local parts = {}
-  while true do
-    local ok, chunk = board.invoke(file, "read", READ_SIZE)
-    if not ok or chunk == nil then
-      break
-    end
-    parts[#parts + 1] = chunk
-  end
-  board.invoke(file, "close")
-  return table.concat(parts)
-end
-
+-- A kernel module, read off the boot disk itself (the VFS isn't up yet), run with its arguments.
 local function module(name, ...)
   local path = MODULES .. name .. ".lua"
-  local code, why = bootfile(path)
-  if not code then
-    error(path .. ": " .. tostring(why), 0)
+  local opened, file = board.invoke(root, "open", path)
+  if not opened then
+    error(path .. ": " .. tostring(file), 0)
   end
-  return assert(load(code, "=" .. path))(...)
+  local parts, ok, chunk = {}, nil, nil
+  repeat
+    ok, chunk = board.invoke(file, "read", READ_SIZE)
+    parts[#parts + 1] = ok and chunk or nil
+  until not (ok and chunk)
+  board.invoke(file, "close")
+  return assert(load(table.concat(parts), "=" .. path))(...)
 end
 
 local vfs = module("vfs", k)
@@ -126,14 +115,10 @@ end
 
 -- ---- interrupts ---------------------------------------------------------------------------------
 
--- The handlers drivers register (a tty's line discipline for its device's ring), run whenever the
--- kernel gets control: a process stopped for input or by the timer, a syscall, waking from idle.
-local handlers = {}
-
+-- The interrupt handler, run whenever the kernel gets control (a process stopped for input or by the
+-- timer, a syscall, waking from idle): the console tty's line discipline, over its device's ring.
 local function interrupt()
-  for i = 1, #handlers do
-    handlers[i]()
-  end
+  console:pump()
 end
 
 -- ---- processes ----------------------------------------------------------------------------------
@@ -216,7 +201,11 @@ local function exit(p, how, value)
   p.zombie, p.status = true, {how, value}
   p.request, p.reply, p.blocked = nil, nil, false
   for _, child in ipairs(children(p)) do
-    child.ppid = 0
+    if child.zombie then
+      reap(child) -- an orphan that had ended: the kernel reaps it (as init reaps orphans)
+    else
+      child.ppid = 0
+    end
   end
   if p.ppid == 0 then
     reap(p) -- the kernel's own child: reaped at once
@@ -239,7 +228,7 @@ local function post(p, signal)
     p.caught[#p.caught + 1] = signal
     if p.blocked then
       p.blocked, p.request = false, nil
-      p.reply = table.pack(fail("EINTR"))
+      p.reply = table.pack(true, fail("EINTR"))
     end
   else
     p.killed = signal
@@ -277,7 +266,7 @@ local function systable(p)
           handler(signal)
         end
       end
-      return table.unpack(reply, 1, reply.n)
+      return table.unpack(reply, 2, reply.n)
     end
   end
   sys.SIGNALS = SIGNALS
@@ -355,8 +344,7 @@ end
 -- it): a Lua file is compiled once, as function(_ENV, ...) around its text, and each process runs it
 -- with its own globals, so the compiled code (the most of a program's memory) is in memory once.
 -- Kept while some process holds one (weak), and compiled again when the file changes.
-local images = setmetatable({}, {__mode = "v"})
-local versions = {} -- by path: what the file was (size, modified) when its image was made
+local images = setmetatable({}, {__mode = "v"}) -- by path and what the file was (size, modified)
 
 local function image(path)
   local st, why, errno = vfs.stat(path)
@@ -366,33 +354,30 @@ local function image(path)
     return fail("EISDIR")
   end
   path = st.path -- (by where links lead: one image for every name of a file)
-  local version = st.size .. ":" .. tostring(st.modified)
-  local cached = images[path]
-  if cached and versions[path] == version then
-    return cached
+  local key = path .. ":" .. st.size .. ":" .. tostring(st.modified)
+  if images[key] then
+    return images[key]
   end
   reclaim() -- (compiling takes far more for a moment than the image keeps)
-  local code
+  local code, chunk
   code, why, errno = vfs.readfile(path)
   if not code then
     return nil, why, errno
   end
   code = string.gsub(code, "^#![^\n]*", "") -- a #! line is the kernel's (its line stays, empty)
-  local chunk
   chunk, why = load("return function(_ENV, ...) " .. code .. "\nend", "=" .. path, "t", {})
   if not chunk then
     return nil, why, "ENOEXEC"
   end
-  cached = chunk()
-  images[path], versions[path] = cached, version
-  return cached
+  images[key] = chunk()
+  return images[key]
 end
 
 -- posix_spawn: a new process running 'path' (through the loader) with 'argv', as the parent's
 -- child. opts: fds (the child's descriptors: {[0] = a parent fd, ...}; 0, 1 and 2 are inherited
 -- when not given, the others aren't: close-on-exec), env (its environment; the parent's when not
 -- given), ignore (signals it starts ignoring, as an async list's SIGINT), pgid (0: a group of its
--- own), cwd.
+-- own). A descriptor mapped to false starts closed in the child (a shell's n>&-), even 0, 1 or 2.
 local function spawn(parent, path, argv, opts)
   opts = opts or {}
   reclaim()
@@ -432,14 +417,14 @@ local function spawn(parent, path, argv, opts)
     end
   end
   for fd, from in pairs(map) do
-    local description = parent.fds[from]
-    if math.type(fd) ~= "integer" or fd < 0 or fd >= MAX_FDS or not description then
+    local description = from ~= false and parent.fds[from]
+    if math.type(fd) ~= "integer" or fd < 0 or fd >= MAX_FDS or (from ~= false and not description) then
       for _, held in pairs(p.fds) do
         release(held)
       end
       return fail("EBADF")
     end
-    p.fds[fd] = hold(description)
+    p.fds[fd] = description and hold(description) or nil
   end
   p.co = coroutine.create(function()
     return loader(env, path, table.unpack(p.argv))
@@ -453,10 +438,6 @@ end
 
 -- The time, in ticks, read once a pass of the scheduler (a board call).
 local now
-local function clock()
-  now = now or board.uptime()
-  return now
-end
 
 -- ---- syscalls -----------------------------------------------------------------------------------
 -- Each: (process, request, args...) -> its answer, or k.BLOCK to be asked again when things change.
@@ -569,56 +550,34 @@ syscalls.dup = withfd(function(p, request, d, fd, from)
   return new
 end)
 
-syscalls.dup2 = withfd(function(p, request, d, fd, to)
-  if math.type(to) ~= "integer" or to < 0 or to >= MAX_FDS then
-    return fail("EBADF")
-  end
-  if fd ~= to then
-    hold(d)
-    if p.fds[to] then
-      release(p.fds[to])
-    end
-    p.fds[to] = d
-  end
-  return to
-end)
-
 function syscalls.pipe(p)
   local r = lowestfd(p)
-  if not r then
+  local w = r and lowestfd(p, r + 1)
+  if not w then
     return fail("EMFILE")
   end
   local reader, writer = newpipe()
-  p.fds[r] = hold(reader)
-  local w = lowestfd(p)
-  if not w then
-    p.fds[r] = nil
-    return fail("EMFILE")
-  end
-  p.fds[w] = hold(writer)
+  p.fds[r], p.fds[w] = hold(reader), hold(writer)
   return r, w
 end
 
 -- isatty, and the terminal's ioctls by their Linux names: TCGETS and TCSETS (termios flags, as a
--- table), TIOCGWINSZ (columns, rows), TIOCGPGRP and TIOCSPGRP (its foreground process group),
--- TIOCSTI (bytes put in as if typed).
+-- table), TIOCGWINSZ (columns, rows), TIOCSTI (bytes put in as if typed).
 syscalls.ioctl = withfd(function(p, request, d, fd, op, arg)
   if d.type ~= "tty" then
     return fail("ENOTTY")
   end
   local t = d.tty
   if op == "TCGETS" then
-    return t:getattr()
+    return copy(t.flags)
   elseif op == "TCSETS" and type(arg) == "table" then
     t:setattr(fromuser(arg))
     return true
   elseif op == "TIOCGWINSZ" then
-    return t:size()
-  elseif op == "TIOCGPGRP" then
-    return t.foreground
-  elseif op == "TIOCSPGRP" and math.type(arg) == "integer" then
-    t.foreground = arg
-    return true
+    local ok, width, height = board.invoke(t.device, "getSize")
+    if ok then
+      return width, height
+    end
   elseif op == "TIOCSTI" and type(arg) == "string" then
     t:receive(arg) -- input, as if typed (Linux's TIOCSTI): a shell gives back what it read ahead
     return true
@@ -633,10 +592,10 @@ end
 
 -- Syscalls on paths (made absolute from the process's working directory), answered by the VFS:
 -- stat, lstat (a link itself: type "link", its target), readlink, realpath (every link followed),
--- mkdir, unlink, rmdir, umount, image (a Lua file's shared image: see images; a compile's error is
+-- mkdir, unlink, rmdir, umount, statfs ({type, size, used}), image (a Lua file's shared image: see images; a compile's error is
 -- ENOEXEC), and with two paths rename and link (a hard link).
 local ONE_PATH = {stat = vfs.stat, lstat = vfs.lstat, readlink = vfs.readlink, realpath = vfs.realpath,
-  mkdir = vfs.mkdir, umount = vfs.umount, image = image,
+  mkdir = vfs.mkdir, umount = vfs.umount, statfs = vfs.statfs, image = image,
   unlink = function(at)
     return vfs.remove(at, false)
   end,
@@ -720,9 +679,8 @@ end
 -- What's mounted (Linux's /proc/mounts): {source, path, type} each.
 function syscalls.mounts()
   local list = {}
-  for i = #vfs.mounts, 1, -1 do
-    local mount = vfs.mounts[i]
-    list[#list + 1] = {source = mount.source, path = mount.path, type = mount.fs.type}
+  for i, mount in ipairs(vfs.mounts) do
+    list[i] = {source = mount.source, path = mount.path, type = mount.fs.type}
   end
   table.sort(list, function(a, b)
     return a.path < b.path
@@ -730,19 +688,8 @@ function syscalls.mounts()
   return list
 end
 
-function syscalls.statfs(p, request, file)
-  local at = path(p, file or "/")
-  if not at then
-    return fail("EINVAL")
-  end
-  return vfs.statfs(at)
-end
-
 function syscalls.spawn(p, request, file, argv, opts)
-  if type(file) ~= "string" then
-    return fail("EINVAL")
-  end
-  if argv ~= nil and type(argv) ~= "table" then
+  if type(file) ~= "string" or (argv ~= nil and type(argv) ~= "table") then
     return fail("EINVAL")
   end
   local child, why, errno = spawn(p, file, fromuser(argv), fromuser(opts, true))
@@ -782,19 +729,6 @@ end
 
 function syscalls.getpid(p)
   return p.pid
-end
-
-function syscalls.getppid(p)
-  return p.ppid
-end
-
-function syscalls.getpgid(p)
-  return p.pgid
-end
-
-function syscalls.setpgid(p, request, pgid)
-  p.pgid = math.type(pgid) == "integer" and pgid > 0 and pgid or p.pid
-  return true
 end
 
 -- kill(pid, signal): a process; a negative pid is a process group.
@@ -879,23 +813,13 @@ function syscalls.sleep(p, request, seconds)
   if type(seconds) ~= "number" or seconds < 0 then
     return fail("EINVAL")
   end
-  local now = clock()
+  now = now or board.uptime()
   request.deadline = request.deadline or now + math.ceil(seconds * TICKS_PER_SECOND)
   if now >= request.deadline then
     return true
   end
   p.wakeat = request.deadline
   return k.BLOCK
-end
-
--- Ends every process, closing what it held (the disks get what was written), as a shutdown does.
-local function shutdown()
-  for _, pid in ipairs(copy(order)) do
-    local p = processes[pid]
-    if p then
-      exit(p, "killed", "SIGKILL")
-    end
-  end
 end
 
 -- reboot("halt" | "poweroff" | "restart"), as Linux's reboot(2) with LINUX_REBOOT_CMD_HALT,
@@ -909,7 +833,11 @@ function syscalls.reboot(p, request, how)
     return fail("EINVAL")
   end
   kernel.respawning = false
-  shutdown()
+  for _, pid in ipairs(copy(order)) do
+    if processes[pid] then
+      exit(processes[pid], "killed", "SIGKILL")
+    end
+  end
   board[board_call]()
 end
 
@@ -919,21 +847,14 @@ local function serve(p)
   if p.zombie or not request then
     return
   end
-  local call = syscalls[request[1]]
-  local reply
-  if call then
-    reply = table.pack(pcall(call, p, request, table.unpack(request, 2, request.n)))
-    if not reply[1] then
-      printk("sys." .. request[1] .. ": " .. tostring(reply[2])) -- a kernel bug, not the process's
-      reply = table.pack(fail("EINVAL"))
-    elseif reply[2] == k.BLOCK then
-      p.blocked = true
-      return
-    else
-      reply = table.pack(table.unpack(reply, 2, reply.n))
-    end
-  else
-    reply = table.pack(fail("ENOSYS"))
+  -- (the reply is pcall's: true and the answer; a process only ever asks for what its sys holds)
+  local reply = table.pack(pcall(syscalls[request[1]], p, request, table.unpack(request, 2, request.n)))
+  if not reply[1] then
+    printk("sys." .. request[1] .. ": " .. tostring(reply[2])) -- a kernel bug, not the process's
+    reply = table.pack(true, fail("EINVAL"))
+  elseif reply[2] == k.BLOCK then
+    p.blocked = true
+    return
   end
   p.blocked, p.request, p.reply, p.wakeat = false, nil, reply, nil
 end
@@ -949,21 +870,14 @@ end
 
 console = tty.new(options.console or CONSOLE, ttysignal)
 k.console = console
-handlers[#handlers + 1] = function()
-  console:pump()
-end
 kernel.tty = console
 
 vfs.mount("/", hfs(root), root)
 vfs.mount("/dev", devfs, "devfs")
 vfs.mount("/tmp", tmpfs(), "tmpfs")
 
--- Disks on the bus, mounted as the kernel finds them (as udisks does) and unmounted as they go.
-local function mountpoint(address)
-  local kind, name = string.match(address, "^(%w+):(.+)$")
-  return MOUNT_BASE .. "/" .. (kind or "id") .. "/" .. (name or address)
-end
-
+-- Disks on the bus, mounted as the kernel finds them (as udisks does: sata:1 at /mnt/sata/1, id:x at
+-- /mnt/id/x) and unmounted as they go.
 local function hotplug()
   local present, mounted = {[root] = true}, {}
   for _, mount in ipairs(vfs.mounts) do
@@ -976,7 +890,8 @@ local function hotplug()
       if not mounted[address] then
         local _, mode = board.invoke(address, "getMode")
         if mode == "hfs" then
-          vfs.mount(mountpoint(address), hfs(address), address, true)
+          local kind, name = string.match(address, "^(%w+):(.+)$")
+          vfs.mount(MOUNT_BASE .. "/" .. (kind or "id") .. "/" .. (name or address), hfs(address), address)
         end
       end
     end
@@ -1026,10 +941,7 @@ local function run(p)
     return -- (it ended itself: exit)
   end
   if isfrozen(co) then
-    if p.request then
-      serve(p)
-    end
-    -- else stopped for input or by the timer: the handlers run before anything else does
+    serve(p) -- (if it trapped; else it was stopped for input or by the timer: the handlers run first)
   elseif coroutine.status(co) == "dead" then
     if ok then
       exit(p, "exited", math.type(result) == "integer" and result or 0)
@@ -1081,21 +993,19 @@ while true do
   for _, pid in ipairs(copy(order)) do
     local p = processes[pid]
     if p and not p.zombie then
-      if p.killed then
-        exit(p, "killed", p.killed)
-        progressed = true
-      else
+      if not p.killed then
         if p.blocked then
           serve(p) -- what it waits for may have come
         end
         if not p.blocked then
           run(p)
           interrupt()
-          if p.killed and not p.zombie then
-            exit(p, "killed", p.killed)
-          end
           progressed = true
         end
+      end
+      if p.killed then
+        exit(p, "killed", p.killed) -- (nothing, if it ended meanwhile)
+        progressed = true
       end
     end
   end

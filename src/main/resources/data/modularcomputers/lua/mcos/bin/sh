@@ -29,10 +29,7 @@ local DEFAULT_IFS = " \t\n"
 local NOT_FOUND, NOT_RUNNABLE, SYNTAX, SIGNALED = 127, 126, 2, 128
 
 -- The shell's variables (all exported: children get them), aliases, positional parameters.
-local vars = {}
-for name, value in pairs(io.environ()) do
-  vars[name] = value
-end
+local vars = sys.environ() -- (a copy of the environment the shell started with)
 local aliases = {}
 local positional = {n = 0}
 local name0 = "sh"
@@ -40,9 +37,14 @@ local status = 0 -- $?
 local lastbg = nil -- $!
 local interactive = false -- reading commands at a terminal (not -c, not a script)
 
+-- Where the shell's messages go: its stderr, or a builtin's while it runs (2>; false: closed).
+local errfd = 2
+
 local function say(text)
   io.stdout:flush()
-  io.stderr:write("sh: " .. text .. "\n")
+  if errfd then
+    sys.write(errfd, "sh: " .. text .. "\n")
+  end
 end
 
 local function environment()
@@ -65,9 +67,16 @@ end
 -- inside its own text, and one whose text ends in a blank makes the next word a command name too.
 -- The lexer gives back the line as it ended up (aliases in it), which the tokens' places refer to.
 
-local INCOMPLETE = setmetatable({}, {__name = "INCOMPLETE"})
+local INCOMPLETE = {} -- (a line that goes on)
 
-local OPERATORS = {"&&", "||", ";", "&", "|", "!"}
+-- After these, a line goes on (a new line just continues it).
+local CONTINUES = {["|"] = true, ["&&"] = true, ["||"] = true}
+
+-- A word that's an assignment (NAME=..., its first part unquoted): the name.
+local function assignment(word)
+  local first = word and word[1]
+  return first and first.text and not first.quoted and string.match(first.text, "^([%a_][%w_]*)=")
+end
 
 -- Where the ) closing a $( whose text starts at 'at' is (quotes, nested $( and backticks skipped).
 local function closing(line, at)
@@ -77,8 +86,8 @@ local function closing(line, at)
     local c = string.sub(line, i, i)
     if c == "\\" then
       i = i + 2
-    elseif c == "'" then
-      local close = string.find(line, "'", i + 1, true)
+    elseif c == "'" or c == "`" then
+      local close = string.find(line, c, i + 1, true)
       if not close then
         return nil
       end
@@ -92,12 +101,6 @@ local function closing(line, at)
         return nil
       end
       i = i + 1
-    elseif c == "`" then
-      local close = string.find(line, "`", i + 1, true)
-      if not close then
-        return nil
-      end
-      i = close + 1
     elseif c == "(" then
       depth = depth + 1
       i = i + 1
@@ -163,12 +166,9 @@ local function lex(line, noalias)
       return true
     end
     for k = #tokens, 1, -1 do
-      local t = tokens[k]
-      if t.op then
+      if tokens[k].op then
         return true
-      end
-      local first = t.word and t.word[1]
-      if not (first and first.text and not first.quoted and string.match(first.text, "^[%a_][%w_]*=")) then
+      elseif not assignment(tokens[k].word) then
         return false
       end
     end
@@ -215,12 +215,14 @@ local function lex(line, noalias)
     end
     parts, inword = {}, false
   end
+  local dq = false -- inside double quotes
   while i <= n do
     local c = string.sub(line, i, i)
     if not inword then
       wordstart = i
     end
-    if c == "\\" then
+    if c == "\\" and (not dq or string.find(string.sub(line, i + 1, i + 1), '[\\"$`\n]')) then
+      -- (in double quotes, only before \ " $ ` or a new line; else it's itself)
       if i == n then
         return INCOMPLETE -- a line ending in \ goes on
       end
@@ -229,54 +231,12 @@ local function lex(line, noalias)
         text(d, true)
       end
       i = i + 2
-    elseif c == "'" then
-      local close = string.find(line, "'", i + 1, true)
-      if not close then
-        return INCOMPLETE
-      end
-      text(string.sub(line, i + 1, close - 1), true)
-      i = close + 1
     elseif c == '"' then
+      dq = not dq
+      text("", true) -- ("" is a word)
       i = i + 1
-      text("", true)
-      while true do
-        if i > n then
-          return INCOMPLETE
-        end
-        local d = string.sub(line, i, i)
-        if d == '"' then
-          i = i + 1
-          break
-        elseif d == "\\" and string.find(string.sub(line, i + 1, i + 1), '[\\"$`\n]') then
-          text(string.sub(line, i + 1, i + 1), true)
-          i = i + 2
-        elseif d == "$" then
-          local part, after = dollar(line, i, true)
-          if part == INCOMPLETE then
-            return INCOMPLETE
-          elseif part then
-            parts[#parts + 1] = part
-            i = after
-          elseif after then
-            return nil, after
-          else
-            text("$", true)
-            i = i + 1
-          end
-        elseif d == "`" then
-          local close = string.find(line, "`", i + 1, true)
-          if not close then
-            return INCOMPLETE
-          end
-          parts[#parts + 1] = {cmd = string.sub(line, i + 1, close - 1), quoted = true}
-          i = close + 1
-        else
-          text(d, true)
-          i = i + 1
-        end
-      end
     elseif c == "$" then
-      local part, after = dollar(line, i, false)
+      local part, after = dollar(line, i, dq)
       if part == INCOMPLETE then
         return INCOMPLETE
       elseif part then
@@ -286,7 +246,7 @@ local function lex(line, noalias)
       elseif after then
         return nil, after
       else
-        text("$", false)
+        text("$", dq)
         i = i + 1
       end
     elseif c == "`" then
@@ -294,8 +254,18 @@ local function lex(line, noalias)
       if not close then
         return INCOMPLETE
       end
-      parts[#parts + 1] = {cmd = (string.gsub(string.sub(line, i + 1, close - 1), "\\([`\\$])", "%1")), quoted = false}
+      parts[#parts + 1] = {cmd = (string.gsub(string.sub(line, i + 1, close - 1), "\\([`\\$])", "%1")), quoted = dq}
       inword = true
+      i = close + 1
+    elseif dq then
+      text(c, true)
+      i = i + 1
+    elseif c == "'" then
+      local close = string.find(line, "'", i + 1, true)
+      if not close then
+        return INCOMPLETE
+      end
+      text(string.sub(line, i + 1, close - 1), true)
       i = close + 1
     elseif c == "~" and not inword and (i == n or string.find(string.sub(line, i + 1, i + 1), "[/ \t\n;|&]")) then
       parts[#parts + 1] = {tilde = true}
@@ -310,8 +280,7 @@ local function lex(line, noalias)
       if finish() then
         goto continue
       end
-      local last = tokens[#tokens]
-      if not (last and (last.op == "|" or last.op == "&&" or last.op == "||")) then
+      if not (tokens[#tokens] and CONTINUES[tokens[#tokens].op]) then
         tokens[#tokens + 1] = {op = ";", from = i, last = i} -- (after | && || a new line just goes on)
       end
       i = i + 1
@@ -331,10 +300,7 @@ local function lex(line, noalias)
         local start = digits and wordstart or i
         if digits then
           fd = tonumber(digits)
-          parts, inword = {}, false
-        end
-        if finish() then
-          goto continue
+          parts, inword = {}, false -- (the digits were the redirection's, not a word)
         end
         if target then
           tokens[#tokens + 1] = {redirect = op .. "&", fd = fd, to = target, from = start, last = i + #op + #target}
@@ -348,13 +314,7 @@ local function lex(line, noalias)
           goto continue
         end
       else
-        local found
-        for _, candidate in ipairs(OPERATORS) do
-          if string.sub(line, i, i + #candidate - 1) == candidate then
-            found = candidate
-            break
-          end
-        end
+        local found = string.match(line, "^&&", i) or string.match(line, "^||", i) or string.match(line, "^[;&|!]", i)
         -- ! is an operator only as a word of its own
         if found == "!" and (inword or not string.find(string.sub(line, i + 1, i + 1), "^[ \t]")) then
           found = nil
@@ -376,9 +336,11 @@ local function lex(line, noalias)
       finish() -- (a word at the line's end: if it was an alias, its text is lexed next)
     end
   end
+  if dq then
+    return INCOMPLETE -- an open quote: the line goes on
+  end
   finish()
-  local last = tokens[#tokens]
-  if last and (last.op == "|" or last.op == "&&" or last.op == "||") then
+  if tokens[#tokens] and CONTINUES[tokens[#tokens].op] then
     return INCOMPLETE -- a line ending in | && || goes on
   end
   return tokens, nil, line
@@ -402,8 +364,7 @@ local function parse(tokens)
       local t = tokens[i]
       if t.word then
         local first = t.word[1]
-        local name = #cmd.words == 0 and first and first.text and not first.quoted
-          and string.match(first.text, "^([%a_][%w_]*)=")
+        local name = #cmd.words == 0 and assignment(t.word)
         if name then
           local value = {}
           for k, part in ipairs(t.word) do
@@ -510,6 +471,26 @@ end
 -- Command substitutions run so far (an assignment's status is its last one's).
 local substitutions = 0
 
+-- How a child's end reads as a status.
+local function statusof(how, value)
+  if how == "exited" then
+    return value
+  end
+  return SIGNALED + (sys.SIGNALS[value] or 0)
+end
+
+-- A word quoted for sh, as it was ('...').
+local function quote(value)
+  return "'" .. string.gsub(value, "'", "'\\''") .. "'"
+end
+
+-- Closes the fds in a list.
+local function closeall(list)
+  for _, fd in ipairs(list) do
+    sys.close(fd)
+  end
+end
+
 local function substitute(text)
   local r, w = sys.pipe()
   if not r then
@@ -531,8 +512,7 @@ local function substitute(text)
     out[#out + 1] = data
   end
   sys.close(r)
-  local _, how, value = sys.waitpid(pid)
-  status = how == "exited" and value or SIGNALED + (sys.SIGNALS[value] or 0)
+  status = statusof(select(2, sys.waitpid(pid)))
   substitutions = substitutions + 1
   return (string.gsub(table.concat(out), "\n+$", ""))
 end
@@ -686,24 +666,11 @@ local function locate(name)
     end
     return name
   end
-  for dir in string.gmatch(vars.PATH or "", "[^:]+") do
-    local file = fs.join(dir, name)
-    local st = sys.stat(file)
-    if st and st.type ~= "directory" then
-      return file
-    end
+  local file = fs.command(name, vars.PATH or "")
+  if file then
+    return file
   end
   return nil, NOT_FOUND, name .. ": not found"
-end
-
--- Whether an fd of the shell's is open.
-local function isopen(fd)
-  local copy = sys.dup(fd)
-  if copy then
-    sys.close(copy)
-    return true
-  end
-  return false
 end
 
 -- Opens a command's redirections: the fds it gets ({[child fd] = an fd of ours, or false: closed})
@@ -720,7 +687,11 @@ local function redirect(cmd, fds, opened)
         local from = tonumber(r.to)
         local source = fds[from]
         if source == nil then
-          source = isopen(from) and from or false
+          local copy = sys.dup(from) -- (whether the shell has it open)
+          source = copy and from or false
+          if copy then
+            sys.close(copy)
+          end
         end
         if source == false then
           return nil, r.to .. ": Bad file descriptor"
@@ -742,14 +713,6 @@ local function redirect(cmd, fds, opened)
     end
   end
   return true
-end
-
--- How a child's end reads as a status.
-local function statusof(how, value)
-  if how == "exited" then
-    return value
-  end
-  return SIGNALED + (sys.SIGNALS[value] or 0)
 end
 
 local function waitfor(pid)
@@ -783,21 +746,16 @@ local function runbuiltin(cmd, argv)
     end
     vars[name] = expandword(assign.word, true)[1]
   end
-  local function restore()
-    for name, old in pairs(saved) do
-      vars[name] = old[1]
-    end
-  end
   local fds, opened = {}, {}
   local ok, why = redirect(cmd, fds, opened)
   local result = 1
   local raised
   if ok then
-    local out = fds[1] == nil and 1 or fds[1]
-    local err = fds[2] == nil and 2 or fds[2]
+    -- its stdout, stderr and stdin: the shell's, unless redirected (false: closed, n>&-)
+    local out, err, input = fds[1] == nil and 1 or fds[1], fds[2] == nil and 2 or fds[2], fds[0] == nil and 0 or fds[0]
     io.stdout:flush()
-    local input = fds[0] == nil and 0 or fds[0]
-    local done, value = pcall(builtins[argv[1]], argv, out or nil, err or nil, input or nil)
+    errfd = err
+    local done, value = pcall(builtins[argv[1]], argv, out, err, input)
     if done then
       result = value or 0
     elseif type(value) == "table" and value.exit then
@@ -805,17 +763,26 @@ local function runbuiltin(cmd, argv)
     else
       say(argv[1] .. ": " .. tostring(type(value) == "table" and value.shell or value))
     end
+    errfd = 2
   else
     say(why)
   end
-  for _, fd in ipairs(opened) do
-    sys.close(fd)
+  closeall(opened)
+  for name, old in pairs(saved) do
+    vars[name] = old[1]
   end
-  restore()
   if raised then
     error(raised, 0)
   end
   return result
+end
+
+-- A job started in the background: its pid is $!, and said at a terminal.
+local function started(pid)
+  lastbg = pid
+  if sys.isatty(0) then
+    io.stderr:write("[" .. pid .. "]\n")
+  end
 end
 
 local function runpipeline(pipeline, background)
@@ -844,9 +811,7 @@ local function runpipeline(pipeline, background)
     end
     local fds, opened = {}, {}
     local ok, why = redirect(first, fds, opened)
-    for _, fd in ipairs(opened) do
-      sys.close(fd)
-    end
+    closeall(opened)
     if not ok then
       say(why)
       return 1
@@ -870,15 +835,7 @@ local function runpipeline(pipeline, background)
       r, w = sys.pipe()
       fds[1] = w
     end
-    local ok, why = redirect(cmd, fds, opened)
-    local spawnfds, closed = {}, {}
-    for fd, from in pairs(fds) do
-      if from == false then
-        closed[#closed + 1] = fd
-      else
-        spawnfds[fd] = from
-      end
-    end
+    local ok, why = redirect(cmd, fds, opened) -- (an fd false: closed in the child, n>&-)
     if not ok then
       say(why)
       result = 1
@@ -894,15 +851,15 @@ local function runpipeline(pipeline, background)
         -- a builtin in a pipeline (or the background) runs in a child shell, as in a real one
         local quoted = {}
         for k, a in ipairs(cmd.argv) do
-          quoted[k] = "'" .. string.gsub(a, "'", "'\\''") .. "'"
+          quoted[k] = quote(a)
         end
-        pid, err = sys.spawn("/bin/sh", {"-c", table.concat(quoted, " ")}, {fds = spawnfds, env = env, ignore = ignore})
+        pid, err = sys.spawn("/bin/sh", {"-c", table.concat(quoted, " ")}, {fds = fds, env = env, ignore = ignore})
         code = NOT_RUNNABLE
       else
         local program
         program, code, err = locate(name)
         if program then
-          pid, err = sys.spawn(program, {table.unpack(cmd.argv, 2)}, {fds = spawnfds, env = env, ignore = ignore})
+          pid, err = sys.spawn(program, {table.unpack(cmd.argv, 2)}, {fds = fds, env = env, ignore = ignore})
           if not pid then
             err, code = name .. ": " .. tostring(err), NOT_RUNNABLE
           end
@@ -916,7 +873,7 @@ local function runpipeline(pipeline, background)
       else
         -- said where the command's own stderr goes: its redirections are made before it's looked
         -- for (as in a forked child before exec), so "cmd 2> /dev/null" hides "not found" too
-        local stderr = spawnfds[2] or (fds[2] == nil and 2 or nil)
+        local stderr = fds[2] == nil and 2 or fds[2] or nil
         if stderr then
           io.stdout:flush()
           sys.write(stderr, "sh: " .. err .. "\n")
@@ -935,15 +892,10 @@ local function runpipeline(pipeline, background)
   if input then
     sys.close(input)
   end
-  for _, fd in ipairs(opened) do
-    sys.close(fd)
-  end
+  closeall(opened)
   if background then
     for _, pid in ipairs(pids) do
-      lastbg = pid
-      if sys.isatty(0) then
-        io.stderr:write("[" .. pid .. "]\n")
-      end
+      started(pid)
     end
     return 0
   end
@@ -957,7 +909,7 @@ end
 local runscript
 
 -- A list in the background (a && b &): all of it in a child shell, as a real shell forks one for
--- it; its pid is $!. True.
+-- it; its pid is $!.
 local function background(text)
   io.stdout:flush()
   local pid, why = sys.spawn("/bin/sh", {"-c", text, name0, table.unpack(positional, 1, positional.n)},
@@ -965,14 +917,10 @@ local function background(text)
   if not pid then
     say("/bin/sh: " .. tostring(why))
     status = 1
-    return true
+    return
   end
-  lastbg = pid
-  if sys.isatty(0) then
-    io.stderr:write("[" .. pid .. "]\n")
-  end
+  started(pid)
   status = 0
-  return true
 end
 
 -- Runs a line (or a script's text): its status, and whether it was a syntax error (nothing on the
@@ -992,9 +940,13 @@ local function runline(line)
     return status, true
   end
   for _, list in ipairs(lists) do
-    local child = #list.pipelines > 1 and list.background and background(string.sub(source, list.from, list.last))
     local run = true
-    for _, pipeline in ipairs(child and {} or list.pipelines) do
+    local pipelines = list.pipelines
+    if #pipelines > 1 and list.background then
+      background(string.sub(source, list.from, list.last)) -- (all of it, in a child shell)
+      pipelines = {}
+    end
+    for _, pipeline in ipairs(pipelines) do
       if run then
         local ok, result = pcall(runpipeline, pipeline, list.background)
         if not ok then
@@ -1024,17 +976,18 @@ end
 
 -- ---- builtins -----------------------------------------------------------------------------------
 
+-- A builtin's output, to its fd (false: closed by n>&-, as bash says it).
 local function write(fd, text)
-  sys.write(fd or 1, text)
+  if not fd then
+    error({shell = "write error: Bad file descriptor"}, 0)
+  end
+  sys.write(fd, text)
 end
 
 builtins[":"] = function()
   return 0
 end
-
-builtins["true"] = function()
-  return 0
-end
+builtins["true"] = builtins[":"]
 
 builtins["false"] = function()
   return 1
@@ -1042,19 +995,15 @@ end
 
 function builtins.cd(argv, out, err)
   local target = argv[2]
-  if target == nil then
-    target = vars.HOME
+  local var = target == nil and "HOME" or target == "-" and "OLDPWD"
+  if var then
+    target = vars[var]
     if not target then
-      say("cd: HOME not set")
+      say("cd: " .. var .. " not set")
       return 1
+    elseif var == "OLDPWD" then
+      write(out, target .. "\n")
     end
-  elseif target == "-" then
-    target = vars.OLDPWD
-    if not target then
-      say("cd: OLDPWD not set")
-      return 1
-    end
-    write(out, target .. "\n")
   end
   local before = sys.getcwd()
   local ok, why = sys.chdir(target)
@@ -1083,21 +1032,25 @@ function builtins.exit(argv)
   error({exit = code}, 0)
 end
 
-local function quote(value)
-  return "'" .. string.gsub(value, "'", "'\\''") .. "'"
+-- A table's names and values (the variables, the aliases), sorted, a line each: prefix name='value';
+-- or just those 'only' names.
+local function listvars(t, prefix, out, only)
+  local names = only or {}
+  if not only then
+    for name in pairs(t) do
+      names[#names + 1] = name
+    end
+    table.sort(names)
+  end
+  for _, name in ipairs(names) do
+    write(out, prefix .. name .. "=" .. quote(t[name]) .. "\n")
+  end
+  return 0
 end
 
 function builtins.export(argv, out)
   if #argv == 1 then
-    local names = {}
-    for name in pairs(vars) do
-      names[#names + 1] = name
-    end
-    table.sort(names)
-    for _, name in ipairs(names) do
-      write(out, "export " .. name .. "=" .. quote(vars[name]) .. "\n")
-    end
-    return 0
+    return listvars(vars, "export ", out)
   end
   local result = 0
   for k = 2, #argv do
@@ -1113,15 +1066,7 @@ function builtins.export(argv, out)
 end
 
 function builtins.set(argv, out)
-  local names = {}
-  for name in pairs(vars) do
-    names[#names + 1] = name
-  end
-  table.sort(names)
-  for _, name in ipairs(names) do
-    write(out, name .. "=" .. quote(vars[name]) .. "\n")
-  end
-  return 0
+  return listvars(vars, "", out)
 end
 
 function builtins.unset(argv)
@@ -1133,15 +1078,7 @@ end
 
 function builtins.alias(argv, out)
   if #argv == 1 then
-    local names = {}
-    for name in pairs(aliases) do
-      names[#names + 1] = name
-    end
-    table.sort(names)
-    for _, name in ipairs(names) do
-      write(out, "alias " .. name .. "=" .. quote(aliases[name]) .. "\n")
-    end
-    return 0
+    return listvars(aliases, "alias ", out)
   end
   local result = 0
   for k = 2, #argv do
@@ -1152,7 +1089,7 @@ function builtins.alias(argv, out)
     elseif name then
       aliases[name] = value
     elseif aliases[argv[k]] then
-      write(out, "alias " .. argv[k] .. "=" .. quote(aliases[argv[k]]) .. "\n")
+      listvars(aliases, "alias ", out, {argv[k]})
     else
       say("alias: " .. argv[k] .. ": not found")
       result = 1
@@ -1191,8 +1128,11 @@ function builtins.read(argv, out, err, input)
   end
   io.stdout:flush()
   -- A line: from the shell's stdin, or a byte at a time from a redirection (so no more is taken).
+  if input == false then
+    error({shell = "read error: 0: Bad file descriptor"}, 0)
+  end
   local function nextline()
-    if not input or input == 0 then
+    if input == 0 then
       return io.stdin:read("l")
     end
     local bytes = {}
@@ -1243,9 +1183,12 @@ function builtins.read(argv, out, err, input)
     return not quoted[k] and chars[k] and string.find(ifs, chars[k], 1, true) and not blank(k)
   end
   local at = 1
-  while blank(at) do
-    at = at + 1
+  local function skip() -- (past blanks)
+    while blank(at) do
+      at = at + 1
+    end
   end
+  skip()
   for index, name in ipairs(names) do
     if index == #names then
       local last = #chars
@@ -1260,42 +1203,45 @@ function builtins.read(argv, out, err, input)
       at = at + 1
     end
     vars[name] = table.concat(chars, "", from, at - 1)
-    while blank(at) do
-      at = at + 1
-    end
+    skip()
     if delimiter(at) then
       at = at + 1
-      while blank(at) do
-        at = at + 1
-      end
+      skip()
     end
   end
   return 0
 end
 
-function builtins.type(argv, out)
+-- How each name would run, for type (in words: "ls is /bin/ls"; not found is said, 1) and command
+-- -v (an alias's definition, a builtin's name, a program's path; not found: nothing, 1) and -V (as
+-- type); the names from argv[from] on.
+local function describe(argv, from, out, words)
   local result = 0
-  for k = 2, #argv do
+  for k = from, #argv do
     local name = argv[k]
+    local program = not aliases[name] and not builtins[name] and locate(name)
     if aliases[name] then
-      write(out, name .. " is an alias for " .. aliases[name] .. "\n")
+      write(out, words and name .. " is an alias for " .. aliases[name] .. "\n" or "alias " .. name .. "=" .. quote(aliases[name]) .. "\n")
     elseif builtins[name] then
-      write(out, name .. " is a shell builtin\n")
+      write(out, words and name .. " is a shell builtin\n" or name .. "\n")
+    elseif program then
+      write(out, words and name .. " is " .. program .. "\n" or program .. "\n")
     else
-      local program = locate(name)
-      if program then
-        write(out, name .. " is " .. program .. "\n")
-      else
+      if words then
         say("type: " .. name .. ": not found")
-        result = 1
       end
+      result = 1
     end
   end
   return result
 end
 
--- command -v name...: how each would be run (an alias's definition, a builtin's name, a program's
--- path); -V says it in words, as type does. (command name [args] runs it: see runpipeline.)
+function builtins.type(argv, out)
+  return describe(argv, 2, out, true)
+end
+
+-- command -v name..., command -V name...: see describe. (command name [args] runs it: see
+-- runpipeline.)
 function builtins.command(argv, out)
   local mode = argv[2]
   if mode ~= "-v" and mode ~= "-V" then
@@ -1306,26 +1252,18 @@ function builtins.command(argv, out)
     say("command: usage: command [-pVv] command [arg ...]")
     return SYNTAX
   end
-  if mode == "-V" then
-    return builtins.type({"type", table.unpack(argv, 3)}, out)
+  return describe(argv, 3, out, mode == "-V")
+end
+
+-- A whole file's text; or nil and why.
+local function slurp(path)
+  local file, why = io.open(path)
+  if not file then
+    return nil, why
   end
-  local result = 0
-  for k = 3, #argv do
-    local name = argv[k]
-    if aliases[name] then
-      write(out, "alias " .. name .. "=" .. quote(aliases[name]) .. "\n")
-    elseif builtins[name] then
-      write(out, name .. "\n")
-    else
-      local program = locate(name)
-      if program then
-        write(out, program .. "\n")
-      else
-        result = 1
-      end
-    end
-  end
-  return result
+  local text = file:read("a")
+  file:close()
+  return text
 end
 
 -- . file, source file: runs a file's commands in this shell.
@@ -1334,13 +1272,11 @@ function builtins.source(argv)
     say(argv[1] .. ": filename argument required")
     return SYNTAX
   end
-  local file, why = io.open(argv[2])
-  if not file then
+  local text, why = slurp(argv[2])
+  if not text then
     say(argv[1] .. ": " .. why)
     return 1
   end
-  local text = file:read("a")
-  file:close()
   return runscript(text)
 end
 builtins["."] = builtins.source
@@ -1374,20 +1310,9 @@ local function prompt(ps)
   if home and home ~= "/" and (cwd == home or string.sub(cwd, 1, #home + 1) == home .. "/") then
     shown = "~" .. string.sub(cwd, #home + 1)
   end
-  return (string.gsub(ps, "\\(.)", function(c)
-    if c == "w" then
-      return shown
-    elseif c == "W" then
-      return shown == "/" and "/" or fs.name(shown)
-    elseif c == "$" then
-      return "$"
-    elseif c == "n" then
-      return "\n"
-    elseif c == "\\" then
-      return "\\"
-    end
-    return "\\" .. c
-  end))
+  -- (an escape it doesn't know stays as it is)
+  return (string.gsub(ps, "\\(.)", {w = shown, W = shown == "/" and "/" or fs.name(shown), ["$"] = "$", n = "\n",
+    ["\\"] = "\\"}))
 end
 
 -- ---- line editing ------------------------------------------------------------------------------
@@ -1395,7 +1320,7 @@ end
 -- completion knowing commands: the first word of a command completes to a builtin, an alias or a
 -- program in PATH; any other word (or one with a /) to file names.
 
-local readline = require("readline")
+local readline, editor -- (an interactive shell's: see main)
 
 -- Whether the line before a word leaves it the first of a command.
 local function commandposition(before)
@@ -1405,7 +1330,7 @@ end
 
 local function completions(before, word)
   if string.find(word, "/", 1, true) or not commandposition(before) then
-    return readline.filenames(word)
+    return readline.filenames(before, word)
   end
   local seen, found = {}, {}
   local function add(name)
@@ -1431,7 +1356,6 @@ local function completions(before, word)
   return found
 end
 
-local editor = readline.new({complete = completions})
 
 -- Background jobs that ended, reported before a prompt.
 local function reap()
@@ -1462,18 +1386,18 @@ local function main(...)
   elseif args[1] then
     name0 = args[1]
     positional = {n = args.n - 1, table.unpack(args, 2, args.n)}
-    local file, why = io.open(args[1])
-    if not file then
+    local text, why = slurp(args[1])
+    if not text then
       say(why)
       return NOT_FOUND
     end
-    local text = file:read("a")
-    file:close()
     return runscript((string.gsub(text, "^#![^\n]*", "")))
   end
   interactive = sys.isatty(0)
   if interactive then
     sys.signal("SIGINT", function() end) -- ^C: a read returns EINTR; the command in front ends
+    readline = require("readline")
+    editor = readline.new({complete = completions})
   end
   -- A line: at a terminal the shell's own editor, else the input's next line; and why not (EINTR).
   local function nextline(ps)
@@ -1506,7 +1430,7 @@ local function main(...)
         line = line .. "\n" .. more
       end
       if line then
-        if editor.typeahead ~= "" then
+        if editor and editor.typeahead ~= "" then
           sys.ioctl(0, "TIOCSTI", editor.typeahead) -- what was typed ahead is the command's to read
           editor.typeahead = ""
         end

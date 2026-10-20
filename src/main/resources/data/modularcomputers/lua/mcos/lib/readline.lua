@@ -53,8 +53,8 @@ function readline.unescape(text)
 end
 
 -- The default completer: the file names a word could be (as typed, backslashes and all), each a
--- word to put in its place; directories end in /.
-function readline.filenames(word)
+-- word to put in its place; directories end in /. ('before', the line before the word, isn't used.)
+function readline.filenames(before, word)
   local typed = readline.unescape(word)
   local dir, prefix = string.match(typed, "^(.*/)([^/]*)$")
   if not dir then
@@ -86,11 +86,6 @@ local function common(words)
   return prefix
 end
 
--- How a completion is listed: its last part (a file's name, not its directory).
-local function display(word)
-  return readline.unescape(string.match(word, "([^/]*/?)$"))
-end
-
 -- Words in columns down then across, as wide as the screen (as readline's list, and ls's).
 local function grid(words, width)
   local widest = 0
@@ -114,20 +109,20 @@ local function grid(words, width)
   return table.concat(lines, "\r\n")
 end
 
+-- Keys that do the same as another: Home and End's other codes, ^H, and LF.
+local SAME = {["\27[H"] = "\1", ["\27[1~"] = "\1", ["\27[F"] = "\5", ["\27[4~"] = "\5", ["\8"] = "\127", ["\n"] = "\r"}
+
 local editor = {}
 editor.__index = editor
 
 -- An editor: its history and completion. options: complete(before, word) (the words 'word' could
 -- be; 'before' is the line before it; a second value false: no space after a single one), breaks
--- (a Lua pattern: a character that ends a word), history (lines kept).
+-- (a Lua pattern: a character that ends a word).
 function readline.new(options)
   options = options or {}
   return setmetatable({
     history = {},
-    size = options.history or HISTORY_SIZE,
-    complete = options.complete or function(_, word)
-      return readline.filenames(word)
-    end,
+    complete = options.complete or readline.filenames,
     breaks = options.breaks or DEFAULT_BREAKS,
     -- Keys read past the end of a line: the next line's (the editor reads all that's waiting); a
     -- program gives them back to the tty before it runs a command (TIOCSTI), so it gets them.
@@ -206,11 +201,22 @@ function editor:read(shown)
     sys.ioctl(0, "TCSETS", saved)
     if line and line ~= "" and line ~= history[#history] then
       history[#history + 1] = line
-      if #history > self.size then
+      if #history > HISTORY_SIZE then
         table.remove(history, 1)
       end
     end
     return line, why
+  end
+  -- Takes characters a..b out of the line; the cursor goes to where they were.
+  local function cut(a, b)
+    for _ = a, b do
+      table.remove(buffer, a)
+    end
+    cursor = a - 1
+  end
+  local function go(at)
+    cursor = at
+    moveto(start + at)
   end
   -- Tab: the word before the cursor completed, or (a second Tab with nothing to add) the words it
   -- could be, listed.
@@ -231,19 +237,18 @@ function editor:read(shown)
       put = put .. " "
     end
     if #put > #word then
-      for _ = from + 1, cursor do
-        table.remove(buffer, from + 1)
-      end
-      for k, c in ipairs(characters(put)) do
+      cut(from + 1, cursor)
+      local chars = characters(put)
+      for k, c in ipairs(chars) do
         table.insert(buffer, from + k, c)
       end
-      cursor = from + #characters(put)
+      cursor = from + #chars
       redraw(from)
       return #words > 1 -- (still more than one: the next Tab lists them)
     elseif #words > 1 and listing then
       local shownwords = {}
       for k, w in ipairs(words) do
-        shownwords[k] = display(w)
+        shownwords[k] = readline.unescape(string.match(w, "([^/]*/?)$")) -- (a file's name, not its directory)
       end
       moveto(start + #buffer)
       out[#out + 1] = "\r\n" .. grid(shownwords, width) .. "\r\n"
@@ -272,50 +277,38 @@ function editor:read(shown)
     local key = string.match(pending, "^\27%[[%d;]*[%a~]") or string.match(pending, "^\27O%a")
       or string.match(pending, "^[\0-\127\194-\244][\128-\191]*") or string.sub(pending, 1, 1)
     pending = string.sub(pending, #key + 1)
+    key = string.gsub(key, "^\27O", "\27[") -- (ESC O x, as in cursor-keys application mode: the same keys)
+    key = SAME[key] or key
     local tabbed = false
-    if key == "\r" or key == "\n" then
+    if key == "\r" then
       return finish(table.concat(buffer))
     elseif key == "\t" then
       tabbed = complete()
     elseif key == "\4" and #buffer == 0 then
       return finish(nil)
-    elseif key == "\127" or key == "\8" then
+    elseif key == "\127" then
       if cursor > 0 then
-        table.remove(buffer, cursor)
-        cursor = cursor - 1
+        cut(cursor, cursor)
         redraw(cursor)
       end
     elseif key == "\27[3~" or key == "\4" then
       if cursor < #buffer then
-        table.remove(buffer, cursor + 1)
+        cut(cursor + 1, cursor + 1)
         redraw(cursor)
       end
-    elseif key == "\27[D" or key == "\27OD" then
-      if cursor > 0 then
-        cursor = cursor - 1
-        moveto(start + cursor)
-      end
-    elseif key == "\27[C" or key == "\27OC" then
-      if cursor < #buffer then
-        cursor = cursor + 1
-        moveto(start + cursor)
-      end
-    elseif key == "\1" or key == "\27[H" or key == "\27[1~" or key == "\27OH" then
-      cursor = 0
-      moveto(start)
-    elseif key == "\5" or key == "\27[F" or key == "\27[4~" or key == "\27OF" then
-      cursor = #buffer
-      moveto(start + cursor)
+    elseif key == "\27[D" then
+      go(math.max(cursor - 1, 0))
+    elseif key == "\27[C" then
+      go(math.min(cursor + 1, #buffer))
+    elseif key == "\1" then
+      go(0)
+    elseif key == "\5" then
+      go(#buffer)
     elseif key == "\21" then -- ^U
-      for _ = 1, cursor do
-        table.remove(buffer, 1)
-      end
-      cursor = 0
+      cut(1, cursor)
       redraw(0)
     elseif key == "\11" then -- ^K
-      for _ = cursor + 1, #buffer do
-        table.remove(buffer)
-      end
+      cut(cursor + 1, #buffer)
       redraw(cursor)
     elseif key == "\23" then -- ^W: the word before the cursor (and the spaces after it)
       local from = cursor
@@ -325,16 +318,13 @@ function editor:read(shown)
       while from > 0 and buffer[from] ~= " " do
         from = from - 1
       end
-      for _ = from + 1, cursor do
-        table.remove(buffer, from + 1)
-      end
-      cursor = from
+      cut(from + 1, cursor)
       redraw(cursor)
     elseif key == "\12" then -- ^L
       out[#out + 1] = CSI .. "H" .. CSI .. "2J"
       prompt()
       redraw(0)
-    elseif key == "\27[A" or key == "\27OA" then
+    elseif key == "\27[A" then
       if entry > 1 then
         if entry == #history + 1 then
           stash = table.concat(buffer)
@@ -342,7 +332,7 @@ function editor:read(shown)
         entry = entry - 1
         set(history[entry])
       end
-    elseif key == "\27[B" or key == "\27OB" then
+    elseif key == "\27[B" then
       if entry <= #history then
         entry = entry + 1
         set(entry == #history + 1 and stash or history[entry])

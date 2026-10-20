@@ -196,6 +196,9 @@ process (as VFIO does).
   and a fresh checkout booted without a shell. Anchor root-only rules.
 - **Subagents doing parallel file work need disjoint scopes and no bulk edits**: one ran a cleanup
   script over every page in a shared folder, touching others' files.
+- **Lua inside a Java text block is unescaped twice** (Java's, then Lua's): a test's `"\\d"` reached Lua
+  as `"\d"`, an invalid escape, and the program failed before writing anything. Use Lua long strings
+  (`[[\d]]`) for patterns in tests, and capture a test program's stderr (`2> /err`) to see why.
 - **LungoLua bugs look like ours.** A pattern `%s` once matched "s"; verify against stock Lua's
   semantics, report to the lua thread, work around until fixed.
 

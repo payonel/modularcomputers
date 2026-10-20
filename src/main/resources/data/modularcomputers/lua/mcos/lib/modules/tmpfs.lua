@@ -13,14 +13,16 @@ local function kind(node)
   return node.dir and "directory" or node.link and "link" or "file"
 end
 
--- The node at a path, its parent and its name; a link met on the way (or at the end, with 'follow')
--- is a reparse: nil, {at, target}, "REPARSE" (vfs.lua).
+-- The node at a path, its parent and its name (the node nil when only the last name is missing:
+-- it could be made there); nothing at all when a directory on the way isn't there. A link met on
+-- the way (or at the end, with 'follow') is a reparse: nil, {at, target}, "REPARSE" (vfs.lua).
 local function walk(root, path, follow)
   local node, parent, name = root, nil, nil
   local walked = ""
-  local rest = path
   for part in string.gmatch(path, "[^/]+") do
-    if node.link then
+    if not node then
+      return nil -- under a name that isn't there (ENOENT)
+    elseif node.link then
       return nil, {at = walked, target = node.link}, "REPARSE"
     elseif not node.dir then
       return nil -- through a file: nothing there
@@ -28,41 +30,27 @@ local function walk(root, path, follow)
     parent, name = node, part
     node = node.dir[part]
     walked = walked .. "/" .. part
-    if not node then
-      return nil, parent, name
-    end
   end
-  if node.link and follow then
+  if node and node.link and follow then
     return nil, {at = walked, target = node.link}, "REPARSE"
   end
   return node, parent, name
 end
 
-local function reparse(parent, errno)
-  if errno == "REPARSE" then
-    return nil, parent, errno
-  end
-end
-
+-- An open file. Whether it may be read or written is the VFS's to enforce (by its mode); this
+-- only keeps where it's at, appending when opened to append.
 local function file(node, mode)
-  local at = string.sub(mode, 1, 1) == "a" and #node.data or 0
-  local readable = string.sub(mode, 1, 1) == "r" or string.find(mode, "+", 1, true)
-  local writable = string.sub(mode, 1, 1) ~= "r" or string.find(mode, "+", 1, true)
+  local append = string.sub(mode, 1, 1) == "a"
+  local at = append and #node.data or 0
   return {
     type = "file",
     read = function(self, n)
-      if not readable then
-        return fail("EBADF")
-      end
       local data = string.sub(node.data, at + 1, at + n)
       at = at + #data
       return data
     end,
     write = function(self, data)
-      if not writable then
-        return fail("EBADF")
-      end
-      if string.sub(mode, 1, 1) == "a" then
+      if append then
         at = #node.data
       end
       if at > #node.data then
@@ -86,18 +74,13 @@ end
 function fs:open(path, mode)
   local node, parent, name = walk(self.root, path, true)
   if name == "REPARSE" then
-    return reparse(parent, name)
-  end
-  if not node and not parent then
+    return nil, parent, name
+  elseif not node and (not parent or string.sub(mode, 1, 1) == "r") then
     return fail("ENOENT")
-  end
-  if node and node.dir then
+  elseif node and node.dir then
     return fail("EISDIR")
   end
   if not node then
-    if string.sub(mode, 1, 1) == "r" then
-      return fail("ENOENT")
-    end
     node = {data = ""}
     parent.dir[name] = node
   elseif string.sub(mode, 1, 1) == "w" then
@@ -109,7 +92,7 @@ end
 function fs:stat(path, nofollow)
   local node, link, errno = walk(self.root, path, not nofollow)
   if errno == "REPARSE" then
-    return reparse(link, errno)
+    return nil, link, errno
   elseif not node then
     return fail("ENOENT")
   end
@@ -120,7 +103,7 @@ end
 function fs:list(path)
   local node, link, errno = walk(self.root, path, true)
   if errno == "REPARSE" then
-    return reparse(link, errno)
+    return nil, link, errno
   elseif not node then
     return fail("ENOENT")
   elseif not node.dir then
@@ -133,26 +116,33 @@ function fs:list(path)
   return entries
 end
 
-function fs:mkdir(path)
+-- A new node at a path whose last name isn't there yet (mkdir, symlink, rename's target).
+local function create(self, path, new)
   local node, parent, name = walk(self.root, path)
   if name == "REPARSE" then
-    return reparse(parent, name)
-  end
-  if node then
+    return nil, parent, name
+  elseif node then
     return fail("EEXIST")
   elseif not parent then
     return fail("ENOENT")
   end
-  parent.dir[name] = {dir = {}}
+  parent.dir[name] = new
   return true
+end
+
+function fs:mkdir(path)
+  return create(self, path, {dir = {}})
+end
+
+function fs:symlink(target, path)
+  return create(self, path, {link = target})
 end
 
 function fs:remove(path)
   local node, parent, name = walk(self.root, path)
   if name == "REPARSE" then
-    return reparse(parent, name)
-  end
-  if not node then
+    return nil, parent, name
+  elseif not node then
     return fail("ENOENT")
   elseif node.dir and next(node.dir) then
     return fail("ENOTEMPTY")
@@ -164,37 +154,17 @@ end
 function fs:rename(from, to)
   local node, parent, name = walk(self.root, from)
   if name == "REPARSE" then
-    return reparse(parent, name)
+    return nil, parent, name
   elseif not node then
     return fail("ENOENT")
+  elseif string.sub(to, 1, #from + 1) == from .. "/" then
+    return fail("EINVAL") -- (a directory into itself: Linux says so before anything else)
   end
-  local there, toparent, toname = walk(self.root, to)
-  if toname == "REPARSE" then
-    return reparse(toparent, toname)
-  elseif there then
-    return fail("EEXIST")
-  elseif not toparent then
-    return fail("ENOENT")
+  local ok, why, errno = create(self, to, node)
+  if ok then
+    parent.dir[name] = nil
   end
-  if string.sub(to, 1, #from + 1) == from .. "/" then
-    return fail("EINVAL")
-  end
-  parent.dir[name] = nil
-  toparent.dir[toname] = node
-  return true
-end
-
-function fs:symlink(target, path)
-  local node, parent, name = walk(self.root, path)
-  if name == "REPARSE" then
-    return reparse(parent, name)
-  elseif node then
-    return fail("EEXIST")
-  elseif not parent then
-    return fail("ENOENT")
-  end
-  parent.dir[name] = {link = target}
-  return true
+  return ok, why, errno
 end
 
 local function used(node)

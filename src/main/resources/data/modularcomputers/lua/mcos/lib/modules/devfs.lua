@@ -32,6 +32,17 @@ function k.ttyfile(t)
   }
 end
 
+-- null and zero: writes are taken and dropped; reads give 'read's answer.
+local function discard(self, data)
+  return #data
+end
+
+local function sink(read)
+  return function()
+    return {type = "device", read = read, write = discard}
+  end
+end
+
 local devices = {
   console = function()
     return k.ttyfile(k.console)
@@ -42,40 +53,19 @@ local devices = {
     end
     return k.ttyfile(process.tty)
   end,
-  null = function()
-    return {
-      type = "device",
-      read = function()
-        return ""
-      end,
-      write = function(self, data)
-        return #data
-      end,
-    }
-  end,
-  zero = function()
-    return {
-      type = "device",
-      read = function(self, n)
-        return string.rep("\0", n)
-      end,
-      write = function(self, data)
-        return #data
-      end,
-    }
-  end,
+  null = sink(function()
+    return ""
+  end),
+  zero = sink(function(self, n)
+    return string.rep("\0", n)
+  end),
 }
 
-local function name(path)
-  return string.match(path, "^/([^/]+)$")
-end
-
--- A bus device with data, by its /dev name; nil if there's none (or it has no get or set).
-local function datadevice(path)
-  local device = k.devices.byname[name(path) or ""]
-  if device and (device.get or device.set) then
-    return device
-  end
+-- What a path in /dev names: one of the kernel's devices (its maker), or a bus device with data.
+local function find(path)
+  local name = string.match(path, "^/([^/]+)$") or ""
+  local device = k.devices.byname[name]
+  return devices[name], device and (device.get or device.set) and device
 end
 
 -- A device call's failure as an errno: a device that's gone is ENODEV (and the kernel's view of the
@@ -89,12 +79,11 @@ local function failed(why)
 end
 
 -- An open device file: reads from what get gave (taken at the first read), writes kept for one set
--- at close.
+-- at close. (Which of them the open's mode allows is the VFS's to enforce.)
 local function devicefile(device, mode)
-  local first = string.sub(mode, 1, 1)
-  local readable = first == "r" or string.find(mode, "+", 1, true) ~= nil
-  local writable = first ~= "r" or string.find(mode, "+", 1, true) ~= nil
-  if (readable and not device.get) or (writable and not device.set) then
+  local plus = string.find(mode, "+", 1, true)
+  local reads, writes = string.sub(mode, 1, 1) == "r" or plus, string.sub(mode, 1, 1) ~= "r" or plus
+  if (reads and not device.get) or (writes and not device.set) then
     return fail("EACCES")
   end
   local id = device.id
@@ -103,9 +92,6 @@ local function devicefile(device, mode)
   return {
     type = "device",
     read = function(self, n)
-      if not readable then
-        return fail("EBADF")
-      end
       if data == nil then
         local ok, got = board.invoke(id, "get")
         if not ok then
@@ -118,9 +104,6 @@ local function devicefile(device, mode)
       return chunk
     end,
     write = function(self, bytes)
-      if not writable then
-        return fail("EBADF")
-      end
       written = written or {}
       written[#written + 1] = bytes
       return #bytes
@@ -139,31 +122,27 @@ local function devicefile(device, mode)
 end
 
 function fs:open(path, mode, process)
-  local make = devices[name(path) or ""]
+  local make, device = find(path)
   if make then
     return make(process)
-  end
-  local device = datadevice(path)
-  if not device then
-    return fail(path == "/" and "EISDIR" or "ENOENT")
+  elseif not device then
+    return fail("ENOENT")
   end
   return devicefile(device, mode)
 end
 
 function fs:stat(path)
+  local make, device = find(path)
   if path == "/" then
     return {type = "directory", size = 0, modified = 0}
-  end
-  if devices[name(path) or ""] or datadevice(path) then
+  elseif make or device then
     return {type = "device", size = 0, modified = 0}
   end
   return fail("ENOENT")
 end
 
-function fs:list(path)
-  if path ~= "/" then
-    return fail("ENOTDIR")
-  end
+-- (only / is a directory here, so it's the only one listed)
+function fs:list()
   local entries = {}
   for device in pairs(devices) do
     entries[#entries + 1] = {name = device, type = "device"}
@@ -179,14 +158,7 @@ end
 function fs:mkdir()
   return fail("EPERM")
 end
-
-function fs:remove()
-  return fail("EPERM")
-end
-
-function fs:rename()
-  return fail("EPERM")
-end
+fs.remove, fs.rename = fs.mkdir, fs.mkdir
 
 function fs:statfs()
   return {type = "devfs", size = 0, used = 0}

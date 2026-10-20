@@ -39,32 +39,21 @@ local function message(err)
   end
   local meta = getmetatable(err)
   if type(meta) == "table" and meta.__tostring then
-    local ok, text = pcall(tostring, err)
-    if ok and type(text) == "string" then
+    local ok, text = pcall(tostring, err) -- (it errs unless __tostring gives a string)
+    if ok then
       return text
     end
   end
   return "(error object is a " .. type(err) .. " value)"
 end
 
--- The stack where an error happened, cut at this interpreter's xpcall (below it is its own and the
--- loader's, not the chunk's).
+-- The stack where an error happened, cut at this interpreter's xpcall: the first one going down
+-- (below it is this file's and the loader's, whose xpcall is further down, not the chunk's).
 local function traceback()
-  local lines = {}
-  for line in string.gmatch(debug.traceback("", 3), "[^\n]+") do
-    lines[#lines + 1] = line
-  end
-  local cut = #lines + 1
-  for k = #lines, 1, -1 do
-    if string.find(lines[k], "'xpcall'", 1, true) then
-      cut = k
-      break
-    end
-  end
-  while cut > 2 and string.find(lines[cut - 1], "(...tail calls...)", 1, true) do
-    cut = cut - 1
-  end
-  return "\n" .. table.concat(lines, "\n", 1, cut - 1)
+  local text = debug.traceback("", 3)
+  local cut = string.find(text, "\n[^\n]*'xpcall'")
+  text = cut and string.sub(text, 1, cut - 1) or text
+  return (string.gsub(text, "\n[^\n]*%(%.%.%.tail calls%.%.%.%)$", ""))
 end
 
 -- A message on stderr, as lua.c's l_message: "lua: " first, except in the REPL.

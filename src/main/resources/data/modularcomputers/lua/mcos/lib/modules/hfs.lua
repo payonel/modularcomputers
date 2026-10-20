@@ -4,25 +4,24 @@ local k, vfs = ...
 
 local fail = vfs.fail
 
--- What the disk's failures mean, as errnos (its messages are its own).
+-- What the disk's failures mean, as errnos (its messages are its own): pattern, errno, pattern...
 local FAILURES = {
-  {"^no such file", "ENOENT"},
-  {"^already exists", "EEXIST"},
-  {"^directory not empty", "ENOTEMPTY"},
-  {"^is a directory", "EISDIR"},
-  {"^too many open files", "EMFILE"},
-  {"^No space left", "ENOSPC"},
-  {"^can't move a directory into itself", "EINVAL"},
-  {"^bad ", "EINVAL"},
-  {"^outside the disk", "EINVAL"},
-  {"^raw disk", "ENODEV"},
-  {"^no storage", "ENODEV"},
-  {"^can't remove the root", "EBUSY"},
-  {"^closed handle", "EBADF"},
-  {"^not open for", "EBADF"},
-  {"^no such device", "ENODEV"},
-  {"^name too long", "ENAMETOOLONG"},
-  {"^not a link", "EINVAL"},
+  "^no such file", "ENOENT",
+  "^already exists", "EEXIST",
+  "^directory not empty", "ENOTEMPTY",
+  "^is a directory", "EISDIR",
+  "^too many open files", "EMFILE",
+  "^No space left", "ENOSPC",
+  "^can't move a directory into itself", "EINVAL",
+  "^bad ", "EINVAL",
+  "^outside the disk", "EINVAL",
+  "^raw disk", "ENODEV",
+  "^no storage", "ENODEV",
+  "^can't remove the root", "EBUSY",
+  "^closed handle", "EBADF",
+  "^not open for", "EBADF",
+  "^no such device", "ENODEV",
+  "^name too long", "ENAMETOOLONG",
 }
 
 local REPARSE = "symbolic link\0" -- the disk met a link: its path, a NUL, its target
@@ -33,9 +32,9 @@ local function failed(why)
     local at, target = string.match(why, "^([^%z]*)%z(.*)$", #REPARSE + 1)
     return nil, {at = at, target = target}, "REPARSE"
   end
-  for _, failure in ipairs(FAILURES) do
-    if string.find(why, failure[1]) then
-      return fail(failure[2])
+  for i = 1, #FAILURES, 2 do
+    if string.find(why, FAILURES[i]) then
+      return fail(FAILURES[i + 1])
     end
   end
   return fail("EIO")
@@ -50,10 +49,18 @@ local function call(target, method, ...)
   return table.unpack(result, 2, result.n)
 end
 
+-- A call answered with nothing but success: true, or the failure.
+local function done(_, why, errno)
+  if why then
+    return nil, why, errno
+  end
+  return true
+end
+
 local fs = {}
 fs.__index = fs
 
-local function file(handle, mode)
+local function file(handle)
   return {
     type = "file",
     read = function(self, n)
@@ -74,11 +81,7 @@ local function file(handle, mode)
       return call(handle, "seek", whence, offset)
     end,
     close = function(self)
-      local ok, why = board.invoke(handle, "close") -- commits what was written, at once
-      if not ok then
-        return failed(why)
-      end
-      return true
+      return done(call(handle, "close")) -- (commits what was written, at once)
     end,
   }
 end
@@ -88,7 +91,7 @@ function fs:open(path, mode)
   if not handle then
     return nil, why, errno
   end
-  return file(handle, mode)
+  return file(handle)
 end
 
 function fs:stat(path, nofollow)
@@ -99,50 +102,19 @@ function fs:stat(path, nofollow)
     end
     return fail("ENOENT")
   end
-  if st.link then
-    return {type = "link", size = st.size, modified = st.modified, target = st.link}
-  end
-  return {type = st.directory and "directory" or "file", size = st.size, modified = st.modified}
+  return {type = st.link and "link" or st.directory and "directory" or "file", size = st.size,
+    modified = st.modified, target = st.link}
 end
 
 function fs:list(path)
-  local entries, why, errno = call(self.address, "list", path, true)
-  if not entries then
-    return nil, why, errno
-  end
-  return entries
+  return call(self.address, "list", path, true)
 end
 
-function fs:mkdir(path)
-  local ok, why, errno = call(self.address, "mkdir", path)
-  if why then
-    return nil, why, errno
+-- mkdir(path), remove(path), rename(from, to), symlink(target, path): the disk's own.
+for _, method in ipairs({"mkdir", "remove", "rename", "symlink"}) do
+  fs[method] = function(self, ...)
+    return done(call(self.address, method, ...))
   end
-  return true
-end
-
-function fs:remove(path)
-  local ok, why, errno = call(self.address, "remove", path)
-  if why then
-    return nil, why, errno
-  end
-  return true
-end
-
-function fs:rename(from, to)
-  local ok, why, errno = call(self.address, "rename", from, to)
-  if why then
-    return nil, why, errno
-  end
-  return true
-end
-
-function fs:symlink(target, path)
-  local ok, why, errno = call(self.address, "symlink", target, path)
-  if why then
-    return nil, why, errno
-  end
-  return true
 end
 
 function fs:statfs()

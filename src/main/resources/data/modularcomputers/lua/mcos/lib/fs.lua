@@ -23,77 +23,31 @@ function fs.join(...)
   return path
 end
 
--- A path made absolute (from the working directory) with no ".", ".." or repeated "/".
-function fs.canonical(path)
-  if string.sub(path, 1, 1) ~= "/" then
-    path = sys.getcwd() .. "/" .. path
-  end
-  local parts = {}
-  for part in string.gmatch(path, "[^/]+") do
-    if part == ".." then
-      parts[#parts] = nil
-    elseif part ~= "." then
-      parts[#parts + 1] = part
-    end
-  end
-  return "/" .. table.concat(parts, "/")
-end
-
--- The last part of a path (basename), and all before it (dirname).
+-- The last part of a path (basename).
 function fs.name(path)
   return string.match(path, "([^/]*)/*$")
 end
 
-function fs.dirname(path)
-  local dir = string.match(path, "^(.*[^/])/+[^/]+/*$")
-  if dir then
-    return dir
-  end
-  return string.sub(path, 1, 1) == "/" and "/" or "."
-end
-
 -- ---- what's there -------------------------------------------------------------------------------
 
-function fs.stat(path)
-  local st, why, errno = sys.stat(path)
-  if not st then
+-- A syscall's answer; or nil, its error with the path named, and its errno.
+local function named(path, value, why, errno)
+  if not value then
     return nil, path .. ": " .. why, errno
   end
-  return st
+  return value
 end
 
--- lstat: a link itself (type "link", target), not what it points to.
-function fs.lstat(path)
-  local st, why, errno = sys.lstat(path)
-  if not st then
-    return nil, path .. ": " .. why, errno
+-- stat, lstat (a link itself: type "link", its target), readlink (a link's target), realpath.
+for _, name in ipairs({"stat", "lstat", "readlink", "realpath"}) do
+  fs[name] = function(path)
+    return named(path, sys[name](path))
   end
-  return st
-end
-
-function fs.readlink(path)
-  local target, why, errno = sys.readlink(path)
-  if not target then
-    return nil, path .. ": " .. why, errno
-  end
-  return target
 end
 
 -- A symbolic link at 'path' to 'target'.
 function fs.symlink(target, path)
-  local ok, why, errno = sys.symlink(target, path)
-  if not ok then
-    return nil, path .. ": " .. why, errno
-  end
-  return true
-end
-
-function fs.realpath(path)
-  local real, why, errno = sys.realpath(path)
-  if not real then
-    return nil, path .. ": " .. why, errno
-  end
-  return real
+  return named(path, sys.symlink(target, path))
 end
 
 function fs.exists(path)
@@ -114,21 +68,7 @@ function fs.list(path)
   local entries
   entries, why, errno = sys.getdents(fd)
   sys.close(fd)
-  if not entries then
-    return nil, path .. ": " .. why, errno
-  end
-  return entries
-end
-
--- Iterates a directory's names.
-function fs.dir(path)
-  local entries = assert(fs.list(path))
-  local i = 0
-  return function()
-    i = i + 1
-    local entry = entries[i]
-    return entry and entry.name, entry and entry.type
-  end
+  return named(path, entries, why, errno)
 end
 
 -- Where a command is, as execvp looks it up: a name with a / is itself; else the first file by that
@@ -154,25 +94,21 @@ end
 -- ---- making and removing ------------------------------------------------------------------------
 
 function fs.mkdir(path, parents)
-  if parents then
-    local at = string.sub(path, 1, 1) == "/" and "" or "."
-    for part in string.gmatch(path, "[^/]+") do
-      at = at .. "/" .. part
-      local st = sys.stat(at)
-      if not st then
-        local ok, why, errno = sys.mkdir(at)
-        if not ok then
-          return nil, at .. ": " .. why, errno
-        end
-      elseif st.type ~= "directory" then
-        return nil, at .. ": Not a directory", "ENOTDIR"
-      end
-    end
-    return true
+  if not parents then
+    return named(path, sys.mkdir(path))
   end
-  local ok, why, errno = sys.mkdir(path)
-  if not ok then
-    return nil, path .. ": " .. why, errno
+  local at = string.sub(path, 1, 1) == "/" and "" or "."
+  for part in string.gmatch(path, "[^/]+") do
+    at = at .. "/" .. part
+    local st = sys.stat(at)
+    if not st then
+      local ok, why, errno = named(at, sys.mkdir(at))
+      if not ok then
+        return nil, why, errno
+      end
+    elseif st.type ~= "directory" then
+      return nil, at .. ": Not a directory", "ENOTDIR"
+    end
   end
   return true
 end
@@ -180,38 +116,21 @@ end
 -- Removes a file, a link (never what it points to) or an empty directory; 'recursive' a directory
 -- and all in it (links in it are removed, never followed).
 function fs.remove(path, recursive)
-  local st, why, errno = fs.lstat(path)
-  if not st then
-    return nil, why, errno
-  end
-  if st.type == "directory" then
-    if recursive then
-      local entries
-      entries, why, errno = fs.list(path)
-      if not entries then
+  local st = sys.lstat(path)
+  if recursive and st and st.type == "directory" then
+    local entries, why, errno = fs.list(path)
+    if not entries then
+      return nil, why, errno
+    end
+    for _, entry in ipairs(entries) do
+      local ok
+      ok, why, errno = fs.remove(fs.join(path, entry.name), true)
+      if not ok then
         return nil, why, errno
       end
-      for _, entry in ipairs(entries) do
-        local ok
-        ok, why, errno = fs.remove(fs.join(path, entry.name), true)
-        if not ok then
-          return nil, why, errno
-        end
-      end
     end
-    local ok
-    ok, why, errno = sys.rmdir(path)
-    if not ok then
-      return nil, path .. ": " .. why, errno
-    end
-    return true
   end
-  local ok
-  ok, why, errno = sys.unlink(path)
-  if not ok then
-    return nil, path .. ": " .. why, errno
-  end
-  return true
+  return os.remove(path) -- (the path itself: a file, a link, or a directory now empty)
 end
 
 -- Copies a file (or, 'recursive', a directory and all in it) to a path that doesn't exist yet or
@@ -283,11 +202,9 @@ end
 
 -- Moves a file or directory; across filesystems by copying and removing, as mv does (EXDEV).
 function fs.move(from, to)
-  local ok, why, errno = sys.rename(from, to)
-  if ok then
-    return true
-  elseif errno ~= "EXDEV" then
-    return nil, from .. ": " .. why, errno
+  local ok, why, errno = os.rename(from, to)
+  if ok or errno ~= "EXDEV" then
+    return ok, why, errno
   end
   ok, why, errno = fs.copy(from, to, true)
   if not ok then
@@ -301,6 +218,13 @@ end
 local CLASSES = {alpha = "%a", digit = "%d", alnum = "%w", space = "%s", upper = "%u", lower = "%l",
   punct = "%p", xdigit = "%x", cntrl = "%c", print = "\32-\126", graph = "\33-\126", blank = " \t"}
 
+-- A character as itself in a Lua pattern.
+local function esc(c)
+  return (string.gsub(c, "%W", "%%%0"))
+end
+
+local WILD = {["*"] = ".*", ["?"] = "."} -- any run of characters, any one
+
 -- A shell pattern (one part of a path) as a Lua pattern, as POSIX fnmatch reads it: * any run of
 -- characters, ? any one, [...] one of a set ([!...] or [^...] one not in it; ranges, [:class:]),
 -- and a backslash makes the next character itself. Nil if it has nothing special (no glob).
@@ -309,20 +233,16 @@ function fs.pattern(glob)
   while at <= n do
     local c = string.sub(glob, at, at)
     if c == "\\" and at < n then
-      out[#out + 1] = "%" .. string.sub(glob, at + 1, at + 1)
+      out[#out + 1] = esc(string.sub(glob, at + 1, at + 1))
       at = at + 2
-    elseif c == "*" then
-      out[#out + 1] = ".*"
-      special = true
-      at = at + 1
-    elseif c == "?" then
-      out[#out + 1] = "."
+    elseif WILD[c] then
+      out[#out + 1] = WILD[c]
       special = true
       at = at + 1
     elseif c == "[" then
       -- a set ends at the first ] after its first character (so []] and [!]] hold a ])
       local start = at + 1
-      local negate = string.sub(glob, start, start) == "!" or string.sub(glob, start, start) == "^"
+      local negate = string.find(glob, "^[!^]", start) ~= nil
       if negate then
         start = start + 1
       end
@@ -344,14 +264,13 @@ function fs.pattern(glob)
             set[#set + 1] = CLASSES[class]
             k = k + #class + 4
           elseif d == "\\" and k < #body then
-            set[#set + 1] = "%" .. string.sub(body, k + 1, k + 1)
+            set[#set + 1] = esc(string.sub(body, k + 1, k + 1))
             k = k + 2
           elseif string.sub(body, k + 1, k + 1) == "-" and k + 2 <= #body then
-            local a, b = d, string.sub(body, k + 2, k + 2)
-            set[#set + 1] = (string.find(a, "%W") and "%" .. a or a) .. "-" .. (string.find(b, "%W") and "%" .. b or b)
+            set[#set + 1] = esc(d) .. "-" .. esc(string.sub(body, k + 2, k + 2))
             k = k + 3
           else
-            set[#set + 1] = string.find(d, "%W") and "%" .. d or d
+            set[#set + 1] = esc(d)
             k = k + 1
           end
         end
@@ -360,7 +279,7 @@ function fs.pattern(glob)
         at = close + 1
       end
     else
-      out[#out + 1] = string.find(c, "%W") and "%" .. c or c
+      out[#out + 1] = esc(c)
       at = at + 1
     end
   end
@@ -389,19 +308,18 @@ function fs.glob(glob)
     local next = {}
     local pattern = fs.pattern(part)
     for _, base in ipairs(found) do
+      local dir = base == "" and "." or base
       if pattern then
-        local entries = fs.list(base == "" and "." or base)
-        for _, entry in ipairs(entries or {}) do
+        for _, entry in ipairs(fs.list(dir) or {}) do
           local hidden = string.sub(entry.name, 1, 1) == "."
           if string.find(entry.name, pattern) and (not hidden or string.sub(part, 1, 1) == ".")
             and (index == #parts or entry.type == "directory"
-              or (entry.type == "link" and fs.isdir(fs.join(base == "" and "." or base, entry.name)))) then
-            next[#next + 1] = base == "" and entry.name or fs.join(base, entry.name)
+              or (entry.type == "link" and fs.isdir(fs.join(dir, entry.name)))) then
+            next[#next + 1] = fs.join(base, entry.name)
           end
         end
       else
-        local name = literal(part)
-        local path = base == "" and name or fs.join(base, name)
+        local path = fs.join(base, literal(part))
         if index == #parts or fs.isdir(path) then
           next[#next + 1] = path
         end

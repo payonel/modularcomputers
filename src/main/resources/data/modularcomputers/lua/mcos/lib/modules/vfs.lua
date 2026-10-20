@@ -43,7 +43,6 @@ local ERRNO = {
   ELOOP = "Too many levels of symbolic links",
   ENAMETOOLONG = "File name too long",
 }
-vfs.ERRNO = ERRNO
 
 function vfs.fail(name)
   return nil, ERRNO[name] or name, name
@@ -53,7 +52,7 @@ local fail = vfs.fail
 local MAX_LINKS = 40 -- links followed in one lookup (Linux's MAXSYMLINKS)
 local REPARSE = "REPARSE" -- a filesystem's errno for a call that met a link
 
--- Mounts, longest path first: {path, fs, source, auto (mounted by the kernel for a disk it found)}.
+-- Mounts, longest path first: {path, fs, source}.
 local mounts = {}
 vfs.mounts = mounts
 
@@ -88,13 +87,11 @@ function vfs.resolve(path)
   end
 end
 
-function vfs.mount(path, fs, source, auto)
-  for _, mount in ipairs(mounts) do
-    if mount.path == path then
-      return fail("EBUSY")
-    end
+function vfs.mount(path, fs, source)
+  if select(2, vfs.resolve(path)) == "/" then
+    return fail("EBUSY") -- (something's mounted there already)
   end
-  mounts[#mounts + 1] = {path = path, fs = fs, source = source, auto = auto}
+  mounts[#mounts + 1] = {path = path, fs = fs, source = source}
   table.sort(mounts, function(a, b)
     return #a.path > #b.path
   end)
@@ -153,22 +150,6 @@ local function lookup(path, attempt)
   return path, fail("ELOOP")
 end
 
--- The path with its directory's links followed and its last name kept (for calls on a name itself:
--- unlink, rename, mkdir, symlink, lstat); nil and the error if the directory isn't there.
-local function parentfollowed(path)
-  if path == "/" then
-    return path
-  end
-  local dir, name = string.match(path, "^(.*)/([^/]+)$")
-  local real, st, why, errno = vfs.locate(dir == "" and "/" or dir)
-  if not st then
-    return nil, why, errno
-  elseif st.type ~= "directory" then
-    return fail("ENOTDIR")
-  end
-  return (real == "/" and "" or real) .. "/" .. name
-end
-
 -- stat: {type = "file" | "directory" | "link" | "device" | "fifo", size, modified, target (a link's),
 -- mount = its mount's path, path = where it is with links followed}. 'nofollow': a link itself (lstat).
 local function stat(path, nofollow)
@@ -185,9 +166,20 @@ local function stat(path, nofollow)
   end)
 end
 
--- Where a path leads (links followed), and its stat (or the error); the path is given either way.
-function vfs.locate(path)
-  return stat(path)
+-- The path with its directory's links followed and its last name kept (for calls on a name itself:
+-- unlink, rename, mkdir, symlink, lstat); nil and the error if the directory isn't there.
+local function parentfollowed(path)
+  if path == "/" then
+    return path
+  end
+  local dir, name = string.match(path, "^(.*)/([^/]+)$")
+  local real, st, why, errno = stat(dir == "" and "/" or dir)
+  if not st then
+    return nil, why, errno
+  elseif st.type ~= "directory" then
+    return fail("ENOTDIR")
+  end
+  return (real == "/" and "" or real) .. "/" .. name
 end
 
 function vfs.stat(path)
@@ -238,21 +230,11 @@ function vfs.list(path)
   return entries
 end
 
--- A directory's open description: its entries, read once (getdents).
-local function directory(entries)
-  return {
-    type = "directory",
-    getdents = function(self)
-      local all = self.entries
-      self.entries = {}
-      return all
-    end,
-    entries = entries,
-  }
-end
-
 -- open: an open file description; mode is fopen's (r, w, a, r+, w+, a+). Its 'mount' counts it.
--- Links are followed (a link to nothing yet makes its target, as O_CREAT does).
+-- Links are followed (a link to nothing yet makes its target, as O_CREAT does). The mode is enforced
+-- here, for every filesystem and device: a description opened only to read loses its write, one
+-- opened only to write its read, so the syscall says EBADF (as Linux's file mode checks); a
+-- filesystem's open only does what the mode means for it (making, truncating, appending).
 function vfs.open(path, mode, process)
   local real, st, why, errno = stat(path)
   if not st and errno ~= "ENOENT" then
@@ -268,7 +250,12 @@ function vfs.open(path, mode, process)
     if not entries then
       return nil, why, errno
     end
-    description, mount = directory(entries), vfs.resolve(real)
+    -- a directory's entries, read once (getdents)
+    description, mount = {type = "directory", getdents = function(self)
+      local all = entries
+      entries = {}
+      return all
+    end}, vfs.resolve(real)
   else
     real, description, why, errno = lookup(real, function(m, rel)
       mount = m
@@ -276,6 +263,12 @@ function vfs.open(path, mode, process)
     end)
     if not description then
       return nil, why, errno
+    end
+    local plus = string.find(mode, "+", 1, true)
+    if string.sub(mode, 1, 1) == "r" and not plus then
+      description.write = nil
+    elseif string.sub(mode, 1, 1) ~= "r" and not plus then
+      description.read = nil
     end
   end
   description.path = real
@@ -296,18 +289,10 @@ function vfs.close(description)
   return true
 end
 
-local function isroot(path)
-  for _, mount in ipairs(mounts) do
-    if mount.path == path then
-      return true
-    end
-  end
-  return false
-end
-
 -- A call on a name itself (its directory's links followed, not a link it names): its filesystem
--- and the path in it, or nil and the error.
-local function named(path)
+-- and the path in it (which is "/" for a mount point), or nil and the error; 'new': a name to make,
+-- so EEXIST if something's there.
+local function named(path, new)
   local at, why, errno = parentfollowed(path)
   if not at then
     return nil, why, errno
@@ -315,17 +300,16 @@ local function named(path)
   local mount, rel = vfs.resolve(at)
   if not mount then
     return fail("ENOENT")
+  elseif new and select(2, stat(at, true)) then
+    return fail("EEXIST")
   end
   return mount, rel, at
 end
 
 function vfs.mkdir(path)
-  local mount, rel, at = named(path)
+  local mount, rel, at = named(path, true)
   if not mount then
     return nil, rel, at
-  end
-  if select(2, stat(at, true)) then
-    return fail("EEXIST")
   end
   return mount.fs:mkdir(rel)
 end
@@ -340,10 +324,9 @@ function vfs.remove(path, directory)
   if not st then
     return nil, why, errno
   end
-  if isroot(at) then
-    return fail("EBUSY")
-  end
-  if directory and st.type ~= "directory" then
+  if rel == "/" then
+    return fail("EBUSY") -- (a mount point)
+  elseif directory and st.type ~= "directory" then
     return fail("ENOTDIR")
   elseif not directory and st.type == "directory" then
     return fail("EISDIR")
@@ -365,10 +348,9 @@ function vfs.rename(from, to)
   if not st then
     return nil, why, errno
   end
-  if isroot(atfrom) or isroot(atto) then
+  if relfrom == "/" or relto == "/" then
     return fail("EBUSY")
-  end
-  if a ~= b then
+  elseif a ~= b then
     return fail("EXDEV") -- mv copies, as across filesystems in Linux
   end
   return a.fs:rename(relfrom, relto)
@@ -379,38 +361,27 @@ function vfs.symlink(target, path)
   if target == "" then
     return fail("ENOENT")
   end
-  local mount, rel, at = named(path)
+  local mount, rel, at = named(path, true)
   if not mount then
     return nil, rel, at
-  end
-  if select(2, stat(at, true)) then
-    return fail("EEXIST")
-  end
-  if not mount.fs.symlink then
+  elseif not mount.fs.symlink then
     return fail("EPERM") -- (a filesystem with no links)
   end
   return mount.fs:symlink(target, rel)
 end
 
--- link: a hard link (another name for the same file); no filesystem here has them (as FAT).
+-- link: a hard link (another name for the same file). No filesystem here has them (as FAT): EPERM,
+-- once the names are good (EXDEV first across filesystems, as Linux checks it).
 function vfs.link(from, to)
-  local mount, rel, at = named(to)
+  local mount, rel, at = named(to, true)
   if not mount then
     return nil, rel, at
   end
   local st, why, errno = vfs.stat(from)
   if not st then
     return nil, why, errno
-  elseif select(2, stat(at, true)) then
-    return fail("EEXIST")
-  elseif st.type == "directory" then
-    return fail("EPERM")
-  elseif st.mount ~= mount.path then
-    return fail("EXDEV")
-  elseif not mount.fs.link then
-    return fail("EPERM")
   end
-  return mount.fs:link(select(2, vfs.resolve(st.path)), rel)
+  return fail(st.mount ~= mount.path and "EXDEV" or "EPERM")
 end
 
 -- readlink: a link's target.
@@ -433,29 +404,21 @@ function vfs.statfs(path)
   return mount.fs:statfs()
 end
 
--- A whole file's contents (the kernel's own reads: its modules, a program to run).
+-- A whole file's contents (the kernel's own reads: a program to run; never a directory).
 function vfs.readfile(path)
   local description, why, errno = vfs.open(path, "r")
   if not description then
     return nil, why, errno
   end
-  if description.type == "directory" then
-    vfs.close(description)
-    return fail("EISDIR")
-  end
-  local parts = {}
-  while true do
-    local chunk, err, code = description:read(k.READ_SIZE)
-    if chunk == nil or chunk == "" or chunk == k.BLOCK then
-      if err then
-        vfs.close(description)
-        return nil, err, code
-      end
-      break
-    end
-    parts[#parts + 1] = chunk
-  end
+  local parts, chunk = {}, nil
+  repeat
+    chunk, why, errno = description:read(k.READ_SIZE)
+    parts[#parts + 1] = type(chunk) == "string" and chunk or nil
+  until type(chunk) ~= "string" or chunk == ""
   vfs.close(description)
+  if why then
+    return nil, why, errno
+  end
   return table.concat(parts)
 end
 

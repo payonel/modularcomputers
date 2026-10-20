@@ -34,18 +34,11 @@ if not ioload then
   sys.write(2, "ld.lua: " .. tostring(why) .. "\n")
   sys.exit(1)
 end
-io = ioload(sys)
+-- The environment: getenv's, setenv's, and what io.popen's children get.
+local environ = sys.environ()
+io = ioload(sys, environ)
 
 -- os: what Lua's has that means something here.
-local environ = sys.environ()
-io.environ = function()
-  local copy = {}
-  for name, value in pairs(environ) do
-    copy[name] = value
-  end
-  return copy
-end
-
 os = {}
 function os.getenv(name)
   return environ[name]
@@ -56,25 +49,15 @@ function os.setenv(name, value)
 end
 function os.exit(code, close)
   io.flushall()
-  if code == true or code == nil then
-    code = 0
-  elseif code == false then
-    code = 1
-  end
-  sys.exit(code)
+  sys.exit((code == nil or code == true) and 0 or code == false and 1 or code)
 end
+-- (C's remove: a file, a link itself (never what it points to), or an empty directory)
 function os.remove(path)
-  local st, why, errno = sys.stat(path)
+  local st, why, errno = sys.lstat(path)
+  if st then
+    st, why, errno = (st.type == "directory" and sys.rmdir or sys.unlink)(path)
+  end
   if not st then
-    return nil, path .. ": " .. why, errno
-  end
-  local ok
-  if st.type == "directory" then
-    ok, why, errno = sys.rmdir(path)
-  else
-    ok, why, errno = sys.unlink(path)
-  end
-  if not ok then
     return nil, path .. ": " .. why, errno
   end
   return true
@@ -173,8 +156,8 @@ local function message(err)
   end
   local meta = getmetatable(err)
   if type(meta) == "table" and meta.__tostring then
-    local ok, text = pcall(tostring, err)
-    if ok and type(text) == "string" then
+    local ok, text = pcall(tostring, err) -- (it errs unless __tostring gives a string)
+    if ok then
       return text
     end
   end
@@ -182,29 +165,21 @@ local function message(err)
 end
 
 -- The stack where an error happened, as debug.traceback gives it (from the frame that raised it),
--- cut at this file's xpcall: what's below is the loader's and the kernel's, not the program's.
+-- cut at this file's xpcall: what's below is the loader's and the kernel's, not the program's. (Its
+-- is the last xpcall: a program's own are above it, and over by the time an error reaches this one.)
 local function traceback()
-  local lines = {}
-  for line in string.gmatch(debug.traceback("", 3), "[^\n]+") do
-    lines[#lines + 1] = line
+  local text = debug.traceback("", 3)
+  local cut
+  for at in string.gmatch(text, "()\n[^\n]*'xpcall'") do
+    cut = at
   end
-  local cut = #lines + 1
-  for k = #lines, 1, -1 do
-    if string.find(lines[k], "'xpcall'", 1, true) then
-      cut = k
-      break
-    end
-  end
-  while cut > 2 and string.find(lines[cut - 1], "(...tail calls...)", 1, true) do
-    cut = cut - 1
-  end
-  return "\n" .. table.concat(lines, "\n", 1, cut - 1)
+  text = cut and string.sub(text, 1, cut - 1) or text
+  return (string.gsub(text, "\n[^\n]*%(%.%.%.tail calls%.%.%.%)$", ""))
 end
 
 local path = ...
-local args = table.pack(select(2, ...))
 local name = string.match(path, "([^/]*)$") -- (as a program's messages start: program_invocation_short_name)
-_G.arg = {[0] = path, table.unpack(args, 1, args.n)}
+_G.arg = {[0] = path, select(2, ...)}
 local status
 local main, err = loadfile(path)
 if not main then
@@ -213,19 +188,19 @@ if not main then
 else
   -- an error: its message and stack traceback on stderr, 1; an integer it returns: its status; false
   -- (or nil) and a message: 1, the message on stderr (as OpenOS took "return false, why"); else 0
-  local results = table.pack(xpcall(main, function(e)
-    return {message(e) .. traceback()}
-  end, table.unpack(args, 1, args.n)))
-  if not results[1] then
+  local ok, value, why = xpcall(main, function(e)
+    return message(e) .. traceback()
+  end, select(2, ...))
+  if not ok then
     io.stdout:flush()
-    io.stderr:write(name, ": ", results[2][1], "\n")
+    io.stderr:write(name, ": ", value, "\n")
     status = 1
-  elseif math.type(results[2]) == "integer" then
-    status = results[2]
-  elseif results[2] == false or (results[2] == nil and results.n >= 3 and results[3] ~= nil) then
-    if results[3] ~= nil then
+  elseif math.type(value) == "integer" then
+    status = value
+  elseif value == false or (value == nil and why ~= nil) then
+    if why ~= nil then
       io.stdout:flush()
-      io.stderr:write(message(results[3]), "\n")
+      io.stderr:write(message(why), "\n")
     end
     status = 1
   else

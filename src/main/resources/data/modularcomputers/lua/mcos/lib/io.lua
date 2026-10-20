@@ -2,8 +2,8 @@
 -- read(2) and write(2). Files buffer in the process (lost if it's killed, as stdio's are; what was
 -- written to the kernel isn't); a tty's output is line buffered, a file's fully, stderr not at all;
 -- reading any file flushes stdout first, so a prompt shows before the read waits (as glibc does).
--- Returns the io table, given the process's syscalls.
-local sys = ...
+-- Returns the io table, given the process's syscalls and its environment (io.popen's children's).
+local sys, environ = ...
 
 local BUFFER_SIZE = 4096 -- what a buffered file holds before it writes (BUFSIZ)
 local READ_SIZE = 4096 -- what one read(2) asks for
@@ -13,13 +13,6 @@ local FILE = {__name = "FILE*"}
 FILE.__index = FILE
 
 local open = setmetatable({}, {__mode = "k"}) -- every open file, to flush at exit
-
-local function result(ok, why, errno)
-  if ok == nil then
-    return nil, why, errno
-  end
-  return ok
-end
 
 local function wrap(fd, mode, name)
   local file = setmetatable({fd = fd, mode = mode, name = name, rbuf = "", wbuf = {}, wsize = 0,
@@ -93,11 +86,12 @@ function FILE:write(...)
   return self
 end
 
--- One read(2) into the read buffer: whether it got anything (false at end of file). End of file is
--- sticky, as in C's stdio (glibc since 2.28): once seen, reads don't ask again (a tty's ^D is
--- read once; a second read would wait for more) until a seek.
+-- One read(2) into the read buffer: whether it got anything (false at end of file, or on an error,
+-- kept in file.why and file.errno for read to give). End of file is sticky, as in C's stdio (glibc
+-- since 2.28): once seen, reads don't ask again (a tty's ^D is read once; a second read would wait
+-- for more) until a seek.
 local function fill(file)
-  if file.eof then
+  if file.eof or file.why then
     return false
   end
   if file ~= io.stdout and io.stdout and not io.stdout.closed then
@@ -105,9 +99,9 @@ local function fill(file)
   end
   local data, why, errno = sys.read(file.fd, READ_SIZE)
   if data == nil then
-    return nil, why, errno
-  end
-  if data == "" then
+    file.why, file.errno = why, errno
+    return false
+  elseif data == "" then
     file.eof = true
     return false
   end
@@ -115,57 +109,44 @@ local function fill(file)
   return true
 end
 
+-- The read buffer's first n bytes (all of it, with no n), taken out of it.
+local function take(file, n)
+  local data = string.sub(file.rbuf, 1, n)
+  file.rbuf = string.sub(file.rbuf, (n or #file.rbuf) + 1)
+  return data
+end
+
+-- (Each reader gives nothing on an error: the buffer stays as it was, and read gives the error.)
 local function readline(file, keep)
-  while true do
-    local at = string.find(file.rbuf, "\n", 1, true)
-    if at then
-      local line = string.sub(file.rbuf, 1, keep and at or at - 1)
-      file.rbuf = string.sub(file.rbuf, at + 1)
-      return line
-    end
-    local got, why, errno = fill(file)
-    if got == nil then
-      return nil, why, errno
-    elseif not got then
-      local line = file.rbuf
-      file.rbuf = ""
-      if line == "" then
-        return nil -- end of file
-      end
-      return line
-    end
+  local at = string.find(file.rbuf, "\n", 1, true)
+  while not at and fill(file) do
+    at = string.find(file.rbuf, "\n", 1, true)
+  end
+  if file.why then
+    return nil
+  elseif at then
+    local line = take(file, at)
+    return keep and line or string.sub(line, 1, -2)
+  elseif file.rbuf ~= "" then
+    return take(file) -- the last line, with no new line after it
   end
 end
 
 local function readcount(file, n)
-  while #file.rbuf < n do
-    local got, why, errno = fill(file)
-    if got == nil then
-      return nil, why, errno
-    elseif not got then
-      break
-    end
+  while #file.rbuf < n and fill(file) do
   end
-  if file.rbuf == "" and n > 0 then
+  if file.why or (file.rbuf == "" and n > 0) then
     return nil
   end
-  local data = string.sub(file.rbuf, 1, n)
-  file.rbuf = string.sub(file.rbuf, n + 1)
-  return data
+  return take(file, n)
 end
 
 local function readall(file)
-  while true do
-    local got, why, errno = fill(file)
-    if got == nil then
-      return nil, why, errno
-    elseif not got then
-      break
-    end
+  while fill(file) do
   end
-  local data = file.rbuf
-  file.rbuf = ""
-  return data
+  if not file.why then
+    return take(file)
+  end
 end
 
 -- "n": a numeral, as Lua reads one (skipping white space first).
@@ -179,12 +160,12 @@ local function readnumber(file)
         break
       end
     end
-    local got, why, errno = fill(file)
-    if got == nil then
-      return nil, why, errno
-    elseif not got then
+    if not fill(file) then
       break
     end
+  end
+  if file.why then
+    return nil
   end
   local numeral = string.match(file.rbuf, "^[%+%-]?0[xX][%x%.]+[pP]?[%+%-]?%d*")
     or string.match(file.rbuf, "^[%+%-]?%d*%.?%d*[eE][%+%-]?%d+")
@@ -203,10 +184,8 @@ local function readformat(file, format, i)
   end
   format = string.gsub(tostring(format), "^%*", "") -- ("*l" as Lua 5.1 wrote it)
   local kind = string.sub(format, 1, 1)
-  if kind == "l" then
-    return readline(file, false)
-  elseif kind == "L" then
-    return readline(file, true)
+  if kind == "l" or kind == "L" then
+    return readline(file, kind == "L")
   elseif kind == "a" then
     return readall(file)
   elseif kind == "n" then
@@ -228,8 +207,10 @@ function FILE:read(...)
   end
   local results = {}
   for i = 1, formats.n do
-    local value, why, errno = readformat(self, formats[i], i)
-    if why then
+    local value = readformat(self, formats[i], i)
+    if self.why then
+      local why, errno = self.why, self.errno
+      self.why, self.errno = nil, nil -- (not sticky: the next read tries again)
       return nil, why, errno
     end
     results[i] = value
@@ -240,15 +221,26 @@ function FILE:read(...)
   return table.unpack(results, 1, formats.n)
 end
 
-function FILE:lines(...)
-  checkopen(self)
+-- An iterator over a file's reads (in read's formats), closing it at the end when 'close' (io.lines).
+local function lines(file, close, ...)
   local formats = table.pack(...)
+  local function after(value, ...)
+    if value == nil and close then
+      file:close()
+    end
+    return value, ...
+  end
   return function()
-    if self.closed then
+    if file.closed then
       return nil
     end
-    return self:read(table.unpack(formats, 1, formats.n))
+    return after(file:read(table.unpack(formats, 1, formats.n)))
   end
+end
+
+function FILE:lines(...)
+  checkopen(self)
+  return lines(self, false, ...)
 end
 
 function FILE:seek(whence, offset)
@@ -283,8 +275,10 @@ function FILE:close()
   end
   if not ok then
     return nil, why, errno
+  elseif not closed then
+    return nil, err, code
   end
-  return result(closed, err, code)
+  return true
 end
 
 io.stdin = wrap(0, "r", "stdin")
@@ -330,36 +324,27 @@ function io.lines(path, ...)
   if not file then
     error(why, 2)
   end
-  local formats = table.pack(...)
-  return function()
-    if file.closed then
-      return nil
-    end
-    local value = file:read(table.unpack(formats, 1, formats.n))
-    if value == nil then
-      file:close()
-    end
-    return value
-  end, nil, nil, file
+  return lines(file, true, ...), nil, nil, file
+end
+
+-- io.input and io.output: the default file, set (by name, opened in 'mode', or a file) or not.
+local function default(current, file, mode)
+  if type(file) == "string" then
+    return assert(io.open(file, mode))
+  elseif file then
+    checkopen(file)
+    return file
+  end
+  return current
 end
 
 function io.input(file)
-  if type(file) == "string" then
-    input = assert(io.open(file, "r"))
-  elseif file then
-    checkopen(file)
-    input = file
-  end
+  input = default(input, file, "r")
   return input
 end
 
 function io.output(file)
-  if type(file) == "string" then
-    output = assert(io.open(file, "w"))
-  elseif file then
-    checkopen(file)
-    output = file
-  end
+  output = default(output, file, "w")
   return output
 end
 
@@ -381,14 +366,17 @@ function io.popen(command, mode)
   if not r then
     return nil, w
   end
-  local fds = mode == "r" and {[1] = w} or {[0] = r}
-  local pid, why, errno = sys.spawn("/bin/sh", {"-c", command}, {fds = fds, env = io.environ and io.environ()})
-  sys.close(mode == "r" and w or r)
+  local mine, theirs = r, w -- (the parent reads, the command writes; the other way with "w")
+  if mode == "w" then
+    mine, theirs = w, r
+  end
+  local pid, why, errno = sys.spawn("/bin/sh", {"-c", command}, {fds = {[mode == "r" and 1 or 0] = theirs}, env = environ})
+  sys.close(theirs)
   if not pid then
-    sys.close(mode == "r" and r or w)
+    sys.close(mine)
     return nil, why, errno
   end
-  local file = wrap(mode == "r" and r or w, mode, command)
+  local file = wrap(mine, mode, command)
   file.process = pid
   return file
 end

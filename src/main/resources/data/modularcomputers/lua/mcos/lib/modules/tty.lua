@@ -12,16 +12,14 @@ tty.__index = tty
 local VINTR = "\3" -- Ctrl+C: SIGINT to the foreground process
 local VEOF = "\4" -- Ctrl+D: the line so far is ready; at the start of a line, end of file
 local VKILL = "\21" -- Ctrl+U: erases the line
-local VERASE = "\127" -- Backspace (xterm sends DEL)
 local BS = "\b" -- Ctrl+H erases too
-local CR, NL, TAB, DEL = "\r", "\n", "\t", "\127"
+local CR, NL, TAB = "\r", "\n", "\t"
+local DEL = "\127" -- Backspace's erase (VERASE: xterm sends DEL), and how echoctl shows it (^?)
 local CARET_OFFSET = 64 -- a control character echoes as ^ and the character this far on (\3 as ^C)
 local RING_SIZE = 64 -- packets of input the ring holds (each a few hundred bytes at most); past it the device keeps the rest
 
 -- In the ready queue: an end of file (Ctrl+D at the start of a line), read as nothing.
 local EOF = {}
-
-tty.SIGINT = "SIGINT"
 
 -- A tty on 'device'. 'signal(tty, name)' is the kernel's: it delivers a signal to the tty's
 -- foreground process group.
@@ -34,7 +32,7 @@ function tty.new(device, signal)
     flags = {icanon = true, echo = true, echoe = true, echoctl = true, isig = true, icrnl = true, onlcr = true, iutf8 = true},
     line = {}, -- the line being typed (canonical mode), a byte each
     ready = {}, -- what processes can read: whole lines and EOF marks (canonical), or bytes as typed
-    foreground = nil, -- the process group its signals go to (tcsetpgrp)
+    -- foreground: the process group its signals go to (tcsetpgrp), set by the kernel
     echoes = {}, -- echo not written yet
   }, tty)
 end
@@ -96,11 +94,11 @@ function tty:receive(bytes)
     if flags.isig and c == VINTR then
       self:flush()
       self:echo(c)
-      self.signal(self, tty.SIGINT)
+      self.signal(self, "SIGINT")
     elseif not flags.icanon then
       self.ready[#self.ready + 1] = c
       self:echo(c)
-    elseif c == VERASE or c == BS then
+    elseif c == DEL or c == BS then
       self:erase()
     elseif c == VKILL then
       while #self.line > 0 do
@@ -166,15 +164,8 @@ function tty:read(n)
   return bytes
 end
 
--- termios (tcgetattr, tcsetattr): its flags, as a copy; and set from one (unknown names are ignored).
-function tty:getattr()
-  local copy = {}
-  for name, on in pairs(self.flags) do
-    copy[name] = on
-  end
-  return copy
-end
-
+-- termios (tcsetattr): set from a table of flags (unknown names are ignored); tcgetattr is the
+-- kernel's copy of tty.flags.
 function tty:setattr(flags)
   local wascanonical = self.flags.icanon
   for name in pairs(self.flags) do
@@ -182,13 +173,13 @@ function tty:setattr(flags)
       self.flags[name] = flags[name] and true or false
     end
   end
-  if wascanonical and not self.flags.icanon and #self.line > 0 then
+  if wascanonical and not self.flags.icanon then
     -- leaving canonical mode: what's been typed of a line is input now
     for i = 1, #self.line do
       self.ready[#self.ready + 1] = self.line[i]
     end
     self.line = {}
-  elseif not wascanonical and self.flags.icanon and #self.ready > 0 then
+  elseif not wascanonical and self.flags.icanon then
     -- back to canonical mode: what's waiting unread is typed input again, made into lines (as n_tty
     -- rescans its buffer); it was echoed, or not, as it came
     local waiting = table.concat(self.ready)
@@ -197,14 +188,6 @@ function tty:setattr(flags)
     self.flags.echo = false
     self:receive(waiting)
     self.flags.echo = echo
-  end
-end
-
--- Its window size (TIOCGWINSZ): the device's.
-function tty:size()
-  local ok, width, height = board.invoke(self.device, "getSize")
-  if ok then
-    return width, height
   end
 end
 
