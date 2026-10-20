@@ -14,10 +14,10 @@ function fs.join(...)
   local path = ""
   for i = 1, parts.n do
     local part = parts[i]
-    if string.sub(part, 1, 1) == "/" or path == "" then
+    if part:sub(1, 1) == "/" or path == "" then
       path = part
     else
-      path = (string.sub(path, -1) == "/" and path or path .. "/") .. part
+      path = (path:sub(-1) == "/" and path or path .. "/") .. part
     end
   end
   return path
@@ -25,7 +25,7 @@ end
 
 -- The last part of a path (basename).
 function fs.name(path)
-  return string.match(path, "([^/]*)/*$")
+  return path:match("([^/]*)/*$")
 end
 
 -- ---- what's there -------------------------------------------------------------------------------
@@ -74,14 +74,14 @@ end
 -- Where a command is, as execvp looks it up: a name with a / is itself; else the first file by that
 -- name in the directories of PATH (the environment's, unless given).
 function fs.command(name, path)
-  if string.find(name, "/", 1, true) then
+  if name:find("/", 1, true) then
     local st = sys.stat(name)
     if not st then
       return nil, name .. ": No such file or directory", "ENOENT"
     end
     return name
   end
-  for dir in string.gmatch(path or os.getenv("PATH") or "/bin", "[^:]+") do
+  for dir in (path or os.getenv("PATH") or "/bin"):gmatch("[^:]+") do
     local candidate = fs.join(dir, name)
     local st = sys.stat(candidate)
     if st and st.type ~= "directory" then
@@ -97,8 +97,8 @@ function fs.mkdir(path, parents)
   if not parents then
     return named(path, sys.mkdir(path))
   end
-  local at = string.sub(path, 1, 1) == "/" and "" or "."
-  for part in string.gmatch(path, "[^/]+") do
+  local at = path:sub(1, 1) == "/" and "" or "."
+  for part in path:gmatch("[^/]+") do
     at = at .. "/" .. part
     local st = sys.stat(at)
     if not st then
@@ -220,7 +220,7 @@ local CLASSES = {alpha = "%a", digit = "%d", alnum = "%w", space = "%s", upper =
 
 -- A character as itself in a Lua pattern.
 local function esc(c)
-  return (string.gsub(c, "%W", "%%%0"))
+  return (c:gsub("%W", "%%%0"))
 end
 
 local WILD = {["*"] = ".*", ["?"] = "."} -- any run of characters, any one
@@ -231,9 +231,9 @@ local WILD = {["*"] = ".*", ["?"] = "."} -- any run of characters, any one
 function fs.pattern(glob)
   local out, at, n, special = {"^"}, 1, #glob, false
   while at <= n do
-    local c = string.sub(glob, at, at)
+    local c = glob:sub(at, at)
     if c == "\\" and at < n then
-      out[#out + 1] = esc(string.sub(glob, at + 1, at + 1))
+      out[#out + 1] = esc(glob:sub(at + 1, at + 1))
       at = at + 2
     elseif WILD[c] then
       out[#out + 1] = WILD[c]
@@ -242,32 +242,32 @@ function fs.pattern(glob)
     elseif c == "[" then
       -- a set ends at the first ] after its first character (so []] and [!]] hold a ])
       local start = at + 1
-      local negate = string.find(glob, "^[!^]", start) ~= nil
+      local negate = glob:find("^[!^]", start) ~= nil
       if negate then
         start = start + 1
       end
-      local close = string.find(glob, "]", start + 1, true)
-      while close and string.find(string.sub(glob, start, close - 1), "%[:%a*:$") do
-        close = string.find(glob, "]", close + 1, true) -- (inside a [:class:])
+      local close = glob:find("]", start + 1, true)
+      while close and (glob:sub(start, close - 1)):find("%[:%a*:$") do
+        close = glob:find("]", close + 1, true) -- (inside a [:class:])
       end
       if not close then
         out[#out + 1] = "%["
         at = at + 1
       else
-        local body = string.sub(glob, start, close - 1)
+        local body = glob:sub(start, close - 1)
         local set = {}
         local k = 1
         while k <= #body do
-          local class = string.match(body, "^%[:(%a+):%]", k)
-          local d = string.sub(body, k, k)
+          local class = body:match("^%[:(%a+):%]", k)
+          local d = body:sub(k, k)
           if class and CLASSES[class] then
             set[#set + 1] = CLASSES[class]
             k = k + #class + 4
           elseif d == "\\" and k < #body then
-            set[#set + 1] = esc(string.sub(body, k + 1, k + 1))
+            set[#set + 1] = esc(body:sub(k + 1, k + 1))
             k = k + 2
-          elseif string.sub(body, k + 1, k + 1) == "-" and k + 2 <= #body then
-            set[#set + 1] = esc(d) .. "-" .. esc(string.sub(body, k + 2, k + 2))
+          elseif body:sub(k + 1, k + 1) == "-" and k + 2 <= #body then
+            set[#set + 1] = esc(d) .. "-" .. esc(body:sub(k + 2, k + 2))
             k = k + 3
           else
             set[#set + 1] = esc(d)
@@ -292,15 +292,15 @@ end
 
 -- What a pattern part without anything special names (its backslashes taken off).
 local function literal(part)
-  return (string.gsub(part, "\\(.)", "%1"))
+  return (part:gsub("\\(.)", "%1"))
 end
 
 -- The paths matching a shell pattern (special characters in any part), sorted; a name starting with
 -- a dot only when its part of the pattern does. None: an empty list (the shell then keeps the word).
 function fs.glob(glob)
-  local absolute = string.sub(glob, 1, 1) == "/"
+  local absolute = glob:sub(1, 1) == "/"
   local parts = {}
-  for part in string.gmatch(glob, "[^/]+") do
+  for part in glob:gmatch("[^/]+") do
     parts[#parts + 1] = part
   end
   local found = {absolute and "/" or ""}
@@ -311,8 +311,8 @@ function fs.glob(glob)
       local dir = base == "" and "." or base
       if pattern then
         for _, entry in ipairs(fs.list(dir) or {}) do
-          local hidden = string.sub(entry.name, 1, 1) == "."
-          if string.find(entry.name, pattern) and (not hidden or string.sub(part, 1, 1) == ".")
+          local hidden = entry.name:sub(1, 1) == "."
+          if entry.name:find(pattern) and (not hidden or part:sub(1, 1) == ".")
             and (index == #parts or entry.type == "directory"
               or (entry.type == "link" and fs.isdir(fs.join(dir, entry.name)))) then
             next[#next + 1] = fs.join(base, entry.name)
@@ -327,7 +327,7 @@ function fs.glob(glob)
     end
     found = next
   end
-  if string.sub(glob, -1) == "/" then
+  if glob:sub(-1) == "/" then
     for i, path in ipairs(found) do
       found[i] = path .. "/"
     end

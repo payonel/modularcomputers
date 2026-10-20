@@ -19,7 +19,7 @@ end
 local function walk(root, path, follow)
   local node, parent, name = root, nil, nil
   local walked = ""
-  for part in string.gmatch(path, "[^/]+") do
+  for part in path:gmatch("[^/]+") do
     if not node then
       return nil -- under a name that isn't there (ENOENT)
     elseif node.link then
@@ -40,12 +40,12 @@ end
 -- An open file. Whether it may be read or written is the VFS's to enforce (by its mode); this
 -- only keeps where it's at, appending when opened to append.
 local function file(node, mode)
-  local append = string.sub(mode, 1, 1) == "a"
+  local append = mode:sub(1, 1) == "a"
   local at = append and #node.data or 0
   return {
     type = "file",
     read = function(self, n)
-      local data = string.sub(node.data, at + 1, at + n)
+      local data = node.data:sub(at + 1, at + n)
       at = at + #data
       return data
     end,
@@ -54,9 +54,9 @@ local function file(node, mode)
         at = #node.data
       end
       if at > #node.data then
-        node.data = node.data .. string.rep("\0", at - #node.data)
+        node.data = node.data .. ("\0"):rep(at - #node.data)
       end
-      node.data = string.sub(node.data, 1, at) .. data .. string.sub(node.data, at + #data + 1)
+      node.data = node.data:sub(1, at) .. data .. node.data:sub(at + #data + 1)
       at = at + #data
       return #data
     end,
@@ -75,7 +75,7 @@ function fs:open(path, mode)
   local node, parent, name = walk(self.root, path, true)
   if name == "REPARSE" then
     return nil, parent, name
-  elseif not node and (not parent or string.sub(mode, 1, 1) == "r") then
+  elseif not node and (not parent or mode:sub(1, 1) == "r") then
     return fail("ENOENT")
   elseif node and node.dir then
     return fail("EISDIR")
@@ -83,7 +83,7 @@ function fs:open(path, mode)
   if not node then
     node = {data = ""}
     parent.dir[name] = node
-  elseif string.sub(mode, 1, 1) == "w" then
+  elseif mode:sub(1, 1) == "w" then
     node.data = ""
   end
   return file(node, mode)
@@ -157,7 +157,7 @@ function fs:rename(from, to)
     return nil, parent, name
   elseif not node then
     return fail("ENOENT")
-  elseif string.sub(to, 1, #from + 1) == from .. "/" then
+  elseif to:sub(1, #from + 1) == from .. "/" then
     return fail("EINVAL") -- (a directory into itself: Linux says so before anything else)
   end
   local ok, why, errno = create(self, to, node)

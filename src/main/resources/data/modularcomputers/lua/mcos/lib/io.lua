@@ -22,7 +22,7 @@ local function wrap(fd, mode, name)
 end
 
 function FILE:__tostring()
-  return self.closed and "file (closed)" or string.format("file (fd %d)", self.fd)
+  return self.closed and "file (closed)" or ("file (fd %d)"):format(self.fd)
 end
 
 function FILE:__close()
@@ -77,7 +77,7 @@ function FILE:write(...)
     self.wsize = self.wsize + #value
   end
   if self.vbuf == "no" or self.wsize >= BUFFER_SIZE
-    or (self.vbuf == "line" and string.find(self.wbuf[#self.wbuf] or "", "\n", 1, true)) then
+    or (self.vbuf == "line" and (self.wbuf[#self.wbuf] or ""):find("\n", 1, true)) then
     local ok, why, errno = self:flush()
     if not ok then
       return nil, why, errno
@@ -111,22 +111,22 @@ end
 
 -- The read buffer's first n bytes (all of it, with no n), taken out of it.
 local function take(file, n)
-  local data = string.sub(file.rbuf, 1, n)
-  file.rbuf = string.sub(file.rbuf, (n or #file.rbuf) + 1)
+  local data = file.rbuf:sub(1, n)
+  file.rbuf = file.rbuf:sub((n or #file.rbuf) + 1)
   return data
 end
 
 -- (Each reader gives nothing on an error: the buffer stays as it was, and read gives the error.)
 local function readline(file, keep)
-  local at = string.find(file.rbuf, "\n", 1, true)
+  local at = file.rbuf:find("\n", 1, true)
   while not at and fill(file) do
-    at = string.find(file.rbuf, "\n", 1, true)
+    at = file.rbuf:find("\n", 1, true)
   end
   if file.why then
     return nil
   elseif at then
     local line = take(file, at)
-    return keep and line or string.sub(line, 1, -2)
+    return keep and line or line:sub(1, -2)
   elseif file.rbuf ~= "" then
     return take(file) -- the last line, with no new line after it
   end
@@ -152,11 +152,11 @@ end
 -- "n": a numeral, as Lua reads one (skipping white space first).
 local function readnumber(file)
   while true do
-    local start = string.find(file.rbuf, "%S")
+    local start = file.rbuf:find("%S")
     if start then
-      file.rbuf = string.sub(file.rbuf, start)
+      file.rbuf = file.rbuf:sub(start)
       -- enough to see the whole numeral: it ends before the buffer does, or the file ends
-      if string.find(file.rbuf, "^[%w%.%+%-]*[^%w%.%+%-]") then
+      if file.rbuf:find("^[%w%.%+%-]*[^%w%.%+%-]") then
         break
       end
     end
@@ -167,14 +167,14 @@ local function readnumber(file)
   if file.why then
     return nil
   end
-  local numeral = string.match(file.rbuf, "^[%+%-]?0[xX][%x%.]+[pP]?[%+%-]?%d*")
-    or string.match(file.rbuf, "^[%+%-]?%d*%.?%d*[eE][%+%-]?%d+")
-    or string.match(file.rbuf, "^[%+%-]?%d*%.?%d*")
+  local numeral = file.rbuf:match("^[%+%-]?0[xX][%x%.]+[pP]?[%+%-]?%d*")
+    or file.rbuf:match("^[%+%-]?%d*%.?%d*[eE][%+%-]?%d+")
+    or file.rbuf:match("^[%+%-]?%d*%.?%d*")
   local value = numeral and tonumber(numeral)
   if value == nil then
     return nil
   end
-  file.rbuf = string.sub(file.rbuf, #numeral + 1)
+  file.rbuf = file.rbuf:sub(#numeral + 1)
   return value
 end
 
@@ -182,8 +182,8 @@ local function readformat(file, format, i)
   if math.type(format) == "integer" then
     return readcount(file, format)
   end
-  format = string.gsub(tostring(format), "^%*", "") -- ("*l" as Lua 5.1 wrote it)
-  local kind = string.sub(format, 1, 1)
+  format = (tostring(format)):gsub("^%*", "") -- ("*l" as Lua 5.1 wrote it)
+  local kind = format:sub(1, 1)
   if kind == "l" or kind == "L" then
     return readline(file, kind == "L")
   elseif kind == "a" then
@@ -290,7 +290,7 @@ local input, output = io.stdin, io.stdout
 
 function io.open(path, mode)
   mode = mode or "r"
-  if not string.match(mode, "^[rwa]%+?b?$") then
+  if not mode:match("^[rwa]%+?b?$") then
     error("bad argument #2 to 'open' (invalid mode '" .. tostring(mode) .. "')", 2)
   end
   local fd, why, errno = sys.open(path, mode)

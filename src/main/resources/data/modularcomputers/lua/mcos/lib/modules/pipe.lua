@@ -16,8 +16,8 @@ return function()
       if pipe.buffer == "" then
         return pipe.writers == 0 and "" or k.BLOCK
       end
-      local data = string.sub(pipe.buffer, 1, n)
-      pipe.buffer = string.sub(pipe.buffer, n + 1)
+      local data = pipe.buffer:sub(1, n)
+      pipe.buffer = pipe.buffer:sub(n + 1)
       return data
     end,
     close = function()
@@ -36,7 +36,7 @@ return function()
       if room <= 0 then
         return k.BLOCK
       end
-      local taken = string.sub(data, 1, room)
+      local taken = data:sub(1, room)
       pipe.buffer = pipe.buffer .. taken
       return #taken
     end,

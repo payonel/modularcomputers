@@ -779,6 +779,23 @@ class McosTest {
 	}
 
 	@Test
+	void fieldSplittingIsPosixs() {
+		file("args.lua", """
+			local out = assert(io.open("/r", "a"))
+			out:write(select("#", ...), ":", table.concat({...}, "|"), "\\n")
+			out:close()
+			""");
+		boot();
+		type("a='a::b'; b=':a'; c='a:'; d='  x  y  '; IFS=:; /args.lua $a; /args.lua $b; /args.lua $c\r");
+		untilIdle();
+		type("unset IFS; /args.lua $d; /args.lua x${d}y; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		// two IFS characters that aren't white space make an empty field; one at the start does too, one
+		// at the end doesn't; white space runs separate, and at an expansion's ends end the word's field
+		assertThat(read(root().resolve("r"))).isEqualTo("3:a||b\n2:|a\n1:a\n2:x|y\n4:x|x|y|y\n");
+	}
+
+	@Test
 	void everyCommandHasAManPageThatRenders() {
 		file("t.lua", """
 			local fs = require("fs")

@@ -40,7 +40,7 @@ end
 -- Output: to the device, after output processing.
 function tty:write(text)
   if self.flags.onlcr then
-    text = string.gsub(text, NL, CR .. NL)
+    text = text:gsub(NL, CR .. NL)
   end
   board.invoke(self.device, "write", text)
 end
@@ -48,7 +48,7 @@ end
 -- How a byte echoes: control characters as ^X with echoctl (not a tab or a new line).
 local function echoed(flags, c)
   if flags.echoctl and c ~= TAB and c ~= NL and (c < " " or c == DEL) then
-    return "^" .. (c == DEL and "?" or string.char(string.byte(c) + CARET_OFFSET))
+    return "^" .. (c == DEL and "?" or string.char(c:byte() + CARET_OFFSET))
   end
   return c
 end
@@ -69,11 +69,11 @@ function tty:erase()
     return
   end
   local c = table.remove(line)
-  while self.flags.iutf8 and #line > 0 and string.byte(c) >= 0x80 and string.byte(c) < 0xC0 do
+  while self.flags.iutf8 and #line > 0 and c:byte() >= 0x80 and c:byte() < 0xC0 do
     c = table.remove(line) -- a continuation byte: on to the character's first
   end
   if self.flags.echo and self.flags.echoe then
-    self.echoes[#self.echoes + 1] = string.rep("\b \b", #echoed(self.flags, c)) -- a column a character, two for ^X
+    self.echoes[#self.echoes + 1] = ("\b \b"):rep(#echoed(self.flags, c)) -- a column a character, two for ^X
   end
 end
 
@@ -87,7 +87,7 @@ end
 function tty:receive(bytes)
   local flags = self.flags
   for i = 1, #bytes do
-    local c = string.sub(bytes, i, i)
+    local c = bytes:sub(i, i)
     if flags.icrnl and c == CR then
       c = NL
     end
@@ -152,14 +152,14 @@ function tty:read(n)
       table.remove(ready, 1)
       return chunk
     end
-    ready[1] = string.sub(chunk, n + 1)
-    return string.sub(chunk, 1, n)
+    ready[1] = chunk:sub(n + 1)
+    return chunk:sub(1, n)
   end
   local bytes = table.concat(ready)
   self.ready = {}
   if #bytes > n then
-    self.ready[1] = string.sub(bytes, n + 1)
-    bytes = string.sub(bytes, 1, n)
+    self.ready[1] = bytes:sub(n + 1)
+    bytes = bytes:sub(1, n)
   end
   return bytes
 end

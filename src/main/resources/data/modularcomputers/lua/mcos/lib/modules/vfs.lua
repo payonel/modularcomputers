@@ -58,11 +58,11 @@ vfs.mounts = mounts
 
 -- A path made absolute (from 'cwd') and canonical: no ".", "..", or repeated "/".
 function vfs.normalize(path, cwd)
-  if string.sub(path, 1, 1) ~= "/" then
+  if path:sub(1, 1) ~= "/" then
     path = (cwd or "/") .. "/" .. path
   end
   local parts = {}
-  for part in string.gmatch(path, "[^/]+") do
+  for part in path:gmatch("[^/]+") do
     if part == ".." then
       parts[#parts] = nil
     elseif part ~= "." then
@@ -74,14 +74,14 @@ end
 
 -- Whether 'path' is 'prefix' or under it.
 local function under(path, prefix)
-  return prefix == "/" or path == prefix or string.sub(path, 1, #prefix + 1) == prefix .. "/"
+  return prefix == "/" or path == prefix or path:sub(1, #prefix + 1) == prefix .. "/"
 end
 
 -- The mount holding an absolute path, and the path within its filesystem.
 function vfs.resolve(path)
   for _, mount in ipairs(mounts) do
     if under(path, mount.path) then
-      local rest = mount.path == "/" and path or string.sub(path, #mount.path + 1)
+      local rest = mount.path == "/" and path or path:sub(#mount.path + 1)
       return mount, rest == "" and "/" or rest
     end
   end
@@ -119,8 +119,8 @@ local function mountpoints(path)
   local names = {}
   for _, mount in ipairs(mounts) do
     if mount.path ~= path and under(mount.path, path) then
-      local rest = string.sub(mount.path, path == "/" and 2 or #path + 2)
-      names[string.match(rest, "^[^/]+")] = true
+      local rest = mount.path:sub(path == "/" and 2 or #path + 2)
+      names[rest:match("^[^/]+")] = true
     end
   end
   return names
@@ -140,10 +140,10 @@ local function lookup(path, attempt)
     end
     local link = results[2]
     local at = mount.path == "/" and link.at or mount.path .. link.at
-    local rest = string.sub(rel, #link.at + 1)
+    local rest = rel:sub(#link.at + 1)
     local target = link.target
-    if string.sub(target, 1, 1) ~= "/" then
-      target = (string.match(at, "^(.*)/[^/]*$") or "") .. "/" .. target
+    if target:sub(1, 1) ~= "/" then
+      target = (at:match("^(.*)/[^/]*$") or "") .. "/" .. target
     end
     path = vfs.normalize(target .. rest)
   end
@@ -172,7 +172,7 @@ local function parentfollowed(path)
   if path == "/" then
     return path
   end
-  local dir, name = string.match(path, "^(.*)/([^/]+)$")
+  local dir, name = path:match("^(.*)/([^/]+)$")
   local real, st, why, errno = stat(dir == "" and "/" or dir)
   if not st then
     return nil, why, errno
@@ -264,10 +264,10 @@ function vfs.open(path, mode, process)
     if not description then
       return nil, why, errno
     end
-    local plus = string.find(mode, "+", 1, true)
-    if string.sub(mode, 1, 1) == "r" and not plus then
+    local plus = mode:find("+", 1, true)
+    if mode:sub(1, 1) == "r" and not plus then
       description.write = nil
-    elseif string.sub(mode, 1, 1) ~= "r" and not plus then
+    elseif mode:sub(1, 1) ~= "r" and not plus then
       description.read = nil
     end
   end
@@ -404,8 +404,9 @@ function vfs.statfs(path)
   return mount.fs:statfs()
 end
 
--- A whole file's contents (the kernel's own reads: a program to run; never a directory).
-function vfs.readfile(path)
+-- A whole file's contents, as the pieces read (the kernel's own reads: a program to compile, which
+-- needn't be joined first; never a directory).
+function vfs.readparts(path)
   local description, why, errno = vfs.open(path, "r")
   if not description then
     return nil, why, errno
@@ -413,13 +414,13 @@ function vfs.readfile(path)
   local parts, chunk = {}, nil
   repeat
     chunk, why, errno = description:read(k.READ_SIZE)
-    parts[#parts + 1] = type(chunk) == "string" and chunk or nil
+    parts[#parts + 1] = type(chunk) == "string" and chunk ~= "" and chunk or nil
   until type(chunk) ~= "string" or chunk == ""
   vfs.close(description)
   if why then
     return nil, why, errno
   end
-  return table.concat(parts)
+  return parts
 end
 
 return vfs

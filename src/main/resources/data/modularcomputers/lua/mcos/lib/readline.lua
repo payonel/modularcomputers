@@ -30,14 +30,14 @@ local SPECIAL = "[ \t\n\"'`<>;|&()$\\*?%[%]#~=!{}]" -- characters a file name ha
 
 -- How many columns text takes on the screen (escape sequences take none).
 local function columns(text)
-  text = string.gsub(text, "\27%[[%d;?]*[ -/]*[@-~]", "")
+  text = text:gsub("\27%[[%d;?]*[ -/]*[@-~]", "")
   return utf8.len(text) or #text
 end
 
 -- A string's characters (UTF-8), one a slot.
 local function characters(text)
   local list = {}
-  for c in string.gmatch(text, "[\0-\127\194-\244][\128-\191]*") do
+  for c in text:gmatch("[\0-\127\194-\244][\128-\191]*") do
     list[#list + 1] = c
   end
   return list
@@ -45,25 +45,25 @@ end
 
 -- A name with what the shell would read as special backslashed, and back.
 function readline.escape(text)
-  return (string.gsub(text, SPECIAL, "\\%0"))
+  return (text:gsub(SPECIAL, "\\%0"))
 end
 
 function readline.unescape(text)
-  return (string.gsub(text, "\\(.)", "%1"))
+  return (text:gsub("\\(.)", "%1"))
 end
 
 -- The default completer: the file names a word could be (as typed, backslashes and all), each a
 -- word to put in its place; directories end in /. ('before', the line before the word, isn't used.)
 function readline.filenames(before, word)
   local typed = readline.unescape(word)
-  local dir, prefix = string.match(typed, "^(.*/)([^/]*)$")
+  local dir, prefix = typed:match("^(.*/)([^/]*)$")
   if not dir then
     dir, prefix = "", typed
   end
   local listed = fs.list(dir == "" and "." or dir)
   local found = {}
   for _, entry in ipairs(listed or {}) do
-    if string.sub(entry.name, 1, #prefix) == prefix and (string.sub(entry.name, 1, 1) ~= "." or string.sub(prefix, 1, 1) == ".") then
+    if entry.name:sub(1, #prefix) == prefix and (entry.name:sub(1, 1) ~= "." or prefix:sub(1, 1) == ".") then
       local isdir = entry.type == "directory" or (entry.type == "link" and fs.isdir(dir .. entry.name))
       found[#found + 1] = readline.escape(dir .. entry.name) .. (isdir and "/" or "")
     end
@@ -78,10 +78,10 @@ local function common(words)
   for k = 2, #words do
     local word = words[k]
     local n = 0
-    while n < #prefix and n < #word and string.byte(prefix, n + 1) == string.byte(word, n + 1) do
+    while n < #prefix and n < #word and prefix:byte(n + 1) == word:byte(n + 1) do
       n = n + 1
     end
-    prefix = string.sub(prefix, 1, n)
+    prefix = prefix:sub(1, n)
   end
   return prefix
 end
@@ -101,7 +101,7 @@ local function grid(words, width)
       local word = words[(c - 1) * rows + r]
       if word then
         local last = (c * rows + r) > #words
-        line[#line + 1] = word .. (last and "" or string.rep(" ", widest - columns(word) + GAP))
+        line[#line + 1] = word .. (last and "" or (" "):rep(widest - columns(word) + GAP))
       end
     end
     lines[#lines + 1] = table.concat(line)
@@ -151,7 +151,7 @@ function editor:read(shown)
 
   -- The screen as a line of cells from the prompt's last line's start: the text starts after the
   -- prompt; 'at' is where the terminal's cursor is.
-  local start = columns(string.match(shown, "[^\n]*$"))
+  local start = columns(shown:match("[^\n]*$"))
   local buffer, cursor = {}, 0
   local pending = self.typeahead -- keys read and not yet handled
   self.typeahead = ""
@@ -223,7 +223,7 @@ function editor:read(shown)
   local listing = false
   local function complete()
     local from = cursor
-    while from > 0 and not (string.find(buffer[from], self.breaks) and buffer[from - 1] ~= "\\") do
+    while from > 0 and not (buffer[from]:find(self.breaks) and buffer[from - 1] ~= "\\") do
       from = from - 1
     end
     local before = table.concat(buffer, "", 1, from)
@@ -233,7 +233,7 @@ function editor:read(shown)
       return false
     end
     local put = #words == 1 and words[1] or common(words)
-    if #words == 1 and space ~= false and string.sub(put, -1) ~= "/" then
+    if #words == 1 and space ~= false and put:sub(-1) ~= "/" then
       put = put .. " "
     end
     if #put > #word then
@@ -248,7 +248,7 @@ function editor:read(shown)
     elseif #words > 1 and listing then
       local shownwords = {}
       for k, w in ipairs(words) do
-        shownwords[k] = readline.unescape(string.match(w, "([^/]*/?)$")) -- (a file's name, not its directory)
+        shownwords[k] = readline.unescape(w:match("([^/]*/?)$")) -- (a file's name, not its directory)
       end
       moveto(start + #buffer)
       out[#out + 1] = "\r\n" .. grid(shownwords, width) .. "\r\n"
@@ -274,10 +274,10 @@ function editor:read(shown)
       pending = data
     end
     -- the next key: an escape sequence, a control character, or a character typed
-    local key = string.match(pending, "^\27%[[%d;]*[%a~]") or string.match(pending, "^\27O%a")
-      or string.match(pending, "^[\0-\127\194-\244][\128-\191]*") or string.sub(pending, 1, 1)
-    pending = string.sub(pending, #key + 1)
-    key = string.gsub(key, "^\27O", "\27[") -- (ESC O x, as in cursor-keys application mode: the same keys)
+    local key = pending:match("^\27%[[%d;]*[%a~]") or pending:match("^\27O%a")
+      or pending:match("^[\0-\127\194-\244][\128-\191]*") or pending:sub(1, 1)
+    pending = pending:sub(#key + 1)
+    key = key:gsub("^\27O", "\27[") -- (ESC O x, as in cursor-keys application mode: the same keys)
     key = SAME[key] or key
     local tabbed = false
     if key == "\r" then
@@ -337,9 +337,9 @@ function editor:read(shown)
         entry = entry + 1
         set(entry == #history + 1 and stash or history[entry])
       end
-    elseif #key > 1 and string.sub(key, 1, 1) == "\27" then
+    elseif #key > 1 and key:sub(1, 1) == "\27" then
       -- (a key it has no use for)
-    elseif string.byte(key) >= 32 and key ~= "\127" then
+    elseif key:byte() >= 32 and key ~= "\127" then
       table.insert(buffer, cursor + 1, key)
       cursor = cursor + 1
       redraw(cursor - 1)

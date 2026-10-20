@@ -18,7 +18,7 @@ local function loadfile(path, mode, env)
   end
   local image, why = sys.image(path)
   if not image then
-    if string.sub(why, 1, #path) ~= path then
+    if why:sub(1, #path) ~= path then
       why = path .. ": " .. why
     end
     return nil, why
@@ -85,7 +85,7 @@ end
 local tmpcount = 0
 function os.tmpname()
   tmpcount = tmpcount + 1
-  return string.format("/tmp/lua_%d_%d", sys.getpid(), tmpcount)
+  return ("/tmp/lua_%d_%d"):format(sys.getpid(), tmpcount)
 end
 
 function print(...)
@@ -110,10 +110,10 @@ package = {
   config = "/\n;\n?\n!\n-\n",
 }
 function package.searchpath(name, path, sep, rep)
-  name = string.gsub(name, "%" .. (sep or "."), rep or "/")
+  name = name:gsub("%" .. (sep or "."), rep or "/")
   local tried = {}
-  for template in string.gmatch(path, "[^;]+") do
-    local file = string.gsub(template, "%?", name)
+  for template in path:gmatch("[^;]+") do
+    local file = template:gsub("%?", name)
     local st = sys.stat(file)
     if st and st.type ~= "directory" then
       return file
@@ -170,15 +170,15 @@ end
 local function traceback()
   local text = debug.traceback("", 3)
   local cut
-  for at in string.gmatch(text, "()\n[^\n]*'xpcall'") do
+  for at in text:gmatch("()\n[^\n]*'xpcall'") do
     cut = at
   end
-  text = cut and string.sub(text, 1, cut - 1) or text
-  return (string.gsub(text, "\n[^\n]*%(%.%.%.tail calls%.%.%.%)$", ""))
+  text = cut and text:sub(1, cut - 1) or text
+  return (text:gsub("\n[^\n]*%(%.%.%.tail calls%.%.%.%)$", ""))
 end
 
 local path = ...
-local name = string.match(path, "([^/]*)$") -- (as a program's messages start: program_invocation_short_name)
+local name = path:match("([^/]*)$") -- (as a program's messages start: program_invocation_short_name)
 _G.arg = {[0] = path, select(2, ...)}
 local status
 local main, err = loadfile(path)

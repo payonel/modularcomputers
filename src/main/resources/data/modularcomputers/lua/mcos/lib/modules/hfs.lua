@@ -28,12 +28,12 @@ local REPARSE = "symbolic link\0" -- the disk met a link: its path, a NUL, its t
 
 local function failed(why)
   why = tostring(why)
-  if string.sub(why, 1, #REPARSE) == REPARSE then
-    local at, target = string.match(why, "^([^%z]*)%z(.*)$", #REPARSE + 1)
+  if why:sub(1, #REPARSE) == REPARSE then
+    local at, target = why:match("^([^%z]*)%z(.*)$", #REPARSE + 1)
     return nil, {at = at, target = target}, "REPARSE"
   end
   for i = 1, #FAILURES, 2 do
-    if string.find(why, FAILURES[i]) then
+    if why:find(FAILURES[i]) then
       return fail(FAILURES[i + 1])
     end
   end

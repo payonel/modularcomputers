@@ -28,8 +28,8 @@ local TICKS_PER_SECOND = 20
 local MOUNT_BASE = "/mnt" -- where disks found on the bus are mounted (sata:1 at /mnt/sata/1, id:x at /mnt/id/x)
 
 local options = {}
-for word in string.gmatch(cmdline or "", "%S+") do
-  local key, value = string.match(word, "^([^=]+)=(.*)$")
+for word in (cmdline or ""):gmatch("%S+") do
+  local key, value = word:match("^([^=]+)=(.*)$")
   options[key or word] = value or true
 end
 
@@ -55,7 +55,13 @@ local function module(name, ...)
     parts[#parts + 1] = ok and chunk or nil
   until not (ok and chunk)
   board.invoke(file, "close")
-  return assert(load(table.concat(parts), "=" .. path))(...)
+  local at = 0
+  return assert(load(function() -- (straight from the pieces read: never joined into one string)
+    at = at + 1
+    local piece = parts[at]
+    parts[at] = nil
+    return piece
+  end, "=" .. path))(...)
 end
 
 local vfs = module("vfs", k)
@@ -83,7 +89,7 @@ local SINGLE = {eeprom = "eeprom"} -- the slots of devices there's only ever one
 function k.refreshdevices()
   local list, byname, counts = {}, {}, {}
   for _, device in ipairs(board.list()) do
-    local kind = string.gsub(device.type or "device", "[^%w]", "")
+    local kind = (device.type or "device"):gsub("[^%w]", "")
     local n = counts[kind] or 0
     counts[kind] = n + 1
     local id = device.id or device.address
@@ -98,7 +104,7 @@ function k.refreshdevices()
       end
       described[id] = about
     end
-    local slot = device.address ~= device.id and not string.find(device.address, "^id:") and device.address or nil
+    local slot = device.address ~= device.id and not device.address:find("^id:") and device.address or nil
     local entry = {name = SINGLE[slot] or kind .. n, id = id, path = slot,
       type = device.type, label = about.label, get = about.get, set = about.set}
     list[#list + 1], byname[entry.name] = entry, entry
@@ -359,13 +365,21 @@ local function image(path)
     return images[key]
   end
   reclaim() -- (compiling takes far more for a moment than the image keeps)
-  local code, chunk
-  code, why, errno = vfs.readfile(path)
-  if not code then
+  local parts, chunk
+  parts, why, errno = vfs.readparts(path)
+  if not parts then
     return nil, why, errno
   end
-  code = string.gsub(code, "^#![^\n]*", "") -- a #! line is the kernel's (its line stays, empty)
-  chunk, why = load("return function(_ENV, ...) " .. code .. "\nend", "=" .. path, "t", {})
+  parts[1] = parts[1] and (parts[1]):gsub("^#![^\n]*", "") -- a #! line is the kernel's (its line stays, empty)
+  -- compiled straight from the pieces read, inside function(_ENV, ...) ... end: the text is never
+  -- joined into one string (nor copied to wrap it), and each piece goes once the compiler has it
+  local n, at = #parts, 0
+  chunk, why = load(function()
+    at = at + 1
+    local piece = at == 1 and "return function(_ENV, ...) " or parts[at - 1] or at == n + 2 and "\nend" or nil
+    parts[at - 1] = nil
+    return piece
+  end, "=" .. path, "t", {})
   if not chunk then
     return nil, why, "ENOEXEC"
   end
@@ -481,7 +495,7 @@ function syscalls.open(p, request, file, mode)
   if not fd then
     return fail("EMFILE")
   end
-  local d, why, errno = vfs.open(at, string.gsub(mode, "b", ""), p)
+  local d, why, errno = vfs.open(at, mode:gsub("b", ""), p)
   if not d then
     return nil, why, errno
   end
@@ -513,7 +527,7 @@ syscalls.write = withfd(function(p, request, d, fd, data)
   end
   request.done = request.done or 0
   while request.done < #data do
-    local count, why, errno = d:write(request.done == 0 and data or string.sub(data, request.done + 1))
+    local count, why, errno = d:write(request.done == 0 and data or data:sub(request.done + 1))
     if count == k.BLOCK then
       return k.BLOCK
     elseif not count then
@@ -890,7 +904,7 @@ local function hotplug()
       if not mounted[address] then
         local _, mode = board.invoke(address, "getMode")
         if mode == "hfs" then
-          local kind, name = string.match(address, "^(%w+):(.+)$")
+          local kind, name = address:match("^(%w+):(.+)$")
           vfs.mount(MOUNT_BASE .. "/" .. (kind or "id") .. "/" .. (name or address), hfs(address), address)
         end
       end

@@ -75,7 +75,7 @@ local CONTINUES = {["|"] = true, ["&&"] = true, ["||"] = true}
 -- A word that's an assignment (NAME=..., its first part unquoted): the name.
 local function assignment(word)
   local first = word and word[1]
-  return first and first.text and not first.quoted and string.match(first.text, "^([%a_][%w_]*)=")
+  return first and first.text and not first.quoted and first.text:match("^([%a_][%w_]*)=")
 end
 
 -- Where the ) closing a $( whose text starts at 'at' is (quotes, nested $( and backticks skipped).
@@ -83,19 +83,19 @@ local function closing(line, at)
   local depth = 1
   local i = at
   while i <= #line do
-    local c = string.sub(line, i, i)
+    local c = line:sub(i, i)
     if c == "\\" then
       i = i + 2
     elseif c == "'" or c == "`" then
-      local close = string.find(line, c, i + 1, true)
+      local close = line:find(c, i + 1, true)
       if not close then
         return nil
       end
       i = close + 1
     elseif c == '"' then
       i = i + 1
-      while i <= #line and string.sub(line, i, i) ~= '"' do
-        i = i + (string.sub(line, i, i) == "\\" and 2 or 1)
+      while i <= #line and line:sub(i, i) ~= '"' do
+        i = i + (line:sub(i, i) == "\\" and 2 or 1)
       end
       if i > #line then
         return nil
@@ -119,34 +119,30 @@ end
 -- A $ at 'at': its part and where the line goes on; INCOMPLETE; nil and why (bad substitution);
 -- or nil (a $ that's just a $).
 local function dollar(line, at, quoted)
-  local nxt = string.sub(line, at + 1, at + 1)
+  local nxt = line:sub(at + 1, at + 1)
   if nxt == "(" then
     local close = closing(line, at + 2)
     if not close then
       return INCOMPLETE
     end
-    return {cmd = string.sub(line, at + 2, close - 1), quoted = quoted}, close + 1
+    return {cmd = line:sub(at + 2, close - 1), quoted = quoted}, close + 1
   elseif nxt == "{" then
-    local close = string.find(line, "}", at + 2, true)
+    local close = line:find("}", at + 2, true)
     if not close then
       return INCOMPLETE
     end
-    local body = string.sub(line, at + 2, close - 1)
-    local length = string.match(body, "^#([%w_]+)$")
-    if length then
-      return {var = length, op = "#", quoted = quoted}, close + 1
-    end
-    local name, op, arg = string.match(body, "^([%w_]+)(:?[%-=+?])(.*)$")
-    if name then
-      return {var = name, op = op, arg = arg, quoted = quoted}, close + 1
-    end
-    name = string.match(body, "^([%w_]+)$") or string.match(body, "^([%?%$#@%*!])$")
+    -- ${NAME}, ${#NAME}, ${NAME op word} (op :- - := = :+ + :? ?), and ${?} ${$} ${#} ${@} ${*} ${!}
+    local body = line:sub(at + 2, close - 1)
+    local hash, name, op, arg = body:match("^(#?)([%w_]+)(:?[%-=+?]?)(.*)$")
     if not name then
+      hash, name, op, arg = "", body:match("^[%?%$#@%*!]$"), "", ""
+    end
+    if not name or (op == "" and arg ~= "") or op == ":" or (hash == "#" and op ~= "") then
       return nil, "${" .. body .. "}: bad substitution"
     end
-    return {var = name, quoted = quoted}, close + 1
+    return {var = name, op = hash == "#" and "#" or op ~= "" and op or nil, arg = op ~= "" and arg or nil, quoted = quoted}, close + 1
   end
-  local name = string.match(line, "^[%a_][%w_]*", at + 1) or string.match(line, "^[%d%?%$#@%*!]", at + 1)
+  local name = line:match("^[%a_][%w_]*", at + 1) or line:match("^[%d%?%$#@%*!]", at + 1)
   if name then
     return {var = name, quoted = quoted}, at + 1 + #name
   end
@@ -198,7 +194,7 @@ local function lex(line, noalias)
       local name = #parts == 1 and only.text and not only.quoted and only.text
       local value = name and not noalias and aliases[name]
       if value and commandname() and not expanding(name) then
-        line = string.sub(line, 1, wordstart - 1) .. value .. string.sub(line, i)
+        line = line:sub(1, wordstart - 1) .. value .. line:sub(i)
         local delta = #value - (i - wordstart)
         for _, a in ipairs(active) do
           if a.upto >= wordstart then
@@ -206,7 +202,7 @@ local function lex(line, noalias)
           end
         end
         active[#active + 1] = {name = name, upto = wordstart + #value - 1}
-        after = string.find(value, "[ \t]$") and wordstart + #value or nil
+        after = value:find("[ \t]$") and wordstart + #value or nil
         n, i = #line, wordstart
         parts, inword = {}, false
         return true
@@ -217,16 +213,16 @@ local function lex(line, noalias)
   end
   local dq = false -- inside double quotes
   while i <= n do
-    local c = string.sub(line, i, i)
+    local c = line:sub(i, i)
     if not inword then
       wordstart = i
     end
-    if c == "\\" and (not dq or string.find(string.sub(line, i + 1, i + 1), '[\\"$`\n]')) then
+    if c == "\\" and (not dq or i == n or (line:sub(i + 1, i + 1)):find('[\\"$`\n]')) then
       -- (in double quotes, only before \ " $ ` or a new line; else it's itself)
       if i == n then
         return INCOMPLETE -- a line ending in \ goes on
       end
-      local d = string.sub(line, i + 1, i + 1)
+      local d = line:sub(i + 1, i + 1)
       if d ~= "\n" then -- (\ and a new line: the line goes on, both gone)
         text(d, true)
       end
@@ -250,24 +246,25 @@ local function lex(line, noalias)
         i = i + 1
       end
     elseif c == "`" then
-      local close = string.find(line, "`", i + 1, true)
+      local close = line:find("`", i + 1, true)
       if not close then
         return INCOMPLETE
       end
-      parts[#parts + 1] = {cmd = (string.gsub(string.sub(line, i + 1, close - 1), "\\([`\\$])", "%1")), quoted = dq}
+      parts[#parts + 1] = {cmd = ((line:sub(i + 1, close - 1)):gsub("\\([`\\$])", "%1")), quoted = dq}
       inword = true
       i = close + 1
     elseif dq then
-      text(c, true)
-      i = i + 1
+      local run = line:match('^[^"\\$`]+', i) or c -- (all up to the next special character)
+      text(run, true)
+      i = i + #run
     elseif c == "'" then
-      local close = string.find(line, "'", i + 1, true)
+      local close = line:find("'", i + 1, true)
       if not close then
         return INCOMPLETE
       end
-      text(string.sub(line, i + 1, close - 1), true)
+      text(line:sub(i + 1, close - 1), true)
       i = close + 1
-    elseif c == "~" and not inword and (i == n or string.find(string.sub(line, i + 1, i + 1), "[/ \t\n;|&]")) then
+    elseif c == "~" and not inword and (i == n or (line:sub(i + 1, i + 1)):find("[/ \t\n;|&]")) then
       parts[#parts + 1] = {tilde = true}
       inword = true
       i = i + 1
@@ -285,15 +282,15 @@ local function lex(line, noalias)
       end
       i = i + 1
     elseif c == "#" and not inword then
-      while i <= n and string.sub(line, i, i) ~= "\n" do
+      while i <= n and line:sub(i, i) ~= "\n" do
         i = i + 1
       end
     else
       -- a redirection: [n]< [n]> [n]>> [n]>&m [n]<&m [n]>&-
-      local digits = inword and #parts == 1 and parts[1].quoted == false and string.match(parts[1].text, "^%d+$")
-      local op, target = string.match(line, "^([<>])&([%d%-]+)", i)
+      local digits = inword and #parts == 1 and parts[1].quoted == false and parts[1].text and parts[1].text:match("^%d+$")
+      local op, target = line:match("^([<>])&([%d%-]+)", i)
       if not op then
-        op = string.match(line, "^>>", i) or string.match(line, "^[<>]", i)
+        op = line:match("^>>", i) or line:match("^[<>]", i)
       end
       if op and (not inword or digits) then
         local fd
@@ -314,9 +311,9 @@ local function lex(line, noalias)
           goto continue
         end
       else
-        local found = string.match(line, "^&&", i) or string.match(line, "^||", i) or string.match(line, "^[;&|!]", i)
+        local found = line:match("^&&", i) or line:match("^||", i) or line:match("^[;&|!]", i)
         -- ! is an operator only as a word of its own
-        if found == "!" and (inword or not string.find(string.sub(line, i + 1, i + 1), "^[ \t]")) then
+        if found == "!" and (inword or not (line:sub(i + 1, i + 1)):find("^[ \t]")) then
           found = nil
         end
         if found then
@@ -326,8 +323,9 @@ local function lex(line, noalias)
           tokens[#tokens + 1] = {op = found, from = i, last = i + #found - 1}
           i = i + #found
         else
-          text(c, false)
-          i = i + 1
+          local run = line:match("^[^ \t\n\\\"'$`<>;&|#~!]+", i) or c -- (all up to the next special one)
+          text(run, false)
+          i = i + #run
         end
       end
     end
@@ -370,14 +368,14 @@ local function parse(tokens)
           for k, part in ipairs(t.word) do
             value[k] = part
           end
-          value[1] = {text = string.sub(first.text, #name + 2), quoted = false}
+          value[1] = {text = first.text:sub(#name + 2), quoted = false}
           cmd.assigns[#cmd.assigns + 1] = {name = name, word = value}
         else
           cmd.words[#cmd.words + 1] = t.word
         end
         i = i + 1
       elseif t.redirect then
-        if string.sub(t.redirect, -1) == "&" then
+        if t.redirect:sub(-1) == "&" then
           cmd.redirects[#cmd.redirects + 1] = {op = t.redirect, fd = t.fd, to = t.to}
           i = i + 1
         else
@@ -457,10 +455,10 @@ local function variable(name)
   elseif name == "@" or name == "*" then
     -- (joined with IFS's first character, as "$*" is: a space with IFS unset, nothing with it empty)
     local ifs = vars.IFS
-    return table.concat(positional, ifs == nil and " " or string.sub(ifs, 1, 1), 1, positional.n)
+    return table.concat(positional, ifs == nil and " " or ifs:sub(1, 1), 1, positional.n)
   elseif name == "0" then
     return name0
-  elseif string.match(name, "^%d$") then
+  elseif name:match("^%d$") then
     return positional[tonumber(name)]
   end
   return vars[name]
@@ -481,7 +479,7 @@ end
 
 -- A word quoted for sh, as it was ('...').
 local function quote(value)
-  return "'" .. string.gsub(value, "'", "'\\''") .. "'"
+  return "'" .. value:gsub("'", "'\\''") .. "'"
 end
 
 -- Closes the fds in a list.
@@ -514,10 +512,53 @@ local function substitute(text)
   sys.close(r)
   status = statusof(select(2, sys.waitpid(pid)))
   substitutions = substitutions + 1
-  return (string.gsub(table.concat(out), "\n+$", ""))
+  return ((table.concat(out)):gsub("\n+$", ""))
 end
 
 local expandword
+
+-- Text split into fields on IFS, as POSIX has it (2.6.5): runs of IFS white space separate fields
+-- and are dropped at the ends; each other IFS character ends a field, with any white space about it,
+-- so two in a row make an empty one. With 'max', at most so many, the last the rest of the text
+-- (less the white space at its end: read's last name). 'kept': places a backslash quoted (read's),
+-- never separators. The fields, and whether the text began and ended with a separator.
+local function ifssplit(text, ifs, max, kept)
+  local list, n, at = {}, #text, 1
+  local function sep(k)
+    return k <= n and not (kept and kept[k]) and ifs:find(text:sub(k, k), 1, true) ~= nil
+  end
+  local function white(k)
+    return sep(k) and (" \t\n"):find(text:sub(k, k), 1, true) ~= nil
+  end
+  local function skip()
+    while white(at) do
+      at = at + 1
+    end
+  end
+  skip()
+  local lead = at > 1 or sep(1)
+  while at <= n do
+    if max and #list == max - 1 then
+      local last = n
+      while last >= at and white(last) do
+        last = last - 1
+      end
+      list[#list + 1] = text:sub(at, last)
+      return list, lead, false
+    end
+    local from = at
+    while at <= n and not sep(at) do
+      at = at + 1
+    end
+    list[#list + 1] = text:sub(from, at - 1)
+    skip()
+    if sep(at) then -- (one IFS character that isn't white space, and the white space after it)
+      at = at + 1
+      skip()
+    end
+  end
+  return list, lead, n > 0 and sep(n)
+end
 
 -- A ${NAME op word}'s word, expanded as one string.
 local function argument(arg)
@@ -542,8 +583,8 @@ local function parameter(part)
   elseif not op then
     return value
   end
-  local unset = value == nil or (string.sub(op, 1, 1) == ":" and value == "")
-  local kind = string.sub(op, -1)
+  local unset = value == nil or (op:sub(1, 1) == ":" and value == "")
+  local kind = op:sub(-1)
   if kind == "-" then
     return unset and argument(part.arg) or value
   elseif kind == "=" then
@@ -572,10 +613,10 @@ function expandword(word, single)
   local function add(text, quoted)
     plain[#plain + 1] = text
     if quoted then
-      pattern[#pattern + 1] = (string.gsub(text, GLOB_SPECIAL, "\\%0"))
+      pattern[#pattern + 1] = (text:gsub(GLOB_SPECIAL, "\\%0"))
     else
       pattern[#pattern + 1] = text
-      if string.find(text, "[%*%?%[]") then
+      if text:find("[%*%?%[]") then
         globbed = true
       end
     end
@@ -612,20 +653,19 @@ function expandword(word, single)
         if part.quoted or single or ifs == "" then
           add(value, true)
         else
-          -- field splitting: runs of IFS characters separate fields
-          local separators = "[" .. string.gsub(ifs, "%W", "%%%0") .. "]+"
-          local at = 1
-          while at <= #value do
-            local s, e = string.find(value, separators, at)
-            if not s then
-              add(string.sub(value, at), false)
-              break
-            end
-            if s > at then
-              add(string.sub(value, at, s - 1), false)
-            end
+          -- field splitting (a separator at an end ends the field the word had so far, or starts one)
+          local list, lead, trail = ifssplit(value, ifs)
+          if lead then
             close()
-            at = e + 1
+          end
+          for k, field in ipairs(list) do
+            if k > 1 then
+              close()
+            end
+            add(field, false)
+          end
+          if trail then
+            close()
           end
         end
       elseif part.quoted then
@@ -657,7 +697,7 @@ local builtins = {}
 -- Where a command's program is: the path it names (with a /), or the first in PATH; else nil, the
 -- status and why.
 local function locate(name)
-  if string.find(name, "/", 1, true) then
+  if name:find("/", 1, true) then
     local st, why = sys.stat(name)
     if not st then
       return nil, NOT_FOUND, name .. ": " .. why
@@ -679,8 +719,8 @@ end
 local function redirect(cmd, fds, opened)
   for _, r in ipairs(cmd.redirects) do
     local op = r.op
-    local fd = r.fd or (string.sub(op, 1, 1) == "<" and 0 or 1)
-    if string.sub(op, -1) == "&" then
+    local fd = r.fd or (op:sub(1, 1) == "<" and 0 or 1)
+    if op:sub(-1) == "&" then
       if r.to == "-" then
         fds[fd] = false
       else
@@ -731,6 +771,14 @@ local function waitfor(pid)
   end
 end
 
+-- A command's assignments (NAME=value before it), expanded into a table: the shell's variables, or
+-- its environment.
+local function assign(cmd, into)
+  for _, a in ipairs(cmd.assigns) do
+    into[a.name] = expandword(a.word, true)[1]
+  end
+end
+
 -- POSIX's special builtins: assignments before one stay set; before any other builtin they last
 -- only while it runs (IFS=: read a b).
 local SPECIAL = {[":"] = true, ["."] = true, exit = true, export = true, set = true, unset = true, source = true}
@@ -739,13 +787,12 @@ local SPECIAL = {[":"] = true, ["."] = true, exit = true, export = true, set = t
 -- runs, but for a special builtin's assignments).
 local function runbuiltin(cmd, argv)
   local saved = {}
-  for _, assign in ipairs(cmd.assigns) do
-    local name = assign.name
-    if not SPECIAL[argv[1]] and saved[name] == nil then
-      saved[name] = {vars[name]}
+  for _, a in ipairs(cmd.assigns) do
+    if not SPECIAL[argv[1]] and saved[a.name] == nil then
+      saved[a.name] = {vars[a.name]}
     end
-    vars[name] = expandword(assign.word, true)[1]
   end
+  assign(cmd, vars)
   local fds, opened = {}, {}
   local ok, why = redirect(cmd, fds, opened)
   local result = 1
@@ -795,7 +842,7 @@ local function runpipeline(pipeline, background)
       end
     end
     -- command name [args]: the command itself, past any alias (-p: the default PATH, as ours is)
-    while cmd.argv[1] == "command" and cmd.argv[2] and (cmd.argv[2] == "-p" or string.sub(cmd.argv[2], 1, 1) ~= "-") do
+    while cmd.argv[1] == "command" and cmd.argv[2] and (cmd.argv[2] == "-p" or cmd.argv[2]:sub(1, 1) ~= "-") do
       table.remove(cmd.argv, 1)
       if cmd.argv[1] == "-p" then
         table.remove(cmd.argv, 1)
@@ -806,9 +853,7 @@ local function runpipeline(pipeline, background)
   -- assignments alone set the shell's variables; a lone redirection makes (or empties) its file
   if #commands == 1 and #first.argv == 0 then
     local before = substitutions
-    for _, assign in ipairs(first.assigns) do
-      vars[assign.name] = expandword(assign.word, true)[1]
-    end
+    assign(first, vars)
     local fds, opened = {}, {}
     local ok, why = redirect(first, fds, opened)
     closeall(opened)
@@ -842,9 +887,7 @@ local function runpipeline(pipeline, background)
     elseif #cmd.argv > 0 then
       local name = cmd.argv[1]
       local env = environment()
-      for _, assign in ipairs(cmd.assigns) do
-        env[assign.name] = expandword(assign.word, true)[1]
-      end
+      assign(cmd, env)
       local ignore = background and {"SIGINT"} or nil
       local pid, code, err
       if builtins[name] then
@@ -925,8 +968,10 @@ end
 
 -- Runs a line (or a script's text): its status, and whether it was a syntax error (nothing on the
 -- line runs then).
-local function runline(line)
-  local tokens, why, source = lex(line)
+local function runline(line, tokens, why, source)
+  if tokens == nil and why == nil then
+    tokens, why, source = lex(line)
+  end
   if tokens == INCOMPLETE then
     why = "syntax error: unexpected end of file"
   end
@@ -943,7 +988,7 @@ local function runline(line)
     local run = true
     local pipelines = list.pipelines
     if #pipelines > 1 and list.background then
-      background(string.sub(source, list.from, list.last)) -- (all of it, in a child shell)
+      background(source:sub(list.from, list.last)) -- (all of it, in a child shell)
       pipelines = {}
     end
     for _, pipeline in ipairs(pipelines) do
@@ -1054,10 +1099,10 @@ function builtins.export(argv, out)
   end
   local result = 0
   for k = 2, #argv do
-    local name, value = string.match(argv[k], "^([%a_][%w_]*)=(.*)$")
+    local name, value = argv[k]:match("^([%a_][%w_]*)=(.*)$")
     if name then
       vars[name] = value
-    elseif not string.match(argv[k], "^[%a_][%w_]*$") then
+    elseif not argv[k]:match("^[%a_][%w_]*$") then
       say("export: `" .. argv[k] .. "': not a valid identifier")
       result = 1
     end
@@ -1082,8 +1127,8 @@ function builtins.alias(argv, out)
   end
   local result = 0
   for k = 2, #argv do
-    local name, value = string.match(argv[k], "^([^=]*)=(.*)$")
-    if name and (name == "" or string.find(name, "[%s/$`'\"]")) then
+    local name, value = argv[k]:match("^([^=]*)=(.*)$")
+    if name and (name == "" or name:find("[%s/$`'\"]")) then
       say("alias: `" .. name .. "': invalid alias name")
       result = 1
     elseif name then
@@ -1158,13 +1203,13 @@ function builtins.read(argv, out, err, input)
     end
     local k, joined = 1, false
     while k <= #line do
-      local c = string.sub(line, k, k)
+      local c = line:sub(k, k)
       if c == "\\" and not raw then
         if k == #line then
           joined = true
           break
         end
-        chars[#chars + 1], quoted[#chars + 1] = string.sub(line, k + 1, k + 1), true
+        chars[#chars + 1], quoted[#chars + 1] = line:sub(k + 1, k + 1), true
         k = k + 2
       else
         chars[#chars + 1] = c
@@ -1175,39 +1220,9 @@ function builtins.read(argv, out, err, input)
       break
     end
   end
-  local ifs = vars.IFS or DEFAULT_IFS
-  local function blank(k)
-    return not quoted[k] and chars[k] and string.find(" \t\n", chars[k], 1, true) and string.find(ifs, chars[k], 1, true)
-  end
-  local function delimiter(k)
-    return not quoted[k] and chars[k] and string.find(ifs, chars[k], 1, true) and not blank(k)
-  end
-  local at = 1
-  local function skip() -- (past blanks)
-    while blank(at) do
-      at = at + 1
-    end
-  end
-  skip()
-  for index, name in ipairs(names) do
-    if index == #names then
-      local last = #chars
-      while last >= at and blank(last) do
-        last = last - 1
-      end
-      vars[name] = table.concat(chars, "", at, last)
-      break
-    end
-    local from = at
-    while chars[at] and not blank(at) and not delimiter(at) do
-      at = at + 1
-    end
-    vars[name] = table.concat(chars, "", from, at - 1)
-    skip()
-    if delimiter(at) then
-      at = at + 1
-      skip()
-    end
+  local list = ifssplit(table.concat(chars), vars.IFS or DEFAULT_IFS, #names, quoted)
+  for k, name in ipairs(names) do
+    vars[name] = list[k] or ""
   end
   return 0
 end
@@ -1287,10 +1302,11 @@ builtins["."] = builtins.source
 -- A syntax error stops a script, as it does a real shell's.
 function runscript(text)
   local pending = nil
-  for line in string.gmatch(text .. (string.sub(text, -1) == "\n" and "" or "\n"), "([^\n]*)\n") do
+  for line in (text .. (text:sub(-1) == "\n" and "" or "\n")):gmatch("([^\n]*)\n") do
     pending = pending and pending .. "\n" .. line or line
-    if lex(pending) ~= INCOMPLETE then
-      local _, broken = runline(pending)
+    local tokens, why, source = lex(pending)
+    if tokens ~= INCOMPLETE then
+      local _, broken = runline(pending, tokens, why, source)
       pending = nil
       if broken then
         return status
@@ -1307,11 +1323,11 @@ local function prompt(ps)
   local cwd = sys.getcwd()
   local home = vars.HOME
   local shown = cwd
-  if home and home ~= "/" and (cwd == home or string.sub(cwd, 1, #home + 1) == home .. "/") then
-    shown = "~" .. string.sub(cwd, #home + 1)
+  if home and home ~= "/" and (cwd == home or cwd:sub(1, #home + 1) == home .. "/") then
+    shown = "~" .. cwd:sub(#home + 1)
   end
   -- (an escape it doesn't know stays as it is)
-  return (string.gsub(ps, "\\(.)", {w = shown, W = shown == "/" and "/" or fs.name(shown), ["$"] = "$", n = "\n",
+  return (ps:gsub("\\(.)", {w = shown, W = shown == "/" and "/" or fs.name(shown), ["$"] = "$", n = "\n",
     ["\\"] = "\\"}))
 end
 
@@ -1324,17 +1340,17 @@ local readline, editor -- (an interactive shell's: see main)
 
 -- Whether the line before a word leaves it the first of a command.
 local function commandposition(before)
-  before = string.match(before, "^(.-)%s*$")
-  return before == "" or string.find(before, "[;|&(`!]$") ~= nil or string.sub(before, -2) == "$("
+  before = before:match("^(.-)%s*$")
+  return before == "" or before:find("[;|&(`!]$") ~= nil or before:sub(-2) == "$("
 end
 
 local function completions(before, word)
-  if string.find(word, "/", 1, true) or not commandposition(before) then
+  if word:find("/", 1, true) or not commandposition(before) then
     return readline.filenames(before, word)
   end
   local seen, found = {}, {}
   local function add(name)
-    if string.sub(name, 1, #word) == word and not seen[name] then
+    if name:sub(1, #word) == word and not seen[name] then
       seen[name] = true
       found[#found + 1] = name
     end
@@ -1345,7 +1361,7 @@ local function completions(before, word)
   for name in pairs(aliases) do
     add(name)
   end
-  for dir in string.gmatch(vars.PATH or "", "[^:]+") do
+  for dir in (vars.PATH or ""):gmatch("[^:]+") do
     for _, entry in ipairs(fs.list(dir) or {}) do
       if entry.type ~= "directory" then
         add(entry.name)
@@ -1391,7 +1407,7 @@ local function main(...)
       say(why)
       return NOT_FOUND
     end
-    return runscript((string.gsub(text, "^#![^\n]*", "")))
+    return runscript((text:gsub("^#![^\n]*", "")))
   end
   interactive = sys.isatty(0)
   if interactive then
@@ -1421,20 +1437,22 @@ local function main(...)
       end
     else
       -- a line that goes on: read more (PS2) until it's whole; ^C drops it, end of file ends it
-      while lex(line) == INCOMPLETE do
+      local tokens, why, source = lex(line)
+      while tokens == INCOMPLETE do
         local more = nextline(vars.PS2)
         if more == nil then
           line = nil
           break
         end
         line = line .. "\n" .. more
+        tokens, why, source = lex(line)
       end
       if line then
         if editor and editor.typeahead ~= "" then
           sys.ioctl(0, "TIOCSTI", editor.typeahead) -- what was typed ahead is the command's to read
           editor.typeahead = ""
         end
-        runline(line)
+        runline(line, tokens, why, source)
       end
     end
   end

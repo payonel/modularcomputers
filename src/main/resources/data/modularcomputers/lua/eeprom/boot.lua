@@ -17,7 +17,13 @@ for _, device in ipairs(board.list()) do
         parts[#parts + 1] = chunk
       end
       board.invoke(file, "close")
-      local init, why = load(table.concat(parts), "=init.lua")
+      local at = 0
+      local init, why = load(function() -- (straight from the pieces read: never joined into one string)
+        at = at + 1
+        local piece = parts[at]
+        parts[at] = nil
+        return piece
+      end, "=init.lua")
       if not init then
         say("boot: " .. device.address .. ": " .. why .. "\r\n")
         board.halt()

@@ -57,13 +57,13 @@ local devices = {
     return ""
   end),
   zero = sink(function(self, n)
-    return string.rep("\0", n)
+    return ("\0"):rep(n)
   end),
 }
 
 -- What a path in /dev names: one of the kernel's devices (its maker), or a bus device with data.
 local function find(path)
-  local name = string.match(path, "^/([^/]+)$") or ""
+  local name = path:match("^/([^/]+)$") or ""
   local device = k.devices.byname[name]
   return devices[name], device and (device.get or device.set) and device
 end
@@ -71,7 +71,7 @@ end
 -- A device call's failure as an errno: a device that's gone is ENODEV (and the kernel's view of the
 -- bus is read again: it was out of date); anything else, EIO.
 local function failed(why)
-  if string.find(tostring(why), "^no such device") then
+  if (tostring(why)):find("^no such device") then
     k.refreshdevices()
     return fail("ENODEV")
   end
@@ -81,8 +81,8 @@ end
 -- An open device file: reads from what get gave (taken at the first read), writes kept for one set
 -- at close. (Which of them the open's mode allows is the VFS's to enforce.)
 local function devicefile(device, mode)
-  local plus = string.find(mode, "+", 1, true)
-  local reads, writes = string.sub(mode, 1, 1) == "r" or plus, string.sub(mode, 1, 1) ~= "r" or plus
+  local plus = mode:find("+", 1, true)
+  local reads, writes = mode:sub(1, 1) == "r" or plus, mode:sub(1, 1) ~= "r" or plus
   if (reads and not device.get) or (writes and not device.set) then
     return fail("EACCES")
   end
@@ -99,7 +99,7 @@ local function devicefile(device, mode)
         end
         data = tostring(got or "")
       end
-      local chunk = string.sub(data, at + 1, at + n)
+      local chunk = data:sub(at + 1, at + n)
       at = at + #chunk
       return chunk
     end,
