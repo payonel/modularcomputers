@@ -747,6 +747,13 @@ local function runpipeline(pipeline, background)
         cmd.argv = replaced
       end
     end
+    -- command name [args]: the command itself, past any alias (-p: the default PATH, as ours is)
+    while cmd.argv[1] == "command" and cmd.argv[2] and (cmd.argv[2] == "-p" or string.sub(cmd.argv[2], 1, 1) ~= "-") do
+      table.remove(cmd.argv, 1)
+      if cmd.argv[1] == "-p" then
+        table.remove(cmd.argv, 1)
+      end
+    end
   end
   local first = commands[1]
   -- assignments alone set the shell's variables; a lone redirection makes (or empties) its file
@@ -1106,6 +1113,40 @@ function builtins.type(argv, out)
         write(out, name .. " is " .. program .. "\n")
       else
         say("type: " .. name .. ": not found")
+        result = 1
+      end
+    end
+  end
+  return result
+end
+
+-- command -v name...: how each would be run (an alias's definition, a builtin's name, a program's
+-- path); -V says it in words, as type does. (command name [args] runs it: see runpipeline.)
+function builtins.command(argv, out)
+  local mode = argv[2]
+  if mode ~= "-v" and mode ~= "-V" then
+    if mode == nil then
+      return 0
+    end
+    say("command: " .. mode .. ": invalid option")
+    say("command: usage: command [-pVv] command [arg ...]")
+    return SYNTAX
+  end
+  if mode == "-V" then
+    return builtins.type({"type", table.unpack(argv, 3)}, out)
+  end
+  local result = 0
+  for k = 3, #argv do
+    local name = argv[k]
+    if aliases[name] then
+      write(out, "alias " .. name .. "=" .. quote(aliases[name]) .. "\n")
+    elseif builtins[name] then
+      write(out, name .. "\n")
+    else
+      local program = locate(name)
+      if program then
+        write(out, program .. "\n")
+      else
         result = 1
       end
     end

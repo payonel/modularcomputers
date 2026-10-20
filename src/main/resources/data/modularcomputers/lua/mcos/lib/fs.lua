@@ -131,6 +131,22 @@ function fs.dir(path)
   end
 end
 
+-- Where a command is, as execvp looks it up: a name with a / is itself; else the first file by that
+-- name in the directories of PATH (the environment's, unless given).
+function fs.command(name, path)
+  if string.find(name, "/", 1, true) then
+    return name
+  end
+  for dir in string.gmatch(path or os.getenv("PATH") or "/bin", "[^:]+") do
+    local candidate = fs.join(dir, name)
+    local st = sys.stat(candidate)
+    if st and st.type ~= "directory" then
+      return candidate
+    end
+  end
+  return nil, name .. ": command not found", "ENOENT"
+end
+
 -- ---- making and removing ------------------------------------------------------------------------
 
 function fs.mkdir(path, parents)

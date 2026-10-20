@@ -1,0 +1,85 @@
+-- lsdev [-i]: the devices on the bus, from /dev (each bus device's file there says what it is): its
+-- name, type, path (the slot address) and label, by type and number; -i its id address too.
+local fs = require("fs")
+
+local VIRTUAL = {console = true, tty = true, null = true, zero = true} -- (the kernel's own, not the bus's)
+local GAP = 2 -- spaces between columns
+
+local ids = false
+for _, word in ipairs(arg) do
+  if word == "-i" then
+    ids = true
+  else
+    io.stderr:write("lsdev: invalid option '", word, "'\nusage: lsdev [-i]\n")
+    return 1
+  end
+end
+
+local entries, why = fs.list("/dev")
+if not entries then
+  io.stderr:write("lsdev: ", why, "\n")
+  return 1
+end
+
+-- What a device's file says: its "key: value" lines.
+local function describe(name)
+  local file = io.open("/dev/" .. name)
+  if not file then
+    return nil
+  end
+  local info = {}
+  for line in file:lines() do
+    local key, value = string.match(line, "^([^:]+): (.*)$")
+    if key then
+      info[key] = value
+    end
+  end
+  file:close()
+  return info
+end
+
+-- A row's cells (the id's only with -i).
+local function row(name, kind, path, id, label)
+  if ids then
+    return {name, kind, path, id, label}
+  end
+  return {name, kind, path, label}
+end
+
+local rows = {row("NAME", "TYPE", "PATH", "ID", "LABEL")}
+local order = {}
+for _, entry in ipairs(entries) do
+  if not VIRTUAL[entry.name] then
+    local info = describe(entry.name)
+    if info then
+      local path = string.match(info.path or "", "^%(none") and "-" or info.path or "-"
+      order[#order + 1] = row(entry.name, info.type or "?", path, info.id or "-", info.label or "")
+    end
+  end
+end
+-- (by type, then number: /dev numbers each type's devices in bus order)
+table.sort(order, function(a, b)
+  local ka, na = string.match(a[1], "^(.-)(%d*)$")
+  local kb, nb = string.match(b[1], "^(.-)(%d*)$")
+  if ka ~= kb then
+    return ka < kb
+  end
+  return (tonumber(na) or 0) < (tonumber(nb) or 0)
+end)
+for _, row in ipairs(order) do
+  rows[#rows + 1] = row
+end
+
+local widths = {}
+for _, row in ipairs(rows) do
+  for c, cell in ipairs(row) do
+    widths[c] = math.max(widths[c] or 0, #cell)
+  end
+end
+for _, row in ipairs(rows) do
+  local cells = {}
+  for c, cell in ipairs(row) do
+    cells[c] = c < #row and cell .. string.rep(" ", widths[c] - #cell + GAP) or cell
+  end
+  io.write(table.concat(cells), "\n")
+end

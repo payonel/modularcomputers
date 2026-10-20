@@ -1,0 +1,102 @@
+-- du [-a] [-s] [-h|-b] [-c] [-d n] [path...]: how much each directory holds, all in it counted (and
+-- with -a each file too), in 1 KiB blocks: a file takes its size rounded up to whole blocks. -s only
+-- the paths given, -h human sizes (1.5K, 2M), -b bytes, -c a total, -d n down to n levels. Links are
+-- counted as themselves, never followed (as du's -P). With no path, ".".
+local fs = require("fs")
+
+local BLOCK = 1024 -- bytes a block
+
+local flags, paths, depth = {}, {}, math.huge
+local i = 1
+while i <= #arg do
+  local word = arg[i]
+  if word == "-d" or word == "--max-depth" then
+    i = i + 1
+    depth = math.tointeger(tonumber(arg[i]))
+    if not depth then
+      io.stderr:write("du: invalid maximum depth '", tostring(arg[i]), "'\n")
+      return 1
+    end
+  elseif string.sub(word, 1, 1) == "-" and #word > 1 then
+    for c in string.gmatch(string.sub(word, 2), ".") do
+      if not string.find("ashbc", c, 1, true) then
+        io.stderr:write("du: invalid option -- '", c, "'\n")
+        return 1
+      end
+      flags[c] = true
+    end
+  else
+    paths[#paths + 1] = word
+  end
+  i = i + 1
+end
+if #paths == 0 then
+  paths[1] = "."
+end
+if flags.s then
+  depth = 0
+end
+
+local function size(bytes)
+  if flags.b then
+    return tostring(bytes)
+  end
+  local blocks = (bytes + BLOCK - 1) // BLOCK
+  if not flags.h then
+    return tostring(blocks)
+  end
+  local n, units = blocks * BLOCK, {"", "K", "M", "G"}
+  local unit = 1
+  while n >= BLOCK and unit < #units do
+    n, unit = n / BLOCK, unit + 1
+  end
+  return (n < 10 and unit > 1) and string.format("%.1f%s", math.ceil(n * 10) / 10, units[unit])
+    or string.format("%d%s", math.ceil(n), units[unit])
+end
+
+-- What a file takes: its bytes (-b), or its whole blocks.
+local function taken(st)
+  if flags.b then
+    return st.size
+  end
+  return (st.size + BLOCK - 1) // BLOCK * BLOCK
+end
+
+local status = 0
+local function walk(path, level)
+  local st, why = fs.lstat(path)
+  if not st then
+    io.stderr:write("du: cannot access '", path, "': ", string.gsub(why, "^.-: ", ""), "\n")
+    status = 1
+    return 0
+  end
+  if st.type ~= "directory" then
+    local bytes = taken(st)
+    if level == 0 or (flags.a and level <= depth) then
+      io.write(size(bytes), "\t", path, "\n")
+    end
+    return bytes
+  end
+  local total = 0
+  local entries, err = fs.list(path)
+  if not entries then
+    io.stderr:write("du: ", err, "\n")
+    status = 1
+  end
+  for _, entry in ipairs(entries or {}) do
+    total = total + walk(path == "/" and "/" .. entry.name or path .. "/" .. entry.name, level + 1)
+  end
+  if level <= depth then
+    io.write(size(total), "\t", path, "\n")
+  end
+  return total
+end
+
+local grand = 0
+for _, path in ipairs(paths) do
+  grand = grand + walk(path, 0)
+end
+if flags.c then
+  io.write(size(grand), "\ttotal\n")
+end
+return status

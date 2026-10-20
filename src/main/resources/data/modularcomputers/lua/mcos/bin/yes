@@ -1,0 +1,9 @@
+-- yes [string...]: the words (or y), a line at a time, until it can't write (a pipe's reader is gone).
+local CHUNK = 4096 -- bytes written at a time (whole lines: as GNU yes, a buffer of them)
+
+local line = (#arg > 0 and table.concat(arg, " ") or "y") .. "\n"
+local chunk = string.rep(line, math.max(1, CHUNK // #line))
+io.stdout:setvbuf("no")
+while io.stdout:write(chunk) do
+end
+return 1

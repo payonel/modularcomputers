@@ -1,0 +1,130 @@
+-- find [path...] [expression]: walks directory trees (never into links, as find's -P), printing the
+-- paths that match. Tests, all of which must hold (as find joins them with -a): -name pattern and
+-- -iname (a shell pattern on the last name), -path pattern (on the whole path), -type f|d|l,
+-- -maxdepth n and -mindepth n (levels below the starting points), and -not or ! before a test to
+-- turn it around. -print is what it does anyway. With no path, ".".
+local fs = require("fs")
+
+local roots, tests = {}, {}
+local maxdepth, mindepth = math.huge, 0
+local i = 1
+while i <= #arg and string.sub(arg[i], 1, 1) ~= "-" and arg[i] ~= "!" do
+  roots[#roots + 1] = arg[i]
+  i = i + 1
+end
+if #roots == 0 then
+  roots[1] = "."
+end
+
+local function usage(why)
+  io.stderr:write("find: ", why, "\n")
+  os.exit(1)
+end
+
+local function operand(name)
+  i = i + 1
+  if arg[i] == nil then
+    usage("missing argument to '" .. name .. "'")
+  end
+  return arg[i]
+end
+
+-- A shell pattern as a Lua pattern matching all of a string (no special characters: itself).
+local function matcher(glob, fold)
+  local pattern = fs.pattern(fold and string.lower(glob) or glob)
+  if not pattern then
+    local literal = string.gsub(glob, "\\(.)", "%1")
+    pattern = "^" .. string.gsub(fold and string.lower(literal) or literal, "%W", "%%%0") .. "$"
+  end
+  return function(text)
+    return string.find(fold and string.lower(text) or text, pattern) ~= nil
+  end
+end
+
+local TYPES = {f = "file", d = "directory", l = "link"}
+local negate = false
+while i <= #arg do
+  local word = arg[i]
+  local test
+  if word == "-not" or word == "!" then
+    negate = not negate
+  elseif word == "-name" or word == "-iname" then
+    local match = matcher(operand(word), word == "-iname")
+    test = function(path)
+      return match(fs.name(path))
+    end
+  elseif word == "-path" then
+    local match = matcher(operand(word))
+    test = function(path)
+      return match(path)
+    end
+  elseif word == "-type" then
+    local wanted = TYPES[operand(word)]
+    if not wanted then
+      usage("Unknown argument to -type: " .. arg[i])
+    end
+    test = function(_, st)
+      return st.type == wanted or (wanted == "file" and st.type ~= "directory" and st.type ~= "link")
+    end
+  elseif word == "-maxdepth" or word == "-mindepth" then
+    local n = math.tointeger(tonumber(operand(word)))
+    if not n or n < 0 then
+      usage("Expected a positive decimal integer argument to " .. word .. ", but got '" .. arg[i] .. "'")
+    end
+    if word == "-maxdepth" then
+      maxdepth = n
+    else
+      mindepth = n
+    end
+  elseif word == "-print" then
+    -- (what it does anyway)
+  else
+    usage("unknown predicate '" .. word .. "'")
+  end
+  if test then
+    local positive, inverted = test, negate
+    tests[#tests + 1] = function(path, st)
+      return positive(path, st) ~= inverted
+    end
+    negate = false
+  end
+  i = i + 1
+end
+
+local status = 0
+local function visit(path, depth)
+  local st, why = fs.lstat(path)
+  if not st then
+    io.stderr:write("find: '", path, "': ", string.gsub(why, "^.-: ", ""), "\n")
+    status = 1
+    return
+  end
+  if depth >= mindepth then
+    local all = true
+    for _, test in ipairs(tests) do
+      if not test(path, st) then
+        all = false
+        break
+      end
+    end
+    if all then
+      io.write(path, "\n")
+    end
+  end
+  if st.type == "directory" and depth < maxdepth then
+    local entries, err = fs.list(path)
+    if not entries then
+      io.stderr:write("find: ", err, "\n")
+      status = 1
+      return
+    end
+    for _, entry in ipairs(entries) do
+      visit(path == "/" and "/" .. entry.name or path .. "/" .. entry.name, depth + 1)
+    end
+  end
+end
+
+for _, root in ipairs(roots) do
+  visit(root, 0)
+end
+return status

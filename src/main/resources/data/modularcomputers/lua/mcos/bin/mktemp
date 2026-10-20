@@ -1,0 +1,71 @@
+-- mktemp [-d] [-p dir] [-t] [template]: makes a new, empty file (or -d a directory) with a name no
+-- other has, and prints it. The template's trailing Xs (at least 3) become random letters and digits;
+-- without one, tmp.XXXXXXXXXX in $TMPDIR or /tmp. A template with no / goes in that directory too
+-- (-t, or -p dir: in dir).
+local sys = require("sys")
+local fs = require("fs")
+
+local MIN_XS = 3 -- the fewest Xs a template may end in
+local TRIES = 100 -- names tried before giving up
+local DEFAULT = "tmp.XXXXXXXXXX"
+local CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+
+local directory, dir, template = false, nil, nil
+local i = 1
+while i <= #arg do
+  local word = arg[i]
+  if word == "-d" then
+    directory = true
+  elseif word == "-t" then
+    dir = dir or os.getenv("TMPDIR") or "/tmp"
+  elseif word == "-p" then
+    i = i + 1
+    dir = arg[i]
+  elseif string.sub(word, 1, 1) == "-" and #word > 1 then
+    io.stderr:write("mktemp: invalid option -- '", string.sub(word, 2, 2), "'\n")
+    return 1
+  else
+    template = word
+  end
+  i = i + 1
+end
+if not template then
+  template, dir = DEFAULT, dir or os.getenv("TMPDIR") or "/tmp"
+end
+local xs = #string.match(template, "X*$")
+if xs < MIN_XS then
+  io.stderr:write("mktemp: too few X's in template '", template, "'\n")
+  return 1
+end
+if dir and not string.find(template, "/", 1, true) then
+  template = fs.join(dir, template)
+end
+
+local stem = string.sub(template, 1, #template - xs)
+for _ = 1, TRIES do
+  local name = {stem}
+  for _ = 1, xs do
+    local n = math.random(#CHARS)
+    name[#name + 1] = string.sub(CHARS, n, n)
+  end
+  local path = table.concat(name)
+  if not sys.lstat(path) then
+    local ok, why
+    if directory then
+      ok, why = sys.mkdir(path)
+    else
+      local fd
+      fd, why = sys.open(path, "w")
+      ok = fd and sys.close(fd)
+    end
+    if not ok then
+      io.stderr:write("mktemp: failed to create ", directory and "directory" or "file", " via template '",
+        template, "': ", why, "\n")
+      return 1
+    end
+    io.write(path, "\n")
+    return 0
+  end
+end
+io.stderr:write("mktemp: failed to create file via template '", template, "': File exists\n")
+return 1

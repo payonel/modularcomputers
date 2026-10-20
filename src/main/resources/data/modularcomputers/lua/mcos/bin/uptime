@@ -1,0 +1,46 @@
+-- uptime [-p]: how long the computer has been running, as procps's uptime says it (with no clock
+-- for the time of day and no load average: " up 1:05"); -p pretty ("up 1 hour, 5 minutes").
+local sys = require("sys")
+
+local MINUTE, HOUR, DAY = 60, 3600, 86400
+
+local pretty = false
+for _, word in ipairs(arg) do
+  if word == "-p" or word == "--pretty" then
+    pretty = true
+  else
+    io.stderr:write("uptime: invalid option '" .. word .. "'\nusage: uptime [-p]\n")
+    return 1
+  end
+end
+
+local seconds = math.floor(sys.uptime())
+local days = seconds // DAY
+local hours = seconds % DAY // HOUR
+local minutes = seconds % HOUR // MINUTE
+
+local function plural(n, word)
+  return n .. " " .. word .. (n == 1 and "" or "s")
+end
+
+if pretty then
+  local parts = {}
+  if days > 0 then
+    parts[#parts + 1] = plural(days, "day")
+  end
+  if hours > 0 then
+    parts[#parts + 1] = plural(hours, "hour")
+  end
+  if minutes > 0 or #parts == 0 then
+    parts[#parts + 1] = plural(minutes, "minute")
+  end
+  io.write("up ", table.concat(parts, ", "), "\n")
+else
+  local up = days > 0 and plural(days, "day") .. ", " or ""
+  if hours > 0 then
+    up = up .. string.format("%2d:%02d", hours, minutes)
+  else
+    up = up .. minutes .. " min"
+  end
+  io.write(" up ", up, "\n")
+end

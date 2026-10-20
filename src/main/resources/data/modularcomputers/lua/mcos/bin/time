@@ -1,0 +1,30 @@
+-- time command [args...]: runs a command and says on stderr how long it took (real time: as bash's
+-- time; no user or system times, which the kernel doesn't count), with the command's exit status.
+local sys = require("sys")
+local fs = require("fs")
+
+local KILLED = 128 -- a status of 128 + n: ended by signal n
+
+if #arg == 0 then
+  io.stderr:write("usage: time command [args...]\n")
+  return 2
+end
+local path, why = fs.command(arg[1])
+if not path then
+  io.stderr:write("time: ", why, "\n")
+  return 127
+end
+local started = sys.uptime()
+local pid, err = sys.spawn(path, {table.unpack(arg, 2)})
+if not pid then
+  io.stderr:write("time: ", arg[1], ": ", err, "\n")
+  return 126
+end
+local _, how, status = sys.waitpid(pid)
+local real = sys.uptime() - started
+io.stderr:write(string.format("\nreal\t%dm%.3fs\n", real // 60, real % 60))
+if how == "killed" then
+  local signals = sys.SIGNALS or {}
+  return KILLED + (signals[status] or 0)
+end
+return status

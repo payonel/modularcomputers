@@ -539,6 +539,44 @@ class McosTest {
 	}
 
 	@Test
+	void findDuTreeYesTimeUptimeMktempAndLsdev() {
+		file("w/a.txt", "x".repeat(1500));
+		file("w/s/b.lua", "y");
+		file("w/s/.h", "");
+		boot();
+		type("find /w -name '*.lua' > /r1; find /w -type d > /r2; find /w -mindepth 1 -maxdepth 1 -not -name s > /r3\r");
+		untilIdle();
+		type("du /w > /r4; du -s -b /w > /r5; tree /w > /r6; yes hi | head -n 3 > /r7\r");
+		untilIdle();
+		type("time true 2> /r8; uptime > /r9; mktemp > /r10; mktemp -d -p /w dXXX > /r11; lsdev > /r12; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("r1"))).isEqualTo("/w/s/b.lua\n");
+		assertThat(read(root().resolve("r2"))).isEqualTo("/w\n/w/s\n");
+		assertThat(read(root().resolve("r3"))).isEqualTo("/w/a.txt\n");
+		assertThat(read(root().resolve("r4"))).as("1 KiB blocks").isEqualTo("1\t/w/s\n3\t/w\n");
+		assertThat(read(root().resolve("r5"))).isEqualTo("1501\t/w\n");
+		assertThat(read(root().resolve("r6"))).isEqualTo("/w\n├── a.txt\n└── s\n    └── b.lua\n\n1 directory, 2 files\n");
+		assertThat(read(root().resolve("r7"))).isEqualTo("hi\nhi\nhi\n");
+		assertThat(read(root().resolve("r8"))).matches("\nreal\t0m\\d\\.\\d{3}s\n");
+		assertThat(read(root().resolve("r9"))).matches(" up \\d+ min\n");
+		assertThat(read(root().resolve("r10"))).matches("/tmp/tmp\\.[A-Za-z0-9]{10}\n");
+		String dir = read(root().resolve("r11")).strip();
+		assertThat(dir).matches("/w/d[A-Za-z0-9]{3}");
+		assertThat(root().resolve(dir.substring(1))).isDirectory();
+		assertThat(read(root().resolve("r12"))).startsWith("NAME").contains("storage0", "sata:0");
+	}
+
+	@Test
+	void commandRunsPastAliasesAndSaysHowNamesWouldRun() {
+		file("w/f", "");
+		boot();
+		type("alias ls='echo aliased'; ls > /r1; command ls /w > /r2; command -v ls cd sh nosuch > /r3; echo $? >> /r3\r");
+		untilFile(root().resolve("r3"), "alias ls='echo aliased'\ncd\n/bin/sh\n1\n");
+		assertThat(read(root().resolve("r1"))).isEqualTo("aliased\n");
+		assertThat(read(root().resolve("r2"))).isEqualTo("f\n");
+	}
+
+	@Test
 	void binLuaIsLuasStandaloneInterpreter() {
 		file("s.lua", """
 			local out = assert(io.open("/r1", "w"))

@@ -1,0 +1,87 @@
+-- tree [-a] [-d] [-L level] [--noreport] [dir...]: a directory's contents as a tree, then how many
+-- directories and files there were. -a names starting with a dot too, -d directories only, -L down to
+-- that many levels. Links show where they point (name -> target) and aren't followed.
+local fs = require("fs")
+
+local BRANCH, LAST, PIPE, SPACE = "├── ", "└── ", "│   ", "    "
+
+local flags, dirs, levels = {}, {}, math.huge
+local i = 1
+while i <= #arg do
+  local word = arg[i]
+  if word == "-L" then
+    i = i + 1
+    levels = math.tointeger(tonumber(arg[i]))
+    if not levels or levels < 1 then
+      io.stderr:write("tree: Invalid level, must be greater than 0.\n")
+      return 1
+    end
+  elseif word == "--noreport" then
+    flags.noreport = true
+  elseif string.sub(word, 1, 1) == "-" and #word > 1 then
+    for c in string.gmatch(string.sub(word, 2), ".") do
+      if not string.find("ad", c, 1, true) then
+        io.stderr:write("tree: Invalid argument -`", c, "'.\n")
+        return 1
+      end
+      flags[c] = true
+    end
+  else
+    dirs[#dirs + 1] = word
+  end
+  i = i + 1
+end
+if #dirs == 0 then
+  dirs[1] = "."
+end
+
+local ndirs, nfiles = 0, 0
+local function draw(path, prefix, level)
+  local entries = fs.list(path)
+  if not entries then
+    return
+  end
+  local shown = {}
+  for _, entry in ipairs(entries) do
+    if (flags.a or string.sub(entry.name, 1, 1) ~= ".") and (not flags.d or entry.type == "directory") then
+      shown[#shown + 1] = entry
+    end
+  end
+  for n, entry in ipairs(shown) do
+    local last = n == #shown
+    local full = fs.join(path, entry.name)
+    local text = entry.name
+    if entry.type == "link" then
+      text = text .. " -> " .. (fs.readlink(full) or "?")
+    end
+    io.write(prefix, last and LAST or BRANCH, text, "\n")
+    if entry.type == "directory" then
+      ndirs = ndirs + 1
+      if level < levels then
+        draw(full, prefix .. (last and SPACE or PIPE), level + 1)
+      end
+    else
+      nfiles = nfiles + 1
+    end
+  end
+end
+
+local status = 0
+for _, dir in ipairs(dirs) do
+  local st = fs.stat(dir)
+  if not st or st.type ~= "directory" then
+    io.write(dir, " [error opening dir]\n")
+    status = 2
+  else
+    io.write(dir, "\n")
+    draw(dir, "", 1)
+  end
+end
+if not flags.noreport then
+  io.write("\n", ndirs, ndirs == 1 and " directory" or " directories")
+  if not flags.d then
+    io.write(", ", nfiles, nfiles == 1 and " file" or " files")
+  end
+  io.write("\n")
+end
+return status
