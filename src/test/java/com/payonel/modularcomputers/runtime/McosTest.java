@@ -80,8 +80,10 @@ class McosTest {
 	private void boot() {
 		LuaScripts.copyTree("mcos", root());
 		devices.put("sata:0", new Disk(DiskTier.TIER_1, root()));
+		Eeprom eeprom = new Eeprom(LuaScripts.read("eeprom/boot"));
+		devices.put("eeprom", eeprom); // (on the bus at its slot, as a board puts it)
 		machine.setDevices(new LinkedHashMap<>(devices));
-		machine.board().setEeprom(new Eeprom(LuaScripts.read("eeprom/boot")));
+		machine.board().setEeprom(eeprom);
 		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
 		untilIdle();
 	}
@@ -229,13 +231,34 @@ class McosTest {
 	}
 
 	@Test
-	void devListsTheBusAndEachFileSaysBothAddresses() {
+	void devHoldsOnlyDataTheEepromIsReadAndWrittenThroughItAndLsdevAsksTheKernel() {
 		dataDisk();
 		boot();
-		type("ls /dev > /ld; cat /dev/storage* > /d\r");
-		settle(() -> Files.isRegularFile(root().resolve("d")) && read(root().resolve("d")).contains("sata:1"));
-		assertThat(read(root().resolve("ld"))).contains("console\n", "null\n", "storage0\n", "storage1\n", "terminal0\n");
-		assertThat(read(root().resolve("d"))).contains("path: sata:0", "path: sata:1", "type: storage", "id: ");
+		String image = machine.board().eeprom().orElseThrow().image();
+		type("ls /dev > /ld; cat /dev/eeprom0 > /e; lsdev -i > /devs\r");
+		untilFile(root().resolve("e"), image);
+		settle(() -> Files.isRegularFile(root().resolve("devs")) && read(root().resolve("devs")).contains("terminal0"));
+		assertThat(read(root().resolve("ld"))).as("only data: no storage or terminal files")
+			.contains("console\n", "null\n", "eeprom0\n").doesNotContain("storage", "terminal");
+		assertThat(read(root().resolve("devs"))).contains("storage0", "storage1", "sata:1", "eeprom0", "terminal0", "id:");
+		// written: one set at close, the whole of it (cp writes it in pieces)
+		file("new.lua", "-- " + "x".repeat(9000) + "\nboard.halt()\n");
+		type("cp /new.lua /dev/eeprom0; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(machine.board().eeprom().orElseThrow().image()).isEqualTo(read(root().resolve("new.lua")));
+	}
+
+	@Test
+	void theKernelsViewOfTheBusCatchesUpWithAHotPlug() {
+		boot();
+		type("lsdev > /before\r");
+		settle(() -> Files.isRegularFile(root().resolve("before")) && read(root().resolve("before")).contains("storage0"));
+		assertThat(read(root().resolve("before"))).doesNotContain("storage1");
+		devices.put("sata:1", new Disk(DiskTier.TIER_1, world.resolve("late")));
+		machine.setDevices(new LinkedHashMap<>(devices));
+		untilIdle();
+		type("lsdev > /after\r");
+		settle(() -> Files.isRegularFile(root().resolve("after")) && read(root().resolve("after")).contains("storage1"));
 	}
 
 	@Test

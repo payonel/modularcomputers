@@ -9,11 +9,13 @@ lsdev \- list the devices on the bus
 lists the devices on the computer's bus, as a table with a header row:
 .TP
 .B NAME
-The device's file in
-.IR /dev ,
-named by its type and its place among devices of that type in bus order
+The kernel's name for it: its type and its place among devices of that
+type in bus order
 .RB ( terminal0 ,
 .BR storage1 ).
+A device with data to read or write (the EEPROM) has a file by that name
+in
+.IR /dev .
 .TP
 .B TYPE
 What kind of device it is.
@@ -35,15 +37,9 @@ which names it however it is connected. Shown only with
 .B LABEL
 The name the player gave its item, if any.
 .PP
-Rows are sorted by type, then number. The information comes from reading
-each device's file in
-.IR /dev ;
-the kernel's own files there
-.RB ( console ,
-.BR tty ,
-.BR null ,
-.BR zero )
-are not listed.
+Rows are in bus order. The list is the kernel's: it reads the bus when
+the bus says it changed (or a device it called is gone), so just after a
+change it may be a moment behind.
 .SH OPTIONS
 .TP
 .B \-i
@@ -51,9 +47,7 @@ Add the
 .B ID
 column.
 .SH EXIT STATUS
-0 on success; 1 on any other argument, or if
-.I /dev
-cannot be read.
+0 on success; 1 on any other argument.
 .SH NOTES
 Bus positions (the numbers in the case view) are not addresses; programs
 name devices by their path or id.

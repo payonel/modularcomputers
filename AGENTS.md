@@ -140,8 +140,20 @@ program's start). Commands are programs in `/bin`; the shell holds only shell be
 is a library (`/lib/readline.lua`), as GNU readline is for bash and lua. When choosing behavior,
 copy Linux/POSIX/GNU (and say where it can't). From OpenOS's experience: **no lazy loading** (OpenOS
 split libraries to fit OC's RAM; it cost speed, complexity and more memory than loading whole) and
-**no legacy compatibility** (supporting old programs made OpenOS complex). Not decided yet: how user programs reach devices
-(`/dev` files and `ioctl` is the plan; the user has concerns to discuss first).
+**no legacy compatibility** (supporting old programs made OpenOS complex). 
+**`/dev` holds only data** (user, 2026-10-20), flat, as Linux's: the kernel's `console`, `tty`, `null`,
+`zero`, and a node for each bus device with a `get` or `set` method (the EEPROM sits there too: not
+where Linux keeps one, but convenient for users, the user's call). Reading gives `get`'s answer;
+what's written goes to `set` in one call at close, and **the device decides what `set` means**
+(replace, append). Descriptions of devices aren't data: they come from the kernel (`sys.devices`,
+for `lsdev`), and a `/sys` tree is postponed. **The kernel caches the bus list, eventually
+correct** (as udev fills `/dev` in after a hot-plug): it's read again on the bus's hot-plug
+interrupt and when a call fails because the device is gone, so no `/dev` lookup ever makes a board
+call (each costs a thread hop, about 50 times a trap). That's safe because **an open file holds the
+device's id, never its name**: a stale name can't send a write to another device; a gone one fails
+with ENODEV. Why not `board` in user space: it would save only the traps (the board calls stay) and
+lose the kernel's ownership of devices; if a fast path is ever needed, grant one device to one
+process (as VFIO does).
 
 ## 4. Easy to miss (a change that needs another)
 
@@ -255,10 +267,13 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
 
 ### mcos
 
-- **Devices for user programs** (user, 2026-10-19: hold off; they have concerns to discuss first):
-  programs can't reach devices (`board` is the kernel's). The plan so far is `/dev` files and
-  `ioctl`. Waiting on it: editing the EEPROM through a `/dev` file (the user: not a `flash`
-  command), and the REPL as a workbench for trying devices without writing a script.
+- **More devices for user programs:** only devices with `get`/`set` have `/dev` nodes; the rest
+  (cards, terminals' own methods) can't be reached from a program yet. The REPL as a workbench for
+  trying devices without writing a script waits on that. A `/sys` tree (one file per attribute) is
+  postponed (user, 2026-10-20).
+- **A busy kernel learns of a hot-plug late:** its view of the bus is read again when it idles or a
+  call fails. To make it prompt with no polling: the host pushes the new bus list into a kernel ring
+  when it changes, as a terminal's keys are pushed.
 - **A tty per terminal:** the boot option (`console=`) names one device; a tty, interrupt handler
   and shell per terminal isn't started yet.
 - **Signal handlers run only on the way back from a syscall** (a stopped process can't be made to
@@ -269,8 +284,7 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
 - **The shell's language:** `if`, `for`, `while`, `case`, functions, here-documents (user: maybe
   later).
 - `/proc`; a filesystem on raw disks; permissions and users; `os.date` (no real-time clock: the time
-  is seconds since boot); a page cache; noticing the bus's hot-plug at once, not when the kernel
-  idles.
+  is seconds since boot); a page cache.
 - **Later, from the user's review of OpenOS (2026-10-19):**
   - `type -a`;
   - `install`, once loot software is worked out;

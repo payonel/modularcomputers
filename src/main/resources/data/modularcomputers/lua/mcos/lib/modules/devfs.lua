@@ -1,9 +1,12 @@
--- devfs: /dev, the kernel's devices as files, as Linux's devtmpfs: console (the kernel's console
--- tty), tty (the opening process's own terminal), null and zero; and every device on the bus, as
--- the board lists it, named by its type and its place among those of its type in bus order
--- (terminal0, storage1: as Linux's sda, ttyS0). Reading one gives what the board says of it: both
--- addresses board.invoke takes (its path, the slot it's in, if it has one: sata:0; and its id,
--- id:<uuid>, however it's connected), its type and label, and what its kind adds (a tier, a size).
+-- devfs: /dev, devices as files, as Linux's devtmpfs: only data. The kernel's own: console (its
+-- console tty), tty (the opening process's own terminal), null and zero; and every device on the
+-- bus that has data to read or write (a get or a set), by the kernel's name for it (eeprom0). Reading
+-- a device's file gives what its get returns, taken at the first read; what's written to it goes to
+-- its set, all of it in one call, when the file is closed; the device decides what that means
+-- (replace, append...). An open file holds the device's id: it reaches that device or fails
+-- (ENODEV, and the kernel reads the bus again), whatever happens to the names meanwhile. The names
+-- come from the kernel's view of the bus (k.devices), which may be a moment behind: no lookup here
+-- makes a board call.
 local k, vfs = ...
 
 local fail = vfs.fail
@@ -67,61 +70,70 @@ local function name(path)
   return string.match(path, "^/([^/]+)$")
 end
 
--- The bus's devices as /dev names them: {name = {address, id, type}}, and the names in bus order.
-local function busdevices()
-  local byname, names, counts = {}, {}, {}
-  for _, device in ipairs(board.list()) do
-    local kind = string.gsub(device.type or "device", "[^%w]", "")
-    local n = counts[kind] or 0
-    counts[kind] = n + 1
-    local entry = kind .. n
-    byname[entry] = device
-    names[#names + 1] = entry
+-- A bus device with data, by its /dev name; nil if there's none (or it has no get or set).
+local function datadevice(path)
+  local device = k.devices.byname[name(path) or ""]
+  if device and (device.get or device.set) then
+    return device
   end
-  return byname, names
 end
 
--- What a bus device's file says: "key: value" lines, its addresses first.
-local INFO_FIRST = {"address", "id", "type", "label"}
-
-local function describe(device)
-  local info = board.info(device.address) or {}
-  local lines = {}
-  local path = device.address ~= device.id and device.address or nil
-  lines[#lines + 1] = "path: " .. (path or "(none: not in a slot)")
-  lines[#lines + 1] = "id: " .. tostring(device.id or "(none)")
-  lines[#lines + 1] = "type: " .. tostring(device.type)
-  if info.label then
-    lines[#lines + 1] = "label: " .. tostring(info.label)
+-- A device call's failure as an errno: a device that's gone is ENODEV (and the kernel's view of the
+-- bus is read again: it was out of date); anything else, EIO.
+local function failed(why)
+  if string.find(tostring(why), "^no such device") then
+    k.refreshdevices()
+    return fail("ENODEV")
   end
-  local keys = {}
-  for key in pairs(info) do
-    local first = false
-    for _, known in ipairs(INFO_FIRST) do
-      if key == known then
-        first = true
-      end
-    end
-    if not first then
-      keys[#keys + 1] = key
-    end
-  end
-  table.sort(keys)
-  for _, key in ipairs(keys) do
-    lines[#lines + 1] = key .. ": " .. tostring(info[key])
-  end
-  return table.concat(lines, "\n") .. "\n"
+  return fail("EIO")
 end
 
--- A file whose contents are fixed when it's opened.
-local function textfile(text)
-  local at = 0
+-- An open device file: reads from what get gave (taken at the first read), writes kept for one set
+-- at close.
+local function devicefile(device, mode)
+  local first = string.sub(mode, 1, 1)
+  local readable = first == "r" or string.find(mode, "+", 1, true) ~= nil
+  local writable = first ~= "r" or string.find(mode, "+", 1, true) ~= nil
+  if (readable and not device.get) or (writable and not device.set) then
+    return fail("EACCES")
+  end
+  local id = device.id
+  local data, at = nil, 0
+  local written = nil
   return {
     type = "device",
     read = function(self, n)
-      local data = string.sub(text, at + 1, at + n)
-      at = at + #data
-      return data
+      if not readable then
+        return fail("EBADF")
+      end
+      if data == nil then
+        local ok, got = board.invoke(id, "get")
+        if not ok then
+          return failed(got)
+        end
+        data = tostring(got or "")
+      end
+      local chunk = string.sub(data, at + 1, at + n)
+      at = at + #chunk
+      return chunk
+    end,
+    write = function(self, bytes)
+      if not writable then
+        return fail("EBADF")
+      end
+      written = written or {}
+      written[#written + 1] = bytes
+      return #bytes
+    end,
+    close = function(self)
+      if written then
+        local ok, why = board.invoke(id, "set", table.concat(written))
+        written = nil
+        if not ok then
+          return failed(why)
+        end
+      end
+      return true
     end,
   }
 end
@@ -131,20 +143,18 @@ function fs:open(path, mode, process)
   if make then
     return make(process)
   end
-  local device = busdevices()[name(path) or ""]
+  local device = datadevice(path)
   if not device then
     return fail(path == "/" and "EISDIR" or "ENOENT")
-  elseif mode ~= "r" then
-    return fail("EACCES")
   end
-  return textfile(describe(device))
+  return devicefile(device, mode)
 end
 
 function fs:stat(path)
   if path == "/" then
     return {type = "directory", size = 0, modified = 0}
   end
-  if devices[name(path) or ""] or busdevices()[name(path) or ""] then
+  if devices[name(path) or ""] or datadevice(path) then
     return {type = "device", size = 0, modified = 0}
   end
   return fail("ENOENT")
@@ -158,9 +168,10 @@ function fs:list(path)
   for device in pairs(devices) do
     entries[#entries + 1] = {name = device, type = "device"}
   end
-  local _, names = busdevices()
-  for _, device in ipairs(names) do
-    entries[#entries + 1] = {name = device, type = "device"}
+  for _, device in ipairs(k.devices.list) do
+    if device.get or device.set then
+      entries[#entries + 1] = {name = device.name, type = "device"}
+    end
   end
   return entries
 end

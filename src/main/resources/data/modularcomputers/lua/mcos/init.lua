@@ -77,6 +77,45 @@ local devfs = module("devfs", k, vfs)
 local newpipe = module("pipe", k, vfs)
 local tmpfs = module("tmpfs", k, vfs)
 
+-- The bus as the kernel last read it: each device's name (its type and its place among those of its
+-- type in bus order: storage0, eeprom0, as Linux's sda, ttyS0), id (the address it's used by, whatever
+-- slot or cable it's on), slot path (nil when it isn't in one), type, label, and whether it has a
+-- get and a set (data /dev can read and write). It may be out of date, and is correct eventually
+-- (as Linux's /dev, which udev fills in after the fact): it's read again when the bus's hot-plug
+-- interrupt comes and when a call to a device fails because the device is gone, never on a /dev
+-- lookup. Nothing depends on it being fresh: an open file holds a device's id, so it reaches that
+-- device or fails (ENODEV), never another one.
+local devices = {list = {}, byname = {}}
+k.devices = devices
+local described = {} -- by id: {label, get, set}, asked once a device (an id never changes what it is)
+
+function k.refreshdevices()
+  local list, byname, counts = {}, {}, {}
+  for _, device in ipairs(board.list()) do
+    local kind = string.gsub(device.type or "device", "[^%w]", "")
+    local n = counts[kind] or 0
+    counts[kind] = n + 1
+    local id = device.id or device.address
+    local about = described[id]
+    if not about then
+      local info = board.info(device.address) or {}
+      about = {label = info.label}
+      for _, method in ipairs(board.methods(device.address) or {}) do
+        if method == "get" or method == "set" then
+          about[method] = true
+        end
+      end
+      described[id] = about
+    end
+    local slot = device.address ~= device.id and not string.find(device.address, "^id:") and device.address or nil
+    local entry = {name = kind .. n, id = id, path = slot,
+      type = device.type, label = about.label, get = about.get, set = about.set}
+    list[#list + 1], byname[entry.name] = entry, entry
+  end
+  devices.list, devices.byname = list, byname
+  return list
+end
+
 -- printk: the kernel's messages go to the console.
 local console
 local function printk(text)
@@ -872,6 +911,16 @@ function syscalls.image(p, request, file)
   return image(at)
 end
 
+-- The devices on the bus, as the kernel knows them (it may be a moment behind): {name, id, path,
+-- type, label} each, in bus order (lsdev).
+function syscalls.devices()
+  local list = {}
+  for i, device in ipairs(devices.list) do
+    list[i] = {name = device.name, id = device.id, path = device.path, type = device.type, label = device.label}
+  end
+  return list
+end
+
 function syscalls.environ(p)
   return copy(p.environ)
 end
@@ -996,18 +1045,21 @@ end
 
 local function hotplug()
   local present = {[root] = true}
-  for _, device in ipairs(board.list()) do
-    if device.type == "storage" and device.address ~= root and device.id ~= root then
-      present[device.address] = true
+  for _, device in ipairs(k.refreshdevices()) do
+    local address = device.path or device.id
+    if device.type == "storage" and address ~= root and device.id ~= root then
+      present[address] = true
       local mounted = false
       for _, mount in ipairs(vfs.mounts) do
-        if mount.source == device.address then
+        if mount.source == address then
           mounted = true
         end
       end
-      local _, mode = board.invoke(device.address, "getMode")
-      if not mounted and mode == "hfs" then
-        vfs.mount(mountpoint(device.address), hfs(device.address), device.address, true)
+      if not mounted then
+        local _, mode = board.invoke(address, "getMode")
+        if mode == "hfs" then
+          vfs.mount(mountpoint(address), hfs(address), address, true)
+        end
       end
     end
   end
