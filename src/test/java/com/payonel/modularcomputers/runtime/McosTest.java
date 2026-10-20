@@ -235,15 +235,15 @@ class McosTest {
 		dataDisk();
 		boot();
 		String image = machine.board().eeprom().orElseThrow().image();
-		type("ls /dev > /ld; cat /dev/eeprom0 > /e; lsdev -i > /devs\r");
+		type("ls /dev > /ld; cat /dev/eeprom > /e; lsdev -i > /devs\r");
 		untilFile(root().resolve("e"), image);
 		settle(() -> Files.isRegularFile(root().resolve("devs")) && read(root().resolve("devs")).contains("terminal0"));
 		assertThat(read(root().resolve("ld"))).as("only data: no storage or terminal files")
-			.contains("console\n", "null\n", "eeprom0\n").doesNotContain("storage", "terminal");
-		assertThat(read(root().resolve("devs"))).contains("storage0", "storage1", "sata:1", "eeprom0", "terminal0", "id:");
+			.contains("console\n", "null\n", "eeprom\n").doesNotContain("storage", "terminal");
+		assertThat(read(root().resolve("devs"))).contains("storage0", "storage1", "sata:1", "eeprom ", "terminal0", "id:");
 		// written: one set at close, the whole of it (cp writes it in pieces)
 		file("new.lua", "-- " + "x".repeat(9000) + "\nboard.halt()\n");
-		type("cp /new.lua /dev/eeprom0; touch /done\r");
+		type("cp /new.lua /dev/eeprom; touch /done\r");
 		untilFile(root().resolve("done"), "");
 		assertThat(machine.board().eeprom().orElseThrow().image()).isEqualTo(read(root().resolve("new.lua")));
 	}

@@ -1,6 +1,6 @@
 -- devfs: /dev, devices as files, as Linux's devtmpfs: only data. The kernel's own: console (its
 -- console tty), tty (the opening process's own terminal), null and zero; and every device on the
--- bus that has data to read or write (a get or a set), by the kernel's name for it (eeprom0). Reading
+-- bus that has data to read or write (a get or a set), by the kernel's name for it (eeprom). Reading
 -- a device's file gives what its get returns, taken at the first read; what's written to it goes to
 -- its set, all of it in one call, when the file is closed; the device decides what that means
 -- (replace, append...). An open file holds the device's id: it reaches that device or fails

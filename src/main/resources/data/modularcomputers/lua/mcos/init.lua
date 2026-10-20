@@ -78,7 +78,8 @@ local newpipe = module("pipe", k, vfs)
 local tmpfs = module("tmpfs", k, vfs)
 
 -- The bus as the kernel last read it: each device's name (its type and its place among those of its
--- type in bus order: storage0, eeprom0, as Linux's sda, ttyS0), id (the address it's used by, whatever
+-- type in bus order: storage0, terminal1, as Linux's sda, ttyS0; a device the board has one slot
+-- for, and nowhere else to be, is just its type: eeprom, as Linux's /dev/mem), id (the address it's used by, whatever
 -- slot or cable it's on), slot path (nil when it isn't in one), type, label, and whether it has a
 -- get and a set (data /dev can read and write). It may be out of date, and is correct eventually
 -- (as Linux's /dev, which udev fills in after the fact): it's read again when the bus's hot-plug
@@ -88,6 +89,7 @@ local tmpfs = module("tmpfs", k, vfs)
 local devices = {list = {}, byname = {}}
 k.devices = devices
 local described = {} -- by id: {label, get, set}, asked once a device (an id never changes what it is)
+local SINGLE = {eeprom = "eeprom"} -- the slots of devices there's only ever one of: named without a number
 
 function k.refreshdevices()
   local list, byname, counts = {}, {}, {}
@@ -108,7 +110,7 @@ function k.refreshdevices()
       described[id] = about
     end
     local slot = device.address ~= device.id and not string.find(device.address, "^id:") and device.address or nil
-    local entry = {name = kind .. n, id = id, path = slot,
+    local entry = {name = SINGLE[slot] or kind .. n, id = id, path = slot,
       type = device.type, label = about.label, get = about.get, set = about.set}
     list[#list + 1], byname[entry.name] = entry, entry
   end
