@@ -70,11 +70,21 @@ class RedstoneTerminalTest {
 	}
 
 	@Test
+	void aRedstoneSidesLevelIsTheStrongestSignalThereComingInOrItsOwn() {
+		input[NORTH] = 6;
+		terminal.set(args(Map.of("north", Map.of("level", 3L))));
+		assertThat(sides(terminal.get(args()).first()).get("north")).containsEntry("level", 6L).containsEntry("powered", true);
+		input[NORTH] = 0;
+		terminal.set(args(Map.of("north", Map.of("level", 0L))));
+		assertThat(sides(terminal.get(args()).first()).get("north")).containsEntry("level", 0L).containsEntry("powered", false);
+	}
+
+	@Test
 	void setPutsOutALevelOnARedstoneSideAndIgnoresItOnACableSide() {
 		var sides = sides(terminal.set(args(Map.of("north", Map.of("level", 9L), "top", Map.of("level", 5L)))).first());
 		assertThat(terminal.output(NORTH)).isEqualTo(9);
 		assertThat(terminal.output(TOP)).as("a cable side's level is ignored").isZero();
-		assertThat(sides.get("north")).containsEntry("powered", true);
+		assertThat(sides.get("north")).containsEntry("powered", true).as("its own signal is the level there").containsEntry("level", 9L);
 		assertThat(sides).as("set answers every side").hasSize(6);
 		assertThat(paid).as("a change costs power; no change, nothing").containsExactly(RedstoneTerminal.CHANGE_COST);
 		assertThat(outputChanges).isEqualTo(1);

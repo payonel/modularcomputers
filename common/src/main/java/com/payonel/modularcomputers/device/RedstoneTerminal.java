@@ -24,9 +24,9 @@ import java.util.Set;
  * <p>
  * Programs see the sides as a table, by name: {@code {north = {mode = "redstone", level = 7,
  * powered = true}, ...}}. {@code mode} is {@code "cable"} or {@code "redstone"}; {@code level} is a
- * cable side's cable (1) or the signal coming in on a redstone side (0 to 15; it may include the
- * terminal's own, as the world sees it); {@code powered} whether the terminal puts out a signal
- * there. {@code get} and {@code set} answer the whole table; {@code set} takes the same table, and
+ * cable side's cable (1) or the signal on a redstone side (0 to 15): the strongest there, coming in
+ * or its own (user, 2026-10-20: the level detected, powered or not); {@code powered} whether the
+ * terminal puts out a signal there. {@code get} and {@code set} answer the whole table; {@code set} takes the same table, and
  * changes only what it names.
  */
 public final class RedstoneTerminal implements Device {
@@ -141,7 +141,7 @@ public final class RedstoneTerminal implements Device {
 		}
 	}
 
-	@Method(doc = "get([sides]): every side as {mode, level, powered} by name (north, south, east, west, top, bottom); with a table, only the sides it names (as keys or as a list)")
+	@Method(doc = "get([sides]): every side as {mode, level (a redstone side's signal, coming in or its own), powered} by name (north, south, east, west, top, bottom); with a table, only the sides it names (as keys or as a list)")
 	public Result get(Arguments args) {
 		Map<?, ?> asked = args.optTable(0);
 		return Result.ok(sides(asked == null ? allSides() : named(asked)));
@@ -242,7 +242,7 @@ public final class RedstoneTerminal implements Device {
 			Map<String, Object> fields = new LinkedHashMap<>();
 			boolean redstone = redstone(side);
 			fields.put("mode", redstone ? REDSTONE : CABLE);
-			fields.put("level", redstone ? (long) world.input(side) : CABLE_LEVEL);
+			fields.put("level", redstone ? (long) Math.max(world.input(side), output[side]) : CABLE_LEVEL);
 			fields.put("powered", redstone && output[side] > 0);
 			sides.put(SIDES.get(side), fields);
 		}
