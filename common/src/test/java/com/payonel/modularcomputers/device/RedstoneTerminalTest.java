@@ -72,31 +72,38 @@ class RedstoneTerminalTest {
 	@Test
 	void aRedstoneSidesLevelIsTheStrongestSignalThereComingInOrItsOwn() {
 		input[NORTH] = 6;
-		terminal.set(args(Map.of("north", Map.of("level", 3L))));
+		terminal.set(args(Map.of("north", Map.of("powered", 3L))));
 		assertThat(sides(terminal.get(args()).first()).get("north")).containsEntry("level", 6L).containsEntry("powered", 3L);
 		input[NORTH] = 0;
-		terminal.set(args(Map.of("north", Map.of("level", 0L))));
+		terminal.set(args(Map.of("north", Map.of("powered", 0L))));
 		assertThat(sides(terminal.get(args()).first()).get("north")).containsEntry("level", 0L).containsEntry("powered", 0L);
 	}
 
 	@Test
-	void setPutsOutALevelOnARedstoneSideAndIgnoresItOnACableSide() {
-		var sides = sides(terminal.set(args(Map.of("north", Map.of("level", 9L), "top", Map.of("level", 5L)))).first());
+	void setPoweredPutsOutASignalOnARedstoneSideAndIsIgnoredOnACableSide() {
+		var sides = sides(terminal.set(args(Map.of("north", Map.of("powered", 9L), "top", Map.of("powered", 5L)))).first());
 		assertThat(terminal.output(NORTH)).isEqualTo(9);
-		assertThat(terminal.output(TOP)).as("a cable side's level is ignored").isZero();
+		assertThat(terminal.output(TOP)).as("a cable side's powered is ignored").isZero();
 		assertThat(sides.get("north")).containsEntry("powered", 9L).as("its own signal is the level there").containsEntry("level", 9L);
 		assertThat(sides).as("set answers every side").hasSize(6);
 		assertThat(paid).as("a change costs power; no change, nothing").containsExactly(RedstoneTerminal.CHANGE_COST);
 		assertThat(outputChanges).isEqualTo(1);
-		terminal.set(args(Map.of("north", Map.of("level", 9L))));
+		terminal.set(args(Map.of("north", Map.of("powered", 9L))));
 		assertThat(paid).hasSize(1);
-		terminal.set(args(Map.of("north", Map.of("level", 99L))));
+		terminal.set(args(Map.of("north", Map.of("powered", 99L))));
 		assertThat(terminal.output(NORTH)).as("15 at most").isEqualTo(RedstoneTerminal.MAX_SIGNAL);
 	}
 
 	@Test
+	void setIgnoresALevelItIsWhatsDetected() {
+		terminal.set(args(Map.of("north", Map.of("level", 9L))));
+		assertThat(terminal.output(NORTH)).isZero();
+		assertThat(paid).isEmpty();
+	}
+
+	@Test
 	void settingASidesModeOpensOrClosesItsPort() {
-		var sides = sides(terminal.set(args(Map.of("top", Map.of("mode", "redstone", "level", 4L)))).first());
+		var sides = sides(terminal.set(args(Map.of("top", Map.of("mode", "redstone", "powered", 4L)))).first());
 		assertThat(closed[TOP]).isTrue();
 		assertThat(sides.get("top")).as("closed: a redstone side, and its level counts").containsEntry("mode", "redstone").containsEntry("powered", 4L);
 		terminal.set(args(Map.of("top", Map.of("mode", "cable"))));
@@ -115,19 +122,19 @@ class RedstoneTerminalTest {
 
 	@Test
 	void aBadTableChangesNothing() {
-		assertThatThrownBy(() -> terminal.set(args(Map.of("north", Map.of("level", 3L), "up", Map.of("level", 1L)))))
+		assertThatThrownBy(() -> terminal.set(args(Map.of("north", Map.of("powered", 3L), "up", Map.of("powered", 1L)))))
 			.hasMessageContaining("no such side: up");
 		assertThatThrownBy(() -> terminal.set(args(Map.of("north", Map.of("mode", "red")))))
 			.hasMessageContaining("a tier 1 redstone terminal has no color mode");
 		assertThatThrownBy(() -> terminal.set(args(Map.of("north", Map.of("mode", "bundled"))))).hasMessageContaining("no such mode");
-		assertThatThrownBy(() -> terminal.set(args(Map.of("north", Map.of("level", 2.5))))).hasMessageContaining("integer expected");
+		assertThatThrownBy(() -> terminal.set(args(Map.of("north", Map.of("powered", 2.5))))).hasMessageContaining("powered: integer expected");
 		assertThat(terminal.output(NORTH)).isZero();
 		assertThat(paid).isEmpty();
 	}
 
 	@Test
 	void whatItPutsOutHoldsWhenThePowerGoes() {
-		terminal.set(args(Map.of("north", Map.of("level", 12L))));
+		terminal.set(args(Map.of("north", Map.of("powered", 12L))));
 		terminal.powerOff();
 		assertThat(terminal.output(NORTH)).isEqualTo(12);
 	}

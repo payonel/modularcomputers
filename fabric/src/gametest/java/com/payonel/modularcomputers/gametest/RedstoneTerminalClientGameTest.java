@@ -38,7 +38,7 @@ public class RedstoneTerminalClientGameTest implements FabricClientGameTest {
 			singleplayer.getServer().runOnServer(server -> {
 				var be = (RedstoneTerminalBlockEntity) server.overworld().getBlockEntity(terminal);
 				be.cards().setItem(RedstoneTerminalBlockEntity.BATTERY_SLOT, ModItems.TIER1_BATTERY.charged());
-				be.device().set(new Arguments(List.of(Map.of("east", Map.of("level", 15L)))));
+				be.device().set(new Arguments(List.of(Map.of("east", Map.of("powered", 15L)))));
 			});
 			teleport(singleplayer, feet, 180);
 			context.getInput().lookAt(terminal);

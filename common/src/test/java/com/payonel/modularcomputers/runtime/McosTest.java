@@ -253,7 +253,7 @@ class McosTest {
 		com.payonel.modularcomputers.device.RedstoneTerminal terminal = new com.payonel.modularcomputers.device.RedstoneTerminal();
 		devices.put("id:redstone", terminal);
 		boot();
-		file("set.txt", "{north = {level = 11}, top = {mode = \"redstone\"}}\n");
+		file("set.txt", "{north = {powered = 11}, top = {mode = \"redstone\"}}\n");
 		file("bad.txt", "not a table\n");
 		type("cp /set.txt /dev/redstone0; cat /dev/redstone0 > /r; cp /bad.txt /dev/redstone0 2> /err; touch /done\r");
 		untilFile(root().resolve("done"), "");

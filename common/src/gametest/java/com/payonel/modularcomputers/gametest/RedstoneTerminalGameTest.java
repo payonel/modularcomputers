@@ -75,7 +75,7 @@ public class RedstoneTerminalGameTest {
 			.thenExecute(() -> {
 				helper.assertValueEqual(sides(device).get("west").get("mode"), "cable", "the side against the cable");
 				helper.assertValueEqual(sides(device).get("east").get("mode"), "redstone", "the others");
-				device.set(args(Map.of("east", Map.of("level", 15L))));
+				device.set(args(Map.of("east", Map.of("powered", 15L))));
 				helper.assertValueEqual(sides(device).get("east").get("powered"), 15L, "it drives east");
 				helper.assertValueEqual(sides(device).get("east").get("level"), 15L, "and reads its own signal there");
 				helper.setBlock(TERMINAL.north(), Blocks.REDSTONE_BLOCK);
@@ -86,7 +86,7 @@ public class RedstoneTerminalGameTest {
 				Object event = device.pull(args()).first();
 				helper.assertTrue(event instanceof Map<?, ?> map && "north".equals(map.get("side")) && Long.valueOf(15).equals(map.get("new")),
 					"a change coming in is an event: " + event);
-				device.set(args(Map.of("east", Map.of("level", 0L))));
+				device.set(args(Map.of("east", Map.of("powered", 0L))));
 			})
 			.thenWaitUntil(() -> helper.assertBlockProperty(TERMINAL.east(), RedstoneLampBlock.LIT, false))
 			.thenSucceed();
@@ -120,7 +120,7 @@ public class RedstoneTerminalGameTest {
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertTrue(onBus(computer, device), "on the bus"))
 			.thenExecute(() -> {
-				device.set(args(Map.of("east", Map.of("level", 15L))));
+				device.set(args(Map.of("east", Map.of("powered", 15L))));
 				computer.pressPower();
 			})
 			.thenIdle(10)
@@ -143,7 +143,7 @@ public class RedstoneTerminalGameTest {
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertTrue(onBus(computer, terminal.device()), "on the bus"))
 			.thenExecute(() -> {
-				terminal.device().set(args(Map.of("east", Map.of("level", 3L))));
+				terminal.device().set(args(Map.of("east", Map.of("powered", 3L))));
 				int left = BatteryItem.charge(terminal.cards().getItem(RedstoneTerminalBlockEntity.BATTERY_SLOT)).units();
 				helper.assertValueEqual(left, full - RedstoneTerminal.CHANGE_COST, "the change, paid from its battery");
 			})
@@ -154,7 +154,7 @@ public class RedstoneTerminalGameTest {
 	public void itsOutputsAndClosedPortsOutlastASave(GameTestHelper helper) {
 		helper.setBlock(TERMINAL, ModBlocks.REDSTONE_TERMINAL);
 		RedstoneTerminalBlockEntity terminal = terminal(helper);
-		terminal.device().set(args(Map.of("north", Map.of("level", 5L), "west", Map.of("mode", "redstone"))));
+		terminal.device().set(args(Map.of("north", Map.of("powered", 5L), "west", Map.of("mode", "redstone"))));
 		var registries = helper.getLevel().registryAccess();
 		net.minecraft.nbt.CompoundTag saved = terminal.saveWithoutMetadata(registries);
 		helper.setBlock(TERMINAL, Blocks.AIR);

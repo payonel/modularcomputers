@@ -28,7 +28,8 @@ import java.util.Set;
  * or its own (user, 2026-10-20: the level detected, powered or not); {@code powered} the signal the
  * terminal puts out there (0 on a cable side: it puts out nothing there). {@code get} and
  * {@code set} answer the whole table; {@code set} takes the same table, and changes only what it
- * names.
+ * names: {@code powered} turns a side's signal on (its level is what's detected, so {@code set}
+ * ignores it).
  */
 public final class RedstoneTerminal implements Device {
 	/** The sides, as programs name them. */
@@ -148,7 +149,7 @@ public final class RedstoneTerminal implements Device {
 		return Result.ok(sides(asked == null ? allSides() : named(asked)));
 	}
 
-	@Method(doc = "set(sides): sets each side named: mode (\"cable\" or \"redstone\": a cable side's port open or closed) and level (the signal it puts out, 0 to 15; ignored on a cable side); returns every side, as get()")
+	@Method(doc = "set(sides): sets each side named: mode (\"cable\" or \"redstone\": a cable side's port open or closed) and powered (the signal it puts out, 0 to 15; ignored on a cable side); level is what's detected, so it's ignored; returns every side, as get()")
 	public Result set(Arguments args) {
 		Map<?, ?> table = args.checkTable(0);
 		Map<Integer, Setting> settings = new LinkedHashMap<>();
@@ -159,7 +160,7 @@ public final class RedstoneTerminal implements Device {
 			}
 			settings.put(side, setting(SIDES.get(side), fields));
 		}
-		// All checked: now it changes, modes first (a side's level counts where it's a redstone side).
+		// All checked: now it changes, modes first (a side's signal counts where it's a redstone side).
 		settings.forEach((side, setting) -> {
 			if (setting.mode() != null) {
 				world.port(side, setting.mode().equals(CABLE));
@@ -168,10 +169,10 @@ public final class RedstoneTerminal implements Device {
 		boolean changedOutput = false;
 		for (Map.Entry<Integer, Setting> entry : settings.entrySet()) {
 			int side = entry.getKey();
-			Integer level = entry.getValue().level();
-			if (level != null && redstone(side) && output[side] != level) {
+			Integer powered = entry.getValue().powered();
+			if (powered != null && redstone(side) && output[side] != powered) {
 				payer.pay(CHANGE_COST);
-				output[side] = level;
+				output[side] = powered;
 				changedOutput = true;
 			}
 		}
@@ -188,7 +189,7 @@ public final class RedstoneTerminal implements Device {
 	}
 
 	/** One side's setting from a program: null where it said nothing. */
-	private record Setting(String mode, Integer level) {
+	private record Setting(String mode, Integer powered) {
 	}
 
 	private static Setting setting(String name, Map<?, ?> fields) {
@@ -201,15 +202,15 @@ public final class RedstoneTerminal implements Device {
 			}
 			mode = text;
 		}
-		Integer level = null;
-		Object value = fields.get("level");
+		Integer powered = null;
+		Object value = fields.get("powered");
 		if (value != null) {
 			if (!(value instanceof Long || value instanceof Double d && d == Math.rint(d))) {
-				throw new Arguments.ArgumentError(name + ": level: integer expected");
+				throw new Arguments.ArgumentError(name + ": powered: integer expected");
 			}
-			level = (int) Math.clamp(((Number) value).longValue(), 0, MAX_SIGNAL);
+			powered = (int) Math.clamp(((Number) value).longValue(), 0, MAX_SIGNAL);
 		}
-		return new Setting(mode, level);
+		return new Setting(mode, powered); // (a level given is what get answered: detected, not set)
 	}
 
 	private static int side(Object name) {

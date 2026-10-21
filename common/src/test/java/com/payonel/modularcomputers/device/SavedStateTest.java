@@ -65,7 +65,7 @@ class SavedStateTest {
 	void aRedstoneTerminalKeepsItsEventsItsOutputsAndWhatItSaw() {
 		RedstoneTerminal terminal = new RedstoneTerminal();
 		terminal.accepting(true); // on a running board\'s bus
-		terminal.set(args(Map.of("north", Map.of("level", 7L))));
+		terminal.set(args(Map.of("north", Map.of("powered", 7L))));
 		terminal.sense(5, 9);
 		RedstoneTerminal loaded = new RedstoneTerminal();
 		loaded.restore(terminal.saved());
