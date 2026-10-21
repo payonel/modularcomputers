@@ -1144,10 +1144,16 @@ class McosTest {
 	@Test
 	void anEnabledServiceStartsAtBootOutOfTheConsolesReachAndRcStopsIt() {
 		file("etc/rc.d/testd", """
-			# a test's service
-			description="waits"
-			command=/testd.lua
-			command_args=one two
+			-- a test's service: settings, and an action of its own
+			description = "waits"
+			command = "/testd.lua"
+			command_args = {"one", "two"}
+			function hello()
+			  local out = io.open("/hello", "w")
+			  out:write(name)
+			  out:close()
+			  return 4
+			end
 			""");
 		file("testd.lua", """
 			local sys = require("sys")
@@ -1171,8 +1177,10 @@ class McosTest {
 		untilFile(root().resolve("s2"), "3\n");
 		assertThat(read(root().resolve("s1"))).as("running, though ^C was typed at the console").isEqualTo("0\n");
 		assertThat(root().resolve("stopped")).as("stopped by SIGTERM").exists();
-		type("rc testd disable; rc other enable 2> /dev/null; echo $? > /none\r");
+		type("rc testd hello; echo $? > /h; rc testd disable; rc other enable 2> /dev/null; echo $? > /none\r");
 		untilFile(root().resolve("none"), "1\n"); // no such service
+		assertThat(read(root().resolve("hello"))).as("its own action, with its name").isEqualTo("testd");
+		assertThat(read(root().resolve("h"))).as("its status").isEqualTo("4\n");
 		assertThat(read(root().resolve("etc/rc.conf"))).isEqualTo("testd_enable=NO\n");
 	}
 }

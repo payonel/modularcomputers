@@ -209,9 +209,11 @@ the disks' reports turned into full paths by their mounts (tmpfs reports through
 no-op until then); it watches paths, not inodes as Linux's does, and a change made on a disk's
 host isn't seen. **Services** (user, 2026-10-21, for mcsshd): the kernel runs `/etc/rc` with sh to its end before
 the console's shell (inittab's sysinit, BSD's `/etc/rc`), which mounts `/run` and runs `rc boot`.
-A service is declared, not scripted (OpenRC's settings in `/etc/rc.d/<name>`; FreeBSD's
-`name_enable=YES` in `/etc/rc.conf`), because mcos's sh has no `if` or `case` for sysvinit's
-scripts. `rc` starts one with `setsid` (spawn's, as glibc's posix_spawn has): a session of its own,
+A service is a Lua script in `/etc/rc.d/<name>` (user, 2026-10-21: as sysvinit's are scripts in
+the system's language, and mcos's is Lua; sh has no `if` or `case`): OpenRC's shape, settings
+(`command`, `command_args`) from which `rc` gives start/stop/status, and functions of its own that
+replace those or add actions. `/etc/rc.conf` (FreeBSD's `name_enable=YES`) says what starts at
+boot, so enabling never rewrites a script. `rc` starts one with `setsid` (spawn's, as glibc's posix_spawn has): a session of its own,
 no controlling tty, so no ^C reaches it. The kernel stays init (it respawns the console's shell):
 a user-space PID 1 would stay resident for nothing.
 
@@ -259,7 +261,7 @@ process (as VFIO does).
   without one. Pages use only the man(7) macros `/bin/man` supports (its header lists them).
 - **A program's header comment is its spec**: keep it true when its behavior changes.
 - **Data files under `lua/` that aren't Lua go under a `share/` folder** (or mcos's `/etc`, its
-  settings and sh scripts): `LuaScriptsTest` compiles every other file there as Lua.
+  settings and sh scripts; `/etc/rc.d`'s services are Lua): `LuaScriptsTest` compiles every other file there as Lua.
 - **The mcos files are copied onto a disk once**, when the disk is first made: a world's existing
   disks keep their old mcos. Tests copy afresh each run.
 - **Textures and sounds come from `scripts/`**: change the script and regenerate; never edit the

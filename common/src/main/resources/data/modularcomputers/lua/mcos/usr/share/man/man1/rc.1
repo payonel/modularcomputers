@@ -8,22 +8,23 @@ rc \- start, stop and enable services
 .I name
 .BR start | stop | restart | status | enable | disable
 .br
+.B rc
+.I name action
+.br
 .B rc boot
 .SH DESCRIPTION
 A service is a program that runs in the background (a daemon), started
-at boot or by hand. Each is defined by a file in
+at boot or by hand. Each is a Lua script in
 .BR /etc/rc.d ,
-named for it, of settings, a line each,
-.IB name = value
-(the value maybe in quotes;
-.B #
-starts a comment), as OpenRC's:
+named for it, run in an environment of its own where
+.B name
+is its name. It sets, as OpenRC's scripts do:
 .TP
 .B command
 The program, as a path.
 .TP
 .B command_args
-Its arguments, split on spaces.
+Its arguments: a list, or a string split on spaces.
 .TP
 .B description
 What it is.
@@ -32,6 +33,24 @@ What it is.
 A file its output and errors are added to;
 .B /dev/null
 when not given.
+.PP
+From those,
+.B rc
+gives it the actions below. A function the script defines by one of their
+names (start, stop, status) is used instead, and any other function it
+defines is an action too:
+.B rc
+.I name action
+calls it (its return value, a number, is the exit status). For example:
+.PP
+.nf
+description = "remote shell daemon"
+command = "/bin/mcsshd"
+command_args = {"\-p", "22"}
+function reload()
+  require("sys").kill(tonumber(io.open("/run/" .. name .. ".pid"):read("l")), "SIGHUP")
+end
+.fi
 .PP
 With no arguments,
 .B rc
@@ -102,8 +121,9 @@ rc mcsshd status
 .SH NOTES
 Linux has several: sysvinit's scripts in
 .B /etc/init.d
-take start and stop themselves, OpenRC's declare settings (as these do,
-with OpenRC's names), systemd has units.
+are shell scripts that take start and stop themselves; OpenRC's set
+settings and may define their own functions (as these do, with OpenRC's
+names, in Lua: mcos's scripting language); systemd has units.
 .BR rc.conf 's
 .I name_enable
 is FreeBSD's, as is

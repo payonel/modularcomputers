@@ -24,9 +24,10 @@ class LuaScriptsTest {
 		List<Path> scripts;
 		try (Stream<Path> files = Files.walk(root)) {
 			// every file is Lua (mcos's programs have no .lua, as Linux's), but data: man pages, under share/,
-			// and mcos's settings and scripts in /etc (sh's, and name=value)
+			// and mcos's settings and sh scripts in /etc (its services, in /etc/rc.d, are Lua)
 			scripts = files.filter(Files::isRegularFile).map(file -> root.relativize(file).toString().replace('\\', '/'))
-				.filter(name -> !name.contains("/share/") && !name.startsWith("mcos/etc/")).map(root::resolve).toList();
+				.filter(name -> !name.contains("/share/") && !(name.startsWith("mcos/etc/") && !name.startsWith("mcos/etc/rc.d/")))
+				.map(root::resolve).toList();
 		}
 		assertThat(scripts).isNotEmpty();
 		for (Path script : scripts) {
