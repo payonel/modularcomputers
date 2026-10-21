@@ -259,7 +259,7 @@ class McosTest {
 		untilFile(root().resolve("done"), "");
 		assertThat(terminal.output(0)).as("north, as written").isEqualTo(11);
 		String read = read(root().resolve("r"));
-		assertThat(read).contains("north", "south", "east", "west", "top", "bottom", "mode = \"redstone\"", "powered = true", "level = 0");
+		assertThat(read).contains("north", "south", "east", "west", "top", "bottom", "mode = \"redstone\"", "powered = 11", "level = 11", "powered = 0");
 		assertThat(read(root().resolve("err"))).as("text that isn't a table: the write fails").isNotEmpty();
 		assertThat(terminal.output(0)).isEqualTo(11);
 	}

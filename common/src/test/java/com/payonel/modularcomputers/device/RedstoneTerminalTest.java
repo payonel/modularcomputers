@@ -65,18 +65,18 @@ class RedstoneTerminalTest {
 		input[NORTH] = 6;
 		var sides = sides(terminal.get(args()).first());
 		assertThat(sides.keySet()).containsExactly("north", "south", "east", "west", "top", "bottom");
-		assertThat(sides.get("top")).containsEntry("mode", "cable").containsEntry("level", 1L).containsEntry("powered", false);
-		assertThat(sides.get("north")).containsEntry("mode", "redstone").containsEntry("level", 6L).containsEntry("powered", false);
+		assertThat(sides.get("top")).containsEntry("mode", "cable").containsEntry("level", 1L).containsEntry("powered", 0L);
+		assertThat(sides.get("north")).containsEntry("mode", "redstone").containsEntry("level", 6L).containsEntry("powered", 0L);
 	}
 
 	@Test
 	void aRedstoneSidesLevelIsTheStrongestSignalThereComingInOrItsOwn() {
 		input[NORTH] = 6;
 		terminal.set(args(Map.of("north", Map.of("level", 3L))));
-		assertThat(sides(terminal.get(args()).first()).get("north")).containsEntry("level", 6L).containsEntry("powered", true);
+		assertThat(sides(terminal.get(args()).first()).get("north")).containsEntry("level", 6L).containsEntry("powered", 3L);
 		input[NORTH] = 0;
 		terminal.set(args(Map.of("north", Map.of("level", 0L))));
-		assertThat(sides(terminal.get(args()).first()).get("north")).containsEntry("level", 0L).containsEntry("powered", false);
+		assertThat(sides(terminal.get(args()).first()).get("north")).containsEntry("level", 0L).containsEntry("powered", 0L);
 	}
 
 	@Test
@@ -84,7 +84,7 @@ class RedstoneTerminalTest {
 		var sides = sides(terminal.set(args(Map.of("north", Map.of("level", 9L), "top", Map.of("level", 5L)))).first());
 		assertThat(terminal.output(NORTH)).isEqualTo(9);
 		assertThat(terminal.output(TOP)).as("a cable side's level is ignored").isZero();
-		assertThat(sides.get("north")).containsEntry("powered", true).as("its own signal is the level there").containsEntry("level", 9L);
+		assertThat(sides.get("north")).containsEntry("powered", 9L).as("its own signal is the level there").containsEntry("level", 9L);
 		assertThat(sides).as("set answers every side").hasSize(6);
 		assertThat(paid).as("a change costs power; no change, nothing").containsExactly(RedstoneTerminal.CHANGE_COST);
 		assertThat(outputChanges).isEqualTo(1);
@@ -98,7 +98,7 @@ class RedstoneTerminalTest {
 	void settingASidesModeOpensOrClosesItsPort() {
 		var sides = sides(terminal.set(args(Map.of("top", Map.of("mode", "redstone", "level", 4L)))).first());
 		assertThat(closed[TOP]).isTrue();
-		assertThat(sides.get("top")).as("closed: a redstone side, and its level counts").containsEntry("mode", "redstone").containsEntry("powered", true);
+		assertThat(sides.get("top")).as("closed: a redstone side, and its level counts").containsEntry("mode", "redstone").containsEntry("powered", 4L);
 		terminal.set(args(Map.of("top", Map.of("mode", "cable"))));
 		assertThat(closed[TOP]).isFalse();
 		terminal.set(args(Map.of("north", Map.of("mode", "cable"))));

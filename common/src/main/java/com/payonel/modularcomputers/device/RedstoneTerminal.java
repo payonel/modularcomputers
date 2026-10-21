@@ -23,11 +23,12 @@ import java.util.Set;
  * holds when the power's gone, as a latch does. A change coming in on a redstone side is an event.
  * <p>
  * Programs see the sides as a table, by name: {@code {north = {mode = "redstone", level = 7,
- * powered = true}, ...}}. {@code mode} is {@code "cable"} or {@code "redstone"}; {@code level} is a
+ * powered = 7}, ...}}. {@code mode} is {@code "cable"} or {@code "redstone"}; {@code level} is a
  * cable side's cable (1) or the signal on a redstone side (0 to 15): the strongest there, coming in
- * or its own (user, 2026-10-20: the level detected, powered or not); {@code powered} whether the
- * terminal puts out a signal there. {@code get} and {@code set} answer the whole table; {@code set} takes the same table, and
- * changes only what it names.
+ * or its own (user, 2026-10-20: the level detected, powered or not); {@code powered} the signal the
+ * terminal puts out there (0 on a cable side: it puts out nothing there). {@code get} and
+ * {@code set} answer the whole table; {@code set} takes the same table, and changes only what it
+ * names.
  */
 public final class RedstoneTerminal implements Device {
 	/** The sides, as programs name them. */
@@ -141,7 +142,7 @@ public final class RedstoneTerminal implements Device {
 		}
 	}
 
-	@Method(doc = "get([sides]): every side as {mode, level (a redstone side's signal, coming in or its own), powered} by name (north, south, east, west, top, bottom); with a table, only the sides it names (as keys or as a list)")
+	@Method(doc = "get([sides]): every side as {mode, level (a redstone side's signal, coming in or its own), powered (its own)} by name (north, south, east, west, top, bottom); with a table, only the sides it names (as keys or as a list)")
 	public Result get(Arguments args) {
 		Map<?, ?> asked = args.optTable(0);
 		return Result.ok(sides(asked == null ? allSides() : named(asked)));
@@ -243,7 +244,7 @@ public final class RedstoneTerminal implements Device {
 			boolean redstone = redstone(side);
 			fields.put("mode", redstone ? REDSTONE : CABLE);
 			fields.put("level", redstone ? (long) Math.max(world.input(side), output[side]) : CABLE_LEVEL);
-			fields.put("powered", redstone && output[side] > 0);
+			fields.put("powered", redstone ? (long) output[side] : 0L);
 			sides.put(SIDES.get(side), fields);
 		}
 		return sides;

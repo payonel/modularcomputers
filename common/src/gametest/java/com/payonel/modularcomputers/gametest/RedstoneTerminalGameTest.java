@@ -76,7 +76,7 @@ public class RedstoneTerminalGameTest {
 				helper.assertValueEqual(sides(device).get("west").get("mode"), "cable", "the side against the cable");
 				helper.assertValueEqual(sides(device).get("east").get("mode"), "redstone", "the others");
 				device.set(args(Map.of("east", Map.of("level", 15L))));
-				helper.assertValueEqual(sides(device).get("east").get("powered"), true, "it drives east");
+				helper.assertValueEqual(sides(device).get("east").get("powered"), 15L, "it drives east");
 				helper.assertValueEqual(sides(device).get("east").get("level"), 15L, "and reads its own signal there");
 				helper.setBlock(TERMINAL.north(), Blocks.REDSTONE_BLOCK);
 			})
