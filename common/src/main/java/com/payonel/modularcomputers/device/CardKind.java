@@ -9,9 +9,9 @@ public enum CardKind {
 	/** Will emit and detect redstone where it's installed (a computer, or an expansion hub). */
 	REDSTONE(DeviceType.REDSTONE),
 	AUDIO(DeviceType.AUDIO),
-	MOTION_SENSOR(DeviceType.SENSOR),
+	MOTION_SENSOR(DeviceType.MOTION),
 	AUDIO_SENSOR(DeviceType.SENSOR),
-	WEATHER_SENSOR(DeviceType.SENSOR);
+	WEATHER_SENSOR(DeviceType.WEATHER);
 
 	private final DeviceType type;
 

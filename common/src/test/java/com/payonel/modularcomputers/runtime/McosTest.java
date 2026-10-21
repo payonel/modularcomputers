@@ -268,7 +268,7 @@ class McosTest {
 		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
 		devices.put("id:motion", motion);
 		boot();
-		type("head -n 2 /dev/sensor0 > /m; touch /done\r");
+		type("head -n 2 /dev/motion0 > /m; touch /done\r");
 		untilIdle(); // head waits: nothing has moved
 		assertThat(root().resolve("done")).doesNotExist();
 		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));

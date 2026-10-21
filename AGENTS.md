@@ -167,7 +167,7 @@ what's written goes to `set` in one call at close, and **the device decides what
 (replace, append). A device whose data is a table, not text, has a **driver**
 (`lib/modules/drivers/<type>.lua`): the redstone card's turns its table into Lua's syntax and back.
 A device with events to `pull` and no `get` (a sensor) has a read-only file: each read is an event,
-a line (the sensor driver's), and a read with none waiting blocks, as a keyboard's does (the
+a line (its driver's: `drivers/motion.lua`), and a read with none waiting blocks, as a keyboard's does (the
 kernel's idle wait listens to the devices blocked reads wait on). Files are text, never tables
 (user asked, 2026-10-21): `cat`, pipes and redirection keep working; a program wanting tables
 unserializes a line, or calls the device's `pull` itself. **A device type costs no memory until it's used** (user, 2026-10-21: add devices and drivers

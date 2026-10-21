@@ -15,6 +15,10 @@ public enum DeviceType {
 	REDSTONE,
 	AUDIO,
 	SENSOR,
+	/** A motion sensor: what moves near it (user, 2026-10-21: motion, not just "sensor"). */
+	MOTION,
+	/** A weather sensor: the weather where it is. */
+	WEATHER,
 	/** Something that moves things in the world (the robotic piston). */
 	ACTUATOR,
 	/** Something that makes things (the photomask, which prints chips). */
