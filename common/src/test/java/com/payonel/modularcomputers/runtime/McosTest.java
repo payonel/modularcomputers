@@ -281,6 +281,66 @@ class McosTest {
 	}
 
 	@Test
+	void pollWaitsForARedstoneChangeOrAPipesDataOrItsTime() {
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		devices.put("id:redstone", card);
+		boot();
+		file("p.lua", """
+			local sys = require("sys")
+			local serialization = require("serialization")
+			local function put(name, text)
+			  local out = io.open(name, "w")
+			  out:write(text)
+			  out:close()
+			end
+			local r, w = sys.pipe()
+			local empty = sys.poll({r}, 0.1)
+			sys.write(w, "x")
+			local data = sys.poll({r}, 0.1)
+			put("/pipe", #empty .. " " .. #data .. " " .. tostring(data[1] == r))
+			local f = io.open("/dev/redstone0")
+			local function west()
+			  f:seek("set", 0)
+			  return serialization.unserialize(f:read("a")).west.level
+			end
+			local before = west()
+			local quiet = sys.poll({sys.fileno(f)}, 0.1)
+			put("/started", "")
+			local ready = sys.poll({sys.fileno(f), r}) -- (r was read: nothing there now)
+			put("/polled", before .. " " .. west() .. " " .. #quiet .. " " .. tostring(ready[1] == sys.fileno(f)))
+			""");
+		type("lua /p.lua; touch /done\r");
+		settle(() -> Files.isRegularFile(root().resolve("started")));
+		server.add(() -> card.sense(3, 9)); // west: 9 comes in
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("pipe"))).as("nothing, then the pipe's data").isEqualTo("0 1 true");
+		assertThat(read(root().resolve("polled"))).as("it waited for the change, which a read from the start shows").isEqualTo("0 9 0 true");
+	}
+
+	@Test
+	void pollWaitsOnASensorAndTheKeyboardAtOnce() {
+		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
+		devices.put("id:motion", motion);
+		boot();
+		file("m.lua", """
+			local sys = require("sys")
+			local f = io.open("/dev/motion0")
+			local fd = sys.fileno(f)
+			local started = io.open("/started", "w")
+			started:close()
+			local ready = sys.poll({0, fd})
+			local out = io.open("/m", "w")
+			out:write(tostring(ready[1] == fd), " ", f:read("l"))
+			out:close()
+			""");
+		type("lua /m.lua; touch /done\r");
+		settle(() -> Files.isRegularFile(root().resolve("started")));
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("m"))).startsWith("true {").contains("minecraft:pig");
+	}
+
+	@Test
 	void theKernelsViewOfTheBusCatchesUpWithAHotPlug() {
 		boot();
 		type("lsdev > /before\r");

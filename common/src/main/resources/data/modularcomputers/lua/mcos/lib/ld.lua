@@ -37,6 +37,11 @@ end
 -- The environment: getenv's, setenv's, and what io.popen's children get.
 local environ = sys.environ()
 io = ioload(sys, environ)
+-- (not a syscall, as C's fileno isn't: an io file's descriptor, for sys.poll. A drift from Lua's io,
+-- which hides it; what the file has read ahead into its buffer, poll doesn't see, as with C's stdio)
+function sys.fileno(file)
+  return file.fd
+end
 
 -- os: what Lua's has that means something here.
 os = {}

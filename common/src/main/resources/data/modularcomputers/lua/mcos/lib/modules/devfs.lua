@@ -18,6 +18,9 @@ function k.ttyfile(t)
   return {
     type = "tty",
     tty = t,
+    ready = function(self)
+      return #t.ready > 0
+    end,
     read = function(self, n)
       local data = t:read(n)
       if data == nil then
@@ -93,18 +96,31 @@ local drivers = {}
 -- line (through its driver), and a read with none waiting waits for one, as a keyboard's does.
 local function eventfile(id, driver)
   local line, at = "", 0
+  -- An event to read: true (one is in 'line'), false (none waiting: the kernel listens for one), or
+  -- the device's failure.
+  local function take()
+    if at < #line then
+      return true
+    end
+    local ok, event = board.invoke(id, "pull")
+    if not ok then
+      return failed(event)
+    elseif event == nil then
+      k.listen(id)
+      return false
+    end
+    line, at = driver and driver.get(event) or tostring(event) .. "\n", 0
+    return true
+  end
   return {
     type = "device",
+    ready = take,
     read = function(self, n)
-      if at >= #line then
-        local ok, event = board.invoke(id, "pull")
-        if not ok then
-          return failed(event)
-        elseif event == nil then
-          k.listen(id)
-          return k.BLOCK
-        end
-        line, at = driver and driver.get(event) or tostring(event) .. "\n", 0
+      local got, why, errno = take()
+      if got == nil then
+        return nil, why, errno
+      elseif not got then
+        return k.BLOCK
       end
       local chunk = line:sub(at + 1, at + n)
       at = at + #chunk
@@ -134,8 +150,44 @@ local function devicefile(device, mode)
   end
   local data, at = nil, 0
   local written = nil
+  local changed = false -- a change came in since the file was last read from its start (poll)
+  -- Each event the device has waiting (a redstone card's changes coming in), taken and dropped: true
+  -- if there was one. (A failure counts: the next read reports it.)
+  local function drain()
+    local any = false
+    while true do
+      local ok, event = board.invoke(id, "pull")
+      if not ok or event == nil then
+        return any or not ok
+      end
+      any = true
+    end
+  end
   return {
     type = "device",
+    -- Ready for poll once something changed since it was read from its start (as a GPIO's value
+    -- file, in sysfs); a device without events always is.
+    ready = function(self)
+      if not changed and device.pull then
+        changed = drain()
+        if not changed then
+          k.listen(id)
+        end
+      end
+      return changed or not device.pull
+    end,
+    -- Back to the start (the only place it seeks to): the next read takes get anew, and what's
+    -- changed so far is in it.
+    seek = function(self, whence, offset)
+      if whence ~= "set" or offset ~= 0 then
+        return fail("ESPIPE")
+      end
+      data, at, changed = nil, 0, false
+      if device.pull then
+        drain()
+      end
+      return 0
+    end,
     read = function(self, n)
       if data == nil then
         local ok, got = board.invoke(id, "get")

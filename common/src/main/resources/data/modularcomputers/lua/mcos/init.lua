@@ -852,6 +852,37 @@ function syscalls.sleep(p, request, seconds)
   return k.BLOCK
 end
 
+-- poll(fds, seconds), as poll(2) waiting for input (POLLIN): which of the open files 'fds' (a list
+-- of descriptors) a read would answer now (a file that can't say, a disk's, always would), waiting
+-- for one until 'seconds' pass (nil: as long as it takes). The ready ones, a list; empty: the time
+-- passed. Each file says what ready is (its ready: a tty's line, a pipe's data or end, a device's
+-- event or change); a device it waits on is listened to (k.listen).
+function syscalls.poll(p, request, fds, seconds)
+  if type(fds) ~= "table" or seconds ~= nil and (type(seconds) ~= "number" or seconds < 0) then
+    return fail("EINVAL")
+  end
+  local ready = {}
+  for _, fd in ipairs(fds) do
+    local d, why, errno = description(p, fd)
+    if not d then
+      return nil, why, errno
+    end
+    if d.read and (not d.ready or d:ready() ~= false) then
+      ready[#ready + 1] = fd
+    end
+  end
+  if #ready > 0 or seconds == nil then
+    return #ready > 0 and ready or k.BLOCK
+  end
+  now = now or board.uptime()
+  request.deadline = request.deadline or now + math.ceil(seconds * TICKS_PER_SECOND)
+  if now >= request.deadline then
+    return ready
+  end
+  p.wakeat = request.deadline
+  return k.BLOCK
+end
+
 -- reboot("halt" | "poweroff" | "restart"), as Linux's reboot(2) with LINUX_REBOOT_CMD_HALT,
 -- _POWER_OFF and _RESTART: every process ends (its files closed: the disks get what was written),
 -- then the board halts the CPU, turns the machine off, or restarts it.

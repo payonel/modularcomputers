@@ -12,6 +12,9 @@ return function()
   local pipe = {buffer = "", readers = 1, writers = 1}
   local reader = {
     type = "fifo",
+    ready = function(self)
+      return pipe.buffer ~= "" or pipe.writers == 0
+    end,
     read = function(self, n)
       if pipe.buffer == "" then
         return pipe.writers == 0 and "" or k.BLOCK
