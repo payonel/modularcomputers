@@ -180,7 +180,13 @@ function tty:setattr(flags)
     end
   end
   if wascanonical and not self.flags.icanon then
-    -- leaving canonical mode: what's been typed of a line is input now
+    -- leaving canonical mode: what's been typed of a line is input now, and an end of file waiting
+    -- is the ^D that was typed (back in canonical mode, it's an end of file again)
+    for i, chunk in ipairs(self.ready) do
+      if chunk == EOF then
+        self.ready[i] = VEOF
+      end
+    end
     for i = 1, #self.line do
       self.ready[#self.ready + 1] = self.line[i]
     end

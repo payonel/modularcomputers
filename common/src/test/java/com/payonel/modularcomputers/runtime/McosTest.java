@@ -1256,4 +1256,34 @@ class McosTest {
 		assertThat(read(root().resolve("result"))).as("typed, interrupted by ^C, ended by the hangup; its echo shown to the master")
 			.isEqualTo("true true killed SIGHUP true");
 	}
+
+	/**
+	 * A ^D waiting at the start of a line (an end of file, in canonical mode) when a program turns
+	 * the tty raw is the ^D typed, and an end of file again back in canonical mode (found as a
+	 * kernel error when the shell's line editor went raw after a ^D was typed under a command).
+	 */
+	@Test
+	void anEndOfFileWaitingWhenTheTtyGoesRawIsTheCtrlDTyped() {
+		file("eof.lua", """
+			local sys = require("sys")
+			local cooked = sys.ioctl(0, "TCGETS")
+			local raw = {}
+			for k, v in pairs(cooked) do raw[k] = v end
+			raw.icanon, raw.echo = false, false
+			assert(sys.ioctl(0, "TIOCSTI", "\\4")) -- ^D at the start of a line: an end of file
+			assert(sys.ioctl(0, "TCSETS", raw))
+			local rawread = sys.read(0)
+			assert(sys.ioctl(0, "TIOCSTI", "\\4"))
+			assert(sys.ioctl(0, "TCSETS", cooked))
+			local cookedread = sys.read(0)
+			local out = io.open("/eof", "w")
+			out:write(string.format("%q %q", rawread, cookedread))
+			out:close()
+			""");
+		boot();
+		type("lua /eof.lua 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("err"))).isEmpty();
+		assertThat(read(root().resolve("eof"))).as("raw: the ^D byte; cooked again: an end of file").isEqualTo("\"\\4\" \"\"");
+	}
 }
