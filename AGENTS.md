@@ -207,7 +207,7 @@ real Lua's). **inotify** (`sys.inotify()`, `sys.watch(fd, path)`, a module loade
 gives Linux's notices as lines (`MODIFY /log`; a rename `MOVED_FROM`/`MOVED_TO`; `OVERFLOW`), from
 the disks' reports turned into full paths by their mounts (tmpfs reports through `k.changed`, a
 no-op until then); it watches paths, not inodes as Linux's does, and a change made on a disk's
-host isn't seen. **Services** (user, 2026-10-21, for mcsshd): the kernel runs `/etc/rc` with sh to its end before
+host isn't seen. **Services** (user, 2026-10-21, for rshd): the kernel runs `/etc/rc` with sh to its end before
 the console's shell (inittab's sysinit, BSD's `/etc/rc`), which mounts `/run` and runs `rc boot`.
 A service is a Lua script in `/etc/rc.d/<name>` (user, 2026-10-21: as sysvinit's are scripts in
 the system's language, and mcos's is Lua; sh has no `if` or `case`): OpenRC's shape, settings
@@ -429,17 +429,19 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   ignore SIGINT, as sh without job control.
 - **The shell's language:** `if`, `for`, `while`, `case`, functions, here-documents (user: maybe
   later).
-- **mcssh and mcsshd, next** (user, 2026-10-21): a remote shell, the user's psh (OpenPrograms) done
-  again simply. Goals: no users or passwords, no encryption. psh was a mess on the tty layer;
-  here the kernel's ptys do that work, as OpenSSH relies on Linux's. Planned, in order (`rc`, the
-  first, is built): ptys (`sys.openpty`, the tty taking input from the master's writes and giving output
-  to its reads, a session's controlling tty, SIGHUP when the master closes); stream sockets (TCP's
-  shape: `listen`/`accept`/`connect`, a byte stream, a window so receivers never overflow, the
-  link's own retries, as Wi-Fi's); then mcsshd (port 22, a process per connection relaying a pty
-  with `poll`, as sshd) and mcssh (raw tty, `~.`, the remote exit status). Threads aren't needed for any of it (OpenSSH has none): maybe later, as a convenience.
-  A host is named by its card's full id, or a unique prefix of it (user, 2026-10-21: ids, not names); mcsshd
-  is open to anyone (no allow-list); `mcssh host command` runs without a pty, and an `mcscp`
-  copies files.
+- **rsh, rshd and rcp, next** (user, 2026-10-21): a remote shell, the user's psh (OpenPrograms) done
+  again simply. Goals: no users or passwords, no encryption, so Berkeley's r-commands are its
+  names (rsh runs a command or a shell on another host, rshd serves it, rcp copies files), not
+  ssh's: the names say what's missing. psh was a mess on the tty layer; here the kernel's ptys do
+  that work, as sshd relies on Linux's. rshd is a service that's off until `rc rshd enable`.
+  Planned, in order (`rc`, the first, is built): ptys (`sys.openpty`, the tty taking input from
+  the master's writes and giving output to its reads, a session's controlling tty, SIGHUP when the
+  master closes); stream sockets (TCP's shape: `listen`/`accept`/`connect`, a byte stream, a window
+  so receivers never overflow, the link's own retries, as Wi-Fi's); then rshd (port 514, rsh's; a
+  process per connection relaying a pty with `poll`) and rsh (raw tty, `~.`, the remote exit
+  status; with a command, no pty), then rcp. A host is named by its card's full id, or a unique
+  prefix of it (user: ids, not names); rshd is open to anyone (no allow-list). Threads aren't
+  needed for any of it (OpenSSH has none): maybe later, as a convenience.
 - **Networking, later:** a router between wired and wireless networks, raw frames for programs
   (Linux's packet sockets, for a `tcpdump`), a WLAN card's range as a setting (OC's strength, its
   power cost).
