@@ -6,7 +6,7 @@ import com.payonel.modularcomputers.bus.DeviceType;
 /**
  * An expansion card, in a computer's expansion slot or in an expansion hub. A card of a kind that
  * works is one of its subclasses ({@link Cards#make}); it works where it's installed (user,
- * 2026-10-11): a redstone card in a hub sets and reads redstone at the hub.
+ * 2026-10-11): a motion sensor in a hub watches around the hub.
  */
 public class Card implements Device {
 	private final CardKind kind;

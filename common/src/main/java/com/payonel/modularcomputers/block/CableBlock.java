@@ -15,9 +15,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 
 /**
- * A cable: joins computers to the devices they use (screens, for now). It reaches out to
- * every neighbor that takes a cable on that side (other cables, and screens and computers
- * anywhere but their front), and its model shows each of those connections.
+ * A cable: joins computers to the devices they use. It reaches out to every neighbor that takes a
+ * cable on that side (other cables, and screens and computers anywhere but their front, where the
+ * port isn't closed: {@link CablePorts}), and its model shows each of those connections.
  */
 public final class CableBlock extends PipeBlock {
 	/** Thickness, in pixels. */
@@ -45,7 +45,7 @@ public final class CableBlock extends PipeBlock {
 	/** Joins every neighbor that takes a cable. */
 	public static BlockState withConnections(BlockGetter level, BlockPos pos, BlockState state) {
 		for (Direction side : Direction.values()) {
-			state = state.setValue(PROPERTY_BY_DIRECTION.get(side), Cabling.hasPort(level.getBlockState(pos.relative(side)), side.getOpposite()));
+			state = state.setValue(PROPERTY_BY_DIRECTION.get(side), Cabling.hasPort(level, pos.relative(side), side.getOpposite()));
 		}
 		return state;
 	}
@@ -53,7 +53,7 @@ public final class CableBlock extends PipeBlock {
 	@Override
 	protected BlockState updateShape(BlockState state, LevelReader level, ScheduledTickAccess ticks, BlockPos pos, Direction side,
 		BlockPos neighborPos, BlockState neighbor, RandomSource random) {
-		return state.setValue(PROPERTY_BY_DIRECTION.get(side), Cabling.hasPort(neighbor, side.getOpposite()));
+		return state.setValue(PROPERTY_BY_DIRECTION.get(side), Cabling.hasPort(level, neighborPos, side.getOpposite()));
 	}
 
 	@Override

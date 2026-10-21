@@ -58,16 +58,16 @@ public class CardHolderGameTest {
 		cable(helper, new BlockPos(2, 1, 1));
 		ExpansionHubBlockEntity hub = hub(helper, new BlockPos(3, 1, 1));
 		hub.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
-		hub.cards().setItem(2, new ItemStack(ModItems.REDSTONE_CARD));
+		hub.cards().setItem(2, new ItemStack(ModItems.WEATHER_SENSOR_CARD));
 		helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.TIER3_SCREEN.defaultBlockState().setValue(ScreenBlock.FACING, Direction.SOUTH));
 		ScreenBlockEntity screen = helper.getBlockEntity(new BlockPos(4, 1, 1), ScreenBlockEntity.class);
 		helper.succeedWhen(() -> {
 			var cabled = computer.busEntries().stream().filter(AllInOneBlockEntity.BusEntry::cabled).toList();
 			helper.assertValueEqual(cabled.stream().map(entry -> entry.name().getString()).toList(),
-				List.of("Audio Card", "Redstone Card", "Tier 3 Screen"), "the hub's cards, then the screen beyond it");
+				List.of("Audio Card", "Weather Sensor Card", "Tier 3 Screen"), "the hub's cards, then the screen beyond it");
 			helper.assertValueEqual(locations(computer), List.of("hub 1, 2m", "hub 3, 2m", "cable, 3m"), "where each is");
-			helper.assertTrue(computer.machine().board().bus().devices().stream().anyMatch(device -> device.type() == DeviceType.REDSTONE),
-				"the redstone card is on the bus");
+			helper.assertTrue(computer.machine().board().bus().devices().stream().anyMatch(device -> device.type() == DeviceType.SENSOR),
+				"the weather card is on the bus");
 			helper.assertTrue(computer.machine().board().bus().devices().contains(screen.terminal()), "the hub passes the connection on");
 		});
 	}

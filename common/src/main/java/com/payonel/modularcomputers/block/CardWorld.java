@@ -2,7 +2,6 @@ package com.payonel.modularcomputers.block;
 
 import com.payonel.modularcomputers.device.Card;
 import com.payonel.modularcomputers.device.MotionSensorCard;
-import com.payonel.modularcomputers.device.RedstoneCard;
 import com.payonel.modularcomputers.device.WeatherCard;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -10,7 +9,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.WeakHashMap;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -51,11 +49,6 @@ public final class CardWorld {
 			return;
 		}
 		switch (card) {
-			case RedstoneCard redstone -> {
-				for (Direction side : Direction.values()) {
-					redstone.sense(side.ordinal(), level.getSignal(pos.relative(side), side));
-				}
-			}
 			case WeatherCard weather -> {
 				if (now % 20 == 0) {
 					weather.sense(weatherAt(level, pos));
@@ -73,18 +66,6 @@ public final class CardWorld {
 			default -> {
 			}
 		}
-	}
-
-	/** The signal the redstone cards in a block put out toward a neighbour: the strongest. {@code direction} is from the neighbour to the block. */
-	public static int redstone(Iterable<? extends Card> cards, Direction direction) {
-		int side = direction.getOpposite().ordinal(); // the block's face toward that neighbour
-		int strongest = 0;
-		for (Card card : cards) {
-			if (card instanceof RedstoneCard redstone) {
-				strongest = Math.max(strongest, redstone.output(side));
-			}
-		}
-		return strongest;
 	}
 
 	/** The weather where the block is, whether or not it sees the sky: clear, rain, snow or thunder. */

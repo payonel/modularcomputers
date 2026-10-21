@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Draws the 16x16 textures of the blocks on the cable network: the screen, the cable, the
-# expansion hub and the robotic piston (needs Pillow), in the all-in-one's beige. Screens come
+# expansion hub, the robotic piston, the paint gun and the redstone terminal (needs Pillow), in the all-in-one's beige. Screens come
 # in their tier's era, matching the cases (scripts/art/case_tier_textures.py; user's pick,
 # 2026-10-12): an 80s beige terminal with green-phosphor glass, a 90s platinum color monitor
 # with an RGB badge, a modern graphite flat panel. The PNGs are
@@ -162,12 +162,45 @@ def paint_gun_side():
 		rect(im, 4 + i * 3, 5, 5 + i * 3, 10, c)
 	return im
 
+REDSTONE = (196, 24, 18)
+REDSTONE_DIM = (98, 16, 12)
+
+def redstone_terminal_top():
+	"""The top: a little red-phosphor readout of six bars (one a side) over a row of redstone dots."""
+	im = casing(22)
+	rect(im, 2, 2, 13, 8, (40, 40, 46))
+	rect(im, 3, 3, 12, 7, (24, 6, 6))
+	for i, height in enumerate((4, 2, 5, 1, 3, 2)):
+		rect(im, 3 + i * 2, 8 - height, 3 + i * 2, 7, REDSTONE)
+	for i in range(4):
+		im.putpixel((3 + i * 3, 11), REDSTONE if i % 2 == 0 else REDSTONE_DIM)
+		im.putpixel((4 + i * 3, 11), REDSTONE_DIM)
+	return im
+
+def redstone_terminal_side():
+	"""A side, half a block tall (a slab's side shows the texture's lower half): a port that takes a
+	cable or a signal, with a redstone dot beside it."""
+	im = casing(23)
+	rect(im, 0, 0, 15, 7, (40, 40, 46))  # (never shown)
+	for i in range(16):
+		im.putpixel((i, 8), LIGHT)  # the top edge of the half block
+	rect(im, 6, 10, 9, 13, (40, 40, 46))
+	rect(im, 7, 11, 8, 12, (90, 92, 100))
+	im.putpixel((12, 11), REDSTONE)
+	im.putpixel((12, 12), REDSTONE_DIM)
+	return im
+
+def redstone_terminal_bottom():
+	return casing(24)
+
 textures = [(f"tier{t}_screen_{face}", (lambda t=t, fn=fn: fn(t))) for t in (1, 2, 3)
 	for face, fn in (("front", tier_screen_front), ("side", screen_side), ("back", screen_back), ("top", screen_top))] + [
 	("cable", cable), ("expansion_hub", expansion_hub),
 	("robotic_piston_port", robotic_piston_port), ("robotic_piston_plate", robotic_piston_plate),
 	("robotic_sticky_piston_plate", robotic_sticky_piston_plate),
-	("paint_gun_nozzle", paint_gun_nozzle), ("paint_gun_side", paint_gun_side)]
+	("paint_gun_nozzle", paint_gun_nozzle), ("paint_gun_side", paint_gun_side),
+	("redstone_terminal_top", redstone_terminal_top), ("redstone_terminal_side", redstone_terminal_side),
+	("redstone_terminal_bottom", redstone_terminal_bottom)]
 for name, fn in textures:
 	fn().save(f"{OUT}/{name}.png")
 

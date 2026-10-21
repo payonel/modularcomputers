@@ -249,6 +249,22 @@ class McosTest {
 	}
 
 	@Test
+	void aRedstoneTerminalsFileIsItsTableAsTextThroughItsDriver() {
+		com.payonel.modularcomputers.device.RedstoneTerminal terminal = new com.payonel.modularcomputers.device.RedstoneTerminal();
+		devices.put("id:redstone", terminal);
+		boot();
+		file("set.txt", "{north = {level = 11}, top = {mode = \"redstone\"}}\n");
+		file("bad.txt", "not a table\n");
+		type("cp /set.txt /dev/redstone0; cat /dev/redstone0 > /r; cp /bad.txt /dev/redstone0 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(terminal.output(0)).as("north, as written").isEqualTo(11);
+		String read = read(root().resolve("r"));
+		assertThat(read).contains("north", "south", "east", "west", "top", "bottom", "mode = \"redstone\"", "powered = true", "level = 0");
+		assertThat(read(root().resolve("err"))).as("text that isn't a table: the write fails").isNotEmpty();
+		assertThat(terminal.output(0)).isEqualTo(11);
+	}
+
+	@Test
 	void theKernelsViewOfTheBusCatchesUpWithAHotPlug() {
 		boot();
 		type("lsdev > /before\r");

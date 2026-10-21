@@ -660,7 +660,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 
 	/**
 	 * Finds the devices wired to this computer (screens, the cards in expansion hubs, robotic
-	 * pistons, paint guns) and puts them on the bus.
+	 * pistons, paint guns, photomasks, redstone terminals) and puts them on the bus.
 	 */
 	private void scanCables() {
 		List<Cabled> found = new ArrayList<>();
@@ -692,6 +692,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 				addCabled(found, devices, new Cabled(Motherboard.id(gun.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
 			} else if (block instanceof PhotomaskBlockEntity mask) {
 				addCabled(found, devices, new Cabled(Motherboard.id(mask.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PHOTOMASK.asItem(), -1), mask.device());
+			} else if (block instanceof RedstoneTerminalBlockEntity terminal) {
+				addCabled(found, devices, new Cabled(Motherboard.id(terminal.id()), at.pos(), at.meters(), at.wireless(), paired,
+					ModBlocks.REDSTONE_TERMINAL.asItem(), -1), terminal.device());
 			}
 		}
 		boolean sameDevices = found.equals(cabled) && devices.keySet().equals(cabledDevices.keySet())
@@ -798,23 +801,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	 * Where a disk's data lives: the world save's {@code modularcomputers/disks/<id>} (a folder
 	 * for hfs, with ".img" for raw), so it's the disk's wherever it goes.
 	 */
-	/** A card that works here, at the case: a redstone card's output changes update the case's neighbours. */
+	/** A card that works here, at the case. */
 	private Card cardHere(CardKind kind) {
 		Card card = com.payonel.modularcomputers.device.Cards.make(kind);
 		card.onChange(this::markChanged);
-		if (card instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
-			redstone.onOutput(() -> {
-				if (level != null && !level.isClientSide()) {
-					level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
-				}
-			});
-		}
 		return card;
-	}
-
-	/** The redstone the case's cards put out toward a neighbour ({@code direction}: from the neighbour to the case). */
-	public int redstoneOut(net.minecraft.core.Direction direction) {
-		return CardWorld.redstone(java.util.Arrays.stream(cards).filter(java.util.Objects::nonNull).toList(), direction);
 	}
 
 	private void retireDisk(int lane) {

@@ -36,7 +36,7 @@ class SavedStateTest {
 		terminal.press("a");
 		terminal.accepting(false); // its board halted, was turned off, or let it go
 		assertThat(terminal.interruptPending()).isFalse();
-		RedstoneCard card = new RedstoneCard();
+		RedstoneTerminal card = new RedstoneTerminal();
 		card.sense(0, 3);
 		assertThat(card.interruptPending()).as("an event while not accepting: dropped").isFalse();
 		card.accepting(true);
@@ -62,19 +62,18 @@ class SavedStateTest {
 	}
 
 	@Test
-	void aRedstoneCardKeepsItsEventsItsOutputsAndWhatItSaw() {
-		RedstoneCard card = new RedstoneCard();
-		card.accepting(true); // on a running board\'s bus
-		card.setOutput(args("north", 7L));
-		card.sense(0, 9);
-		RedstoneCard loaded = new RedstoneCard();
-		loaded.restore(card.saved());
-		assertThat(loaded.getOutput(args("north")).first()).isEqualTo(7L);
-		assertThat(loaded.getInput(args("down")).first()).isEqualTo(9L);
-		loaded.sense(0, 9);
+	void aRedstoneTerminalKeepsItsEventsItsOutputsAndWhatItSaw() {
+		RedstoneTerminal terminal = new RedstoneTerminal();
+		terminal.accepting(true); // on a running board\'s bus
+		terminal.set(args(Map.of("north", Map.of("level", 7L))));
+		terminal.sense(5, 9);
+		RedstoneTerminal loaded = new RedstoneTerminal();
+		loaded.restore(terminal.saved());
+		assertThat(loaded.output(0)).isEqualTo(7);
 		@SuppressWarnings("unchecked")
 		Map<String, Object> event = (Map<String, Object>) loaded.pull(args()).first();
-		assertThat(event).containsEntry("new", 9L);
+		assertThat(event).containsEntry("side", "bottom").containsEntry("new", 9L);
+		loaded.sense(5, 9);
 		assertThat(loaded.pull(args()).first()).as("the same signal after a load is no change").isNull();
 	}
 

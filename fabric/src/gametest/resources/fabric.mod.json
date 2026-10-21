@@ -12,7 +12,8 @@
 			"com.payonel.modularcomputers.gametest.ModularComputersClientGameTest",
 			"com.payonel.modularcomputers.gametest.AllInOneClientGameTest",
 			"com.payonel.modularcomputers.gametest.CableClientGameTest",
-			"com.payonel.modularcomputers.gametest.CaseTierClientGameTest"
+			"com.payonel.modularcomputers.gametest.CaseTierClientGameTest",
+			"com.payonel.modularcomputers.gametest.RedstoneTerminalClientGameTest"
 		]
 	},
 	"mixins": [

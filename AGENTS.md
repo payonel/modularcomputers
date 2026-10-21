@@ -160,11 +160,13 @@ is a library (`/lib/readline.lua`), as GNU readline is for bash and lua. When ch
 copy Linux/POSIX/GNU (and say where it can't). From OpenOS's experience: **no lazy loading** (OpenOS
 split libraries to fit OC's RAM; it cost speed, complexity and more memory than loading whole) and
 **no legacy compatibility** (supporting old programs made OpenOS complex). 
-**`/dev` holds only data** (user, 2026-10-20), flat, as Linux's: the kernel's `console`, `tty`, `null`,
-`zero`, and a node for each bus device with a `get` or `set` method (the EEPROM sits there too: not
+**`/dev` holds only data** (user, 2026-10-20), flat, as Linux's: the kernel's `console`, `tty`,
+`null`, `zero`, and a node for each bus device with a `get` or `set` method (the EEPROM sits there too: not
 where Linux keeps one, but convenient for users, the user's call). Reading gives `get`'s answer;
 what's written goes to `set` in one call at close, and **the device decides what `set` means**
-(replace, append). Descriptions of devices aren't data: they come from the kernel (`sys.devices`,
+(replace, append). A device whose data is a table, not text, has a **driver** (a kernel module
+devfs loads when its file is first opened, as Linux loads a device's module): the redstone
+terminal's turns its table into Lua's syntax and back. Descriptions of devices aren't data: they come from the kernel (`sys.devices`,
 for `lsdev`), and a `/sys` tree is postponed. **The kernel caches the bus list, eventually
 correct** (as udev fills `/dev` in after a hot-plug): it's read again on the bus's hot-plug
 interrupt (when the kernel idles) and when a call fails because the device is gone; being late is
@@ -181,6 +183,10 @@ process (as VFIO does).
   against that loader; then it goes behind `Platform` (one method, implemented in `FabricPlatform`,
   `NeoForgePlatform` and the unit tests' `TestPlatform`) or into the loader's entry point as an event
   calling a common hook. `common` can't see a loader's API, so a slip fails its compile.
+- **A device whose `get`/`set` take tables gets a driver** (`lib/modules/<type>.lua`, named in devfs's
+  `DRIVEN`), or its `/dev` file reads as nothing useful.
+- **A new cabled block's entity holds `CablePorts`** (so its sides can be closed), and `Cabling`
+  learns its ports and kind.
 - **A new packet goes in `ModNetwork`'s lists** (and a client handler in `ModNetworkClient`); a new
   game test class in `GameTests.CLASSES`. Nothing else registers them.
 - **A test opens a menu or sends as the mod does** (`ModMenus.open`, `ModNetwork.send`,
@@ -264,10 +270,15 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
 - **Multiblock screens that grow** (user idea, undecided): neighboring screens merging into one
   bigger display.
 - **The all-in-one** is a dev kit: it may go away, or become a creative "everything built in" block.
-- **The redstone card, open** (user, 2026-10-20: "let's work on the redstone card"): bundled (16
-  colour) signals, as a second set of methods or a tier 2 card. No Fabric mod carries them on 26.x
-  (RSWires stopped at 1.18.2); on NeoForge, Ender IO's redstone conduit and More Red do, each with its
-  own API. Our own bundled cable is the other way. Also open: its `/dev` node.
+- **The gear-box tab, next** (user, 2026-10-20): on every block's GUI, a right-side tab (a gear-box
+  icon) showing the block's device type ("tier 3 case", "tier 1 redstone terminal"), its device id (or
+  "not assigned"), and a wireframe of the block with a faint render of the world around it, where
+  clicking a side opens or closes its cable port (`CablePorts`, which every cabled block entity is to
+  hold; only the redstone terminal does yet).
+- **Redstone terminal, tier 2** (user, 2026-10-20, skipped for now): crafted from tier 1; a side can
+  also be set to one of the 16 colors, reading that one channel of a bundled input (Ender IO's
+  conduit on NeoForge, or a bundled cable of ours). `mode` would then answer the color's name. No
+  Fabric mod carries bundled signals on 26.x (RSWires stopped at 1.18.2).
 - **Cards still placeholders:** WLAN, Audio, Audio Sensor. The paint gun (shoots paint at nearby
   wool, out of its nozzle face) does nothing yet.
 - **Bluetooth, open:** range limits; whether links show differently in the bus order; what a
@@ -350,7 +361,7 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   - `type -a`;
   - `install`, once loot software is worked out;
   - `rc`, once there are start-up services;
-  - `sides`, with the redstone card's API;
+  - `sides`, with the redstone terminal's API;
   - profile, `.shrc` and motd;
   - maybe `label`, `primary`, `resolution`, `address`.
   - The internet card's commands (`wget`, `pastebin`) will be its device's API.

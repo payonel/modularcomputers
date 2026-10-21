@@ -79,6 +79,7 @@ public final class ModularComputersClient {
 		screens.register(ModMenus.ROBOTIC_PISTON, CardHolderScreen::new);
 		screens.register(ModMenus.SCREEN, CardHolderScreen::new);
 		screens.register(ModMenus.PAINT_GUN, CardHolderScreen::new);
+		screens.register(ModMenus.REDSTONE_TERMINAL, CardHolderScreen::new);
 		screens.register(ModMenus.PHOTOMASK, PhotomaskScreen::new);
 	}
 

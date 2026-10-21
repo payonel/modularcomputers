@@ -84,6 +84,14 @@ public final class ModBlocks {
 		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("photomask"),
 		new BlockEntityType<>(PhotomaskBlockEntity::new, Set.of(PHOTOMASK)));
 
+	/** A redstone terminal, tier 1: redstone sides and cable sides, half a block tall (user design, 2026-10-20). */
+	public static final Block REDSTONE_TERMINAL = registerWithItem("redstone_terminal", RedstoneTerminalBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(2.0f).sound(SoundType.METAL));
+
+	public static final BlockEntityType<RedstoneTerminalBlockEntity> REDSTONE_TERMINAL_ENTITY = Registry.register(
+		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("redstone_terminal"),
+		new BlockEntityType<>(RedstoneTerminalBlockEntity::new, Set.of(REDSTONE_TERMINAL)));
+
 	/** A broken computer from the ancient sites: decoration, nothing works; broken, it's gone (no drops). */
 	public static final Block BROKEN_CASE = registerWithItem("broken_case", BrokenCaseBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(1.5f).sound(SoundType.METAL).noOcclusion().noLootTable());

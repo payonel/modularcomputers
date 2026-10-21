@@ -42,9 +42,8 @@ local k = {
   BLOCK = setmetatable({}, {__name = "BLOCK"}), -- a description's answer: try again when things change
 }
 
--- A kernel module, read off the boot disk itself (the VFS isn't up yet), run with its arguments.
-local function module(name, ...)
-  local path = MODULES .. name .. ".lua"
+-- A file of the kernel's, read off the boot disk itself (the VFS isn't up yet), run with its arguments.
+local function kload(path, ...)
   local opened, file = board.invoke(root, "open", path)
   if not opened then
     error(path .. ": " .. tostring(file), 0)
@@ -63,6 +62,13 @@ local function module(name, ...)
     return piece
   end, "=" .. path))(...)
 end
+k.kload = kload
+
+-- A kernel module (lib/modules/<name>.lua): at boot, or later for a driver.
+local function module(name, ...)
+  return kload(MODULES .. name .. ".lua", ...)
+end
+k.module = module
 
 local vfs = module("vfs", k)
 local fail = vfs.fail

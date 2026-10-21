@@ -78,15 +78,27 @@ local function failed(why)
   return fail("EIO")
 end
 
--- An open device file: reads from what get gave (taken at the first read), writes kept for one set
--- at close. (Which of them the open's mode allows is the VFS's to enforce.)
+-- Drivers, by device type: a device whose data is a table, not text, has one (lib/modules/<type>.lua),
+-- loaded the first time one of its files is opened, as Linux loads a device's module when it's
+-- needed. It makes the table text to read (get) and the text written back a table (set).
+local DRIVEN = {redstone = true}
+local drivers = {}
+
+-- An open device file: reads from what get gave (taken at the first read, through its driver if it
+-- has one), writes kept for one set at close. (Which of them the open's mode allows is the VFS's to
+-- enforce.)
 local function devicefile(device, mode)
   local plus = mode:find("+", 1, true)
   local reads, writes = mode:sub(1, 1) == "r" or plus, mode:sub(1, 1) ~= "r" or plus
   if (reads and not device.get) or (writes and not device.set) then
     return fail("EACCES")
   end
-  local id = device.id
+  local id, kind = device.id, device.type
+  local driver = DRIVEN[kind] and drivers[kind]
+  if DRIVEN[kind] and not driver then
+    driver = k.module(kind, k)
+    drivers[kind] = driver
+  end
   local data, at = nil, 0
   local written = nil
   return {
@@ -97,7 +109,7 @@ local function devicefile(device, mode)
         if not ok then
           return failed(got)
         end
-        data = tostring(got or "")
+        data = driver and driver.get(got) or tostring(got or "")
       end
       local chunk = data:sub(at + 1, at + n)
       at = at + #chunk
@@ -110,8 +122,15 @@ local function devicefile(device, mode)
     end,
     close = function(self)
       if written then
-        local ok, why = board.invoke(id, "set", table.concat(written))
+        local value = table.concat(written)
         written = nil
+        if driver then
+          value = driver.set(value)
+          if value == nil then
+            return fail("EINVAL")
+          end
+        end
+        local ok, why = board.invoke(id, "set", value)
         if not ok then
           return failed(why)
         end

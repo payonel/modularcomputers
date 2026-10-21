@@ -3,6 +3,8 @@ package com.payonel.modularcomputers.menu;
 import com.payonel.modularcomputers.block.CardHolderBlockEntity;
 import com.payonel.modularcomputers.block.ExpansionHubBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
+import com.payonel.modularcomputers.block.RedstoneTerminalBlockEntity;
+import com.payonel.modularcomputers.item.BatteryItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
@@ -18,7 +20,8 @@ import net.minecraft.world.level.block.Block;
 /**
  * The card slots of a block on the network, above the player's inventory: an expansion hub's
  * four expansion slots, and every holder's radio slot (a Bluetooth card, which pairs the block
- * with one computer). Screens, robotic pistons and paint guns have just the radio slot.
+ * with one computer). Screens, robotic pistons and paint guns have just the radio slot; a
+ * redstone terminal has a battery slot beside it.
  */
 public final class CardHolderMenu extends AbstractContainerMenu {
 	public static final int SLOT_Y = 35;
@@ -29,15 +32,24 @@ public final class CardHolderMenu extends AbstractContainerMenu {
 
 	private final int cardSlots;
 	private final int radioSlot;
+	/** A battery slot's index, or {@link #NO_BATTERY}. */
+	private final int batterySlot;
+	public static final int NO_BATTERY = -1;
 	private final BlockPos pos;
 	private final ContainerLevelAccess access;
 	private final Block block;
 
 	private CardHolderMenu(MenuType<?> type, int id, Inventory inventory, Container cards, int radioSlot, BlockPos pos,
 		ContainerLevelAccess access, Block block) {
+		this(type, id, inventory, cards, radioSlot, NO_BATTERY, pos, access, block);
+	}
+
+	private CardHolderMenu(MenuType<?> type, int id, Inventory inventory, Container cards, int radioSlot, int batterySlot, BlockPos pos,
+		ContainerLevelAccess access, Block block) {
 		super(type, id);
 		this.cardSlots = cards.getContainerSize();
 		this.radioSlot = radioSlot;
+		this.batterySlot = batterySlot;
 		this.pos = pos;
 		this.access = access;
 		this.block = block;
@@ -49,7 +61,7 @@ public final class CardHolderMenu extends AbstractContainerMenu {
 			addSlot(new Slot(cards, slot, x, SLOT_Y) {
 				@Override
 				public boolean mayPlace(ItemStack stack) {
-					return CardHolderBlockEntity.accepts(index, radioSlot, stack);
+					return index == batterySlot ? stack.getItem() instanceof BatteryItem : CardHolderBlockEntity.accepts(index, radioSlot, stack);
 				}
 
 				@Override
@@ -96,8 +108,22 @@ public final class CardHolderMenu extends AbstractContainerMenu {
 		return paintGun(id, inventory, new SimpleContainer(1), pos, ContainerLevelAccess.NULL);
 	}
 
+	public static CardHolderMenu redstoneTerminal(int id, Inventory inventory, Container cards, BlockPos pos, ContainerLevelAccess access) {
+		return new CardHolderMenu(ModMenus.REDSTONE_TERMINAL, id, inventory, cards, RedstoneTerminalBlockEntity.RADIO_SLOT,
+			RedstoneTerminalBlockEntity.BATTERY_SLOT, pos, access, ModBlocks.REDSTONE_TERMINAL);
+	}
+
+	public static CardHolderMenu redstoneTerminal(int id, Inventory inventory, BlockPos pos) {
+		return redstoneTerminal(id, inventory, new SimpleContainer(2), pos, ContainerLevelAccess.NULL);
+	}
+
 	public int radioSlot() {
 		return radioSlot;
+	}
+
+	/** The battery slot, or {@link #NO_BATTERY}. */
+	public int batterySlot() {
+		return batterySlot;
 	}
 
 	public BlockPos pos() {

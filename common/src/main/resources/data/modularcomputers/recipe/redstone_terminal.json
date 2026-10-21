@@ -2,17 +2,18 @@
 	"type": "minecraft:crafting_shaped",
 	"category": "redstone",
 	"key": {
-		"G": "minecraft:gold_nugget",
+		"C": "minecraft:copper_ingot",
 		"Q": "modularcomputers:chip",
+		"R": "minecraft:redstone",
 		"X": "minecraft:comparator",
-		"c": "minecraft:copper_nugget"
+		"h": "minecraft:smooth_stone_slab"
 	},
 	"pattern": [
-		"XQ ",
-		"ccc",
-		"GGG"
+		"RQR",
+		"CXC",
+		"hhh"
 	],
 	"result": {
-		"id": "modularcomputers:redstone_card"
+		"id": "modularcomputers:redstone_terminal"
 	}
 }

@@ -272,16 +272,16 @@ public class AllInOneGameTest {
 	@GameTest
 	public void theEepromIsOnTheBusAndEveryCardKindIsADeviceButNotTheBatteries(GameTestHelper helper) {
 		AllInOneBlockEntity computer = install(place(helper), true, true);
-		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.REDSTONE_CARD));
+		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.AUDIO_CARD));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.BLUETOOTH_CARD));
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 2, new ItemStack(ModItems.WEATHER_SENSOR_CARD));
 		helper.assertValueEqual(busKeys(computer), List.of("eeprom", "exp:0", "exp:1", "exp:2"), "default order: no battery");
 		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.EEPROM,
-			DeviceType.REDSTONE, DeviceType.NETWORK, DeviceType.SENSOR), "each reports its class");
+			DeviceType.AUDIO, DeviceType.NETWORK, DeviceType.SENSOR), "each reports its class");
 		var entries = computer.busEntries();
 		helper.assertValueEqual(entries.get(0).location().getString(), "ROM", "the EEPROM sits in the ROM socket");
 		helper.assertValueEqual(entries.get(0).slot(), CaseMenu.EEPROM_SLOT, "its row goes with its slot");
-		helper.assertValueEqual(entries.get(1).name().getString(), "Redstone Card", "card names");
+		helper.assertValueEqual(entries.get(1).name().getString(), "Audio Card", "card names");
 		var bus = computer.machine().board().bus();
 		for (String address : List.of("eeprom", "exp:0")) {
 			String id = bus.id(address);

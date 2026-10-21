@@ -4,7 +4,6 @@ import com.payonel.modularcomputers.block.AllInOneBlock;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.device.MotionSensorCard;
-import com.payonel.modularcomputers.device.RedstoneCard;
 import com.payonel.modularcomputers.device.WeatherCard;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.CaseMenu;
@@ -21,10 +20,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.RedstoneLampBlock;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
-/** Cards that work where they're installed (user design, 2026-10-13): redstone, weather, motion. */
+/** Cards that work where they're installed (user design, 2026-10-13): weather, motion. */
 public class CardGameTest {
 	private static final BlockPos POS = new BlockPos(4, 2, 4);
 	/** How long the test computer's program waits at a time (it waits on, so its cards take data). */
@@ -53,37 +51,15 @@ public class CardGameTest {
 		return new Arguments(List.of(values));
 	}
 
-	@GameTest(maxTicks = 40)
-	public void aRedstoneCardSetsAndReadsRedstoneOnItsBlocksFaces(GameTestHelper helper) {
-		RedstoneCard card = computerWith(helper, ModItems.REDSTONE_CARD, RedstoneCard.class);
-		helper.setBlock(POS.east(), Blocks.REDSTONE_LAMP);
-		helper.assertTrue(!card.setOutput(args("east", 15L)).failed(), "set east to 15");
-		helper.setBlock(POS.west(), Blocks.REDSTONE_BLOCK);
-		helper.startSequence()
-			.thenWaitUntil(() -> helper.assertBlockProperty(POS.east(), RedstoneLampBlock.LIT, true))
-			.thenWaitUntil(() -> helper.assertValueEqual(card.getInput(args("west")).first(), 15L, "west reads 15"))
-			.thenExecute(() -> {
-				helper.assertTrue(card.interruptPending(), "a change is an interrupt");
-				List<Map<?, ?>> events = new ArrayList<>();
-				Object event;
-				while ((event = card.pull(args()).first()) != null) {
-					events.add((Map<?, ?>) event);
-				}
-				helper.assertTrue(events.stream().anyMatch(e -> "west".equals(e.get("side")) && Long.valueOf(15).equals(e.get("new"))), "the change, as an event: " + events);
-				card.setOutput(args("east", 0L));
-			})
-			.thenWaitUntil(() -> helper.assertBlockProperty(POS.east(), RedstoneLampBlock.LIT, false))
-			.thenSucceed();
-	}
-
 	@GameTest(maxTicks = 60)
-	public void aCardsEventsAndOutputsOutlastASave(GameTestHelper helper) {
-		RedstoneCard card = computerWith(helper, ModItems.REDSTONE_CARD, RedstoneCard.class);
-		card.setOutput(args("east", 9L));
-		helper.setBlock(POS.west(), Blocks.REDSTONE_BLOCK);
+	public void aCardsEventsAndSettingsOutlastASave(GameTestHelper helper) {
+		MotionSensorCard card = computerWith(helper, ModItems.MOTION_SENSOR_CARD, MotionSensorCard.class);
+		card.setRange(args(9L));
 		var registries = helper.getLevel().registryAccess();
 		helper.startSequence()
-			.thenWaitUntil(() -> helper.assertTrue(card.interruptPending(), "the change waits for the program"))
+			.thenIdle(1)
+			.thenExecute(() -> card.sense("drop", Map.of("x", 1.0)))
+			.thenWaitUntil(() -> helper.assertTrue(card.interruptPending(), "the event waits for the program"))
 			.thenExecute(() -> {
 				// Saved as the world is, then gone, and loaded again: a save isn't a power cut.
 				net.minecraft.nbt.CompoundTag saved = helper.getBlockEntity(POS, AllInOneBlockEntity.class).saveWithoutMetadata(registries);
@@ -91,13 +67,12 @@ public class CardGameTest {
 				helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
 				AllInOneBlockEntity again = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
 				again.loadWithComponents(net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, registries, saved));
-				RedstoneCard loaded = again.machine().board().bus().devices().stream()
-					.filter(RedstoneCard.class::isInstance).map(RedstoneCard.class::cast).findFirst().orElseThrow();
+				MotionSensorCard loaded = again.machine().board().bus().devices().stream()
+					.filter(MotionSensorCard.class::isInstance).map(MotionSensorCard.class::cast).findFirst().orElseThrow();
 				helper.assertTrue(loaded != card, "a new card device, from the save");
-				helper.assertValueEqual(loaded.getOutput(args("east")).first(), 9L, "what it put out");
+				helper.assertValueEqual(loaded.getRange(args()).first(), 9L, "the range it was set to");
 				Object event = loaded.pull(args()).first();
-				helper.assertTrue(event instanceof Map<?, ?> map && "west".equals(map.get("side")) && Long.valueOf(15).equals(map.get("new")),
-					"the event that waited: " + event);
+				helper.assertTrue(event instanceof Map<?, ?>, "the event that waited: " + event);
 			})
 			.thenSucceed();
 	}
@@ -114,8 +89,8 @@ public class CardGameTest {
 		helper.setBlock(hubPos, ModBlocks.EXPANSION_HUB);
 		var screen = helper.getBlockEntity(screenPos, com.payonel.modularcomputers.block.ScreenBlockEntity.class);
 		var hub = helper.getBlockEntity(hubPos, com.payonel.modularcomputers.block.ExpansionHubBlockEntity.class);
-		hub.cards().setItem(0, new ItemStack(ModItems.REDSTONE_CARD));
-		RedstoneCard card = (RedstoneCard) hub.card(0).orElseThrow();
+		hub.cards().setItem(0, new ItemStack(ModItems.MOTION_SENSOR_CARD));
+		MotionSensorCard card = (MotionSensorCard) hub.card(0).orElseThrow();
 		screen.terminal().accepting(true); // as on a running computer's bus
 		card.accepting(true);
 		var screenChunk = helper.getLevel().getChunkAt(helper.absolutePos(screenPos));
@@ -123,8 +98,8 @@ public class CardGameTest {
 		java.util.Map<Runnable, net.minecraft.world.level.chunk.LevelChunk> changes = new java.util.LinkedHashMap<>();
 		changes.put(() -> screen.terminal().press("a"), screenChunk);
 		changes.put(() -> screen.terminal().read(args()), screenChunk);
-		changes.put(() -> card.setOutput(args("up", 3L)), hubChunk);
-		changes.put(() -> card.sense(0, 5), hubChunk);
+		changes.put(() -> card.setRange(args(3L)), hubChunk);
+		changes.put(() -> card.sense("drop", Map.of("x", 1.0)), hubChunk);
 		changes.put(() -> card.pull(args()), hubChunk);
 		changes.forEach((change, chunk) -> {
 			screenChunk.tryMarkSaved();

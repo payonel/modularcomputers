@@ -82,6 +82,25 @@ public final class Arguments {
 		throw bad(index, "boolean expected, got " + Values.typeName(get(index)));
 	}
 
+	/** A table, as a map (a sequence's keys are its indexes, from 1; an empty table is an empty map). */
+	public java.util.Map<?, ?> checkTable(int index) {
+		if (get(index) instanceof java.util.Map<?, ?> map) {
+			return map;
+		}
+		if (get(index) instanceof java.util.List<?> list) {
+			java.util.Map<Object, Object> map = new java.util.LinkedHashMap<>();
+			for (int i = 0; i < list.size(); i++) {
+				map.put((long) i + 1, list.get(i));
+			}
+			return map;
+		}
+		throw bad(index, "table expected, got " + Values.typeName(get(index)));
+	}
+
+	public java.util.Map<?, ?> optTable(int index) {
+		return get(index) == null ? null : checkTable(index);
+	}
+
 	public long optInteger(int index, long fallback) {
 		return get(index) == null ? fallback : checkInteger(index);
 	}

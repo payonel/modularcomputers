@@ -17,7 +17,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * An expansion hub: a box of expansion card slots on the cable network, like an external
  * expansion chassis. Every computer wired to it has its cards on its bus, unless a Bluetooth
  * card in its radio slot pairs the whole hub with one computer. A card works where it's
- * installed: a redstone card in a hub will emit and detect redstone at the hub.
+ * installed: a motion sensor in a hub watches around the hub.
  */
 public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 	/** Expansion card slots; the radio slot comes after them. */
@@ -61,7 +61,7 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 		return CardHolderMenu.hub(id, inventory, cards(), worldPosition, ContainerLevelAccess.create(level, worldPosition));
 	}
 
-	/** A card that works here, at the hub: a redstone card's output changes update the hub's neighbours. */
+	/** A card that works here, at the hub. */
 	private Card cardHere(com.payonel.modularcomputers.device.CardKind kind) {
 		Card card = com.payonel.modularcomputers.device.Cards.make(kind);
 		// Minecraft writes only chunks marked changed: its cards' events and settings change as they're used.
@@ -70,13 +70,6 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 				level.blockEntityChanged(worldPosition);
 			}
 		});
-		if (card instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
-			redstone.onOutput(() -> {
-				if (level != null && !level.isClientSide()) {
-					level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
-				}
-			});
-		}
 		return card;
 	}
 
@@ -99,11 +92,6 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 				DeviceSave.load(input, CARD + slot, devices[slot]);
 			}
 		}
-	}
-
-	/** The redstone the hub's cards put out toward a neighbour ({@code direction}: from the neighbour to the hub). */
-	public int redstoneOut(net.minecraft.core.Direction direction) {
-		return CardWorld.redstone(java.util.Arrays.stream(devices).filter(java.util.Objects::nonNull).toList(), direction);
 	}
 
 	/** Server, every tick: its cards work where they are. */

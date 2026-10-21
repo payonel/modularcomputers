@@ -1,0 +1,8 @@
+{
+	"parent": "minecraft:block/slab",
+	"textures": {
+		"bottom": "modularcomputers:block/redstone_terminal_bottom",
+		"top": "modularcomputers:block/redstone_terminal_top",
+		"side": "modularcomputers:block/redstone_terminal_side"
+	}
+}
