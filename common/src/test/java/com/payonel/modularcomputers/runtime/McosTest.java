@@ -360,6 +360,37 @@ class McosTest {
 	}
 
 	@Test
+	void inotifyTellsOfChangesOnADiskAndInTmp() {
+		boot();
+		file("n.lua", """
+			local sys = require("sys")
+			local fd = sys.inotify()
+			sys.watch(fd, "/data.txt")
+			sys.watch(fd, "/tmp")
+			local function write(name, text)
+			  local f = io.open(name, "w")
+			  f:write(text)
+			  f:close()
+			end
+			write("/data.txt", "one")
+			write("/other.txt", "unwatched")
+			write("/tmp/t", "x")
+			os.rename("/tmp/t", "/tmp/u")
+			local seen = {}
+			while sys.poll({fd}, 0.5)[1] do
+			  seen[#seen + 1] = sys.read(fd)
+			end
+			write("/seen", table.concat(seen))
+			""");
+		type("lua /n.lua; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		String seen = read(root().resolve("seen"));
+		assertThat(seen).contains("event = \"create\", path = \"/tmp/t\"", "event = \"modify\", path = \"/tmp/t\"",
+			"event = \"rename\", from = \"/tmp/t\", path = \"/tmp/u\"", "event = \"modify\", path = \"/data.txt\"")
+			.doesNotContain("other.txt");
+	}
+
+	@Test
 	void theKernelsViewOfTheBusCatchesUpWithAHotPlug() {
 		boot();
 		type("lsdev > /before\r");

@@ -126,6 +126,13 @@ computer's own thread), the firmware (sandbox, budgets, freezing, device data), 
   Flow control is a handshake, never a silent drop: a device keeps its data until there's room,
   and what a full device does is its own business (a keyboard could beep). Only the firmware caches
   device data; with tier 1 RAM there's no cache, and every read is a call (slow, on purpose).
+- **A device reports every change to its state, from wherever it came** (user, 2026-10-21): an event
+  in its own terms (a redstone card's face: its level and powered, whether the change came in, was
+  its own set, or another card's in its block; a motion; a disk's change, by its own paths, or byte
+  ranges when raw), raising its interrupt, taken by a method of its own. The kernel's drivers turn
+  the events into what programs see (poll, /dev lines, inotify), so no kernel has to watch for
+  changes itself, however it's written. A disk's are `changes()`, not `pull()`: its /dev file is
+  its data, never its reports.
 - **Device failures are soft**: no device can stop the machine (a status the driver reads); only the
   program's own error, or the board's supervision (CPU gone, power gone), ends a run. External
   devices are hot-plugged by design: one that isn't there isn't on the bus, and calls to it fail at
@@ -175,7 +182,10 @@ on many files at once (user, 2026-10-21: Lua has no easy background threads): ea
 when it's ready (a tty's line, a pipe's data, an event waiting, a redstone file's change since it
 was last read from its start, as a sysfs GPIO value's). It's in `sys`, not `io` (real Lua's `io` is
 C's stdio, which has no poll) and not a `posix` library (`sys` already is mcos's POSIX layer);
-`sys.fileno(file)` gives an io file's descriptor (not in real Lua: luaposix's). **A device type costs no memory until it's used** (user, 2026-10-21: add devices and drivers
+`sys.fileno(file)` gives an io file's descriptor (not in real Lua: luaposix's). **inotify**
+(`sys.inotify()`, `sys.watch(fd, path)`, a module loaded at the first) turns the disks' reports
+into full paths by their mounts (tmpfs reports through `k.changed`, a no-op until then); it watches
+paths, not inodes as Linux's does, and a change made on a disk's host isn't seen. **A device type costs no memory until it's used** (user, 2026-10-21: add devices and drivers
 freely, never paying at boot for one that isn't there, as a real kernel loads a module when its
 device needs it): devfs looks for the type's driver on the boot disk the first time one of its
 files is opened, and remembers what it found; nothing in the kernel lists the types. Descriptions
@@ -292,6 +302,9 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   input (Ender IO's conduit on NeoForge, or a bundled cable of ours), maybe as a tier 2 redstone
   card. No Fabric mod carries bundled signals on 26.x (RSWires stopped at 1.18.2). (A redstone
   terminal block was built and dropped, 2026-10-21: the user went back to the card.)
+- **Devices that should report their state's changes, not yet:** the robotic piston (its arms), the
+  photomask (its work), the screen (what it shows changes; keys already come as data), the battery
+  of a case (its charge). Each as its own events (the rule in section 3).
 - **Motion sensor, tier 2 maybe** (user, 2026-10-21): finer motion (fluids, drops) and filters (by
   mob); tier 1 has no settings.
 - **Cards still placeholders:** WLAN, Audio, Audio Sensor. The paint gun (shoots paint at nearby

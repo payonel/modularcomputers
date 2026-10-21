@@ -26,10 +26,12 @@ with a blank line before every heading but the first.
 Follows: once the files are shown, waits, and shows what is added to them,
 until it's stopped (^C, or
 .BR kill ).
-Pipes and device files are shown the moment they have something (it
-waits on them with
-.BR poll );
-files on a disk are looked at every second. A file rewritten rather than
+Everything is shown the moment it comes: files on a disk or in
+.B /tmp
+are watched (inotify: a disk reports each change made on it), and pipes
+and device files are waited on with
+.BR poll ,
+all together. A file rewritten rather than
 added to (a disk file grown shorter, or a device whose state changed, as a
 redstone card's) is shown again from its start, after
 .BI "tail: " file ": file truncated"
@@ -85,6 +87,8 @@ last lines to find, so
 .B tail
 waits on it forever, as GNU's does; read it with
 .BR cat .
+A change made to a disk's file outside the computer (on the disk's host)
+isn't seen until the next change made inside it.
 .SH SEE ALSO
 .BR head (1),
 .BR cat (1),

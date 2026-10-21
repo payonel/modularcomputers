@@ -97,7 +97,9 @@ public class CardGameTest {
 				while ((event = card.pull(args()).first()) != null) {
 					events.add((Map<?, ?>) event);
 				}
-				helper.assertTrue(events.stream().anyMatch(e -> "west".equals(e.get("side")) && Long.valueOf(15).equals(e.get("new"))), "the change, as an event: " + events);
+				helper.assertTrue(events.stream().anyMatch(e -> "west".equals(e.get("side")) && Long.valueOf(15).equals(e.get("level"))), "the change, as an event: " + events);
+				helper.assertTrue(events.stream().anyMatch(e -> "east".equals(e.get("side")) && Long.valueOf(15).equals(e.get("powered"))),
+					"its own change too: " + events);
 				card.set(args(Map.of("east", Map.of("powered", 0L))));
 			})
 			.thenWaitUntil(() -> helper.assertBlockProperty(POS.east(), RedstoneLampBlock.LIT, false))
@@ -111,8 +113,9 @@ public class CardGameTest {
 		helper.setBlock(POS.west(), Blocks.REDSTONE_BLOCK);
 		var registries = helper.getLevel().registryAccess();
 		helper.startSequence()
-			.thenWaitUntil(() -> helper.assertTrue(card.interruptPending(), "the change waits for the program"))
+			.thenWaitUntil(() -> helper.assertValueEqual(level(card, "west"), 15L, "the signal came in"))
 			.thenExecute(() -> {
+				helper.assertTrue(card.interruptPending(), "the changes wait for the program");
 				// Saved as the world is, then gone, and loaded again: a save isn't a power cut.
 				net.minecraft.nbt.CompoundTag saved = helper.getBlockEntity(POS, AllInOneBlockEntity.class).saveWithoutMetadata(registries);
 				helper.setBlock(POS, Blocks.AIR);
@@ -123,9 +126,13 @@ public class CardGameTest {
 					.filter(RedstoneCard.class::isInstance).map(RedstoneCard.class::cast).findFirst().orElseThrow();
 				helper.assertTrue(loaded != card, "a new card device, from the save");
 				helper.assertValueEqual(field(loaded, "east", "powered"), 9L, "what it put out");
-				Object event = loaded.pull(args()).first();
-				helper.assertTrue(event instanceof Map<?, ?> map && "west".equals(map.get("side")) && Long.valueOf(15).equals(map.get("new")),
-					"the event that waited: " + event);
+				List<Map<?, ?>> events = new ArrayList<>();
+				Object event;
+				while ((event = loaded.pull(args()).first()) != null) {
+					events.add((Map<?, ?>) event);
+				}
+				helper.assertTrue(events.stream().anyMatch(e -> "west".equals(e.get("side")) && Long.valueOf(15).equals(e.get("level"))),
+					"the events that waited: " + events);
 			})
 			.thenSucceed();
 	}

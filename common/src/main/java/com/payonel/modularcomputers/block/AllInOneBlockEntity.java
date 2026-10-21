@@ -205,6 +205,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	private static final String UPTIME = "uptime";
 	/** A card's saved state, by lane ({@link DeviceSave}). */
 	private static final String CARD = "card_";
+	/** A disk's reports of changes, by lane ({@link DeviceSave}). */
+	private static final String DISK = "disk_";
 
 	/**
 	 * A device wired to this computer: where it is, how far the connection runs to it in meters
@@ -808,6 +810,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 				if (level != null && !level.isClientSide()) {
 					level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
 				}
+				for (var other : cards) {
+					if (other instanceof com.payonel.modularcomputers.device.RedstoneCard sibling && sibling != redstone) {
+						sibling.report(); // what the block puts out changed: so may their levels
+					}
+				}
 			});
 		}
 		return card;
@@ -887,6 +894,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 					imageDisk(diskStack, folder);
 				}
 				disks[lane] = new Disk(diskTier, folder);
+				disks[lane].onChange(this::markChanged); // its reports of changes, saved with the case
 			}
 			diskSerials[lane] = diskSerial;
 			if (disks[lane] != null) {
@@ -1107,6 +1115,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 					DeviceSave.save(output, CARD + lane, cards[lane]);
 				}
 			}
+			for (int lane = 0; lane < disks.length; lane++) {
+				if (disks[lane] != null) {
+					DeviceSave.save(output, DISK + lane, disks[lane]);
+				}
+			}
 		}
 		ScreenSave.save(output, DISPLAY, display);
 		ConsoleSplitter console = machine.board().virtualBus().console();
@@ -1135,6 +1148,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		for (int lane = 0; lane < cards.length; lane++) {
 			if (cards[lane] != null) {
 				DeviceSave.load(input, CARD + lane, cards[lane]);
+			}
+		}
+		for (int lane = 0; lane < disks.length; lane++) {
+			if (disks[lane] != null) {
+				DeviceSave.load(input, DISK + lane, disks[lane]);
 			}
 		}
 		ConsoleSplitter console = machine.board().virtualBus().console();

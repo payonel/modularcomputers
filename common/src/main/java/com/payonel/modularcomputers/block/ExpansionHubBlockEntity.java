@@ -76,6 +76,11 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 				if (level != null && !level.isClientSide()) {
 					level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
 				}
+				for (var other : devices) {
+					if (other instanceof com.payonel.modularcomputers.device.RedstoneCard sibling && sibling != redstone) {
+						sibling.report(); // what the block puts out changed: so may their levels
+					}
+				}
 			});
 		}
 		return card;

@@ -92,6 +92,7 @@ function vfs.mount(path, fs, source)
     return fail("EBUSY") -- (something's mounted there already)
   end
   mounts[#mounts + 1] = {path = path, fs = fs, source = source}
+  fs.at = path -- (a filesystem that reports its own changes, tmpfs, names them by it)
   table.sort(mounts, function(a, b)
     return #a.path > #b.path
   end)

@@ -37,9 +37,16 @@ local function walk(root, path, follow)
   return node, parent, name
 end
 
+-- A change to report (inotify: k.changed), by its full path (where this is mounted, fs.at). tmpfs
+-- has no device to report its changes, as a disk does: the kernel does.
+local function changed(self, path, event, from)
+  local at = self.at == "/" and "" or self.at
+  k.changed(at .. path, event, from and at .. from)
+end
+
 -- An open file. Whether it may be read or written is the VFS's to enforce (by its mode); this
--- only keeps where it's at, appending when opened to append.
-local function file(node, mode)
+-- only keeps where it's at, appending when opened to append; a write is a change.
+local function file(node, mode, wrote)
   local append = mode:sub(1, 1) == "a"
   local at = append and #node.data or 0
   return {
@@ -58,6 +65,7 @@ local function file(node, mode)
       end
       node.data = node.data:sub(1, at) .. data .. node.data:sub(at + #data + 1)
       at = at + #data
+      wrote()
       return #data
     end,
     seek = function(self, whence, offset)
@@ -83,10 +91,14 @@ function fs:open(path, mode)
   if not node then
     node = {data = ""}
     parent.dir[name] = node
+    changed(self, path, "create")
   elseif mode:sub(1, 1) == "w" then
     node.data = ""
+    changed(self, path, "modify")
   end
-  return file(node, mode)
+  return file(node, mode, function()
+    changed(self, path, "modify")
+  end)
 end
 
 function fs:stat(path, nofollow)
@@ -116,8 +128,9 @@ function fs:list(path)
   return entries
 end
 
--- A new node at a path whose last name isn't there yet (mkdir, symlink, rename's target).
-local function create(self, path, new)
+-- A new node at a path whose last name isn't there yet (mkdir, symlink, rename's target: moved, it
+-- reports itself as a rename).
+local function create(self, path, new, moved)
   local node, parent, name = walk(self.root, path)
   if name == "REPARSE" then
     return nil, parent, name
@@ -127,6 +140,9 @@ local function create(self, path, new)
     return fail("ENOENT")
   end
   parent.dir[name] = new
+  if not moved then
+    changed(self, path, "create")
+  end
   return true
 end
 
@@ -148,6 +164,7 @@ function fs:remove(path)
     return fail("ENOTEMPTY")
   end
   parent.dir[name] = nil
+  changed(self, path, "remove")
   return true
 end
 
@@ -160,9 +177,10 @@ function fs:rename(from, to)
   elseif to:sub(1, #from + 1) == from .. "/" then
     return fail("EINVAL") -- (a directory into itself: Linux says so before anything else)
   end
-  local ok, why, errno = create(self, to, node)
+  local ok, why, errno = create(self, to, node, true)
   if ok then
     parent.dir[name] = nil
+    changed(self, to, "rename", from)
   end
   return ok, why, errno
 end

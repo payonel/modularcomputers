@@ -17,8 +17,10 @@ import java.util.function.IntUnaryOperator;
 /**
  * A redstone card (user design, 2026-10-13; its table API 2026-10-21): it puts out a redstone
  * signal on any face of the block it's in (a computer, a hub), 0 to 15, and reads what's on each
- * face; a change coming in is an event (its interrupt). A block may hold several: it puts out the
- * strongest of theirs on each face.
+ * face. A block may hold several: it puts out the strongest of theirs on each face. Any change to a
+ * face's state, from wherever it came (a signal coming in, its own set, another card in the block),
+ * is an event (its interrupt): {name = "redstone", side, level, powered}, the face as it is now
+ * (user, 2026-10-21: a device reports every change to its state).
  * <p>
  * Programs see the faces as a table, by name: {@code {north = {level = 7, powered = 7}, ...}}.
  * {@code powered} is the signal this card puts out there; {@code level} the strongest there,
@@ -39,8 +41,10 @@ public final class RedstoneCard extends Card {
 	private final BusPower power = new BusPower(0);
 	private final EventQueue events = new EventQueue(line, this::changed, this::isAccepting);
 	private final int[] output = new int[SIDES.size()];
-	/** What it last saw coming in on each face (from outside the block): a change is an event. */
+	/** What it last saw coming in on each face (from outside the block). */
 	private final int[] input = new int[SIDES.size()];
+	/** Each face's state as it last reported it, {level, powered}: a change from it is an event. */
+	private final int[][] reported = new int[SIDES.size()][2];
 	/** What the block's cards put out on a face, the strongest: this card alone, until the block says. */
 	private IntUnaryOperator block = side -> output[side];
 	/** Tells the world its outputs changed (the block it's in updates its neighbours). */
@@ -65,17 +69,38 @@ public final class RedstoneCard extends Card {
 		return output[side];
 	}
 
-	/** What came in on a face, seen in the world: a change is an event. */
+	/** What came in on a face, seen in the world. */
 	public void sense(int side, int value) {
 		if (input[side] != value) {
-			Map<String, Object> event = new LinkedHashMap<>();
-			event.put("name", "redstone");
-			event.put("side", SIDES.get(side));
-			event.put("old", (long) input[side]);
-			event.put("new", (long) value);
 			input[side] = value;
 			changed();
-			events.add(event);
+			report();
+		}
+	}
+
+	/** The signal there: the strongest coming in or put out by the block's cards. */
+	private int level(int side) {
+		return Math.max(input[side], Math.max(output[side], block.applyAsInt(side)));
+	}
+
+	/**
+	 * Reports each face whose state changed since it last did (the block calls this when another of
+	 * its cards changed what it puts out).
+	 */
+	public void report() {
+		for (int side = 0; side < SIDES.size(); side++) {
+			int level = level(side);
+			if (reported[side][0] != level || reported[side][1] != output[side]) {
+				reported[side][0] = level;
+				reported[side][1] = output[side];
+				Map<String, Object> event = new LinkedHashMap<>();
+				event.put("name", "redstone");
+				event.put("side", SIDES.get(side));
+				event.put("level", (long) level);
+				event.put("powered", (long) output[side]);
+				changed();
+				events.add(event);
+			}
 		}
 	}
 
@@ -112,12 +137,13 @@ public final class RedstoneCard extends Card {
 		}
 		if (changedOutput) {
 			changed();
-			onOutput.run();
+			onOutput.run(); // (the block's other cards report: their levels may change)
+			report();
 		}
 		return Result.ok(sides(allSides()));
 	}
 
-	@Method(doc = "pull(): the oldest change that came in, as {name, side, old, new}, or nil")
+	@Method(doc = "pull(): the oldest change to a face, from wherever it came, as {name, side, level, powered} (the face as it is now), or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -151,7 +177,7 @@ public final class RedstoneCard extends Card {
 		Map<String, Object> sides = new LinkedHashMap<>();
 		for (int side : which) {
 			Map<String, Object> fields = new LinkedHashMap<>();
-			fields.put("level", (long) Math.max(input[side], Math.max(output[side], block.applyAsInt(side))));
+			fields.put("level", (long) level(side));
 			fields.put("powered", (long) output[side]);
 			sides.put(SIDES.get(side), fields);
 		}
@@ -168,13 +194,14 @@ public final class RedstoneCard extends Card {
 		return "pull";
 	}
 
-	/** Its events waiting, what it puts out, and what it saw coming in (so a load isn't a change). */
+	/** Its events waiting, what it puts out, what it saw coming in and last reported (so a load isn't a change). */
 	@Override
 	public Map<String, Object> saved() {
 		Map<String, Object> saved = new LinkedHashMap<>();
 		events.save(saved);
 		saved.put("input", Arrays.stream(input).mapToObj(v -> (Object) (long) v).toList());
 		saved.put("output", Arrays.stream(output).mapToObj(v -> (Object) (long) v).toList());
+		saved.put("reported", Arrays.stream(reported).flatMapToInt(Arrays::stream).mapToObj(v -> (Object) (long) v).toList());
 		return saved;
 	}
 
@@ -183,6 +210,11 @@ public final class RedstoneCard extends Card {
 		events.restore(saved);
 		restoreSides(saved.get("input"), input);
 		restoreSides(saved.get("output"), output);
+		if (saved.get("reported") instanceof List<?> values) {
+			for (int i = 0; i < values.size() && i < reported.length * 2; i++) {
+				reported[i / 2][i % 2] = values.get(i) instanceof Long v ? (int) Math.clamp(v, 0, MAX_SIGNAL) : 0;
+			}
+		}
 	}
 
 	private static void restoreSides(Object kept, int[] sides) {
@@ -221,6 +253,7 @@ public final class RedstoneCard extends Card {
 		if (any) {
 			changed();
 			onOutput.run();
+			report(); // (dropped while it doesn't take data: its board has let it go)
 		}
 	}
 }

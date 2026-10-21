@@ -4,7 +4,6 @@
 -- until it's stopped (^C); not on stdin when it's a pipe, as tail.
 local sys = require("sys")
 
-local FOLLOW_SECONDS = 1 -- how long -f waits between looks (tail's --sleep-interval)
 local READ_SIZE = 4096
 
 local lines, bytes, from = 10, nil, false
@@ -102,22 +101,25 @@ end
 if #followed == 0 then
   return status
 end
--- -f: what the files grow by, as it comes (a header when it's another file's than the last shown).
--- Files on a disk are looked at every second (a disk's file is always ready to poll: there's no
--- notice of a write); the rest (pipes, /dev files) are waited on with poll, and shown the moment
--- they have something. A file rewritten rather than added to (a disk file grown shorter, or a device
--- file poll says changed with nothing added: a redstone card's state) is shown again from its start,
--- after "file truncated", as GNU tail does when a file shrinks.
+-- -f: what the files grow by, the moment it comes (a header when it's another file's than the last
+-- shown). Files on a disk or in /tmp are watched (inotify: a disk reports each change made on it);
+-- the rest (pipes, /dev files) are waited on with poll, all together. A file rewritten rather than
+-- added to (a file grown shorter, or a device file poll says changed with nothing added: a redstone
+-- card's state) is shown again from its start, after "file truncated", as GNU tail does when a file
+-- shrinks.
 io.stdout:flush()
+local serialization = require("serialization")
 local shown = followed[#followed].path
-local watched, disks = {}, false
+local notices = sys.inotify()
+local watched = {notices}
 for _, entry in ipairs(followed) do
   local st = sys.stat(entry.path)
   entry.fd = entry.file.fd -- (the descriptor itself: a FILE's end of file is sticky, as glibc's is; tail reads past it)
   entry.disk = st and st.type == "file"
   if entry.disk then
-    disks = true
     entry.at = sys.lseek(entry.fd, 0, "cur") or 0
+    entry.real = sys.realpath(entry.path) or entry.path
+    sys.watch(notices, entry.real)
   else
     watched[#watched + 1] = entry.fd
   end
@@ -130,8 +132,8 @@ local function heading(entry)
   end
 end
 
--- Shows what can be read now: everything to the end of a disk file (or a device's state), or one
--- read of a stream (another could wait). Whether there was anything.
+-- Shows what can be read now: everything to the end of a file (or a device's state), or one read of
+-- a stream (another could wait). Whether there was anything.
 local function show(entry, stream)
   local any = false
   repeat
@@ -161,22 +163,27 @@ end
 
 while true do
   local ready = {}
-  if #watched > 0 then
-    for _, fd in ipairs(sys.poll(watched, disks and FOLLOW_SECONDS or nil) or {}) do
-      ready[fd] = true
+  for _, fd in ipairs(sys.poll(watched) or {}) do
+    ready[fd] = true
+  end
+  local changed = {}
+  while ready[notices] and sys.poll({notices}, 0)[1] do
+    local change = serialization.unserialize(sys.read(notices) or "") or {}
+    for _, entry in ipairs(followed) do
+      if entry.disk and (change.event == "lost" or change.path == entry.real) then
+        changed[entry] = true
+      end
     end
-  else
-    sys.sleep(FOLLOW_SECONDS)
   end
   for _, entry in ipairs(followed) do
-    if entry.disk then
+    if changed[entry] then
       local st = sys.stat(entry.path)
       if st and st.size < entry.at then
         again(entry)
       else
         show(entry)
       end
-    elseif ready[entry.fd] and not show(entry, true) and not again(entry) then
+    elseif not entry.disk and ready[entry.fd] and not show(entry, true) and not again(entry) then
       for i, fd in ipairs(watched) do -- (ended: no more to wait for)
         if fd == entry.fd then
           table.remove(watched, i)

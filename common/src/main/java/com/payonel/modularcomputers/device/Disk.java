@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.device;
 import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.bus.DeviceType;
+import com.payonel.modularcomputers.bus.InterruptLine;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Handle;
 import com.payonel.modularcomputers.runtime.Method;
@@ -91,6 +92,17 @@ public final class Disk implements Device {
 	private java.util.function.Supplier<String> label = () -> null;
 	/** Bytes in use, worked out on first need, then kept up to date. */
 	private long used = -1;
+	/**
+	 * Its reports of what changed on it, waiting for a kernel (user design, 2026-10-21: a device
+	 * reports every change to its state, so no kernel has to hook its own writes): in its own terms,
+	 * {event, path} (hfs: modify, create, remove, rename with from; format) or {event, offset,
+	 * length} (raw: a write). Bounded, as a sensor's events.
+	 */
+	private final InterruptLine line = new InterruptLine();
+	private final EventQueue changes = new EventQueue(line, this::changed, () -> this.accepting);
+	private boolean accepting;
+	private Runnable changed = () -> {
+	};
 
 	public Disk(DiskTier tier) {
 		this(tier, null);
@@ -162,12 +174,78 @@ public final class Disk implements Device {
 		}
 	}
 
-	/** Its board stopped taking data (no program runs): the program's open files close, uncommitted. */
+	/** Its board stopped taking data (no program runs): the program's open files close, uncommitted, and its reports go. */
 	@Override
 	public void accepting(boolean accepting) {
+		this.accepting = accepting;
 		if (!accepting) {
 			powerOff();
+			changes.clear();
 		}
+	}
+
+	/** A path on it as its reports name it: from its root, with "/" (whatever the caller wrote: "a//b", "./a"). */
+	private String named(Path at) {
+		return "/" + storage.relativize(at).toString().replace('\\', '/');
+	}
+
+	/** Something changed on it: reported (a kernel pulls it). */
+	private void report(String event, String path, Object... more) {
+		Map<String, Object> change = new LinkedHashMap<>();
+		change.put("event", event);
+		if (path != null) {
+			change.put("path", path.startsWith("/") ? path : "/" + path);
+		}
+		for (int i = 0; i + 1 < more.length; i += 2) {
+			change.put((String) more[i], more[i + 1]);
+		}
+		changes.add(change);
+	}
+
+	/**
+	 * Its reports, for the kernel's filesystem driver (not "pull": a disk's /dev file is its data,
+	 * never its reports).
+	 */
+	@Method(doc = "changes(): the oldest change on it not yet taken, as {event, path} (hfs: modify, create, remove, rename (with from), format) or {event = \"write\", offset, length} (raw), or nil")
+	public Result changes(Arguments args) {
+		return Result.ok(changes.pull());
+	}
+
+	@Override
+	public String streamMethod() {
+		return "changes";
+	}
+
+	@Override
+	public boolean interruptPending() {
+		return changes.pending();
+	}
+
+	@Override
+	public InterruptLine interruptLine() {
+		return line;
+	}
+
+	@Override
+	public void onChange(Runnable changed) {
+		this.changed = changed;
+	}
+
+	private void changed() {
+		changed.run();
+	}
+
+	/** Its reports waiting: a save isn't a power cut. */
+	@Override
+	public Map<String, Object> saved() {
+		Map<String, Object> saved = new LinkedHashMap<>();
+		changes.save(saved);
+		return saved;
+	}
+
+	@Override
+	public void restore(Map<String, Object> saved) {
+		changes.restore(saved);
 	}
 
 	// ---- the host side -----------------------------------------------------------------------
@@ -424,6 +502,7 @@ public final class Disk implements Device {
 				throw new UncheckedIOException(e);
 			}
 			used = -1;
+			report("format", "/", "mode", mode);
 			return Result.ok();
 		});
 	}
@@ -479,6 +558,7 @@ public final class Disk implements Device {
 				if (!exists) {
 					grow(ENTRY); // a new file is there at once, empty, as fopen makes it
 					Files.createFile(file);
+					report("create", named(file));
 				}
 				String relative = storage.relativize(file).toString().replace('\\', '/');
 				FileHandle handle = new FileHandle(id(), relative, mode, Files.size(file));
@@ -557,6 +637,7 @@ public final class Disk implements Device {
 				}
 				grow(ENTRY);
 				Files.createDirectory(dir);
+				report("create", named(dir));
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
 			}
@@ -579,6 +660,7 @@ public final class Disk implements Device {
 				long freed = ENTRY + size(at);
 				Files.delete(at);
 				grow(-freed);
+				report("remove", named(at));
 			} catch (DirectoryNotEmptyException e) {
 				throw new Refused("directory not empty: " + path);
 			} catch (IOException e) {
@@ -606,6 +688,7 @@ public final class Disk implements Device {
 			}
 			try {
 				Files.move(source, target);
+				report("rename", named(target), "from", named(source));
 			} catch (NoSuchFileException e) {
 				throw new NoSuchFileRuntime(to);
 			} catch (IOException e) {
@@ -636,6 +719,7 @@ public final class Disk implements Device {
 			try {
 				grow(ENTRY + LINK_SIZE);
 				Files.write(at, linkFile(target));
+				report("create", named(at));
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
 			}
@@ -710,6 +794,7 @@ public final class Disk implements Device {
 			try (RandomAccessFile image = rawImage("rw")) {
 				image.seek((long) sector * SECTOR);
 				image.write(java.util.Arrays.copyOf(data, SECTOR));
+				report("write", null, "offset", (long) sector * SECTOR, "length", (long) SECTOR);
 				return Result.ok();
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
@@ -1049,6 +1134,7 @@ public final class Disk implements Device {
 					}
 				}
 				Files.move(scratch, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+				disk.report("modify", path);
 			} catch (IOException e) {
 				Files.deleteIfExists(scratch);
 				disk.grow(current - length); // undo: nothing was committed

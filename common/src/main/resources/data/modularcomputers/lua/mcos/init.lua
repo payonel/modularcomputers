@@ -852,6 +852,31 @@ function syscalls.sleep(p, request, seconds)
   return k.BLOCK
 end
 
+-- inotify() and watch(fd, path), as Linux's inotify_init and inotify_add_watch: an open file whose
+-- reads are file changes, a line each, and the paths it watches (lib/modules/inotify.lua, loaded at
+-- the first: until then, k.changed (tmpfs's notices) does nothing).
+local inotify
+function k.changed()
+end
+
+function syscalls.inotify(p)
+  local fd = lowestfd(p)
+  if not fd then
+    return fail("EMFILE")
+  end
+  inotify = inotify or module("inotify", k, vfs)
+  p.fds[fd] = hold(inotify.open())
+  return fd
+end
+
+syscalls.watch = withfd(function(p, request, d, fd, file)
+  local at = path(p, file)
+  if d.type ~= "inotify" or not at then
+    return fail("EINVAL")
+  end
+  return inotify.watch(d, at)
+end)
+
 -- poll(fds, seconds), as poll(2) waiting for input (POLLIN): which of the open files 'fds' (a list
 -- of descriptors) a read would answer now (a file that can't say, a disk's, always would), waiting
 -- for one until 'seconds' pass (nil: as long as it takes). The ready ones, a list; empty: the time
