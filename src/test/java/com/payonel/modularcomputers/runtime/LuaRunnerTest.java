@@ -82,11 +82,13 @@ class LuaRunnerTest {
 
 	@Test
 	void theProgramsMemoryIsTheRamInstalled() {
-		ram(1); // 256 KiB: all the program's, on top of what the firmware and libraries take
+		ram(1); // a tier 1 stick: all the program's, on top of what the firmware and libraries take
+		long stick = com.payonel.modularcomputers.machine.MemoryTier.TIER_1.bytes();
 		boot("""
+			local stick = %d
 			local total = board.hardware().memoryTotal
-			local big = string.rep("x", 200 * 1024) -- most of the stick: the firmware's memory isn't the program's
-			local fits = #big == 200 * 1024
+			local big = string.rep("x", stick * 4 // 5) -- most of the stick: the firmware's memory isn't the program's
+			local fits = #big == stick * 4 // 5
 			big = nil
 			collectgarbage()
 			local used = board.hardware().memoryUsed
@@ -95,10 +97,10 @@ class LuaRunnerTest {
 			  for i = 1, 1000000 do t[i] = string.rep("x", 1000) .. i end
 			end)
 			collectgarbage() -- (as stock Lua: growing a stack never collects, so the next call may fail until something does)
-			board.invoke("console", "write", tostring(total == 256 * 1024) .. " " .. tostring(fits) .. " "
+			board.invoke("console", "write", tostring(total == stick) .. " " .. tostring(fits) .. " "
 			  .. tostring(used > 0 and used < 64 * 1024) .. " " .. tostring(ok) .. " " .. tostring(err))
 			board.halt()
-			""");
+			""".formatted(stick));
 		untilHalted();
 		assertThat(row(0)).as("the RAM is the program's; used is counted above the baseline; past it, Lua's own error")
 			.isEqualTo("true true true false not enough memory");

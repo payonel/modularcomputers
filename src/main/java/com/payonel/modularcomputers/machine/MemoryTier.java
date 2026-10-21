@@ -1,10 +1,13 @@
 package com.payonel.modularcomputers.machine;
 
-/** What a RAM tier brings (user design, 2026-10-11): more space. */
+/**
+ * What a RAM tier brings (user design, 2026-10-11): more space, doubling a tier. Tier 1 holds mcos
+ * to its shell (user, 2026-10-20: 1 MiB, the others scaled as before; it needs about 492 KiB).
+ */
 public enum MemoryTier {
-	TIER_1(256 << 10, 0),
-	TIER_2(512 << 10, 2),
-	TIER_3(1 << 20, 4);
+	TIER_1(1 << 20, 0),
+	TIER_2(2 << 20, 2),
+	TIER_3(4 << 20, 4);
 
 	private final int bytes;
 	/**

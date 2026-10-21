@@ -177,6 +177,10 @@ process (as VFIO does).
 - **Run one simple test before a long suite after a risky change.** A shell change once made every
   mcos test wait out its timeout (the suite ran past 10 minutes) when the bug (no command ran at all)
   showed in the first test in 20 seconds. Use `--tests '*McosTest.haltHalts'` and `timeout`.
+- **Measure what stays before shrinking what peaks.** The minimum RAM looked set by compiling `sh`
+  (it was, until the compile stopped copying the source); after that, what stays loaded at the prompt
+  (`free -b`, 20 collections) was within ~20 KiB of the minimum, so more peak work would have bought
+  nothing. Compare resident memory to the minimum first.
 - **Memory exhaustion can look like a race.** Spawns failing intermittently were the VM running out
   (a new coroutine's stack gets no emergency collection); check memory before chasing ordering.
 - **Typing more than 256 keys at once in a test drops the rest** (a terminal's key queue, as a real
@@ -261,9 +265,15 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
 
 - **RAM sizes:** settle the tiers' sizes (and their ring sizes) once the VM and mcos are finished,
   with OC's values as a reference.
-- **mcos needs a 1 MiB stick** (the user: optimize later; maybe raise tier 1's capacity): the shell is
-  the biggest cost. Options: a smaller boot set, bigger RAM tiers, asking LungoLua what a compiled
-  prototype costs (about 1.4 times the C++ build's).
+- **mcos's memory** (measured 2026-10-20; tier 1 is 1 MiB now, the user's call): it reaches its prompt
+  in 492 KiB, and holds ~472 KiB there after full collections, mostly compiled code (~341 KB: sh 86,
+  the kernel 70, its modules 88, io+ld 46, readline 27, fs 24). Levers left: stripping debug info
+  (below); LungoLua's compiled size (about 1.4 times the C++ build's: ask the lua thread); the
+  standard libraries shared read-only between processes (each copies string, table, math, utf8,
+  coroutine and its own io/os closures); sh's parser restructured (one splitter for ; && || |, the
+  lexer finding $( )'s end: ~10 KB, from studying OpenOS's); sh and readline needing only a few of
+  fs.lua's functions. Measure with LuaRunner.loadTrace and a throwaway probe that varies one stick's
+  size freely (4 KiB steps), not by tier.
 - **Stripping debug info from system code** (user, 2026-10-20): debug info is about 30% of compiled
   code (bytecode measured). Lua has no switch for it at compile time; only `string.dump(f, true)`
   strips, and loading that back takes bytecode mode, which the sandbox refuses (crafted bytecode

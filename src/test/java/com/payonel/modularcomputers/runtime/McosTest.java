@@ -397,9 +397,9 @@ class McosTest {
 		assertThat(root().resolve("tmp")).as("/tmp is the kernel's memory, not the disk").doesNotExist();
 	}
 
-	/** One tier 3 stick (1 MiB): what mcos needs for now, with its shell and a pipeline (the user: memory is optimized later). */
+	/** One tier 1 stick (1 MiB): mcos with its shell and a pipeline. */
 	@Test
-	void aPipelineRunsOnOneTier3Stick() {
+	void aPipelineRunsOnOneTier1Stick() {
 		machine.board().setChassis(new com.payonel.modularcomputers.machine.Chassis() {
 			@Override
 			public int tier() {
@@ -413,7 +413,7 @@ class McosTest {
 
 			@Override
 			public java.util.List<Board.MemoryInfo> memory() {
-				return java.util.List.of(new Board.MemoryInfo(0, 3, com.payonel.modularcomputers.machine.MemoryTier.TIER_3.bytes()));
+				return java.util.List.of(new Board.MemoryInfo(0, 1, com.payonel.modularcomputers.machine.MemoryTier.TIER_1.bytes()));
 			}
 		});
 		file("count.lua", """
