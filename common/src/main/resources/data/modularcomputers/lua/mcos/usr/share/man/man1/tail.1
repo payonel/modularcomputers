@@ -23,11 +23,18 @@ with a blank line before every heading but the first.
 .SH OPTIONS
 .TP
 .B \-f
-Follows: once the files are shown, waits, and every second shows what has
-been added to them, until it's stopped (^C, or
+Follows: once the files are shown, waits, and shows what is added to them,
+until it's stopped (^C, or
 .BR kill ).
-A heading names the file when the text is another file's than the last
-shown. Standard input isn't followed.
+Pipes and device files are shown the moment they have something (it
+waits on them with
+.BR poll );
+files on a disk are looked at every second. A file rewritten rather than
+added to (a disk file grown shorter, or a device whose state changed, as a
+redstone card's) is shown again from its start, after
+.BI "tail: " file ": file truncated"
+on standard error. A heading names the file when the text is another
+file's than the last shown. Standard input isn't followed.
 .TP
 .BI \-n " lines"
 The last
@@ -64,6 +71,7 @@ opened (the other files are still shown).
 tail \-n 3 /init.lua
 tail \-n +2 list.txt
 ps | tail \-c 100
+tail \-f /dev/redstone0
 .fi
 .SH NOTES
 What another program writes to a file on a disk shows when it closes the
@@ -72,6 +80,11 @@ file (a disk's files take writes at close), so
 sees a line once its writer has closed the file;
 .B >>
 in the shell closes it at once.
+A device whose file never ends (a motion sensor's: an event a line) has no
+last lines to find, so
+.B tail
+waits on it forever, as GNU's does; read it with
+.BR cat .
 .SH SEE ALSO
 .BR head (1),
 .BR cat (1),

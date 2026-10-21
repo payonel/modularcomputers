@@ -341,6 +341,25 @@ class McosTest {
 	}
 
 	@Test
+	void tailFollowsARedstoneFileShowingItAgainWhenItChanges() {
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		devices.put("id:redstone", card);
+		boot();
+		// (into /tmp: a file on a disk shows its writes at close, and tail -f keeps it open)
+		type("tail -f -n 100 /dev/redstone0 > /tmp/out 2> /tmp/err &\r");
+		untilIdle();
+		server.add(() -> card.sense(3, 9)); // west: 9 comes in
+		type("sleep 1; cp /tmp/out /o; cp /tmp/err /e\r");
+		settle(() -> Files.isRegularFile(root().resolve("e")) && read(root().resolve("e")).contains("truncated"));
+		String out = read(root().resolve("o"));
+		assertThat(out.split("west", -1)).as("the state, then again, changed").hasSize(3);
+		assertThat(out.substring(out.lastIndexOf("west"))).contains("level = 9");
+		assertThat(read(root().resolve("e"))).isEqualTo("tail: /dev/redstone0: file truncated\n");
+		type("kill $!\r");
+		untilIdle();
+	}
+
+	@Test
 	void theKernelsViewOfTheBusCatchesUpWithAHotPlug() {
 		boot();
 		type("lsdev > /before\r");

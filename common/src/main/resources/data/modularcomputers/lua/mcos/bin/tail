@@ -1,6 +1,7 @@
 -- tail [-f] [-n [+]lines] [-c [+]bytes] [-N] [file...]: the last lines (10) or bytes of each file,
 -- or of stdin; with +N, from line (or byte) N on. -f follows: once they're shown, it waits and shows
--- what's added to the files, until it's stopped (^C); not on stdin when it's a pipe, as tail.
+-- what's added to the files, or a file again when it's rewritten (a redstone card's state changing),
+-- until it's stopped (^C); not on stdin when it's a pipe, as tail.
 local sys = require("sys")
 
 local FOLLOW_SECONDS = 1 -- how long -f waits between looks (tail's --sleep-interval)
@@ -101,21 +102,87 @@ end
 if #followed == 0 then
   return status
 end
--- -f: what the files grow by, as it comes (a header when it's another file's than the last shown)
+-- -f: what the files grow by, as it comes (a header when it's another file's than the last shown).
+-- Files on a disk are looked at every second (a disk's file is always ready to poll: there's no
+-- notice of a write); the rest (pipes, /dev files) are waited on with poll, and shown the moment
+-- they have something. A file rewritten rather than added to (a disk file grown shorter, or a device
+-- file poll says changed with nothing added: a redstone card's state) is shown again from its start,
+-- after "file truncated", as GNU tail does when a file shrinks.
 io.stdout:flush()
 local shown = followed[#followed].path
+local watched, disks = {}, false
+for _, entry in ipairs(followed) do
+  local st = sys.stat(entry.path)
+  entry.fd = entry.file.fd -- (the descriptor itself: a FILE's end of file is sticky, as glibc's is; tail reads past it)
+  entry.disk = st and st.type == "file"
+  if entry.disk then
+    disks = true
+    entry.at = sys.lseek(entry.fd, 0, "cur") or 0
+  else
+    watched[#watched + 1] = entry.fd
+  end
+end
+
+local function heading(entry)
+  if #files > 1 and shown ~= entry.path then
+    io.write("\n==> ", entry.path, " <==\n")
+    shown = entry.path
+  end
+end
+
+-- Shows what can be read now: everything to the end of a disk file (or a device's state), or one
+-- read of a stream (another could wait). Whether there was anything.
+local function show(entry, stream)
+  local any = false
+  repeat
+    local data = sys.read(entry.fd, READ_SIZE)
+    if not data or data == "" then
+      break
+    end
+    any = true
+    heading(entry)
+    io.write(data)
+    entry.at = (entry.at or 0) + #data
+  until stream
+  return any
+end
+
+-- Shown again from its start, as a file that was truncated and written anew. False if it can't be
+-- (a pipe whose writers are gone: nothing more will come).
+local function again(entry)
+  if not sys.lseek(entry.fd, 0, "set") then
+    return false
+  end
+  io.stderr:write("tail: ", entry.path, ": file truncated\n")
+  entry.at = 0
+  show(entry)
+  return true
+end
+
 while true do
-  sys.sleep(FOLLOW_SECONDS)
+  local ready = {}
+  if #watched > 0 then
+    for _, fd in ipairs(sys.poll(watched, disks and FOLLOW_SECONDS or nil) or {}) do
+      ready[fd] = true
+    end
+  else
+    sys.sleep(FOLLOW_SECONDS)
+  end
   for _, entry in ipairs(followed) do
-    -- (the descriptor itself: a FILE's end of file is sticky, as glibc's is; tail reads past it)
-    local data = sys.read(entry.file.fd, READ_SIZE)
-    while data and data ~= "" do
-      if #files > 1 and shown ~= entry.path then
-        io.write("\n==> ", entry.path, " <==\n")
-        shown = entry.path
+    if entry.disk then
+      local st = sys.stat(entry.path)
+      if st and st.size < entry.at then
+        again(entry)
+      else
+        show(entry)
       end
-      io.write(data)
-      data = sys.read(entry.file.fd, READ_SIZE)
+    elseif ready[entry.fd] and not show(entry, true) and not again(entry) then
+      for i, fd in ipairs(watched) do -- (ended: no more to wait for)
+        if fd == entry.fd then
+          table.remove(watched, i)
+          break
+        end
+      end
     end
   end
   io.stdout:flush()
