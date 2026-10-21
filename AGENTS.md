@@ -414,16 +414,27 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   ignore SIGINT, as sh without job control.
 - **The shell's language:** `if`, `for`, `while`, `case`, functions, here-documents (user: maybe
   later).
-- **Networking, later:** TCP (streams, `connect`/`listen`/`accept`), a router between wired and
-  wireless networks, raw frames for programs (Linux's packet sockets, for a `tcpdump`), a WLAN
-  card's range as a setting (OC's strength, its power cost), and a remote shell (the user's psh,
-  from OpenPrograms) once ptys and `rc` exist.
+- **mcssh and mcsshd, next** (user, 2026-10-21): a remote shell, the user's psh (OpenPrograms) done
+  again simply. Goals: no users or passwords, no encryption. psh was a mess on the tty layer;
+  here the kernel's ptys do that work, as OpenSSH relies on Linux's. Planned, in order:
+  `rc` (services at boot: `/etc/rc.d/<name>` with start/stop/status, enabled in `/etc/rc.conf`,
+  the kernel running `/etc/rc` before the console's shell, a sysinit step; daemons spawned with
+  `setsid`); ptys (`sys.openpty`, the tty taking input from the master's writes and giving output
+  to its reads, a session's controlling tty, SIGHUP when the master closes); stream sockets (TCP's
+  shape: `listen`/`accept`/`connect`, a byte stream, a window so receivers never overflow, the
+  link's own retries, as Wi-Fi's); then mcsshd (port 22, a process per connection relaying a pty
+  with `poll`, as sshd) and mcssh (raw tty, `~.`, the remote exit status), with `/etc/hosts` for
+  names. Threads aren't needed for any of it (OpenSSH has none): maybe later, as a convenience.
+  Open: name discovery beyond `/etc/hosts`; whether mcsshd needs an allow-list (with no
+  passwords, anyone in reach gets a shell); `mcssh host command` without a pty (and an `mcscp`).
+- **Networking, later:** a router between wired and wireless networks, raw frames for programs
+  (Linux's packet sockets, for a `tcpdump`), a WLAN card's range as a setting (OC's strength, its
+  power cost).
 - `/proc`; a filesystem on raw disks; permissions and users; `os.date` (no real-time clock: the time
   is seconds since boot); a page cache.
 - **Later, from the user's review of OpenOS (2026-10-19):**
   - `type -a`;
   - `install`, once loot software is worked out;
-  - `rc`, once there are start-up services;
   - `sides`, with the redstone card's API;
   - profile, `.shrc` and motd;
   - maybe `label`, `primary`, `resolution`, `address`.
