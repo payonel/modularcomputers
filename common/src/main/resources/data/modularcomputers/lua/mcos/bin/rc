@@ -1,0 +1,222 @@
+-- rc [name start|stop|restart|status|enable|disable] | rc boot: services, as BSD's and OpenRC's.
+-- A service is a file in /etc/rc.d, named for it, of OpenRC's settings (name=value, a line each, #
+-- comments, the value maybe quoted): command (the program), command_args (its arguments, split on
+-- spaces), description, output_log (where its stdout and stderr go: /dev/null when not given).
+-- start runs it as a daemon (a session of its own: no tty's ^C reaches it; stdin /dev/null) and
+-- keeps its pid in /run/<name>.pid; stop sends it SIGTERM, then SIGKILL if it hasn't ended in
+-- STOP_SECONDS; status: 0 running, 3 not (LSB's). enable and disable set name_enable=YES in
+-- /etc/rc.conf, which rc boot (/etc/rc's) starts, in its order. With no arguments: every service,
+-- whether it's enabled and running.
+local sys = require("sys")
+local fs = require("fs")
+
+local RC_D = "/etc/rc.d/"
+local RC_CONF = "/etc/rc.conf"
+local RUN = "/run/"
+local STOP_SECONDS = 5 -- how long a service has to end after SIGTERM, before SIGKILL
+local STOP_POLL = 0.1 -- how often stop looks whether it has
+local NOT_RUNNING = 3 -- status's answer when it isn't (LSB's "program is not running")
+local USAGE = "usage: rc [name start|stop|restart|status|enable|disable]\n       rc boot\n"
+
+local function warn(...)
+  io.stderr:write("rc: ", ...)
+  io.stderr:write("\n")
+end
+
+-- A file's lines, or nil.
+local function lines(path)
+  local file = io.open(path)
+  if not file then
+    return nil
+  end
+  local all = {}
+  for line in file:lines() do
+    all[#all + 1] = line
+  end
+  file:close()
+  return all
+end
+
+-- name=value settings, each value unquoted.
+local function settings(path)
+  local all = lines(path)
+  if not all then
+    return nil
+  end
+  local found = {}
+  for _, line in ipairs(all) do
+    local key, value = string.match(line, "^%s*([%w_]+)=(.*)$")
+    if key then
+      value = string.match(value, '^"(.*)"%s*$') or string.match(value, "^'(.*)'%s*$") or string.match(value, "^(.-)%s*$")
+      found[key] = value
+    end
+  end
+  return found
+end
+
+local function service(name)
+  if not string.match(name, "^[%w_.-]+$") then
+    return nil
+  end
+  return settings(RC_D .. name)
+end
+
+local function enabled(name)
+  local conf = settings(RC_CONF) or {}
+  return string.upper(conf[name .. "_enable"] or "") == "YES"
+end
+
+-- Its pid, when it runs (its pidfile names a process still running its command).
+local function running(name, def)
+  local file = io.open(RUN .. name .. ".pid")
+  if not file then
+    return nil
+  end
+  local pid = math.tointeger(tonumber(file:read("l") or ""))
+  file:close()
+  for _, p in ipairs(sys.processes()) do
+    if p.pid == pid and p.state ~= "zombie" and p.path == sys.realpath(def.command) then
+      return pid
+    end
+  end
+  return nil
+end
+
+local actions = {}
+
+function actions.start(name, def)
+  if running(name, def) then
+    warn(name, " is already running")
+    return 0
+  end
+  local null = assert(sys.open("/dev/null", "r"))
+  local out, why = sys.open(def.output_log or "/dev/null", "a")
+  if not out then
+    sys.close(null)
+    warn(def.output_log, ": ", why)
+    return 1
+  end
+  local args = {}
+  for word in string.gmatch(def.command_args or "", "%S+") do
+    args[#args + 1] = word
+  end
+  local pid
+  pid, why = sys.spawn(def.command, args, {setsid = true, fds = {[0] = null, [1] = out, [2] = out}})
+  sys.close(null)
+  sys.close(out)
+  if not pid then
+    warn(name, ": ", def.command, ": ", why)
+    return 1
+  end
+  local pidfile
+  pidfile, why = io.open(RUN .. name .. ".pid", "w")
+  if not pidfile then
+    warn(RUN, name, ".pid: ", why)
+    return 1
+  end
+  pidfile:write(pid, "\n")
+  pidfile:close()
+  return 0
+end
+
+function actions.stop(name, def)
+  local pid = running(name, def)
+  if not pid then
+    warn(name, " is not running")
+    return 0
+  end
+  sys.kill(pid, "SIGTERM")
+  local waited = 0
+  while running(name, def) and waited < STOP_SECONDS do
+    sys.sleep(STOP_POLL)
+    waited = waited + STOP_POLL
+  end
+  if running(name, def) then
+    sys.kill(pid, "SIGKILL")
+  end
+  sys.unlink(RUN .. name .. ".pid")
+  return 0
+end
+
+function actions.restart(name, def)
+  actions.stop(name, def)
+  return actions.start(name, def)
+end
+
+function actions.status(name, def)
+  local pid = running(name, def)
+  io.write(name, pid and " is running (pid " .. pid .. ")" or " is stopped", "\n")
+  return pid and 0 or NOT_RUNNING
+end
+
+-- Sets name_enable in /etc/rc.conf (replacing its line, or adding one).
+local function setenabled(name, on)
+  local all = lines(RC_CONF) or {}
+  local line = name .. "_enable=" .. (on and "YES" or "NO")
+  local found = false
+  for i, text in ipairs(all) do
+    if string.match(text, "^%s*([%w_]+)=") == name .. "_enable" then
+      all[i], found = line, true
+    end
+  end
+  if not found then
+    all[#all + 1] = line
+  end
+  local file, why = io.open(RC_CONF, "w")
+  if not file then
+    warn(RC_CONF, ": ", why)
+    return 1
+  end
+  file:write(table.concat(all, "\n"), "\n")
+  file:close()
+  return 0
+end
+
+function actions.enable(name)
+  return setenabled(name, true)
+end
+
+function actions.disable(name)
+  return setenabled(name, false)
+end
+
+if #arg == 0 then
+  local names = {}
+  for _, entry in ipairs(fs.list(RC_D) or {}) do
+    names[#names + 1] = entry.name
+  end
+  for _, name in ipairs(names) do
+    local def = service(name)
+    if def then
+      io.write(name, "\t", enabled(name) and "enabled" or "disabled", "\t", running(name, def) and "running" or "stopped", "\n")
+    end
+  end
+  return 0
+elseif arg[1] == "boot" and #arg == 1 then
+  local status = 0
+  for _, line in ipairs(lines(RC_CONF) or {}) do
+    local name = string.match(line, "^%s*([%w_.-]-)_enable=")
+    if name and enabled(name) then
+      local def = service(name)
+      if not def or not def.command then
+        warn(name, ": no service ", RC_D, name)
+        status = 1
+      elseif actions.start(name, def) ~= 0 then
+        status = 1
+      end
+    end
+  end
+  return status
+end
+
+local name, action = arg[1], arg[2]
+if #arg ~= 2 or not actions[action] then
+  io.stderr:write(USAGE)
+  return 1
+end
+local def = service(name)
+if not def or not def.command then
+  warn(name, ": no such service (", RC_D, name, ")")
+  return 1
+end
+return actions[action](name, def)

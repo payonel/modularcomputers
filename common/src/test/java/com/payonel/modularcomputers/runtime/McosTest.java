@@ -78,7 +78,14 @@ class McosTest {
 	}
 
 	private void boot() {
+		boot(() -> {
+		});
+	}
+
+	/** Boots, with {@code configure} changing mcos's own files on the disk first (its /etc). */
+	private void boot(Runnable configure) {
 		LuaScripts.copyTree("mcos", root());
+		configure.run();
 		devices.put("sata:0", new Disk(DiskTier.TIER_1, root()));
 		Eeprom eeprom = new Eeprom(LuaScripts.read("eeprom/boot"));
 		devices.put("eeprom", eeprom); // (on the bus at its slot, as a board puts it)
@@ -1133,5 +1140,39 @@ class McosTest {
 		var hi = (Map<?, ?>) peer.receive(args()).first();
 		assertThat(hi).isNotNull();
 		assertThat((String) hi.get("data")).endsWith("hi\n");
+	}
+	@Test
+	void anEnabledServiceStartsAtBootOutOfTheConsolesReachAndRcStopsIt() {
+		file("etc/rc.d/testd", """
+			# a test's service
+			description="waits"
+			command=/testd.lua
+			command_args=one two
+			""");
+		file("testd.lua", """
+			local sys = require("sys")
+			local function put(name, text)
+			  local out = io.open(name, "w")
+			  out:write(text)
+			  out:close()
+			end
+			sys.signal("SIGTERM", function()
+			  put("/stopped", "")
+			  sys.exit(0)
+			end)
+			put("/started", table.concat(arg, " ") .. " " .. tostring(sys.isatty(0)))
+			while true do
+			  sys.sleep(1000)
+			end
+			""");
+		boot(() -> file("etc/rc.conf", "testd_enable=YES\n"));
+		untilFile(root().resolve("started"), "one two false");
+		type("\u0003rc testd status > /dev/null; echo $? > /s1; rc testd stop; rc testd status > /dev/null; echo $? > /s2\r");
+		untilFile(root().resolve("s2"), "3\n");
+		assertThat(read(root().resolve("s1"))).as("running, though ^C was typed at the console").isEqualTo("0\n");
+		assertThat(root().resolve("stopped")).as("stopped by SIGTERM").exists();
+		type("rc testd disable; rc other enable 2> /dev/null; echo $? > /none\r");
+		untilFile(root().resolve("none"), "1\n"); // no such service
+		assertThat(read(root().resolve("etc/rc.conf"))).isEqualTo("testd_enable=NO\n");
 	}
 }

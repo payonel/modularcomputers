@@ -1,6 +1,7 @@
 -- mcos (Lua): the kernel. The bootloader hands it its boot disk's address, then its command line
 -- (words: console=<address> names the input device its console tty reads, the board's console by
--- default; init=<path> the program it starts on it, /bin/sh by default).
+-- default; init=<path> the program it starts on it, /bin/sh by default; rc=<path> the shell script
+-- it runs first, to its end, /etc/rc by default).
 --
 -- Kernel and user space, as Linux keeps them: the kernel owns every resource (open files, pipes,
 -- ttys, mounts, processes) and runs only on its own coroutine; a process runs its own code and
@@ -18,6 +19,8 @@ local root, cmdline = ...
 local VERSION = "0.2"
 local CONSOLE = "console" -- the device the console tty is on, unless the command line says (console=)
 local INIT = "/bin/sh" -- what runs on the console, unless the command line says (init=); started again when it ends
+local SHELL = "/bin/sh" -- what runs the boot's script
+local RC = "/etc/rc" -- the boot's script, unless the command line says (rc=): run once, before init
 local LOADER = "/lib/ld.lua" -- where every process starts (an ELF program's PT_INTERP): every program is Lua, native to this CPU
 local MODULES = "/lib/modules/" -- the kernel's own parts
 -- When init can't be started (its file missing or broken), how long before the kernel tries again.
@@ -230,8 +233,8 @@ local function exit(p, how, value)
   end
   if p.ppid == 0 then
     reap(p) -- the kernel's own child: reaped at once
-    if p.respawn then
-      respawn()
+    if p.respawn or p.sysinit then
+      respawn() -- (after the boot's script: init's first start)
     end
   end
 end
@@ -410,7 +413,9 @@ end
 -- child. opts: fds (the child's descriptors: {[0] = a parent fd, ...}; 0, 1 and 2 are inherited
 -- when not given, the others aren't: close-on-exec), env (its environment; the parent's when not
 -- given), ignore (signals it starts ignoring, as an async list's SIGINT), pgid (0: a group of its
--- own). A descriptor mapped to false starts closed in the child (a shell's n>&-), even 0, 1 or 2.
+-- own), setsid (a session of its own, as glibc's POSIX_SPAWN_SETSID: its own group, and no
+-- controlling tty, so no tty's signals reach it: a daemon). A descriptor mapped to false starts
+-- closed in the child (a shell's n>&-), even 0, 1 or 2.
 local function spawn(parent, path, argv, opts)
   opts = opts or {}
   reclaim()
@@ -432,8 +437,11 @@ local function spawn(parent, path, argv, opts)
     handlers = {}, caught = {},
   }
   local env = environment(p)
-  if opts.pgid == 0 then
+  if opts.pgid == 0 or opts.setsid then
     p.pgid = p.pid
+  end
+  if opts.setsid then
+    p.tty = nil
   end
   for signal, disposition in pairs(parent.handlers) do
     if disposition == "ignore" then
@@ -1124,8 +1132,20 @@ local function idle()
 end
 
 console:write("\27[0m\27[2J\27[H" .. "mcos " .. VERSION .. "\n")
+-- The boot's script (/etc/rc, as BSD's; inittab's sysinit), run by the shell on the console to
+-- its end, before init starts: it mounts what the system needs and starts its services (rc).
+local function sysinit()
+  local path = options.rc or RC
+  local p = vfs.stat(path) and spawn(kernel, SHELL, {path}, {pgid = 0})
+  if not p then
+    return respawn()
+  end
+  p.sysinit = true
+  console.foreground = p.pgid
+end
+
 hotplug()
-respawn()
+sysinit()
 while true do
   interrupt()
   now = nil

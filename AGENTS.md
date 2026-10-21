@@ -207,7 +207,15 @@ real Lua's). **inotify** (`sys.inotify()`, `sys.watch(fd, path)`, a module loade
 gives Linux's notices as lines (`MODIFY /log`; a rename `MOVED_FROM`/`MOVED_TO`; `OVERFLOW`), from
 the disks' reports turned into full paths by their mounts (tmpfs reports through `k.changed`, a
 no-op until then); it watches paths, not inodes as Linux's does, and a change made on a disk's
-host isn't seen. **Sockets** are UDP over the network cards (`lib/modules/net.lua`, loaded at the first
+host isn't seen. **Services** (user, 2026-10-21, for mcsshd): the kernel runs `/etc/rc` with sh to its end before
+the console's shell (inittab's sysinit, BSD's `/etc/rc`), which mounts `/run` and runs `rc boot`.
+A service is declared, not scripted (OpenRC's settings in `/etc/rc.d/<name>`; FreeBSD's
+`name_enable=YES` in `/etc/rc.conf`), because mcos's sh has no `if` or `case` for sysvinit's
+scripts. `rc` starts one with `setsid` (spawn's, as glibc's posix_spawn has): a session of its own,
+no controlling tty, so no ^C reaches it. The kernel stays init (it respawns the console's shell):
+a user-space PID 1 would stay resident for nothing.
+
+**Sockets** are UDP over the network cards (`lib/modules/net.lua`, loaded at the first
 `sys.socket()`): `bind`, `sendto`, `recvfrom`, `poll`, Linux's names for interfaces (eth0, wlan0)
 and ioctls (`SIOCGIFCONF`, ethtool's wake), with no commands for them (user, 2026-10-21:
 `ifconfig` and `ethtool` have no purpose here; an address is in `lsdev -i`, and a program sets the
@@ -250,8 +258,8 @@ process (as VFIO does).
   statuses, NOTES where it differs from GNU. A test renders every page and fails for a program
   without one. Pages use only the man(7) macros `/bin/man` supports (its header lists them).
 - **A program's header comment is its spec**: keep it true when its behavior changes.
-- **Data files under `lua/` that aren't Lua go under a `share/` folder**: `LuaScriptsTest` compiles
-  every other file there as Lua.
+- **Data files under `lua/` that aren't Lua go under a `share/` folder** (or mcos's `/etc`, its
+  settings and sh scripts): `LuaScriptsTest` compiles every other file there as Lua.
 - **The mcos files are copied onto a disk once**, when the disk is first made: a world's existing
   disks keep their old mcos. Tests copy afresh each run.
 - **Textures and sounds come from `scripts/`**: change the script and regenerate; never edit the
@@ -416,17 +424,15 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   later).
 - **mcssh and mcsshd, next** (user, 2026-10-21): a remote shell, the user's psh (OpenPrograms) done
   again simply. Goals: no users or passwords, no encryption. psh was a mess on the tty layer;
-  here the kernel's ptys do that work, as OpenSSH relies on Linux's. Planned, in order:
-  `rc` (services at boot: `/etc/rc.d/<name>` with start/stop/status, enabled in `/etc/rc.conf`,
-  the kernel running `/etc/rc` before the console's shell, a sysinit step; daemons spawned with
-  `setsid`); ptys (`sys.openpty`, the tty taking input from the master's writes and giving output
+  here the kernel's ptys do that work, as OpenSSH relies on Linux's. Planned, in order (`rc`, the
+  first, is built): ptys (`sys.openpty`, the tty taking input from the master's writes and giving output
   to its reads, a session's controlling tty, SIGHUP when the master closes); stream sockets (TCP's
   shape: `listen`/`accept`/`connect`, a byte stream, a window so receivers never overflow, the
   link's own retries, as Wi-Fi's); then mcsshd (port 22, a process per connection relaying a pty
-  with `poll`, as sshd) and mcssh (raw tty, `~.`, the remote exit status), with `/etc/hosts` for
-  names. Threads aren't needed for any of it (OpenSSH has none): maybe later, as a convenience.
-  Open: name discovery beyond `/etc/hosts`; whether mcsshd needs an allow-list (with no
-  passwords, anyone in reach gets a shell); `mcssh host command` without a pty (and an `mcscp`).
+  with `poll`, as sshd) and mcssh (raw tty, `~.`, the remote exit status). Threads aren't needed for any of it (OpenSSH has none): maybe later, as a convenience.
+  A host is named by its card's full id, or a unique prefix of it (user, 2026-10-21: ids, not names); mcsshd
+  is open to anyone (no allow-list); `mcssh host command` runs without a pty, and an `mcscp`
+  copies files.
 - **Networking, later:** a router between wired and wireless networks, raw frames for programs
   (Linux's packet sockets, for a `tcpdump`), a WLAN card's range as a setting (OC's strength, its
   power cost).

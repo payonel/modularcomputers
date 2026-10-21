@@ -1,0 +1,117 @@
+.TH RC 1 "" "" "mcos Manual"
+.SH NAME
+rc \- start, stop and enable services
+.SH SYNOPSIS
+.B rc
+.br
+.B rc
+.I name
+.BR start | stop | restart | status | enable | disable
+.br
+.B rc boot
+.SH DESCRIPTION
+A service is a program that runs in the background (a daemon), started
+at boot or by hand. Each is defined by a file in
+.BR /etc/rc.d ,
+named for it, of settings, a line each,
+.IB name = value
+(the value maybe in quotes;
+.B #
+starts a comment), as OpenRC's:
+.TP
+.B command
+The program, as a path.
+.TP
+.B command_args
+Its arguments, split on spaces.
+.TP
+.B description
+What it is.
+.TP
+.B output_log
+A file its output and errors are added to;
+.B /dev/null
+when not given.
+.PP
+With no arguments,
+.B rc
+lists the services: each one's name, whether it's enabled, and whether
+it's running.
+.SH ACTIONS
+.TP
+.B start
+Runs it in a session of its own, with no terminal (so no ^C at a
+terminal reaches it) and its input from
+.BR /dev/null ,
+and keeps its process id in
+.BI /run/ name .pid .
+.TP
+.B stop
+Sends it SIGTERM, and SIGKILL if it hasn't ended within 5 seconds.
+.TP
+.B restart
+Stops it, then starts it.
+.TP
+.B status
+Says whether it's running.
+.TP
+.BR enable ", " disable
+Sets
+.IB name _enable=YES
+(or NO) in
+.BR /etc/rc.conf :
+whether it starts at boot.
+.TP
+.B boot
+Starts every service enabled in
+.BR /etc/rc.conf ,
+in its order.
+.B /etc/rc
+runs it at boot: the kernel runs that script with
+.B sh
+before the console's shell starts (the
+.B rc=
+boot option names another).
+.SH EXIT STATUS
+0 on success;
+.B status
+3 when it isn't running; 1 for a bad argument, a service that doesn't
+exist, or one that can't be started.
+.SH FILES
+.TP
+.B /etc/rc
+The boot's script.
+.TP
+.B /etc/rc.conf
+Which services start at boot.
+.TP
+.BI /etc/rc.d/ name
+A service.
+.TP
+.BI /run/ name .pid
+A running service's process id
+.RB ( /run
+is in memory, mounted by
+.BR /etc/rc ).
+.SH EXAMPLES
+.nf
+rc mcsshd enable
+rc mcsshd start
+rc mcsshd status
+.fi
+.SH NOTES
+Linux has several: sysvinit's scripts in
+.B /etc/init.d
+take start and stop themselves, OpenRC's declare settings (as these do,
+with OpenRC's names), systemd has units.
+.BR rc.conf 's
+.I name_enable
+is FreeBSD's, as is
+.BR "/etc/rc.d" .
+Services start in
+.BR rc.conf 's
+order, with no dependencies between them.
+.SH SEE ALSO
+.BR sh (1),
+.BR kill (1),
+.BR ps (1)
