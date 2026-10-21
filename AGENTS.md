@@ -165,11 +165,16 @@ split libraries to fit OC's RAM; it cost speed, complexity and more memory than 
 where Linux keeps one, but convenient for users, the user's call). Reading gives `get`'s answer;
 what's written goes to `set` in one call at close, and **the device decides what `set` means**
 (replace, append). A device whose data is a table, not text, has a **driver**
-(`lib/modules/drivers/<type>.lua`): the redstone terminal's turns its table into Lua's syntax and
-back. **A device type costs no memory until it's used** (user, 2026-10-21: add devices and drivers
+(`lib/modules/drivers/<type>.lua`): the redstone card's turns its table into Lua's syntax and back.
+A device with events to `pull` and no `get` (a sensor) has a read-only file: each read is an event,
+a line (the sensor driver's), and a read with none waiting blocks, as a keyboard's does (the
+kernel's idle wait listens to the devices blocked reads wait on). Files are text, never tables
+(user asked, 2026-10-21): `cat`, pipes and redirection keep working; a program wanting tables
+unserializes a line, or calls the device's `pull` itself. **A device type costs no memory until it's used** (user, 2026-10-21: add devices and drivers
 freely, never paying at boot for one that isn't there, as a real kernel loads a module when its
 device needs it): devfs looks for the type's driver on the boot disk the first time one of its
-files is opened, and remembers what it found; nothing in the kernel lists the types. Descriptions of devices aren't data: they come from the kernel (`sys.devices`,
+files is opened, and remembers what it found; nothing in the kernel lists the types. Descriptions
+of devices aren't data: they come from the kernel (`sys.devices`,
 for `lsdev`), and a `/sys` tree is postponed. **The kernel caches the bus list, eventually
 correct** (as udev fills `/dev` in after a hot-plug): it's read again on the bus's hot-plug
 interrupt (when the kernel idles) and when a call fails because the device is gone; being late is
@@ -274,14 +279,16 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   bigger display.
 - **The all-in-one** is a dev kit: it may go away, or become a creative "everything built in" block.
 - **The gear-box tab, next** (user, 2026-10-20): on every block's GUI, a right-side tab (a gear-box
-  icon) showing the block's device type ("tier 3 case", "tier 1 redstone terminal"), its device id (or
+  icon) showing the block's device type ("tier 3 case", "tier 1 screen"), its device id (or
   "not assigned"), and a wireframe of the block with a faint render of the world around it, where
   clicking a side opens or closes its cable port (`CablePorts`, which every cabled block entity is to
-  hold; only the redstone terminal does yet).
-- **Redstone terminal, tier 2** (user, 2026-10-20, skipped for now): crafted from tier 1; a side can
-  also be set to one of the 16 colors, reading that one channel of a bundled input (Ender IO's
-  conduit on NeoForge, or a bundled cable of ours). `mode` would then answer the color's name. No
-  Fabric mod carries bundled signals on 26.x (RSWires stopped at 1.18.2).
+  hold; none does yet).
+- **Bundled redstone, later** (user, 2026-10-20): a face reading one of the 16 colors of a bundled
+  input (Ender IO's conduit on NeoForge, or a bundled cable of ours), maybe as a tier 2 redstone
+  card. No Fabric mod carries bundled signals on 26.x (RSWires stopped at 1.18.2). (A redstone
+  terminal block was built and dropped, 2026-10-21: the user went back to the card.)
+- **Motion sensor, tier 2 maybe** (user, 2026-10-21): finer motion (fluids, drops) and filters (by
+  mob); tier 1 has no settings.
 - **Cards still placeholders:** WLAN, Audio, Audio Sensor. The paint gun (shoots paint at nearby
   wool, out of its nozzle face) does nothing yet.
 - **Bluetooth, open:** range limits; whether links show differently in the bus order; what a
@@ -364,7 +371,7 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   - `type -a`;
   - `install`, once loot software is worked out;
   - `rc`, once there are start-up services;
-  - `sides`, with the redstone terminal's API;
+  - `sides`, with the redstone card's API;
   - profile, `.shrc` and motd;
   - maybe `label`, `primary`, `resolution`, `address`.
   - The internet card's commands (`wget`, `pastebin`) will be its device's API.

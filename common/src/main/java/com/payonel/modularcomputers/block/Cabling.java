@@ -41,13 +41,13 @@ public final class Cabling {
 	}
 
 	/**
-	 * A block has a cable port on {@code side}: cables, expansion hubs and redstone terminals on
-	 * every side, screens and computers on every side but the front, robotic pistons only on their
-	 * port face, paint guns on every side but the nozzle. (Whether it's open: {@link CablePorts}.)
+	 * A block has a cable port on {@code side}: cables and expansion hubs on every side, screens and
+	 * computers on every side but the front, robotic pistons only on their port face, paint guns on
+	 * every side but the nozzle. (Whether it's open: {@link CablePorts}.)
 	 */
 	public static boolean hasPort(BlockState state, Direction side) {
 		Block block = state.getBlock();
-		if (block instanceof CableBlock || block instanceof ExpansionHubBlock || block instanceof RedstoneTerminalBlock) {
+		if (block instanceof CableBlock || block instanceof ExpansionHubBlock) {
 			return true;
 		}
 		if (block instanceof ScreenBlock || block instanceof AllInOneBlock) {
@@ -63,18 +63,6 @@ public final class Cabling {
 			return side != state.getValue(HorizontalDirectionalBlock.FACING); // not the gear's face
 		}
 		return false;
-	}
-
-	/**
-	 * The connection reaches the block at {@code pos} on {@code side}: its port there is open, and
-	 * the neighbour carries the connection to it (a cable, a screen, a hub: not another device, as
-	 * two devices don't connect by touching), with its own port open.
-	 */
-	public static boolean carriesTo(BlockGetter level, BlockPos pos, Direction side) {
-		BlockPos next = pos.relative(side);
-		Block neighbor = level.getBlockState(next).getBlock();
-		boolean carries = neighbor instanceof CableBlock || neighbor instanceof ScreenBlock || neighbor instanceof ExpansionHubBlock;
-		return carries && hasPort(level, pos, side) && hasPort(level, next, side.getOpposite());
 	}
 
 	/** The blocks connected to the one at {@code start}, by cable or Bluetooth, nearest first. Never looks into unloaded chunks. */
@@ -94,7 +82,7 @@ public final class Cabling {
 					return CableWalk.Kind.RELAY;
 				}
 				return block instanceof AllInOneBlock || block instanceof RoboticPistonBlock || block instanceof PaintGunBlock
-					|| block instanceof PhotomaskBlock || block instanceof RedstoneTerminalBlock ? CableWalk.Kind.DEVICE : CableWalk.Kind.NONE;
+					|| block instanceof PhotomaskBlock ? CableWalk.Kind.DEVICE : CableWalk.Kind.NONE;
 			}
 
 			@Override

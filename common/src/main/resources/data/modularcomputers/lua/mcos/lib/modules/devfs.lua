@@ -61,11 +61,16 @@ local devices = {
   end),
 }
 
+-- A bus device with data: a get, a set, or events to pull.
+local function hasdata(device)
+  return device.get or device.set or device.pull
+end
+
 -- What a path in /dev names: one of the kernel's devices (its maker), or a bus device with data.
 local function find(path)
   local name = path:match("^/([^/]+)$") or ""
   local device = k.devices.byname[name]
-  return devices[name], device and (device.get or device.set) and device
+  return devices[name], device and hasdata(device) and device
 end
 
 -- A device call's failure as an errno: a device that's gone is ENODEV (and the kernel's view of the
@@ -84,13 +89,38 @@ end
 -- costs nothing until it's used, and a type without one costs one look.
 local drivers = {}
 
+-- An event device's file (a sensor's, with events to pull and no get): read only; each event is a
+-- line (through its driver), and a read with none waiting waits for one, as a keyboard's does.
+local function eventfile(id, driver)
+  local line, at = "", 0
+  return {
+    type = "device",
+    read = function(self, n)
+      if at >= #line then
+        local ok, event = board.invoke(id, "pull")
+        if not ok then
+          return failed(event)
+        elseif event == nil then
+          k.listen(id)
+          return k.BLOCK
+        end
+        line, at = driver and driver.get(event) or tostring(event) .. "\n", 0
+      end
+      local chunk = line:sub(at + 1, at + n)
+      at = at + #chunk
+      return chunk
+    end,
+  }
+end
+
 -- An open device file: reads from what get gave (taken at the first read, through its driver if it
--- has one), writes kept for one set at close. (Which of them the open's mode allows is the VFS's to
--- enforce.)
+-- has one), writes kept for one set at close; or an event device's. (Which of them the open's mode
+-- allows is the VFS's to enforce.)
 local function devicefile(device, mode)
   local plus = mode:find("+", 1, true)
   local reads, writes = mode:sub(1, 1) == "r" or plus, mode:sub(1, 1) ~= "r" or plus
-  if (reads and not device.get) or (writes and not device.set) then
+  local events = device.pull and not device.get
+  if (reads and not (device.get or events)) or (writes and not device.set) then
     return fail("EACCES")
   end
   local id, kind = device.id, device.type or ""
@@ -98,6 +128,9 @@ local function devicefile(device, mode)
   if driver == nil then
     driver = k.driver(kind) or false
     drivers[kind] = driver
+  end
+  if events then
+    return eventfile(id, driver)
   end
   local data, at = nil, 0
   local written = nil
@@ -167,7 +200,7 @@ function fs:list()
     entries[#entries + 1] = {name = device, type = "device"}
   end
   for _, device in ipairs(k.devices.list) do
-    if device.get or device.set then
+    if hasdata(device) then
       entries[#entries + 1] = {name = device.name, type = "device"}
     end
   end

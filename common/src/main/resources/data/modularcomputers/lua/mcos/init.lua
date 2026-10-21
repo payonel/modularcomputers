@@ -114,7 +114,7 @@ function k.refreshdevices()
       local info = board.info(device.address) or {}
       about = {label = info.label}
       for _, method in ipairs(board.methods(device.address) or {}) do
-        if method == "get" or method == "set" then
+        if method == "get" or method == "set" or method == "pull" then
           about[method] = true
         end
       end
@@ -122,7 +122,7 @@ function k.refreshdevices()
     end
     local slot = device.address ~= device.id and not device.address:find("^id:") and device.address or nil
     local entry = {name = SINGLE[slot] or kind .. n, id = id, path = slot,
-      type = device.type, label = about.label, get = about.get, set = about.set}
+      type = device.type, label = about.label, get = about.get, set = about.set, pull = about.pull}
     list[#list + 1], byname[entry.name] = entry, entry
   end
   devices.list, devices.byname = list, byname
@@ -986,6 +986,13 @@ local function run(p)
   -- (it yielded at its top: it gave up its turn, sched_yield)
 end
 
+-- Devices a blocked read waits on (a sensor's events), by id: the idle wait listens to them too. A
+-- read that still waits says so again (k.listen) each time it's retried.
+local listening = {}
+function k.listen(id)
+  listening[id] = true
+end
+
 -- Idles (the CPU's HLT) until a device has something, or the soonest sleeper's time.
 local function idle()
   local wake
@@ -1002,7 +1009,12 @@ local function idle()
   if wake then
     seconds = math.max(0, wake - board.uptime()) / TICKS_PER_SECOND
   end
-  local raised = board.waitForInterrupt(seconds, console.device, "bus")
+  local sources = {console.device, "bus"}
+  for id in pairs(listening) do
+    sources[#sources + 1] = id
+  end
+  listening = {}
+  local raised = board.waitForInterrupt(seconds, table.unpack(sources))
   for _, source in ipairs(raised) do
     if source == "bus" then
       hotplug()

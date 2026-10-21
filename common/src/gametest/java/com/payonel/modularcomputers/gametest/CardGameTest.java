@@ -4,6 +4,7 @@ import com.payonel.modularcomputers.block.AllInOneBlock;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.device.MotionSensorCard;
+import com.payonel.modularcomputers.device.RedstoneCard;
 import com.payonel.modularcomputers.device.WeatherCard;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.CaseMenu;
@@ -20,9 +21,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.RedstoneLampBlock;
 
-/** Cards that work where they're installed (user design, 2026-10-13): weather, motion. */
+/** Cards that work where they're installed (user design, 2026-10-13): redstone, weather, motion. */
 public class CardGameTest {
 	private static final BlockPos POS = new BlockPos(4, 2, 4);
 	/** How long the test computer's program waits at a time (it waits on, so its cards take data). */
@@ -51,15 +52,66 @@ public class CardGameTest {
 		return new Arguments(List.of(values));
 	}
 
+	/** A face's field, as the card answers it. */
+	private static Object field(RedstoneCard card, String side, String field) {
+		return ((Map<?, ?>) ((Map<?, ?>) card.get(args()).first()).get(side)).get(field);
+	}
+
+	private static Object level(RedstoneCard card, String side) {
+		return field(card, side, "level");
+	}
+
+	@GameTest(maxTicks = 40)
+	public void twoRedstoneCardsInABlockPutOutTheStrongestAndEachReadsTheOthers(GameTestHelper helper) {
+		RedstoneCard first = computerWith(helper, ModItems.REDSTONE_CARD, RedstoneCard.class);
+		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		computer.parts().setItem(CaseMenu.EXP_SLOTS + 2, new ItemStack(ModItems.REDSTONE_CARD));
+		helper.setBlock(POS.east(), Blocks.REDSTONE_LAMP);
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertValueEqual(computer.machine().board().bus().devices().stream().filter(RedstoneCard.class::isInstance).count(),
+				2L, "both cards on the bus"))
+			.thenExecute(() -> {
+				RedstoneCard second = computer.machine().board().bus().devices().stream().filter(RedstoneCard.class::isInstance)
+					.map(RedstoneCard.class::cast).filter(card -> card != first).findFirst().orElseThrow();
+				first.set(args(Map.of("east", Map.of("powered", 15L))));
+				helper.assertValueEqual(level(second, "east"), 15L, "the other card reads the first's signal");
+				helper.assertValueEqual(field(second, "east", "powered"), 0L, "but puts out none");
+			})
+			.thenWaitUntil(() -> helper.assertBlockProperty(POS.east(), RedstoneLampBlock.LIT, true))
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 40)
+	public void aRedstoneCardSetsAndReadsRedstoneOnItsBlocksFaces(GameTestHelper helper) {
+		RedstoneCard card = computerWith(helper, ModItems.REDSTONE_CARD, RedstoneCard.class);
+		helper.setBlock(POS.east(), Blocks.REDSTONE_LAMP);
+		helper.assertTrue(!card.set(args(Map.of("east", Map.of("powered", 15L)))).failed(), "set east to 15");
+		helper.setBlock(POS.west(), Blocks.REDSTONE_BLOCK);
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertBlockProperty(POS.east(), RedstoneLampBlock.LIT, true))
+			.thenWaitUntil(() -> helper.assertValueEqual(level(card, "west"), 15L, "west reads 15"))
+			.thenExecute(() -> {
+				helper.assertTrue(card.interruptPending(), "a change is an interrupt");
+				List<Map<?, ?>> events = new ArrayList<>();
+				Object event;
+				while ((event = card.pull(args()).first()) != null) {
+					events.add((Map<?, ?>) event);
+				}
+				helper.assertTrue(events.stream().anyMatch(e -> "west".equals(e.get("side")) && Long.valueOf(15).equals(e.get("new"))), "the change, as an event: " + events);
+				card.set(args(Map.of("east", Map.of("powered", 0L))));
+			})
+			.thenWaitUntil(() -> helper.assertBlockProperty(POS.east(), RedstoneLampBlock.LIT, false))
+			.thenSucceed();
+	}
+
 	@GameTest(maxTicks = 60)
-	public void aCardsEventsAndSettingsOutlastASave(GameTestHelper helper) {
-		MotionSensorCard card = computerWith(helper, ModItems.MOTION_SENSOR_CARD, MotionSensorCard.class);
-		card.setRange(args(9L));
+	public void aCardsEventsAndOutputsOutlastASave(GameTestHelper helper) {
+		RedstoneCard card = computerWith(helper, ModItems.REDSTONE_CARD, RedstoneCard.class);
+		card.set(args(Map.of("east", Map.of("powered", 9L))));
+		helper.setBlock(POS.west(), Blocks.REDSTONE_BLOCK);
 		var registries = helper.getLevel().registryAccess();
 		helper.startSequence()
-			.thenIdle(1)
-			.thenExecute(() -> card.sense("drop", Map.of("x", 1.0)))
-			.thenWaitUntil(() -> helper.assertTrue(card.interruptPending(), "the event waits for the program"))
+			.thenWaitUntil(() -> helper.assertTrue(card.interruptPending(), "the change waits for the program"))
 			.thenExecute(() -> {
 				// Saved as the world is, then gone, and loaded again: a save isn't a power cut.
 				net.minecraft.nbt.CompoundTag saved = helper.getBlockEntity(POS, AllInOneBlockEntity.class).saveWithoutMetadata(registries);
@@ -67,12 +119,13 @@ public class CardGameTest {
 				helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
 				AllInOneBlockEntity again = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
 				again.loadWithComponents(net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, registries, saved));
-				MotionSensorCard loaded = again.machine().board().bus().devices().stream()
-					.filter(MotionSensorCard.class::isInstance).map(MotionSensorCard.class::cast).findFirst().orElseThrow();
+				RedstoneCard loaded = again.machine().board().bus().devices().stream()
+					.filter(RedstoneCard.class::isInstance).map(RedstoneCard.class::cast).findFirst().orElseThrow();
 				helper.assertTrue(loaded != card, "a new card device, from the save");
-				helper.assertValueEqual(loaded.getRange(args()).first(), 9L, "the range it was set to");
+				helper.assertValueEqual(field(loaded, "east", "powered"), 9L, "what it put out");
 				Object event = loaded.pull(args()).first();
-				helper.assertTrue(event instanceof Map<?, ?>, "the event that waited: " + event);
+				helper.assertTrue(event instanceof Map<?, ?> map && "west".equals(map.get("side")) && Long.valueOf(15).equals(map.get("new")),
+					"the event that waited: " + event);
 			})
 			.thenSucceed();
 	}
@@ -89,8 +142,8 @@ public class CardGameTest {
 		helper.setBlock(hubPos, ModBlocks.EXPANSION_HUB);
 		var screen = helper.getBlockEntity(screenPos, com.payonel.modularcomputers.block.ScreenBlockEntity.class);
 		var hub = helper.getBlockEntity(hubPos, com.payonel.modularcomputers.block.ExpansionHubBlockEntity.class);
-		hub.cards().setItem(0, new ItemStack(ModItems.MOTION_SENSOR_CARD));
-		MotionSensorCard card = (MotionSensorCard) hub.card(0).orElseThrow();
+		hub.cards().setItem(0, new ItemStack(ModItems.REDSTONE_CARD));
+		RedstoneCard card = (RedstoneCard) hub.card(0).orElseThrow();
 		screen.terminal().accepting(true); // as on a running computer's bus
 		card.accepting(true);
 		var screenChunk = helper.getLevel().getChunkAt(helper.absolutePos(screenPos));
@@ -98,8 +151,8 @@ public class CardGameTest {
 		java.util.Map<Runnable, net.minecraft.world.level.chunk.LevelChunk> changes = new java.util.LinkedHashMap<>();
 		changes.put(() -> screen.terminal().press("a"), screenChunk);
 		changes.put(() -> screen.terminal().read(args()), screenChunk);
-		changes.put(() -> card.setRange(args(3L)), hubChunk);
-		changes.put(() -> card.sense("drop", Map.of("x", 1.0)), hubChunk);
+		changes.put(() -> card.set(args(Map.of("top", Map.of("powered", 3L)))), hubChunk);
+		changes.put(() -> card.sense(0, 5), hubChunk);
 		changes.put(() -> card.pull(args()), hubChunk);
 		changes.forEach((change, chunk) -> {
 			screenChunk.tryMarkSaved();
@@ -135,17 +188,15 @@ public class CardGameTest {
 	}
 
 	@GameTest(maxTicks = 60)
-	public void aMotionSensorSeesWhatMovesWhereRelativeToItsBlock(GameTestHelper helper) {
+	public void aMotionSensorSeesMobsMoveWhereRelativeToItsBlockAndNotItems(GameTestHelper helper) {
 		MotionSensorCard card = computerWith(helper, ModItems.MOTION_SENSOR_CARD, MotionSensorCard.class);
-		helper.assertTrue(card.setRange(args(100L)).first().equals(32L), "range tops out at 32");
-		card.setRange(args(6L));
-		card.setMode(args("drops"));
-		helper.spawn(EntityTypes.PIG, POS.north(3));
 		ItemEntity drop = new ItemEntity(helper.getLevel(), helper.absolutePos(POS.east(2)).getX() + 0.5, helper.absolutePos(POS).getY() + 0.5,
 			helper.absolutePos(POS).getZ() + 0.5, new ItemStack(Items.DIAMOND));
 		drop.setDeltaMovement(0, 0, 0);
 		drop.setNoGravity(true);
 		helper.getLevel().addFreshEntity(drop);
+		var pig = helper.spawn(EntityTypes.PIG, POS.north(3));
+		pig.setNoAi(true);
 		List<Map<?, ?>> seen = new ArrayList<>();
 		helper.startSequence()
 			.thenWaitUntil(() -> {
@@ -156,31 +207,10 @@ public class CardGameTest {
 				helper.assertTrue(!seen.isEmpty(), "saw something");
 			})
 			.thenExecute(() -> {
-				helper.assertTrue(seen.stream().allMatch(e -> "drop".equals(e.get("kind"))), "drops only, in its mode: " + seen);
-				Map<?, ?> diamond = seen.getFirst();
-				helper.assertValueEqual(diamond.get("item"), "minecraft:diamond", "what dropped");
-				helper.assertValueEqual(diamond.get("x"), 2.0, "two blocks east of it");
-				card.setMode(args("blocks"));
-				helper.setBlock(POS.south(2), Blocks.OAK_DOOR.defaultBlockState());
-			})
-			.thenIdle(2)
-			.thenExecute(() -> {
-				card.pull(args()); // (whatever placing it said)
-				while (card.pull(args()).first() != null) {
-				}
-				helper.setBlock(POS.south(2), helper.getBlockState(POS.south(2)).setValue(BlockStateProperties.OPEN, true));
-			})
-			.thenWaitUntil(() -> {
-				Map<?, ?> event = (Map<?, ?>) card.pull(args()).first();
-				helper.assertTrue(event != null && "door".equals(event.get("kind")) && Boolean.TRUE.equals(event.get("open")) && Double.valueOf(2.0).equals(event.get("z")),
-					"the door opening, two blocks south: " + event);
-				while (card.pull(args()).first() != null) {
-				}
-				helper.setBlock(POS.west(3), Blocks.WATER);
-			})
-			.thenWaitUntil(() -> {
-				Map<?, ?> event = (Map<?, ?>) card.pull(args()).first();
-				helper.assertTrue(event != null && "fluid".equals(event.get("kind")) && "minecraft:water".equals(event.get("type")), "water flowing: " + event);
+				helper.assertTrue(seen.stream().allMatch(e -> "minecraft:pig".equals(e.get("mob"))), "mobs only: " + seen);
+				Map<?, ?> first = seen.getFirst();
+				helper.assertValueEqual(first.keySet(), java.util.Set.of("mob", "x", "y", "z"), "which mob, and where");
+				helper.assertValueEqual(first.get("z"), -3.0, "three blocks north of it");
 			})
 			.thenSucceed();
 	}

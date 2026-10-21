@@ -31,9 +31,6 @@ public final class ModMenus {
 	public static final MenuType<PhotomaskMenu> PHOTOMASK = Registry.register(BuiltInRegistries.MENU, id("photomask"),
 		Platform.INSTANCE.menuType(PhotomaskMenu::new));
 
-	public static final MenuType<CardHolderMenu> REDSTONE_TERMINAL = Registry.register(BuiltInRegistries.MENU, id("redstone_terminal"),
-		Platform.INSTANCE.menuType(CardHolderMenu::redstoneTerminal));
-
 	private ModMenus() {
 	}
 

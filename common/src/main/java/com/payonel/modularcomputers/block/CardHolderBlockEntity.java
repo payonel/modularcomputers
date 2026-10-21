@@ -99,11 +99,6 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements MenuP
 		return radioCard().has(ModComponents.BLUETOOTH_LINK);
 	}
 
-	/** Whether a slot holds a card (every slot but the radio here; a terminal's battery slot doesn't): a card there gets its serial number. */
-	protected boolean holdsCard(int slot) {
-		return slot != radioSlot();
-	}
-
 	/** The cards changed: rebuild whatever they make. Runs on both sides, and after loading. */
 	protected void cardsChanged() {
 	}
@@ -155,7 +150,7 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements MenuP
 		}
 		for (int slot = 0; slot < cards.getContainerSize(); slot++) {
 			ItemStack card = cards.getItem(slot);
-			if (holdsCard(slot) && !card.isEmpty()) {
+			if (slot != radioSlot() && !card.isEmpty()) {
 				ModComponents.serial(card); // its identity from now on, whatever slot it's in
 			}
 		}

@@ -249,19 +249,35 @@ class McosTest {
 	}
 
 	@Test
-	void aRedstoneTerminalsFileIsItsTableAsTextThroughItsDriver() {
-		com.payonel.modularcomputers.device.RedstoneTerminal terminal = new com.payonel.modularcomputers.device.RedstoneTerminal();
-		devices.put("id:redstone", terminal);
+	void aRedstoneCardsFileIsItsTableAsTextThroughItsDriver() {
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		devices.put("id:redstone", card);
 		boot();
-		file("set.txt", "{north = {powered = 11}, top = {mode = \"redstone\"}}\n");
+		file("set.txt", "{north = {powered = 11}}\n");
 		file("bad.txt", "not a table\n");
 		type("cp /set.txt /dev/redstone0; cat /dev/redstone0 > /r; cp /bad.txt /dev/redstone0 2> /err; touch /done\r");
 		untilFile(root().resolve("done"), "");
-		assertThat(terminal.output(0)).as("north, as written").isEqualTo(11);
-		String read = read(root().resolve("r"));
-		assertThat(read).contains("north", "south", "east", "west", "top", "bottom", "mode = \"redstone\"", "powered = 11", "level = 11", "powered = 0");
+		assertThat(card.output(0)).as("north, as written").isEqualTo(11);
+		assertThat(read(root().resolve("r"))).contains("north", "south", "east", "west", "top", "bottom", "powered = 11", "level = 11", "powered = 0");
 		assertThat(read(root().resolve("err"))).as("text that isn't a table: the write fails").isNotEmpty();
-		assertThat(terminal.output(0)).isEqualTo(11);
+		assertThat(card.output(0)).isEqualTo(11);
+	}
+
+	@Test
+	void aSensorsFileGivesAnEventALineAndAReadWaitsForOne() {
+		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
+		devices.put("id:motion", motion);
+		boot();
+		type("head -n 2 /dev/sensor0 > /m; touch /done\r");
+		untilIdle(); // head waits: nothing has moved
+		assertThat(root().resolve("done")).doesNotExist();
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:zombie", "x", 0.0, "y", 0.0, "z", 2.0)));
+		untilFile(root().resolve("done"), "");
+		String[] lines = read(root().resolve("m")).split("\n");
+		assertThat(lines).hasSize(2);
+		assertThat(lines[0]).contains("mob = \"minecraft:pig\"", "x = 1.5", "z = -3.0");
+		assertThat(lines[1]).contains("minecraft:zombie");
 	}
 
 	@Test

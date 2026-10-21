@@ -36,7 +36,7 @@ class SavedStateTest {
 		terminal.press("a");
 		terminal.accepting(false); // its board halted, was turned off, or let it go
 		assertThat(terminal.interruptPending()).isFalse();
-		RedstoneTerminal card = new RedstoneTerminal();
+		RedstoneCard card = new RedstoneCard();
 		card.sense(0, 3);
 		assertThat(card.interruptPending()).as("an event while not accepting: dropped").isFalse();
 		card.accepting(true);
@@ -62,13 +62,13 @@ class SavedStateTest {
 	}
 
 	@Test
-	void aRedstoneTerminalKeepsItsEventsItsOutputsAndWhatItSaw() {
-		RedstoneTerminal terminal = new RedstoneTerminal();
-		terminal.accepting(true); // on a running board\'s bus
-		terminal.set(args(Map.of("north", Map.of("powered", 7L))));
-		terminal.sense(5, 9);
-		RedstoneTerminal loaded = new RedstoneTerminal();
-		loaded.restore(terminal.saved());
+	void aRedstoneCardKeepsItsEventsItsOutputsAndWhatItSaw() {
+		RedstoneCard card = new RedstoneCard();
+		card.accepting(true); // on a running board\'s bus
+		card.set(args(Map.of("north", Map.of("powered", 7L))));
+		card.sense(5, 9);
+		RedstoneCard loaded = new RedstoneCard();
+		loaded.restore(card.saved());
 		assertThat(loaded.output(0)).isEqualTo(7);
 		@SuppressWarnings("unchecked")
 		Map<String, Object> event = (Map<String, Object>) loaded.pull(args()).first();
@@ -78,18 +78,14 @@ class SavedStateTest {
 	}
 
 	@Test
-	void aMotionSensorKeepsItsModeRangeAndEvents() {
+	void aMotionSensorKeepsItsEvents() {
 		MotionSensorCard card = new MotionSensorCard();
 		card.accepting(true); // on a running board\'s bus
-		card.setMode(args("drops"));
-		card.setRange(args(20L));
-		card.sense("drop", Map.of("x", 1.0));
+		card.sense(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", -2.0));
 		MotionSensorCard loaded = new MotionSensorCard();
 		loaded.restore(card.saved());
-		assertThat(loaded.getMode(args()).first()).isEqualTo("drops");
-		assertThat(loaded.getRange(args()).first()).isEqualTo(20L);
-		assertThat(loaded.power().draw()).isEqualTo(card.power().draw());
 		assertThat(loaded.interruptPending()).isTrue();
+		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", -2.0));
 	}
 
 	@Test

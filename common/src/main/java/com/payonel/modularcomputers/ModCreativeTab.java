@@ -28,7 +28,7 @@ public final class ModCreativeTab {
 		things.addAll(ModBlocks.CASES);
 		things.addAll(ModBlocks.SCREENS);
 		things.addAll(List.of(ModBlocks.CABLE, ModBlocks.EXPANSION_HUB, ModBlocks.ROBOTIC_PISTON, ModBlocks.ROBOTIC_STICKY_PISTON,
-			ModBlocks.PAINT_GUN, ModBlocks.PHOTOMASK, ModBlocks.REDSTONE_TERMINAL, ModItems.SILICON, ModItems.CHIP));
+			ModBlocks.PAINT_GUN, ModBlocks.PHOTOMASK, ModItems.SILICON, ModItems.CHIP));
 		things.addAll(ModItems.CPUS);
 		things.addAll(List.of(ModItems.JAVA_CPU, ModItems.EEPROM, ModItems.JAVA_EEPROM));
 		things.addAll(ModItems.RAMS);

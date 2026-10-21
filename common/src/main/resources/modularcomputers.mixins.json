@@ -3,8 +3,7 @@
 	"package": "com.payonel.modularcomputers.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
-		"MinecraftServerSaves",
-		"ServerLevelBlockUpdates"
+		"MinecraftServerSaves"
 	],
 	"injectors": {
 		"defaultRequire": 1

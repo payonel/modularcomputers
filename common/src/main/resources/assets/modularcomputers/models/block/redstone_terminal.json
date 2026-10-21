@@ -1,8 +1,0 @@
-{
-	"parent": "minecraft:block/cube_bottom_top",
-	"textures": {
-		"bottom": "modularcomputers:block/redstone_terminal_bottom",
-		"top": "modularcomputers:block/redstone_terminal_top",
-		"side": "modularcomputers:block/redstone_terminal_side"
-	}
-}

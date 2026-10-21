@@ -16,8 +16,7 @@ import net.minecraft.world.inventory.Slot;
 /**
  * The card slots of a block on the network: a strip of circuit board with a socket per slot,
  * above the player's inventory. The radio slot (for a Bluetooth card) has a blue socket and
- * its own label; an expansion hub's four expansion slots sit left of it, as does a redstone
- * terminal's battery slot. A screen's slot view
+ * its own label; an expansion hub's four expansion slots sit left of it. A screen's slot view
  * also has the toggle back to its screen view, where the case view has it.
  */
 public final class CardHolderScreen extends AbstractContainerScreen<CardHolderMenu> {
@@ -25,7 +24,6 @@ public final class CardHolderScreen extends AbstractContainerScreen<CardHolderMe
 	private static final int HEIGHT = 166;
 	private static final Identifier ICONS = ModularComputers.id("textures/gui/case_icons.png");
 	private static final int ICON_CARD = 4;
-	private static final int ICON_UPS = 5;
 	private static final int PANEL = 0xFFC6C6C6;
 	private static final int LIGHT = 0xFFFFFFFF;
 	private static final int SHADOW = 0xFF555555;
@@ -93,13 +91,12 @@ public final class CardHolderScreen extends AbstractContainerScreen<CardHolderMe
 			boolean pairing = slot == menu.radioSlot();
 			graphics.fill(area.x() - 2, area.y() - 2, area.right() + 2, area.bottom() + 2, pairing ? RADIO_SOCKET : SOCKET);
 			graphics.fill(area.x() - 1, area.y() - 1, area.right() + 1, area.bottom() + 1, pairing ? RADIO_FACE : SOCKET_FACE);
-			boolean battery = slot == menu.batterySlot();
-			if (pairing || battery) {
-				Component label = Component.translatable(pairing ? "gui.modularcomputers.radio" : "gui.modularcomputers.battery");
+			if (pairing) {
+				Component label = Component.translatable("gui.modularcomputers.radio");
 				graphics.text(font, label, area.x() + 8 - font.width(label) / 2, area.y() - 12, SILK, false);
 			}
 			if (!menu.slots.get(slot).hasItem()) {
-				graphics.blit(RenderPipelines.GUI_TEXTURED, ICONS, area.x(), area.y(), (battery ? ICON_UPS : ICON_CARD) * 16, 0, 16, 16, 128, 16);
+				graphics.blit(RenderPipelines.GUI_TEXTURED, ICONS, area.x(), area.y(), ICON_CARD * 16, 0, 16, 16, 128, 16);
 			}
 		}
 		ComputerButtons.extract(graphics, new Viewport(0, 0, 0, 0), viewToggle(), ComputerButtons.Target.SCREEN, null, false);

@@ -90,7 +90,7 @@
 	"gui.modularcomputers.power.time_idle": "Time: -",
 	"gui.modularcomputers.power.time_forever": "Time: forever",
 	"item.modularcomputers.bluetooth_card": "Bluetooth Card",
-	"block.modularcomputers.redstone_terminal": "Redstone Terminal",
+	"item.modularcomputers.redstone_card": "Redstone Card",
 	"item.modularcomputers.audio_card": "Audio Card",
 	"item.modularcomputers.motion_sensor_card": "Motion Sensor Card",
 	"item.modularcomputers.audio_sensor_card": "Audio Sensor Card",
@@ -121,6 +121,5 @@
 	"gui.modularcomputers.bus.bluetooth": "bluetooth, %sm",
 	"gui.modularcomputers.bus.paired": "paired",
 	"gui.modularcomputers.bus.hub_paired": "hub %s, paired",
-	"gui.modularcomputers.radio": "Radio",
-	"gui.modularcomputers.battery": "Battery"
+	"gui.modularcomputers.radio": "Radio"
 }

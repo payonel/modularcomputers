@@ -652,7 +652,7 @@ class LuaRunnerTest {
 	@Test
 	void aWaitTheInboxCanAnswerIsFree() {
 		ram(3);
-		com.payonel.modularcomputers.device.RedstoneTerminal card = new com.payonel.modularcomputers.device.RedstoneTerminal();
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("id:redstone", card);
@@ -678,7 +678,7 @@ class LuaRunnerTest {
 	@Test
 	void aKeyTypedWhileTheProgramIsBusyIsNewsItsNextWaitSeesAtOnce() {
 		ram(3);
-		com.payonel.modularcomputers.device.RedstoneTerminal card = new com.payonel.modularcomputers.device.RedstoneTerminal();
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("id:redstone", card);
@@ -747,7 +747,7 @@ class LuaRunnerTest {
 
 	@Test
 	void aRingTakesOnlyWhatItHasRoomForAndTheDeviceKeepsTheRest() {
-		com.payonel.modularcomputers.device.RedstoneTerminal card = new com.payonel.modularcomputers.device.RedstoneTerminal();
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("id:redstone", card);
@@ -938,7 +938,7 @@ class LuaRunnerTest {
 	@Test
 	void eachDeviceHasItsOwnRoomInTheInbox() {
 		ram(2); // 2 a device
-		com.payonel.modularcomputers.device.RedstoneTerminal card = new com.payonel.modularcomputers.device.RedstoneTerminal();
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("id:redstone", card);

@@ -1,0 +1,93 @@
+package com.payonel.modularcomputers.device;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.payonel.modularcomputers.runtime.Arguments;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+
+/** A redstone card's faces, as programs see and set them (user design, 2026-10-21). */
+class RedstoneCardTest {
+	private static final int NORTH = 0;
+	private static final int BOTTOM = 5;
+
+	private final RedstoneCard card = new RedstoneCard();
+
+	private static Arguments args(Object... values) {
+		return new Arguments(List.of(values));
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Map<String, Map<String, Object>> sides(Object answer) {
+		return (Map<String, Map<String, Object>>) answer;
+	}
+
+	@Test
+	void everyFaceHasItsLevelAndWhatItPutsOut() {
+		card.sense(NORTH, 6);
+		var sides = sides(card.get(args()).first());
+		assertThat(sides.keySet()).containsExactly("north", "south", "east", "west", "top", "bottom");
+		assertThat(sides.get("north")).containsEntry("level", 6L).containsEntry("powered", 0L);
+	}
+
+	@Test
+	void setPoweredPutsOutASignalAndItsLevelIsTheStrongestThere() {
+		var sides = sides(card.set(args(Map.of("north", Map.of("powered", 9L)))).first());
+		assertThat(card.output(NORTH)).isEqualTo(9);
+		assertThat(sides.get("north")).containsEntry("powered", 9L).as("its own signal is the level there").containsEntry("level", 9L);
+		assertThat(sides).as("set answers every face").hasSize(6);
+		card.sense(NORTH, 12);
+		assertThat(sides(card.get(args()).first()).get("north")).containsEntry("level", 12L).containsEntry("powered", 9L);
+		card.set(args(Map.of("north", Map.of("powered", 99L))));
+		assertThat(card.output(NORTH)).as("15 at most").isEqualTo(RedstoneCard.MAX_SIGNAL);
+	}
+
+	@Test
+	void aCardReadsWhatTheOtherCardsInItsBlockPutOut() {
+		card.block(side -> side == BOTTOM ? 15 : 0); // another card in the block puts out 15 below
+		assertThat(sides(card.get(args()).first()).get("bottom")).containsEntry("level", 15L).containsEntry("powered", 0L);
+	}
+
+	@Test
+	void setIgnoresALevelItIsWhatsDetected() {
+		card.set(args(Map.of("north", Map.of("level", 9L))));
+		assertThat(card.output(NORTH)).isZero();
+	}
+
+	@Test
+	void getTakesTheFacesToAskAboutAsKeysOrAList() {
+		Map<Object, Object> keyed = new LinkedHashMap<>();
+		keyed.put("north", Map.of("powered", 3L)); // its fields aren't filters
+		assertThat(sides(card.get(args(keyed)).first()).keySet()).containsExactly("north");
+		assertThat(sides(card.get(args(List.of("top", "west"))).first()).keySet()).containsExactly("top", "west");
+	}
+
+	@Test
+	void aBadTableChangesNothing() {
+		assertThatThrownBy(() -> card.set(args(Map.of("north", Map.of("powered", 3L), "up", Map.of("powered", 1L)))))
+			.hasMessageContaining("no such side: up");
+		assertThatThrownBy(() -> card.set(args(Map.of("north", Map.of("powered", 2.5))))).hasMessageContaining("powered: integer expected");
+		assertThat(card.output(NORTH)).isZero();
+	}
+
+	@Test
+	void withoutPowerItPutsOutNothing() {
+		card.set(args(Map.of("north", Map.of("powered", 12L))));
+		card.powerOff();
+		assertThat(card.output(NORTH)).isZero();
+	}
+
+	@Test
+	void aChangeComingInIsAnEventWhileItTakesData() {
+		card.sense(NORTH, 4);
+		assertThat(card.interruptPending()).as("not on a running board: dropped").isFalse();
+		card.accepting(true);
+		card.sense(NORTH, 7);
+		@SuppressWarnings("unchecked")
+		Map<String, Object> event = (Map<String, Object>) card.pull(args()).first();
+		assertThat(event).containsEntry("name", "redstone").containsEntry("side", "north").containsEntry("old", 4L).containsEntry("new", 7L);
+	}
+}

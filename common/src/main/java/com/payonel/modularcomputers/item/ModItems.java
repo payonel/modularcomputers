@@ -61,6 +61,7 @@ public final class ModItems {
 	/** Expansion cards, for a computer's expansion slots or an expansion hub. */
 	public static final Item WLAN_CARD = register("wlan_card");
 	public static final Item BLUETOOTH_CARD = register("bluetooth_card", BluetoothCardItem::new, UnaryOperator.identity());
+	public static final Item REDSTONE_CARD = register("redstone_card");
 	public static final Item AUDIO_CARD = register("audio_card");
 	public static final Item MOTION_SENSOR_CARD = register("motion_sensor_card");
 	public static final Item AUDIO_SENSOR_CARD = register("audio_sensor_card");
@@ -80,6 +81,7 @@ public final class ModItems {
 		Map<Item, CardKind> cards = new LinkedHashMap<>();
 		cards.put(WLAN_CARD, CardKind.WLAN);
 		cards.put(BLUETOOTH_CARD, CardKind.BLUETOOTH);
+		cards.put(REDSTONE_CARD, CardKind.REDSTONE);
 		cards.put(AUDIO_CARD, CardKind.AUDIO);
 		cards.put(MOTION_SENSOR_CARD, CardKind.MOTION_SENSOR);
 		cards.put(AUDIO_SENSOR_CARD, CardKind.AUDIO_SENSOR);

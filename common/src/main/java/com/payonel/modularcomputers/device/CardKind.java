@@ -6,6 +6,8 @@ import com.payonel.modularcomputers.bus.DeviceType;
 public enum CardKind {
 	WLAN(DeviceType.NETWORK),
 	BLUETOOTH(DeviceType.NETWORK),
+	/** Will emit and detect redstone where it's installed (a computer, or an expansion hub). */
+	REDSTONE(DeviceType.REDSTONE),
 	AUDIO(DeviceType.AUDIO),
 	MOTION_SENSOR(DeviceType.SENSOR),
 	AUDIO_SENSOR(DeviceType.SENSOR),
