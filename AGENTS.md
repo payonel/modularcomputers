@@ -171,21 +171,27 @@ split libraries to fit OC's RAM; it cost speed, complexity and more memory than 
 `null`, `zero`, and a node for each bus device with a `get` or `set` method (the EEPROM sits there too: not
 where Linux keeps one, but convenient for users, the user's call). Reading gives `get`'s answer;
 what's written goes to `set` in one call at close, and **the device decides what `set` means**
-(replace, append). A device whose data is a table, not text, has a **driver**
-(`lib/modules/drivers/<type>.lua`): the redstone card's turns its table into Lua's syntax and back.
-A device with events to `pull` and no `get` (a sensor) has a read-only file: each read is an event,
-a line (its driver's: `drivers/motion.lua`), and a read with none waiting blocks, as a keyboard's does (the
-kernel's idle wait listens to the devices blocked reads wait on). Files are text, never tables
-(user asked, 2026-10-21): `cat`, pipes and redirection keep working; a program wanting tables
-unserializes a line, or calls the device's `pull` itself. **`sys.poll(fds, seconds)`** (poll(2), input only) waits
-on many files at once (user, 2026-10-21: Lua has no easy background threads): each kind of file says
-when it's ready (a tty's line, a pipe's data, an event waiting, a redstone file's change since it
-was last read from its start, as a sysfs GPIO value's). It's in `sys`, not `io` (real Lua's `io` is
-C's stdio, which has no poll) and not a `posix` library (`sys` already is mcos's POSIX layer);
-`sys.fileno(file)` gives an io file's descriptor (not in real Lua: luaposix's). **inotify**
-(`sys.inotify()`, `sys.watch(fd, path)`, a module loaded at the first) turns the disks' reports
-into full paths by their mounts (tmpfs reports through `k.changed`, a no-op until then); it watches
-paths, not inodes as Linux's does, and a change made on a disk's host isn't seen. **A device type costs no memory until it's used** (user, 2026-10-21: add devices and drivers
+(replace, append). **mcos's interfaces are Linux-shaped; the devices' are for anyone** (user,
+2026-10-21, after a review of where we'd drifted): devices speak tables (their methods, events and
+reports: the hardware's interface, convenient for any kernel), and mcos turns them into what Linux
+would give: text, never Lua's syntax (the kernel loads no user-space library). A device whose data
+is a table has a **driver** (`lib/modules/drivers/<type>.lua`) making it text: the redstone card's
+file is a line a face, `north 7 7` (face, level, powered), and a line written, `north 11`, takes
+effect at once, as a sysfs attribute's write does (a device without a line driver, the EEPROM,
+takes everything written at close: all or nothing, as a firmware load's commit). A device with
+events to `pull` and no `get` (a sensor) has a read-only file, an event a line (`minecraft:pig 1.5
+0.0 -3.0`), and a read with none waiting blocks, as a keyboard's does (the kernel's idle wait
+listens to the devices blocked reads wait on). **`sys.poll(fds, seconds)`** is poll(2): a map of
+files to the events wanted (`IN`, `PRI`, `OUT`), answered with what happened (`HUP`, `ERR` come
+unasked), so a program waits on many files at once (user: Lua has no easy background threads). A
+redstone file is always readable and reports a change as `PRI` (a sysfs GPIO value's way). It's
+in `sys`, not `io` (real Lua's `io` is C's stdio, which has no poll) nor a `posix` library (`sys`
+already is mcos's POSIX layer); `sys.fileno(file)` gives an io file's descriptor (luaposix's, not
+real Lua's). **inotify** (`sys.inotify()`, `sys.watch(fd, path)`, a module loaded at the first)
+gives Linux's notices as lines (`MODIFY /log`; a rename `MOVED_FROM`/`MOVED_TO`; `OVERFLOW`), from
+the disks' reports turned into full paths by their mounts (tmpfs reports through `k.changed`, a
+no-op until then); it watches paths, not inodes as Linux's does, and a change made on a disk's
+host isn't seen. **A device type costs no memory until it's used** (user, 2026-10-21: add devices and drivers
 freely, never paying at boot for one that isn't there, as a real kernel loads a module when its
 device needs it): devfs looks for the type's driver on the boot disk the first time one of its
 files is opened, and remembers what it found; nothing in the kernel lists the types. Descriptions

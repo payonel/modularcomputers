@@ -18,8 +18,8 @@ function k.ttyfile(t)
   return {
     type = "tty",
     tty = t,
-    ready = function(self)
-      return #t.ready > 0
+    events = function(self)
+      return {IN = #t.ready > 0, OUT = true}
     end,
     read = function(self, n)
       local data = t:read(n)
@@ -77,23 +77,27 @@ local function find(path)
 end
 
 -- A device call's failure as an errno: a device that's gone is ENODEV (and the kernel's view of the
--- bus is read again: it was out of date); anything else, EIO.
-local function failed(why)
+-- bus is read again: it was out of date); anything else, 'errno' (EIO unless said).
+local function failed(why, errno)
   if (tostring(why)):find("^no such device") then
     k.refreshdevices()
     return fail("ENODEV")
   end
-  return fail("EIO")
+  return fail(errno or "EIO")
 end
 
 -- Drivers, by device type: a device whose data is a table, not text, has one on the boot disk
--- (k.driver), which makes the table text to read (get) and the text written back a table (set). It's
--- looked for the first time a file of that type is opened, and remembered (false: none), so a type
--- costs nothing until it's used, and a type without one costs one look.
+-- (k.driver), which makes it text, as Linux's interfaces are (lines, words), never Lua's syntax:
+-- get(value) is what a read gives (an event's line, or the state); line(text), if it has one, is
+-- what to set for a line written (nil: not a line it takes), each taking effect as it's written, as
+-- a sysfs attribute's write does. It's looked for the first time a file of that type is opened, and
+-- remembered (false: none), so a type costs nothing until it's used, and a type without one costs
+-- one look.
 local drivers = {}
 
 -- An event device's file (a sensor's, with events to pull and no get): read only; each event is a
--- line (through its driver), and a read with none waiting waits for one, as a keyboard's does.
+-- line (its driver's), and a read with none waiting waits for one, as a keyboard's does. Ready to
+-- poll (IN) while one waits.
 local function eventfile(id, driver)
   local line, at = "", 0
   -- An event to read: true (one is in 'line'), false (none waiting: the kernel listens for one), or
@@ -114,7 +118,9 @@ local function eventfile(id, driver)
   end
   return {
     type = "device",
-    ready = take,
+    events = function(self)
+      return {IN = take() ~= false}
+    end,
     read = function(self, n)
       local got, why, errno = take()
       if got == nil then
@@ -130,8 +136,9 @@ local function eventfile(id, driver)
 end
 
 -- An open device file: reads from what get gave (taken at the first read, through its driver if it
--- has one), writes kept for one set at close; or an event device's. (Which of them the open's mode
--- allows is the VFS's to enforce.)
+-- has one); writes, a line at a time as they come with a line driver, otherwise kept for one set at
+-- close (the EEPROM's image: all of it or none, as a firmware load's commit); or an event device's.
+-- (Which of them the open's mode allows is the VFS's to enforce.)
 local function devicefile(device, mode)
   local plus = mode:find("+", 1, true)
   local reads, writes = mode:sub(1, 1) == "r" or plus, mode:sub(1, 1) ~= "r" or plus
@@ -148,11 +155,12 @@ local function devicefile(device, mode)
   if events then
     return eventfile(id, driver)
   end
+  local lines = driver and driver.line
   local data, at = nil, 0
-  local written = nil
-  local changed = false -- a change came in since the file was last read from its start (poll)
-  -- Each event the device has waiting (a redstone card's changes coming in), taken and dropped: true
-  -- if there was one. (A failure counts: the next read reports it.)
+  local written = nil -- what's been written: all of it (kept for close), or a line not yet ended
+  local changed = false -- a change came in since the file was last read from its start (poll's PRI)
+  -- Each event the device has waiting (a redstone card's changes), taken and dropped: true if there
+  -- was one. (A failure counts: the next read reports it.)
   local function drain()
     local any = false
     while true do
@@ -163,18 +171,30 @@ local function devicefile(device, mode)
       any = true
     end
   end
+  -- A line written, set at once (its driver's).
+  local function set(text)
+    local value = lines(text)
+    if value == nil then
+      return fail("EINVAL")
+    end
+    local ok, why = board.invoke(id, "set", value)
+    if not ok then
+      return failed(why, "EINVAL")
+    end
+    return true
+  end
   return {
     type = "device",
-    -- Ready for poll once something changed since it was read from its start (as a GPIO's value
-    -- file, in sysfs); a device without events always is.
-    ready = function(self)
+    -- As a sysfs attribute, for poll: always readable (IN, a read gives the state at once); PRI once
+    -- the state changed since it was read from its start (as a GPIO's value file).
+    events = function(self)
       if not changed and device.pull then
         changed = drain()
         if not changed then
           k.listen(id)
         end
       end
-      return changed or not device.pull
+      return {IN = true, PRI = changed, OUT = device.set ~= nil}
     end,
     -- Back to the start (the only place it seeks to): the next read takes get anew, and what's
     -- changed so far is in it.
@@ -201,21 +221,29 @@ local function devicefile(device, mode)
       return chunk
     end,
     write = function(self, bytes)
-      written = written or {}
-      written[#written + 1] = bytes
+      if not lines then
+        written = written or {}
+        written[#written + 1] = bytes
+        return #bytes
+      end
+      written = (written or "") .. bytes
+      for line in written:gmatch("([^\n]*)\n") do
+        local ok, why, errno = set(line)
+        if not ok then
+          written = nil
+          return nil, why, errno
+        end
+      end
+      written = written:match("[^\n]*$")
       return #bytes
     end,
     close = function(self)
-      if written then
-        local value = table.concat(written)
-        written = nil
-        if driver then
-          value = driver.set(value)
-          if value == nil then
-            return fail("EINVAL")
-          end
-        end
-        local ok, why = board.invoke(id, "set", value)
+      local value = written
+      written = nil
+      if lines then
+        return value == nil or value == "" or set(value) -- (a last line with no end)
+      elseif value then
+        local ok, why = board.invoke(id, "set", table.concat(value))
         if not ok then
           return failed(why)
         end

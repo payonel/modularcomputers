@@ -249,17 +249,18 @@ class McosTest {
 	}
 
 	@Test
-	void aRedstoneCardsFileIsItsTableAsTextThroughItsDriver() {
+	void aRedstoneCardsFileIsTextALineAFace() {
 		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
 		devices.put("id:redstone", card);
 		boot();
-		file("set.txt", "{north = {powered = 11}}\n");
-		file("bad.txt", "not a table\n");
+		file("set.txt", "north 11\n");
+		file("bad.txt", "not a face\n");
 		type("cp /set.txt /dev/redstone0; cat /dev/redstone0 > /r; cp /bad.txt /dev/redstone0 2> /err; touch /done\r");
 		untilFile(root().resolve("done"), "");
 		assertThat(card.output(0)).as("north, as written").isEqualTo(11);
-		assertThat(read(root().resolve("r"))).contains("north", "south", "east", "west", "top", "bottom", "powered = 11", "level = 11", "powered = 0");
-		assertThat(read(root().resolve("err"))).as("text that isn't a table: the write fails").isNotEmpty();
+		assertThat(read(root().resolve("r"))).as("a line a face: face level powered")
+			.isEqualTo("north 11 11\nsouth 0 0\neast 0 0\nwest 0 0\ntop 0 0\nbottom 0 0\n");
+		assertThat(read(root().resolve("err"))).as("a line that isn't \"face powered\": the write fails").isNotEmpty();
 		assertThat(card.output(0)).isEqualTo(11);
 	}
 
@@ -276,8 +277,7 @@ class McosTest {
 		untilFile(root().resolve("done"), "");
 		String[] lines = read(root().resolve("m")).split("\n");
 		assertThat(lines).hasSize(2);
-		assertThat(lines[0]).contains("mob = \"minecraft:pig\"", "x = 1.5", "z = -3.0");
-		assertThat(lines[1]).contains("minecraft:zombie");
+		assertThat(lines).containsExactly("minecraft:pig 1.5 0.0 -3.0", "minecraft:zombie 0.0 0.0 2.0");
 	}
 
 	@Test
@@ -287,34 +287,63 @@ class McosTest {
 		boot();
 		file("p.lua", """
 			local sys = require("sys")
-			local serialization = require("serialization")
 			local function put(name, text)
 			  local out = io.open(name, "w")
 			  out:write(text)
 			  out:close()
 			end
 			local r, w = sys.pipe()
-			local empty = sys.poll({r}, 0.1)
+			local IN = {IN = true}
+			local empty = sys.poll({[r] = IN}, 0.1)
 			sys.write(w, "x")
-			local data = sys.poll({r}, 0.1)
-			put("/pipe", #empty .. " " .. #data .. " " .. tostring(data[1] == r))
+			local data = sys.poll({[r] = IN}, 0.1)
+			sys.read(r)
+			sys.close(w)
+			local hup = sys.poll({[r] = IN}, 0.1)
+			put("/pipe", tostring(next(empty) == nil) .. " " .. tostring(data[r].IN) .. " " .. tostring(hup[r].HUP))
 			local f = io.open("/dev/redstone0")
+			local fd = sys.fileno(f)
 			local function west()
 			  f:seek("set", 0)
-			  return serialization.unserialize(f:read("a")).west.level
+			  return f:read("a"):match("west (%d+)")
 			end
 			local before = west()
-			local quiet = sys.poll({sys.fileno(f)}, 0.1)
+			local always = sys.poll({[fd] = IN}, 0) -- an attribute: always readable
+			local quiet = sys.poll({[fd] = {PRI = true}}, 0.1) -- nothing changed
 			put("/started", "")
-			local ready = sys.poll({sys.fileno(f), r}) -- (r was read: nothing there now)
-			put("/polled", before .. " " .. west() .. " " .. #quiet .. " " .. tostring(ready[1] == sys.fileno(f)))
+			local changed = sys.poll({[fd] = {PRI = true}})
+			put("/polled", before .. " " .. west() .. " " .. tostring(always[fd].IN) .. " " .. tostring(next(quiet) == nil) .. " " .. tostring(changed[fd].PRI))
 			""");
 		type("lua /p.lua; touch /done\r");
 		settle(() -> Files.isRegularFile(root().resolve("started")));
 		server.add(() -> card.sense(3, 9)); // west: 9 comes in
 		untilFile(root().resolve("done"), "");
-		assertThat(read(root().resolve("pipe"))).as("nothing, then the pipe's data").isEqualTo("0 1 true");
-		assertThat(read(root().resolve("polled"))).as("it waited for the change, which a read from the start shows").isEqualTo("0 9 0 true");
+		assertThat(read(root().resolve("pipe"))).as("nothing, then the pipe's data, then its writer gone").isEqualTo("true true true");
+		assertThat(read(root().resolve("polled"))).as("readable at once; PRI waited for the change, which a read from the start shows")
+			.isEqualTo("0 9 true true true");
+	}
+
+	@Test
+	void aLineWrittenToARedstoneFileTakesEffectAtOnceSoAPulseWorks() {
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		devices.put("id:redstone", card);
+		boot();
+		file("pulse.lua", """
+			local sys = require("sys")
+			local f = io.open("/dev/redstone0", "w")
+			f:write("north 15\\n")
+			f:flush()
+			local started = io.open("/started", "w")
+			started:close()
+			sys.sleep(0.5)
+			f:write("north 0\\n")
+			f:close()
+			""");
+		type("lua /pulse.lua; touch /done\r");
+		settle(() -> Files.isRegularFile(root().resolve("started")));
+		assertThat(card.output(0)).as("the first line, set with the file still open").isEqualTo(15);
+		untilFile(root().resolve("done"), "");
+		assertThat(card.output(0)).isZero();
 	}
 
 	@Test
@@ -328,16 +357,16 @@ class McosTest {
 			local fd = sys.fileno(f)
 			local started = io.open("/started", "w")
 			started:close()
-			local ready = sys.poll({0, fd})
+			local ready = sys.poll({[0] = {IN = true}, [fd] = {IN = true}})
 			local out = io.open("/m", "w")
-			out:write(tostring(ready[1] == fd), " ", f:read("l"))
+			out:write(tostring(ready[fd] ~= nil and ready[0] == nil), " ", f:read("l"))
 			out:close()
 			""");
 		type("lua /m.lua; touch /done\r");
 		settle(() -> Files.isRegularFile(root().resolve("started")));
 		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
 		untilFile(root().resolve("done"), "");
-		assertThat(read(root().resolve("m"))).startsWith("true {").contains("minecraft:pig");
+		assertThat(read(root().resolve("m"))).isEqualTo("true minecraft:pig 1.5 0.0 -3.0");
 	}
 
 	@Test
@@ -353,7 +382,7 @@ class McosTest {
 		settle(() -> Files.isRegularFile(root().resolve("e")) && read(root().resolve("e")).contains("truncated"));
 		String out = read(root().resolve("o"));
 		assertThat(out.split("west", -1)).as("the state, then again, changed").hasSize(3);
-		assertThat(out.substring(out.lastIndexOf("west"))).contains("level = 9");
+		assertThat(out.substring(out.lastIndexOf("west"))).startsWith("west 9 0");
 		assertThat(read(root().resolve("e"))).isEqualTo("tail: /dev/redstone0: file truncated\n");
 		type("kill $!\r");
 		untilIdle();
@@ -377,7 +406,7 @@ class McosTest {
 			write("/tmp/t", "x")
 			os.rename("/tmp/t", "/tmp/u")
 			local seen = {}
-			while sys.poll({fd}, 0.5)[1] do
+			while sys.poll({[fd] = {IN = true}}, 0.5)[fd] do
 			  seen[#seen + 1] = sys.read(fd)
 			end
 			write("/seen", table.concat(seen))
@@ -385,9 +414,8 @@ class McosTest {
 		type("lua /n.lua; touch /done\r");
 		untilFile(root().resolve("done"), "");
 		String seen = read(root().resolve("seen"));
-		assertThat(seen).contains("event = \"create\", path = \"/tmp/t\"", "event = \"modify\", path = \"/tmp/t\"",
-			"event = \"rename\", from = \"/tmp/t\", path = \"/tmp/u\"", "event = \"modify\", path = \"/data.txt\"")
-			.doesNotContain("other.txt");
+		assertThat(seen.lines()).contains("CREATE /tmp/t", "MODIFY /tmp/t", "MOVED_FROM /tmp/t", "MOVED_TO /tmp/u", "MODIFY /data.txt")
+			.noneMatch(line -> line.contains("other.txt"));
 	}
 
 	@Test

@@ -62,7 +62,6 @@ local function kload(path, ...)
     return piece
   end, "=" .. path))(...)
 end
-k.kload = kload
 
 -- A kernel module (lib/modules/<name>.lua).
 local function module(name, ...)
@@ -877,27 +876,37 @@ syscalls.watch = withfd(function(p, request, d, fd, file)
   return inotify.watch(d, at)
 end)
 
--- poll(fds, seconds), as poll(2) waiting for input (POLLIN): which of the open files 'fds' (a list
--- of descriptors) a read would answer now (a file that can't say, a disk's, always would), waiting
--- for one until 'seconds' pass (nil: as long as it takes). The ready ones, a list; empty: the time
--- passed. Each file says what ready is (its ready: a tty's line, a pipe's data or end, a device's
--- event or change); a device it waits on is listened to (k.listen).
+-- poll(fds, seconds), as poll(2): 'fds' maps each open file to the events wanted, a set of Linux's
+-- names (IN: a read won't wait; PRI: something exceptional, as a device's state changing; OUT: a
+-- write won't wait); the answer maps each file something happened to, to what (HUP: the other end
+-- is gone; ERR; both come asked or not), waiting for one until 'seconds' pass (nil: as long as it
+-- takes); empty: the time passed. Each file says what's true of it now (its events: a tty's line,
+-- a pipe's data, a device's event or change); one that can't, a disk's file, always is readable and
+-- writable, as on Linux. A device it waits on is listened to (k.listen).
+local ALWAYS = {HUP = true, ERR = true}
+
 function syscalls.poll(p, request, fds, seconds)
   if type(fds) ~= "table" or seconds ~= nil and (type(seconds) ~= "number" or seconds < 0) then
     return fail("EINVAL")
   end
   local ready = {}
-  for _, fd in ipairs(fds) do
+  for fd, wanted in pairs(fds) do
     local d, why, errno = description(p, fd)
     if not d then
       return nil, why, errno
+    elseif type(wanted) ~= "table" then
+      return fail("EINVAL")
     end
-    if d.read and (not d.ready or d:ready() ~= false) then
-      ready[#ready + 1] = fd
+    local state = d.events and d:events() or {IN = d.read ~= nil, OUT = d.write ~= nil}
+    for name, on in pairs(state) do
+      if on and (wanted[name] or ALWAYS[name]) then
+        ready[fd] = ready[fd] or {}
+        ready[fd][name] = true
+      end
     end
   end
-  if #ready > 0 or seconds == nil then
-    return #ready > 0 and ready or k.BLOCK
+  if next(ready) or seconds == nil then
+    return next(ready) and ready or k.BLOCK
   end
   now = now or board.uptime()
   request.deadline = request.deadline or now + math.ceil(seconds * TICKS_PER_SECOND)

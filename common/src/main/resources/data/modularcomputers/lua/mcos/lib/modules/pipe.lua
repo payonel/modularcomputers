@@ -12,8 +12,9 @@ return function()
   local pipe = {buffer = "", readers = 1, writers = 1}
   local reader = {
     type = "fifo",
-    ready = function(self)
-      return pipe.buffer ~= "" or pipe.writers == 0
+    -- poll: IN with data waiting, HUP once every writer is gone (a read gives the end then)
+    events = function(self)
+      return {IN = pipe.buffer ~= "", HUP = pipe.writers == 0}
     end,
     read = function(self, n)
       if pipe.buffer == "" then
@@ -30,6 +31,10 @@ return function()
   }
   local writer = {
     type = "fifo",
+    -- poll: OUT while there's room, ERR once every reader is gone (a write fails: EPIPE)
+    events = function(self)
+      return {OUT = #pipe.buffer < PIPE_SIZE, ERR = pipe.readers == 0}
+    end,
     -- Takes what fits; a partial count tells the kernel to wait with the rest.
     write = function(self, data)
       if pipe.readers == 0 then

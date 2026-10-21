@@ -1,11 +1,8 @@
--- The motion sensor's driver, for its /dev file: its events are tables ({mob, x, y, z}); its file
--- reads one a line, in Lua's syntax (lib/serialization.lua), so a program reads a line and
--- unserializes it. Loaded (k.driver) the first time a motion file is opened.
-local k = ...
-local serialization = k.kload("/lib/serialization.lua")
-
+-- The motion sensor's driver, for its /dev file: an event a line, "mob x y z" (the mob's type, and
+-- where, relative to the sensor's block: minecraft:pig 1.5 0.0 -3.0); "lost n" before one when n
+-- were dropped, the sensor's buffer full (as an input device's SYN_DROPPED).
 return {
   get = function(event)
-    return serialization.serialize(event) .. "\n"
+    return (event.lost and "lost " .. event.lost .. "\n" or "") .. event.mob .. " " .. event.x .. " " .. event.y .. " " .. event.z .. "\n"
   end,
 }

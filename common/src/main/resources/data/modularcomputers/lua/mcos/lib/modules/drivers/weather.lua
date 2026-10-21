@@ -1,4 +1,7 @@
--- The weather sensor's driver, for its /dev file: its events are tables ({name, old, new}), one a
--- line, as the motion sensor's are: the same driver.
-local k = ...
-return k.driver("motion")
+-- The weather sensor's driver, for its /dev file: an event a line, the weather now (clear, rain, snow
+-- or thunder); "lost n" before one when n were dropped.
+return {
+  get = function(event)
+    return (event.lost and "lost " .. event.lost .. "\n" or "") .. event.new .. "\n"
+  end,
+}

@@ -104,14 +104,14 @@ end
 -- -f: what the files grow by, the moment it comes (a header when it's another file's than the last
 -- shown). Files on a disk or in /tmp are watched (inotify: a disk reports each change made on it);
 -- the rest (pipes, /dev files) are waited on with poll, all together. A file rewritten rather than
--- added to (a file grown shorter, or a device file poll says changed with nothing added: a redstone
--- card's state) is shown again from its start, after "file truncated", as GNU tail does when a file
--- shrinks.
+-- added to (a file grown shorter, or changed with nothing added) is shown again from its start,
+-- after "file truncated", as GNU tail does when a file shrinks. A file that's always readable but
+-- gives nothing new (a device's attribute: a redstone card's state) is waited on for a change
+-- instead (poll's PRI, as a sysfs GPIO value's).
 io.stdout:flush()
-local serialization = require("serialization")
 local shown = followed[#followed].path
 local notices = sys.inotify()
-local watched = {notices}
+local wanted = {[notices] = {IN = true}}
 for _, entry in ipairs(followed) do
   local st = sys.stat(entry.path)
   entry.fd = entry.file.fd -- (the descriptor itself: a FILE's end of file is sticky, as glibc's is; tail reads past it)
@@ -121,7 +121,7 @@ for _, entry in ipairs(followed) do
     entry.real = sys.realpath(entry.path) or entry.path
     sys.watch(notices, entry.real)
   else
-    watched[#watched + 1] = entry.fd
+    wanted[entry.fd] = {IN = true}
   end
 end
 
@@ -149,47 +149,39 @@ local function show(entry, stream)
   return any
 end
 
--- Shown again from its start, as a file that was truncated and written anew. False if it can't be
--- (a pipe whose writers are gone: nothing more will come).
+-- Shown again from its start, as a file that was truncated and written anew.
 local function again(entry)
-  if not sys.lseek(entry.fd, 0, "set") then
-    return false
+  if sys.lseek(entry.fd, 0, "set") then
+    io.stderr:write("tail: ", entry.path, ": file truncated\n")
+    entry.at = 0
+    show(entry)
   end
-  io.stderr:write("tail: ", entry.path, ": file truncated\n")
-  entry.at = 0
-  show(entry)
-  return true
 end
 
 while true do
-  local ready = {}
-  for _, fd in ipairs(sys.poll(watched) or {}) do
-    ready[fd] = true
-  end
+  local happened = sys.poll(wanted) or {}
   local changed = {}
-  while ready[notices] and sys.poll({notices}, 0)[1] do
-    local change = serialization.unserialize(sys.read(notices) or "") or {}
+  while happened[notices] and (sys.poll({[notices] = {IN = true}}, 0) or {})[notices] do
+    local name, path = (sys.read(notices) or ""):match("^(%S+) ?([^\n]*)")
+    happened[notices] = name ~= nil
     for _, entry in ipairs(followed) do
-      if entry.disk and (change.event == "lost" or change.path == entry.real) then
+      if entry.disk and (name == "OVERFLOW" or path == entry.real) then
         changed[entry] = true
       end
     end
   end
   for _, entry in ipairs(followed) do
+    local now = happened[entry.fd]
     if changed[entry] then
       local st = sys.stat(entry.path)
-      if st and st.size < entry.at then
+      if st and st.size < entry.at or not show(entry) then
         again(entry)
-      else
-        show(entry)
       end
-    elseif not entry.disk and ready[entry.fd] and not show(entry, true) and not again(entry) then
-      for i, fd in ipairs(watched) do -- (ended: no more to wait for)
-        if fd == entry.fd then
-          table.remove(watched, i)
-          break
-        end
-      end
+    elseif now and now.PRI then
+      again(entry)
+    elseif now and not show(entry, true) then
+      -- readable with nothing new: an attribute (wait for a change), or a pipe ended (stop)
+      wanted[entry.fd] = not now.HUP and {PRI = true} or nil
     end
   end
   io.stdout:flush()
