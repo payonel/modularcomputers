@@ -2,7 +2,7 @@
 # Draws the broken case found in the ancient sites, from the tier 1 case's textures (needs Pillow):
 # cracked glass, missing keys, grime and rust, an empty board behind the back window. The PNGs
 # are committed; rerun after all_in_one_textures.py, then check the preview.
-#   scripts/art/ancient_site_textures.py src/main/resources/assets/modularcomputers/textures/block preview.png
+#   scripts/art/ancient_site_textures.py common/src/main/resources/assets/modularcomputers/textures/block preview.png
 import random, sys
 from PIL import Image
 

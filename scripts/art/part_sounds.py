@@ -3,7 +3,7 @@
 # bus's overflow hum, as Ogg Vorbis (see oggwrite.py). The .ogg files are committed; rerun after
 # changing a sound. Name sounds to write only those (re-encoding changes a file's bytes even
 # when the sound is the same):
-#   scripts/art/part_sounds.py src/main/resources/assets/modularcomputers/sounds [name...]
+#   scripts/art/part_sounds.py common/src/main/resources/assets/modularcomputers/sounds [name...]
 #
 # Everything is soft and low-passed: plastic and metal seating into sockets, not a UI click.
 # Building blocks: a slide (sparse grains ringing a resonance, a rasp), a click (a short, damped knock), a

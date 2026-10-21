@@ -5,7 +5,7 @@
 # and among the ruins a working photomask, the way into making chips. Weathering (moss, cracks,
 # missing cables and windows) is added at generation by the processor list
 # modularcomputers:ancient_lab, so each site differs. Rerun after editing:
-#   scripts/data/ancient_lab_structure.py src/main/resources/data/modularcomputers/structure/ancient_lab.nbt
+#   scripts/data/ancient_lab_structure.py common/src/main/resources/data/modularcomputers/structure/ancient_lab.nbt
 import gzip, struct, sys
 
 DATA_VERSION = 5023  # Minecraft 26.3 (version.json's world_version)

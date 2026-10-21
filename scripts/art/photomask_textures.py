@@ -4,7 +4,7 @@
 # block and item models: a full cube with a recess in its front for the gear (the item's holds the
 # gear too, built from the same numbers as PhotomaskRenderer's). The PNGs and models are committed;
 # rerun after editing this to regenerate them, then check the preview.
-#   scripts/art/photomask_textures.py src/main/resources/assets/modularcomputers/textures preview.png
+#   scripts/art/photomask_textures.py common/src/main/resources/assets/modularcomputers/textures preview.png
 import json, math, os, random, sys
 from PIL import Image
 

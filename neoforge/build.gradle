@@ -1,0 +1,83 @@
+plugins {
+	id 'net.neoforged.moddev'
+}
+
+def common = project(':common')
+
+// The test mod: the server game tests, apart from the mod (as on Fabric).
+sourceSets {
+	gametest {
+		compileClasspath += main.compileClasspath + main.output
+		runtimeClasspath += main.runtimeClasspath + main.output
+	}
+}
+
+neoForge {
+	version = project.neoforge_version
+
+	runs {
+		// The server game tests (common/src/gametest, registered by the test mod here), on a headless
+		// server that exits with their result. NeoForge has no client test harness: the client tests
+		// run on Fabric only (user, 2026-10-20).
+		gameTestServer {
+			type = "gameTestServer"
+			gameDirectory = layout.buildDirectory.dir("run/gameTestServer")
+			systemProperty "neoforge.enabledGameTestNamespaces", "modularcomputers"
+		}
+		client {
+			client()
+			gameDirectory = layout.buildDirectory.dir("run/client")
+		}
+		server {
+			server()
+			gameDirectory = layout.buildDirectory.dir("run/server")
+		}
+	}
+
+	mods {
+		modularcomputers {
+			sourceSet sourceSets.main
+		}
+		modularcomputers_gametest {
+			sourceSet sourceSets.gametest
+		}
+	}
+}
+
+neoForge.addModdingDependenciesTo(sourceSets.gametest)
+
+// The common code (its main and client sources: NeoForge keeps both in one jar, and loads client
+// classes only on a client) compiled into this jar, with its resources.
+tasks.named("compileJava", JavaCompile) {
+	source(common.file("src/main/java"), common.file("src/client/java"))
+}
+tasks.named("processResources", ProcessResources) {
+	from(common.file("src/main/resources"))
+	def props = [
+		version                      : project.version,
+		minecraft_version_range      : project.neoforge_version_range,
+		neoforge_version             : project.neoforge_version,
+		neoforge_loader_version_range: project.neoforge_loader_version_range,
+	]
+	inputs.properties props
+	filesMatching("META-INF/neoforge.mods.toml") {
+		expand props
+	}
+}
+tasks.named("compileGametestJava", JavaCompile) {
+	source(common.file("src/gametest/java"))
+}
+tasks.named("processGametestResources", ProcessResources) {
+	from(common.file("src/gametest/resources"))
+	def props = [version: project.version]
+	inputs.properties props
+	filesMatching("META-INF/neoforge.mods.toml") {
+		expand props
+	}
+}
+
+dependencies {
+	// The Lua engine and Styx, nested in the jar (NeoForge loads them as libraries).
+	implementation jarJar("com.payonel:lungolua:${project.lungolua_version}")
+	implementation jarJar("com.payonel:styxlua:${project.styxlua_version}")
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Draws the all-in-one computer's 16x16 block textures and the GUI power button (needs Pillow).
 # The PNGs are committed; rerun after editing this to regenerate them, then check the preview.
-#   scripts/art/all_in_one_textures.py src/main/resources/assets/modularcomputers/textures/block preview.png
+#   scripts/art/all_in_one_textures.py common/src/main/resources/assets/modularcomputers/textures/block preview.png
 import random, sys
 from PIL import Image
 

@@ -1,0 +1,208 @@
+package com.payonel.modularcomputers.gametest;
+
+import com.payonel.modularcomputers.block.AllInOneBlock;
+import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.ModBlocks;
+import com.payonel.modularcomputers.bus.DeviceType;
+import com.payonel.modularcomputers.device.Terminal;
+import com.payonel.modularcomputers.device.TerminalTier;
+import com.payonel.modularcomputers.item.ModItems;
+import com.payonel.modularcomputers.machine.CaseTier;
+import com.payonel.modularcomputers.menu.CaseMenu;
+import com.payonel.modularcomputers.item.ModComponents;
+import com.payonel.modularcomputers.machine.MemoryTier;
+import com.payonel.modularcomputers.runtime.Board;
+import com.payonel.modularcomputers.runtime.Handle;
+import java.util.ArrayList;
+import java.util.List;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
+
+/**
+ * Case tiers: the same board, with more of it at higher tiers. A lower tier refuses the slots it
+ * leaves out; tiers 2 and 3 have a gold first expansion slot that also takes a screen, which then
+ * is the case's terminal, on its front.
+ */
+public class CaseTierGameTest {
+	private static final BlockPos POS = new BlockPos(1, 1, 1);
+
+	private static AllInOneBlockEntity place(GameTestHelper helper, Block block) {
+		helper.setBlock(POS, block.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
+		return helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+	}
+
+	private static CaseMenu menu(GameTestHelper helper, AllInOneBlockEntity computer) {
+		ServerPlayer player = GameTests.serverPlayer(helper);
+		return (CaseMenu) computer.createMenu(0, player.getInventory(), player);
+	}
+
+	@GameTest
+	public void eachTierOffersItsOwnSlotsOfTheSameBoard(GameTestHelper helper) {
+		for (Block block : ModBlocks.CASES) {
+			AllInOneBlockEntity computer = place(helper, block);
+			CaseTier tier = computer.tier();
+			CaseMenu menu = menu(helper, computer);
+			int bays = 0;
+			int sticks = 0;
+			int drives = 0;
+			int cards = 0;
+			for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
+				var place = menu.slots.get(slot);
+				bays += place.mayPlace(ModItems.TIER1_BATTERY.charged()) ? 1 : 0;
+				sticks += place.mayPlace(new ItemStack(ModItems.TIER1_RAM)) ? 1 : 0;
+				drives += place.mayPlace(new ItemStack(ModItems.TIER1_HARD_DISK)) ? 1 : 0;
+				cards += place.mayPlace(new ItemStack(ModItems.WLAN_CARD)) ? 1 : 0;
+			}
+			String name = tier.name();
+			helper.assertValueEqual(List.of(bays, sticks, drives, cards), List.of(tier.bays(), tier.ram(), tier.sata(), tier.expansion()),
+				name + ": bays, RAM, SATA, expansion");
+			helper.assertTrue(menu.slots.get(CaseMenu.CPU_SLOT).mayPlace(new ItemStack(ModItems.TIER1_CPU)), name + " takes a CPU");
+			helper.assertTrue(menu.slots.get(CaseMenu.EEPROM_SLOT).mayPlace(new ItemStack(ModItems.EEPROM)), name + " takes an EEPROM");
+			helper.assertValueEqual(computer.power().capacity(), tier.bufferCapacity(), name + ": its power buffer");
+			for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
+				helper.assertValueEqual(menu.slots.get(slot).isActive(), CaseMenu.available(tier, slot),
+					name + ": slot " + slot + " is a slot only if this tier has it (no highlight otherwise)");
+			}
+		}
+		helper.assertTrue(CaseTier.TIER_1.bufferCapacity() < CaseTier.TIER_3.bufferCapacity(), "bigger cases store more");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void onlyTheGoldSlotOfTiers2And3TakesAScreen(GameTestHelper helper) {
+		ItemStack screen = new ItemStack(ModBlocks.TIER2_SCREEN);
+		for (Block block : ModBlocks.CASES) {
+			AllInOneBlockEntity computer = place(helper, block);
+			CaseMenu menu = menu(helper, computer);
+			boolean gold = computer.tier().screenSlot();
+			helper.assertValueEqual(menu.slots.get(CaseMenu.EXP_SLOTS).mayPlace(screen), gold, computer.tier() + ": its first expansion slot");
+			helper.assertTrue(!menu.slots.get(CaseMenu.EXP_SLOTS + 1).mayPlace(screen), computer.tier() + ": no other slot takes one");
+		}
+		helper.succeed();
+	}
+
+	@GameTest
+	public void aScreenInTheGoldSlotIsTheCasesTerminalOnItsFront(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		TestPrograms.flash(computer, TestPrograms.HELLO);
+		helper.assertBlockProperty(POS, AllInOneBlock.SCREEN, false);
+		helper.assertTrue(!computer.showsScreen(), "no screen: a blank front");
+
+		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModBlocks.TIER2_SCREEN));
+		helper.assertBlockProperty(POS, AllInOneBlock.SCREEN, true);
+		var bus = computer.machine().board().bus();
+		helper.assertValueEqual(bus.device("exp:0").map(device -> device.type()).orElse(null), DeviceType.TERMINAL, "on the bus in the gold slot");
+		Terminal terminal = computer.terminal();
+		helper.assertValueEqual(terminal.tier(), TerminalTier.TIER_2, "the screen's tier");
+		String id = bus.id("exp:0");
+		helper.assertTrue(id != null && id.startsWith("id:"), "it has its own id too");
+
+		computer.pressPower();
+		helper.assertValueEqual(terminal.buffer().row(0).strip(), TestPrograms.GREETING, "the console shows on it");
+
+		computer.parts().setItem(CaseMenu.EXP_SLOTS, ItemStack.EMPTY);
+		helper.assertBlockProperty(POS, AllInOneBlock.SCREEN, false);
+		helper.assertTrue(bus.device("exp:0").isEmpty(), "gone from the bus");
+		helper.assertTrue(terminal.buffer().isBlank(), "and dark");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void theBoardReportsItsCaseAndTheEepromKeepsWhatAProgramWrites(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
+		ItemStack chip = new ItemStack(ModItems.EEPROM);
+		chip.set(DataComponents.CUSTOM_NAME, Component.literal("boot"));
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, chip);
+		computer.parts().setItem(CaseMenu.UPS_SLOT + 1, ModItems.TIER1_BATTERY.charged());
+		computer.parts().setItem(CaseMenu.RAM_SLOTS + 1, new ItemStack(ModItems.TIER2_RAM));
+		List<Object> seen = new ArrayList<>();
+		TestPrograms.flash(computer, board -> {
+			seen.add(board.power());
+			seen.add(board.hardware());
+			seen.add(board.info("eeprom").orElseThrow().get("label"));
+			board.invoke("eeprom", "set", "boot code");
+			board.halt();
+		});
+		computer.pressPower();
+		Board.PowerInfo power = (Board.PowerInfo) seen.get(0);
+		helper.assertValueEqual(power.store().capacity(), (long) CaseTier.TIER_2.bufferCapacity(), "the case's store");
+		helper.assertValueEqual(power.batteries().size(), 1, "one battery");
+		helper.assertValueEqual(power.batteries().get(0).bay(), 1, "in the second bay");
+		helper.assertValueEqual(power.batteries().get(0).tier(), 1, "a tier 1");
+		Board.HardwareInfo hardware = (Board.HardwareInfo) seen.get(1);
+		helper.assertValueEqual(hardware.caseTier(), 2, "case tier");
+		helper.assertValueEqual(hardware.cpu(), new Board.CpuInfo(2, 16), "the CPU");
+		helper.assertValueEqual(hardware.memory(), List.of(new Board.MemoryInfo(1, 2, MemoryTier.TIER_2.bytes())), "the RAM");
+		helper.assertValueEqual(seen.get(2), "boot", "an anvil's name is the device's label");
+		ItemStack after = computer.parts().getItem(CaseMenu.EEPROM_SLOT);
+		helper.assertValueEqual(after.get(ModComponents.EEPROM_IMAGE), "boot code", "the write is on the item");
+		after.set(DataComponents.CUSTOM_NAME, Component.literal("renamed")); // the item changes in place
+		after.set(ModComponents.EEPROM_IMAGE, "edited");
+		var eeprom = computer.machine().board().eeprom().orElseThrow();
+		helper.assertValueEqual(eeprom.label(), "renamed", "the device reads its label from the item");
+		helper.assertValueEqual(eeprom.image(), "edited", "and its contents: no copy in between");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void aDisksFilesAreInTheWorldSaveByItsIdAndGoWithIt(GameTestHelper helper) {
+		AllInOneBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.TIER1_HARD_DISK));
+		java.util.UUID id = computer.parts().getItem(CaseMenu.SATA_SLOTS).get(ModComponents.SERIAL);
+		helper.assertTrue(id != null, "the disk has its id");
+		List<Object> seen = new ArrayList<>();
+		TestPrograms.flash(computer, board -> {
+			Handle file = (Handle) board.invoke("sata:0", "open", "/hello.txt", "w").first();
+			board.invoke(file, "write", "hello world save");
+			board.invoke(file, "close");
+			board.halt();
+		});
+		computer.pressPower();
+		java.nio.file.Path folder = AllInOneBlockEntity.diskFolder(helper.getLevel().getServer(), id);
+		helper.assertTrue(java.nio.file.Files.isRegularFile(folder.resolve("hello.txt")), "the file is in the world save: " + folder);
+		computer.pressPower(); // off
+
+		// The same disk in another computer reads it.
+		ItemStack disk = computer.parts().removeItemNoUpdate(CaseMenu.SATA_SLOTS);
+		computer.parts().setItem(CaseMenu.SATA_SLOTS, ItemStack.EMPTY);
+		helper.setBlock(POS.east(), ModBlocks.TIER2_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
+		AllInOneBlockEntity other = helper.getBlockEntity(POS.east(), AllInOneBlockEntity.class);
+		other.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
+		other.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
+		other.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
+		other.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		other.parts().setItem(CaseMenu.SATA_SLOTS, disk);
+		TestPrograms.flash(other, board -> {
+			Handle file = (Handle) board.invoke("sata:0", "open", "/hello.txt").first();
+			seen.add(board.invoke(file, "read", 100).first());
+			board.halt();
+		});
+		other.pressPower();
+		helper.assertValueEqual(seen, List.of("hello world save"), "what the other computer read");
+		helper.succeed();
+	}
+
+	@GameTest
+	public void aCaseWithoutAScreenOpensItsCaseViewOnRightClick(GameTestHelper helper) {
+		place(helper, ModBlocks.TIER1_CASE);
+		ServerPlayer player = GameTests.serverPlayer(helper);
+		helper.useBlock(POS, player);
+		helper.assertTrue(player.containerMenu instanceof CaseMenu, "the case view, got " + player.containerMenu);
+		helper.succeed();
+	}
+}

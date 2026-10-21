@@ -1,175 +1,70 @@
 plugins {
-	id 'net.fabricmc.fabric-loom' version "${loom_version}"
-	id 'maven-publish'
+	id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
+	id 'net.neoforged.moddev' version "${moddev_version}" apply false
 }
 
-// Published version carries the Minecraft version as SemVer build metadata: 0.1.0+26.3.
-// Fabric Loader ignores build metadata when comparing versions. See docs/VERSIONING.md.
-version = "${project.mod_version}+${project.minecraft_version}"
-group = project.maven_group
+// Published versions carry the Minecraft version as SemVer build metadata: 0.1.0+26.3 (each loader's
+// jar is named for its loader). See docs/VERSIONING.md.
+subprojects {
+	apply plugin: 'java-library'
 
-base {
-	archivesName = project.archives_base_name
-}
+	version = "${project.mod_version}+${project.minecraft_version}"
+	group = project.maven_group
 
-repositories {
-	mavenCentral()
-	maven {
-		name = 'LungoLua'
-		url = 'https://maven.pkg.github.com/payonel/lua'
-		credentials {
-			username = providers.gradleProperty('gpr.user').orElse(providers.environmentVariable('GITHUB_ACTOR')).getOrNull()
-			password = providers.gradleProperty('gpr.key').orElse(providers.environmentVariable('GITHUB_TOKEN')).getOrNull()
-		}
-		content {
-			includeModule 'com.payonel', 'lungolua'
-		}
+	base {
+		archivesName = "${project.archives_base_name}-${project.name}"
 	}
-	maven {
-		name = 'StyxLua'
-		url = 'https://maven.pkg.github.com/payonel/styxlua'
-		credentials {
-			username = providers.gradleProperty('gpr.user').orElse(providers.environmentVariable('GITHUB_ACTOR')).getOrNull()
-			password = providers.gradleProperty('gpr.key').orElse(providers.environmentVariable('GITHUB_TOKEN')).getOrNull()
-		}
-		content {
-			includeModule 'com.payonel', 'styxlua'
-		}
-	}
-}
 
-loom {
-	splitEnvironmentSourceSets()
-
-	mods {
-		"modularcomputers" {
-			sourceSet sourceSets.main
-			sourceSet sourceSets.client
+	repositories {
+		mavenCentral()
+		maven {
+			name = 'LungoLua'
+			url = 'https://maven.pkg.github.com/payonel/lua'
+			credentials {
+				username = providers.gradleProperty('gpr.user').orElse(providers.environmentVariable('GITHUB_ACTOR')).getOrNull()
+				password = providers.gradleProperty('gpr.key').orElse(providers.environmentVariable('GITHUB_TOKEN')).getOrNull()
+			}
+			content {
+				includeModule 'com.payonel', 'lungolua'
+			}
+		}
+		maven {
+			name = 'StyxLua'
+			url = 'https://maven.pkg.github.com/payonel/styxlua'
+			credentials {
+				username = providers.gradleProperty('gpr.user').orElse(providers.environmentVariable('GITHUB_ACTOR')).getOrNull()
+				password = providers.gradleProperty('gpr.key').orElse(providers.environmentVariable('GITHUB_TOKEN')).getOrNull()
+			}
+			content {
+				includeModule 'com.payonel', 'styxlua'
+			}
 		}
 	}
-}
 
-fabricApi {
-	// Creates the `gametest` source set plus the runGameTest / runClientGameTest tasks.
-	configureTests {
-		createSourceSet = true
-		modId = "modularcomputers-gametest"
-		enableGameTests = true
-		enableClientGameTests = true
-		eula = true
+	java {
+		sourceCompatibility = JavaVersion.VERSION_25
+		targetCompatibility = JavaVersion.VERSION_25
+	}
+
+	tasks.withType(JavaCompile).configureEach {
+		it.options.release = 25
+		it.options.encoding = "UTF-8"
+	}
+
+	def baseName = project.archives_base_name
+	def license = rootProject.file("LICENSE")
+	tasks.withType(Jar).configureEach {
+		from(license) {
+			rename { "${it}_${baseName}" }
+		}
 	}
 }
 
-configurations {
-	// Third-party mod jars to install alongside ours in production-style test runs.
-	productionRuntimeMods {
-		transitive = false
-	}
-}
-
-dependencies {
-	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-	// LungoLua, the Lua CPU's engine, nested in the mod's jar. Its interpreter and JLine line editor
-	// are in the jar too; the mod never loads them, so JLine isn't needed.
-	implementation "com.payonel:lungolua:${project.lungolua_version}"
-	include "com.payonel:lungolua:${project.lungolua_version}"
-	// Styx, persisting a whole Lua state (saving running computers): its own library now.
-	implementation "com.payonel:styxlua:${project.styxlua_version}"
-	include "com.payonel:styxlua:${project.styxlua_version}"
-
-	// Unit tests: plain JUnit, with fabric-loader-junit so tests can bootstrap Minecraft registries.
-	testImplementation platform("org.junit:junit-bom:${project.junit_version}")
-	testImplementation "org.junit.jupiter:junit-jupiter"
-	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
-	testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"
-	testImplementation "org.mockito:mockito-core:${project.mockito_version}"
-	testImplementation "org.assertj:assertj-core:${project.assertj_version}"
-
-	productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-	// The test-harness modules are not bundled in the release fabric-api jar.
-	productionRuntimeMods fabricApi.module("fabric-gametest-api-v1", project.fabric_api_version)
-	productionRuntimeMods fabricApi.module("fabric-client-gametest-api-v1", project.fabric_api_version)
-}
-
-tasks.withType(ProcessResources).configureEach {
-	def props = [
-		version               : project.version,
-		minecraft_version_range: project.minecraft_version_range,
-		loader_version        : project.loader_version,
-	]
-	inputs.properties props
-
-	filesMatching("fabric.mod.json") {
-		expand props
-	}
-}
-
-java {
-	withSourcesJar()
-	sourceCompatibility = JavaVersion.VERSION_25
-	targetCompatibility = JavaVersion.VERSION_25
-}
-
-tasks.withType(JavaCompile).configureEach {
-	it.options.release = 25
-	it.options.encoding = "UTF-8"
-}
-
-test {
-	useJUnitPlatform()
-	testLogging {
-		events "failed", "skipped"
-		exceptionFormat "full"
-	}
-}
-
-def gametestJar = tasks.register("gametestJar", Jar) {
-	from sourceSets.gametest.output
-	archiveClassifier = "gametest"
-}
-
-// Client game tests against the jar we actually ship (not the dev classpath), on a virtual X
-// server that Loom starts and stops. This is what CI runs. For quick local iteration use
-// scripts/headless.sh ./gradlew runClientGameTest instead.
-tasks.register("runProductionClientGameTest", net.fabricmc.loom.task.prod.ClientProductionRunTask) {
-	group = "verification"
-	description = "Starts the Minecraft client on Xvfb with the release jar, runs client game tests, and exits."
-	mods.from(tasks.named("jar"), gametestJar, configurations.productionRuntimeMods)
-	jvmArgs.add("-Dfabric.client.gametest")
-	useXVFB = true
-	runDir = layout.buildDirectory.dir("run/productionClientGameTest")
-	// A missing test entrypoint leaves the client idling on the title screen forever; never hang CI.
-	timeout = java.time.Duration.ofMinutes(10)
-}
-
-// Loom puts the server game tests under `check`, which would make every `build` boot a Minecraft
-// server. Keep `build` fast (compile, jars, unit tests) and run the game tests from `testAll`.
-tasks.named("check") {
-	setDependsOn(dependsOn.findAll { it != "runGameTest" })
-}
-
-// Everything: `build` (unit tests), then the server game tests, then the headless client.
+// Everything: each project's `build` (unit tests in common), the server game tests on both loaders,
+// and the headless client tests on Fabric only (NeoForge has no client test harness; user, 2026-10-20).
 tasks.register("testAll") {
 	group = "verification"
-	description = "Runs unit tests, server game tests, and headless client game tests."
-	dependsOn "build", "runGameTest", "runProductionClientGameTest"
-}
-
-jar {
-	def projectName = project.name
-	inputs.property "projectName", projectName
-
-	from("LICENSE") {
-		rename { "${it}_$projectName" }
-	}
-}
-
-publishing {
-	publications {
-		create("mavenJava", MavenPublication) {
-			from components.java
-		}
-	}
+	description = "Runs unit tests, the server game tests on Fabric and NeoForge, and Fabric's headless client game tests."
+	dependsOn ":common:build", ":fabric:build", ":neoforge:build",
+		":fabric:runGameTest", ":neoforge:runGameTestServer", ":fabric:runProductionClientGameTest"
 }

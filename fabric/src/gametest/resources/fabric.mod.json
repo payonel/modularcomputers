@@ -1,0 +1,24 @@
+{
+	"schemaVersion": 1,
+	"id": "modularcomputers-gametest",
+	"version": "${version}",
+	"name": "Modular Computers Game Tests",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.payonel.modularcomputers.gametest.FabricGameTests"
+		],
+		"fabric-client-gametest": [
+			"com.payonel.modularcomputers.gametest.ModularComputersClientGameTest",
+			"com.payonel.modularcomputers.gametest.AllInOneClientGameTest",
+			"com.payonel.modularcomputers.gametest.CableClientGameTest",
+			"com.payonel.modularcomputers.gametest.CaseTierClientGameTest"
+		]
+	},
+	"mixins": [
+		"modularcomputers-gametest.mixins.json"
+	],
+	"depends": {
+		"modularcomputers": "*"
+	}
+}

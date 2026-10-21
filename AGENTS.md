@@ -16,7 +16,7 @@
 
 ## 1. Intent
 
-**Modular Computers** is a Fabric mod for the latest Minecraft (Java), by payonel (GitHub), one of
+**Modular Computers** is a mod for the latest Minecraft (Java), on Fabric and NeoForge, by payonel (GitHub), one of
 the original authors of **OpenComputers** (OC). It's OC's idea built again from scratch: computers
 players assemble from parts (case, CPU, RAM, EEPROM, disks, cards, screens, cables) and program in
 Lua, to automate and control their world (redstone, sensors, pistons) and to learn how computers
@@ -36,17 +36,20 @@ really work.
 
 ## 2. Building, testing, working
 
-- **Toolchain:** Fabric (Loom), Java 25 (Gradle provisions Temurin), versions only in
+- **Toolchain:** Java 25 (Gradle provisions Temurin); three projects: `common` (all the mod's code,
+  built against the plain game with NeoForge's ModDevGradle in NeoForm mode), `fabric` (Loom) and
+  `neoforge` (ModDevGradle), each compiling common's sources into its own jar. Versions only in
   `gradle.properties`. Minecraft is unobfuscated since 26.1: Mojang's names, no remapping. Verify
-  Minecraft and Fabric names against the jars (`javap`), not memory; many changed.
+  Minecraft, Fabric and NeoForge names against the jars (`javap`, or the sources jars in the Gradle
+  cache), not memory; many changed.
 - **Lua engine: LungoLua and StyxLua**, the user's own projects (a Java port of their Lua 5.5 fork,
   with budgets, freezing and state persistence), taken as published jars from GitHub Packages (needs
   `gpr.user`/`gpr.key` in `~/.gradle/gradle.properties`). **Never edit them**; report what they need
   to the "lua thread", another agent session (a teammate: it can't grant permissions). **Always take
   the latest published build of each** when told to update.
 - **Commands:** `./gradlew build` (seconds: compile + unit tests) while iterating; `./gradlew testAll`
-  (unit, server game tests, client game tests on Xvfb against the release jar) before claiming
-  anything works. Details: `docs/TESTING.md`.
+  (unit tests, the server game tests on both loaders, Fabric's client game tests on Xvfb against the
+  release jar) before claiming anything works. Details: `docs/TESTING.md`.
 - **Tests are the play-testing.** Build every feature around automated tests at the lowest layer
   that can express it (plain-Java unit tests, then server game tests, then client game tests); a
   visible feature gets a client test, and its screenshots get looked at. Keep machine logic in plain
@@ -79,6 +82,22 @@ pattern when seen.
 settings exist.
 
 **No old-save compatibility**: change formats freely, no shims. Old test worlds may break.
+
+**Two loaders, one mod** (user, 2026-10-20): Fabric and NeoForge (not MinecraftForge: the mods that
+kept up moved to NeoForge). Why NeoForge at all: the mods worth meeting (Ender IO's conduits, More
+Red's and Project Red's bundled cables) are NeoForge-only. The code is written once, against the
+plain game; each loader's project only starts it and adapts what the game can't do itself:
+- **Registration** stays the game's own `Registry.register`: Fabric allows it at any time, and
+  NeoForge keeps every registry open for its whole registration phase, so its entry point runs the
+  common init in its first `RegisterEvent`. No `DeferredRegister` layer.
+- **Packets** are the game's own (`ClientboundCustomPayloadPacket`); only registering them is the
+  loader's, from one list. A packet goes only to a client that takes it (NeoForge refuses otherwise).
+- **World saves** reach the mod through a mixin (`MinecraftServerSaves`), the same on both:
+  NeoForge has no event before a save.
+- **Server game tests are loader-neutral** (the mod's own `@GameTest`, registered by each loader's
+  test mod), so every one runs on both. **Client tests run on Fabric only** (user): NeoForge has no
+  client test harness; the only port of Fabric's found (Wurst-Imperium's, 2026-06) was unlicensed,
+  four commits old and on 26.1.2.
 
 **Items stack to 64**, except what holds data (EEPROMs, disks). A part that's been in a machine
 carries its id and stacks only with identical ones; crafting it alone clears it (a new device).
@@ -158,6 +177,14 @@ process (as VFIO does).
 
 ## 4. Easy to miss (a change that needs another)
 
+- **The mod's code goes in `common`**, never in a loader's project, unless it can only be written
+  against that loader; then it goes behind `Platform` (one method, implemented in `FabricPlatform`,
+  `NeoForgePlatform` and the unit tests' `TestPlatform`) or into the loader's entry point as an event
+  calling a common hook. `common` can't see a loader's API, so a slip fails its compile.
+- **A new packet goes in `ModNetwork`'s lists** (and a client handler in `ModNetworkClient`); a new
+  game test class in `GameTests.CLASSES`. Nothing else registers them.
+- **A test opens a menu or sends as the mod does** (`ModMenus.open`, `ModNetwork.send`,
+  `GameTests.serverPlayer`), never with the game's own call: the loaders need their part of it.
 - **A change to an mcos program (`lua/mcos/bin/<name>`) updates its man page**
   (`lua/mcos/usr/share/man/man1/<name>.1`), and a new program gets one: options, behavior, exit
   statuses, NOTES where it differs from GNU. A test renders every page and fails for a program
@@ -237,6 +264,10 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
 - **Multiblock screens that grow** (user idea, undecided): neighboring screens merging into one
   bigger display.
 - **The all-in-one** is a dev kit: it may go away, or become a creative "everything built in" block.
+- **The redstone card, open** (user, 2026-10-20: "let's work on the redstone card"): bundled (16
+  colour) signals, as a second set of methods or a tier 2 card. No Fabric mod carries them on 26.x
+  (RSWires stopped at 1.18.2); on NeoForge, Ender IO's redstone conduit and More Red do, each with its
+  own API. Our own bundled cable is the other way. Also open: its `/dev` node.
 - **Cards still placeholders:** WLAN, Audio, Audio Sensor. The paint gun (shoots paint at nearby
   wool, out of its nozzle face) does nothing yet.
 - **Bluetooth, open:** range limits; whether links show differently in the bus order; what a
@@ -288,6 +319,15 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   overall management; later, round robin which machines get time each tick, if many busy
   computers starve the tick.
 - **Settings:** tunables stay named constants until settings are revisited.
+
+### Other mods
+
+- **Ender IO's conduits** (NeoForge): a conduit carrying our bus cable inside its bundles, as its own
+  AE2 module carries ME cable (an ordinary NeoForge registry, `EnderIORegistries.CONDUIT_TYPE`; the
+  bundle exposes a capability our cable walk would treat as cable), optional, loaded only when Ender
+  IO is. Waits on Ender IO reaching 26.x (its main line is 1.21.1; a 26.2 port is in progress).
+- **A NeoForge release-jar check:** the tests run NeoForge from its dev folders only; nothing starts
+  the shipped NeoForge jar, and nothing starts a NeoForge client at all.
 
 ### mcos
 

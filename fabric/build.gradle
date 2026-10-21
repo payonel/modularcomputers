@@ -1,0 +1,124 @@
+plugins {
+	id 'net.fabricmc.fabric-loom'
+	id 'maven-publish'
+}
+
+def common = project(':common')
+
+loom {
+	splitEnvironmentSourceSets()
+
+	mods {
+		"modularcomputers" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+}
+
+fabricApi {
+	// Creates the `gametest` source set plus the runGameTest / runClientGameTest tasks.
+	configureTests {
+		createSourceSet = true
+		modId = "modularcomputers-gametest"
+		enableGameTests = true
+		enableClientGameTests = true
+		eula = true
+	}
+}
+
+// The common code compiled into this jar, each part into its own source set (Loom keeps client
+// code apart), with its resources; the server game tests into the test mod.
+tasks.named("compileJava", JavaCompile) {
+	source(common.file("src/main/java"))
+}
+tasks.named("compileClientJava", JavaCompile) {
+	source(common.file("src/client/java"))
+}
+tasks.named("compileGametestJava", JavaCompile) {
+	source(common.file("src/gametest/java"))
+}
+tasks.named("processResources", ProcessResources) {
+	from(common.file("src/main/resources"))
+}
+tasks.named("processGametestResources", ProcessResources) {
+	from(common.file("src/gametest/resources"))
+}
+
+configurations {
+	// Third-party mod jars to install alongside ours in production-style test runs.
+	productionRuntimeMods {
+		transitive = false
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// LungoLua, the Lua CPU's engine, and Styx, nested in the mod's jar. LungoLua's interpreter and
+	// JLine line editor are in its jar too; the mod never loads them, so JLine isn't needed.
+	implementation "com.payonel:lungolua:${project.lungolua_version}"
+	include "com.payonel:lungolua:${project.lungolua_version}"
+	implementation "com.payonel:styxlua:${project.styxlua_version}"
+	include "com.payonel:styxlua:${project.styxlua_version}"
+
+	productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// The test-harness modules are not bundled in the release fabric-api jar.
+	productionRuntimeMods fabricApi.module("fabric-gametest-api-v1", project.fabric_api_version)
+	productionRuntimeMods fabricApi.module("fabric-client-gametest-api-v1", project.fabric_api_version)
+}
+
+tasks.withType(ProcessResources).configureEach {
+	def props = [
+		version                : project.version,
+		minecraft_version_range: project.minecraft_version_range,
+		loader_version         : project.loader_version,
+	]
+	inputs.properties props
+
+	filesMatching("fabric.mod.json") {
+		expand props
+	}
+}
+
+java {
+	withSourcesJar()
+}
+
+tasks.named("sourcesJar", Jar) {
+	from(common.file("src/main/java"), common.file("src/client/java"), common.file("src/main/resources"))
+}
+
+def gametestJar = tasks.register("gametestJar", Jar) {
+	from sourceSets.gametest.output
+	archiveClassifier = "gametest"
+}
+
+// Client game tests against the jar we actually ship (not the dev classpath), on a virtual X
+// server that Loom starts and stops. This is what CI runs. For quick local iteration use
+// scripts/headless.sh ./gradlew :fabric:runClientGameTest instead.
+tasks.register("runProductionClientGameTest", net.fabricmc.loom.task.prod.ClientProductionRunTask) {
+	group = "verification"
+	description = "Starts the Minecraft client on Xvfb with the release jar, runs client game tests, and exits."
+	mods.from(tasks.named("jar"), gametestJar, configurations.productionRuntimeMods)
+	jvmArgs.add("-Dfabric.client.gametest")
+	useXVFB = true
+	runDir = layout.buildDirectory.dir("run/productionClientGameTest")
+	// A missing test entrypoint leaves the client idling on the title screen forever; never hang CI.
+	timeout = java.time.Duration.ofMinutes(10)
+}
+
+// Loom puts the server game tests under `check`, which would make every `build` boot a Minecraft
+// server. Keep `build` fast (compile, jars, unit tests) and run the game tests from `testAll`.
+tasks.named("check") {
+	setDependsOn(dependsOn.findAll { it != "runGameTest" })
+}
+
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			from components.java
+		}
+	}
+}

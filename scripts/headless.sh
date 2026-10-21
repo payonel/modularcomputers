@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Run a command with a private virtual display, then tear the display down.
-#   scripts/headless.sh ./gradlew runClientGameTest
-#   scripts/headless.sh ./gradlew runClient        # poke at the game; screenshots via F2
-# CI uses ./gradlew runProductionClientGameTest, which manages Xvfb itself.
+#   scripts/headless.sh ./gradlew :fabric:runClientGameTest
+#   scripts/headless.sh ./gradlew :fabric:runClient   # poke at the game (:neoforge:runClient too); screenshots via F2
+# CI uses ./gradlew :fabric:runProductionClientGameTest, which manages Xvfb itself.
 set -euo pipefail
 PATH="$HOME/.local/bin:$PATH"
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Synthesizes the sound of a computer dying when its case runs out of power, as Ogg Vorbis (see
 # oggwrite.py). The .ogg is committed; rerun after changing the sound.
-#   scripts/art/power_down.py src/main/resources/assets/modularcomputers/sounds/power_down.ogg
+#   scripts/art/power_down.py common/src/main/resources/assets/modularcomputers/sounds/power_down.ogg
 #
 # The sound: the error beep's buzzy square wave (error_beep.py) starting at its pitch, then sagging
 # deeper and fading out as the power drains away, like a speaker on a dying supply. The upper

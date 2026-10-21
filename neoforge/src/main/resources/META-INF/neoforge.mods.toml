@@ -1,0 +1,27 @@
+modLoader = "javafml"
+loaderVersion = "${neoforge_loader_version_range}"
+license = "MIT"
+
+[[mods]]
+modId = "modularcomputers"
+version = "${version}"
+displayName = "Modular Computers"
+authors = "payonel"
+description = '''Programmable computers and components for Minecraft.'''
+
+[[mixins]]
+config = "modularcomputers.mixins.json"
+
+[[dependencies.modularcomputers]]
+modId = "neoforge"
+type = "required"
+versionRange = "[${neoforge_version},)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.modularcomputers]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "BOTH"

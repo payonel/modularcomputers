@@ -2,7 +2,7 @@
 # Draws the case view's static art (needs Pillow): the motherboard, the bus order panel, and the
 # small icons. Text (labels, the etched bus order numbers) is drawn by the game with its own
 # font, so none is baked in here. The PNGs are committed; rerun after editing this.
-#   scripts/art/case_gui_textures.py src/main/resources/assets/modularcomputers/textures/gui
+#   scripts/art/case_gui_textures.py common/src/main/resources/assets/modularcomputers/textures/gui
 #
 # Slot positions below must match CaseMenu / CaseScreen; CaseArtTest checks that each slot in
 # the code sits on a socket cavity in case_board.png.

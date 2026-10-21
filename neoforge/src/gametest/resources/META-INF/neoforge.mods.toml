@@ -1,0 +1,16 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT"
+
+[[mods]]
+modId = "modularcomputers_gametest"
+version = "${version}"
+displayName = "Modular Computers Game Tests"
+description = '''The server game tests (run by ./gradlew :neoforge:runGameTestServer).'''
+
+[[dependencies.modularcomputers_gametest]]
+modId = "modularcomputers"
+type = "required"
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"

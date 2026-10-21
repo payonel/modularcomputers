@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Synthesizes the computer's error beep as Ogg Vorbis (see oggwrite.py). The .ogg is committed;
 # rerun after changing the sound.
-#   scripts/art/error_beep.py src/main/resources/assets/modularcomputers/sounds/error_beep.ogg
+#   scripts/art/error_beep.py common/src/main/resources/assets/modularcomputers/sounds/error_beep.ogg
 #
 # The sound: a short, low, buzzy square wave at a steady pitch, like a PC speaker's error beep.
 # No vibrato or pitch bend (that reads as musical); a hard but click-free start and stop.

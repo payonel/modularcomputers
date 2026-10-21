@@ -11,7 +11,7 @@
 # The shapes stay the tier 1 ones (the glass the display is drawn on, the back's window and power
 # button housing, which BackPanel maps clicks to); only colors and the era's details change.
 # Rerun after all_in_one_textures.py, then check the preview.
-#   scripts/art/case_tier_textures.py src/main/resources/assets/modularcomputers preview.png
+#   scripts/art/case_tier_textures.py common/src/main/resources/assets/modularcomputers preview.png
 import json, random, sys
 from PIL import Image
 

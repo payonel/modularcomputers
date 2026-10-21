@@ -9,20 +9,22 @@ MAJOR.MINOR.PATCH+MCVERSION        e.g. 0.1.0+26.3
 - `MAJOR.MINOR.PATCH` is the mod's own [SemVer](https://semver.org) version (`mod_version` in
   `gradle.properties`).
 - `+MCVERSION` is SemVer *build metadata* naming the Minecraft version the jar was built for
-  (`minecraft_version`). It is appended automatically in `build.gradle`.
+  (`minecraft_version`). It is appended automatically in `build.gradle`. Each loader gets its own
+  jar with the same version: `modularcomputers-fabric-0.1.0+26.3.jar`, `modularcomputers-neoforge-0.1.0+26.3.jar`.
 
 This is the convention the Fabric ecosystem itself uses (Fabric API ships as e.g.
 `0.162.0+26.3`). Why it works well:
 
-- Users see the Minecraft version in the file name: `modularcomputers-0.1.0+26.3.jar`.
+- Users see the Minecraft version in the file name: `modularcomputers-fabric-0.1.0+26.3.jar`.
 - Fabric Loader parses mod versions as SemVer and **ignores build metadata when comparing**, so
   `1.2.0+26.3` and `1.2.0+26.4` are the same feature set built for two games, and dependency
   ranges written by other mods (`"modularcomputers": ">=1.2.0"`) keep working across Minecraft
   versions.
 - Modrinth and CurseForge accept it as-is; the Minecraft version is also set as upload metadata.
 
-The jar also refuses to load on the wrong game: `fabric.mod.json` declares
-`"minecraft": "${minecraft_version_range}"` (`~26.3` = any 26.3.x hotfix).
+The jars also refuse to load on the wrong game: `fabric.mod.json` declares
+`"minecraft": "${minecraft_version_range}"` (`~26.3` = any 26.3.x hotfix), and
+`neoforge.mods.toml` the same range in Maven's notation (`neoforge_version_range`, `[26.3,26.4)`).
 
 ### Minecraft's own numbering (since 2026)
 

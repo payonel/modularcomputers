@@ -5,7 +5,7 @@
 # 2026-10-12): an 80s beige terminal with green-phosphor glass, a 90s platinum color monitor
 # with an RGB badge, a modern graphite flat panel. The PNGs are
 # committed; rerun after editing this to regenerate them, then check the preview.
-#   scripts/art/cabled_block_textures.py src/main/resources/assets/modularcomputers/textures/block preview.png
+#   scripts/art/cabled_block_textures.py common/src/main/resources/assets/modularcomputers/textures/block preview.png
 import random, sys
 from PIL import Image
 
