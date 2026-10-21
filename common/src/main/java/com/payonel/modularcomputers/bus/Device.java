@@ -54,6 +54,15 @@ public interface Device {
 		return null;
 	}
 
+	/**
+	 * Its wake line, if it can turn its computer on (PCI's PME#: a NIC's Wake-on-LAN): raised, the
+	 * computer whose bus holds it, while that's off, switches on as its power button would. Wired
+	 * whether the computer is on or off.
+	 */
+	default InterruptLine wakeLine() {
+		return null;
+	}
+
 	/** A program's turn changed it: push what it shows out now (to players), rather than at the next tick. */
 	default void flush() {
 	}

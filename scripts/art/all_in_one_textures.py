@@ -294,6 +294,17 @@ def card_base():
 		im.putpixel((x, 12), (222, 182, 70, 255))
 	return im
 
+def network_card_item():
+	"""A network chip and an Ethernet jack (with its link light) on the bracket."""
+	im = card_base()
+	rect(im, 4, 7, 7, 9, (30, 30, 34, 255))
+	im.putpixel((5, 8), (90, 200, 220, 255))
+	rect(im, 14, 6, 15, 10, (40, 40, 46, 255))  # the jack
+	for y in (7, 8, 9):
+		im.putpixel((15, y), (222, 182, 70, 255))  # its contacts
+	im.putpixel((14, 5), (90, 230, 110, 255))  # link light
+	return im
+
 def redstone_card_item():
 	"""Red: a redstone chip and a little torch on the bracket."""
 	im = card_base()
@@ -383,7 +394,7 @@ for name, fn in [("tier1_cpu", tier1_cpu_item), ("tier2_cpu", tier2_cpu_item), (
 		("java_cpu", java_cpu_item), ("java_eeprom", java_eeprom_item),
 		("tier1_ram", lambda: ram_item(1)), ("tier2_ram", lambda: ram_item(2)), ("tier3_ram", lambda: ram_item(3)),
 		("tier1_hard_disk", lambda: hard_disk_item(1)), ("tier2_hard_disk", lambda: hard_disk_item(2)), ("tier3_hard_disk", lambda: hard_disk_item(3)),
-		("wlan_card", wlan_card_item), ("tier1_battery", tier1_battery_item), ("tier2_battery", tier2_battery_item), ("tier3_battery", tier3_battery_item), ("redstone_card", redstone_card_item),
+		("wlan_card", wlan_card_item), ("network_card", network_card_item), ("tier1_battery", tier1_battery_item), ("tier2_battery", tier2_battery_item), ("tier3_battery", tier3_battery_item), ("redstone_card", redstone_card_item),
 		("audio_card", audio_card_item), ("motion_sensor_card", motion_sensor_card_item), ("audio_sensor_card", audio_sensor_card_item),
 		("weather_sensor_card", weather_sensor_card_item), ("bluetooth_card", bluetooth_card_item)]:
 	fn().save(f"{OUT}/../item/{name}.png")

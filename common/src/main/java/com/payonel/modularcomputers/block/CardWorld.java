@@ -2,6 +2,7 @@ package com.payonel.modularcomputers.block;
 
 import com.payonel.modularcomputers.device.Card;
 import com.payonel.modularcomputers.device.MotionSensorCard;
+import com.payonel.modularcomputers.device.NetworkCard;
 import com.payonel.modularcomputers.device.RedstoneCard;
 import com.payonel.modularcomputers.device.WeatherCard;
 import java.util.HashMap;
@@ -33,6 +34,10 @@ public final class CardWorld {
 		Direction.WEST, Direction.UP, Direction.DOWN);
 	/** Motion sensors at work: where each is, and what it saw last. */
 	private static final Map<MotionSensorCard, Watch> WATCHING = new WeakHashMap<>();
+	/** How often a wired network card's cables are walked again, though none changed (chunks load and unload), in ticks. */
+	private static final int REACH_TICKS = 20;
+	/** The cable changes ({@link Cabling#changes}) each wired network card's reach was last worked out at. */
+	private static final Map<NetworkCard, Long> REACHED = new WeakHashMap<>();
 
 	private CardWorld() {
 	}
@@ -47,6 +52,9 @@ public final class CardWorld {
 
 	/** Each server tick, for each card in the block at {@code pos}. A card works while a running computer powers it. */
 	public static void tick(Card card, ServerLevel level, BlockPos pos, long now) {
+		if (card instanceof NetworkCard network) {
+			network(network, level, pos, now); // (on or off: one listening for a wake hears while its computer's off)
+		}
 		if (card.power() == null || !card.power().powered()) {
 			return;
 		}
@@ -73,6 +81,23 @@ public final class CardWorld {
 			}
 			default -> {
 			}
+		}
+	}
+
+	/** A network card says where it is; a wired one, where its cables reach, when they changed (or now and then). */
+	private static void network(NetworkCard card, ServerLevel level, BlockPos pos, long now) {
+		card.place(level, pos, now);
+		if (card.wireless()) {
+			return;
+		}
+		Long seen = REACHED.get(card);
+		if (seen == null || seen != Cabling.changes() || now % REACH_TICKS == 0) {
+			REACHED.put(card, Cabling.changes());
+			Map<BlockPos, Integer> reach = new HashMap<>();
+			for (var found : Cabling.walk(level, pos)) {
+				reach.put(found.pos(), found.meters());
+			}
+			card.reach(reach);
 		}
 	}
 

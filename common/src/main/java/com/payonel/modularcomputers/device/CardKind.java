@@ -2,11 +2,14 @@ package com.payonel.modularcomputers.device;
 
 import com.payonel.modularcomputers.bus.DeviceType;
 
-/** The expansion cards there are, and what each reports itself as on the bus. None work yet. */
+/** The expansion cards there are, and what each reports itself as on the bus. */
 public enum CardKind {
+	/** A wired network card: frames over the cables ({@link NetworkCard}). */
+	NETWORK(DeviceType.NETWORK),
+	/** A wireless one: frames through the air, without cables ({@link NetworkCard}). */
 	WLAN(DeviceType.NETWORK),
 	BLUETOOTH(DeviceType.NETWORK),
-	/** Will emit and detect redstone where it's installed (a computer, or an expansion hub). */
+	/** Emits and detects redstone where it's installed (a computer, or an expansion hub). */
 	REDSTONE(DeviceType.REDSTONE),
 	AUDIO(DeviceType.AUDIO),
 	MOTION_SENSOR(DeviceType.MOTION),

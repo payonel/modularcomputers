@@ -145,6 +145,22 @@ computer's own thread), the firmware (sandbox, budgets, freezing, device data), 
 - Memory is the RAM installed, above a measured baseline, so a stick means the same to a program
   whatever the firmware costs.
 
+**Network cards** (user, 2026-10-21; OpenComputers' broadcast and peer-to-peer messages, in a real
+NIC's shape): a wired card sends frames over the cables, a WLAN card through the air (its range),
+each to a card's address (its id, a MAC) or to every card it reaches; nothing routes between the
+two networks. Why over the bus's own cables: a cable is a shared fabric, not one host's private
+bus. Two cases on one cable are two hosts on it, as two Macs on one Thunderbolt cable get both PCIe
+devices and a network, or SAN hosts share a Fibre Channel fabric; the bus devices on it still
+belong to one board at a time (`BusHolds`, a SCSI reservation's role), and the frames go between
+the cards, which are on their own boards' buses. A case ends the walk (a host isn't a switch);
+hubs and screens carry it on. **Ports aren't the card's** (OC's modem opened them): they're UDP's,
+the kernel's, in the frame's data, so the card knows only addresses, as a NIC does, and any kernel
+can put its own protocol on it. **Wake-on-LAN** is a device's wake line (PCI's PME#,
+`Device.wakeLine`), wired by the board whether it's on or off: a card with a wake message keeps
+listening while its computer is off, and a frame holding it presses the power button (at the next
+tick). OC's wake message, not a real card's magic packet (the user asked for OC's idea); matched
+anywhere in the data, as a pattern-matching NIC does.
+
 **Terminals are VT102/xterm devices** (a screen and keyboard as one device): programs only write
 escape sequences. Their modes (cursor shape, alternate screen, keyboard reporting) are the
 terminal's, set by escape sequences, as on real terminals; the tty's raw mode is termios, a separate
@@ -191,7 +207,14 @@ real Lua's). **inotify** (`sys.inotify()`, `sys.watch(fd, path)`, a module loade
 gives Linux's notices as lines (`MODIFY /log`; a rename `MOVED_FROM`/`MOVED_TO`; `OVERFLOW`), from
 the disks' reports turned into full paths by their mounts (tmpfs reports through `k.changed`, a
 no-op until then); it watches paths, not inodes as Linux's does, and a change made on a disk's
-host isn't seen. **A device type costs no memory until it's used** (user, 2026-10-21: add devices and drivers
+host isn't seen. **Sockets** are UDP over the network cards (`lib/modules/net.lua`, loaded at the first
+`sys.socket()`): `bind`, `sendto`, `recvfrom`, `poll`, Linux's names for interfaces (eth0, wlan0)
+and ioctls (`SIOCGIFCONF`, ethtool's wake). No IP: an address is a card's. A NIC has no `/dev`
+file, as on Linux (its method is `receive`, not `pull`, so devfs makes none): a program reads the
+network through a socket (`nc -ul 7`), never a device file. **A process's syscall wrappers are
+made at its first use of each** (a metatable on its `sys`): a syscall costs a process nothing
+until it's called, so adding one is free at boot (measured: 20 KiB less with a pipeline running).
+**A device type costs no memory until it's used** (user, 2026-10-21: add devices and drivers
 freely, never paying at boot for one that isn't there, as a real kernel loads a module when its
 device needs it): devfs looks for the type's driver on the boot disk the first time one of its
 files is opened, and remembers what it found; nothing in the kernel lists the types. Descriptions
@@ -313,7 +336,7 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   of a case (its charge). Each as its own events (the rule in section 3).
 - **Motion sensor, tier 2 maybe** (user, 2026-10-21): finer motion (fluids, drops) and filters (by
   mob); tier 1 has no settings.
-- **Cards still placeholders:** WLAN, Audio, Audio Sensor. The paint gun (shoots paint at nearby
+- **Cards still placeholders:** Audio, Audio Sensor. The paint gun (shoots paint at nearby
   wool, out of its nozzle face) does nothing yet.
 - **Bluetooth, open:** range limits; whether links show differently in the bus order; what a
   Bluetooth card does on the bus itself.
@@ -389,6 +412,10 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   ignore SIGINT, as sh without job control.
 - **The shell's language:** `if`, `for`, `while`, `case`, functions, here-documents (user: maybe
   later).
+- **Networking, later:** TCP (streams, `connect`/`listen`/`accept`), a router between wired and
+  wireless networks, raw frames for programs (Linux's packet sockets, for a `tcpdump`), a WLAN
+  card's range as a setting (OC's strength, its power cost), and a remote shell (the user's psh,
+  from OpenPrograms) once ptys and `rc` exist.
 - `/proc`; a filesystem on raw disks; permissions and users; `os.date` (no real-time clock: the time
   is seconds since boot); a page cache.
 - **Later, from the user's review of OpenOS (2026-10-19):**

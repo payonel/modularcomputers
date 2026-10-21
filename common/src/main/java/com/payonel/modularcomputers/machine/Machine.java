@@ -63,6 +63,12 @@ public final class Machine {
 	private boolean running;
 	/** What the machine's devices' interrupt lines call. */
 	private final Runnable wake = this::wake;
+	/** What the machine's devices' wake lines call (see {@link Device#wakeLine}). */
+	private final Runnable wakeUp = this::wakeUp;
+	/** A device asked to switch the machine on: at its next tick. */
+	private boolean wakeAsked;
+	/** How it switches on when a device wakes it: its power button (in a game, the block's, which clicks and lights). */
+	private Runnable waker = this::pressPower;
 	private int callsPerTick = DEFAULT_CALLS_PER_TICK;
 	/** Runs work on the server thread soon (in a game, the server); null: only at ticks. */
 	private java.util.concurrent.Executor server;
@@ -78,6 +84,31 @@ public final class Machine {
 		this.power = power;
 		this.api = new MotherboardApi(board, () -> uptime, () -> runner == null ? 0 : runner.memoryUsed(),
 			() -> runner == null ? com.payonel.modularcomputers.runtime.MemoryAccount.UNLIMITED : runner.memoryAccount());
+		board.bus().devices().forEach(this::wireWake);
+	}
+
+	/** How a device's wake switches it on: by {@code waker} (the block's power button), not the machine's own. */
+	public void wakeWith(Runnable waker) {
+		this.waker = waker;
+	}
+
+	/** A device's wake line rose (see {@link Device#wakeLine}): off, it switches on at its next tick. */
+	private void wakeUp() {
+		if (!powered) {
+			wakeAsked = true;
+		}
+	}
+
+	private void wireWake(Device device) {
+		if (device.wakeLine() != null) {
+			device.wakeLine().connect(wakeUp);
+		}
+	}
+
+	private void unwireWake(Device device) {
+		if (device.wakeLine() != null) {
+			device.wakeLine().disconnect(wakeUp);
+		}
 	}
 
 	/** How a runner on its own thread gets the server thread to serve it soon (in a game, the server). */
@@ -125,8 +156,13 @@ public final class Machine {
 	 */
 	public Supervision tick() {
 		if (!powered) {
+			if (wakeAsked) {
+				wakeAsked = false;
+				waker.run(); // a device woke it, as its power button would (a wake from a frame that came while it was on is dropped)
+			}
 			return Supervision.OK;
 		}
+		wakeAsked = false;
 		if (board.cpu().isEmpty()) {
 			cutPower();
 			return Supervision.LOST_CPU;
@@ -331,6 +367,7 @@ public final class Machine {
 	 */
 	public void unload() {
 		com.payonel.modularcomputers.bus.BusHolds.releaseAll(board); // its devices are free for other boards
+		board.bus().devices().forEach(this::unwireWake);
 		stopProgram();
 		if (powered) {
 			board.bus().devices().forEach(device -> {
@@ -518,6 +555,16 @@ public final class Machine {
 		Map<String, Device> was = new java.util.HashMap<>();
 		board.bus().forEach(was::put);
 		board.bus().setDevices(addressed, aliases);
+		for (Device device : before) {
+			if (!devices.contains(device)) {
+				unwireWake(device); // (its wake line is wired on or off)
+			}
+		}
+		for (Device device : devices) {
+			if (!before.contains(device)) {
+				wireWake(device);
+			}
+		}
 		if (runner != null) {
 			List<String> left = was.entrySet().stream().filter(entry -> addressed.get(entry.getKey()) != entry.getValue()).map(Map.Entry::getKey).toList();
 			if (!left.isEmpty()) {

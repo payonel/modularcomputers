@@ -1,0 +1,120 @@
+-- nc -u [-b] [-p port] address port | nc -u -l [-p] port: netcat, for UDP (mcos's only transport).
+-- Sends what it reads from stdin, a datagram each read (a line, from a terminal), to address:port
+-- ("broadcast": every card the network cards reach), and writes the data of each datagram that
+-- comes to its port to stdout, until stdin ends. -l listens on port instead: it writes each datagram
+-- that comes, and sends what it reads to whoever sent the last one (traditional netcat's -u -l
+-- answers its first), until it's stopped (^C). -p is the port it sends from; -b is taken and needs
+-- nothing (mcos has no SO_BROADCAST to set).
+local sys = require("sys")
+
+local READ_SIZE = 4096
+local USAGE = "usage: nc -u [-b] [-p port] address port\n       nc -u -l [-p] port\n"
+
+local udp, listen, port = false, false, nil
+local words = {}
+local i = 1
+while i <= #arg do
+  local word = arg[i]
+  if string.sub(word, 1, 1) == "-" and #word > 1 then
+    local at = 2
+    while at <= #word do
+      local flag = string.sub(word, at, at)
+      if flag == "u" then
+        udp = true
+      elseif flag == "l" then
+        listen = true
+      elseif flag == "b" then
+        -- (broadcasts need nothing set)
+      elseif flag == "p" then
+        local value = string.sub(word, at + 1)
+        if value == "" then
+          i = i + 1
+          value = arg[i]
+        end
+        port = math.tointeger(tonumber(value))
+        if not port then
+          io.stderr:write("nc: invalid port: ", tostring(value), "\n")
+          return 1
+        end
+        break
+      else
+        io.stderr:write("nc: invalid option -- '", flag, "'\n", USAGE)
+        return 1
+      end
+      at = at + 1
+    end
+  else
+    words[#words + 1] = word
+  end
+  i = i + 1
+end
+
+if not udp then
+  io.stderr:write("nc: only UDP is supported: use -u\n")
+  return 1
+end
+local address, to
+if listen then
+  port = port or math.tointeger(tonumber(words[1]))
+  if not port or #words > 1 or words[1] and math.tointeger(tonumber(words[1])) ~= port then
+    io.stderr:write(USAGE)
+    return 1
+  end
+else
+  address, to = words[1], math.tointeger(tonumber(words[2]))
+  if not (address and to) or #words > 2 then
+    io.stderr:write(USAGE)
+    return 1
+  end
+end
+
+local function fail(what, why)
+  io.stderr:write("nc: ", what, ": ", tostring(why), "\n")
+  return 1
+end
+
+local socket, why = sys.socket()
+if not socket then
+  return fail("socket", why)
+end
+if port then
+  local ok
+  ok, why = sys.bind(socket, port)
+  if not ok then
+    return fail("bind", why)
+  end
+end
+
+local wanted = {[socket] = {IN = true}, [0] = {IN = true}}
+while true do
+  local ready
+  ready, why = sys.poll(wanted)
+  if not ready then
+    return fail("poll", why)
+  end
+  if ready[socket] then
+    local data, from, fromport = sys.recvfrom(socket)
+    if data then
+      io.write(data)
+      io.stdout:flush()
+      if listen then
+        address, to = from, fromport
+      end
+    end
+  end
+  if ready[0] then
+    local data = sys.read(0, READ_SIZE)
+    if not data or data == "" then
+      if not listen then
+        return 0 -- stdin ended
+      end
+      wanted[0] = nil -- listening goes on
+    elseif address then
+      local ok
+      ok, why = sys.sendto(socket, data, address, to)
+      if not ok then
+        return fail(address, why)
+      end
+    end
+  end
+end

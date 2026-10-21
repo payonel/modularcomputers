@@ -31,6 +31,7 @@
 	"item.modularcomputers.tier3_hard_disk": "Tier 3 Hard Disk",
 	"item.modularcomputers.disk.size": "Space: %s",
 	"item.modularcomputers.disk.draw": "Draws %s a tick while powered",
+	"item.modularcomputers.network_card": "Network Card",
 	"item.modularcomputers.wlan_card": "WLAN Card",
 	"item.modularcomputers.tier1_battery": "Tier 1 Battery",
 	"item.modularcomputers.tier2_battery": "Tier 2 Battery",

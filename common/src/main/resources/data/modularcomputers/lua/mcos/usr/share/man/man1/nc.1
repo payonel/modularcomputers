@@ -1,0 +1,88 @@
+.TH NC 1 "" "" "mcos Manual"
+.SH NAME
+nc \- send and receive UDP datagrams
+.SH SYNOPSIS
+.B nc \-u
+.RB [ \-b ]
+.RB [ \-p
+.IR port ]
+.I address port
+.br
+.B nc \-u \-l
+.RB [ \-p ]
+.I port
+.SH DESCRIPTION
+.B nc
+(netcat) sends what it reads from standard input over the network, as
+UDP datagrams through the computer's network cards, and writes the data of
+the datagrams that come to it to standard output.
+.PP
+In the first form it sends each read (a line, from a terminal) as a
+datagram to
+.I port
+at
+.IR address :
+a network card's address (its id, as
+.B ifconfig
+shows it), or
+.B broadcast
+for every card the computer's cards reach (a wired card's cables, a WLAN
+card's range). What comes back to its port is written out. It ends when
+standard input ends.
+.PP
+With
+.B \-l
+it listens on
+.IR port :
+it writes each datagram that comes, and sends what it reads to whoever
+sent the last one, until it's stopped (^C).
+.SH OPTIONS
+.TP
+.B \-u
+UDP. It's mcos's only transport, so it's needed, as for UDP on Linux.
+.TP
+.B \-l
+Listens on
+.I port
+for datagrams.
+.TP
+.BI \-p " port"
+The port it sends from (or listens on, with
+.BR \-l ).
+Without it, a free one is given (32768 to 60999).
+.TP
+.B \-b
+Taken, and needed for nothing: mcos sends to
+.B broadcast
+without SO_BROADCAST set.
+.SH EXIT STATUS
+0 when standard input ends; 1 for a bad option or port, or when a datagram
+can't be sent (no network card: "Network is unreachable"; no card took
+it: "No route to host").
+.SH EXAMPLES
+.nf
+nc \-ul 7 > /tmp/heard
+echo hello | nc \-u 1b9c0e6a\-6f0c\-4e0f\-9a43\-7d2f3c1a5e88 7
+echo all | nc \-ub broadcast 7
+.fi
+.SH NOTES
+mcos has UDP and no IP: an address is a network card's, and the network is
+what the cards reach, with nothing routed between networks (a wired card
+and a WLAN card are two networks). A datagram is lost when no program has
+its port, or its queue is full, as UDP's are; one sent to a single card is
+acknowledged by that card (Wi\-Fi does at its link layer), so a card that
+isn't there is an error, as an unanswered ARP is on Linux. A datagram to
+the computer's own card, or a broadcast, reaches its own programs too.
+.PP
+GNU and OpenBSD netcat stay after standard input ends, until
+.B \-q
+or
+.B \-w
+says; this one ends at once, as with
+.BR "\-q 0" .
+Without
+.BR \-u ,
+netcat would use TCP, which mcos doesn't have.
+.SH SEE ALSO
+.BR ifconfig (1),
+.BR ethtool (1)

@@ -238,6 +238,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		machine.describedBy(() -> "board " + boardId + " at " + worldPosition.toShortString()
 			+ (level != null ? " in " + level.dimension().identifier() : "") + ", chunk " + net.minecraft.core.SectionPos.blockToSectionCoord(worldPosition.getX())
 			+ "," + net.minecraft.core.SectionPos.blockToSectionCoord(worldPosition.getZ()));
+		machine.wakeWith(this::pressPower); // a network card's wake presses its power button: it clicks and lights
 	}
 
 	/** What the board's firmware reads from this case (ACPI and SMBIOS): its tier, power and RAM. */
@@ -921,6 +922,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 			if (cards[lane] != null) {
 				int slot = CaseMenu.EXP_SLOTS + lane;
 				cards[lane].labelFrom(() -> ModComponents.label(parts.getItem(slot))); // read from the card itself
+				cards[lane].idFrom(() -> serial(slot));
 			}
 			board.plug(Motherboard.exp(lane), cards[lane], serial(CaseMenu.EXP_SLOTS + lane));
 		}

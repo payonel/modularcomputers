@@ -25,6 +25,18 @@ public class Card implements Device {
 		this.label = label;
 	}
 
+	/** Where its id is (its item's serial number), read when asked. */
+	private java.util.function.Supplier<java.util.UUID> id = () -> null;
+
+	public void idFrom(java.util.function.Supplier<java.util.UUID> id) {
+		this.id = id;
+	}
+
+	/** Its id (its item's serial number), or null before it has one. */
+	protected java.util.UUID id() {
+		return id.get();
+	}
+
 	@Override
 	public String label() {
 		return label.get();

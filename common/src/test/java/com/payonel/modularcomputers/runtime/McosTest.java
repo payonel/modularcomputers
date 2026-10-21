@@ -1039,4 +1039,95 @@ class McosTest {
 		type("/t.lua\r");
 		untilFile(root().resolve("result"), "piped through\n|true exit 0");
 	}
+	/** A network card beside the test computer's (it and the peer: one world, one block), with its id. */
+	private com.payonel.modularcomputers.device.NetworkCard networkCard(Object world, java.util.UUID id) {
+		var card = new com.payonel.modularcomputers.device.NetworkCard(com.payonel.modularcomputers.device.CardKind.WLAN);
+		card.idFrom(() -> id);
+		card.place(world, net.minecraft.core.BlockPos.ZERO, 0);
+		return card;
+	}
+
+	/** A UDP datagram, as a card's frame carries it: source and destination port, then the data. */
+	private static String datagram(int from, int to, String data) {
+		return "" + (char) (from >> 8) + (char) (from & 0xff) + (char) (to >> 8) + (char) (to & 0xff) + data;
+	}
+
+	private static Arguments args(Object... values) {
+		return new Arguments(java.util.Arrays.asList(values));
+	}
+
+	@Test
+	void aSocketTakesDatagramsOnItsPortAndAnswersTheirSenders() {
+		Object world = new Object();
+		java.util.UUID mine = java.util.UUID.randomUUID();
+		var card = networkCard(world, mine);
+		devices.put("id:" + mine, card);
+		var peer = networkCard(world, java.util.UUID.randomUUID());
+		peer.power().supply(this); // (a card on a running computer's bus elsewhere)
+		peer.accepting(true);
+		file("u.lua", """
+			local sys = require("sys")
+			local function put(name, text)
+			  local out = io.open(name, "w")
+			  out:write(text)
+			  out:close()
+			end
+			local s = assert(sys.socket())
+			assert(sys.bind(s, 7))
+			local _, _, inuse = sys.bind(assert(sys.socket()), 7)
+			local quiet = sys.poll({[s] = {IN = true}}, 0)
+			put("/ready", "")
+			local ready = sys.poll({[s] = {IN = true}})
+			local data, from, port = sys.recvfrom(s)
+			assert(sys.sendto(s, "pong", from, port))
+			local _, _, unreachable = sys.sendto(s, "x", "nobody", 1)
+			local _, _, toolong = sys.sendto(s, string.rep("x", 9000), from, port)
+			assert(sys.sendto(s, "all", "broadcast", 9))
+			local back = assert(sys.socket())
+			assert(sys.bind(back, 9))
+			local mine = sys.ioctl(back, "SIOCGIFCONF")[1]
+			assert(sys.sendto(s, "self", mine.address, 9))
+			local looped, _, loopport = sys.recvfrom(back)
+			put("/got", table.concat({tostring(next(quiet) == nil), tostring(ready[s].IN), data, from, port, inuse,
+			  unreachable, toolong, looped, loopport, mine.name}, " "))
+			""");
+		boot();
+		type("lua /u.lua 2> /err; touch /done\r");
+		settle(() -> Files.isRegularFile(root().resolve("ready")));
+		server.add(() -> peer.send(args(mine.toString(), datagram(5000, 7, "ping"))));
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("err"))).isEmpty();
+		assertThat(read(root().resolve("got"))).as("nothing waited, then the ping, from its card and port; the errors; its own datagram looped back")
+			.isEqualTo("true true ping " + peer.address() + " 5000 EADDRINUSE EHOSTUNREACH EMSGSIZE self 7 wlan0");
+		@SuppressWarnings("unchecked") var pong = (Map<String, Object>) peer.receive(args()).first();
+		assertThat(pong).containsEntry("from", mine.toString()).containsEntry("data", datagram(7, 5000, "pong"));
+		@SuppressWarnings("unchecked") var all = (Map<String, Object>) peer.receive(args()).first();
+		assertThat(all).containsEntry("data", datagram(7, 9, "all")).containsEntry("broadcast", true);
+	}
+
+	@Test
+	void ncListensAndSendsAndEthtoolSetsTheWakeMessage() {
+		Object world = new Object();
+		java.util.UUID mine = java.util.UUID.randomUUID();
+		var card = networkCard(world, mine);
+		devices.put("id:" + mine, card);
+		var peer = networkCard(world, java.util.UUID.randomUUID());
+		peer.power().supply(this);
+		peer.accepting(true);
+		boot();
+		type("ethtool -s wlan0 sopass secret; touch /set\r");
+		untilFile(root().resolve("set"), "");
+		assertThat(card.getWake(args()).first()).isEqualTo("secret");
+		type("nc -ul 7 > /tmp/heard &\r");
+		untilIdle();
+		server.add(() -> peer.send(args(mine.toString(), datagram(5000, 7, "hello\n"))));
+		untilIdle();
+		type("cp /tmp/heard /heard; echo hi | nc -u " + peer.address() + " 6 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("heard"))).isEqualTo("hello\n");
+		assertThat(read(root().resolve("err"))).isEmpty();
+		var hi = (Map<?, ?>) peer.receive(args()).first();
+		assertThat(hi).isNotNull();
+		assertThat((String) hi.get("data")).endsWith("hi\n");
+	}
 }

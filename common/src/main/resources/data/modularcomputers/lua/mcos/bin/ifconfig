@@ -1,0 +1,28 @@
+-- ifconfig [interface]: the network interfaces (the network cards: eth0, the first wired one, wlan0
+-- the first WLAN one), each with its address (its card's id, as a NIC's MAC) and MTU; or one.
+local sys = require("sys")
+
+local MTU = 8192 -- a card's frame's data, at most
+
+if #arg > 1 then
+  io.stderr:write("usage: ifconfig [interface]\n")
+  return 1
+end
+local socket, why = sys.socket()
+if not socket then
+  io.stderr:write("ifconfig: socket: ", tostring(why), "\n")
+  return 1
+end
+local found = false
+for _, nic in ipairs(sys.ioctl(socket, "SIOCGIFCONF") or {}) do
+  if not arg[1] or arg[1] == nic.name then
+    found = true
+    io.write(nic.name, ": flags=<UP,BROADCAST,RUNNING>  mtu ", MTU, "\n")
+    io.write("        ether ", nic.address, "\n")
+  end
+end
+sys.close(socket)
+if arg[1] and not found then
+  io.stderr:write("ifconfig: ", arg[1], ": error fetching interface information: Device not found\n")
+  return 1
+end

@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"G": "minecraft:gold_nugget",
+		"Q": "modularcomputers:chip",
+		"W": "modularcomputers:cable",
+		"c": "minecraft:copper_nugget"
+	},
+	"pattern": [
+		"WQ ",
+		"ccc",
+		"GGG"
+	],
+	"result": {
+		"id": "modularcomputers:network_card"
+	}
+}

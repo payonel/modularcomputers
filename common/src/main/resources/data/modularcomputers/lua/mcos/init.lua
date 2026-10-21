@@ -270,9 +270,13 @@ local syscalls = {}
 -- The syscall table a process is given: each traps to the kernel and returns its answer; then any
 -- signal the process caught is handled, in the process, as Linux does on the way back to user mode.
 local function systable(p)
-  local sys = {}
-  for name in pairs(syscalls) do
-    sys[name] = function(...)
+  -- (each made the first time the process looks it up: most use a few, and a syscall costs a
+  -- process nothing until it does)
+  return setmetatable({SIGNALS = SIGNALS}, {__index = function(sys, name)
+    if not syscalls[name] then
+      return nil
+    end
+    local function call(...)
       p.request = table.pack(name, ...)
       trap()
       local reply = p.reply
@@ -289,9 +293,9 @@ local function systable(p)
       end
       return table.unpack(reply, 2, reply.n)
     end
-  end
-  sys.SIGNALS = SIGNALS
-  return sys
+    sys[name] = call
+    return call
+  end})
 end
 
 local function copy(t)
@@ -591,9 +595,12 @@ function syscalls.pipe(p)
 end
 
 -- isatty, and the terminal's ioctls by their Linux names: TCGETS and TCSETS (termios flags, as a
--- table), TIOCGWINSZ (columns, rows), TIOCSTI (bytes put in as if typed).
+-- table), TIOCGWINSZ (columns, rows), TIOCSTI (bytes put in as if typed); a socket's are net's.
+local net -- (lib/modules/net.lua, once a socket is made)
 syscalls.ioctl = withfd(function(p, request, d, fd, op, arg)
-  if d.type ~= "tty" then
+  if d.type == "socket" then
+    return net.ioctl(d, op, type(arg) == "table" and fromuser(arg) or arg)
+  elseif d.type ~= "tty" then
     return fail("ENOTTY")
   end
   local t = d.tty
@@ -875,6 +882,32 @@ syscalls.watch = withfd(function(p, request, d, fd, file)
   end
   return inotify.watch(d, at)
 end)
+
+-- Sockets, as Linux's: socket([type]) an open file (a UDP socket), bind(fd, port), sendto(fd, data,
+-- address, port), recvfrom(fd) (data, address, port), and their ioctls (lib/modules/net.lua, loaded
+-- at the first).
+function syscalls.socket(p, request, kind)
+  local fd = lowestfd(p)
+  if not fd then
+    return fail("EMFILE")
+  end
+  net = net or module("net", k, vfs)
+  local d, why, errno = net.socket(kind)
+  if not d then
+    return nil, why, errno
+  end
+  p.fds[fd] = hold(d)
+  return fd
+end
+
+for _, name in ipairs({"bind", "sendto", "recvfrom"}) do
+  syscalls[name] = withfd(function(p, request, d, fd, ...)
+    if d.type ~= "socket" then
+      return nil, "Socket operation on non-socket", "ENOTSOCK"
+    end
+    return net[name](d, request, ...)
+  end)
+end
 
 -- poll(fds, seconds), as poll(2): 'fds' maps each open file to the events wanted, a set of Linux's
 -- names (IN: a read won't wait; PRI: something exceptional, as a device's state changing; OUT: a

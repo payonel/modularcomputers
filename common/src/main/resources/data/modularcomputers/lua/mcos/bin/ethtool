@@ -1,0 +1,75 @@
+-- ethtool interface | ethtool -s interface [wol s|d] [sopass message]: a network card's Wake-on-LAN.
+-- Shows whether a frame turns its computer on while it's off (Wake-on: s, with the message it must
+-- hold, its SecureOn password; d: it doesn't); -s sets it: sopass the message (and with it, s), wol d
+-- none. A frame holding the message anywhere in its data wakes it: echo message | nc -ub broadcast 9.
+local sys = require("sys")
+
+local USAGE = "usage: ethtool interface\n       ethtool -s interface [wol s|d] [sopass message]\n"
+
+local function fail(text)
+  io.stderr:write("ethtool: ", text, "\n")
+  return 1
+end
+
+local socket, why = sys.socket()
+if not socket then
+  return fail("socket: " .. tostring(why))
+end
+
+if arg[1] ~= "-s" then
+  if #arg ~= 1 then
+    io.stderr:write(USAGE)
+    return 1
+  end
+  local exists = false
+  for _, nic in ipairs(sys.ioctl(socket, "SIOCGIFCONF") or {}) do
+    exists = exists or nic.name == arg[1]
+  end
+  if not exists then
+    return fail(arg[1] .. ": No such device")
+  end
+  local wake = sys.ioctl(socket, "ETHTOOL_GWOL", arg[1])
+  io.write("Settings for ", arg[1], ":\n")
+  io.write("\tSupports Wake-on: sd\n")
+  io.write("\tWake-on: ", wake and "s" or "d", "\n")
+  if wake then
+    io.write("\tSecureOn password: ", wake, "\n")
+  end
+  return 0
+end
+
+local name = arg[2]
+local mode, message
+local i = 3
+while i <= #arg do
+  local key, value = arg[i], arg[i + 1]
+  if value == nil then
+    io.stderr:write(USAGE)
+    return 1
+  elseif key == "wol" and (value == "s" or value == "d") then
+    mode = value
+  elseif key == "sopass" then
+    message = value
+  else
+    io.stderr:write(USAGE)
+    return 1
+  end
+  i = i + 2
+end
+if not name or not (mode or message) then
+  io.stderr:write(USAGE)
+  return 1
+end
+if mode == "d" then
+  message = nil
+elseif not message then
+  message = sys.ioctl(socket, "ETHTOOL_GWOL", name)
+  if not message then
+    return fail("wol s needs a message: sopass message")
+  end
+end
+local ok
+ok, why = sys.ioctl(socket, "ETHTOOL_SWOL", {name = name, wake = message})
+if not ok then
+  return fail(name .. ": " .. tostring(why))
+end
