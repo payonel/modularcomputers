@@ -84,8 +84,6 @@ local pending = debug.getregistry()["modularcomputers.pending"]
 -- and its ear for how much room each ring has.
 local drain = debug.getregistry()["modularcomputers.drain"]
 local credit = debug.getregistry()["modularcomputers.credit"]
--- Debugging (tests): told of every chunk compiled, its name and size; nil, as normally.
-local loadtrace = debug.getregistry()["modularcomputers.loadtrace"]
 local load, pairs, ipairs, select, type, error, tostring = load, pairs, ipairs, select, type, error, tostring
 local table_pack, table_unpack, table_remove = table.pack, table.unpack, table.remove
 local setmetatable, rawget, rawset = setmetatable, rawget, rawset
@@ -252,11 +250,7 @@ sandbox._G = sandbox
 
 -- Text only (crafted bytecode is the classic way out of a VM), and the sandbox by default.
 sandbox.load = function(chunk, name, mode, env)
-  local f, why = load(chunk, name, "t", env or sandbox)
-  if loadtrace and f then
-    loadtrace(tostring(name), type(chunk) == "string" and #chunk or -1)
-  end
-  return f, why
+  return load(chunk, name, "t", env or sandbox)
 end
 
 -- The collector is the VM's: a program may measure it and nudge it, not stop it.
@@ -443,14 +437,8 @@ sandbox.board = {
 -- The sandbox is built: the host measures what's held now as the baseline the program's RAM goes
 -- on top of (so the RAM is all the program's, whatever this file and the libraries take).
 ask("baseline")
-if loadtrace then
-  loadtrace("(baseline: the firmware alone)", 0)
-end
 
 local main, why = load(image, "=eeprom", "t", sandbox)
-if loadtrace then
-  loadtrace("eeprom", #image)
-end
 image = nil
 if not main then
   return "abort", "EEPROM: " .. why

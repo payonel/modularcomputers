@@ -410,7 +410,6 @@ public final class LuaRunner implements Runner {
 		if (luaL_loadbufferx(firmwareCo, new ByteView(firmware), new HostString("=machine"), new HostString("t")) != LUA_OK) {
 			throw new IllegalStateException("the CPU's firmware doesn't load: " + text(firmwareCo, -1)); // a bug in the mod
 		}
-		trace("machine", firmware.length, memory);
 		// The EEPROM's text, for the firmware to take (and let go of once compiled: a chunk's arguments
 		// would stay in its frame for as long as it runs).
 		push(main, image);
@@ -419,26 +418,6 @@ public final class LuaRunner implements Runner {
 
 	/** The EEPROM's text, in the registry until the firmware has taken it. */
 	private static final String IMAGE = "modularcomputers.image";
-
-	/**
-	 * Debugging (tests): told of every chunk the VM compiles, from the firmware on (its name, its size
-	 * in bytes, and the VM's memory in use right after it, in bytes); null, as normally, for none.
-	 */
-	public static volatile java.util.function.Consumer<String> loadTrace;
-	/** The firmware's report of a chunk it compiled ({@code loadtrace(name, size)}): there only while {@link #loadTrace} is set. */
-	private static final String LOAD_TRACE = "modularcomputers.loadtrace";
-
-	private static void trace(String name, long size, Memory memory) {
-		java.util.function.Consumer<String> to = loadTrace;
-		if (to != null) {
-			to.accept(name + ", " + size + ", " + memory.used);
-		}
-	}
-
-	private static int loadTrace(lua_State L) {
-		trace(text(L, 1), lua_tointegerx(L, 2).orElse(-1), (Memory) lua_getallocf(L));
-		return 0;
-	}
 
 	/** A computer coming back from its saved state ({@link #persist}). */
 	private LuaRunner(lua_State main, Memory memory) {
@@ -549,10 +528,6 @@ public final class LuaRunner implements Runner {
 		lua_setfield(L, LUA_REGISTRYINDEX, new HostString(USER_MODE));
 		lua_pushcfunction(L, LuaRunner::pending);
 		lua_setfield(L, LUA_REGISTRYINDEX, new HostString(PENDING));
-		if (loadTrace != null) {
-			lua_pushcfunction(L, LuaRunner::loadTrace);
-			lua_setfield(L, LUA_REGISTRYINDEX, new HostString(LOAD_TRACE));
-		}
 		byte[] walk = PERMANENTS_WALK.getBytes(StandardCharsets.UTF_8);
 		if (luaL_loadbufferx(L, new ByteView(walk), new HostString("=permanents"), new HostString("t")) != LUA_OK) {
 			throw new IllegalStateException("the permanents don't load: " + text(L, -1));

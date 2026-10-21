@@ -272,8 +272,9 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   standard libraries shared read-only between processes (each copies string, table, math, utf8,
   coroutine and its own io/os closures); sh's parser restructured (one splitter for ; && || |, the
   lexer finding $( )'s end: ~10 KB, from studying OpenOS's); sh and readline needing only a few of
-  fs.lua's functions. Measure with LuaRunner.loadTrace and a throwaway probe that varies one stick's
-  size freely (4 KiB steps), not by tier.
+  fs.lua's functions. Measure with a throwaway probe that varies one stick's size freely (4 KiB
+  steps), not by tier, and a temporary trace of each chunk the firmware compiles (its size, memory
+  after) when the order matters (removed once measured: see git, 0be0dc8).
 - **Stripping debug info from system code** (user, 2026-10-20): debug info is about 30% of compiled
   code (bytecode measured). Lua has no switch for it at compile time; only `string.dump(f, true)`
   strips, and loading that back takes bytecode mode, which the sandbox refuses (crafted bytecode
