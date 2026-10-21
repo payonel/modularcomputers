@@ -774,6 +774,50 @@ class LuaRunnerTest {
 		assertThat(card.pull(new Arguments(java.util.List.of())).first()).as("none left in the card, none lost").isNull();
 	}
 
+	/**
+	 * A key still in the device at a save (a busy tick's server time ran out before it was pushed)
+	 * reaches the ring after the restore. The restored program finishes the wait it was saved in
+	 * first, before the firmware has told the host which sources have rings again; that wait's
+	 * answer takes the key, and it must go to the ring, not the inbox, which a ring reader never
+	 * reads (it was stranded there: found as a test that failed only alone, on a cold JVM).
+	 */
+	@Test
+	void aKeyLeftInTheDeviceAtASaveReachesTheRingAfterTheRestore() {
+		boot(READ_RING + """
+			local ring = board.ring("console", 8)
+			board.waitForInterrupt(0.5, "nothing") -- parked: saved here
+			local typed = ""
+			while #typed < 2 do
+			  local n = 0
+			  for i = 1, 100000 do n = n + 1 end
+			  typed = typed .. table.concat(take(ring))
+			end
+			board.invoke("console", "write", typed)
+			board.halt()
+			""");
+		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
+		long end = System.nanoTime() + 10_000_000_000L;
+		while (runner.state() != Runner.State.WAITING) {
+			assertThat(System.nanoTime()).isLessThan(end);
+			Runnable task;
+			while ((task = server.poll()) != null) {
+				task.run();
+			}
+			Thread.onSpinWait();
+		}
+		byte[] saved = machine.persistProgram().orElseThrow();
+		machine.unload();
+		Terminal loaded = new Terminal(Resolution.DEFAULT);
+		loaded.restore(Map.of("input", java.util.List.of("b"))); // typed, and not pushed before the save
+		Machine again = reloaded(loaded);
+		again.resumeProgram(saved);
+		settle(again, () -> again.runner().map(r -> r.state() == Runner.State.RUNNING).orElse(false));
+		loaded.press("c");
+		settle(again, () -> again.runner().isEmpty());
+		assertThat(again.board().virtualBus().console().screen().row(0).strip()).as("none lost, in order").isEqualTo("bc");
+		again.pressPower();
+	}
+
 	@Test
 	void whatsOnItsWayToARingIsSavedWithTheComputer() {
 		boot(READ_RING + """

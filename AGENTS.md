@@ -300,6 +300,11 @@ process (as VFIO does).
 - **Lua inside a Java text block is unescaped twice** (Java's, then Lua's): a test's `"\\d"` reached Lua
   as `"\d"`, an invalid escape, and the program failed before writing anything. Use Lua long strings
   (`[[\d]]`) for patterns in tests, and capture a test program's stderr (`2> /err`) to see why.
+- **A test that fails alone but passes with its class is a timing bug, not noise.** On a cold JVM
+  the first board calls are slow, so a tick's 1 ms of server time runs out sooner and data stays in
+  a device that a warm run would have moved: a different, legal state. Make that state on purpose
+  in a test (it found keys stranded across a restore, 2026-10-21). And commit only on `testAll`'s
+  own exit status: a commit gated on grepping its log once went in with a unit test failing.
 - **LungoLua bugs look like ours.** A pattern `%s` once matched "s"; verify against stock Lua's
   semantics, report to the lua thread, work around until fixed.
 

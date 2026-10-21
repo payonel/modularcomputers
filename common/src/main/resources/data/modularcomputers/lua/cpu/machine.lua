@@ -369,14 +369,22 @@ sandbox.board = {
       held[address] = unread(address)
     end
     local reply = syscall("wait", ticks, held, ...)
-    -- Still in firmware mode: the data's out of the devices now, so it must reach the inbox.
+    -- Still in firmware mode: the data's out of the devices now, so it must reach the program:
+    -- a source's ring when it has one (the host may not know it does: after a restore it learns
+    -- the rings again only at the next delivery, and a wait saved partway is answered first), its
+    -- inbox queue otherwise.
     for _, item in ipairs(reply[2]) do
-      local queue = inbox[item.address]
-      if not queue or queue.method ~= item.method then
-        queue = {method = item.method}
-        inbox[item.address] = queue
+      local r = rings[item.address]
+      if r then
+        r.overflow[#r.overflow + 1] = item.value -- (into the ring at the next delivery, before user code runs)
+      else
+        local queue = inbox[item.address]
+        if not queue or queue.method ~= item.method then
+          queue = {method = item.method}
+          inbox[item.address] = queue
+        end
+        queue[#queue + 1] = item.value
       end
-      queue[#queue + 1] = item.value
     end
     usermode(true)
     return reply[1]
@@ -396,8 +404,17 @@ sandbox.board = {
     end
     ring.head, ring.tail, ring.size = 0, 0, size
     usermode(false)
-    rings[source] = {ring = ring, size = size, tail = 0, overflow = {}, armed = true}
-    credit(source, size)
+    -- what the inbox holds of the source already goes to the ring first: the program reads it there now
+    local queue = inbox[source]
+    inbox[source] = nil
+    local overflow = {}
+    if queue then
+      for i = 1, #queue do
+        overflow[i] = queue[i]
+      end
+    end
+    rings[source] = {ring = ring, size = size, tail = 0, overflow = overflow, armed = true}
+    credit(source, size - #overflow) -- (it goes in at the next delivery)
     usermode(true)
     return ring
   end,
