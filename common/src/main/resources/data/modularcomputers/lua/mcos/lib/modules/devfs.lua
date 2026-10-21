@@ -78,10 +78,10 @@ local function failed(why)
   return fail("EIO")
 end
 
--- Drivers, by device type: a device whose data is a table, not text, has one (lib/modules/<type>.lua),
--- loaded the first time one of its files is opened, as Linux loads a device's module when it's
--- needed. It makes the table text to read (get) and the text written back a table (set).
-local DRIVEN = {redstone = true}
+-- Drivers, by device type: a device whose data is a table, not text, has one on the boot disk
+-- (k.driver), which makes the table text to read (get) and the text written back a table (set). It's
+-- looked for the first time a file of that type is opened, and remembered (false: none), so a type
+-- costs nothing until it's used, and a type without one costs one look.
 local drivers = {}
 
 -- An open device file: reads from what get gave (taken at the first read, through its driver if it
@@ -93,10 +93,10 @@ local function devicefile(device, mode)
   if (reads and not device.get) or (writes and not device.set) then
     return fail("EACCES")
   end
-  local id, kind = device.id, device.type
-  local driver = DRIVEN[kind] and drivers[kind]
-  if DRIVEN[kind] and not driver then
-    driver = k.module(kind, k)
+  local id, kind = device.id, device.type or ""
+  local driver = drivers[kind]
+  if driver == nil then
+    driver = k.driver(kind) or false
     drivers[kind] = driver
   end
   local data, at = nil, 0

@@ -164,9 +164,12 @@ split libraries to fit OC's RAM; it cost speed, complexity and more memory than 
 `null`, `zero`, and a node for each bus device with a `get` or `set` method (the EEPROM sits there too: not
 where Linux keeps one, but convenient for users, the user's call). Reading gives `get`'s answer;
 what's written goes to `set` in one call at close, and **the device decides what `set` means**
-(replace, append). A device whose data is a table, not text, has a **driver** (a kernel module
-devfs loads when its file is first opened, as Linux loads a device's module): the redstone
-terminal's turns its table into Lua's syntax and back. Descriptions of devices aren't data: they come from the kernel (`sys.devices`,
+(replace, append). A device whose data is a table, not text, has a **driver**
+(`lib/modules/drivers/<type>.lua`): the redstone terminal's turns its table into Lua's syntax and
+back. **A device type costs no memory until it's used** (user, 2026-10-21: add devices and drivers
+freely, never paying at boot for one that isn't there, as a real kernel loads a module when its
+device needs it): devfs looks for the type's driver on the boot disk the first time one of its
+files is opened, and remembers what it found; nothing in the kernel lists the types. Descriptions of devices aren't data: they come from the kernel (`sys.devices`,
 for `lsdev`), and a `/sys` tree is postponed. **The kernel caches the bus list, eventually
 correct** (as udev fills `/dev` in after a hot-plug): it's read again on the bus's hot-plug
 interrupt (when the kernel idles) and when a call fails because the device is gone; being late is
@@ -183,8 +186,8 @@ process (as VFIO does).
   against that loader; then it goes behind `Platform` (one method, implemented in `FabricPlatform`,
   `NeoForgePlatform` and the unit tests' `TestPlatform`) or into the loader's entry point as an event
   calling a common hook. `common` can't see a loader's API, so a slip fails its compile.
-- **A device whose `get`/`set` take tables gets a driver** (`lib/modules/<type>.lua`, named in devfs's
-  `DRIVEN`), or its `/dev` file reads as nothing useful.
+- **A device whose `get`/`set` take tables gets a driver** (`lib/modules/drivers/<type>.lua`, found
+  by its type: register it nowhere), or its `/dev` file reads as nothing useful.
 - **A new cabled block's entity holds `CablePorts`** (so its sides can be closed), and `Cabling`
   learns its ports and kind.
 - **A new packet goes in `ModNetwork`'s lists** (and a client handler in `ModNetworkClient`); a new

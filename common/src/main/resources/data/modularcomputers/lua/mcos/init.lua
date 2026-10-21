@@ -64,11 +64,21 @@ local function kload(path, ...)
 end
 k.kload = kload
 
--- A kernel module (lib/modules/<name>.lua): at boot, or later for a driver.
+-- A kernel module (lib/modules/<name>.lua).
 local function module(name, ...)
   return kload(MODULES .. name .. ".lua", ...)
 end
-k.module = module
+
+-- A device type's driver (lib/modules/drivers/<type>.lua), loaded when it's first needed, as Linux
+-- finds a device's module on disk: nil when the boot disk has none.
+function k.driver(kind)
+  if not kind:match("^%w+$") then
+    return nil
+  end
+  local path = MODULES .. "drivers/" .. kind .. ".lua"
+  local ok, found = board.invoke(root, "stat", path)
+  return ok and found and kload(path, k) or nil
+end
 
 local vfs = module("vfs", k)
 local fail = vfs.fail
