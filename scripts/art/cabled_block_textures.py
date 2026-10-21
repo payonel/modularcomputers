@@ -178,16 +178,14 @@ def redstone_terminal_top():
 	return im
 
 def redstone_terminal_side():
-	"""A side, half a block tall (a slab's side shows the texture's lower half): a port that takes a
-	cable or a signal, with a redstone dot beside it."""
+	"""A side: a port in the middle that takes a cable or a signal, with a redstone lamp-dot over it
+	and a row of dimmer dots under it."""
 	im = casing(23)
-	rect(im, 0, 0, 15, 7, (40, 40, 46))  # (never shown)
-	for i in range(16):
-		im.putpixel((i, 8), LIGHT)  # the top edge of the half block
-	rect(im, 6, 10, 9, 13, (40, 40, 46))
-	rect(im, 7, 11, 8, 12, (90, 92, 100))
-	im.putpixel((12, 11), REDSTONE)
-	im.putpixel((12, 12), REDSTONE_DIM)
+	rect(im, 5, 5, 10, 10, (40, 40, 46))
+	rect(im, 6, 6, 9, 9, (90, 92, 100))
+	rect(im, 7, 2, 8, 3, REDSTONE)
+	for x in (4, 7, 10):
+		rect(im, x, 12, x + 1, 12, REDSTONE_DIM)
 	return im
 
 def redstone_terminal_bottom():

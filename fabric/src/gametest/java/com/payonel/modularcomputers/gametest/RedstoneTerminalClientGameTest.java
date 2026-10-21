@@ -18,7 +18,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.RedstoneLampBlock;
 
 /**
- * Client game test for the redstone terminal: half a block tall, a cable joined on one side, a lamp
+ * Client game test for the redstone terminal: a cable joined on one side, a lamp
  * it lights on another; its slots view has the radio and the battery.
  */
 public class RedstoneTerminalClientGameTest implements FabricClientGameTest {

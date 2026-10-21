@@ -17,20 +17,15 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.redstone.Orientation;
 import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
- * A redstone terminal, tier 1 (user design, 2026-10-20): a half-block-tall box on the cable network,
+ * A redstone terminal, tier 1 (user design, 2026-10-20): a block on the cable network,
  * with a port on every side. A side with a cable against it joins the network; every other side is
  * a redstone side, put out and read by programs ({@link com.payonel.modularcomputers.device.RedstoneTerminal}).
  * Right-click opens its slots: a radio (a Bluetooth card) and a battery, which pays for its signal
  * changes before the bus does.
  */
 public final class RedstoneTerminalBlock extends Block implements EntityBlock {
-	/** Half a block tall, as a bottom slab. */
-	private static final VoxelShape SHAPE = Block.column(16.0, 0.0, 8.0);
-
 	public RedstoneTerminalBlock(Properties properties) {
 		super(properties);
 	}
@@ -38,16 +33,6 @@ public final class RedstoneTerminalBlock extends Block implements EntityBlock {
 	@Override
 	public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
 		return new RedstoneTerminalBlockEntity(pos, state);
-	}
-
-	@Override
-	protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-		return SHAPE;
-	}
-
-	@Override
-	protected boolean useShapeForLightOcclusion(BlockState state) {
-		return true;
 	}
 
 	@Override
