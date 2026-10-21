@@ -1183,4 +1183,77 @@ class McosTest {
 		assertThat(read(root().resolve("h"))).as("its status").isEqualTo("4\n");
 		assertThat(read(root().resolve("etc/rc.conf"))).isEqualTo("testd_enable=NO\n");
 	}
+
+	@Test
+	void aShellOnAPtyTakesWhatItsMasterTypesAndHangsUpWhenItCloses() {
+		file("winsize.lua", """
+			local sys = require("sys")
+			local out = io.open("/size", "w")
+			out:write(table.concat({sys.ioctl(0, "TIOCGWINSZ")}, " "))
+			out:close()
+			""");
+		file("pty.lua", """
+			local sys = require("sys")
+			local function put(name, text)
+			  local out = io.open(name, "w")
+			  out:write(text)
+			  out:close()
+			end
+			local function exists(name)
+			  return sys.stat(name) ~= nil
+			end
+			local master, terminal = assert(sys.openpty())
+			assert(sys.ioctl(master, "TIOCSWINSZ", {30, 10}))
+			local pid = assert(sys.spawn("/bin/sh", {}, {setsid = true, fds = {[0] = terminal, [1] = terminal, [2] = terminal}}))
+			sys.close(terminal)
+			local shown = ""
+			-- reads what the terminal shows until 'name' exists (or a while passes)
+			local function until_(name)
+			  for _ = 1, 400 do
+			    if exists(name) then
+			      return true
+			    end
+			    local ready = sys.poll({[master] = {IN = true}}, 0.05)
+			    if ready[master] then
+			      shown = shown .. (sys.read(master) or "")
+			    end
+			  end
+			  return false
+			end
+			sys.write(master, "echo typed > /p1\\r")
+			local typed = until_("/p1")
+			sys.write(master, "lua /winsize.lua\\r")
+			until_("/size")
+			sys.write(master, "sleep 100\\r")
+			local function sleeping()
+			  for _, q in ipairs(sys.processes()) do
+			    if q.path == "/bin/sleep" then
+			      return true
+			    end
+			  end
+			  return false
+			end
+			for _ = 1, 400 do
+			  if sleeping() then
+			    break
+			  end
+			  sys.sleep(0.05)
+			end
+			sys.write(master, "\\3") -- ^C: the sleep ends
+			sys.write(master, "echo after > /p2\\r") -- at once, not in 100 seconds
+			local interrupted = until_("/p2")
+			sys.close(master) -- the line hangs up: the shell gets SIGHUP
+			local got, how, value = sys.waitpid(pid)
+			put("/result", table.concat({tostring(typed), tostring(interrupted), tostring(how), tostring(value),
+			  tostring(shown:find("typed", 1, true) ~= nil)}, " "))
+			""");
+		boot();
+		type("lua /pty.lua 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("err"))).isEmpty();
+		assertThat(read(root().resolve("p1"))).isEqualTo("typed\n");
+		assertThat(read(root().resolve("size"))).as("the size its master set").isEqualTo("30 10");
+		assertThat(read(root().resolve("result"))).as("typed, interrupted by ^C, ended by the hangup; its echo shown to the master")
+			.isEqualTo("true true killed SIGHUP true");
+	}
 }

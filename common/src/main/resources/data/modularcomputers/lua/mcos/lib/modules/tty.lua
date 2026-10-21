@@ -4,7 +4,8 @@
 -- a device fills its driver's ring by DMA; Linux's flip buffer), with no call; the line discipline
 -- (pump, receive: the kernel runs it as the interrupt handler for the device) edits, echoes and
 -- signals, and the kernel's read(2) on it takes what's ready (read). Output goes to the device after
--- the tty's output processing (onlcr).
+-- the tty's output processing (onlcr). A pty's tty (lib/modules/pty.lua) has no device: its input
+-- is what the master end writes (receive), its output a function the master end reads from.
 local tty = {}
 tty.__index = tty
 
@@ -21,12 +22,13 @@ local RING_SIZE = 64 -- packets of input the ring holds (each a few hundred byte
 -- In the ready queue: an end of file (Ctrl+D at the start of a line), read as nothing.
 local EOF = {}
 
--- A tty on 'device'. 'signal(tty, name)' is the kernel's: it delivers a signal to the tty's
--- foreground process group.
-function tty.new(device, signal)
+-- A tty on 'device' (or with 'out' its output instead, a pty's). 'signal(tty, name)' is the
+-- kernel's: it delivers a signal to the tty's foreground process group.
+function tty.new(device, signal, out)
   return setmetatable({
     device = device,
-    input = board.ring(device, RING_SIZE), -- what the device sends, as it sends it
+    out = out,
+    input = device and board.ring(device, RING_SIZE), -- what the device sends, as it sends it
     signal = signal,
     -- termios's flags, Linux's defaults for a terminal
     flags = {icanon = true, echo = true, echoe = true, echoctl = true, isig = true, icrnl = true, onlcr = true, iutf8 = true},
@@ -37,10 +39,14 @@ function tty.new(device, signal)
   }, tty)
 end
 
--- Output: to the device, after output processing.
-function tty:write(text)
+-- Output: to the device (or a pty's master), after output processing. A pty's may answer k.BLOCK:
+-- its master holds all it can ('echo': taken anyway, as the line discipline's own).
+function tty:write(text, echo)
   if self.flags.onlcr then
     text = text:gsub(NL, CR .. NL)
+  end
+  if self.out then
+    return self.out(text, echo)
   end
   board.invoke(self.device, "write", text)
 end
@@ -120,7 +126,7 @@ function tty:receive(bytes)
   if #self.echoes > 0 then
     local echoes = table.concat(self.echoes)
     self.echoes = {}
-    self:write(echoes)
+    self:write(echoes, true)
   end
 end
 

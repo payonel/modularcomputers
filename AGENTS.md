@@ -217,6 +217,15 @@ boot, so enabling never rewrites a script. `rc` starts one with `setsid` (spawn'
 no controlling tty, so no ^C reaches it. The kernel stays init (it respawns the console's shell):
 a user-space PID 1 would stay resident for nothing.
 
+**ptys** (`sys.openpty`, `lib/modules/pty.lua`, loaded at the first; for rshd): a tty whose
+terminal is a program, its master end: what the master writes goes through the same line
+discipline as a keyboard's (echo, editing, ^C), and the master reads what's shown, bounded (a
+writer waits), so a remote shell is only a relay and the kernel does the tty work (psh's mess was
+doing it in user space). `spawn`'s `setsid` gives the child its stdin's tty as its controlling tty
+when no session holds it (login_tty's step, folded into posix_spawn: mcos has no fork); closing the
+master hangs up (SIGHUP to the foreground group, then EOF and EIO on the terminal end). No
+`/dev/pts` yet. The window size is the pty's (`TIOCSWINSZ` on the master).
+
 **Sockets** are UDP over the network cards (`lib/modules/net.lua`, loaded at the first
 `sys.socket()`): `bind`, `sendto`, `recvfrom`, `poll`, Linux's names for interfaces (eth0, wlan0)
 and ioctls (`SIOCGIFCONF`, ethtool's wake), with no commands for them (user, 2026-10-21:
@@ -434,9 +443,7 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   names (rsh runs a command or a shell on another host, rshd serves it, rcp copies files), not
   ssh's: the names say what's missing. psh was a mess on the tty layer; here the kernel's ptys do
   that work, as sshd relies on Linux's. rshd is a service that's off until `rc rshd enable`.
-  Planned, in order (`rc`, the first, is built): ptys (`sys.openpty`, the tty taking input from
-  the master's writes and giving output to its reads, a session's controlling tty, SIGHUP when the
-  master closes); stream sockets (TCP's shape: `listen`/`accept`/`connect`, a byte stream, a window
+  Planned, in order (`rc` and ptys are built): stream sockets (TCP's shape: `listen`/`accept`/`connect`, a byte stream, a window
   so receivers never overflow, the link's own retries, as Wi-Fi's); then rshd (port 514, rsh's; a
   process per connection relaying a pty with `poll`) and rsh (raw tty, `~.`, the remote exit
   status; with a command, no pty), then rcp. A host is named by its card's full id, or a unique

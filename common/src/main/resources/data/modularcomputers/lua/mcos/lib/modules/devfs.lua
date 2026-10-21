@@ -14,14 +14,21 @@ local fail = vfs.fail
 local fs = {type = "devfs"}
 
 -- A tty as a file: reads block until a line (or what's typed, in raw mode) is ready.
+-- (A hung-up tty, a pty whose master closed, reads as its end and fails writes, as Linux's.)
 function k.ttyfile(t)
+  if t.opened then
+    t:opened() -- (a pty counts its terminal end's open files)
+  end
   return {
     type = "tty",
     tty = t,
     events = function(self)
-      return {IN = #t.ready > 0, OUT = true}
+      return {IN = #t.ready > 0 or t.hungup, OUT = not t.hungup, HUP = t.hungup}
     end,
     read = function(self, n)
+      if t.hungup then
+        return ""
+      end
       local data = t:read(n)
       if data == nil then
         return k.BLOCK
@@ -29,8 +36,16 @@ function k.ttyfile(t)
       return data
     end,
     write = function(self, data)
-      t:write(data)
+      if t.hungup then
+        return fail("EIO")
+      elseif t:write(data) == k.BLOCK then
+        return k.BLOCK -- (a pty's master is full)
+      end
       return #data
+    end,
+    close = t.closed and function()
+      t:closed()
+      return true
     end,
   }
 end

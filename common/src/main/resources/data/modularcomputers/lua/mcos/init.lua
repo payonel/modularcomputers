@@ -222,6 +222,9 @@ local function exit(p, how, value)
     release(description)
     p.fds[fd] = nil
   end
+  if p.tty and p.tty.session == p.pid then
+    p.tty.session = nil -- its session's over: the tty is free for another
+  end
   p.zombie, p.status = true, {how, value}
   p.request, p.reply, p.blocked = nil, nil, false
   for _, child in ipairs(children(p)) do
@@ -413,8 +416,9 @@ end
 -- child. opts: fds (the child's descriptors: {[0] = a parent fd, ...}; 0, 1 and 2 are inherited
 -- when not given, the others aren't: close-on-exec), env (its environment; the parent's when not
 -- given), ignore (signals it starts ignoring, as an async list's SIGINT), pgid (0: a group of its
--- own), setsid (a session of its own, as glibc's POSIX_SPAWN_SETSID: its own group, and no
--- controlling tty, so no tty's signals reach it: a daemon). A descriptor mapped to false starts
+-- own), setsid (a session of its own, as glibc's POSIX_SPAWN_SETSID: its own group; its controlling
+-- tty is its stdin's, if that's a tty of no session, as login_tty makes it, and it's in front there;
+-- else it has none, so no tty's signals reach it: a daemon). A descriptor mapped to false starts
 -- closed in the child (a shell's n>&-), even 0, 1 or 2.
 local function spawn(parent, path, argv, opts)
   opts = opts or {}
@@ -440,9 +444,6 @@ local function spawn(parent, path, argv, opts)
   if opts.pgid == 0 or opts.setsid then
     p.pgid = p.pid
   end
-  if opts.setsid then
-    p.tty = nil
-  end
   for signal, disposition in pairs(parent.handlers) do
     if disposition == "ignore" then
       p.handlers[signal] = "ignore" -- ignored stays ignored across exec; handlers don't
@@ -466,6 +467,15 @@ local function spawn(parent, path, argv, opts)
       return fail("EBADF")
     end
     p.fds[fd] = description and hold(description) or nil
+  end
+  if opts.setsid then
+    -- a session of its own: its controlling tty is its stdin's, if that's a tty no session has
+    -- (as login_tty does after setsid), and it's in front there; else it has none
+    local t = p.fds[0] and p.fds[0].tty
+    p.tty = t and not t.session and t or nil
+    if p.tty then
+      p.tty.session, p.tty.foreground = p.pid, p.pgid
+    end
   end
   p.co = coroutine.create(function()
     return loader(env, path, table.unpack(p.argv))
@@ -602,13 +612,30 @@ function syscalls.pipe(p)
   return r, w
 end
 
+-- openpty(): a pseudo-terminal, as openpty(3): its master end (the program playing the terminal:
+-- what it writes is typed, what it reads was shown) and its terminal end, a tty
+-- (lib/modules/pty.lua, loaded at the first).
+local newpty
+function syscalls.openpty(p)
+  local m = lowestfd(p)
+  local s = m and lowestfd(p, m + 1)
+  if not s then
+    return fail("EMFILE")
+  end
+  newpty = newpty or module("pty", k, vfs, tty)
+  local master, terminal = newpty()
+  p.fds[m], p.fds[s] = hold(master), hold(terminal)
+  return m, s
+end
+
 -- isatty, and the terminal's ioctls by their Linux names: TCGETS and TCSETS (termios flags, as a
--- table), TIOCGWINSZ (columns, rows), TIOCSTI (bytes put in as if typed); a socket's are net's.
+-- table), TIOCGWINSZ (columns, rows), TIOCSWINSZ ({columns, rows}: a pty's, set by its master),
+-- TIOCSTI (bytes put in as if typed), on a tty or a pty's master; a socket's are net's.
 local net -- (lib/modules/net.lua, once a socket is made)
 syscalls.ioctl = withfd(function(p, request, d, fd, op, arg)
   if d.type == "socket" then
     return net.ioctl(d, op, type(arg) == "table" and fromuser(arg) or arg)
-  elseif d.type ~= "tty" then
+  elseif d.type ~= "tty" and d.type ~= "pty" then
     return fail("ENOTTY")
   end
   local t = d.tty
@@ -617,7 +644,12 @@ syscalls.ioctl = withfd(function(p, request, d, fd, op, arg)
   elseif op == "TCSETS" and type(arg) == "table" then
     t:setattr(fromuser(arg))
     return true
-  elseif op == "TIOCGWINSZ" then
+  elseif op == "TIOCGWINSZ" and t.size then
+    return t.size[1], t.size[2]
+  elseif op == "TIOCSWINSZ" and type(arg) == "table" and math.type(arg[1]) == "integer" and math.type(arg[2]) == "integer" then
+    t.size = {arg[1], arg[2]} -- (a pty's: its master says how big its terminal is)
+    return true
+  elseif op == "TIOCGWINSZ" and t.device then
     local ok, width, height = board.invoke(t.device, "getSize")
     if ok then
       return width, height
@@ -1004,6 +1036,7 @@ local function ttysignal(t, signal)
   end
 end
 
+k.ttysignal = ttysignal
 console = tty.new(options.console or CONSOLE, ttysignal)
 k.console = console
 kernel.tty = console
@@ -1055,7 +1088,7 @@ function respawn()
   end
   retryat = nil
   p.respawn = true
-  console.foreground = p.pgid
+  console.foreground, console.session = p.pgid, p.pid
 end
 
 -- The console as init's stdin, stdout and stderr (as Linux's init opens /dev/console).
