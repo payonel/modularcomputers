@@ -23,8 +23,10 @@ datagram to
 at
 .IR address :
 a network card's address (its id, as
-.B ifconfig
-shows it), or
+.B lsdev \-i
+shows it, with or without its
+.B id:
+prefix), or
 .B broadcast
 for every card the computer's cards reach (a wired card's cables, a WLAN
 card's range). What comes back to its port is written out. It ends when
@@ -83,6 +85,24 @@ says; this one ends at once, as with
 Without
 .BR \-u ,
 netcat would use TCP, which mcos doesn't have.
+.PP
+A network card can turn its computer on while it's off (Wake\-on\-LAN):
+a frame for it holding its wake message, anywhere in the data, presses the
+power button. A program sets the message (an empty one: none) with a
+socket's ioctl, as Linux's ethtool does:
+.PP
+.nf
+local sys = require("sys")
+sys.ioctl(sys.socket(), "ETHTOOL_SWOL", {name = "wlan0", wake = "letmein"})
+.fi
+.PP
+Then, from another computer:
+.B echo letmein | nc \-ub broadcast 9
+(port 9, discard, is the usual one; any will do). Interfaces are named as
+Linux's:
+.B eth0
+for the first wired card,
+.B wlan0
+for the first WLAN card.
 .SH SEE ALSO
-.BR ifconfig (1),
-.BR ethtool (1)
+.BR lsdev (1)

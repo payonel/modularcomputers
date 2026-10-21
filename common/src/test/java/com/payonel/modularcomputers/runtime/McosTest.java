@@ -1106,7 +1106,7 @@ class McosTest {
 	}
 
 	@Test
-	void ncListensAndSendsAndEthtoolSetsTheWakeMessage() {
+	void ncListensAndSendsAndASocketsIoctlSetsTheWakeMessage() {
 		Object world = new Object();
 		java.util.UUID mine = java.util.UUID.randomUUID();
 		var card = networkCard(world, mine);
@@ -1114,8 +1114,12 @@ class McosTest {
 		var peer = networkCard(world, java.util.UUID.randomUUID());
 		peer.power().supply(this);
 		peer.accepting(true);
+		file("w.lua", """
+			local sys = require("sys")
+			assert(sys.ioctl(assert(sys.socket()), "ETHTOOL_SWOL", {name = "wlan0", wake = "secret"}))
+			""");
 		boot();
-		type("ethtool -s wlan0 sopass secret; touch /set\r");
+		type("lua /w.lua; touch /set\r");
 		untilFile(root().resolve("set"), "");
 		assertThat(card.getWake(args()).first()).isEqualTo("secret");
 		type("nc -ul 7 > /tmp/heard &\r");

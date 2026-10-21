@@ -209,7 +209,9 @@ the disks' reports turned into full paths by their mounts (tmpfs reports through
 no-op until then); it watches paths, not inodes as Linux's does, and a change made on a disk's
 host isn't seen. **Sockets** are UDP over the network cards (`lib/modules/net.lua`, loaded at the first
 `sys.socket()`): `bind`, `sendto`, `recvfrom`, `poll`, Linux's names for interfaces (eth0, wlan0)
-and ioctls (`SIOCGIFCONF`, ethtool's wake). No IP: an address is a card's. A NIC has no `/dev`
+and ioctls (`SIOCGIFCONF`, ethtool's wake), with no commands for them (user, 2026-10-21:
+`ifconfig` and `ethtool` have no purpose here; an address is in `lsdev -i`, and a program sets the
+wake message). No IP: an address is a card's. A NIC has no `/dev`
 file, as on Linux (its method is `receive`, not `pull`, so devfs makes none): a program reads the
 network through a socket (`nc -ul 7`), never a device file. **A process's syscall wrappers are
 made at its first use of each** (a metatable on its `sys`): a syscall costs a process nothing
