@@ -56,7 +56,8 @@ public final class DisplayScreen extends Screen {
 	/** Lines a notch of the mouse wheel scrolls the terminal's glass. */
 	private static final int WHEEL_LINES = 3;
 	private final BlockPos pos;
-	private final Resolution resolution;
+	/** The terminal's size as the layout was made for it: a program may change it while it shows. */
+	private Resolution resolution;
 	/** The computer whose power button shows, if any. */
 	private final Optional<BlockPos> computer;
 	private final boolean caseView;
@@ -74,6 +75,11 @@ public final class DisplayScreen extends Screen {
 
 	public BlockPos pos() {
 		return pos;
+	}
+
+	/** The terminal's size, as the glass is laid out for it now. */
+	public Resolution resolution() {
+		return resolution;
 	}
 
 	public Viewport viewport() {
@@ -100,10 +106,14 @@ public final class DisplayScreen extends Screen {
 
 	@Override
 	protected void init() {
-		layout = DisplayLayout.of(width, height, resolution.aspectRatio(), FILL, BEZEL, ComputerButtons.SIZE, ComputerButtons.GAP);
+		layout = layout();
 		// The terminal takes typing: SDL only sends typed characters while text input is on, as
 		// for a focused text box.
 		minecraft.onTextInputFocusChange(this, true);
+	}
+
+	private DisplayLayout layout() {
+		return DisplayLayout.of(width, height, resolution.aspectRatio(), FILL, BEZEL, ComputerButtons.SIZE, ComputerButtons.GAP);
 	}
 
 	@Override
@@ -198,6 +208,10 @@ public final class DisplayScreen extends Screen {
 		// The bezel is the block's (a case's or the screen's own era); the glass and its glow, the terminal's.
 		int tier = host instanceof AllInOneBlockEntity computer ? computer.tier().number()
 			: host != null ? host.terminal().tier().number() : 1;
+		if (host != null && !host.terminal().buffer().resolution().equals(resolution)) {
+			resolution = host.terminal().buffer().resolution(); // a program resized it: the glass takes its new shape
+			layout = layout();
+		}
 		extractBezel(graphics, Bezel.of(tier));
 		Viewport display = layout.display();
 		var depth = host != null ? host.terminal().tier().depth() : com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR;
@@ -239,6 +253,7 @@ public final class DisplayScreen extends Screen {
 			block && column == cursor.column() && row == cursor.row() ? depth.glow(buffer.foreground(column, row)) : buffer.background(column, row);
 		java.util.function.BiFunction<Integer, Integer, Integer> foreground = (column, row) ->
 			block && column == cursor.column() && row == cursor.row() ? buffer.background(column, row) : depth.glow(buffer.foreground(column, row));
+		Resolution resolution = buffer.resolution();
 		Viewport area = layout.display();
 		TextGrid grid = TextGrid.of(area.width(), area.height(), resolution, font);
 		// Backgrounds first, in runs of equal color; the display is already black.

@@ -534,8 +534,11 @@ public class AllInOneGameTest {
 		helper.succeed();
 	}
 
+	/** What a cell of a changed row costs on the wire, at most: its character and its two colors (3 bytes each), and a little. */
+	private static final int BYTES_PER_CELL = 8;
+
 	@GameTest
-	public void aChangedRowGoesToPlayersAsAFewHundredBytesNotTheWholeBlock(GameTestHelper helper) {
+	public void aChangedRowGoesToPlayersAloneNotTheWholeBlock(GameTestHelper helper) {
 		AllInOneBlockEntity computer = install(place(helper), true, true);
 		computer.pressPower();
 		var registries = helper.getLevel().registryAccess();
@@ -555,7 +558,8 @@ public class AllInOneGameTest {
 		int rows = buf.readableBytes();
 		com.payonel.modularcomputers.ModularComputers.LOGGER.info("A typed key: {} bytes as changed rows, {} bytes as the whole block", rows, whole);
 		helper.assertValueEqual(payload.rows().size(), 1, "one row changed");
-		helper.assertTrue(rows < 400 && rows * 10 < whole, "a row is small: " + rows + " bytes, the whole block " + whole);
+		int columns = computer.terminal().buffer().resolution().columns();
+		helper.assertTrue(rows < columns * BYTES_PER_CELL && rows * 10 < whole, "a row is small: " + rows + " bytes (" + columns + " columns), the whole block " + whole);
 		helper.succeed();
 	}
 

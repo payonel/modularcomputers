@@ -1,0 +1,66 @@
+-- resize [-s rows columns]: the terminal's size, as xterm's resize. -s asks the terminal to be rows
+-- by columns first (xterm's sequence, ESC[8;rows;columns t: it's made no larger than it can be, and
+-- 0 is its largest). Then it asks the terminal how big it is (ESC[18t), tells the kernel
+-- (TIOCSWINSZ: the program in front gets SIGWINCH), and prints shell commands setting COLUMNS and
+-- LINES, for eval. It talks to its terminal through /dev/tty, so its output can be redirected.
+local sys = require("sys")
+
+local ANSWER_SECONDS = 1 -- how long it waits for the terminal's answer
+local SETTLE_SECONDS = 0.1 -- after it: more answers (every terminal in the console's group answers) are dropped
+local USAGE = "usage: resize [-s rows columns]\n"
+
+local rows, columns
+if arg[1] == "-s" then
+  rows, columns = math.tointeger(tonumber(arg[2])), math.tointeger(tonumber(arg[3]))
+  if not (rows and columns) or rows < 0 or columns < 0 or #arg ~= 3 then
+    io.stderr:write(USAGE)
+    return 1
+  end
+elseif #arg > 0 then
+  io.stderr:write(USAGE)
+  return 1
+end
+
+local tty, why = sys.open("/dev/tty", "r+")
+if not tty then
+  io.stderr:write("resize: /dev/tty: ", tostring(why), "\n")
+  return 1
+end
+-- Raw while it asks: the answer isn't echoed, and comes as it's sent.
+local saved = sys.ioctl(tty, "TCGETS")
+local raw = {}
+for name, on in pairs(saved) do
+  raw[name] = on
+end
+raw.icanon, raw.echo = false, false
+sys.ioctl(tty, "TCSETS", raw)
+
+if rows then
+  sys.write(tty, "\27[8;" .. rows .. ";" .. columns .. "t")
+end
+sys.write(tty, "\27[18t")
+local answer, got = "", nil
+local waited = 0
+while not got and waited < ANSWER_SECONDS do
+  local ready = sys.poll({[tty] = {IN = true}}, SETTLE_SECONDS)
+  if ready[tty] then
+    answer = answer .. (sys.read(tty) or "")
+    got = {answer:match("\27%[8;(%d+);(%d+)t")}
+    got = got[1] and got or nil
+  else
+    waited = waited + SETTLE_SECONDS
+  end
+end
+while next(sys.poll({[tty] = {IN = true}}, SETTLE_SECONDS)) do
+  sys.read(tty) -- (the other terminals' answers)
+end
+sys.ioctl(tty, "TCSETS", saved)
+if not got then
+  sys.close(tty)
+  io.stderr:write("resize: the terminal didn't say its size\n")
+  return 1
+end
+rows, columns = math.tointeger(tonumber(got[1])), math.tointeger(tonumber(got[2]))
+sys.ioctl(tty, "TIOCSWINSZ", {columns, rows})
+sys.close(tty)
+io.write("COLUMNS=", columns, ";\nLINES=", rows, ";\nexport COLUMNS LINES;\n")

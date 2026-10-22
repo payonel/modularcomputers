@@ -13,10 +13,10 @@ public final class TextBuffer {
 	public static final int DEFAULT_FOREGROUND = 0xFFFFFF;
 	public static final int DEFAULT_BACKGROUND = 0x000000;
 
-	private final Resolution resolution;
-	private final char[][] chars;
-	private final int[][] foregrounds;
-	private final int[][] backgrounds;
+	private Resolution resolution;
+	private char[][] chars;
+	private int[][] foregrounds;
+	private int[][] backgrounds;
 	/** Counts changes, so whoever shows the buffer can tell when it needs sending again. */
 	private int changes;
 	/** Rows changed since {@link #takeDirtyRows()} last looked: what players' copies need. */
@@ -32,6 +32,35 @@ public final class TextBuffer {
 
 	public Resolution resolution() {
 		return resolution;
+	}
+
+	/**
+	 * Another size: the cells that still fit stay where they are (the top left), the rest are
+	 * dropped, and new cells are blank (as xterm's resize: nothing is wrapped again). Every row is
+	 * changed for whoever shows it.
+	 */
+	public void resize(Resolution size) {
+		if (size.equals(resolution)) {
+			return;
+		}
+		char[][] oldChars = chars;
+		int[][] oldForegrounds = foregrounds;
+		int[][] oldBackgrounds = backgrounds;
+		Resolution old = resolution;
+		resolution = size;
+		chars = new char[size.rows()][size.columns()];
+		foregrounds = new int[size.rows()][size.columns()];
+		backgrounds = new int[size.rows()][size.columns()];
+		clear();
+		int columns = Math.min(old.columns(), size.columns());
+		for (int row = 0; row < Math.min(old.rows(), size.rows()); row++) {
+			System.arraycopy(oldChars[row], 0, chars[row], 0, columns);
+			System.arraycopy(oldForegrounds[row], 0, foregrounds[row], 0, columns);
+			System.arraycopy(oldBackgrounds[row], 0, backgrounds[row], 0, columns);
+		}
+		changes++;
+		dirty.clear();
+		dirty.set(0, size.rows());
 	}
 
 	/** Goes up whenever a cell changes (or might have). */

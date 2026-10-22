@@ -221,4 +221,51 @@ class VtDecoderTest {
 		assertThat(copy.foregrounds()).isEqualTo(buffer.foregrounds());
 		assertThat(copy.row(0)).isEqualTo("main  ");
 	}
+	@Test
+	void xtermsResizeSequenceMakesItAnotherSizeUpToItsLargestAndItReportsBoth() {
+		vt.write("ab\r\ncd");
+		vt.write(ESC + "[8;2;4t"); // 2 rows, 4 columns
+		assertThat(buffer.resolution()).isEqualTo(new Resolution(4, 2));
+		assertThat(rows()).as("what still fits stays; nothing wraps again").containsExactly("ab  ", "cd  ");
+		vt.write(ESC + "[8;9;99t");
+		assertThat(buffer.resolution()).as("no larger than its largest (its first size)").isEqualTo(new Resolution(6, 3));
+		vt.write(ESC + "[8;2;4t" + ESC + "[8;0;0t");
+		assertThat(buffer.resolution()).as("0: the largest").isEqualTo(new Resolution(6, 3));
+		vt.write(ESC + "[8;;5t");
+		assertThat(buffer.resolution()).as("an omitted one stays").isEqualTo(new Resolution(5, 3));
+		vt.write(ESC + "[18t" + ESC + "[19t");
+		assertThat(replies).containsExactly(ESC + "[8;3;5t", ESC + "[9;3;6t");
+	}
+
+	@Test
+	void fewerRowsSendTheLinesAboveTheCursorIntoTheScrollbackFirst() {
+		List<String> scrolled = new ArrayList<>();
+		vt.setHistory(new VtDecoder.History() {
+			@Override
+			public void scrolledOff(String text, int[] foregrounds, int[] backgrounds) {
+				scrolled.add(text);
+			}
+
+			@Override
+			public void clear() {
+			}
+		});
+		vt.write("a\r\nb\r\nc");
+		vt.resize(new Resolution(6, 1));
+		assertThat(rows()).as("the cursor's line stays on the screen").containsExactly("c     ");
+		assertThat(scrolled).containsExactly("a     ", "b     ");
+		assertThat(vt.row()).isZero();
+		vt.write(ESC + "[2;1r"); // (a bad region on one row: ignored)
+		vt.resize(new Resolution(6, 3));
+		vt.write(ESC + "[3;1Hz");
+		assertThat(rows()).as("the scroll region is the whole screen again").containsExactly("c     ", "      ", "z     ");
+	}
+
+	@Test
+	void theMainScreenBehindTheAlternateOneIsMadeTheSameSize() {
+		vt.write("main" + ESC + "[?1049h" + "alt");
+		vt.resize(new Resolution(3, 2));
+		vt.write(ESC + "[?1049l");
+		assertThat(rows()).containsExactly("mai", "   ");
+	}
 }

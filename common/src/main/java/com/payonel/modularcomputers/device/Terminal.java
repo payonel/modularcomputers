@@ -39,6 +39,12 @@ import java.util.Optional;
  * go down the line. A key typed or anything written brings the view back to the bottom (xterm's
  * scrollKey and scrollTtyOutput). The alternate screen saves no lines; {@code ESC[3J} clears them.
  * They're not saved with the block (lost when it unloads, as a terminal's memory at power-off).
+ * <p>
+ * <b>Its size</b> (user, 2026-10-21): it powers on at its largest (its tier's), and a program may
+ * make it smaller, or larger again up to that, with xterm's resize sequence ({@code ESC[8;rows;cols
+ * t}). In the console's group its largest is the group's (the console caps it, {@link #cap}), as
+ * UEFI's splitter sets every console device to a mode they all have. Lines in the scrollback keep
+ * the width they had.
  */
 public final class Terminal implements Device {
 	/** What a terminal draws each tick it has power: a tenth of a running CPU. */
@@ -111,18 +117,30 @@ public final class Terminal implements Device {
 	private VtDecoder.Screen live;
 
 	private final TerminalTier tier;
+	/** The size it powers on at, and the largest it can be. */
+	private final Resolution maximum;
+	/** The largest the console's group lets it be while it's in it, or null. */
+	private Resolution cap;
 	/** Where its label is (its item's anvil name), read when asked: no copy of it here. */
 	private java.util.function.Supplier<String> label = () -> null;
 
-	/** A tier 3 terminal (every color). */
+	/** A tier 3 terminal (every color) of this size at most. */
 	public Terminal(Resolution resolution) {
 		this(resolution, TerminalTier.TIER_3);
 	}
 
+	/** A terminal of its tier's largest size. */
+	public Terminal(TerminalTier tier) {
+		this(tier.maximum(), tier);
+	}
+
+	/** A terminal of a tier, of this size at most (it powers on at it). */
 	public Terminal(Resolution resolution, TerminalTier tier) {
 		this.tier = tier;
+		this.maximum = resolution;
 		this.buffer = new TextBuffer(resolution);
 		this.decoder = new VtDecoder(buffer, this::queue, tier.depth(), tier.attributes());
+		decoder.sizing(this::largest, () -> changed.run());
 		decoder.setHistory(new VtDecoder.History() {
 			@Override
 			public void scrolledOff(String text, int[] foregrounds, int[] backgrounds) {
@@ -141,6 +159,34 @@ public final class Terminal implements Device {
 
 	public TerminalTier tier() {
 		return tier;
+	}
+
+	/** The largest it can be: its own, or less in the console's group. */
+	public Resolution largest() {
+		return cap == null ? maximum
+			: new Resolution(Math.min(maximum.columns(), cap.columns()), Math.min(maximum.rows(), cap.rows()));
+	}
+
+	/** Its own largest size, whatever group it's in. */
+	public Resolution maximum() {
+		return maximum;
+	}
+
+	/** The console's group's largest, while it's in the group (null: none): it's made no larger. */
+	public void cap(Resolution cap) {
+		this.cap = cap;
+		Resolution most = largest();
+		Resolution now = buffer.resolution();
+		if (now.columns() > most.columns() || now.rows() > most.rows()) {
+			resize(new Resolution(Math.min(now.columns(), most.columns()), Math.min(now.rows(), most.rows())));
+		}
+	}
+
+	/** Makes it another size (no larger than {@link #largest}), as its resize sequence does. */
+	public void resize(Resolution size) {
+		Resolution most = largest();
+		scrollToBottom();
+		decoder.resize(new Resolution(Math.clamp(size.columns(), 1, most.columns()), Math.clamp(size.rows(), 1, most.rows())));
 	}
 
 	/** What its glass shows: the screen, or the scrollback while it's scrolled back. */
@@ -186,7 +232,9 @@ public final class Terminal implements Device {
 		for (int row = 0; row < rows; row++) {
 			int index = saved.length - viewOffset + row;
 			if (index < saved.length) {
-				buffer.setRow(row, saved[index].text(), saved[index].foregrounds(), saved[index].backgrounds());
+				Line line = saved[index]; // (as wide as the screen was when it scrolled off)
+				buffer.setRow(row, fitted(line.text(), columns), fitted(line.foregrounds(), columns, TextBuffer.DEFAULT_FOREGROUND),
+					fitted(line.backgrounds(), columns, TextBuffer.DEFAULT_BACKGROUND));
 			} else {
 				int screenRow = index - saved.length;
 				int[] foregrounds = java.util.Arrays.copyOfRange(live.foregrounds(), screenRow * columns, (screenRow + 1) * columns);
@@ -194,6 +242,16 @@ public final class Terminal implements Device {
 				buffer.setRow(row, live.rows().get(screenRow), foregrounds, backgrounds);
 			}
 		}
+	}
+
+	private static String fitted(String text, int columns) {
+		return text.length() >= columns ? text.substring(0, columns) : text + " ".repeat(columns - text.length());
+	}
+
+	private static int[] fitted(int[] colors, int columns, int blank) {
+		int[] fitted = java.util.Arrays.copyOf(colors, columns);
+		java.util.Arrays.fill(fitted, Math.min(colors.length, columns), columns, blank);
+		return fitted;
 	}
 
 	/** Back to the bottom: the glass shows the screen as it is. */
@@ -349,9 +407,10 @@ public final class Terminal implements Device {
 		return Result.ok(takeInput(args.optInteger(0, Long.MAX_VALUE), true).orElse(null));
 	}
 
-	@Method(doc = "getSize(): columns, rows")
+	@Method(doc = "getSize(): columns, rows; then the largest it can be made, columns and rows (xterm's resize sequence makes it another size)")
 	public Result getSize(Arguments args) {
-		return Result.ok(buffer.resolution().columns(), buffer.resolution().rows());
+		Resolution most = largest();
+		return Result.ok(buffer.resolution().columns(), buffer.resolution().rows(), most.columns(), most.rows());
 	}
 
 	@Override
@@ -394,12 +453,13 @@ public final class Terminal implements Device {
 		}
 	}
 
-	/** Power's gone: a blank screen, the cursor home, default modes, nothing waiting. */
+	/** Power's gone: a blank screen at its power-on size, the cursor home, default modes, nothing waiting. */
 	@Override
 	public void powerOff() {
 		scrollToBottom();
 		history.clear();
 		decoder.reset();
+		decoder.resize(largest());
 		input.clear();
 		changed.run();
 	}

@@ -1,0 +1,54 @@
+.TH RESIZE 1 "" "" "mcos Manual"
+.SH NAME
+resize \- set or show the terminal's size
+.SH SYNOPSIS
+.B resize
+.RB [ \-s
+.I rows
+.IR columns ]
+.SH DESCRIPTION
+.B resize
+asks the terminal how big it is, tells the kernel (so the program in front
+gets SIGWINCH, and looks again), and prints shell commands setting
+.B COLUMNS
+and
+.BR LINES ,
+for
+.BR eval .
+.PP
+A terminal powers on at the largest its tier shows: 50 by 16 (tier 1), 80 by
+25 (tier 2), 160 by 50 (tier 3). It can be made smaller, and larger again up
+to that. In the console's group (every screen the console shows on), the
+largest is what every one of them can show, and they're all the same size.
+.SH OPTIONS
+.TP
+.BI "\-s " "rows columns"
+First asks the terminal to be
+.I rows
+by
+.I columns
+(xterm's sequence,
+.BR "ESC[8;" rows ; columns t ),
+no larger than it can be;
+.B 0
+is the largest. Text that no longer fits is dropped (lines above the
+cursor go into the scrollback first), and nothing is wrapped again.
+.SH EXIT STATUS
+0 on success; 1 for a bad argument, or when the terminal didn't answer.
+.SH EXAMPLES
+.nf
+resize \-s 25 80
+resize \-s 0 0
+eval $(resize)
+.fi
+.SH NOTES
+As xterm's, it talks to its terminal with escape sequences through
+.BR /dev/tty :
+a program can do the same
+.RB ( "ESC[18t"
+asks the size,
+.B "ESC[19t"
+the largest). A program that resizes the terminal itself, without telling
+the kernel, leaves the program in front unaware until it asks again.
+.SH SEE ALSO
+.BR stty (1)

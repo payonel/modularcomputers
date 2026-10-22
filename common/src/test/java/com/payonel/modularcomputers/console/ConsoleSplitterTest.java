@@ -32,7 +32,7 @@ class ConsoleSplitterTest {
 		ConsoleSplitter console = console(new Disk(DiskTier.TIER_1), one, two);
 		console.write("hi\r\nthere");
 		assertThat(one.buffer().rows()).containsExactly("hi    ", "there ");
-		assertThat(two.buffer().rows()).containsExactly("hi    ", "there ", "      ");
+		assertThat(two.buffer().rows()).as("one size for the group: what every member can show").containsExactly("hi    ", "there ");
 		assertThat(console.size()).isEqualTo(new Resolution(6, 2));
 	}
 
@@ -73,5 +73,28 @@ class ConsoleSplitterTest {
 		console.reset();
 		assertThat(console.screen().isBlank()).isTrue();
 		assertThat(console.decoder().column()).isZero();
+	}
+	@Test
+	void itsGroupIsOneSizeTheLargestEveryMemberCanShowAndAProgramMayResizeIt() {
+		Terminal small = new Terminal(new Resolution(8, 4));
+		Terminal big = new Terminal(new Resolution(12, 6));
+		java.util.Map<String, com.payonel.modularcomputers.bus.Device> devices = new java.util.LinkedHashMap<>();
+		devices.put("id:small", small);
+		devices.put("id:big", big);
+		Bus bus = new Bus(List.of());
+		bus.setDevices(devices);
+		ConsoleSplitter console = new ConsoleSplitter(bus);
+		assertThat(console.size()).isEqualTo(new Resolution(8, 4));
+		assertThat(big.buffer().resolution()).as("set to the console's size").isEqualTo(new Resolution(8, 4));
+		console.write("\u001B[8;2;5t");
+		assertThat(List.of(console.size(), small.buffer().resolution(), big.buffer().resolution())).as("everyone follows")
+			.containsOnly(new Resolution(5, 2));
+		console.write("\u001B[8;0;0t");
+		assertThat(big.buffer().resolution()).as("the group's largest, not its own").isEqualTo(new Resolution(8, 4));
+		assertThat(console.getSize(new com.payonel.modularcomputers.runtime.Arguments(List.of())).values()).containsExactly(8L, 4L, 8L, 4L);
+		console.unbind(new com.payonel.modularcomputers.runtime.Arguments(List.of("id:small")));
+		big.write("\u001B[8;0;0t");
+		assertThat(big.buffer().resolution()).as("the group's largest is its own now").isEqualTo(new Resolution(12, 6));
+		assertThat(console.size()).as("the console keeps its size (a program may change it)").isEqualTo(new Resolution(8, 4));
 	}
 }

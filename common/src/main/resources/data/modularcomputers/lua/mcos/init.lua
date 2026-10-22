@@ -155,9 +155,9 @@ local order = {} -- pids in the order they run (round robin)
 local nextpid = 1
 local kernel = {pid = 0, cwd = "/", fds = {}, environ = {PATH = "/bin", HOME = "/"}, handlers = {}}
 
-local SIGNALS = {SIGHUP = 1, SIGINT = 2, SIGKILL = 9, SIGPIPE = 13, SIGTERM = 15, SIGCHLD = 17}
+local SIGNALS = {SIGHUP = 1, SIGINT = 2, SIGKILL = 9, SIGPIPE = 13, SIGTERM = 15, SIGCHLD = 17, SIGWINCH = 28}
 -- What a signal does when a process hasn't said: end it, or nothing.
-local IGNORED_BY_DEFAULT = {SIGCHLD = true}
+local IGNORED_BY_DEFAULT = {SIGCHLD = true, SIGWINCH = true}
 
 local function children(parent)
   local list = {}
@@ -629,7 +629,8 @@ function syscalls.openpty(p)
 end
 
 -- isatty, and the terminal's ioctls by their Linux names: TCGETS and TCSETS (termios flags, as a
--- table), TIOCGWINSZ (columns, rows), TIOCSWINSZ ({columns, rows}: a pty's, set by its master),
+-- table), TIOCGWINSZ (columns, rows: a terminal's own, asked each time), TIOCSWINSZ ({columns,
+-- rows}: a pty's size, set by its master; on any tty, SIGWINCH to the program in front, as Linux's),
 -- TIOCSTI (bytes put in as if typed), on a tty or a pty's master; a socket's are net's.
 local net -- (lib/modules/net.lua, once a socket is made)
 syscalls.ioctl = withfd(function(p, request, d, fd, op, arg)
@@ -647,7 +648,10 @@ syscalls.ioctl = withfd(function(p, request, d, fd, op, arg)
   elseif op == "TIOCGWINSZ" and t.size then
     return t.size[1], t.size[2]
   elseif op == "TIOCSWINSZ" and type(arg) == "table" and math.type(arg[1]) == "integer" and math.type(arg[2]) == "integer" then
-    t.size = {arg[1], arg[2]} -- (a pty's: its master says how big its terminal is)
+    if not t.device then
+      t.size = {arg[1], arg[2]} -- a pty's: its master says how big its terminal is (a device says for itself)
+    end
+    k.ttysignal(t, "SIGWINCH") -- its size changed: the program in front looks again
     return true
   elseif op == "TIOCGWINSZ" and t.device then
     local ok, width, height = board.invoke(t.device, "getSize")

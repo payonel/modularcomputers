@@ -3,7 +3,6 @@ package com.payonel.modularcomputers.block;
 import com.mojang.serialization.Codec;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.device.TerminalTier;
-import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.menu.CardHolderMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -29,7 +28,7 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 	public ScreenBlockEntity(BlockPos pos, BlockState state) {
 		super(ModBlocks.SCREEN_ENTITY, pos, state, 1);
 		// Its tier is its block's: tier 1 text only, tier 2 16 colors, tier 3 every color.
-		this.display = new Terminal(Resolution.DEFAULT, state.getBlock() instanceof ScreenBlock screen ? screen.tier() : TerminalTier.TIER_3);
+		this.display = new Terminal(state.getBlock() instanceof ScreenBlock screen ? screen.tier() : TerminalTier.TIER_3);
 		display.setFlusher(this::serverTick); // right after a computer's turn changed it
 		// Minecraft writes only chunks marked changed: what it shows and the keys waiting change as it's used.
 		display.onChange(() -> {

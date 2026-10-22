@@ -114,7 +114,7 @@ class RuntimeTest {
 		});
 		assertThat(seen).containsExactly(
 			List.of(new Board.DeviceInfo("id:screen", "id:screen", "terminal"), new Board.DeviceInfo("id:sensor-1", "id:sensor-1", "sensor")),
-			"terminal", "console", List.of("getSize", "read", "write"), "read(): the oldest reading, or nil", List.of(50L, 16L), 0);
+			"terminal", "console", List.of("getSize", "read", "write"), "read(): the oldest reading, or nil", List.of(50L, 16L, 50L, 16L), 0);
 	}
 
 	@Test

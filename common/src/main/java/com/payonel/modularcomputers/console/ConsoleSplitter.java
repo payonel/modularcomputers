@@ -34,6 +34,14 @@ import java.util.Set;
  * (what's on it stays), and takes it back with {@link #bind}, redrawing itself onto it (names from
  * Linux's vtconsole; UEFI sets its members from NVRAM instead). An unbound terminal stays unbound
  * while it's on the bus; one that leaves and comes back is a new arrival and joins the group again.
+ * <p>
+ * <b>Its size</b> (user, 2026-10-21): one for the whole group, the largest every member can show,
+ * as UEFI's splitter sets every console device to a mode they all have. Each member is capped at
+ * the group's largest while it's in the group, and set to the console's size when it joins. Its
+ * size is the group's largest when it's first chosen (at power-on, once it has members), and kept
+ * from then on, a save included. A
+ * program makes it smaller, or larger again up to that, with xterm's resize sequence, which every
+ * member follows within the same cap. Taken out of the group, a terminal may be its own largest.
  */
 public final class ConsoleSplitter {
 	/** The size reported when no terminal is attached; never 0x0, so callers need no special case. */
@@ -47,24 +55,55 @@ public final class ConsoleSplitter {
 	});
 	/** The bus addresses of terminals taken out of the group. */
 	private final Set<String> unbound = new HashSet<>();
+	/** The group as it was last settled ({@link #settle}). */
+	private List<Terminal> group = List.of();
+	/** The largest every member can show (or {@link #HEADLESS} with none): its members' cap, and its own. */
+	private Resolution common = HEADLESS;
+	/** Its size was chosen (with members), or restored from a save: kept from then on, within the group's largest. */
+	private boolean sized;
 
 	public ConsoleSplitter(Bus bus) {
 		this.bus = bus;
+		decoder.sizing(() -> common, () -> {
+		});
+		settle(); // (a bus may come with terminals)
 	}
 
-	/** The smallest size among its terminals, or {@link #HEADLESS} without any. */
+	/** Its size: what it and every terminal in its group show (its copy's), or {@link #HEADLESS} without any. */
 	public Resolution size() {
-		List<Terminal> terminals = terminals();
-		if (terminals.isEmpty()) {
-			return HEADLESS;
+		return group.isEmpty() ? HEADLESS : screen.resolution();
+	}
+
+	/**
+	 * After its group may have changed: the group's largest is worked out again and caps every
+	 * member (one that left the group is let go); a member that joined is set to the console's size,
+	 * which is the group's largest when the group was empty before.
+	 */
+	private void settle() {
+		List<Terminal> now = terminals();
+		for (Terminal left : group) {
+			if (!now.contains(left)) {
+				left.cap(null); // its own largest again
+			}
 		}
 		int columns = Integer.MAX_VALUE;
 		int rows = Integer.MAX_VALUE;
-		for (Terminal terminal : terminals) {
-			columns = Math.min(columns, terminal.buffer().resolution().columns());
-			rows = Math.min(rows, terminal.buffer().resolution().rows());
+		for (Terminal terminal : now) {
+			columns = Math.min(columns, terminal.maximum().columns());
+			rows = Math.min(rows, terminal.maximum().rows());
 		}
-		return new Resolution(columns, rows);
+		common = now.isEmpty() ? HEADLESS : new Resolution(columns, rows);
+		Resolution size = !sized ? common
+			: new Resolution(Math.min(screen.resolution().columns(), common.columns()), Math.min(screen.resolution().rows(), common.rows()));
+		sized |= !now.isEmpty();
+		decoder.resize(size);
+		for (Terminal terminal : now) {
+			terminal.cap(common);
+			if (!group.contains(terminal) || !terminal.buffer().resolution().equals(size)) {
+				terminal.resize(size);
+			}
+		}
+		group = now;
 	}
 
 	/** The console's own copy of what it shows; save it with {@link #decoder()}'s state. */
@@ -118,12 +157,21 @@ public final class ConsoleSplitter {
 	 */
 	public void busChanged() {
 		unbound.retainAll(bus.addresses());
+		settle();
 	}
 
-	/** Power's gone: a blank copy, the cursor home, every terminal back in the group. */
+	/** Power's gone: a blank copy, the cursor home, every terminal back in the group, which settles afresh. */
 	public void reset() {
 		unbound.clear();
 		decoder.reset();
+		group = List.of();
+		sized = false;
+		settle();
+	}
+
+	/** Its copy came back from a save, at the size it had: kept. */
+	public void restored() {
+		sized = true;
 	}
 
 	// ---- device methods: the console as programs use it, by name on the virtual bus ----------
@@ -139,10 +187,10 @@ public final class ConsoleSplitter {
 		return Result.ok(takeInput(args.optInteger(0, Long.MAX_VALUE)).orElse(null));
 	}
 
-	@Method(doc = "getSize(): columns, rows; the smallest of the terminals in the console's group")
+	@Method(doc = "getSize(): columns, rows (what every terminal in the console's group shows); then the largest it can be made, columns and rows")
 	public Result getSize(Arguments args) {
 		Resolution size = size();
-		return Result.ok(size.columns(), size.rows());
+		return Result.ok(size.columns(), size.rows(), common.columns(), common.rows());
 	}
 
 	@Method(doc = "terminals(): the terminals in the console's group, by address, in bus order")
@@ -154,6 +202,7 @@ public final class ConsoleSplitter {
 	public Result unbind(Arguments args) {
 		return member(args.checkString(0)).map(address -> {
 			unbound.add(address);
+			settle();
 			return Result.ok(true);
 		}).orElseGet(() -> Result.fail("not a terminal on the bus: " + args.checkString(0)));
 	}
@@ -162,6 +211,7 @@ public final class ConsoleSplitter {
 	public Result bind(Arguments args) {
 		return member(args.checkString(0)).map(address -> {
 			if (unbound.remove(address) && bus.device(address).orElse(null) instanceof Terminal terminal) {
+				settle(); // (it's set to the console's size)
 				redraw(terminal);
 			}
 			return Result.ok(true);

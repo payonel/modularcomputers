@@ -1,6 +1,7 @@
 package com.payonel.modularcomputers.device;
 
 import com.payonel.modularcomputers.display.ColorDepth;
+import com.payonel.modularcomputers.display.Resolution;
 
 /**
  * What a terminal tier shows (user design, 2026-10-11), each modeled on a real DEC terminal
@@ -9,18 +10,28 @@ import com.payonel.modularcomputers.display.ColorDepth;
  * the 16 ANSI colors; tier 3 every color (sixel graphics are planned for it, as on a VT340). Each
  * answers Device Attributes ({@code ESC[c}) as its model did, so a program can tell what it's
  * talking to: {@code ?6c} a VT102, {@code ?65;...;22c} a VT500-family terminal with ANSI color.
+ * <p>
+ * Each also has a largest size (user, 2026-10-21: OpenComputers' screens' sizes), which it powers
+ * on at; a program may make it smaller, and larger again up to that (xterm's resize sequence).
  */
 public enum TerminalTier {
-	TIER_1(ColorDepth.MONOCHROME, "\u001B[?6c"),
-	TIER_2(ColorDepth.SIXTEEN, "\u001B[?65;22c"),
-	TIER_3(ColorDepth.TRUE_COLOR, "\u001B[?63;22c");
+	TIER_1(ColorDepth.MONOCHROME, "\u001B[?6c", new Resolution(50, 16)),
+	TIER_2(ColorDepth.SIXTEEN, "\u001B[?65;22c", new Resolution(80, 25)),
+	TIER_3(ColorDepth.TRUE_COLOR, "\u001B[?63;22c", new Resolution(160, 50));
 
 	private final ColorDepth depth;
 	private final String attributes;
+	private final Resolution maximum;
 
-	TerminalTier(ColorDepth depth, String attributes) {
+	TerminalTier(ColorDepth depth, String attributes, Resolution maximum) {
 		this.depth = depth;
 		this.attributes = attributes;
+		this.maximum = maximum;
+	}
+
+	/** The largest it shows, which it powers on at. */
+	public Resolution maximum() {
+		return maximum;
 	}
 
 	public ColorDepth depth() {

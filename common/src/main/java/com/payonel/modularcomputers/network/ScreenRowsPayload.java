@@ -14,13 +14,14 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 /**
- * Server to client: the rows of a screen that changed, as the terminal decoded them, and where its
- * cursor is (and whether it shows: players draw it blinking, as a terminal does). The server
+ * Server to client: the rows of a screen that changed, as the terminal decoded them, its size (a
+ * program may change it: then every row comes), and where its cursor is (and whether it shows:
+ * players draw it blinking, as a terminal does). The server
  * is the only decoder; players' copies just take the cells (their glass shows what the device
  * shows). The first view of a screen comes with its block's data; after that only changes come
  * this way, instead of the whole block.
  */
-public record ScreenRowsPayload(BlockPos pos, List<Row> rows, Terminal.Cursor cursor) implements CustomPacketPayload {
+public record ScreenRowsPayload(BlockPos pos, int columns, int lines, List<Row> rows, Terminal.Cursor cursor) implements CustomPacketPayload {
 	public static final Type<ScreenRowsPayload> TYPE = new Type<>(ModularComputers.id("screen_rows"));
 
 	/** One row: its index, characters, and each cell's colors. */
@@ -61,6 +62,8 @@ public record ScreenRowsPayload(BlockPos pos, List<Row> rows, Terminal.Cursor cu
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, ScreenRowsPayload> CODEC = StreamCodec.composite(
 		BlockPos.STREAM_CODEC, ScreenRowsPayload::pos,
+		ByteBufCodecs.VAR_INT, ScreenRowsPayload::columns,
+		ByteBufCodecs.VAR_INT, ScreenRowsPayload::lines,
 		Row.CODEC.apply(ByteBufCodecs.list()), ScreenRowsPayload::rows,
 		CURSOR, ScreenRowsPayload::cursor,
 		ScreenRowsPayload::new);
@@ -78,11 +81,14 @@ public record ScreenRowsPayload(BlockPos pos, List<Row> rows, Terminal.Cursor cu
 		for (int row = dirty.nextSetBit(0); row >= 0 && row < buffer.resolution().rows(); row = dirty.nextSetBit(row + 1)) {
 			rows.add(new Row(row, buffer.row(row), buffer.rowForegrounds(row), buffer.rowBackgrounds(row)));
 		}
-		return new ScreenRowsPayload(pos, rows, cursor);
+		return new ScreenRowsPayload(pos, buffer.resolution().columns(), buffer.resolution().rows(), rows, cursor);
 	}
 
 	/** Puts the rows and the cursor into a player's copy. */
 	public void apply(Terminal terminal) {
+		if (columns > 0 && lines > 0) {
+			terminal.decoder().resize(new com.payonel.modularcomputers.display.Resolution(columns, lines)); // (the server's: no limit here)
+		}
 		for (Row row : rows) {
 			terminal.buffer().setRow(row.index(), row.text(), row.foregrounds(), row.backgrounds());
 		}

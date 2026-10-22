@@ -21,6 +21,9 @@ import java.util.function.Consumer;
  * {@code ?1047});</li>
  * <li>reports, answered through {@code reply}: device status ({@code 5n}), cursor position
  * ({@code 6n}) and device attributes ({@code c}, a VT102);</li>
+ * <li>xterm's size operations: resize the text area ({@code CSI 8;rows;cols t}, up to the
+ * largest its terminal allows), report its size ({@code 18t}: {@code CSI 8;rows;cols t}) and the
+ * largest ({@code 19t}: {@code CSI 9;rows;cols t});</li>
  * <li>full reset (ESC c).</li>
  * </ul>
  * Anything else is parsed and ignored, as real terminals do with sequences they don't know.
@@ -38,8 +41,13 @@ public final class VtDecoder {
 
 	private final TextBuffer buffer;
 	private final Consumer<String> reply;
-	private final int columns;
-	private final int rows;
+	private int columns;
+	private int rows;
+	/** The largest it may be made (xterm's resize sequence): its first size, unless its terminal says. */
+	private java.util.function.Supplier<Resolution> largest;
+	/** Told when its size changes. */
+	private Runnable resized = () -> {
+	};
 
 	private Parse parse = Parse.GROUND;
 	private final StringBuilder params = new StringBuilder();
@@ -134,6 +142,67 @@ public final class VtDecoder {
 		this.columns = buffer.resolution().columns();
 		this.rows = buffer.resolution().rows();
 		this.bottom = rows - 1;
+		Resolution first = buffer.resolution();
+		this.largest = () -> first;
+	}
+
+	/** How large a program may make it ({@code CSI 8;rows;cols t}), and who to tell when its size changes. */
+	public void sizing(java.util.function.Supplier<Resolution> largest, Runnable resized) {
+		this.largest = largest;
+		this.resized = resized;
+	}
+
+	/** The largest it may be made now. */
+	public Resolution largest() {
+		return largest.get();
+	}
+
+	/**
+	 * Another size, as xterm's: nothing is wrapped again (cells that still fit stay, new ones are
+	 * blank). Fewer rows: the lines above the cursor go off the top first (into the scrollback, on
+	 * the main screen), so the cursor stays where it was on the text. The scroll region is the
+	 * whole screen again. The main screen behind the alternate one is made the same size.
+	 */
+	public void resize(Resolution size) {
+		if (size.columns() == columns && size.rows() == rows) {
+			return;
+		}
+		Resolution old = buffer.resolution();
+		if (size.rows() < rows && y >= size.rows()) {
+			int n = y - size.rows() + 1;
+			scrollUp(0, rows - 1, n);
+			y -= n;
+		}
+		buffer.resize(size);
+		columns = size.columns();
+		rows = size.rows();
+		top = 0;
+		bottom = rows - 1;
+		moveTo(x, y);
+		if (mainScreen != null) {
+			mainScreen = resized(mainScreen, old, size);
+		}
+		resized.run();
+	}
+
+	/** A saved screen made another size, as {@link TextBuffer#resize} makes one. */
+	private static Screen resized(Screen screen, Resolution from, Resolution to) {
+		List<String> rows = new java.util.ArrayList<>();
+		int[] foregrounds = new int[to.columns() * to.rows()];
+		int[] backgrounds = new int[to.columns() * to.rows()];
+		java.util.Arrays.fill(foregrounds, TextBuffer.DEFAULT_FOREGROUND);
+		java.util.Arrays.fill(backgrounds, TextBuffer.DEFAULT_BACKGROUND);
+		int columns = Math.min(from.columns(), to.columns());
+		for (int row = 0; row < to.rows(); row++) {
+			String text = row < screen.rows().size() ? screen.rows().get(row) : "";
+			text = text.length() >= to.columns() ? text.substring(0, to.columns()) : text + " ".repeat(to.columns() - text.length());
+			rows.add(text);
+			if (row < from.rows() && (row + 1) * from.columns() <= screen.foregrounds().length && (row + 1) * from.columns() <= screen.backgrounds().length) {
+				System.arraycopy(screen.foregrounds(), row * from.columns(), foregrounds, row * to.columns(), columns);
+				System.arraycopy(screen.backgrounds(), row * from.columns(), backgrounds, row * to.columns(), columns);
+			}
+		}
+		return new Screen(rows, foregrounds, backgrounds);
 	}
 
 	public int column() {
@@ -335,6 +404,26 @@ public final class VtDecoder {
 				}
 			}
 			case 's' -> saveCursor();
+			case 't' -> {
+				// xterm's window operations, those about text: resize (8), report the size (18),
+				// report the largest it can be (19); the rest are a window manager's
+				if (privateMode) {
+					return;
+				}
+				switch (argOrZero(args, 0)) {
+					case 8 -> {
+						// CSI 8;rows;cols t: an omitted one stays as it is, 0 is the largest (xterm's)
+						Resolution most = largest.get();
+						int wantRows = args.size() > 1 && args.get(1) >= 0 ? (args.get(1) == 0 ? most.rows() : args.get(1)) : rows;
+						int wantColumns = args.size() > 2 && args.get(2) >= 0 ? (args.get(2) == 0 ? most.columns() : args.get(2)) : columns;
+						resize(new Resolution(Math.clamp(wantColumns, 1, most.columns()), Math.clamp(wantRows, 1, most.rows())));
+					}
+					case 18 -> reply.accept("\u001B[8;" + rows + ";" + columns + "t");
+					case 19 -> reply.accept("\u001B[9;" + largest.get().rows() + ";" + largest.get().columns() + "t");
+					default -> {
+					}
+				}
+			}
 			case 'u' -> {
 				switch (prefix) {
 					case '>' -> {

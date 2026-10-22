@@ -16,7 +16,6 @@ import com.payonel.modularcomputers.device.Card;
 import com.payonel.modularcomputers.device.CardKind;
 import com.payonel.modularcomputers.device.Disk;
 import com.payonel.modularcomputers.device.Terminal;
-import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.item.CpuItem;
 import com.payonel.modularcomputers.item.DiskItem;
@@ -122,7 +121,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	 * Its terminal: the all-in-one's built-in one, or the screen in a case's gold expansion slot
 	 * (a new one when a screen of another tier goes in). In a case without one it's off the bus.
 	 */
-	private Terminal display = new Terminal(Resolution.DEFAULT);
+	private Terminal display = new Terminal(TerminalTier.TIER_3);
 	/** Devices made from the parts in the slots (by lane for drives and cards); null when empty. */
 	private final Disk[] disks = new Disk[CaseMenu.LANES];
 	/** The serials the disks were made for: another disk is another device, with its own data. */
@@ -908,7 +907,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 				// A screen in the gold slot: the case's terminal, on the bus there.
 				TerminalTier screenTier = ((ScreenItem) card.getItem()).screen().tier();
 				if (display.tier() != screenTier) {
-					display = new Terminal(Resolution.DEFAULT, screenTier);
+					display = new Terminal(screenTier);
 					display.setFlusher(this::syncDisplay);
 					display.onChange(this::markChanged);
 				}
@@ -1159,6 +1158,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		}
 		ConsoleSplitter console = machine.board().virtualBus().console();
 		ScreenSave.load(input, CONSOLE, console.screen(), console.decoder());
+		console.restored();
 		savedProgram = input.read(PROGRAM, Codec.BYTE_BUFFER).map(buffer -> {
 			byte[] bytes = new byte[buffer.remaining()];
 			buffer.get(bytes);

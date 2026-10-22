@@ -164,7 +164,15 @@ anywhere in the data, as a pattern-matching NIC does.
 **Terminals are VT102/xterm devices** (a screen and keyboard as one device): programs only write
 escape sequences. Their modes (cursor shape, alternate screen, keyboard reporting) are the
 terminal's, set by escape sequences, as on real terminals; the tty's raw mode is termios, a separate
-thing. Scrollback lives in the terminal, as xterm keeps it (the tty keeps no output). Only changed
+thing. Scrollback lives in the terminal, as xterm keeps it (the tty keeps no output). **Sizes** (user, 2026-10-21): each tier has OpenComputers' screen size as its largest (50×16,
+80×25, 160×50) and powers on at it (the user's pick over powering on at a standard size, knowing
+160×50 is a few specks on a block's face and small in the GUI: OC had the same; no multiblock
+screens for now). A program resizes with xterm's sequence (`ESC[8;rows;cols t`, `18t`/`19t`
+report the size and the largest; `resize` is xterm's tool), and nothing is wrapped again. The
+console's group is one size, the largest every member can show, as UEFI's ConSplitter sets every
+console device to a common mode. The kernel's `TIOCSWINSZ` sends SIGWINCH (ignored by default, as
+Linux's). Tests that look at a face size the console 50×16 first (`TestPrograms.READABLE`):
+counting pixels of sub-pixel text is flaky. Only changed
 rows go to players, and the server's decoder is the only one (the user rejected a client-side decoder:
 a client-only bug could show what the server never decoded).
 
@@ -342,6 +350,11 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   more status later.
 - **Narrow windows:** the bus order panel is hidden below about 382 GUI units; maybe a toggle or a
   smaller layout.
+- **Resizes, what's left:** readline, `less` and `edit` don't redraw on SIGWINCH yet (they see a
+  new size at their next line or start); a terminal doesn't report its own size changes (the
+  device-reporting rule: today the kernel hears only through `TIOCSWINSZ`, as on a serial line;
+  xterm's in-band resize reports, mode 2048, are a way); a 160-column row is ~1.1 KB to send
+  (colors per cell), so a full redraw at 160×50 is ~56 KB: run-length colors if it matters.
 - **Tier 3 terminals draw pixels:** sixel is the plan (a VT340's pixel graphics by escape sequence);
   the terminal answers `;4` in its Device Attributes once it's built, so programs never send pixels
   to a terminal that would drop them.

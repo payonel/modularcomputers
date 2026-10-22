@@ -137,7 +137,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			DisplayShot released = displayShot(context, "all-in-one-display-no-cpu-released", 0);
 			check(FADED_RED.test(released.buttonCenter()), "released, the button should be faded red again, got " + hex(released.buttonCenter()));
 			check(!context.computeOnClient(client -> machinePowered(client, computer)), "without a CPU the computer must stay off");
-			check(released.whitePixels(0, 16) == 0, "nothing runs without a CPU");
+			check(released.whitePixels(0, released.rows()) == 0, "nothing runs without a CPU");
 			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
 				.setItem(CaseMenu.UPS_SLOT, ItemStack.EMPTY));
 
@@ -325,7 +325,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			check(GREEN.test(on.buttonCenter()), "the power button should be lit green when on, got " + hex(on.buttonCenter()));
 			check(on.whitePixels(0, 1) >= 50, "the display's first row should show text, found " + on.whitePixels(0, 1));
 			check(on.whitePixels(1, 2) > 0, "the cursor should show (a steady block) at the start of the second row");
-			check(on.whitePixels(3, 16) == 0, "the rest of the display should be black"); // (from row 3: the cursor's cell rounds a pixel into row 2's band)
+			check(on.whitePixels(3, on.rows()) == 0, "the rest of the display should be black"); // (from row 3: the cursor's cell rounds a pixel into row 2's band)
 			// Typing in the screen view goes to this terminal; the program echoes it to the console.
 			// SDL only sends typed characters while text input is on: the view turns it on.
 			check(context.computeOnClient(AllInOneClientGameTest::textInputOn), "the screen view should turn text input on");
@@ -647,7 +647,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			Viewport display = scaled(screen.viewport(), scale);
 			int middle = image.getRGB(display.x() + display.width() / 2, display.y() + display.height() * 3 / 4) & 0xFFFFFF;
 			check(middle == background, "display background should be " + hex(background) + ", got " + hex(middle));
-			return new DisplayShot(image, display, scaled(screen.powerButton(), scale), 16);
+			return new DisplayShot(image, display, scaled(screen.powerButton(), scale), screen.resolution().rows());
 		});
 	}
 

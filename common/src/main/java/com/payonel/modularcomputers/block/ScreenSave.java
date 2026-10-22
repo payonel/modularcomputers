@@ -36,6 +36,8 @@ final class ScreenSave {
 	}
 
 	private static void save(ValueOutput output, String name, VtDecoder.Screen screen, VtDecoder decoder) {
+		int columns = screen.rows().isEmpty() ? 0 : screen.rows().getFirst().length();
+		output.putIntArray(name + "_size", new int[] {columns, screen.rows().size()});
 		output.store(name, Codec.STRING.listOf(), screen.rows());
 		output.putIntArray(name + "_foreground", screen.foregrounds());
 		output.putIntArray(name + "_background", screen.backgrounds());
@@ -50,6 +52,8 @@ final class ScreenSave {
 	}
 
 	static void load(ValueInput input, String name, TextBuffer buffer, VtDecoder decoder) {
+		input.getIntArray(name + "_size").filter(size -> size.length == 2 && size[0] > 0 && size[1] > 0)
+			.ifPresent(size -> decoder.resize(new com.payonel.modularcomputers.display.Resolution(size[0], size[1]))); // first: the cells are this size
 		input.read(name, Codec.STRING.listOf()).ifPresent(buffer::setRows);
 		input.getIntArray(name + "_foreground").ifPresent(foreground ->
 			input.getIntArray(name + "_background").ifPresent(background -> buffer.setColors(foreground, background)));

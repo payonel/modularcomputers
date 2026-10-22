@@ -9,19 +9,24 @@ import com.payonel.modularcomputers.machine.Program;
  */
 public final class TestPrograms {
 	public static final String GREETING = "hello world";
-	/** Prints the greeting to the console, then halts. */
+	/**
+	 * Sizes the console 50 by 16 (xterm's resize sequence): large enough to see on a block's face,
+	 * where a tier 3 terminal's 160 by 50, the size it powers on at, makes text a few specks.
+	 */
+	public static final String READABLE = "\u001B[8;16;50t";
+	/** Prints the greeting to the console (sized {@link #READABLE}), then halts. */
 	public static final Program HELLO = board -> {
-		board.invoke("console", "write", GREETING + "\r\n");
+		board.invoke("console", "write", READABLE + GREETING + "\r\n");
 		board.halt();
 	};
 
 	/**
-	 * Writes the greeting, then echoes whatever is typed at the console's terminals back to the
+	 * Writes the greeting (the console sized {@link #READABLE}), then echoes whatever is typed at the console's terminals back to the
 	 * console, forever (Enter starts a new line). Its cursor is a steady block (DECSCUSR 2), so a
 	 * screenshot always finds it lit.
 	 */
 	public static final Program ECHO = board -> {
-		board.invoke("console", "write", "\u001B[2 q" + GREETING + "\r\n");
+		board.invoke("console", "write", READABLE + "\u001B[2 q" + GREETING + "\r\n");
 		board.list();
 		while (true) {
 			for (String source : board.waitForInterrupt(3600)) {

@@ -1286,4 +1286,27 @@ class McosTest {
 		assertThat(read(root().resolve("err"))).isEmpty();
 		assertThat(read(root().resolve("eof"))).as("raw: the ^D byte; cooked again: an end of file").isEqualTo("\"\\4\" \"\"");
 	}
+	@Test
+	void resizeMakesTheTerminalAnotherSizeAndTheProgramInFrontHearsOfIt() {
+		file("w.lua", """
+			local sys = require("sys")
+			local heard = 0
+			sys.signal("SIGWINCH", function() heard = heard + 1 end)
+			local pid = sys.spawn("/bin/resize", {"-s", "10", "30"}, {fds = {[1] = sys.open("/dev/null", "w")}})
+			sys.waitpid(pid)
+			sys.sleep(0.1) -- (a signal is handled on the way back from a syscall)
+			local out = io.open("/w", "w")
+			out:write(heard, " ", table.concat({sys.ioctl(0, "TIOCGWINSZ")}, " "))
+			out:close()
+			""");
+		boot();
+		type("lua /w.lua 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("err"))).isEmpty();
+		assertThat(screen.buffer().resolution()).isEqualTo(new Resolution(30, 10));
+		assertThat(read(root().resolve("w"))).as("SIGWINCH, and the size the kernel gives now").isEqualTo("1 30 10");
+		type("resize -s 0 0 > /dev/null; touch /done2\r");
+		untilFile(root().resolve("done2"), "");
+		assertThat(screen.buffer().resolution()).as("0: as large as it can be").isEqualTo(Resolution.DEFAULT);
+	}
 }
