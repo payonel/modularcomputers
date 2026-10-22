@@ -31,11 +31,7 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 		this.display = new Terminal(state.getBlock() instanceof ScreenBlock screen ? screen.tier() : TerminalTier.TIER_3);
 		display.setFlusher(this::serverTick); // right after a computer's turn changed it
 		// Minecraft writes only chunks marked changed: what it shows and the keys waiting change as it's used.
-		display.onChange(() -> {
-			if (level != null && !level.isClientSide()) {
-				level.blockEntityChanged(worldPosition);
-			}
-		});
+		display.onChange(() -> ChunkMarks.changed(level, worldPosition));
 	}
 
 	@Override

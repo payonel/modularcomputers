@@ -59,6 +59,9 @@ final class EventQueue {
 	}
 
 	void clear() {
+		if (events.isEmpty() && lost == 0) {
+			return; // nothing changed
+		}
 		events.clear();
 		lost = 0;
 		changed.run();

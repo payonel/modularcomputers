@@ -270,6 +270,11 @@ process (as VFIO does).
   learns its ports and kind.
 - **A new packet goes in `ModNetwork`'s lists** (and a client handler in `ModNetworkClient`); a new
   game test class in `GameTests.CLASSES`. Nothing else registers them.
+- **A block marks its chunk changed with `ChunkMarks.changed`, never `setChanged()` or
+  `level.blockEntityChanged()`, from anything a chunk's load can reach** (`setLevel`, `loadAdditional`,
+  a device's `onChange` as its devices go back on the bus): the game's calls wait for the chunk,
+  which is still loading, and the server thread waits on itself forever (a world with a running
+  computer never loaded, 2026-10-21; a test world can't show it: load a real save on a server).
 - **A test opens a menu or sends as the mod does** (`ModMenus.open`, `ModNetwork.send`,
   `GameTests.serverPlayer`), never with the game's own call: the loaders need their part of it.
 - **A change to an mcos program (`lua/mcos/bin/<name>`) updates its man page**
@@ -322,6 +327,10 @@ process (as VFIO does).
   a device that a warm run would have moved: a different, legal state. Make that state on purpose
   in a test (it found keys stranded across a restore, 2026-10-21). And commit only on `testAll`'s
   own exit status: a commit gated on grepping its log once went in with a unit test failing.
+- **A hang at load is a thread dump away.** "The world won't load" with a running computer looked
+  like a stuck restore; restoring its saved state alone took 120 ms. Load the world on a dedicated
+  server (`fabric/run/world`, a `/forceload` through a fifo on stdin) and `jstack` the server
+  thread: it showed the real cause at once. A deadlocked server ignores SIGTERM (`kill -9`).
 - **LungoLua bugs look like ours.** A pattern `%s` once matched "s"; verify against stock Lua's
   semantics, report to the lua thread, work around until fixed.
 

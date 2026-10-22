@@ -455,12 +455,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	/**
 	 * Marks its chunk changed, so the next save or unload writes it (Minecraft writes only chunks
 	 * marked changed), at once when a device's data changes. Without {@link #setChanged}'s comparator
-	 * update, which nothing here needs, so it's cheap to do often.
+	 * update, which nothing here needs, so it's cheap to do often. Never waits for the chunk: its
+	 * devices change as they go back on the bus while the chunk is still loading ({@link ChunkMarks}).
 	 */
 	private void markChanged() {
-		if (level != null && !level.isClientSide()) {
-			level.blockEntityChanged(worldPosition);
-		}
+		ChunkMarks.changed(level, worldPosition);
 	}
 
 	@Override
@@ -850,7 +849,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 			}
 		}
 		stack.remove(ModComponents.DISK_IMAGE);
-		setChanged();
+		markChanged(); // (from setLevel too, as its chunk loads: never setChanged, which waits for the chunk)
 	}
 
 	public static java.nio.file.Path diskFolder(net.minecraft.server.MinecraftServer server, UUID id) {
