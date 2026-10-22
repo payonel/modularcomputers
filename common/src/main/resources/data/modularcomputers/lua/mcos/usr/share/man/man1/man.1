@@ -36,6 +36,15 @@ by default.
 The pager, run with
 .BR "sh \-c" ;
 the first set is used.
+.TP
+.B LESS
+Left as it is; when it isn't set,
+.B man
+runs its pager with
+.B LESS=\-R
+(as man\-db does), so
+.BR less (1)
+shows bold and underline instead of their escape sequences.
 .SH PAGE FORMAT
 The formatter understands this part of man(7), and ignores other
 requests:

@@ -1309,4 +1309,25 @@ class McosTest {
 		untilFile(root().resolve("done2"), "");
 		assertThat(screen.buffer().resolution()).as("0: as large as it can be").isEqualTo(Resolution.DEFAULT);
 	}
+	/** man's bold and underline reach the terminal as styles, not as ^[ (less -R, which man puts in LESS, as man-db does). */
+	@Test
+	void aManPageShowsItsStylesNotTheirEscapeSequences() {
+		file("usr/share/man/man1/t.1", """
+			.TH T 1
+			.SH NAME
+			t \\- a test
+			.SH DESCRIPTION
+			.B emphatic
+			words
+			""");
+		boot();
+		type("man t\r");
+		settle(() -> screen().contains("emphatic"));
+		String shown = screen();
+		type("q");
+		untilIdle();
+		assertThat(shown).as("no escape sequence shown as text").doesNotContain("^[");
+		type("less -Z /dev/null 2> /err; echo $? > /st\r");
+		untilFile(root().resolve("st"), "1\n");
+	}
 }

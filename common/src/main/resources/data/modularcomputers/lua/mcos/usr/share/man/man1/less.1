@@ -3,6 +3,7 @@
 less \- show text a screen at a time
 .SH SYNOPSIS
 .B less
+.RB [ \-R ]
 .RI [ file ]
 .SH DESCRIPTION
 .B less
@@ -19,7 +20,12 @@ is shown.
 .PP
 Long lines wrap at the terminal's width; a tab goes to the next multiple
 of 8 columns, and other control characters show as
-.BR ^X .
+.B ^X
+(the escape that starts a terminal's sequences as
+.BR ^[ ,
+unless
+.B \-R
+lets them through).
 Rows past the end show as
 .BR ~ .
 The last row is the prompt: the file's name on the first screen,
@@ -33,6 +39,24 @@ copies the text to it, as
 .BR cat (1)
 does. With no file named and standard input a terminal, it says
 "Missing filename" and exits 1.
+.SH OPTIONS
+.TP
+.B \-R
+Lets color and style sequences
+.RB ( ESC[ ... m )
+through to the terminal, taking no room on the screen; a style goes on
+across a line's wrap. Searches find the text, not its styles.
+.SH ENVIRONMENT
+.TP
+.B LESS
+Options, before the command line's: one with
+.B R
+in it is
+.BR \-R .
+.BR man (1)
+sets it to
+.B \-R
+for its pager when it isn't set, as man\-db does.
 .SH COMMANDS
 .TP
 .B q Q

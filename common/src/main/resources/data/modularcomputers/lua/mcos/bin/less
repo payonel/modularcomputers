@@ -1,6 +1,8 @@
--- less [file]: shows a file (or what comes on stdin) a screen at a time, as less does: on the
+-- less [-R] [file]: shows a file (or what comes on stdin) a screen at a time, as less does: on the
 -- alternate screen, the tty raw, keys read from the terminal (/dev/tty, so the text can come down a
--- pipe). Long lines wrap; a tab goes to the next multiple of 8. Into a pipe or a file it's cat.
+-- pipe). Long lines wrap; a tab goes to the next multiple of 8; control characters show as ^X. -R
+-- lets color and style sequences (ESC[...m) through, taking no room (a style goes on across a
+-- wrap). Options also come from $LESS, before the command line's. Into a pipe or a file it's cat.
 --   q             quit
 --   Space f ^F ^V PageDown     a screen on;   b ^B PageUp    a screen back
 --   Enter j e ^N Down          a line on;     k y ^P Up      a line back
@@ -18,7 +20,23 @@ local CSI = "\27["
 local ALTERNATE_ON, ALTERNATE_OFF = CSI .. "?1049h", CSI .. "?1049l"
 local REVERSE, RESET = CSI .. "7m", CSI .. "0m"
 
-local name = arg[1]
+local styles = false -- -R: ESC[...m goes through
+local name
+for word in string.gmatch(os.getenv("LESS") or "", "%S+") do
+  if string.find(word, "R", 1, true) then
+    styles = true
+  end
+end
+for _, word in ipairs(arg) do
+  if word == "-R" then
+    styles = true
+  elseif string.sub(word, 1, 1) == "-" and word ~= "-" then
+    io.stderr:write("less: invalid option -- '", string.sub(word, 2, 2), "'\n")
+    return 1
+  else
+    name = word
+  end
+end
 local input = io.stdin
 if name and name ~= "-" then
   local file, why = io.open(name)
@@ -63,9 +81,17 @@ if text == "" then
 end
 for index, line in ipairs(lines) do
   local row, col = {}, 0
-  for ch in string.gmatch(line, "[\0-\127\194-\244][\128-\191]*") do
-    local c = ch
-    if c == "\t" then
+  local style = "" -- (-R: the style set last on this line, for a row it wraps onto)
+  local at = 1
+  while at <= #line do
+    local c = string.match(line, "^[\0-\127\194-\244][\128-\191]*", at) or string.sub(line, at, at)
+    local sgr = styles and string.match(line, "^\27%[[%d;]*m", at)
+    at = at + #(sgr or c)
+    if sgr then
+      style = (sgr == RESET or sgr == CSI .. "m") and "" or style .. sgr
+      row[#row + 1] = sgr
+      goto continue
+    elseif c == "\t" then
       local stop = TAB - col % TAB
       c, col = string.rep(" ", stop), col + stop
     elseif c < " " or c == "\127" then
@@ -74,12 +100,16 @@ for index, line in ipairs(lines) do
       col = col + 1
     end
     if col > width then
-      rows[#rows + 1], lineof[#rows + 1] = table.concat(row), index
-      row, col = {}, utf8.len(c) or #c
+      rows[#rows + 1], lineof[#rows + 1] = table.concat(row) .. (style ~= "" and RESET or ""), index
+      row, col = {style}, utf8.len(c) or #c
     end
     row[#row + 1] = c
+    ::continue::
   end
-  rows[#rows + 1], lineof[#rows + 1] = table.concat(row), index
+  rows[#rows + 1], lineof[#rows + 1] = table.concat(row) .. (style ~= "" and RESET or ""), index
+  if styles then
+    lines[index] = string.gsub(line, "\27%[[%d;]*m", "") -- (searches find the text, not its styles)
+  end
 end
 
 local saved = sys.ioctl(0, "TCGETS") or sys.ioctl(keys, "TCGETS")

@@ -310,7 +310,9 @@ if not tty then
   io.write(page)
   return 0
 end
-local pager = io.popen(os.getenv("MANPAGER") or os.getenv("PAGER") or "less", "w")
+-- (its styles reach the pager as escape sequences: less shows them with -R, which man-db puts in
+-- $LESS when it isn't set, as here)
+local pager = io.popen((os.getenv("LESS") and "" or "LESS=-R ") .. (os.getenv("MANPAGER") or os.getenv("PAGER") or "less"), "w")
 if not pager then
   io.write(page)
   return 0
