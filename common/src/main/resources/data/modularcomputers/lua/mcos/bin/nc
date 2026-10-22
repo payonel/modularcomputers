@@ -1,14 +1,16 @@
--- nc -u [-b] [-p port] address port | nc -u -l [-p] port: netcat, for UDP (mcos's only transport).
--- Sends what it reads from stdin, a datagram each read (a line, from a terminal), to address:port
--- ("broadcast": every card the network cards reach), and writes the data of each datagram that
--- comes to its port to stdout, until stdin ends. -l listens on port instead: it writes each datagram
--- that comes, and sends what it reads to whoever sent the last one (traditional netcat's -u -l
--- answers its first), until it's stopped (^C). -p is the port it sends from; -b is taken and needs
--- nothing (mcos has no SO_BROADCAST to set).
+-- nc [-u] [-b] [-p port] address port | nc [-u] -l [-p] port: netcat. Over TCP (the default):
+-- connects to address:port, sends what it reads from stdin and writes what comes back to stdout;
+-- at the end of stdin it says it's done sending (shutdown) and ends when the other side does. -l
+-- listens on port instead, takes one connection and does the same with it. -u is UDP: each read
+-- of stdin (a line, from a terminal) a datagram to address:port ("broadcast": every card the
+-- network cards reach), and each datagram that comes written out, until stdin ends; with -l, it
+-- writes each datagram that comes and sends what it reads to whoever sent the last one (as
+-- traditional netcat's -u -l answers its first), until it's stopped (^C). -p is the port it sends
+-- from; -b is taken and needs nothing (mcos has no SO_BROADCAST to set).
 local sys = require("sys")
 
 local READ_SIZE = 4096
-local USAGE = "usage: nc -u [-b] [-p port] address port\n       nc -u -l [-p] port\n"
+local USAGE = "usage: nc [-u] [-b] [-p port] address port\n       nc [-u] -l [-p] port\n"
 
 local udp, listen, port = false, false, nil
 local words = {}
@@ -49,10 +51,6 @@ while i <= #arg do
   i = i + 1
 end
 
-if not udp then
-  io.stderr:write("nc: only UDP is supported: use -u\n")
-  return 1
-end
 local address, to
 if listen then
   port = port or math.tointeger(tonumber(words[1]))
@@ -73,7 +71,7 @@ local function fail(what, why)
   return 1
 end
 
-local socket, why = sys.socket()
+local socket, why = sys.socket(udp and "dgram" or "stream")
 if not socket then
   return fail("socket", why)
 end
@@ -83,6 +81,56 @@ if port then
   if not ok then
     return fail("bind", why)
   end
+end
+
+if not udp then
+  -- TCP: one connection, both ways
+  local conn = socket
+  if listen then
+    local ok
+    ok, why = sys.listen(socket, 1)
+    if not ok then
+      return fail("listen", why)
+    end
+    conn, why = sys.accept(socket)
+    if not conn then
+      return fail("accept", why)
+    end
+    sys.close(socket)
+  else
+    local ok
+    ok, why = sys.connect(socket, address, to)
+    if not ok then
+      return fail(address, why)
+    end
+  end
+  local wanted = {[conn] = {IN = true}, [0] = {IN = true}}
+  while wanted[conn] do
+    local ready
+    ready, why = sys.poll(wanted)
+    if not ready then
+      return fail("poll", why)
+    end
+    if ready[0] then
+      local data = sys.read(0, READ_SIZE)
+      if not data or data == "" then
+        wanted[0] = nil
+        sys.shutdown(conn) -- done sending: the other side reads its end
+      elseif not sys.write(conn, data) then
+        return 1
+      end
+    end
+    if ready[conn] then
+      local data = sys.read(conn, READ_SIZE)
+      if not data or data == "" then
+        break -- the other side's done
+      end
+      io.write(data)
+      io.stdout:flush()
+    end
+  end
+  sys.close(conn)
+  return 0
 end
 
 local wanted = {[socket] = {IN = true}, [0] = {IN = true}}

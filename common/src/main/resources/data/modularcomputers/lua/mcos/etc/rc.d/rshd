@@ -1,0 +1,4 @@
+-- rshd: the remote shell's daemon (rsh, rcp). Off until rc rshd enable: with no passwords, anyone
+-- whose card reaches this computer's gets a shell on it.
+description = "remote shell daemon"
+command = "/bin/rshd"

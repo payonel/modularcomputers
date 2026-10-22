@@ -1,0 +1,209 @@
+-- rshd: the remote shell's daemon (Berkeley's name: no passwords, no encryption), run as a service
+-- (rc rshd start; off until rc rshd enable). It takes rsh's connections on TCP port 514 and answers
+-- rsh's probes on UDP port 514, and for each connection runs itself as a session (rshd -s, the
+-- connection on its standard input, as inetd ran BSD's rshd), in a session of its own.
+--
+-- A session reads rsh's request (lib/rsh.lua's protocol): with no command, a login: sh on a pty as
+-- big as rsh's terminal, what rsh sends typed into it and what it shows sent back (the pty does the
+-- terminal's work: echo, editing, ^C); with a command, sh -c command on pipes, its input from rsh,
+-- its output and errors sent back apart. Then how it ended. rsh gone: the login's line hangs up
+-- (SIGHUP), a command's input ends.
+local sys = require("sys")
+local rsh = require("rsh")
+
+local REAP_SECONDS = 1 -- how often the daemon looks for sessions that ended, at least
+
+-- How a process ended, as the protocol says it: "exited 0", "killed SIGHUP".
+local function ended(pid)
+  local _, how, value = sys.waitpid(pid)
+  return tostring(how) .. " " .. tostring(value)
+end
+
+-- A login: sh on a pty, relayed both ways.
+local function login(conn, decoder, columns, rows)
+  local master, terminal = sys.openpty()
+  if not master then
+    rsh.send(sys, conn, rsh.ERRORS, "rshd: no pty\n")
+    return "exited 1"
+  end
+  sys.ioctl(master, "TIOCSWINSZ", {columns, rows})
+  local pid = sys.spawn("/bin/sh", {}, {setsid = true, fds = {[0] = terminal, [1] = terminal, [2] = terminal}})
+  sys.close(terminal)
+  if not pid then
+    sys.close(master)
+    rsh.send(sys, conn, rsh.ERRORS, "rshd: no shell\n")
+    return "exited 1"
+  end
+  -- what rsh sent (frames that came with its request first: they're already here)
+  local function frames()
+    for kind, payload in decoder.next do
+      if kind == rsh.INPUT then
+        sys.write(master, payload)
+      elseif kind == rsh.SIZE then
+        local c, r = payload:match("^(%d+) (%d+)$")
+        if c then
+          sys.ioctl(master, "TIOCSWINSZ", {math.tointeger(tonumber(c)), math.tointeger(tonumber(r))})
+        end
+      elseif kind == rsh.END then
+        sys.write(master, "\4") -- (its input ended: ^D, as typed)
+      end
+    end
+  end
+  frames()
+  local wanted = {[conn] = {IN = true}, [master] = {IN = true}}
+  while true do
+    local ready = sys.poll(wanted)
+    if ready[master] then
+      local data = sys.read(master, rsh.CHUNK)
+      if not data then
+        break -- (EIO: the shell, and all on its terminal, are gone)
+      end
+      rsh.send(sys, conn, rsh.OUTPUT, data)
+    end
+    if ready[conn] then
+      local data = sys.read(conn, rsh.CHUNK)
+      if not data or data == "" then
+        sys.close(master) -- rsh's gone: the line hangs up
+        return nil
+      end
+      decoder.feed(data)
+      frames()
+    end
+  end
+  sys.close(master)
+  return ended(pid)
+end
+
+-- A command: sh -c on pipes, its output and errors sent back apart.
+local function command(conn, decoder, text)
+  local inr, inw = sys.pipe()
+  local outr, outw = sys.pipe()
+  local errr, errw = sys.pipe()
+  local pid, why = sys.spawn("/bin/sh", {"-c", text}, {setsid = true, fds = {[0] = inr, [1] = outw, [2] = errw}})
+  sys.close(inr)
+  sys.close(outw)
+  sys.close(errw)
+  if not pid then
+    rsh.send(sys, conn, rsh.ERRORS, "rshd: sh: " .. tostring(why) .. "\n")
+    return "exited 127"
+  end
+  -- what rsh sent (frames that came with its request first: they're already here)
+  local function frames()
+    for kind, payload in decoder.next do
+      if kind == rsh.INPUT and inw then
+        sys.write(inw, payload)
+      elseif kind == rsh.END and inw then
+        sys.close(inw)
+        inw = nil
+      end
+    end
+  end
+  frames()
+  local wanted = {[conn] = {IN = true}, [outr] = {IN = true}, [errr] = {IN = true}}
+  local kinds = {[outr] = rsh.OUTPUT, [errr] = rsh.ERRORS}
+  while wanted[outr] or wanted[errr] do
+    local ready = sys.poll(wanted)
+    for fd, kind in pairs(kinds) do
+      if ready[fd] then
+        local data = sys.read(fd, rsh.CHUNK)
+        if not data or data == "" then
+          wanted[fd] = nil
+          sys.close(fd)
+        else
+          rsh.send(sys, conn, kind, data)
+        end
+      end
+    end
+    if ready[conn] then
+      local data = sys.read(conn, rsh.CHUNK)
+      if not data or data == "" then
+        wanted[conn] = nil -- rsh's gone: the command's input ends, and it goes on
+        if inw then
+          sys.close(inw)
+          inw = nil
+        end
+      else
+        decoder.feed(data)
+        frames()
+      end
+    end
+  end
+  if inw then
+    sys.close(inw)
+  end
+  return ended(pid)
+end
+
+-- rshd -s: one connection, on standard input.
+local function session()
+  local conn = 0
+  local decoder = rsh.decoder()
+  local kind, request
+  repeat
+    local data = sys.read(conn, rsh.CHUNK)
+    if not data or data == "" then
+      return 1
+    end
+    decoder.feed(data)
+    kind, request = decoder.next()
+  until kind
+  local text, columns, rows
+  if kind == rsh.REQUEST then
+    text, columns, rows = request:match("^(.-)%z(%d+) (%d+)$")
+  end
+  if not text then
+    rsh.send(sys, conn, rsh.ERRORS, "rshd: not rsh's request\n")
+    rsh.send(sys, conn, rsh.EXIT, "exited 1")
+    sys.close(conn)
+    return 1
+  end
+  columns, rows = math.tointeger(tonumber(columns)), math.tointeger(tonumber(rows))
+  local how
+  if text == "" then
+    how = login(conn, decoder, columns, rows)
+  else
+    how = command(conn, decoder, text)
+  end
+  if how then
+    rsh.send(sys, conn, rsh.EXIT, how)
+  end
+  sys.close(conn)
+  return 0
+end
+
+if arg[1] == "-s" then
+  return session()
+elseif #arg > 0 then
+  io.stderr:write("usage: rshd\n")
+  return 1
+end
+
+local listener = assert(sys.socket("stream"))
+local ok, why = sys.bind(listener, rsh.PORT)
+if not ok then
+  io.stderr:write("rshd: port ", rsh.PORT, ": ", tostring(why), "\n")
+  return 1
+end
+assert(sys.listen(listener))
+local probes = assert(sys.socket())
+assert(sys.bind(probes, rsh.PORT))
+local null = assert(sys.open("/dev/null", "w"))
+while true do
+  local ready = sys.poll({[listener] = {IN = true}, [probes] = {IN = true}}, REAP_SECONDS)
+  if ready[probes] then
+    local data, from, port = sys.recvfrom(probes)
+    if data == rsh.PROBE then
+      sys.sendto(probes, rsh.HERE, from, port)
+    end
+  end
+  if ready[listener] then
+    local conn = sys.accept(listener)
+    if conn then
+      sys.spawn("/bin/rshd", {"-s"}, {setsid = true, fds = {[0] = conn, [1] = null, [2] = null}})
+      sys.close(conn)
+    end
+  end
+  while (sys.waitpid(-1, "nohang") or 0) > 0 do
+    -- (a session ended: reaped)
+  end
+end

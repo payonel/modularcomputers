@@ -1,0 +1,66 @@
+.TH RSH 1 "" "" "mcos Manual"
+.SH NAME
+rsh \- run a command or a shell on another computer
+.SH SYNOPSIS
+.B rsh
+.RB [ \-n ]
+.I host
+.RI [ command ...]
+.SH DESCRIPTION
+.B rsh
+connects to
+.BR rshd (1)
+on another computer, over its network cards (TCP, port 514).
+.I host
+is the other computer's network card id
+.RB ( "lsdev \-i"
+shows it), whole, or as much of its start as names one computer that
+answers (rsh asks every rshd in reach); a
+.B *
+at its end is allowed.
+.PP
+With a
+.I command
+(its words joined by spaces), the other computer's
+.B sh \-c
+runs it. Its input is rsh's (none with
+.BR \-n ),
+its output and errors are rsh's, apart, and
+.B rsh
+ends as it did: its exit status, or 128 and the signal's number if a
+signal ended it.
+.PP
+With no command, a login: a shell on a pty on the other computer, as big
+as this terminal. This terminal goes raw, so every key goes there as it's
+typed, ^C and the arrows included; a change of this terminal's size
+(SIGWINCH) goes there too.
+.B ~.
+at the start of a line disconnects, and
+.B ~~
+sends one
+.BR ~ .
+.SH OPTIONS
+.TP
+.B \-n
+No input for the command (as from
+.BR /dev/null ).
+.SH EXIT STATUS
+The command's, or the shell's; 1 when the host isn't found, the
+connection fails, or it's lost.
+.SH EXAMPLES
+.nf
+rsh 1b9c0e uptime
+rsh 1b9c0e
+cat notes | rsh 1b9c0e 'cat > /notes'
+.fi
+.SH NOTES
+Berkeley's r\-commands are its model: no passwords and no encryption
+(anyone whose card reaches the other computer's can do this), which is
+why their names were kept, and not ssh's. BSD's rsh sent errors on a
+second connection, never told how the command ended, and ran rlogin when
+given no command; this one sends everything on one connection, framed, ends
+as the command did, and logs in itself. It speaks only to mcos's rshd.
+.SH SEE ALSO
+.BR rshd (1),
+.BR rcp (1),
+.BR rc (1)

@@ -1,0 +1,46 @@
+.TH RCP 1 "" "" "mcos Manual"
+.SH NAME
+rcp \- copy a file between computers
+.SH SYNOPSIS
+.B rcp
+.I source target
+.SH DESCRIPTION
+.B rcp
+copies one file to or from another computer. One of
+.I source
+and
+.I target
+is remote,
+.IB host : path
+.RI ( host
+as
+.BR rsh (1)
+takes it); a name with no colon, or with a
+.B /
+before its colon, is local. A target that's a directory (or, remote, ends
+with
+.BR / )
+gets the source's name in it.
+.PP
+It's
+.B rsh
+underneath, as BSD's rcp was:
+.B cat
+on the other computer reads or writes the file.
+.SH EXIT STATUS
+0 on success; 1 when the file can't be read or written, or the other
+computer can't be reached.
+.SH EXAMPLES
+.nf
+rcp /notes 1b9c0e:/notes
+rcp 1b9c0e:/log /tmp/
+.fi
+.SH NOTES
+BSD's rcp copies several files and, with
+.BR \-r ,
+directories, and keeps their times with
+.BR \-p ;
+this one copies one file. Both ends being remote isn't supported.
+.SH SEE ALSO
+.BR rsh (1),
+.BR cp (1)

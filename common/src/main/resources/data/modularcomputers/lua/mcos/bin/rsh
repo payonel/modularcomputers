@@ -1,0 +1,204 @@
+-- rsh [-n] host [command...]: the remote shell (Berkeley's name: no passwords, no encryption). host
+-- is a computer's network card id, whole or the start of it (as git takes a commit's), found by
+-- asking every rshd in reach (a broadcast); a * at its end is allowed. With a command (its words
+-- joined by spaces, run by the other computer's sh -c), its input is rsh's (-n: none), its output
+-- and errors are rsh's, and rsh ends as it did. With none, a login: the terminal goes raw and every
+-- key goes to a shell on a pty there (^C included), its window size too; ~. at the start of a line
+-- disconnects (rlogin's escape; ~~ sends a ~).
+local sys = require("sys")
+local rsh = require("rsh")
+
+local PROBE_SECONDS = 0.5 -- how long rsh listens for rshds answering
+local DEFAULT_COLUMNS, DEFAULT_ROWS = 80, 24
+local USAGE = "usage: rsh [-n] host [command...]\n"
+
+local noinput = false
+local i = 1
+while arg[i] == "-n" do
+  noinput = true
+  i = i + 1
+end
+local host = arg[i]
+if not host or host:sub(1, 1) == "-" then
+  io.stderr:write(USAGE)
+  return 1
+end
+local words = {}
+for j = i + 1, #arg do
+  words[#words + 1] = arg[j]
+end
+local text = table.concat(words, " ")
+
+local function fail(...)
+  io.stderr:write("rsh: ", ...)
+  io.stderr:write("\n")
+  return 1
+end
+
+-- The address of the computer 'name' names: its card's whole id, or the one rshd in reach whose
+-- id starts with it.
+local function resolve(name)
+  name = name:gsub("^id:", ""):gsub("%*$", "")
+  if name:match("^%x+%-%x+%-%x+%-%x+%-%x+$") then
+    return name
+  end
+  local probe = assert(sys.socket())
+  local ok, why = sys.sendto(probe, rsh.PROBE, "broadcast", rsh.PORT)
+  if not ok then
+    return nil, why
+  end
+  local found, seen = {}, {}
+  local waited, step = 0, PROBE_SECONDS / 5
+  while waited < PROBE_SECONDS do
+    if next(sys.poll({[probe] = {IN = true}}, step)) then
+      local data, from = sys.recvfrom(probe)
+      if data == rsh.HERE and not seen[from] and from:sub(1, #name) == name then
+        seen[from] = true
+        found[#found + 1] = from
+      end
+    else
+      waited = waited + step
+    end
+  end
+  sys.close(probe)
+  if #found == 0 then
+    return nil, "unknown host"
+  elseif #found > 1 then
+    table.sort(found)
+    return nil, "ambiguous: " .. table.concat(found, ", ")
+  end
+  return found[1]
+end
+
+local address, why = resolve(host)
+if not address then
+  return fail(host, ": ", why)
+end
+local conn = assert(sys.socket("stream"))
+local ok
+ok, why = sys.connect(conn, address, rsh.PORT)
+if not ok then
+  return fail(host, ": ", why)
+end
+
+local login = text == ""
+-- Its terminal's size (its output's, else its input's; else 80 by 24).
+local function size(fd)
+  local c, r = sys.ioctl(fd, "TIOCGWINSZ")
+  if math.type(c) == "integer" and math.type(r) == "integer" then
+    return c, r
+  end
+end
+local columns, rows = size(1)
+if not columns then
+  columns, rows = size(0)
+end
+columns, rows = columns or DEFAULT_COLUMNS, rows or DEFAULT_ROWS
+rsh.send(sys, conn, rsh.REQUEST, text .. "\0" .. columns .. " " .. rows)
+
+-- A login's terminal is raw: every key goes on as it's typed, and the other end's pty does the rest.
+local saved
+if login and sys.isatty(0) then
+  saved = sys.ioctl(0, "TCGETS")
+  local raw = {}
+  for name, on in pairs(saved) do
+    raw[name] = on
+  end
+  raw.icanon, raw.echo, raw.isig, raw.icrnl = false, false, false, false
+  sys.ioctl(0, "TCSETS", raw)
+end
+local resized = false
+if login then
+  sys.signal("SIGWINCH", function()
+    resized = true
+  end)
+end
+local function restore()
+  if saved then
+    sys.ioctl(0, "TCSETS", saved)
+  end
+end
+
+-- What's typed, with rlogin's escape at the start of a line: ~. disconnects, ~~ sends a ~.
+local atstart, tilde = true, false
+local function typed(data)
+  if not login then
+    return data, false
+  end
+  local out = {}
+  for c in data:gmatch(".") do
+    if tilde then
+      tilde = false
+      if c == "." then
+        return table.concat(out), true
+      end
+      out[#out + 1] = c == "~" and "~" or "~" .. c
+    elseif c == "~" and atstart then
+      tilde = true
+    else
+      out[#out + 1] = c
+    end
+    atstart = c == "\r" or c == "\n"
+  end
+  return table.concat(out), false
+end
+
+local wanted = {[conn] = {IN = true}}
+if noinput then
+  rsh.send(sys, conn, rsh.END)
+else
+  wanted[0] = {IN = true}
+end
+local decoder = rsh.decoder()
+local status
+while not status do
+  local ready = sys.poll(wanted)
+  if resized then
+    resized = false
+    local c, r = size(1)
+    if c then
+      rsh.send(sys, conn, rsh.SIZE, c .. " " .. r)
+    end
+  end
+  if ready and ready[0] then
+    local data = sys.read(0, rsh.CHUNK)
+    if not data or data == "" then
+      wanted[0] = nil
+      rsh.send(sys, conn, rsh.END)
+    else
+      local keys, quit = typed(data)
+      if keys ~= "" then
+        rsh.send(sys, conn, rsh.INPUT, keys)
+      end
+      if quit then
+        restore()
+        io.stderr:write("\r\nConnection to ", host, " closed.\r\n")
+        return 1
+      end
+    end
+  end
+  if ready and ready[conn] then
+    local data = sys.read(conn, rsh.CHUNK)
+    if not data or data == "" then
+      restore()
+      return fail(host, ": connection closed")
+    end
+    decoder.feed(data)
+    for kind, payload in decoder.next do
+      if kind == rsh.OUTPUT then
+        sys.write(1, payload)
+      elseif kind == rsh.ERRORS then
+        sys.write(2, payload)
+      elseif kind == rsh.EXIT then
+        status = payload
+      end
+    end
+  end
+end
+restore()
+sys.close(conn)
+local how, value = status:match("^(%S+) (%S+)$")
+if how == "exited" then
+  return math.tointeger(tonumber(value)) or 1
+end
+return 128 + (sys.SIGNALS[value] or 0) -- (as a shell says a command ended by a signal)

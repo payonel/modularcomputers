@@ -1,52 +1,65 @@
 .TH NC 1 "" "" "mcos Manual"
 .SH NAME
-nc \- send and receive UDP datagrams
+nc \- send and receive over TCP or UDP
 .SH SYNOPSIS
-.B nc \-u
+.B nc
+.RB [ \-u ]
 .RB [ \-b ]
 .RB [ \-p
 .IR port ]
 .I address port
 .br
-.B nc \-u \-l
+.B nc
+.RB [ \-u ]
+.B \-l
 .RB [ \-p ]
 .I port
 .SH DESCRIPTION
 .B nc
-(netcat) sends what it reads from standard input over the network, as
-UDP datagrams through the computer's network cards, and writes the data of
-the datagrams that come to it to standard output.
-.PP
-In the first form it sends each read (a line, from a terminal) as a
-datagram to
-.I port
-at
-.IR address :
-a network card's address (its id, as
+(netcat) sends what it reads from standard input over the network,
+through the computer's network cards, and writes what comes back to
+standard output.
+.I address
+is a network card's address (its id, as
 .B lsdev \-i
 shows it, with or without its
 .B id:
-prefix), or
+prefix).
+.PP
+Over TCP (the default) it connects to
+.I port
+at
+.IR address ,
+or with
+.B \-l
+listens on
+.I port
+and takes one connection. Then it sends what it reads and writes what
+comes, until the other side ends; at the end of its input it says it's done
+sending, so the other side reads its end.
+.PP
+With
+.BR \-u ,
+UDP: each read (a line, from a terminal) is a datagram to
+.I port
+at
+.IR address ,
+or
 .B broadcast
 for every card the computer's cards reach (a wired card's cables, a WLAN
 card's range). What comes back to its port is written out. It ends when
-standard input ends.
-.PP
-With
-.B \-l
-it listens on
-.IR port :
+standard input ends. With
+.BR \-l ,
 it writes each datagram that comes, and sends what it reads to whoever
 sent the last one, until it's stopped (^C).
 .SH OPTIONS
 .TP
 .B \-u
-UDP. It's mcos's only transport, so it's needed, as for UDP on Linux.
+UDP, not TCP.
 .TP
 .B \-l
 Listens on
-.I port
-for datagrams.
+.IR port .
 .TP
 .BI \-p " port"
 The port it sends from (or listens on, with
@@ -58,33 +71,37 @@ Taken, and needed for nothing: mcos sends to
 .B broadcast
 without SO_BROADCAST set.
 .SH EXIT STATUS
-0 when standard input ends; 1 for a bad option or port, or when a datagram
-can't be sent (no network card: "Network is unreachable"; no card took
-it: "No route to host").
+0 when it's done; 1 for a bad option or port, or when it can't connect or
+send (no network card: "Network is unreachable"; no card took it: "No route
+to host"; nothing listening: "Connection refused").
 .SH EXAMPLES
 .nf
+nc \-l 7 > /tmp/heard
+nc 1b9c0e\-6f0c\-4e0f\-9a43\-7d2f3c1a5e88 7 < notes
 nc \-ul 7 > /tmp/heard
 echo hello | nc \-u 1b9c0e6a\-6f0c\-4e0f\-9a43\-7d2f3c1a5e88 7
 echo all | nc \-ub broadcast 7
 .fi
 .SH NOTES
-mcos has UDP and no IP: an address is a network card's, and the network is
-what the cards reach, with nothing routed between networks (a wired card
-and a WLAN card are two networks). A datagram is lost when no program has
-its port, or its queue is full, as UDP's are; one sent to a single card is
-acknowledged by that card (Wi\-Fi does at its link layer), so a card that
-isn't there is an error, as an unanswered ARP is on Linux. A datagram to
-the computer's own card, or a broadcast, reaches its own programs too.
+mcos has UDP and TCP but no IP: an address is a network card's, and the
+network is what the cards reach, with nothing routed between networks (a
+wired card and a WLAN card are two networks). A datagram is lost when no
+program has its port, or its queue is full, as UDP's are; one sent to a
+single card is acknowledged by that card (Wi\-Fi does at its link layer),
+so a card that isn't there is an error, as an unanswered ARP is on Linux.
+TCP loses nothing: what isn't acknowledged is sent again. A datagram or a
+connection to the computer's own card, or a broadcast, reaches its own
+programs too.
 .PP
-GNU and OpenBSD netcat stay after standard input ends, until
+GNU and OpenBSD netcat over UDP stay after standard input ends, until
 .B \-q
 or
 .B \-w
 says; this one ends at once, as with
 .BR "\-q 0" .
-Without
-.BR \-u ,
-netcat would use TCP, which mcos doesn't have.
+Over TCP it says it's done sending at the end of its input, as OpenBSD's
+.B \-N
+does.
 .PP
 A network card can turn its computer on while it's off (Wake\-on\-LAN):
 a frame for it holding its wake message, anywhere in the data, presses the

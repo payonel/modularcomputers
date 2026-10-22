@@ -490,6 +490,12 @@ end
 -- The time, in ticks, read once a pass of the scheduler (a board call).
 local now
 
+-- The time, for the kernel's parts (a board call, once a pass).
+function k.now()
+  now = now or board.uptime()
+  return now
+end
+
 -- ---- syscalls -----------------------------------------------------------------------------------
 -- Each: (process, request, args...) -> its answer, or k.BLOCK to be asked again when things change.
 
@@ -927,9 +933,10 @@ syscalls.watch = withfd(function(p, request, d, fd, file)
   return inotify.watch(d, at)
 end)
 
--- Sockets, as Linux's: socket([type]) an open file (a UDP socket), bind(fd, port), sendto(fd, data,
--- address, port), recvfrom(fd) (data, address, port), and their ioctls (lib/modules/net.lua, loaded
--- at the first).
+-- Sockets, as Linux's: socket([type]) an open file ("dgram", UDP's, or "stream", TCP's), bind(fd,
+-- port), sendto(fd, data, address, port), recvfrom(fd) (data, address, port), listen(fd[, backlog]),
+-- connect(fd, address, port), accept(fd) (a new one, the peer's address and port), shutdown(fd) (no
+-- more to send), and their ioctls (lib/modules/net.lua, loaded at the first).
 function syscalls.socket(p, request, kind)
   local fd = lowestfd(p)
   if not fd then
@@ -944,7 +951,26 @@ function syscalls.socket(p, request, kind)
   return fd
 end
 
-for _, name in ipairs({"bind", "sendto", "recvfrom"}) do
+function syscalls.accept(p, request, fd)
+  local d, why, errno = description(p, fd)
+  if not d then
+    return nil, why, errno
+  elseif d.type ~= "socket" then
+    return nil, "Socket operation on non-socket", "ENOTSOCK"
+  end
+  local new = lowestfd(p)
+  if not new then
+    return fail("EMFILE")
+  end
+  local conn, address, port = net.accept(d, request)
+  if conn == k.BLOCK or not conn then
+    return conn, address, port
+  end
+  p.fds[new] = hold(conn)
+  return new, address, port
+end
+
+for _, name in ipairs({"bind", "sendto", "recvfrom", "listen", "connect", "shutdown"}) do
   syscalls[name] = withfd(function(p, request, d, fd, ...)
     if d.type ~= "socket" then
       return nil, "Socket operation on non-socket", "ENOTSOCK"
@@ -1148,6 +1174,9 @@ local function idle()
   if retryat and (not wake or retryat < wake) then
     wake = retryat
   end
+  if k.timer and (not wake or k.timer < wake) then
+    wake = k.timer -- (a module's: the network's retransmissions)
+  end
   local seconds
   if wake then
     seconds = math.max(0, wake - board.uptime()) / TICKS_PER_SECOND
@@ -1161,6 +1190,8 @@ local function idle()
   for _, source in ipairs(raised) do
     if source == "bus" then
       hotplug()
+    elseif k.raised then
+      k.raised(source) -- (a module's: a network card's frames)
     end
   end
   if retryat and board.uptime() >= retryat then
@@ -1186,6 +1217,9 @@ sysinit()
 while true do
   interrupt()
   now = nil
+  if k.service then
+    k.service() -- (a module's own work, as a kernel's softirqs: the network's timers)
+  end
   local progressed = false
   for _, pid in ipairs(copy(order)) do
     local p = processes[pid]

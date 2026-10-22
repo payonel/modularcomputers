@@ -1,0 +1,91 @@
+-- rcp source target: copies a file between computers (Berkeley's name: no passwords, no
+-- encryption). One of the two is remote, host:path (host as rsh takes it: a card's id, whole or
+-- its start); a path without a colon, or with a / before it, is local. It's rsh underneath, as
+-- BSD's was: cat on the other computer reads or writes the file. A target that's a directory (or,
+-- remote, ends with /) gets the source's name in it.
+local sys = require("sys")
+local fs = require("fs")
+
+local USAGE = "usage: rcp source target (one of them host:path)\n"
+
+-- host, path for a remote one; nil for a local path.
+local function remote(name)
+  local host, path = name:match("^([^/:]+):(.*)$")
+  if host then
+    return host, path ~= "" and path or "."
+  end
+end
+
+-- A path quoted for the other computer's sh.
+local function quote(path)
+  return "'" .. path:gsub("'", "'\\''") .. "'"
+end
+
+local function fail(...)
+  io.stderr:write("rcp: ", ...)
+  io.stderr:write("\n")
+  return 1
+end
+
+if #arg ~= 2 then
+  io.stderr:write(USAGE)
+  return 1
+end
+local source, target = arg[1], arg[2]
+local fromhost, frompath = remote(source)
+local tohost, topath = remote(target)
+if (fromhost and tohost) or not (fromhost or tohost) then
+  io.stderr:write(USAGE)
+  return 1
+end
+
+-- Runs rsh with these fds; how it ended.
+local function run(argv, fds)
+  local pid, why = sys.spawn("/bin/rsh", argv, {fds = fds})
+  if not pid then
+    return nil, why
+  end
+  local _, how, value = sys.waitpid(pid)
+  return how == "exited" and value == 0
+end
+
+if tohost then
+  -- local to remote: cat > path there, the file as its input
+  local st = sys.stat(source)
+  if not st then
+    return fail(source, ": No such file or directory")
+  elseif st.type == "directory" then
+    return fail(source, ": is a directory")
+  end
+  if topath:sub(-1) == "/" or topath == "." then
+    topath = (topath == "." and "" or topath) .. fs.name(source)
+  end
+  local file, why = sys.open(source, "r")
+  if not file then
+    return fail(source, ": ", why)
+  end
+  local ok = run({tohost, "cat > " .. quote(topath)}, {[0] = file})
+  sys.close(file)
+  if not ok then
+    return fail(target, ": not copied")
+  end
+  return 0
+end
+
+-- remote to local: cat path there, its output into the file
+local st = sys.stat(target)
+if st and st.type == "directory" then
+  target = fs.join(target, fs.name(frompath))
+end
+local null = assert(sys.open("/dev/null", "r"))
+local file, why = sys.open(target, "w")
+if not file then
+  return fail(target, ": ", why)
+end
+local ok = run({fromhost, "cat " .. quote(frompath)}, {[0] = null, [1] = file})
+sys.close(file)
+sys.close(null)
+if not ok then
+  return fail(source, ": not copied")
+end
+return 0

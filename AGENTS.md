@@ -215,7 +215,18 @@ real Lua's). **inotify** (`sys.inotify()`, `sys.watch(fd, path)`, a module loade
 gives Linux's notices as lines (`MODIFY /log`; a rename `MOVED_FROM`/`MOVED_TO`; `OVERFLOW`), from
 the disks' reports turned into full paths by their mounts (tmpfs reports through `k.changed`, a
 no-op until then); it watches paths, not inodes as Linux's does, and a change made on a disk's
-host isn't seen. **Services** (user, 2026-10-21, for rshd): the kernel runs `/etc/rc` with sh to its end before
+host isn't seen.
+
+**rsh, rshd, rcp** (user, 2026-10-21): the user's psh done again, named for Berkeley's r-commands
+because it has what they had: no passwords, no encryption (not ssh's names). `rshd` is a service,
+off until enabled; each connection runs `rshd -s` with the connection as stdin (inetd's way), a
+login on a pty (the kernel does the tty work: rshd only relays) or a command on pipes. One TCP
+connection, framed both ways (`lib/rsh.lua`), so stdout, stderr and the exit status stay apart;
+BSD's used a second connection for stderr and never sent the status. A host is a card's id or a
+unique prefix of it, found by a UDP broadcast probe on port 514 that rshd answers. `rcp` is rsh
+running `cat` on the other side, as BSD's rcp ran rcp there.
+
+**Services** (user, 2026-10-21, for rshd): the kernel runs `/etc/rc` with sh to its end before
 the console's shell (inittab's sysinit, BSD's `/etc/rc`), which mounts `/run` and runs `rc boot`.
 A service is a Lua script in `/etc/rc.d/<name>` (user, 2026-10-21: as sysvinit's are scripts in
 the system's language, and mcos's is Lua; sh has no `if` or `case`): OpenRC's shape, settings
@@ -234,8 +245,14 @@ when no session holds it (login_tty's step, folded into posix_spawn: mcos has no
 master hangs up (SIGHUP to the foreground group, then EOF and EIO on the terminal end). No
 `/dev/pts` yet. The window size is the pty's (`TIOCSWINSZ` on the master).
 
-**Sockets** are UDP over the network cards (`lib/modules/net.lua`, loaded at the first
-`sys.socket()`): `bind`, `sendto`, `recvfrom`, `poll`, Linux's names for interfaces (eth0, wlan0)
+**Sockets** are UDP and TCP over the network cards (`lib/modules/net.lua`, loaded at the first
+`sys.socket()`; a frame's data starts with IP's protocol number). TCP is TCP's shape, kept small
+because the link already delivers in order and acknowledges a unicast frame: sequence numbers and
+acknowledgements, a receive window, go-back-N retransmission (a card's queue can overflow, a card
+can go out of reach), SYN/FIN/RST; no congestion control or TIME_WAIT. A SYN no card takes is
+retried, and fails as EHOSTUNREACH after 3 (ARP's tries): one lost frame isn't "no route". Its
+timers run from kernel hooks (`k.timer`, `k.service`, `k.raised`), so nothing in the kernel knows
+TCP. Sockets: `bind`, `sendto`, `recvfrom`, `listen`, `accept`, `connect`, `shutdown`, `poll`, Linux's names for interfaces (eth0, wlan0)
 and ioctls (`SIOCGIFCONF`, ethtool's wake), with no commands for them (user, 2026-10-21:
 `ifconfig` and `ethtool` have no purpose here; an address is in `lsdev -i`, and a program sets the
 wake message). No IP: an address is a card's. A NIC has no `/dev`
@@ -460,17 +477,8 @@ reasons where they gave them. Keeping it short (user, 2026-10-20):
   ignore SIGINT, as sh without job control.
 - **The shell's language:** `if`, `for`, `while`, `case`, functions, here-documents (user: maybe
   later).
-- **rsh, rshd and rcp, next** (user, 2026-10-21): a remote shell, the user's psh (OpenPrograms) done
-  again simply. Goals: no users or passwords, no encryption, so Berkeley's r-commands are its
-  names (rsh runs a command or a shell on another host, rshd serves it, rcp copies files), not
-  ssh's: the names say what's missing. psh was a mess on the tty layer; here the kernel's ptys do
-  that work, as sshd relies on Linux's. rshd is a service that's off until `rc rshd enable`.
-  Planned, in order (`rc` and ptys are built): stream sockets (TCP's shape: `listen`/`accept`/`connect`, a byte stream, a window
-  so receivers never overflow, the link's own retries, as Wi-Fi's); then rshd (port 514, rsh's; a
-  process per connection relaying a pty with `poll`) and rsh (raw tty, `~.`, the remote exit
-  status; with a command, no pty), then rcp. A host is named by its card's full id, or a unique
-  prefix of it (user: ids, not names); rshd is open to anyone (no allow-list). Threads aren't
-  needed for any of it (OpenSSH has none): maybe later, as a convenience.
+- **rsh, rcp, what's left:** `rcp` copies one file (BSD's takes several, `-r` directories, `-p`
+  times); a remote-to-remote `rcp`; readline doesn't redraw a line on SIGWINCH.
 - **Networking, later:** a router between wired and wireless networks, raw frames for programs
   (Linux's packet sockets, for a `tcpdump`), a WLAN card's range as a setting (OC's strength, its
   power cost).

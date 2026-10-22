@@ -1,0 +1,40 @@
+.TH RSHD 1 "" "" "mcos Manual"
+.SH NAME
+rshd \- the remote shell's daemon
+.SH SYNOPSIS
+.B rshd
+.SH DESCRIPTION
+.B rshd
+takes
+.BR rsh (1)'s
+connections on TCP port 514, and answers rsh's search for hosts on UDP
+port 514. It's a service:
+.B rc rshd start
+runs it, and
+.B rc rshd enable
+starts it at boot; it's off until then.
+.PP
+Each connection gets a session of its own (rshd runs itself with
+.BR \-s ,
+the connection as its input, as inetd ran BSD's rshd). A login runs
+.B sh
+on a pty as big as rsh's terminal: what rsh sends is typed into it, so
+the pty does the terminal's work (echo, line editing, ^C), and what it
+shows goes back. A command runs with
+.BR "sh \-c" ,
+on pipes: its input from rsh, its output and errors back apart, then how it
+ended. When rsh goes, a login's line hangs up (SIGHUP to its shell), and a
+command's input ends.
+.SH FILES
+.TP
+.B /etc/rc.d/rshd
+Its service.
+.SH NOTES
+No passwords and no encryption: anyone whose network card reaches this
+computer's gets a shell on it, as with Berkeley's rshd before
+.B .rhosts
+files. Leave it off where that matters.
+.SH SEE ALSO
+.BR rsh (1),
+.BR rcp (1),
+.BR rc (1)

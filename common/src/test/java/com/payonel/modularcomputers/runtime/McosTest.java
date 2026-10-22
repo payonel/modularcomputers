@@ -105,10 +105,48 @@ class McosTest {
 				task.run();
 			}
 			machine.tick();
+			for (Runnable tick : ticks) {
+				tick.run(); // (another computer's, and what a test does each tick)
+			}
 			try {
 				Thread.sleep(1);
 			} catch (InterruptedException e) {
 				throw new IllegalStateException(e);
+			}
+		}
+	}
+
+	/** What else happens each tick: other computers' ticks, a test's own doings. */
+	private final java.util.List<Runnable> ticks = new java.util.ArrayList<>();
+
+	/** Another computer running mcos from a disk of its own, on this test's server thread, with a network card in {@code world}. */
+	private final class Other {
+		final Terminal screen = new Terminal(Resolution.DEFAULT);
+		final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(java.util.List.of())));
+		final Path root;
+		final com.payonel.modularcomputers.device.NetworkCard card;
+
+		Other(String name, Object world, java.util.UUID id) {
+			root = McosTest.this.world.resolve(name);
+			LuaScripts.copyTree("mcos", root);
+			card = networkCard(world, id);
+			Eeprom eeprom = new Eeprom(LuaScripts.read("eeprom/boot"));
+			Map<String, Device> devices = new LinkedHashMap<>();
+			devices.put("id:screen", screen);
+			devices.put("sata:0", new Disk(DiskTier.TIER_1, root));
+			devices.put("eeprom", eeprom);
+			devices.put("id:" + id, card);
+			machine.board().setCpu(new Cpu(CpuTier.TIER_3));
+			machine.setServer(server::add);
+			machine.setDevices(devices);
+			machine.board().setEeprom(eeprom);
+			assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
+			ticks.add(machine::tick);
+		}
+
+		void type(String keys) {
+			for (int i = 0; i < keys.length(); i++) {
+				screen.press(keys.substring(i, i + 1));
 			}
 		}
 	}
@@ -1054,9 +1092,9 @@ class McosTest {
 		return card;
 	}
 
-	/** A UDP datagram, as a card's frame carries it: source and destination port, then the data. */
+	/** A UDP datagram, as a card's frame carries it: its protocol (IP's number for UDP, 17), source and destination port, then the data. */
 	private static String datagram(int from, int to, String data) {
-		return "" + (char) (from >> 8) + (char) (from & 0xff) + (char) (to >> 8) + (char) (to & 0xff) + data;
+		return "" + (char) 17 + (char) (from >> 8) + (char) (from & 0xff) + (char) (to >> 8) + (char) (to & 0xff) + data;
 	}
 
 	private static Arguments args(Object... values) {
@@ -1089,12 +1127,14 @@ class McosTest {
 			assert(sys.sendto(s, "pong", from, port))
 			local _, _, unreachable = sys.sendto(s, "x", "nobody", 1)
 			local _, _, toolong = sys.sendto(s, string.rep("x", 9000), from, port)
-			assert(sys.sendto(s, "all", "broadcast", 9))
 			local back = assert(sys.socket())
 			assert(sys.bind(back, 9))
+			assert(sys.sendto(s, "all", "broadcast", 9))
 			local mine = sys.ioctl(back, "SIOCGIFCONF")[1]
 			assert(sys.sendto(s, "self", mine.address, 9))
+			local all = sys.recvfrom(back)
 			local looped, _, loopport = sys.recvfrom(back)
+			looped = all .. "+" .. looped
 			put("/got", table.concat({tostring(next(quiet) == nil), tostring(ready[s].IN), data, from, port, inuse,
 			  unreachable, toolong, looped, loopport, mine.name}, " "))
 			""");
@@ -1104,8 +1144,8 @@ class McosTest {
 		server.add(() -> peer.send(args(mine.toString(), datagram(5000, 7, "ping"))));
 		untilFile(root().resolve("done"), "");
 		assertThat(read(root().resolve("err"))).isEmpty();
-		assertThat(read(root().resolve("got"))).as("nothing waited, then the ping, from its card and port; the errors; its own datagram looped back")
-			.isEqualTo("true true ping " + peer.address() + " 5000 EADDRINUSE EHOSTUNREACH EMSGSIZE self 7 wlan0");
+		assertThat(read(root().resolve("got"))).as("nothing waited, then the ping, from its card and port; the errors; its own broadcast and datagram looped back")
+			.isEqualTo("true true ping " + peer.address() + " 5000 EADDRINUSE EHOSTUNREACH EMSGSIZE all+self 7 wlan0");
 		@SuppressWarnings("unchecked") var pong = (Map<String, Object>) peer.receive(args()).first();
 		assertThat(pong).containsEntry("from", mine.toString()).containsEntry("data", datagram(7, 5000, "pong"));
 		@SuppressWarnings("unchecked") var all = (Map<String, Object>) peer.receive(args()).first();
@@ -1329,5 +1369,116 @@ class McosTest {
 		assertThat(shown).as("no escape sequence shown as text").doesNotContain("^[");
 		type("less -Z /dev/null 2> /err; echo $? > /st\r");
 		untilFile(root().resolve("st"), "1\n");
+	}
+
+	@Test
+	void aStreamCarriesEveryByteInOrderAndEndsAtItsShutdown() {
+		java.util.UUID mine = java.util.UUID.randomUUID();
+		devices.put("id:" + mine, networkCard(new Object(), mine));
+		file("client.lua", """
+			local sys = require("sys")
+			local s = assert(sys.socket("stream"))
+			assert(sys.connect(s, arg[1], 7))
+			local data = string.rep("0123456789", 2000)
+			assert(sys.write(s, data) == #data)
+			assert(sys.shutdown(s))
+			local reply = ""
+			while true do
+			  local d = sys.read(s)
+			  if not d or d == "" then break end
+			  reply = reply .. d
+			end
+			local out = io.open("/client", "w")
+			out:write(reply)
+			out:close()
+			""");
+		file("server.lua", """
+			local sys = require("sys")
+			local me = sys.ioctl(assert(sys.socket()), "SIOCGIFCONF")[1].address
+			local l = assert(sys.socket("stream"))
+			assert(sys.bind(l, 7))
+			assert(sys.listen(l))
+			local _, _, refused = sys.connect(assert(sys.socket("stream")), me, 9)
+			local pid = assert(sys.spawn("/client.lua", {me}))
+			local c, from = assert(sys.accept(l))
+			local got, ok = "", true
+			while true do
+			  local d = sys.read(c, 4096)
+			  if not d or d == "" then break end
+			  got = got .. d
+			end
+			ok = got == string.rep("0123456789", 2000)
+			sys.write(c, "got " .. #got)
+			sys.close(c)
+			sys.waitpid(pid)
+			local out = io.open("/server", "w")
+			out:write(table.concat({tostring(refused), #got, tostring(ok), tostring(from == me)}, " "))
+			out:close()
+			""");
+		boot();
+		type("lua /server.lua 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("err"))).isEmpty();
+		assertThat(read(root().resolve("server"))).as("refused where nothing listens; every byte, in order, from its own address").isEqualTo("ECONNREFUSED 20000 true true");
+		assertThat(read(root().resolve("client"))).isEqualTo("got 20000");
+	}
+
+	@Test
+	void rshRunsCommandsAndLoginsAndRcpCopiesThroughRshd() {
+		java.util.UUID mine = java.util.UUID.randomUUID();
+		devices.put("id:" + mine, networkCard(new Object(), mine));
+		String host = mine.toString().substring(0, 6); // (a prefix: found by asking every rshd in reach)
+		file("f", "a file\n");
+		boot();
+		type("rc rshd start; sleep 0.5; rsh " + host + " 'echo out; echo err >&2; exit 3' > /o 2> /e; echo $? > /st\r");
+		untilFile(root().resolve("st"), "3\n");
+		assertThat(read(root().resolve("o"))).as("its output").isEqualTo("out\n");
+		assertThat(read(root().resolve("e"))).as("its errors, apart").isEqualTo("err\n");
+		type("rcp /f " + host + ":/copied; rcp " + host + ":/copied /back; echo $? > /st2\r");
+		untilFile(root().resolve("st2"), "0\n");
+		assertThat(read(root().resolve("copied"))).isEqualTo("a file\n");
+		assertThat(read(root().resolve("back"))).isEqualTo("a file\n");
+		// (each rsh, then a local touch: what's typed next waits for rsh to be gone, or rsh would take it)
+		type("rsh " + host + "; touch /back1\r");
+		untilIdle();
+		type("echo remote > /p; exit\r");
+		untilFile(root().resolve("p"), "remote\n");
+		untilFile(root().resolve("back1"), "");
+		type("rsh " + host + "; touch /back2\r");
+		untilIdle();
+		type("\r~.");
+		untilFile(root().resolve("back2"), "");
+	}
+	@Test
+	void twoComputersTalkThroughTheirCardsAndTcpLosesNothingWhenFramesAre() {
+		Object world = new Object();
+		java.util.UUID mine = java.util.UUID.randomUUID();
+		java.util.UUID theirs = java.util.UUID.randomUUID();
+		var card = networkCard(world, mine);
+		devices.put("id:" + mine, card);
+		file("big.lua", """
+			local out = io.open("/big", "w")
+			for i = 1, 3000 do
+			  out:write(string.format("line %05d of the file that goes there and back\\n", i))
+			end
+			out:close()
+			""");
+		boot();
+		Other other = new Other("other", world, theirs);
+		settle(() -> other.machine.runner().map(r -> r.state() == Runner.State.WAITING).orElse(false));
+		other.type("rc rshd start\r");
+		// Their card goes out of reach half a second in every two: frames to it are lost then, and
+		// TCP sends them again.
+		int[] tick = {0};
+		ticks.add(() -> {
+			tick[0]++;
+			other.card.place(world, net.minecraft.core.BlockPos.ZERO, tick[0] % 40 < 10 ? -100 : 0);
+		});
+		type("sleep 1; lua /big.lua; rcp /big " + theirs + ":/big; rsh " + theirs + " cat /big > /back; echo $? > /st\r");
+		untilFile(root().resolve("st"), "0\n");
+		String sent = read(root().resolve("big"));
+		assertThat(sent).hasSize(3000 * 48);
+		assertThat(read(other.root.resolve("big"))).as("there, whole").isEqualTo(sent);
+		assertThat(read(root().resolve("back"))).as("and back, whole").isEqualTo(sent);
 	}
 }
