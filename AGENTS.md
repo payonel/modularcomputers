@@ -251,7 +251,11 @@ custom network scripts; our handshake rule): a unicast frame is taken by the oth
 at once with why (`busy`: its queue is full or no program takes data there; `unreachable`), and
 the card never tries again: retrying is software's, as lossless Ethernet's PAUSE leaves it (Wi-Fi
 cards retry in hardware; skipped). A broadcast is best effort (how many took it). "Taken" is the
-card's, never the program's (end to end: only programs can say). TCP is TCP's shape, kept small:
+card's, never the program's (end to end: only programs can say). **UDP has no remote dependency**
+(user, 2026-10-23): a datagram's answer is layer 0's alone (the card took it or said why); the
+other computer's kernel never answers one (no ICMP port unreachable), and drops what has no socket
+or no room, as UDP's are. Not wanted: making a full socket hold frames back in the card (the
+sender's answer would hang on a program's pace). TCP is TCP's shape, kept small:
 sequence numbers and acknowledgements, a receive window, a segment no card took tried again in a
 tenth of a second, one taken and unacknowledged again in a second (go back N), reset after 8
 seconds with no progress (a SYN that found no card for 3: EHOSTUNREACH, ARP's time), SYN/FIN/RST;
