@@ -358,6 +358,14 @@ process (as VFIO does).
   like a stuck restore; restoring its saved state alone took 120 ms. Load the world on a dedicated
   server (`fabric/run/world`, a `/forceload` through a fifo on stdin) and `jstack` the server
   thread: it showed the real cause at once. A deadlocked server ignores SIGTERM (`kill -9`).
+- **Put a test's devices where a case puts them.** A case's card is at its slot's path and named by
+  its id too (an alias); mcos names every device by its id. The unit tests put cards on the bus at
+  `id:` addresses, so a wait on a card's id matched the interrupt there, and in a case it never did:
+  a frame woke no computer until its poll's timeout (rsh's probe missed its 0.5 s more than half
+  the time, 2026-10-23). Tests now slot their cards (an alias, as `Motherboard.layout` gives).
+  A behavior that only a real world shows: load the user's save on a dedicated server, and drive its
+  computers with a throwaway server command (type keys, read the screen; never committed). Set
+  `pause-when-empty-seconds=-1`, or an empty server stops ticking after a minute.
 - **LungoLua bugs look like ours.** A pattern `%s` once matched "s"; verify against stock Lua's
   semantics, report to the lua thread, work around until fixed.
 

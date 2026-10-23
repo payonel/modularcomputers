@@ -143,9 +143,26 @@ final class MotherboardApi implements Board {
 
 	@Override
 	public List<String> waitForInterrupt(double seconds, String... sources) {
-		// The runner does the waiting; called directly, it doesn't wait.
-		List<String> wanted = List.of(sources);
-		return interrupts().stream().filter(source -> wanted.isEmpty() || wanted.contains(source)).toList();
+		// The runner does the waiting; called directly, it doesn't wait. A source is answered by the
+		// name it was asked by (a card's id, or its slot's path).
+		List<String> raised = interrupts();
+		if (sources.length == 0) {
+			return raised;
+		}
+		List<String> ready = new ArrayList<>();
+		for (String address : raised) {
+			for (String source : sources) {
+				if (addressOf(source).equals(address) && !ready.contains(source)) {
+					ready.add(source);
+				}
+			}
+		}
+		return ready;
+	}
+
+	@Override
+	public String addressOf(String name) {
+		return board.bus().address(name).orElse(name);
 	}
 
 	@Override

@@ -140,6 +140,15 @@ public interface Board {
 	/** Restarts the machine: power off and on again, the CPU booting its EEPROM afresh. Never returns. */
 	void reboot();
 
+	/**
+	 * The bus address of the device a name names: a card in a slot is at its slot's path and named
+	 * by its id too ({@code id:<uuid>}); any other name is its own. Interrupts are raised at
+	 * addresses, so a program that names a device by its id hears them through this.
+	 */
+	default String addressOf(String name) {
+		return name;
+	}
+
 	/** The method that takes the next piece of a device's data, when it has a stream (see {@code Device.streamMethod}). */
 	default Optional<String> streamMethod(String address) {
 		return Optional.empty();

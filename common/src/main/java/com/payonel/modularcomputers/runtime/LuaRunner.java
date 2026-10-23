@@ -746,8 +746,10 @@ public final class LuaRunner implements Runner {
 	 * what the program is doing.
 	 */
 	@Override
-	public State tick(Board board, int unused, long now, Supplier<List<String>> interrupts) {
+	public State tick(Board board, int unused, long now, Supplier<List<String>> raisedAt) {
 		this.now = now;
+		this.board = board;
+		Supplier<List<String>> interrupts = () -> named(raisedAt.get());
 		if (thread == null) {
 			memory.cap(board.hardware().memoryTotal()); // the RAM installed: the program's memory, at power-on
 			thread = Thread.ofPlatform().name("modularcomputers-cpu").daemon().priority(Thread.MIN_PRIORITY).unstarted(this::run);
@@ -802,7 +804,43 @@ public final class LuaRunner implements Runner {
 
 	@Override
 	public void interruptsRaised(List<String> raised) {
-		memory.raised = List.copyOf(raised);
+		memory.raised = List.copyOf(named(raised));
+	}
+
+	/** The board it last ran on (server thread): it knows the devices' other names. */
+	private Board board;
+
+	/**
+	 * Interrupts are raised at bus addresses; the program may know a device by another name (a
+	 * card's id, as mcos names every device that has one). Each raised address goes back by the name
+	 * the program used for it (in a wait, a read, a ring), so every comparison with the program's
+	 * names holds. Server thread.
+	 */
+	private List<String> named(List<String> raised) {
+		Board on = board;
+		if (on == null || raised.isEmpty()) {
+			return raised;
+		}
+		Set<String> names = new java.util.LinkedHashSet<>(wanted);
+		Wait waiting = wait;
+		if (waiting != null) {
+			names.addAll(waiting.sources());
+			names.addAll(waiting.held().keySet());
+		}
+		synchronized (memory.push) {
+			names.addAll(memory.push.credit.keySet());
+		}
+		Map<String, String> byAddress = new java.util.HashMap<>();
+		for (String name : names) {
+			String address = on.addressOf(name);
+			if (!address.equals(name)) {
+				byAddress.putIfAbsent(address, name);
+			}
+		}
+		if (byAddress.isEmpty()) {
+			return raised;
+		}
+		return raised.stream().map(address -> byAddress.getOrDefault(address, address)).toList();
 	}
 
 	/**

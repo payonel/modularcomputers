@@ -89,7 +89,7 @@ class McosTest {
 		devices.put("sata:0", new Disk(DiskTier.TIER_1, root()));
 		Eeprom eeprom = new Eeprom(LuaScripts.read("eeprom/boot"));
 		devices.put("eeprom", eeprom); // (on the bus at its slot, as a board puts it)
-		machine.setDevices(new LinkedHashMap<>(devices));
+		machine.setDevices(new LinkedHashMap<>(devices), Map.copyOf(aliases));
 		machine.board().setEeprom(eeprom);
 		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
 		untilIdle();
@@ -116,11 +116,15 @@ class McosTest {
 		}
 	}
 
+	/** Other names for devices on the bus (a card in a slot: its id), as a motherboard gives them. */
+	private final Map<String, String> aliases = new LinkedHashMap<>();
+
 	/** What else happens each tick: other computers' ticks, a test's own doings. */
 	private final java.util.List<Runnable> ticks = new java.util.ArrayList<>();
 
 	/** Another computer running mcos from a disk of its own, on this test's server thread, with a network card in {@code world}. */
 	private final class Other {
+		static final String SLOT = "pcie:1";
 		final Terminal screen = new Terminal(Resolution.DEFAULT);
 		final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(java.util.List.of())));
 		final Path root;
@@ -135,10 +139,10 @@ class McosTest {
 			devices.put("id:screen", screen);
 			devices.put("sata:0", new Disk(DiskTier.TIER_1, root));
 			devices.put("eeprom", eeprom);
-			devices.put("id:" + id, card);
+			devices.put(SLOT, card); // (in a slot, as in a case: named by its id too)
 			machine.board().setCpu(new Cpu(CpuTier.TIER_3));
 			machine.setServer(server::add);
-			machine.setDevices(devices);
+			machine.setDevices(devices, Map.of("id:" + id, SLOT));
 			machine.board().setEeprom(eeprom);
 			assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
 			ticks.add(machine::tick);
@@ -1481,6 +1485,39 @@ class McosTest {
 		assertThat(read(other.root.resolve("big"))).as("there, whole").isEqualTo(sent);
 		assertThat(read(root().resolve("back"))).as("and back, whole").isEqualTo(sent);
 	}
+	@Test
+	void rshFindsAnotherComputerByAPrefixEveryTime() {
+		Object world = new Object();
+		java.util.UUID mine = java.util.UUID.randomUUID();
+		java.util.UUID theirs = java.util.UUID.randomUUID();
+		var card = networkCard(world, mine);
+		devices.put("pcie:1", card); // (cards in slots, as in a case: an interrupt is raised at the slot, and mcos names the card by its id)
+		aliases.put("id:" + mine, "pcie:1");
+		file("tries.lua", """
+			local sys = require("sys")
+			local out = io.open("/tries", "w")
+			for i = 1, 20 do
+			  local pid = assert(sys.spawn("/bin/rsh", {arg[1], "true"}, {}))
+			  local _, how, value = sys.waitpid(pid)
+			  out:write(tostring(how), " ", tostring(value), "\\n")
+			end
+			out:close()
+			""");
+		boot();
+		Other other = new Other("other", world, theirs);
+		settle(() -> other.machine.runner().map(r -> r.state() == Runner.State.WAITING).orElse(false));
+		other.type("rc rshd start\r");
+		long[] tick = {0};
+		ticks.add(() -> { // (each card says where it is every tick, as its block does)
+			tick[0]++;
+			card.place(world, net.minecraft.core.BlockPos.ZERO, tick[0]);
+			other.card.place(world, new net.minecraft.core.BlockPos(3, 0, 0), tick[0]);
+		});
+		type("sleep 1; lua /tries.lua " + theirs.toString().substring(0, 4) + " 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("tries"))).as(() -> "errors: " + read(root().resolve("err"))).isEqualTo("exited 0\n".repeat(20));
+	}
+
 	@Test
 	void sendtoSaysWhenTheOtherCardIsBusy() {
 		Object world = new Object();
