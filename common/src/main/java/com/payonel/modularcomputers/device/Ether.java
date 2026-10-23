@@ -33,34 +33,53 @@ public final class Ether {
 		CARDS.add(card);
 	}
 
-	/**
-	 * A frame from {@code from} to the card whose address is {@code to} (null: every card it
-	 * reaches, a broadcast). Returns whether any card's radio or port took it (a unicast frame's
-	 * acknowledgement, as Wi-Fi's link layer gives one).
-	 */
-	static boolean send(NetworkCard from, String to, String data) {
+	/** The cards {@code from} reaches now, each with how far, in meters. */
+	private static java.util.Map<NetworkCard, Double> reached(NetworkCard from) {
+		java.util.Map<NetworkCard, Double> reached = new java.util.LinkedHashMap<>();
 		Place here = from.place();
-		String address = from.address();
-		if (here == null || address == null) {
-			return false;
+		if (here == null || from.address() == null) {
+			return reached;
 		}
 		List<NetworkCard> cards;
 		synchronized (Ether.class) {
 			cards = List.copyOf(CARDS);
 		}
-		boolean heard = false;
 		for (NetworkCard card : cards) {
 			Place there = card.place();
 			if (card == from || card.kind() != from.kind() || there == null || there.world() != here.world()
-				|| there.seen() < here.seen() - STALE_TICKS || to != null && !to.equals(card.address())) {
+				|| there.seen() < here.seen() - STALE_TICKS) {
 				continue;
 			}
 			Double distance = distance(from, here, there);
 			if (distance != null) {
-				heard |= card.hear(address, data, distance, to == null);
+				reached.put(card, distance);
 			}
 		}
-		return heard;
+		return reached;
+	}
+
+	/**
+	 * A frame from {@code from} to the card whose address is {@code to}: null when it took it, else
+	 * why not ({@link NetworkCard#BUSY}, {@link NetworkCard#UNREACHABLE}). Nothing tries again.
+	 */
+	static String send(NetworkCard from, String to, String data) {
+		for (var entry : reached(from).entrySet()) {
+			if (to.equals(entry.getKey().address())) {
+				return entry.getKey().hear(from.address(), data, entry.getValue(), false);
+			}
+		}
+		return NetworkCard.UNREACHABLE;
+	}
+
+	/** A frame from {@code from} to every card it reaches, as best it can: how many took it. */
+	static int broadcast(NetworkCard from, String data) {
+		int took = 0;
+		for (var entry : reached(from).entrySet()) {
+			if (entry.getKey().hear(from.address(), data, entry.getValue(), true) == null) {
+				took++;
+			}
+		}
+		return took;
 	}
 
 	/** How far a frame goes from one card to another, in meters; null: it doesn't reach. */

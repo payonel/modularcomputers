@@ -52,9 +52,9 @@ class NetworkCardTest {
 		assertThat(received(b)).containsEntry("from", a.address()).containsEntry("data", "hello").containsEntry("distance", 5.0)
 			.doesNotContainKey("broadcast");
 		assertThat(c.interruptPending()).as("not for it").isFalse();
-		assertThat(a.send(args("id:" + far.address(), "x")).first()).as("out of range: not acknowledged").isEqualTo(false);
-		assertThat(a.send(args(UUID.randomUUID().toString(), "x")).first()).as("nobody there").isEqualTo(false);
-		a.broadcast(args("all"));
+		assertThat(a.send(args("id:" + far.address(), "x")).values()).as("out of range").containsExactly(false, NetworkCard.UNREACHABLE);
+		assertThat(a.send(args(UUID.randomUUID().toString(), "x")).values()).as("nobody there").containsExactly(false, NetworkCard.UNREACHABLE);
+		assertThat(a.broadcast(args("all")).first()).as("how many took it").isEqualTo(2L);
 		assertThat(received(b)).containsEntry("data", "all").containsEntry("broadcast", true);
 		assertThat(received(c)).containsEntry("data", "all");
 		assertThat(far.interruptPending()).isFalse();
@@ -98,8 +98,8 @@ class NetworkCardTest {
 		assertThat(received(b)).containsEntry("data", "1");
 		assertThat(received(b)).containsEntry("data", "2");
 		assertThat(received(b)).isNull();
-		b.accepting(false); // no program: frames are dropped, though its radio still takes them
-		assertThat(a.send(args(b.address(), "3")).first()).isEqualTo(true);
+		b.accepting(false); // no program: it takes nothing, and says so
+		assertThat(a.send(args(b.address(), "3")).values()).containsExactly(false, NetworkCard.BUSY);
 		b.accepting(true);
 		assertThat(received(b)).isNull();
 	}
@@ -124,5 +124,23 @@ class NetworkCardTest {
 		assertThat(machine.isPowered()).as("woken, as its power button would").isTrue();
 		assertThat(card.getWake(args()).first()).as("the setting outlasts power").isEqualTo("wake");
 		assertThat(card.saved()).containsEntry("wake", "wake");
+	}
+
+	@Test
+	void aFullCardRefusesAFrameAndTheSenderHearsItsBusyNothingDropped() {
+		NetworkCard a = card(CardKind.WLAN, BlockPos.ZERO);
+		NetworkCard b = card(CardKind.WLAN, BlockPos.ZERO);
+		int sent = 0;
+		while (a.send(args(b.address(), "f" + sent)).first().equals(true)) {
+			sent++;
+		}
+		assertThat(a.send(args(b.address(), "more")).values()).as("full: refused, not dropped").containsExactly(false, NetworkCard.BUSY);
+		assertThat(a.broadcast(args("all")).first()).as("a broadcast it can't take: missed, counted").isEqualTo(0L);
+		assertThat(received(b)).as("the oldest is still there").containsEntry("data", "f0");
+		assertThat(a.send(args(b.address(), "more")).first()).as("room again").isEqualTo(true);
+		for (int i = 1; i < sent; i++) {
+			assertThat(received(b)).containsEntry("data", "f" + i);
+		}
+		assertThat(received(b)).containsEntry("data", "more");
 	}
 }

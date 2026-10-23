@@ -1481,4 +1481,25 @@ class McosTest {
 		assertThat(read(other.root.resolve("big"))).as("there, whole").isEqualTo(sent);
 		assertThat(read(root().resolve("back"))).as("and back, whole").isEqualTo(sent);
 	}
+	@Test
+	void sendtoSaysWhenTheOtherCardIsBusy() {
+		Object world = new Object();
+		java.util.UUID mine = java.util.UUID.randomUUID();
+		devices.put("id:" + mine, networkCard(world, mine));
+		var peer = networkCard(world, java.util.UUID.randomUUID());
+		peer.power().supply(this); // on a computer whose program takes no data: it takes nothing
+		file("b.lua", """
+			local sys = require("sys")
+			local s = assert(sys.socket())
+			local _, _, busy = sys.sendto(s, "x", arg[1], 7)
+			local out = io.open("/b", "w")
+			out:write(tostring(busy))
+			out:close()
+			""");
+		boot();
+		type("lua /b.lua " + peer.address() + " 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("err"))).isEmpty();
+		assertThat(read(root().resolve("b"))).isEqualTo("ENOBUFS");
+	}
 }

@@ -10,14 +10,19 @@
 --
 -- UDP ("dgram"): bind(port), sendto(data, address, port), recvfrom() (data, address, port), a read
 -- takes one datagram's data. Its header: source and destination port (length and checksum are
--- skipped: a frame knows its length, and nothing corrupts one). It's lossy, as UDP is: a datagram
--- with no socket for it, or no room, is dropped.
+-- skipped: a frame knows its length, and nothing corrupts one). sendto says when the other card
+-- didn't take it (ENOBUFS: it's busy; EHOSTUNREACH); a datagram it took with no socket for it, or
+-- no room in the socket's queue, is dropped there, as UDP's are: "taken" is the card's, not the
+-- program's.
 --
 -- TCP ("stream"): listen(backlog) and accept() (a new socket, the peer's address and port), or
 -- connect(address, port); then a byte stream both ways, in order, none lost: segments carry a
 -- sequence number and an acknowledgement, a receiver says how much room it has (its window: a
--- sender never sends more), and what isn't acknowledged in RTO_TICKS is sent again (a card's queue
--- may overflow), up to MAX_TRIES times (then the connection is reset: ETIMEDOUT). A connection opens
+-- sender never sends more). A card never drops a frame: it takes it or says why not at once (busy,
+-- unreachable), and never tries again itself; TCP does: a segment no card took goes again in
+-- RETRY_TICKS, one taken and not acknowledged in RTO_TICKS goes again too (go back N), and with no
+-- progress for GIVE_UP_TICKS the connection is reset (ETIMEDOUT; a SYN that found no card for
+-- UNREACHABLE_TICKS, EHOSTUNREACH, as an ARP that's never answered). A connection opens
 -- with SYN, SYN|ACK, ACK and closes with a FIN each way (close, or shutdown: no more to send); a
 -- segment for nothing gets RST (connect: ECONNREFUSED). Not modeled: congestion control, TIME_WAIT,
 -- urgent data, options. Its header: protocol, ports, flags, sequence, acknowledgement, window.
@@ -37,9 +42,10 @@ local QUEUE = 64 -- datagrams a UDP socket holds before it drops the next (SO_RC
 local MSS = 2048 -- the most data a TCP segment carries
 local WINDOW = 8192 -- what a TCP connection holds received and unread (its window), and unsent
 local BACKLOG = 8 -- connections waiting to be accepted, unless listen says
-local RTO_TICKS = 20 -- what isn't acknowledged in this long (a second) is sent again
-local MAX_TRIES = 8 -- sent this many times with no acknowledgement: the connection is reset
-local UNREACHED_TRIES = 3 -- a SYN no card took this many times: no route to the host (ARP's tries, as Linux's)
+local RTO_TICKS = 20 -- what a card took and isn't acknowledged in this long (a second) is sent again
+local RETRY_TICKS = 2 -- what no card took (busy, out of reach) is tried again this soon
+local GIVE_UP_TICKS = 160 -- no progress in this long (8 seconds): the connection is reset
+local UNREACHABLE_TICKS = 60 -- a SYN no card was there to take for this long: no route to the host (ARP's 3 seconds, as Linux's)
 local SEQ_SPACE = 4294967296 -- sequence numbers are 32 bits
 local EPHEMERAL_FIRST, EPHEMERAL_LAST = 32768, 60999 -- the ports given to a socket that sends unbound (Linux's ip_local_port_range)
 local MAX_PORT = 65535
@@ -47,6 +53,7 @@ local BROADCAST = "broadcast"
 
 local ERRNO = {
   ENOTSOCK = "Socket operation on non-socket",
+  ENOBUFS = "No buffer space available",
   EMSGSIZE = "Message too long",
   EPROTONOSUPPORT = "Protocol not supported",
   EADDRINUSE = "Address already in use",
@@ -109,8 +116,9 @@ local function ephemeral(protocol)
 end
 
 -- A frame out: to one of this computer's own cards (looped back), through the card that reaches the
--- address (its acknowledgement says which: a unicast frame no card took is EHOSTUNREACH, as an ARP
--- that's never answered), or to every card (a broadcast, which loops back too). True, or the error.
+-- address (the card says whether the other took it: ENOBUFS when it was busy, EHOSTUNREACH when no
+-- card there was in reach, as an ARP that's never answered), or to every card (a broadcast, as
+-- best it can, which loops back too). True, or the error.
 local function transmit(address, frame)
   local nics = interfaces()
   if not nics[1] then
@@ -129,13 +137,15 @@ local function transmit(address, frame)
     loop[#loop + 1] = {frame, nics[1].address}
     return true
   end
+  local busy = false
   for _, nic in ipairs(nics) do
-    local ok, heard = board.invoke(nic.id, "send", address, frame)
-    if ok and heard then
+    local ok, took, why = board.invoke(nic.id, "send", address, frame)
+    if ok and took then
       return true
     end
+    busy = busy or why == "busy"
   end
-  return fail("EHOSTUNREACH")
+  return fail(busy and "ENOBUFS" or "EHOSTUNREACH")
 end
 
 -- ---- TCP ----------------------------------------------------------------------------------------
@@ -146,16 +156,19 @@ local function key(address, lport, rport)
   return address .. "/" .. lport .. "/" .. rport
 end
 
--- Arms the connection's retransmission (or keeps it armed), and the kernel's timer with it.
-local function arm(c)
-  c.timer = c.timer or k.now() + RTO_TICKS
+-- Arms the connection's timer for 'ticks' on (RTO_TICKS unless said), unless it's due sooner; and
+-- the kernel's timer with it.
+local function arm(c, ticks)
+  local at = k.now() + (ticks or RTO_TICKS)
+  if not c.timer or at < c.timer then
+    c.timer = at
+  end
   if not k.timer or c.timer < k.timer then
     k.timer = c.timer
   end
 end
 
--- A segment out, carrying what it acknowledges and the room this end has. A frame no card took
--- counts as a try that failed.
+-- A segment out, carrying what it acknowledges and the room this end has: true, or why no card took it.
 local function segment(c, flags, seq, data)
   local room = WINDOW - #c.inbuf
   local frame = string.pack(TCP_HEADER, TCP, c.lport, c.rport, flags, seq % SEQ_SPACE, c.rcv_nxt % SEQ_SPACE, room) .. (data or "")
@@ -195,12 +208,18 @@ local function output(c, probe)
       break
     end
     local n = math.min(unsent, room, MSS)
-    segment(c, ACK, c.snd_nxt, c.out:sub(inflight + 1, inflight + n))
+    if not segment(c, ACK, c.snd_nxt, c.out:sub(inflight + 1, inflight + n)) then
+      arm(c, RETRY_TICKS) -- (no card took it: again soon, from here)
+      return
+    end
     c.snd_nxt = c.snd_nxt + n
     arm(c)
   end
   if c.closing and not c.fin_sent and c.snd_nxt - c.snd_una == #c.out then
-    segment(c, FIN | ACK, c.snd_nxt)
+    if not segment(c, FIN | ACK, c.snd_nxt) then
+      arm(c, RETRY_TICKS)
+      return
+    end
     c.snd_nxt = c.snd_nxt + 1 -- (a FIN takes a sequence number)
     c.fin_sent = true
     arm(c)
@@ -213,7 +232,7 @@ end
 local function newconn(address, lport, rport, owner)
   local isn = (k.now() * 7919 + lport * 31 + rport) % SEQ_SPACE
   local c = {key = key(address, lport, rport), raddr = address, lport = lport, rport = rport, owner = owner,
-    snd_una = isn, snd_nxt = isn, rcv_nxt = 0, peerwnd = 0, out = "", inbuf = "", tries = 0}
+    snd_una = isn, snd_nxt = isn, rcv_nxt = 0, peerwnd = 0, out = "", inbuf = "", progress = k.now()}
   conns[c.key] = c
   return c
 end
@@ -233,9 +252,9 @@ local function tcp(data, from)
     elseif flags & SYN ~= 0 and flags & ACK == 0 and listener and listener.listening and #listener.pending < listener.backlog then
       c = newconn(from, dport, sport, nil)
       c.state, c.rcv_nxt, c.peerwnd, c.listener = SYN_RCVD, seq + 1, wnd, listener
-      segment(c, SYN | ACK, c.snd_nxt)
+      local took = segment(c, SYN | ACK, c.snd_nxt)
       c.snd_nxt = c.snd_nxt + 1
-      arm(c)
+      arm(c, took and RTO_TICKS or RETRY_TICKS)
     else
       -- nothing here for it: refused (or reset), as TCP answers
       local rst = string.pack(TCP_HEADER, TCP, dport, sport, RST | ACK, ack, (seq + #payload + 1) % SEQ_SPACE, 0)
@@ -252,7 +271,7 @@ local function tcp(data, from)
   ack = c.snd_una + ((ack - c.snd_una) % SEQ_SPACE)
   if c.state == SYN_SENT then
     if flags & SYN ~= 0 and flags & ACK ~= 0 and ack == c.snd_nxt then
-      c.state, c.snd_una, c.rcv_nxt, c.peerwnd, c.tries, c.timer = ESTABLISHED, ack, seq + 1, wnd, 0, nil
+      c.state, c.snd_una, c.rcv_nxt, c.peerwnd, c.progress, c.timer = ESTABLISHED, ack, seq + 1, wnd, k.now(), nil
       segment(c, ACK, c.snd_nxt)
     end
     return
@@ -262,7 +281,7 @@ local function tcp(data, from)
       segment(c, SYN | ACK, c.snd_nxt - 1) -- (its ACK was lost: again)
       return
     elseif flags & ACK ~= 0 and ack == c.snd_nxt then
-      c.state, c.snd_una, c.tries, c.timer = ESTABLISHED, ack, 0, nil
+      c.state, c.snd_una, c.progress, c.timer = ESTABLISHED, ack, k.now(), nil
       local listener = c.listener
       c.listener = nil
       if listener.listening then
@@ -279,7 +298,7 @@ local function tcp(data, from)
     local acked = ack - c.snd_una
     local fin = c.fin_sent and ack == c.snd_nxt and 1 or 0 -- (its FIN's number is acknowledged too)
     c.out = c.out:sub(acked - fin + 1)
-    c.snd_una, c.tries = ack, 0
+    c.snd_una, c.progress = ack, k.now()
     c.timer = c.snd_una ~= c.snd_nxt and k.now() + RTO_TICKS or nil
   end
   c.peerwnd = wnd
@@ -303,28 +322,22 @@ local function tcp(data, from)
   end
 end
 
--- What's due: unacknowledged segments sent again (from the first: go back N), a closed window
--- probed; a connection tried MAX_TRIES times with no answer is reset.
+-- What's due: segments no card took tried again, unacknowledged ones sent again (from the first:
+-- go back N), a closed window probed; a connection with no progress for GIVE_UP_TICKS is reset.
 local function timers()
   local now = k.now()
   local soonest
   for _, c in pairs(conns) do
     if c.timer and c.timer <= now then
-      c.tries = c.tries + 1
-      c.timer = now + RTO_TICKS
-      if c.tries > MAX_TRIES then
+      c.timer = nil
+      if c.state == SYN_SENT and c.unreached and now - c.progress > UNREACHABLE_TICKS then
+        reset(c, "EHOSTUNREACH")
+      elseif now - c.progress > GIVE_UP_TICKS then
         reset(c, "ETIMEDOUT")
-      elseif c.state == SYN_SENT then
-        if segment(c, SYN, c.snd_una) then
-          c.unreached = nil
-        else
-          c.unreached = (c.unreached or 0) + 1
-          if c.unreached >= UNREACHED_TRIES then
-            reset(c, "EHOSTUNREACH")
-          end
-        end
-      elseif c.state == SYN_RCVD then
-        segment(c, SYN | ACK, c.snd_una)
+      elseif c.state == SYN_SENT or c.state == SYN_RCVD then
+        local ok, _, errno = segment(c, c.state == SYN_SENT and SYN or SYN | ACK, c.snd_una)
+        c.unreached = not ok and errno == "EHOSTUNREACH"
+        arm(c, ok and RTO_TICKS or RETRY_TICKS)
       else
         if c.fin_sent and c.snd_una ~= c.snd_nxt then
           c.fin_sent = false -- (its FIN is sent again after the data)
@@ -651,8 +664,8 @@ function net.connect(socket, request, address, port)
       reset(c, errno)
       return nil, why, errno
     end
-    c.unreached = not ok and 1 or nil -- (no card took it: sent again, as a lost frame is; no route after a few)
-    arm(c)
+    c.unreached = not ok and errno == "EHOSTUNREACH" -- (no card took it: tried again soon; no route after a while)
+    arm(c, ok and RTO_TICKS or RETRY_TICKS)
   end
   pump()
   if c.state == ESTABLISHED then

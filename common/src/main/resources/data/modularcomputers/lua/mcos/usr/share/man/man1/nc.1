@@ -85,11 +85,14 @@ echo all | nc \-ub broadcast 7
 .SH NOTES
 mcos has UDP and TCP but no IP: an address is a network card's, and the
 network is what the cards reach, with nothing routed between networks (a
-wired card and a WLAN card are two networks). A datagram is lost when no
-program has its port, or its queue is full, as UDP's are; one sent to a
-single card is acknowledged by that card (Wi\-Fi does at its link layer),
-so a card that isn't there is an error, as an unanswered ARP is on Linux.
-TCP loses nothing: what isn't acknowledged is sent again. A datagram or a
+wired card and a WLAN card are two networks). A card never drops a frame:
+the other card takes it, or the sender hears why not at once ("No buffer
+space available": it's busy, its queue full or no program taking data there;
+"No route to host": no card there in reach), and nothing tries again but
+the software. So a datagram that's sent reached the other card; it's lost
+there only when no program has its port, or its socket's queue is full, as
+UDP's are. TCP loses nothing: it tries again what wasn't taken, or wasn't
+acknowledged. A datagram or a
 connection to the computer's own card, or a broadcast, reaches its own
 programs too.
 .PP

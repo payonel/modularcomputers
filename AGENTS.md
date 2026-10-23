@@ -246,11 +246,17 @@ master hangs up (SIGHUP to the foreground group, then EOF and EIO on the termina
 `/dev/pts` yet. The window size is the pty's (`TIOCSWINSZ` on the master).
 
 **Sockets** are UDP and TCP over the network cards (`lib/modules/net.lua`, loaded at the first
-`sys.socket()`; a frame's data starts with IP's protocol number). TCP is TCP's shape, kept small
-because the link already delivers in order and acknowledges a unicast frame: sequence numbers and
-acknowledgements, a receive window, go-back-N retransmission (a card's queue can overflow, a card
-can go out of reach), SYN/FIN/RST; no congestion control or TIME_WAIT. A SYN no card takes is
-retried, and fails as EHOSTUNREACH after 3 (ARP's tries): one lost frame isn't "no route". Its
+`sys.socket()`; a frame's data starts with IP's protocol number). **A card never drops a frame** (user, 2026-10-22, for
+custom network scripts; our handshake rule): a unicast frame is taken by the other card or refused
+at once with why (`busy`: its queue is full or no program takes data there; `unreachable`), and
+the card never tries again: retrying is software's, as lossless Ethernet's PAUSE leaves it (Wi-Fi
+cards retry in hardware; skipped). A broadcast is best effort (how many took it). "Taken" is the
+card's, never the program's (end to end: only programs can say). TCP is TCP's shape, kept small:
+sequence numbers and acknowledgements, a receive window, a segment no card took tried again in a
+tenth of a second, one taken and unacknowledged again in a second (go back N), reset after 8
+seconds with no progress (a SYN that found no card for 3: EHOSTUNREACH, ARP's time), SYN/FIN/RST;
+no congestion control or TIME_WAIT. A blip (a WLAN computer briefly out of range) is retried, not
+an error. Its
 timers run from kernel hooks (`k.timer`, `k.service`, `k.raised`), so nothing in the kernel knows
 TCP. Sockets: `bind`, `sendto`, `recvfrom`, `listen`, `accept`, `connect`, `shutdown`, `poll`, Linux's names for interfaces (eth0, wlan0)
 and ioctls (`SIOCGIFCONF`, ethtool's wake), with no commands for them (user, 2026-10-21:

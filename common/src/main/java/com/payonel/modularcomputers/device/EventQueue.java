@@ -45,6 +45,20 @@ final class EventQueue {
 		line.raise();
 	}
 
+	/**
+	 * Puts an event in only if there's room and its card takes data now: whether it did (a device
+	 * that refuses rather than drops: its sender hears, and tries again).
+	 */
+	boolean offer(Map<String, Object> event) {
+		if (!accepting.getAsBoolean() || events.size() >= CAPACITY) {
+			return false;
+		}
+		events.addLast(event);
+		changed.run();
+		line.raise();
+		return true;
+	}
+
 	Map<String, Object> pull() {
 		Map<String, Object> event = events.pollFirst();
 		if (event != null) {
