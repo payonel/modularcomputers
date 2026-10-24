@@ -80,12 +80,6 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 - **What a block holds, shown on it** (user): a miniature of each thing in a block's slots, drawn
   on the block in the world (the Disk Station's disks), on every block that holds objects, maybe
   even the case (its parts).
-- **Raw disks by byte offset** (user, decided): a raw disk is read and written at any byte offset
-  (`write(offset, data)`: the bytes written, bounded by its size; `read(offset, n)`), replacing
-  `readSector`/`writeSector`; an hfs disk refuses both. The user's call over real disks' sectors
-  (ATA/NVMe LBAs; OC used sectors too): sectors don't make programs better. Byte-addressed storage
-  is real elsewhere (NVDIMM, persistent memory), and the hfs refusal is real too (a mounted
-  filesystem owns its disk).
 - **A bell:** terminals ignore BEL, and a full key queue drops keys silently, where a real keyboard
   beeps.
 - **Beep codes:** audible boot errors for headless machines.

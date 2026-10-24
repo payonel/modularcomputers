@@ -239,7 +239,9 @@ Disks in hfs mode serve files themselves (like 9P): real host files in the world
 can look at them. A handle never holds a host file open: writes buffer and commit atomically at
 close (power lost before close loses them). Paths never leave the disk's folder. Symbolic links are
 CIFS's Minshall+French `XSym` files, never host links (one could point out of the save); the disk
-never follows them, the OS's VFS does. mcos's files are copied onto a disk once, when it's first
+never follows them, the OS's VFS does. A raw disk is read and written at any byte offset (`read(offset, n)`,
+`write(offset, data)`), the user's call over real disks' sectors (sectors don't make programs
+better); an hfs disk refuses those, its filesystem owning it. mcos's files are copied onto a disk once, when it's first
 made: a world's disks keep their old mcos; tests copy afresh.
 
 ### mcos
