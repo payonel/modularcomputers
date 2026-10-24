@@ -52,6 +52,6 @@ public final class DiskItem extends HintedItem {
 	@Override
 	public void details(ItemStack stack, Consumer<Hint.Element> hint) {
 		hint.accept(Hint.text(Component.translatable("item.modularcomputers.disk.format." + ModComponents.diskFormat(stack))));
-		hint.accept(Hint.text(Component.translatable("item.modularcomputers.disk.draw", tier.draw())));
+		hint.accept(Hint.text(Component.translatable("item.modularcomputers.disk.draw", com.payonel.modularcomputers.power.PowerUnits.rate(tier.draw()))));
 	}
 }

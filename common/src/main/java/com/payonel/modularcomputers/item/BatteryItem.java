@@ -106,7 +106,7 @@ public final class BatteryItem extends HintedItem {
 	public void summary(ItemStack stack, Consumer<Hint.Element> hint) {
 		hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.charge", percent(stack))));
 		hint.accept(Hint.text(Component.translatable("item.modularcomputers.battery.stored",
-			tier.infinite() ? PowerUnits.INFINITE : PowerUnits.format(charge(stack).units()))));
+			PowerUnits.amount(charge(stack).units(), tier.infinite()))));
 	}
 
 	@Override

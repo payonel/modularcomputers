@@ -199,9 +199,9 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		}
 		long stored = power.level() + units;
 		lines.add(Component.translatable("gui.modularcomputers.power.stored",
-			infinite ? PowerUnits.INFINITE : PowerUnits.format(stored)));
+			PowerUnits.amount(stored, infinite)));
 		long load = menu.load();
-		lines.add(Component.translatable("gui.modularcomputers.power.load", PowerUnits.format(load)));
+		lines.add(Component.translatable("gui.modularcomputers.power.load", PowerUnits.rate(load)));
 		long runtime = PowerUnits.runtime(stored, load);
 		if (infinite) {
 			lines.add(Component.translatable("gui.modularcomputers.power.time_forever"));

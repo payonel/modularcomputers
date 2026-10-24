@@ -167,6 +167,9 @@ blank, and its files leave the world save when the player takes it.
   them).
 - **Power is lazy:** devices and batteries settle what they owe when someone looks (every 20 ticks,
   or at an event), from game time; nothing ticks per device (big builds).
+- **Power is named in one place** (`PowerUnits.rate`, `amount`): a unit a tick shows as a watt,
+  stored units as watt-hours. Every draw, load and charge shown goes through them (the user may
+  rename the unit).
 - **A device takes data only while a program runs on the board holding it** (keys typed at an off
   computer must not appear at boot).
 - **Memory** is the RAM installed, above a measured baseline, so a stick means the same to a program

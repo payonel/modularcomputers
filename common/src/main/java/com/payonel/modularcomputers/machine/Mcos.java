@@ -931,7 +931,7 @@ public final class Mcos implements Program {
 			}
 			case "acpi" -> {
 				Board.PowerInfo power = board.power();
-				out.accept("Case: " + store(power.store()) + ", load " + power.load() + "\n");
+				out.accept("Case: " + store(power.store()) + ", load " + com.payonel.modularcomputers.power.PowerUnits.rate(power.load()) + "\n");
 				for (Board.BatteryInfo battery : power.batteries()) {
 					out.accept("Battery " + battery.bay() + ": tier " + battery.tier() + ", " + store(battery.charge()) + "\n");
 				}
@@ -1040,6 +1040,7 @@ public final class Mcos implements Program {
 		if (store.infinite()) {
 			return "100%, inf";
 		}
-		return store.percent() + "%, " + store.stored() + " of " + store.capacity();
+		return store.percent() + "%, " + com.payonel.modularcomputers.power.PowerUnits.amount(store.stored(), false) + " of "
+			+ com.payonel.modularcomputers.power.PowerUnits.amount(store.capacity(), false);
 	}
 }

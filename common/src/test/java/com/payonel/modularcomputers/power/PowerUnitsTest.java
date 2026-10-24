@@ -6,14 +6,16 @@ import org.junit.jupiter.api.Test;
 
 class PowerUnitsTest {
 	@Test
-	void unitsShowShortWithAnSiPrefix() {
-		assertThat(PowerUnits.format(950)).isEqualTo("950");
-		assertThat(PowerUnits.format(12_345)).isEqualTo("12.3k");
-		assertThat(PowerUnits.format(264_000)).isEqualTo("264k");
-		assertThat(PowerUnits.format(PowerUnits.DAY)).isEqualTo("2.64M");
-		assertThat(PowerUnits.format(26_400_000)).isEqualTo("26.4M");
-		assertThat(PowerUnits.format(999_999)).isEqualTo("1.00M");
-		assertThat(PowerUnits.format(1_056_000_000)).isEqualTo("1.06G");
+	void ratesAndAmountsShowShortWithAnSiPrefixAndTheirUnit() {
+		assertThat(PowerUnits.rate(8)).isEqualTo("8 " + PowerUnits.RATE_SYMBOL);
+		assertThat(PowerUnits.rate(950)).isEqualTo("950 " + PowerUnits.RATE_SYMBOL);
+		assertThat(PowerUnits.rate(12_345)).isEqualTo("12.3 k" + PowerUnits.RATE_SYMBOL);
+		assertThat(PowerUnits.rate(999_999)).isEqualTo("1.00 M" + PowerUnits.RATE_SYMBOL);
+		assertThat(PowerUnits.rate(0)).isEqualTo("0 " + PowerUnits.RATE_SYMBOL);
+		long hundred = (long) (100 * PowerUnits.UNITS_PER_AMOUNT);
+		assertThat(PowerUnits.amount(hundred, false)).isEqualTo("100 " + PowerUnits.AMOUNT_SYMBOL);
+		assertThat(PowerUnits.amount(hundred / 1000, false)).as("a tenth").isEqualTo("100 m" + PowerUnits.AMOUNT_SYMBOL);
+		assertThat(PowerUnits.amount(hundred, true)).isEqualTo(PowerUnits.INFINITE);
 	}
 
 	@Test

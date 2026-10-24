@@ -110,11 +110,11 @@ public class BatteryGameTest {
 	@GameTest
 	public void aBatteryHintShowsItsChargeAndWithShiftHowToChargeIt(GameTestHelper helper) {
 		helper.assertValueEqual(Hint.lines(Hint.of(ModItems.TIER1_BATTERY.charged(), false)),
-			List.of("Charge: 100%", "Stored: 26.4M", "Hold [Shift] for details"), "a full tier 1");
+			List.of("Charge: 100%", "Stored: 367 Wh", "Hold [Shift] for details"), "a full tier 1");
 		ItemStack tier2 = battery(ModItems.TIER2_BATTERY, 5 * DAY + DAY / 2 + 20 * 7 * PowerUnits.ALL_IN_ONE, 0);
-		helper.assertValueEqual(Hint.lines(Hint.of(tier2, false)), List.of("Charge: 28%", "Stored: 14.5M", "Hold [Shift] for details"), "a tier 2");
+		helper.assertValueEqual(Hint.lines(Hint.of(tier2, false)), List.of("Charge: 28%", "Stored: 202 Wh", "Hold [Shift] for details"), "a tier 2");
 		List<Hint.Element> details = Hint.of(tier2, true);
-		helper.assertValueEqual(Hint.lines(details), List.of("Charge: 28%", "Stored: 14.5M", "Recharges itself while not in use",
+		helper.assertValueEqual(Hint.lines(details), List.of("Charge: 28%", "Stored: 202 Wh", "Recharges itself while not in use",
 			"Charge it in a crafting grid with a glowing item:", "Crafting:"), "tier 2 details");
 		Hint.Icons icons = (Hint.Icons) details.stream().filter(Hint.Icons.class::isInstance).findFirst().orElseThrow();
 		helper.assertValueEqual(icons.icons().stream().map(icon -> icon.stack().getItem()).toList(),

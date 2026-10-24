@@ -38,6 +38,7 @@ public final class CpuItem extends HintedItem {
 
 	@Override
 	public void details(ItemStack stack, Consumer<Hint.Element> hint) {
-		hint.accept(Hint.text(Component.translatable("item.modularcomputers.cpu.draw", tier.running(), tier.waiting())));
+		hint.accept(Hint.text(Component.translatable("item.modularcomputers.cpu.draw", com.payonel.modularcomputers.power.PowerUnits.rate(tier.running()),
+			com.payonel.modularcomputers.power.PowerUnits.rate(tier.waiting()))));
 	}
 }

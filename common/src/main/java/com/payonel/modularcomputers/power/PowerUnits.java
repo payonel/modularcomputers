@@ -24,25 +24,46 @@ public final class PowerUnits {
 	/** What an infinite store shows instead of a number. */
 	public static final String INFINITE = "inf";
 
+	// How power is named to players: here only, so it's one change (the user's: watts for now, maybe
+	// not for good). Everything shown goes through rate() and amount().
+	/** A rate, units a tick: one a tick is a watt. */
+	public static final String RATE_SYMBOL = "W";
+	/** An amount, units: shown in watt-hours. */
+	public static final String AMOUNT_SYMBOL = "Wh";
+	/** Units in one shown amount: a watt for an hour of ticks (20 a second). */
+	public static final double UNITS_PER_AMOUNT = 20 * 60 * 60;
+
+	/** A draw or load, units a tick, for players: "8 W", "1.10 kW". */
+	public static String rate(long perTick) {
+		return si(perTick, RATE_SYMBOL);
+	}
+
+	/** Units stored, for players: "367 Wh", or {@link #INFINITE}. */
+	public static String amount(long units, boolean infinite) {
+		return infinite ? INFINITE : si(units / UNITS_PER_AMOUNT, AMOUNT_SYMBOL);
+	}
+
 	/**
-	 * A number of units for players, short, as batteries are rated in kWh: three significant
-	 * digits with an SI prefix ("950", "12.3k", "264k", "26.4M", "1.06G").
+	 * A value in a unit, short, as a meter shows it: three significant digits with an SI prefix
+	 * ("950 W", "12.3 kW", "26.4 MW", "13.2 mWh"), a whole number under a thousand as it is ("8 W").
 	 */
-	public static String format(long units) {
-		String[] prefixes = {"", "k", "M", "G", "T"};
-		double value = Math.max(0, units);
-		int prefix = 0;
+	static String si(double value, String symbol) {
+		String[] prefixes = {"m", "", "k", "M", "G", "T"};
+		value = Math.max(0, value);
+		int prefix = 1;
+		if (value > 0 && value < 1) {
+			value *= 1000;
+			prefix = 0;
+		}
 		while (value >= 999.5 && prefix < prefixes.length - 1) {
 			value /= 1000;
 			prefix++;
 		}
-		if (prefix == 0) {
-			return Long.toString(Math.max(0, units));
-		}
-		String digits = value >= 99.95 ? String.format(java.util.Locale.ROOT, "%.0f", value)
+		String digits = prefix == 1 && value == Math.rint(value) ? Long.toString((long) value)
+			: value >= 99.95 ? String.format(java.util.Locale.ROOT, "%.0f", value)
 			: value >= 9.995 ? String.format(java.util.Locale.ROOT, "%.1f", value)
 			: String.format(java.util.Locale.ROOT, "%.2f", value);
-		return digits + prefixes[prefix];
+		return digits + " " + prefixes[prefix] + symbol;
 	}
 
 	/** How many ticks {@code stored} units last at {@code load} units a tick; -1 with no load. */
