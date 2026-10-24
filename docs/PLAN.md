@@ -86,9 +86,6 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   (ATA/NVMe LBAs; OC used sectors too): sectors don't make programs better. Byte-addressed storage
   is real elsewhere (NVDIMM, persistent memory), and the hfs refusal is real too (a mounted
   filesystem owns its disk).
-- **Faces as constants, open** (user's concern): faces are strings (`"north"`, `"front"`: `Face`);
-  open whether programs should have names as constants too (Lua has no enums: a table, as OC's
-  `sides`).
 - **A bell:** terminals ignore BEL, and a full key queue drops keys silently, where a real keyboard
   beeps.
 - **Beep codes:** audible boot errors for headless machines.

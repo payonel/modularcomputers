@@ -121,7 +121,8 @@ to come): the world's names (`north`, `south`, `east`, `west`, `up`, `down`: Min
 names relative to the block's front (`front`, `back`, `left`, `right`, left and right as the block
 sees them looking out of its front: ComputerCraft's), so a program written for a block works however
 it's turned, and configurations compose. A block with no front (an expansion hub) takes only the
-world's names; devices answer with the world's names. A block tells its devices where its front is
+world's names; devices answer with the world's names. Faces are strings, only (the user's
+call: no constants table, as OC's `sides` was). A block tells its devices where its front is
 (`Card.frontFrom`): a case's is its facing, a robotic piston's is opposite its cable port.
 
 ### The look
