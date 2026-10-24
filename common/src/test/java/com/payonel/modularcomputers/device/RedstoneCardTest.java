@@ -112,7 +112,7 @@ class RedstoneCardTest {
 		assertThat(card.output(2)).as("east, its front").isEqualTo(4);
 		assertThat(card.output(NORTH)).as("north, its left").isEqualTo(2);
 		assertThat(sides(card.get(args(List.of("front"))).first()).keySet()).as("answered by the world's names").containsExactly("east");
-		card.frontFrom(() -> null); // (in a hub: no front)
+		card.frontFrom(() -> null); // (no block has said where its front is)
 		assertThatThrownBy(() -> card.set(args(Map.of("back", Map.of("powered", 1L))))).hasMessageContaining("no front");
 	}
 }

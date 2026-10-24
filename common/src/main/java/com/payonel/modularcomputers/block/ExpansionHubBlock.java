@@ -7,20 +7,35 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * An expansion hub: card slots on the cable network. It takes a cable on every side and passes
- * the connection on, like a cable. Right-click opens its slots.
+ * the connection on, like a cable. Right-click opens its slots. Its front (its card bays) faces the
+ * player who placed it: its cards' faces are named from it ({@code front}, {@code left}...).
  */
-public final class ExpansionHubBlock extends Block implements EntityBlock {
+public final class ExpansionHubBlock extends HorizontalDirectionalBlock implements EntityBlock {
 	public ExpansionHubBlock(Properties properties) {
 		super(properties);
+		registerDefaultState(stateDefinition.any().setValue(FACING, net.minecraft.core.Direction.NORTH));
+	}
+
+	@Override
+	protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+		builder.add(FACING);
+	}
+
+	@Override
+	public BlockState getStateForPlacement(BlockPlaceContext context) {
+		return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
 	}
 
 	@Override

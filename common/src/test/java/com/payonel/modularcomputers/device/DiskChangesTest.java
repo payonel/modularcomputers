@@ -54,9 +54,9 @@ class DiskChangesTest {
 		assertThat(disk.interruptPending()).isFalse();
 		disk.accepting(true);
 		disk.setMode(args(Disk.RAW));
-		disk.writeSector(args(2L, "abc"));
+		disk.write(args(1030L, "abc"));
 		assertThat(changes(disk)).containsExactly(Map.of("event", "format", "path", "/", "mode", "raw"),
-			Map.of("event", "write", "offset", 2L * Disk.SECTOR, "length", (long) Disk.SECTOR));
+			Map.of("event", "write", "offset", 1030L, "length", 3L));
 		disk.retire();
 	}
 }

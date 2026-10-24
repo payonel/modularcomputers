@@ -120,10 +120,11 @@ Every device that takes a face takes it through `Face` (the user's rule for ever
 to come): the world's names (`north`, `south`, `east`, `west`, `up`, `down`: Minecraft's own) or
 names relative to the block's front (`front`, `back`, `left`, `right`, left and right as the block
 sees them looking out of its front: ComputerCraft's), so a program written for a block works however
-it's turned, and configurations compose. A block with no front (an expansion hub) takes only the
-world's names; devices answer with the world's names. Faces are strings, only (the user's
-call: no constants table, as OC's `sides` was). A block tells its devices where its front is
-(`Card.frontFrom`): a case's is its facing, a robotic piston's is opposite its cable port.
+it's turned, and configurations compose. Every block that holds devices has a front, with its own
+look, facing the player who placed it (a case's, a hub's card bays), and tells its devices where it
+is (`Card.frontFrom`); a robotic piston's front is opposite its cable port. A device with no block
+to say (a test's) takes only the world's names. Devices answer with the world's names. Faces are
+strings, only (the user's call: no constants table, as OC's `sides` was).
 
 ### The look
 

@@ -8,8 +8,8 @@ import java.util.Locale;
  * ({@code north}, {@code south}, {@code east}, {@code west}, {@code up}, {@code down}: Minecraft's
  * own), or relative to the block's front ({@code front}, {@code back}, {@code left},
  * {@code right}), so a program written for a block works however it's turned. Left and right are the
- * block's own, looking out of its front (ComputerCraft's). A block with no front (an expansion hub)
- * takes only the world's names. Devices answer with the world's names.
+ * block's own, looking out of its front (ComputerCraft's). A device whose block hasn't said where
+ * its front is takes only the world's names. Devices answer with the world's names.
  */
 public enum Face {
 	NORTH, SOUTH, EAST, WEST, UP, DOWN;
@@ -65,7 +65,7 @@ public enum Face {
 			throw new IllegalArgumentException("no such face: " + name + " (north, south, east, west, up, down, or front, back, left, right)");
 		}
 		if (front == null) {
-			throw new IllegalArgumentException(key + ": this block has no front (name a face by north, south, east, west, up or down)");
+			throw new IllegalArgumentException(key + ": no front is known here (name a face by north, south, east, west, up or down)");
 		}
 		return switch (key) {
 			case "front" -> front;

@@ -262,23 +262,26 @@ class DiskTest {
 	}
 
 	@Test
-	void formattingRawGivesSectorsInOneImageFileAndBackErasesIt() {
+	void formattingRawGivesBytesByOffsetInOneImageFileAndBackErasesIt() {
+		long size = DiskTier.TIER_1.bytes();
 		run(DiskTier.TIER_1, board -> {
+			seen.add(board.invoke("sata:0", "write", 0, "x").error()); // an hfs disk: its filesystem owns it
 			Handle file = (Handle) board.invoke("sata:0", "open", "/a", "w").first();
 			seen.add(board.invoke("sata:0", "setMode", "raw").failed());
 			seen.add(file.isOpen());
 			seen.add(board.invoke("sata:0", "open", "/a", "w").error());
-			seen.add(board.invoke("sata:0", "writeSector", 3, "boot").failed());
-			Result sector = board.invoke("sata:0", "readSector", 3);
-			seen.add(((String) sector.first()).length());
-			seen.add(((String) sector.first()).substring(0, 4));
-			seen.add(board.invoke("sata:0", "readSector", DiskTier.TIER_1.bytes() / Disk.SECTOR).error());
+			seen.add(board.invoke("sata:0", "write", 1000, "boot").first());
+			seen.add(board.invoke("sata:0", "read", 998, 8).first()); // (never written: zeros)
+			seen.add(board.invoke("sata:0", "write", size - 2, "tail").first()); // as many as fit
+			seen.add(board.invoke("sata:0", "read", size - 2, 10).first());
+			seen.add(board.invoke("sata:0", "read", size, 1).first()); // the end
+			seen.add(board.invoke("sata:0", "read", size + 1, 1).error());
 			seen.add(board.invoke("sata:0", "setMode", "hfs").failed());
 			seen.add(board.invoke("sata:0", "list", "/").first());
 			board.halt();
 		});
-		assertThat(seen).containsExactly(false, false, "raw disk: no filesystem", false, Disk.SECTOR, "boot",
-			"no such sector: " + DiskTier.TIER_1.bytes() / Disk.SECTOR, false, List.of());
+		assertThat(seen).containsExactly("hfs disk: format it raw to read and write it by offset", false, false, "raw disk: no filesystem",
+			4L, "\0\0boot\0\0", 2L, "ta", null, "no such offset: " + (size + 1) + " (0 to " + size + ")", false, List.of());
 		assertThat(storage().resolveSibling("d1.img")).doesNotExist();
 	}
 

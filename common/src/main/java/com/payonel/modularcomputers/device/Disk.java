@@ -34,8 +34,9 @@ import java.util.stream.Stream;
  * {@link FileHandle}, then read and write through it, like Plan 9's 9P, where a device serves
  * files itself. A handle never keeps a host file open (user design, 2026-10-13): it reads through
  * a window of the file, buffers its writes, and commits them atomically at {@code close}.</li>
- * <li><b>raw</b>, an opaque block device: sectors of {@link #SECTOR} bytes, kept on the host as one
- * image file.</li>
+ * <li><b>raw</b>, an opaque block device, read and written at any byte offset (the user's call
+ * over real disks' sectors: sectors don't make programs better), kept on the host as one image
+ * file. An hfs disk refuses those reads and writes: its filesystem owns it.</li>
  * </ul>
  * Paths are the disk's own, from its root ({@code /notes/a.txt}): {@code /} is the disk's folder in
  * the world save ({@code modularcomputers/disks/<id>}), and nothing a program names can reach
@@ -55,7 +56,6 @@ import java.util.stream.Stream;
 public final class Disk implements Device {
 	public static final String HFS = "hfs";
 	public static final String RAW = "raw";
-	public static final int SECTOR = 512;
 	/** What each file or directory costs on top of its bytes, like an inode. */
 	public static final int ENTRY = 512;
 	/** Open files at once, all programs together. */
@@ -473,7 +473,7 @@ public final class Disk implements Device {
 		return run(() -> Result.ok(mode().equals(RAW) ? tier.bytes() : used() + reserved)); // what open files will take counts, as df counts delayed allocation
 	}
 
-	@Method(doc = "getMode(): \"hfs\" (it serves files) or \"raw\" (sectors)")
+	@Method(doc = "getMode(): \"hfs\" (it serves files) or \"raw\" (bytes, by offset)")
 	public Result getMode(Arguments args) {
 		return Result.ok(mode());
 	}
@@ -750,31 +750,35 @@ public final class Disk implements Device {
 			throw new Refused("no storage");
 		}
 		if (!mode().equals(RAW)) {
-			throw new Refused("hfs disk: format it raw for sectors");
+			throw new Refused("hfs disk: format it raw to read and write it by offset");
 		}
 		return new RandomAccessFile(image().toFile(), access);
 	}
 
-	private int sector(Arguments args) {
-		long sector = args.checkInteger(0);
-		if (sector < 0 || sector >= tier.bytes() / SECTOR) {
-			throw new Refused("no such sector: " + sector);
+	/** A byte offset on it, from 0; at most its size (the end). */
+	private long offset(Arguments args) {
+		long offset = args.checkInteger(0);
+		if (offset < 0 || offset > tier.bytes()) {
+			throw new Refused("no such offset: " + offset + " (0 to " + tier.bytes() + ")");
 		}
-		return (int) sector;
+		return offset;
 	}
 
-	@Method(doc = "getSectorSize(): bytes in a sector (raw)")
-	public Result getSectorSize(Arguments args) {
-		return Result.ok(SECTOR);
-	}
-
-	@Method(doc = "readSector(n): sector n's bytes, from 0 (raw)")
-	public Result readSector(Arguments args) {
+	@Method(doc = "read(offset, n): up to n bytes (at most " + MAX_READ + ") from that byte offset (from 0), fewer at the end; nil at the end (raw)")
+	public Result read(Arguments args) {
 		return run(() -> {
-			int sector = sector(args);
+			long offset = offset(args);
+			long n = args.checkInteger(1);
+			if (n < 0) {
+				throw new Refused("a negative count: " + n);
+			}
+			int count = (int) Math.min(Math.min(n, MAX_READ), tier.bytes() - offset);
+			if (count == 0 && n > 0) {
+				return Result.ok(); // the end
+			}
 			try (RandomAccessFile image = rawImage("r")) {
-				byte[] bytes = new byte[SECTOR];
-				image.seek((long) sector * SECTOR);
+				byte[] bytes = new byte[count];
+				image.seek(offset);
 				image.readFully(bytes);
 				return Result.ok(new String(bytes, StandardCharsets.ISO_8859_1));
 			} catch (IOException e) {
@@ -783,19 +787,19 @@ public final class Disk implements Device {
 		});
 	}
 
-	@Method(doc = "writeSector(n, data): writes sector n, padded with zeros to its size (raw)")
-	public Result writeSector(Arguments args) {
+	@Method(doc = "write(offset, data): writes the bytes at that byte offset (from 0), as many as fit before the end; returns how many it wrote (raw)")
+	public Result write(Arguments args) {
 		return run(() -> {
-			int sector = sector(args);
+			long offset = offset(args);
 			byte[] data = args.checkString(1).getBytes(StandardCharsets.ISO_8859_1);
-			if (data.length > SECTOR) {
-				throw new Refused("more than a sector: " + data.length + " bytes");
-			}
+			int count = (int) Math.min(data.length, tier.bytes() - offset);
 			try (RandomAccessFile image = rawImage("rw")) {
-				image.seek((long) sector * SECTOR);
-				image.write(java.util.Arrays.copyOf(data, SECTOR));
-				report("write", null, "offset", (long) sector * SECTOR, "length", (long) SECTOR);
-				return Result.ok();
+				if (count > 0) {
+					image.seek(offset);
+					image.write(data, 0, count);
+					report("write", null, "offset", offset, "length", (long) count);
+				}
+				return Result.ok((long) count);
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
 			}

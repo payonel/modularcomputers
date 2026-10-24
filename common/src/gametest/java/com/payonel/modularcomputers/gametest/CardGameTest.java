@@ -137,6 +137,20 @@ public class CardGameTest {
 			.thenSucceed();
 	}
 
+	@GameTest
+	public void aHubsCardsNameFacesFromTheHubsFront(GameTestHelper helper) {
+		BlockPos hubPos = POS.west(2);
+		helper.setBlock(hubPos, ModBlocks.EXPANSION_HUB.defaultBlockState().setValue(com.payonel.modularcomputers.block.ExpansionHubBlock.FACING, Direction.EAST));
+		var hub = helper.getBlockEntity(hubPos, com.payonel.modularcomputers.block.ExpansionHubBlockEntity.class);
+		hub.cards().setItem(0, new ItemStack(ModItems.REDSTONE_CARD));
+		RedstoneCard card = (RedstoneCard) hub.card(0).orElseThrow();
+		card.power().supply(this); // (as a running computer's bus powers it)
+		card.set(args(Map.of("front", Map.of("powered", 6L), "left", Map.of("powered", 2L))));
+		helper.assertValueEqual(field(card, "east", "powered"), 6L, "its front: east, the way the hub faces");
+		helper.assertValueEqual(field(card, "north", "powered"), 2L, "its left, as it looks out: north");
+		helper.succeed();
+	}
+
 	/**
 	 * Minecraft writes only chunks marked changed, even at an unload: a device's data changing (keys
 	 * typed or read, events, outputs) marks its block's chunk at once, or the old copy stays on disk.

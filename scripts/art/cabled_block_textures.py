@@ -96,15 +96,22 @@ def cable():
 		im.putpixel((i, 7), (78, 80, 88)); im.putpixel((7, i), (78, 80, 88))
 	return im
 
-def expansion_hub():
-	"""Four card bays side by side, each with a card's metal bracket showing; the same on every
-	side, since the hub takes a cable anywhere."""
+def expansion_hub_front():
+	"""Its front (it faces the player who placed it; its cards name faces from it): four card bays
+	side by side, each with a card's metal bracket showing."""
 	im = casing(16)
 	for i in range(4):
 		x = 2 + i * 3
 		rect(im, x, 2, x + 2, 13, (40, 40, 46))      # bay
 		rect(im, x + 1, 3, x + 1, 12, (176, 180, 190))  # bracket
 		im.putpixel((x + 1, 6), (90, 92, 100))       # bracket screw slot
+	return im
+
+def expansion_hub_side():
+	"""Every other face: the casing with a cable socket, since the hub takes a cable anywhere."""
+	im = casing(22)
+	rect(im, 6, 6, 9, 9, (40, 40, 46))
+	rect(im, 7, 7, 8, 8, (90, 92, 100))
 	return im
 
 def robotic_piston_port():
@@ -164,7 +171,7 @@ def paint_gun_side():
 
 textures = [(f"tier{t}_screen_{face}", (lambda t=t, fn=fn: fn(t))) for t in (1, 2, 3)
 	for face, fn in (("front", tier_screen_front), ("side", screen_side), ("back", screen_back), ("top", screen_top))] + [
-	("cable", cable), ("expansion_hub", expansion_hub),
+	("cable", cable), ("expansion_hub_front", expansion_hub_front), ("expansion_hub_side", expansion_hub_side),
 	("robotic_piston_port", robotic_piston_port), ("robotic_piston_plate", robotic_piston_plate),
 	("robotic_sticky_piston_plate", robotic_sticky_piston_plate),
 	("paint_gun_nozzle", paint_gun_nozzle), ("paint_gun_side", paint_gun_side)]

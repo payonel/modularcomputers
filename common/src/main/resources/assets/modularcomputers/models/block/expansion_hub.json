@@ -1,6 +1,12 @@
 {
-	"parent": "minecraft:block/cube_all",
+	"parent": "minecraft:block/cube",
 	"textures": {
-		"all": "modularcomputers:block/expansion_hub"
+		"particle": "modularcomputers:block/expansion_hub_side",
+		"north": "modularcomputers:block/expansion_hub_front",
+		"south": "modularcomputers:block/expansion_hub_side",
+		"east": "modularcomputers:block/expansion_hub_side",
+		"west": "modularcomputers:block/expansion_hub_side",
+		"up": "modularcomputers:block/expansion_hub_side",
+		"down": "modularcomputers:block/expansion_hub_side"
 	}
 }
