@@ -123,18 +123,18 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(DisplayScreen.class);
 			checkDisplayLayout(context);
-			DisplayShot empty = displayShot(context, "all-in-one-display-no-cpu", 0);
+			DisplayShot empty = displayShot(context, "all-in-one-display-no-cpu", com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR_GLASS);
 			check(FADED_RED.test(empty.buttonCenter()), "without a CPU the power button should be faded red, got " + hex(empty.buttonCenter()));
 			moveCursorTo(context, screen -> ((DisplayScreen) screen).powerButton());
 			context.getInput().holdMouse(InputConstants.MOUSE_BUTTON_RIGHT);
 			context.waitTicks(CLICK_PAUSE);
-			DisplayShot held = displayShot(context, "all-in-one-display-no-cpu-held", 0);
+			DisplayShot held = displayShot(context, "all-in-one-display-no-cpu-held", com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR_GLASS);
 			check(FADED_GREEN.test(held.buttonCenter()), "held without a CPU the button should be faded green, got " + hex(held.buttonCenter()));
 			context.getInput().releaseMouse(InputConstants.MOUSE_BUTTON_RIGHT);
 			// The refused press also flashes faded green briefly (the block state); wait it out.
 			context.waitFor(client -> !client.level.getBlockState(computer).getValue(AllInOneBlock.POWERED));
 			context.waitTicks(2);
-			DisplayShot released = displayShot(context, "all-in-one-display-no-cpu-released", 0);
+			DisplayShot released = displayShot(context, "all-in-one-display-no-cpu-released", com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR_GLASS);
 			check(FADED_RED.test(released.buttonCenter()), "released, the button should be faded red again, got " + hex(released.buttonCenter()));
 			check(!context.computeOnClient(client -> machinePowered(client, computer)), "without a CPU the computer must stay off");
 			check(released.whitePixels(0, released.rows()) == 0, "nothing runs without a CPU");
@@ -321,7 +321,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_RIGHT, screen -> ((DisplayScreen) screen).powerButton());
 			context.waitFor(client -> machinePowered(client, computer));
 			context.waitTicks(2);
-			DisplayShot on = displayShot(context, "all-in-one-display-on", 0);
+			DisplayShot on = displayShot(context, "all-in-one-display-on", com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR_GLASS);
 			check(GREEN.test(on.buttonCenter()), "the power button should be lit green when on, got " + hex(on.buttonCenter()));
 			check(on.whitePixels(0, 1) >= 50, "the display's first row should show text, found " + on.whitePixels(0, 1));
 			check(on.whitePixels(1, 2) > 0, "the cursor should show (a steady block) at the start of the second row");

@@ -32,8 +32,8 @@ def front():
 	# Recessed bezel: shadow on top/left, light on bottom/right.
 	rect(im, 1, 1, 14, 1, DARK); rect(im, 1, 1, 1, 10, DARK)
 	rect(im, 2, 10, 14, 10, LIGHT); rect(im, 14, 2, 14, 10, LIGHT)
-	# Glass: black. Display text is drawn over x 2..13, y 2..9.
-	rect(im, 2, 2, 13, 9, (10, 10, 12))
+	# Glass: unlit, its built-in screen's (tier 3's, as ColorDepth's). Display text is drawn over x 2..13, y 2..9.
+	rect(im, 2, 2, 13, 9, (17, 19, 21))
 	# Power LED (off).
 	im.putpixel((13, 11), (74, 44, 40))
 	# Keyboard tray with keys.

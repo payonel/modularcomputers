@@ -294,6 +294,10 @@ the farther it reaches (OC's wirelessCostPerRange); any tier hears any other.
   tool); nothing is wrapped again. The console's group is one size, the largest every member can
   show (UEFI's ConSplitter's common mode). Tests that look at pixels size the console 50×16 first
   (`TestPrograms.READABLE`): sub-pixel text is flaky to count.
+- **Each tier's glass and white** (`ColorDepth.glass`, `white`): a real screen is never pure black
+  or white; the defaults (pure black and white, as a theme recolors them) show as the tier's (tier
+  2 a CRT's cool near black and white, tier 3 a charcoal and a warm white), every other color as
+  it is; the block textures' glass matches.
 - **Attributes as each tier's model showed them:** bold is the cell's (`TextBuffer.BOLD`, in the
   foreground's top byte, so it goes wherever the color goes) and drawn in the bold font; tier 1, a
   VT102 with one phosphor, shows intensities instead of colors (bold full, normal a little less,

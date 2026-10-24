@@ -14,7 +14,7 @@ BEIGE = [(206, 197, 168), (199, 190, 160), (212, 203, 175), (195, 186, 156)]
 LIGHT = (226, 218, 192)
 SHADE = (172, 163, 135)
 DARK = (148, 139, 113)
-GLASS = (10, 10, 12)
+GLASS = {2: (10, 12, 15), 3: (17, 19, 21)}  # unlit glass, as ColorDepth's: tier 2 a CRT's near black with a blue cast, tier 3 a deep charcoal
 PHOSPHOR_GLASS = (6, 33, 15)  # a monochrome terminal's green glass, unlit
 
 # Each tier's casing: noise colors, bevel light and shadow, recess shadow.
@@ -49,7 +49,7 @@ def screen_front(tier=1):
 	_, light, _, dark = ERAS[tier]
 	im = casing(11, tier=tier)
 	# Glass: x 1..14, y 3..11; the display is drawn over it (DisplayRenderer.SCREEN). Keep it there.
-	rect(im, 1, 3, 14, 11, PHOSPHOR_GLASS if tier == 1 else GLASS)
+	rect(im, 1, 3, 14, 11, PHOSPHOR_GLASS if tier == 1 else GLASS[tier])
 	rect(im, 1, 2, 14, 2, dark)    # recess: shadow above
 	rect(im, 1, 12, 14, 12, light)  # and light below
 	return im

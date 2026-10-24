@@ -25,6 +25,17 @@ public enum ColorDepth {
 	 * little less. Reverse video lights the cell and leaves the text dark.
 	 */
 	public static final int NORMAL_INTENSITY = 0xB8B8B8;
+	/**
+	 * The glass and the default text of the color tiers (user, 2026-10-24: a real screen is never
+	 * pure black or pure white): tier 2's a VT525's CRT, near black with a faint blue cast and a white
+	 * phosphor's cool white; tier 3's a deep charcoal and a soft, slightly warm white. Only the
+	 * default colors (pure black and pure white, as a terminal's theme recolors its black and white):
+	 * every other color a program sets shows as it is.
+	 */
+	public static final int SIXTEEN_GLASS = 0x0A0C0F;
+	public static final int SIXTEEN_WHITE = 0xD8DEE6;
+	public static final int TRUE_COLOR_GLASS = 0x111315;
+	public static final int TRUE_COLOR_WHITE = 0xE8E6E1;
 
 	/**
 	 * The color a cell (its text, or its background) glows on the glass: what the decoder settled
@@ -35,7 +46,7 @@ public enum ColorDepth {
 	public int glow(int rgb) {
 		int color = TextBuffer.color(rgb);
 		if (this != MONOCHROME) {
-			return color;
+			return color == TextBuffer.DEFAULT_BACKGROUND ? glass() : color == TextBuffer.DEFAULT_FOREGROUND ? white() : color;
 		}
 		float lit = Math.max(color >> 16 & 0xFF, Math.max(color >> 8 & 0xFF, color & 0xFF)) / 255f;
 		int glow = 0;
@@ -49,7 +60,20 @@ public enum ColorDepth {
 
 	/** The glass's color where nothing is lit. */
 	public int glass() {
-		return this == MONOCHROME ? PHOSPHOR_GLASS : 0x000000;
+		return switch (this) {
+			case MONOCHROME -> PHOSPHOR_GLASS;
+			case SIXTEEN -> SIXTEEN_GLASS;
+			case TRUE_COLOR -> TRUE_COLOR_GLASS;
+		};
+	}
+
+	/** Its white: the default text's color on its glass. */
+	public int white() {
+		return switch (this) {
+			case MONOCHROME -> PHOSPHOR;
+			case SIXTEEN -> SIXTEEN_WHITE;
+			case TRUE_COLOR -> TRUE_COLOR_WHITE;
+		};
 	}
 
 	/** How many colors it shows: 2 (text only), 16, or every 24-bit color. */
