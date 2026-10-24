@@ -38,7 +38,7 @@ public final class ModComponents {
 	/**
 	 * A disk's files to come (user design, 2026-10-13): the name of a set of the mod's Lua files
 	 * ({@code data/modularcomputers/lua/<name>/}), copied into the disk's folder the first time it's
-	 * made, then gone. A crafted tier 1 disk comes with mcos.
+	 * made, then gone. A crafted disk comes with mcos, every tier.
 	 */
 	public static final DataComponentType<String> DISK_IMAGE = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("disk_image"),
 		DataComponentType.<String>builder().persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.STRING_UTF8).build());

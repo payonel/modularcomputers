@@ -110,9 +110,10 @@ public final class ModItems {
 	}
 
 	private static DiskItem disk(String name, DiskTier tier) {
-		// A tier 1 disk comes with mcos (user, 2026-10-13): no trouble getting an OS once you can craft a computer.
+		// Every disk comes with mcos: no trouble getting an OS once you can craft a computer. Crafted
+		// alone, it's blank.
 		return (DiskItem) register(name, properties -> new DiskItem(properties, tier),
-			properties -> tier == DiskTier.TIER_1 ? holdsData(properties).component(ModComponents.DISK_IMAGE, "mcos") : holdsData(properties));
+			properties -> holdsData(properties).component(ModComponents.DISK_IMAGE, "mcos"));
 	}
 
 	private static CpuItem cpu(String name, CpuTier tier) {

@@ -114,10 +114,20 @@ what the game can't do:
   run on both. **Client tests run on Fabric only**: NeoForge has no client test harness (the one
   port of Fabric's found was unlicensed and abandoned).
 
+### The look
+
+Blocks, items and their GUIs share one aesthetic, and new ones keep to it: a GUI shows the device's
+own insides as real hardware would look (the case view is its motherboard: a green board, gold
+traces, sockets and latches, silkscreen labels in the game's font), its controls are that
+hardware's parts (switches, LEDs, meters), and every texture comes from the scripts in
+`scripts/art/` with their shared palette.
+
 ### Items
 
 Items stack to 64, except what holds data (EEPROMs, disks). A part that's been in a machine carries
-its id and stacks only with identical ones; crafting it alone clears it (a new device).
+its id and stacks only with identical ones; crafting it alone clears it (a new device). Every disk
+tier comes with mcos (its files are made when the disk is first installed); crafted alone it's
+blank, and its files leave the world save when the player takes it.
 
 ### The machine is a real PC, abstracted
 

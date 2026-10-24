@@ -19,7 +19,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.RecipeType;
 
-/** Disks that come with mcos, booting them, and wiping a disk by crafting it alone (user design, 2026-10-13). */
+/** Disks that come with mcos (every tier), booting them, and wiping a disk by crafting it alone (user design, 2026-10-13). */
 public class DiskGameTest {
 	private static final BlockPos POS = new BlockPos(1, 1, 1);
 
@@ -34,9 +34,10 @@ public class DiskGameTest {
 	}
 
 	@GameTest
-	public void aTier1DiskComesWithMcosItsFilesMadeWhenItsFolderIs(GameTestHelper helper) {
-		helper.assertValueEqual(new ItemStack(ModItems.TIER1_HARD_DISK).get(ModComponents.DISK_IMAGE), "mcos", "a new tier 1 disk comes with mcos");
-		helper.assertTrue(!new ItemStack(ModItems.TIER2_HARD_DISK).has(ModComponents.DISK_IMAGE), "a tier 2 comes blank");
+	public void aDiskComesWithMcosItsFilesMadeWhenItsFolderIs(GameTestHelper helper) {
+		for (var tier : List.of(ModItems.TIER1_HARD_DISK, ModItems.TIER2_HARD_DISK, ModItems.TIER3_HARD_DISK)) {
+			helper.assertValueEqual(new ItemStack(tier).get(ModComponents.DISK_IMAGE), "mcos", "a new disk comes with mcos, every tier");
+		}
 		AllInOneBlockEntity computer = computer(helper);
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.TIER1_HARD_DISK));
 		ItemStack disk = computer.parts().getItem(CaseMenu.SATA_SLOTS);

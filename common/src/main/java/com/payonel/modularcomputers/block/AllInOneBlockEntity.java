@@ -832,7 +832,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	}
 
 	/**
-	 * A disk that comes with files (a crafted tier 1's mcos, {@link ModComponents#DISK_IMAGE}) gets
+	 * A disk that comes with files (a crafted disk's mcos, {@link ModComponents#DISK_IMAGE}) gets
 	 * them the first time its folder is made, from the mod's Lua files; then the mark goes.
 	 */
 	private void imageDisk(ItemStack stack, java.nio.file.Path folder) {
