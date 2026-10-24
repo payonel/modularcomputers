@@ -269,6 +269,18 @@ the world. In mcos it's OSS's `/dev/dsp` (`dsp1` the next): an open starts at OS
 u8, mono), so `cat file.raw > /dev/dsp` plays, and OSS's ioctls set the format; `aplay` plays WAV
 files.
 
+### The bot golem
+
+A robot a block high, an iron golem's look (user design, 2026-10-24): an entity holding a
+`BoardAssembly` (as a case does) in `GolemLayout`'s slots: a battery, 2 RAM, a disk, a gold slot
+taking only a tier 1 screen (its face, drawn by `TerminalFace` as a case's front), 2 cards, and its
+robotics device soldered onto the last lane (`/dev/robotics0`), the only way it moves: it never acts
+on its own (no goals). The device walks it to a point relative to itself (it knows nothing of where
+it is: a GPS card later), at a player's walking pace, by the game's pathfinding, turns it, and stops
+it; each ends in an event. A player's hit picks it up as its item, parts kept; nothing else harms
+it. Creative only until the Advanced Robotics Assembly. Its board's state reaches players by
+`BoardStatePayload` (an entity has no block update), its screen's rows as a block's do.
+
 ### The operator card
 
 Creative only (OC's debug card, named for Minecraft's operators: Lua has its own debug). It runs
@@ -520,6 +532,13 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
 ## Pitfalls
 
 Lessons from mistakes, each with its test:
+- **Check a game API in the plain game's jar** (Loom's `minecraft-common-deobf`), not NeoForge's
+  patched one: common code is built against the plain game (`onAddedToLevel` is NeoForge's).
+- **A mob's speed is squared:** `Mob.setSpeed` makes it the forward push too, so a mob moves as a
+  player at its speed's square (`BotGolem.WALKING_SPEED`). (`itWalksWhereItsTold...`)
+- **A host that shows a changed power state sends its board's state:** the board doesn't then (a
+  case's block update carries its block entity); a golem's entity data doesn't.
+  (`BotGolemClientGameTest`)
 - **A poll takes nothing:** a device file's `events` must not use up what a read or a method would
   give; what it had to take is the file's to give next (`held`). (`pollingADeviceFileLoses...`)
 - **An ioctl passes exactly the arguments given:** `table.pack(arg, ...)` adds a nil, and the

@@ -36,6 +36,12 @@ public final class ModularComputersNeoForgeClient {
 				BlockEntityRendererProvider<T, S> provider) {
 				event.registerBlockEntityRenderer(type, provider);
 			}
+
+			@Override
+			public <T extends net.minecraft.world.entity.Entity> void entity(net.minecraft.world.entity.EntityType<? extends T> type,
+				net.minecraft.client.renderer.entity.EntityRendererProvider<T> provider) {
+				event.registerEntityRenderer(type, provider);
+			}
 		}));
 		modBus.addListener(RegisterMenuScreensEvent.class, event -> ModularComputersClient.screens(new ModularComputersClient.Screens() {
 			@Override

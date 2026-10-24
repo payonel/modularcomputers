@@ -40,7 +40,8 @@ public final class ModNetwork {
 		new ToClient<>(OpenDisplayPayload.TYPE, OpenDisplayPayload.CODEC),
 		new ToClient<>(ScreenRowsPayload.TYPE, ScreenRowsPayload.CODEC),
 		new ToClient<>(SettingsPayload.TYPE, SettingsPayload.CODEC),
-		new ToClient<>(SoundCardPayload.TYPE, SoundCardPayload.CODEC));
+		new ToClient<>(SoundCardPayload.TYPE, SoundCardPayload.CODEC),
+		new ToClient<>(BoardStatePayload.TYPE, BoardStatePayload.CODEC));
 
 	private ModNetwork() {
 	}

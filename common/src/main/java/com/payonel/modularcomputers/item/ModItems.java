@@ -68,8 +68,10 @@ public final class ModItems {
 	public static final Item INTERNET_CARD = register("internet_card");
 	/** Runs server commands: creative only (OpenComputers' debug card). */
 	public static final Item OPERATOR_CARD = register("operator_card");
+	/** A bot golem, picked up (its parts in it): creative only until the Advanced Robotics Assembly makes them. */
+	public static final Item BOT_GOLEM = register("bot_golem", BotGolemItem::new, ModItems::holdsData);
 	/** Items with no recipe on purpose: the creative tab's (and giveall's). */
-	public static final List<Item> CREATIVE_ONLY = List.of(JAVA_CPU, JAVA_EEPROM, OPERATOR_CARD);
+	public static final List<Item> CREATIVE_ONLY = List.of(JAVA_CPU, JAVA_EEPROM, OPERATOR_CARD, BOT_GOLEM);
 	public static final Item MOTION_SENSOR_CARD = register("motion_sensor_card");
 	public static final Item AUDIO_SENSOR_CARD = register("audio_sensor_card");
 	public static final Item WEATHER_SENSOR_CARD = register("weather_sensor_card");

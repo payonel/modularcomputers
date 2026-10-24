@@ -107,6 +107,9 @@ public final class BoardAssembly {
 	/** A disk's reports of changes, by lane ({@link DeviceSave}). */
 	private static final String DISK = "disk_";
 
+	/** The bus panel's icon for a robotics device (case_icons.png's ninth). */
+	public static final int ROBOTICS_ICON = 8;
+
 	private final BoardHost host;
 	private final BoardLayout layout;
 	/**
@@ -399,7 +402,12 @@ public final class BoardAssembly {
 					}
 					entries.add(new BusEntry(key, item.getHoverName(), location, item, -1, -1, Optional.of(device.pos()), busOrder.isConnected(key), online, position));
 				});
-			} else if (!soldered.containsKey(key)) {
+			} else if (soldered.containsKey(key)) {
+				// A soldered device is on the bus like any (as lspci lists a board's own), its place its connector's.
+				entries.add(new BusEntry(key, Component.translatable("gui.modularcomputers.bus.robotics"),
+					Component.translatable("gui.modularcomputers.bus.soldered", Motherboard.lane(key) + 1), ItemStack.EMPTY, -1, ROBOTICS_ICON,
+					Optional.empty(), true, true, position));
+			} else {
 				int slot = partSlot(key);
 				ItemStack item = parts.getItem(slot);
 				entries.add(new BusEntry(key, item.getHoverName(), partLocation(key), item, slot, -1, Optional.empty(), true, true, position));

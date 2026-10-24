@@ -38,6 +38,7 @@ Every device also has a **type**, which the bus reports as a lower case word:
 | `hearing` | [Audio sensor](/devices/audio-sensor/) |
 | `weather` | [Weather sensor](/devices/weather-sensor/) |
 | `actuator` | [Robotic piston](/devices/robotic-piston/) |
+| `robotics` | [Robotics device](/devices/robotics/) |
 
 Besides its type, a device says a little about itself (`board.info`, below): its label, and what its
 kind adds, such as a disk's tier and capacity. Each page lists these.
@@ -142,3 +143,4 @@ printable characters. A device with no item to keep it on cannot have one.
 | [Audio sensor](/devices/audio-sensor/) | Reports sounds a player there would hear |
 | [Weather sensor](/devices/weather-sensor/) | Reports the weather and its changes |
 | [Robotic piston](/devices/robotic-piston/) | Pushes and retracts on any side |
+| [Robotics device](/devices/robotics/) | A bot golem's motors: walks it, turns it |

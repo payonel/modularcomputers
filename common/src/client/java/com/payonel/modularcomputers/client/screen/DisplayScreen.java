@@ -44,6 +44,9 @@ public final class DisplayScreen extends Screen {
 	 * recess shadow. Tier 1 beige, tier 2 platinum, tier 3 graphite.
 	 */
 	private record Bezel(int body, int light, int shade, int dark) {
+		/** A bot golem's head: its iron (scripts/art/bot_golem_textures.py's). */
+		static final Bezel GOLEM = new Bezel(0xFFC9C2B5, 0xFFE4DED2, 0xFF8A8377, 0xFF686258);
+
 		static Bezel of(int tier) {
 			return switch (tier) {
 				case 2 -> new Bezel(0xFFC9C4B8, 0xFFDEDAD0, 0xFFA59F95, 0xFF8D887C);
@@ -225,7 +228,7 @@ public final class DisplayScreen extends Screen {
 			resolution = host.terminal().buffer().resolution(); // a program resized it: the glass takes its new shape
 			layout = layout();
 		}
-		extractBezel(graphics, Bezel.of(tier));
+		extractBezel(graphics, host instanceof com.payonel.modularcomputers.entity.BotGolem ? Bezel.GOLEM : Bezel.of(tier));
 		Viewport display = layout.display();
 		var depth = host != null ? host.terminal().tier().depth() : com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR;
 		graphics.fill(display.x(), display.y(), display.right(), display.bottom(), BLACK | depth.glass());

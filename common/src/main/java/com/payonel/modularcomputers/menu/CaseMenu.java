@@ -118,7 +118,7 @@ public final class CaseMenu extends AbstractContainerMenu {
 		} else if (slot < EXP_SLOTS) {
 			return slot - SATA_SLOTS < tier.sata();
 		}
-		return slot - EXP_SLOTS < tier.expansion();
+		return slot - EXP_SLOTS < tier.expansion() && !tier.soldered(slot - EXP_SLOTS);
 	}
 
 	/** The gold-trimmed expansion slot, which also takes a screen: the first one, on tiers that have it. */
@@ -131,8 +131,8 @@ public final class CaseMenu extends AbstractContainerMenu {
 		if (!available(tier, slot)) {
 			return false;
 		}
-		if (isScreenSlot(tier, slot) && stack.getItem() instanceof ScreenItem) {
-			return true;
+		if (isScreenSlot(tier, slot) && stack.getItem() instanceof ScreenItem screen) {
+			return tier.takesScreen(screen.screen().tier());
 		}
 		return accepts(slot, stack);
 	}

@@ -32,6 +32,8 @@ public final class ModularComputersNeoForge {
 				ModularComputers.init();
 			}
 		});
+		modBus.addListener(net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent.class,
+			event -> NeoForgePlatform.ATTRIBUTES.forEach((type, attributes) -> event.put(type, attributes.get())));
 		modBus.addListener(RegisterPayloadHandlersEvent.class, event -> {
 			PayloadRegistrar registrar = event.registrar(NETWORK_VERSION);
 			ModNetwork.TO_SERVER.forEach(packet -> register(registrar, packet));

@@ -129,6 +129,17 @@ public record ScreenRowsPayload(HostRef host, int columns, int lines, List<Row> 
 		return new ScreenRowsPayload(host, buffer.resolution().columns(), buffer.resolution().rows(), rows, cursor);
 	}
 
+	/** Every row of a terminal's glass and its cursor, for a player who starts seeing it (its changes stay to go to the others). */
+	public static ScreenRowsPayload whole(HostRef host, Terminal terminal) {
+		TextBuffer buffer = terminal.buffer();
+		List<Row> rows = new ArrayList<>();
+		for (int row = 0; row < buffer.resolution().rows(); row++) {
+			rows.add(new Row(row, buffer.row(row), buffer.rowForegrounds(row), buffer.rowBackgrounds(row),
+				com.payonel.modularcomputers.display.Tiles.row(buffer.rowTiles(row))));
+		}
+		return new ScreenRowsPayload(host, buffer.resolution().columns(), buffer.resolution().rows(), rows, terminal.shownCursor());
+	}
+
 	/** Puts the rows and the cursor into a player's copy. */
 	public void apply(Terminal terminal) {
 		if (columns > 0 && lines > 0) {

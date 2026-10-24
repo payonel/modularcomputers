@@ -68,4 +68,19 @@ public final class TestPlatform implements Platform {
 	public void openMenu(Player player, MenuProvider provider, BlockPos pos) {
 		throw new UnsupportedOperationException();
 	}
+
+	@Override
+	public <M extends AbstractContainerMenu> MenuType<M> hostMenuType(HostMenu<M> factory) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public void openMenu(Player player, MenuProvider provider, com.payonel.modularcomputers.network.HostRef host) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public void entityAttributes(net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.LivingEntity> type,
+		java.util.function.Supplier<net.minecraft.world.entity.ai.attributes.AttributeSupplier> attributes) {
+	}
 }

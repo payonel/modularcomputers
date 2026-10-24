@@ -39,6 +39,7 @@ or by Bluetooth.
 - [Disk Station](/hardware/disk-station/): formats, wipes, clones and installs disks.
 - [Photomask](/hardware/photomask/): prints chips from silicon.
 - [Robotic Piston](/hardware/robotic-piston/): a piston a computer can push with.
+- [Bot Golem](/hardware/bot-golem/): a robot a block high, a computer that walks.
 
 ## Cards
 

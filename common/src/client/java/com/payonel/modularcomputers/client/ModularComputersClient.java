@@ -47,6 +47,10 @@ public final class ModularComputersClient {
 	public interface Renderers {
 		<T extends BlockEntity, S extends BlockEntityRenderState> void register(BlockEntityType<? extends T> type,
 			BlockEntityRendererProvider<T, S> provider);
+
+		/** An entity's renderer. */
+		<T extends net.minecraft.world.entity.Entity> void entity(net.minecraft.world.entity.EntityType<? extends T> type,
+			net.minecraft.client.renderer.entity.EntityRendererProvider<T> provider);
 	}
 
 	/** Makes a menu's screen. */
@@ -70,10 +74,12 @@ public final class ModularComputersClient {
 		renderers.register(ModBlocks.EXPANSION_HUB_ENTITY, context -> new OutlineRenderer<>());
 		renderers.register(ModBlocks.ROBOTIC_PISTON_ENTITY, context -> new OutlineRenderer<>());
 		renderers.register(ModBlocks.PHOTOMASK_ENTITY, context -> new PhotomaskRenderer());
+		renderers.entity(com.payonel.modularcomputers.entity.ModEntities.BOT_GOLEM, com.payonel.modularcomputers.client.entity.BotGolemRenderer::new);
 	}
 
 	public static void screens(Screens screens) {
 		screens.register(ModMenus.CASE, CaseScreen::new);
+		screens.register(ModMenus.GOLEM, CaseScreen::new); // (its art by its board: a golem's)
 		screens.register(ModMenus.EXPANSION_HUB, CardHolderScreen::new);
 		screens.register(ModMenus.ROBOTIC_PISTON, CardHolderScreen::new);
 		screens.register(ModMenus.SCREEN, CardHolderScreen::new);

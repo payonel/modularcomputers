@@ -33,4 +33,6 @@ public enum DeviceType {
 	FABRICATOR,
 	/** A Disk Station: a dock that formats, wipes, clones and installs disks. */
 	DISK_STATION,
+	/** A robot's robotics device: its body's motors (a golem's legs), soldered onto its board. */
+	ROBOTICS,
 }

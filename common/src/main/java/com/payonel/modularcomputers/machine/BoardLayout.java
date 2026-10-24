@@ -24,4 +24,14 @@ public interface BoardLayout {
 
 	/** Its tier, as the board's firmware reads it (SMBIOS's chassis). */
 	int number();
+
+	/** An expansion lane with a device soldered on (a golem's robotics device): no slot for a part. */
+	default boolean soldered(int lane) {
+		return false;
+	}
+
+	/** Whether its screen slot takes a screen of {@code tier}. */
+	default boolean takesScreen(com.payonel.modularcomputers.device.TerminalTier tier) {
+		return true;
+	}
 }

@@ -24,7 +24,12 @@ public final class ModNetworkClient {
 		new Handler<>(OpenDisplayPayload.TYPE, ModNetworkClient::openDisplay),
 		new Handler<>(SettingsPayload.TYPE, SettingsPayload::apply),
 		new Handler<>(ScreenRowsPayload.TYPE, ModNetworkClient::screenRows),
-		new Handler<>(com.payonel.modularcomputers.network.SoundCardPayload.TYPE, com.payonel.modularcomputers.client.sound.SoundCardSpeakers::receive));
+		new Handler<>(com.payonel.modularcomputers.network.SoundCardPayload.TYPE, com.payonel.modularcomputers.client.sound.SoundCardSpeakers::receive),
+		new Handler<>(com.payonel.modularcomputers.network.BoardStatePayload.TYPE, payload -> {
+			if (Minecraft.getInstance().level != null) {
+				payload.apply(Minecraft.getInstance().level);
+			}
+		}));
 
 	private ModNetworkClient() {
 	}

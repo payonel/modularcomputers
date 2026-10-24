@@ -34,7 +34,8 @@ public interface BoardHost {
 
 	/**
 	 * Shows whether it could run, is on, halted, and shows a screen (a case's power button and
-	 * front); whether that changed (and was sent to clients).
+	 * front); whether that changed, and then it was sent to clients with the board's state too (the
+	 * board doesn't send it again: a case's block update carries its block entity).
 	 */
 	boolean showPowerState(boolean ready, boolean powered, boolean halted, boolean screen);
 

@@ -82,6 +82,7 @@ class DeviceInterruptsTest {
 			peer.send(new com.payonel.modularcomputers.runtime.Arguments(List.of(card.address(), "frame")));
 		},
 		Terminal.class, device -> ((Terminal) device).press("a"),
+		com.payonel.modularcomputers.device.RoboticsDevice.class, device -> ((com.payonel.modularcomputers.device.RoboticsDevice) device).arrived(),
 		Disk.class, device -> ((Disk) device).mkdir(new com.payonel.modularcomputers.runtime.Arguments(List.of("/made"))));
 
 	private static final String BY_ID = "by its id";
@@ -99,6 +100,7 @@ class DeviceInterruptsTest {
 		}
 		devices.add(Map.entry(Motherboard.exp(0), () -> new Terminal(Resolution.DEFAULT)));
 		devices.add(Map.entry(Motherboard.sata(0), () -> new Disk(DiskTier.TIER_1, folder())));
+		devices.add(Map.entry(Motherboard.exp(3), com.payonel.modularcomputers.device.RoboticsDevice::new)); // (a golem's, soldered)
 		return devices;
 	}
 

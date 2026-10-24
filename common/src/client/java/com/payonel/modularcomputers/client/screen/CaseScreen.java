@@ -52,6 +52,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final Identifier BOARD_BARE = ModularComputers.id("textures/gui/case_board_bare.png");
 	private static final int BOARD_W = 168;
 	private static final int BOARD_H = 132;
+	/** A golem's: the same board, its robotics device soldered on, seen through its iron chest (golem_panel.png). */
+	private static final Identifier GOLEM_BOARD = ModularComputers.id("textures/gui/golem_board.png");
+	private static final Identifier GOLEM_BOARD_BARE = ModularComputers.id("textures/gui/golem_board_bare.png");
+	private static final Identifier GOLEM_PANEL = ModularComputers.id("textures/gui/golem_panel.png");
 	private static final Identifier BUS_PANEL = ModularComputers.id("textures/gui/bus_panel.png");
 	private static final int BUS_W = 176;
 	private static final int BUS_H = 230;
@@ -66,6 +70,8 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int SCROLLBAR_X = BUS_W - 13;
 	private static final int SCROLLBAR_W = 6;
 	private static final Identifier ICONS = ModularComputers.id("textures/gui/case_icons.png");
+	/** The icon sheet's width: nine 16-pixel icons. */
+	private static final int ICONS_WIDTH = 16 * 9;
 	private static final int ICON_CPU = 0, ICON_ROM = 1, ICON_RAM = 2, ICON_DISK = 3, ICON_CARD = 4, ICON_UPS = 5;
 
 	private static final int PANEL = 0xFFC6C6C6;
@@ -118,7 +124,16 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	public CaseScreen(CaseMenu menu, Inventory inventory, Component title) {
 		super(menu, inventory, title, WIDTH, HEIGHT);
 		inventoryLabelY = CaseMenu.INVENTORY_Y - 10;
+		boolean golem = menu.tier() instanceof com.payonel.modularcomputers.machine.GolemLayout;
+		board = golem ? GOLEM_BOARD : BOARD;
+		boardBare = golem ? GOLEM_BOARD_BARE : BOARD_BARE;
+		panel = golem ? GOLEM_PANEL : null;
 	}
+
+	/** Its board's art, full and bare, and its panel's (null: the plain panel), by what it's in. */
+	private final Identifier board;
+	private final Identifier boardBare;
+	private final Identifier panel;
 
 	@Override
 	protected void init() {
@@ -345,7 +360,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		graphics.fill(x + 1, y + 1, x + imageWidth - 1, y + imageHeight - 1, LIGHT);
 		graphics.fill(x + 2, y + 2, x + imageWidth - 1, y + imageHeight - 1, SHADOW);
 		graphics.fill(x + 2, y + 2, x + imageWidth - 2, y + imageHeight - 2, PANEL);
-		graphics.blit(RenderPipelines.GUI_TEXTURED, BOARD, x + CaseMenu.BOARD_X, y + CaseMenu.BOARD_Y, 0, 0, BOARD_W, BOARD_H, BOARD_W, BOARD_H);
+		if (panel != null) {
+			graphics.blit(RenderPipelines.GUI_TEXTURED, panel, x, y, 0, 0, imageWidth, imageHeight, imageWidth, imageHeight);
+		}
+		graphics.blit(RenderPipelines.GUI_TEXTURED, board, x + CaseMenu.BOARD_X, y + CaseMenu.BOARD_Y, 0, 0, BOARD_W, BOARD_H, BOARD_W, BOARD_H);
 		extractBoardLabels(graphics, x, y);
 		extractIndicators(graphics);
 		extractTierMarks(graphics);
@@ -451,7 +469,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
 			if (!CaseMenu.available(menu.tier(), slot)) {
 				Viewport part = partArt(slot);
-				graphics.blit(RenderPipelines.GUI_TEXTURED, BOARD_BARE, bx + part.x(), by + part.y(), part.x(), part.y(),
+				graphics.blit(RenderPipelines.GUI_TEXTURED, boardBare, bx + part.x(), by + part.y(), part.x(), part.y(),
 					part.width(), part.height(), BOARD_W, BOARD_H);
 			}
 		}
@@ -501,7 +519,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	}
 
 	private void extractIcon(GuiGraphicsExtractor graphics, int icon, int x, int y) {
-		graphics.blit(RenderPipelines.GUI_TEXTURED, ICONS, x, y, icon * 16, 0, 16, 16, 128, 16);
+		graphics.blit(RenderPipelines.GUI_TEXTURED, ICONS, x, y, icon * 16, 0, 16, 16, ICONS_WIDTH, 16);
 	}
 
 	/** A vanilla-style slot for the player's inventory: 18x18, shadowed top-left, lit bottom-right. */

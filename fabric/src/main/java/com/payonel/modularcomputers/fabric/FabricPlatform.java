@@ -68,6 +68,37 @@ public final class FabricPlatform implements Platform {
 	}
 
 	@Override
+	public <M extends AbstractContainerMenu> MenuType<M> hostMenuType(HostMenu<M> factory) {
+		return new ExtendedMenuType<>(factory::create, com.payonel.modularcomputers.network.HostRef.STREAM_CODEC);
+	}
+
+	@Override
+	public void openMenu(Player player, MenuProvider provider, com.payonel.modularcomputers.network.HostRef host) {
+		player.openMenu(new ExtendedMenuProvider<com.payonel.modularcomputers.network.HostRef>() {
+			@Override
+			public com.payonel.modularcomputers.network.HostRef getScreenOpeningData(ServerPlayer player) {
+				return host;
+			}
+
+			@Override
+			public Component getDisplayName() {
+				return provider.getDisplayName();
+			}
+
+			@Override
+			public AbstractContainerMenu createMenu(int id, Inventory inventory, Player player) {
+				return provider.createMenu(id, inventory, player);
+			}
+		});
+	}
+
+	@Override
+	public void entityAttributes(net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.LivingEntity> type,
+		Supplier<net.minecraft.world.entity.ai.attributes.AttributeSupplier> attributes) {
+		net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry.register(type, attributes.get());
+	}
+
+	@Override
 	public void openMenu(Player player, MenuProvider provider, BlockPos pos) {
 		player.openMenu(new ExtendedMenuProvider<BlockPos>() {
 			@Override

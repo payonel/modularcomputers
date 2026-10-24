@@ -78,6 +78,7 @@ public final class ModularComputers {
 		BatteryUpgradeRecipe.init();
 		com.payonel.modularcomputers.item.DiskUsingRecipe.init();
 		ModBlocks.init();
+		com.payonel.modularcomputers.entity.ModEntities.init();
 		ModMenus.init();
 		ModCreativeTab.init();
 		initialized = true;

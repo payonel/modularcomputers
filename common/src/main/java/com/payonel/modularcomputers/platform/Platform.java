@@ -57,4 +57,22 @@ public interface Platform {
 	interface BlockMenu<M extends AbstractContainerMenu> {
 		M create(int id, Inventory inventory, BlockPos pos);
 	}
+
+	/** A menu type whose client side is made knowing what it's for (a block or an entity: a golem), sent on opening. */
+	<M extends AbstractContainerMenu> MenuType<M> hostMenuType(HostMenu<M> factory);
+
+	/** Opens a menu of a type from {@link #hostMenuType} for the player (nothing on a client), sending it {@code host}. */
+	void openMenu(Player player, MenuProvider provider, com.payonel.modularcomputers.network.HostRef host);
+
+	/** Makes the client's side of a menu for {@code host}. */
+	interface HostMenu<M extends AbstractContainerMenu> {
+		M create(int id, Inventory inventory, com.payonel.modularcomputers.network.HostRef host);
+	}
+
+	/**
+	 * Gives an entity type of the mod's its attributes (health, speed...): a living entity has none
+	 * until the loader's registry does (the plain game's table is fixed).
+	 */
+	void entityAttributes(net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.LivingEntity> type,
+		Supplier<net.minecraft.world.entity.ai.attributes.AttributeSupplier> attributes);
 }

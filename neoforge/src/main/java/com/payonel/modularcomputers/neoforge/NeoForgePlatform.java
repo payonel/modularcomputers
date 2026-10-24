@@ -64,4 +64,24 @@ public final class NeoForgePlatform implements Platform {
 	public void openMenu(Player player, MenuProvider provider, BlockPos pos) {
 		player.openMenu(provider, pos);
 	}
+
+	@Override
+	public <M extends AbstractContainerMenu> MenuType<M> hostMenuType(HostMenu<M> factory) {
+		return IMenuTypeExtension.create((id, inventory, data) -> factory.create(id, inventory, com.payonel.modularcomputers.network.HostRef.STREAM_CODEC.decode(data)));
+	}
+
+	@Override
+	public void openMenu(Player player, MenuProvider provider, com.payonel.modularcomputers.network.HostRef host) {
+		player.openMenu(provider, buffer -> com.payonel.modularcomputers.network.HostRef.STREAM_CODEC.encode(buffer, host));
+	}
+
+	/** The mod's entity types' attributes, given to NeoForge's event when it comes ({@link ModularComputersNeoForge}). */
+	static final java.util.Map<net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.LivingEntity>,
+		java.util.function.Supplier<net.minecraft.world.entity.ai.attributes.AttributeSupplier>> ATTRIBUTES = new java.util.LinkedHashMap<>();
+
+	@Override
+	public void entityAttributes(net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.LivingEntity> type,
+		java.util.function.Supplier<net.minecraft.world.entity.ai.attributes.AttributeSupplier> attributes) {
+		ATTRIBUTES.put(type, attributes);
+	}
 }

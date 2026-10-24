@@ -30,6 +30,12 @@ public final class ModularComputersFabricClient implements ClientModInitializer 
 				BlockEntityRendererProvider<T, S> provider) {
 				BlockEntityRenderers.register(type, provider);
 			}
+
+			@Override
+			public <T extends net.minecraft.world.entity.Entity> void entity(net.minecraft.world.entity.EntityType<? extends T> type,
+				net.minecraft.client.renderer.entity.EntityRendererProvider<T> provider) {
+				net.minecraft.client.renderer.entity.EntityRenderers.register(type, provider);
+			}
 		});
 		ModularComputersClient.screens(new ModularComputersClient.Screens() {
 			@Override

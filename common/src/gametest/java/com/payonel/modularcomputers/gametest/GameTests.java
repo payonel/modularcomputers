@@ -31,7 +31,7 @@ public final class GameTests {
 	public static final List<Class<?>> CLASSES = List.of(ModularComputersGameTest.class, AllInOneGameTest.class, CableGameTest.class,
 		CardHolderGameTest.class, BluetoothGameTest.class, BatteryGameTest.class, CaseTierGameTest.class, DiskGameTest.class,
 		RoboticPistonGameTest.class, CardGameTest.class, NetworkGameTest.class, RecipeGameTest.class, KeepPartsGameTest.class, PhotomaskGameTest.class,
-		AncientLabGameTest.class, DiskStationGameTest.class);
+		AncientLabGameTest.class, DiskStationGameTest.class, BotGolemGameTest.class);
 
 	/** Ticks a test may take unless it says otherwise (the game's usual). */
 	public static final int MAX_TICKS = 20;

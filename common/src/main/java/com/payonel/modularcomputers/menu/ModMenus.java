@@ -28,6 +28,12 @@ public final class ModMenus {
 	public static final MenuType<PhotomaskMenu> PHOTOMASK = Registry.register(BuiltInRegistries.MENU, id("photomask"),
 		Platform.INSTANCE.menuType(PhotomaskMenu::new));
 
+	/** A bot golem's parts view: its board, in its iron chest (the case view's, for an entity). */
+	public static final MenuType<CaseMenu> GOLEM = Registry.register(BuiltInRegistries.MENU, id("golem"),
+		Platform.INSTANCE.hostMenuType((id, inventory, host) -> new CaseMenu(ModMenus.GOLEM, id, inventory,
+			new net.minecraft.world.SimpleContainer(CaseMenu.PART_SLOTS), new net.minecraft.world.inventory.SimpleContainerData(CaseMenu.POWER_DATA),
+			BlockPos.ZERO, host, player -> true, com.payonel.modularcomputers.machine.GolemLayout.BOT_GOLEM)));
+
 	public static final MenuType<DiskStationMenu> DISK_STATION = Registry.register(BuiltInRegistries.MENU, id("disk_station"),
 		Platform.INSTANCE.menuType(DiskStationMenu::new));
 

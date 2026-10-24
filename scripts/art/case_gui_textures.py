@@ -252,6 +252,111 @@ def case_board(bare=False):
 		(bare_exp if bare else exp)(p, *e)
 	return p.im
 
+# The bot golem's board (user design, 2026-10-24): the same board, seen through its iron chest
+# plate (riveted, vines grown over it, as an iron golem's), with its robotics device soldered onto
+# the last expansion lane: a big chip, no connector.
+IRON = [(201, 194, 181), (197, 190, 177), (205, 198, 185)]  # an iron golem's warm grey, brushed
+IRON_SHADE = (138, 131, 119)
+IRON_LIGHT = (228, 222, 210)
+RIVET = (112, 106, 96)
+VINE = (58, 110, 40)
+VINE_DARK = (40, 82, 28)
+LEAF = (88, 148, 56)
+ROBOTICS_LANE = 3
+
+PANEL_W, PANEL_H = 176, 230  # the whole view, as CaseScreen's
+BOARD_AT = (4, 4)  # where the board shows through it (CaseMenu.BOARD_X, BOARD_Y)
+
+def strand(p, points, vr, thick=2):
+	"""A vine along the points, {thick} wide, leaf clusters here and there."""
+	for (x0, y0), (x1, y1) in zip(points, points[1:]):
+		steps = max(abs(x1 - x0), abs(y1 - y0))
+		for i in range(steps + 1):
+			x = x0 + (x1 - x0) * i // max(steps, 1)
+			y = y0 + (y1 - y0) * i // max(steps, 1)
+			for t in range(thick):
+				p.px(x + t, y, VINE if vr.random() < 0.65 else VINE_DARK)
+			if vr.random() < 0.12:
+				lx = x + vr.choice((-2, thick + 1))
+				for dx, dy in [(0, 0), (1, 0), (0, -1), (1, -1), (0, 1)]:
+					p.px(lx + dx, y + dy, LEAF if vr.random() < 0.7 else VINE)
+
+def golem_panel():
+	"""The golem's chest, open: iron plates (seams, rivets, weathering) with vines grown over them,
+	and the opening the board shows through, its lip in shadow."""
+	pr = random.Random(23)
+	p = Pic(PANEL_W, PANEL_H)
+	tone = {}  # each plate a little lighter or darker than the next
+	for y in range(PANEL_H):
+		row = pr.choice(IRON)
+		for x in range(PANEL_W):
+			c = row if pr.random() < 0.8 else pr.choice(IRON)  # brushed: rows of one shade
+			plate = (y // 46, (x + (30 if (y // 46) % 2 else 60)) // 88)
+			d = tone.setdefault(plate, pr.choice((-6, -3, 0, 3)))
+			c = tuple(max(0, min(255, v + d)) for v in c)
+			if pr.random() < 0.006:
+				c = IRON_SHADE  # a pit
+			p.px(x, y, c)
+	# plates: seams across, and between plates down, offset row by row, riveted at the seams
+	rows = [0, 46, 92, 140, 186, PANEL_H]
+	for i, top in enumerate(rows[:-1]):
+		bottom = rows[i + 1]
+		p.fill(0, top, PANEL_W, top + 1, IRON_SHADE)
+		p.fill(0, top + 1, PANEL_W, top + 2, IRON_LIGHT)
+		start = 30 if i % 2 else 60
+		for sx in range(start, PANEL_W, 88):
+			p.fill(sx, top, sx + 1, bottom, IRON_SHADE)
+			p.fill(sx + 1, top, sx + 2, bottom, IRON_LIGHT)
+		for rx in range(6, PANEL_W - 4, 14):
+			p.fill(rx, top + 4, rx + 2, top + 6, RIVET); p.px(rx, top + 4, IRON_LIGHT)
+	# the outer bevel
+	p.fill(0, 0, PANEL_W, 1, IRON_LIGHT); p.fill(0, 0, 1, PANEL_H, IRON_LIGHT)
+	p.fill(0, PANEL_H - 1, PANEL_W, PANEL_H, IRON_SHADE); p.fill(PANEL_W - 1, 0, PANEL_W, PANEL_H, IRON_SHADE)
+	# the opening's lip: dark above and left (in shadow), light below and right
+	bx, by = BOARD_AT
+	p.fill(bx - 2, by - 2, bx + BOARD_W + 2, by + BOARD_H + 2, IRON_SHADE)
+	p.fill(bx - 1, by + BOARD_H, bx + BOARD_W + 2, by + BOARD_H + 2, IRON_LIGHT)
+	p.fill(bx + BOARD_W, by - 1, bx + BOARD_W + 2, by + BOARD_H + 2, IRON_LIGHT)
+	p.fill(bx, by, bx + BOARD_W, by + BOARD_H, (0, 0, 0))
+	# vines: up the left side from the bottom, along the top, over the lower plates
+	vr = random.Random(11)
+	strand(p, [(2, PANEL_H - 1), (1, 200), (3, 170), (1, 140), (2, 110), (1, 70), (2, 40), (1, 2)], vr)
+	strand(p, [(1, 1), (30, 2), (58, 1), (90, 2), (118, 1)], vr)
+	strand(p, [(1, 150), (12, 148), (20, 146)], vr)
+	strand(p, [(PANEL_W - 2, PANEL_H - 1), (PANEL_W - 3, 214), (PANEL_W - 1, 196), (PANEL_W - 12, 190)], vr)
+	return p.im
+
+def tendrils(p):
+	"""Vine tendrils reaching onto the board from the plate, where no part is."""
+	vr = random.Random(13)
+	strand(p, [(88, 0), (89, 4), (87, 7)], vr, thick=1)
+	strand(p, [(0, 88), (3, 90), (5, 93)], vr, thick=1)
+	strand(p, [(BOARD_W - 1, 100), (BOARD_W - 3, 103)], vr, thick=1)
+
+def robotics_chip(p, x, y):
+	"""The robotics device, soldered where the lane's connector would be: a large chip, pins all round."""
+	p.fill(x - 5, y - 1, x + 19, y + 17, (34, 88, 49))  # its pad, the board showing
+	p.fill(x - 3, y + 1, x + 17, y + 15, BLACK)
+	for qx in range(x - 2, x + 17, 2):
+		p.px(qx, y, GOLD); p.px(qx, y + 15, GOLD)
+	for qy in range(y + 2, y + 15, 2):
+		p.px(x - 4, qy, GOLD); p.px(x + 17, qy, GOLD)
+	p.fill(x - 1, y + 3, x + 15, y + 4, (60, 60, 66))  # its die's edge
+	# a little gear: what it drives
+	cx, cy = x + 7, y + 8
+	p.fill(cx - 2, cy - 2, cx + 3, cy + 3, SILVER)
+	for dx, dy in [(0, -3), (0, 3), (-3, 0), (3, 0)]:
+		p.px(cx + dx, cy + dy, SILVER)
+	p.px(cx, cy, BLACK)
+	p.px(x - 2, y + 13, SILK)  # pin 1
+
+def golem_board(bare=False):
+	p = Pic(BOARD_W, BOARD_H)
+	p.im = case_board(bare)
+	tendrils(p)
+	robotics_chip(p, *EXP[ROBOTICS_LANE])
+	return p.im
+
 BUS_W, BUS_H = 176, 230
 
 def bus_panel():
@@ -315,13 +420,21 @@ def bus_icon(kind):
 		p.fill(0, 5, 16, 12, (66, 64, 59))
 		for x in range(1, 15, 2):
 			p.px(x, 7, (196, 191, 176)); p.px(x, 9, (196, 191, 176))
+	elif kind == "robotics":  # the golem's soldered chip: pins all round, a gear on it
+		p.fill(3, 3, 13, 13, BLACK)
+		for q in range(4, 13, 2):
+			p.px(q, 2, GOLD); p.px(q, 13, GOLD); p.px(2, q, GOLD); p.px(13, q, GOLD)
+		p.fill(6, 6, 10, 10, SILVER)
+		for dx, dy in [(7, 5), (8, 5), (7, 10), (8, 10), (5, 7), (5, 8), (10, 7), (10, 8)]:
+			p.px(dx, dy, SILVER)
+		p.px(7, 7, BLACK); p.px(8, 8, BLACK)
 	return p.im
 
 def icons():
-	"""One row of 16x16 icons: slot ghosts (cpu, rom, ram, disk, card, ups), then built-in bus devices (display, keyboard)."""
-	sheet = Image.new("RGBA", (16 * 8, 16), (0, 0, 0, 0))
+	"""One row of 16x16 icons: slot ghosts (cpu, rom, ram, disk, card, ups), then built-in bus devices (display, keyboard, robotics)."""
+	sheet = Image.new("RGBA", (16 * 9, 16), (0, 0, 0, 0))
 	for i, im in enumerate([ghost(cpu_ghost), ghost(rom_ghost), ghost(ram_ghost), ghost(disk_ghost),
-			ghost(card_ghost), ghost(ups_ghost), bus_icon("display"), bus_icon("keyboard")]):
+			ghost(card_ghost), ghost(ups_ghost), bus_icon("display"), bus_icon("keyboard"), bus_icon("robotics")]):
 		sheet.paste(im, (16 * i, 0))
 	return sheet
 
@@ -334,3 +447,10 @@ rnd.setstate(after)
 bus_panel().save(f"{OUT}/bus_panel.png")
 bus_row().save(f"{OUT}/bus_row.png")
 icons().save(f"{OUT}/case_icons.png")
+state = rnd.getstate()
+golem_board().save(f"{OUT}/golem_board.png")
+after = rnd.getstate()
+rnd.setstate(state)
+golem_board(bare=True).save(f"{OUT}/golem_board_bare.png")
+rnd.setstate(after)
+golem_panel().save(f"{OUT}/golem_panel.png")

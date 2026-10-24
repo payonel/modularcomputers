@@ -13,7 +13,8 @@
 			"com.payonel.modularcomputers.gametest.AllInOneClientGameTest",
 			"com.payonel.modularcomputers.gametest.CableClientGameTest",
 			"com.payonel.modularcomputers.gametest.CaseTierClientGameTest",
-			"com.payonel.modularcomputers.gametest.TerminalTierClientGameTest"
+			"com.payonel.modularcomputers.gametest.TerminalTierClientGameTest",
+			"com.payonel.modularcomputers.gametest.BotGolemClientGameTest"
 		]
 	},
 	"mixins": [
