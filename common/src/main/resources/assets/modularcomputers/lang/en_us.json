@@ -103,7 +103,6 @@
 	"block.modularcomputers.robotic_piston": "Robotic Piston",
 	"block.modularcomputers.robotic_sticky_piston": "Robotic Sticky Piston",
 	"block.modularcomputers.robotic_piston_arm": "Robotic Piston Arm",
-	"block.modularcomputers.paint_gun": "Paint Gun",
 	"block.modularcomputers.photomask": "Photomask",
 	"block.modularcomputers.disk_station": "Disk Station",
 	"hint.modularcomputers.details.disk_station": "Formats, wipes, clones and installs disks. The disk crafted into it loses its files",

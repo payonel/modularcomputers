@@ -42,8 +42,8 @@ public final class Cabling {
 
 	/**
 	 * A block has a cable port on {@code side}: cables and expansion hubs on every side, screens and
-	 * computers on every side but the front, robotic pistons only on their port face, paint guns on
-	 * every side but the nozzle. (Whether it's open: {@link CablePorts}.)
+	 * computers on every side but the front, robotic pistons only on their port face, Disk Stations and
+	 * photomasks on every side but the front. (Whether it's open: {@link CablePorts}.)
 	 */
 	public static boolean hasPort(BlockState state, Direction side) {
 		Block block = state.getBlock();
@@ -55,9 +55,6 @@ public final class Cabling {
 		}
 		if (block instanceof RoboticPistonBlock) {
 			return side == state.getValue(DirectionalBlock.FACING);
-		}
-		if (block instanceof PaintGunBlock) {
-			return side != state.getValue(DirectionalBlock.FACING); // not the nozzle
 		}
 		if (block instanceof DiskStationBlock) {
 			return side != state.getValue(HorizontalDirectionalBlock.FACING); // not its front
@@ -84,7 +81,7 @@ public final class Cabling {
 				if (block instanceof ScreenBlock || block instanceof ExpansionHubBlock) {
 					return CableWalk.Kind.RELAY;
 				}
-				return block instanceof AllInOneBlock || block instanceof RoboticPistonBlock || block instanceof PaintGunBlock
+				return block instanceof AllInOneBlock || block instanceof RoboticPistonBlock
 					|| block instanceof PhotomaskBlock || block instanceof DiskStationBlock ? CableWalk.Kind.DEVICE : CableWalk.Kind.NONE;
 			}
 

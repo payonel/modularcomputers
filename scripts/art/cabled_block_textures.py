@@ -151,30 +151,11 @@ def robotic_sticky_piston_plate():
 		im.putpixel((i, 4), (168, 232, 150))  # its sheen
 	return im
 
-def paint_gun_nozzle():
-	"""The nozzle face: a dark muzzle with dabs of paint around it."""
-	im = casing(19)
-	rect(im, 4, 4, 11, 11, (60, 62, 68))
-	rect(im, 6, 6, 9, 9, (20, 20, 22))
-	for (x, y), c in zip(((3, 3), (12, 4), (4, 12), (11, 12), (13, 9)),
-			((220, 60, 60), (60, 120, 220), (240, 200, 50), (80, 190, 90), (200, 90, 200))):
-		im.putpixel((x, y), c)
-	return im
-
-def paint_gun_side():
-	"""The body: beige with three paint canisters showing through a window."""
-	im = casing(20)
-	rect(im, 3, 4, 12, 11, (40, 40, 46))
-	for i, c in enumerate(((220, 60, 60), (60, 120, 220), (240, 200, 50))):
-		rect(im, 4 + i * 3, 5, 5 + i * 3, 10, c)
-	return im
-
 textures = [(f"tier{t}_screen_{face}", (lambda t=t, fn=fn: fn(t))) for t in (1, 2, 3)
 	for face, fn in (("front", tier_screen_front), ("side", screen_side), ("back", screen_back), ("top", screen_top))] + [
 	("cable", cable), ("expansion_hub_front", expansion_hub_front), ("expansion_hub_side", expansion_hub_side),
 	("robotic_piston_port", robotic_piston_port), ("robotic_piston_plate", robotic_piston_plate),
-	("robotic_sticky_piston_plate", robotic_sticky_piston_plate),
-	("paint_gun_nozzle", paint_gun_nozzle), ("paint_gun_side", paint_gun_side)]
+	("robotic_sticky_piston_plate", robotic_sticky_piston_plate)]
 for name, fn in textures:
 	fn().save(f"{OUT}/{name}.png")
 

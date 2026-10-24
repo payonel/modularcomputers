@@ -56,6 +56,8 @@ class DeviceInterruptsTest {
 			((WeatherCard) device).sense("rain"); // (a change is an event, not the first look)
 		},
 		MotionSensorCard.class, device -> ((MotionSensorCard) device).sense(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", 0.0)),
+		com.payonel.modularcomputers.device.AudioSensorCard.class, device -> ((com.payonel.modularcomputers.device.AudioSensorCard) device)
+			.hear(Map.of("sound", "minecraft:entity.pig.ambient", "source", "neutral", "x", 1.0, "y", 0.0, "z", 0.0)),
 		NetworkCard.class, device -> {
 			NetworkCard card = (NetworkCard) device;
 			card.place(WORLD, net.minecraft.core.BlockPos.ZERO, 0);

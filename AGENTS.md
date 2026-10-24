@@ -203,7 +203,7 @@ device data), and user code, as a real CPU runs firmware under an OS.
   what a full device does is its own business.
 - **A device reports every change to its state, from wherever it came:** an event in its own terms
   (a redstone face's level and whether the change came in, was its own, or another card's; a
-  motion; a disk's change by path, or byte ranges raw), raising its interrupt, taken by a method of
+  motion; a sound heard; a disk's change by path, or byte ranges raw), raising its interrupt, taken by a method of
   its own. The kernel's drivers turn events into what programs see (poll, `/dev` lines, inotify), so
   no kernel has to watch for changes. A disk's are `changes()`, not `pull()`: its `/dev` file is its
   data.
@@ -212,6 +212,16 @@ device data), and user code, as a real CPU runs firmware under an OS.
   that isn't there isn't on the bus, and calls to it fail at once.
 - **Saving a running computer** (Styx) happens at a safe point with no call in flight, so a save
   never splits a program from its devices; no timeouts, no kills (a persist that never ends is a bug).
+
+### Sensors and the Bluetooth card
+
+- **The audio sensor hears what a player at its block would** (the game's range for each sound),
+  reported as the game's subtitles know sounds: the sound's id, its category, and where, relative
+  to the block (as the motion sensor reports a mob). It hears every sound the server sends players
+  (`ServerLevelSounds`, a mixin on `playSeededSound`) and the sounds players make of level events
+  (`LevelSounds`, the client's table, kept by hand; a block broken plays its own break sound).
+- **A Bluetooth card in a computer is a device:** its link (the board it links to) and its board
+  are read and set by programs as by hand, on the card itself (its item).
 
 ### Network cards
 

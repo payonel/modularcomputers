@@ -14,7 +14,10 @@ public enum DeviceType {
 	EEPROM,
 	REDSTONE,
 	AUDIO,
-	SENSOR,
+	/** An audio sensor: the sounds it hears near it, as the game's subtitles report them (motion's naming). */
+	HEARING,
+	/** A Bluetooth card: the link it makes to another block's board. */
+	BLUETOOTH,
 	/** A motion sensor: what moves near it (user, 2026-10-21: motion, not just "sensor"). */
 	MOTION,
 	/** A weather sensor: the weather where it is. */

@@ -237,6 +237,54 @@ public class CardGameTest {
 	}
 
 	@GameTest(maxTicks = 60)
+	public void anAudioSensorHearsSoundsAndLevelEventsWhereRelativeToItsBlockWithinTheirRange(GameTestHelper helper) {
+		var card = computerWith(helper, ModItems.AUDIO_SENSOR_CARD, com.payonel.modularcomputers.device.AudioSensorCard.class);
+		BlockPos near = helper.absolutePos(POS.north(3));
+		BlockPos far = helper.absolutePos(POS.north(40)); // past a sound's range at its usual volume (16 blocks)
+		List<Map<?, ?>> heard = new ArrayList<>();
+		helper.startSequence()
+			.thenIdle(2) // (powered: its computer runs)
+			.thenExecute(() -> {
+				helper.getLevel().playSound(null, far.getX() + 0.5, far.getY() + 0.5, far.getZ() + 0.5,
+					net.minecraft.sounds.SoundEvents.PIGLIN_ANGRY, net.minecraft.sounds.SoundSource.HOSTILE, 1, 1);
+				helper.getLevel().playSound(null, near.getX() + 0.5, near.getY() + 0.5, near.getZ() + 0.5,
+					net.minecraft.sounds.SoundEvents.PIGLIN_AMBIENT, net.minecraft.sounds.SoundSource.HOSTILE, 1, 1);
+				helper.getLevel().levelEvent(net.minecraft.world.level.block.LevelEvent.SOUND_DISPENSER_DISPENSE, near, 0);
+			})
+			.thenWaitUntil(() -> {
+				Object event;
+				while ((event = card.pull(args()).first()) != null) {
+					heard.add((Map<?, ?>) event);
+				}
+				helper.assertValueEqual(heard.size(), 2, "the two near sounds: " + heard);
+			})
+			.thenExecute(() -> {
+				helper.assertValueEqual(heard.getFirst().get("sound"), "minecraft:entity.piglin.ambient", "which sound");
+				helper.assertValueEqual(heard.getFirst().get("source"), "hostile", "its category");
+				helper.assertValueEqual(heard.getFirst().get("z"), -3.0, "three blocks north of it");
+				helper.assertValueEqual(heard.get(1).get("sound"), "minecraft:block.dispenser.dispense", "a level event's sound");
+			})
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 60)
+	public void aBluetoothCardsLinkIsReadAndSetOnTheCardItself(GameTestHelper helper) {
+		var card = computerWith(helper, ModItems.BLUETOOTH_CARD, com.payonel.modularcomputers.device.BluetoothCard.class);
+		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		java.util.UUID other = java.util.UUID.randomUUID();
+		helper.assertTrue(card.getLink(args()).first() == null, "linked to nothing");
+		helper.assertValueEqual(card.getBoard(args()).first(), computer.boardId().toString(), "its computer's board");
+		helper.assertTrue(!card.setLink(args(other.toString())).failed(), "relinked");
+		helper.assertValueEqual(computer.parts().getItem(CaseMenu.EXP_SLOTS + 1).get(com.payonel.modularcomputers.item.ModComponents.BLUETOOTH_LINK), other,
+			"on the card itself");
+		helper.assertValueEqual(card.getLink(args()).first(), other.toString(), "read back");
+		helper.assertTrue(card.setLink(args("not an id")).failed(), "not an id");
+		helper.assertTrue(!card.setLink(args()).failed(), "unlinked");
+		helper.assertTrue(!computer.parts().getItem(CaseMenu.EXP_SLOTS + 1).has(com.payonel.modularcomputers.item.ModComponents.BLUETOOTH_LINK), "gone from it");
+		helper.succeed();
+	}
+
+	@GameTest(maxTicks = 60)
 	public void aMotionSensorSeesAPlayerMove(GameTestHelper helper) {
 		MotionSensorCard card = computerWith(helper, ModItems.MOTION_SENSOR_CARD, MotionSensorCard.class);
 		var player = GameTests.serverPlayer(helper);

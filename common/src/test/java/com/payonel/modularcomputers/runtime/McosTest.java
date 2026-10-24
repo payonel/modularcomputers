@@ -341,6 +341,38 @@ class McosTest {
 	}
 
 	@Test
+	void anAudioSensorsFileGivesASoundALine() {
+		com.payonel.modularcomputers.device.AudioSensorCard audio = new com.payonel.modularcomputers.device.AudioSensorCard();
+		devices.put(Motherboard.exp(0), audio); // (a card in a slot, as in a case)
+		boot();
+		type("head -n 1 /dev/hearing0 > /h; touch /done\r");
+		untilIdle(); // head waits: nothing was heard
+		server.add(() -> audio.hear(Map.of("sound", "minecraft:entity.pig.ambient", "source", "neutral", "x", 1.5, "y", 0.0, "z", -3.0)));
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("h"))).isEqualTo("minecraft:entity.pig.ambient neutral 1.5 0.0 -3.0\n");
+	}
+
+	@Test
+	void aBluetoothCardsFileSaysItsLinkAndBoardAndALineRelinksIt() {
+		com.payonel.modularcomputers.device.BluetoothCard card = new com.payonel.modularcomputers.device.BluetoothCard();
+		java.util.UUID[] link = {null};
+		java.util.UUID board = java.util.UUID.randomUUID();
+		java.util.UUID other = java.util.UUID.randomUUID();
+		card.linkIn(() -> link[0], id -> link[0] = id);
+		card.boardFrom(() -> board);
+		devices.put(Motherboard.exp(0), card);
+		boot();
+		file("bad.txt", "nonsense\n");
+		type("cat /dev/bluetooth0 > /b1; echo link " + other + " > /dev/bluetooth0; cat /dev/bluetooth0 > /b2; echo link - > /dev/bluetooth0; "
+			+ "cp /bad.txt /dev/bluetooth0 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("err"))).as("a line that isn't a link: the write fails").isNotEmpty();
+		assertThat(read(root().resolve("b1"))).isEqualTo("link -\nboard " + board + "\n");
+		assertThat(read(root().resolve("b2"))).isEqualTo("link " + other + "\nboard " + board + "\n");
+		assertThat(link[0]).as("unlinked").isNull();
+	}
+
+	@Test
 	void aSensorsFileGivesAnEventALineAndAReadWaitsForOne() {
 		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
 		devices.put(Motherboard.exp(0), motion); // (a card in a slot, as in a case)

@@ -10,6 +10,8 @@ public final class Cards {
 			case REDSTONE -> new RedstoneCard();
 			case WEATHER_SENSOR -> new WeatherCard();
 			case MOTION_SENSOR -> new MotionSensorCard();
+			case AUDIO_SENSOR -> new AudioSensorCard();
+			case BLUETOOTH -> new BluetoothCard();
 			case NETWORK, WLAN -> new NetworkCard(kind);
 			default -> new Card(kind);
 		};

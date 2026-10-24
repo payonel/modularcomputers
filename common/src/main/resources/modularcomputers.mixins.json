@@ -3,7 +3,8 @@
 	"package": "com.payonel.modularcomputers.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
-		"MinecraftServerSaves"
+		"MinecraftServerSaves",
+		"ServerLevelSounds"
 	],
 	"injectors": {
 		"defaultRequire": 1

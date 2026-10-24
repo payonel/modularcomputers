@@ -37,7 +37,7 @@ class RuntimeTest {
 
 		@Override
 		public DeviceType type() {
-			return DeviceType.SENSOR;
+			return DeviceType.HEARING;
 		}
 
 		@Override
@@ -117,7 +117,7 @@ class RuntimeTest {
 			board.halt();
 		});
 		assertThat(seen).containsExactly(
-			List.of(new Board.DeviceInfo("id:screen", "id:screen", "terminal"), new Board.DeviceInfo("id:sensor-1", "id:sensor-1", "sensor")),
+			List.of(new Board.DeviceInfo("id:screen", "id:screen", "terminal"), new Board.DeviceInfo("id:sensor-1", "id:sensor-1", "hearing")),
 			"terminal", "console", List.of("getSize", "read", "write"), "read(): the oldest reading, or nil", List.of(50L, 16L, 50L, 16L), CpuTier.TIER_3.busCapacity());
 	}
 
@@ -135,8 +135,8 @@ class RuntimeTest {
 			board.halt();
 		});
 		assertThat((List<Object>) seen.get(0)).as("listed once, by its path, with its id").containsExactlyInAnyOrder(
-			new Board.DeviceInfo("id:screen", "id:screen", "terminal"), new Board.DeviceInfo("exp:0", card, "sensor"));
-		assertThat(seen.subList(1, 3)).containsExactly("sensor", 7L);
+			new Board.DeviceInfo("id:screen", "id:screen", "terminal"), new Board.DeviceInfo("exp:0", card, "hearing"));
+		assertThat(seen.subList(1, 3)).containsExactly("hearing", 7L);
 	}
 
 	@Test

@@ -25,9 +25,6 @@ public final class ModMenus {
 	public static final MenuType<CardHolderMenu> SCREEN = Registry.register(BuiltInRegistries.MENU, id("screen"),
 		Platform.INSTANCE.menuType(CardHolderMenu::screen));
 
-	public static final MenuType<CardHolderMenu> PAINT_GUN = Registry.register(BuiltInRegistries.MENU, id("paint_gun"),
-		Platform.INSTANCE.menuType(CardHolderMenu::paintGun));
-
 	public static final MenuType<PhotomaskMenu> PHOTOMASK = Registry.register(BuiltInRegistries.MENU, id("photomask"),
 		Platform.INSTANCE.menuType(PhotomaskMenu::new));
 

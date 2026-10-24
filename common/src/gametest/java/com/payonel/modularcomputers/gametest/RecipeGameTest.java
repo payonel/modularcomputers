@@ -70,7 +70,6 @@ public class RecipeGameTest {
 		new Craft("cable", 8, null, new String[] {"KKK", "KCK", "KKK"}),
 		make("expansion_hub", "CXC", "XQX", "gXg"),
 		make("robotic_piston", "IPI", "PQP", "ICI"),
-		make("paint_gun", "IQI", "reb", "IdI"),
 		make("network_card", "WQ ", "ccc", "GGG"),
 		make("wlan_card", "OQm", "ccc", "GGG"),
 		make("bluetooth_card", "OQm", "clc", "GGG"),

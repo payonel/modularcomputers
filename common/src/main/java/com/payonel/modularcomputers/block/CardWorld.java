@@ -1,5 +1,6 @@
 package com.payonel.modularcomputers.block;
 
+import com.payonel.modularcomputers.device.AudioSensorCard;
 import com.payonel.modularcomputers.device.Card;
 import com.payonel.modularcomputers.device.MotionSensorCard;
 import com.payonel.modularcomputers.device.NetworkCard;
@@ -18,6 +19,12 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.LevelEvent;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * What cards see of the world where they're installed (a computer, a hub): the glue between the
@@ -34,6 +41,8 @@ public final class CardWorld {
 		Direction.WEST, Direction.UP, Direction.DOWN);
 	/** Motion sensors at work: where each is, and what it saw last. */
 	private static final Map<MotionSensorCard, Watch> WATCHING = new WeakHashMap<>();
+	/** Audio sensors at work: where each is, and when it last was (a sensor not ticked lately has stopped). */
+	private static final Map<AudioSensorCard, Watch> LISTENING = new WeakHashMap<>();
 	/** How often a wired network card's cables are walked again, though none changed (chunks load and unload), in ticks. */
 	private static final int REACH_TICKS = 20;
 	/** The cable changes ({@link Cabling#changes}) each wired network card's reach was last worked out at. */
@@ -69,6 +78,12 @@ public final class CardWorld {
 				if (now % 20 == 0) {
 					weather.sense(weatherAt(level, pos));
 				}
+			}
+			case AudioSensorCard audio -> {
+				Watch watch = LISTENING.computeIfAbsent(audio, a -> new Watch());
+				watch.level = level;
+				watch.pos = pos;
+				watch.seen = now;
 			}
 			case MotionSensorCard motion -> {
 				Watch watch = WATCHING.computeIfAbsent(motion, m -> new Watch());
@@ -152,6 +167,53 @@ public final class CardWorld {
 		}
 		watch.entities.clear();
 		watch.entities.putAll(now);
+	}
+
+	/**
+	 * A sound the world played at {@code x, y, z}: each audio sensor at work in that world that a
+	 * player standing at its block would hear it from (the sound's own range, the game's) hears it.
+	 */
+	public static void heard(ServerLevel level, double x, double y, double z, SoundEvent sound, SoundSource source, float volume) {
+		if (LISTENING.isEmpty()) {
+			return;
+		}
+		double range = sound.getRange(volume);
+		long now = level.getGameTime();
+		for (var entry : LISTENING.entrySet()) {
+			Watch watch = entry.getValue();
+			// (one not ticked this tick or the last is out, or its computer stopped powering it)
+			if (watch.level != level || now - watch.seen > 1 || !entry.getKey().power().powered()
+				|| watch.pos.distToCenterSqr(x, y, z) > range * range) {
+				continue;
+			}
+			Map<String, Object> event = new LinkedHashMap<>();
+			event.put("sound", sound.location().toString());
+			event.put("source", source.getName());
+			event.putAll(where(watch.pos, x, y, z));
+			entry.getKey().hear(event);
+		}
+	}
+
+	/** A level event: the sound players make of it, if it has one ({@link LevelSounds}), heard where it happened. */
+	public static void levelEvent(ServerLevel level, int type, BlockPos pos, int data) {
+		if (LISTENING.isEmpty()) {
+			return;
+		}
+		double x = pos.getX() + 0.5;
+		double y = pos.getY() + 0.5;
+		double z = pos.getZ() + 0.5;
+		if (type == LevelEvent.PARTICLES_AND_SOUND_DESTROY_BLOCK) {
+			BlockState state = Block.stateById(data);
+			if (!state.isAir()) {
+				SoundType sounds = state.getSoundType();
+				heard(level, x, y, z, sounds.getBreakSound(), SoundSource.BLOCKS, (sounds.getVolume() + 1) / 2); // (the client's volume)
+			}
+			return;
+		}
+		LevelSounds.LevelSound sound = LevelSounds.BY_EVENT.get(type);
+		if (sound != null) {
+			heard(level, x, y, z, sound.sound(), sound.source(), 1);
+		}
 	}
 
 	/** Where something is, relative to the block (its center), to a tenth of a block. */

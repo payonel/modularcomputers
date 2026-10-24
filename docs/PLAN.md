@@ -48,8 +48,11 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   of a case (its charge). Each as its own events (the device-reporting rule in `AGENTS.md`).
 - **Motion sensor, tier 2 maybe** (user, 2026-10-21): finer motion (fluids, drops) and filters (by
   mob); tier 1 has no settings.
-- **Cards still placeholders:** Audio, Audio Sensor. The paint gun (shoots paint at nearby
-  wool, out of its nozzle face) does nothing yet.
+- **Cards still placeholders:** the Audio Card, to be the Sound Card (phase 1, a DAC, being built).
+  **Phase 2 (user, 2026-10-24): MIDI-style notes,** an instrument, a note, its loudness, on and off:
+  the instruments Minecraft's note block sounds, pitched to the note, played on each player's game
+  (little data); General MIDI on a card with sampled instruments is the real model; an mcos player
+  for `.mid` files.
 - **Bluetooth, open:** range limits; whether links show differently in the bus order; what a
   Bluetooth card does on the bus itself.
 - **Disks, open:** disks in expansion hubs; labels set by programs.

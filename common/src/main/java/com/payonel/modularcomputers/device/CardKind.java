@@ -8,12 +8,12 @@ public enum CardKind {
 	NETWORK(DeviceType.NETWORK),
 	/** A wireless one: frames through the air, without cables ({@link NetworkCard}). */
 	WLAN(DeviceType.NETWORK),
-	BLUETOOTH(DeviceType.NETWORK),
+	BLUETOOTH(DeviceType.BLUETOOTH),
 	/** Emits and detects redstone where it's installed (a computer, or an expansion hub). */
 	REDSTONE(DeviceType.REDSTONE),
 	AUDIO(DeviceType.AUDIO),
 	MOTION_SENSOR(DeviceType.MOTION),
-	AUDIO_SENSOR(DeviceType.SENSOR),
+	AUDIO_SENSOR(DeviceType.HEARING),
 	WEATHER_SENSOR(DeviceType.WEATHER);
 
 	private final DeviceType type;

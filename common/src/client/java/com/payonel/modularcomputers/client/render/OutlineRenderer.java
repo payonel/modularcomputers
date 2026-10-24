@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * For cabled blocks without a screen (expansion hubs, robotic pistons, paint guns): just the
+ * For cabled blocks without a screen (expansion hubs, robotic pistons): just the
  * bulb's outline, or the Bluetooth outline when the card in hand links to a card in here.
  */
 public final class OutlineRenderer<T extends BlockEntity> implements BlockEntityRenderer<T, OutlineRenderer.State> {

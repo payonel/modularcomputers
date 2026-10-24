@@ -18,7 +18,7 @@ import net.minecraft.world.level.Level;
 
 /**
  * Bluetooth. A card links to a <em>board</em>, not to another card: each block that can hold
- * Bluetooth cards (a computer, an expansion hub, a screen, a robotic piston, a paint gun) has its
+ * Bluetooth cards (a computer, an expansion hub, a screen, a robotic piston) has its
  * own board id, and a card's link ({@link ModComponents#BLUETOOTH_LINK}) names one. Many cards
  * can link to the same board, and that board's own cards can link on, so links daisy-chain. A
  * link joins the two blocks like a cable.

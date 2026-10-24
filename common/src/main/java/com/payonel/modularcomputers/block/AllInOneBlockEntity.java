@@ -87,8 +87,7 @@ import net.minecraft.world.level.storage.ValueOutput;
  * view. Drives and cards join the physical bus after the built-ins, then the screens wired to
  * it by cable, in an order the player can change (the bus order panel), where cabled devices
  * can also be disconnected. Power, the parts, the bus order, display contents and the console
- * state are saved and synced to clients. Only the CPU and EEPROM affect the machine so far;
- * RAM and the UPS battery are placeholders.
+ * state are saved and synced to clients.
  */
 public final class AllInOneBlockEntity extends BlockEntity implements MenuProvider, DisplayHost, Bluetooth.Holder {
 	private static final String POWERED = "powered";
@@ -673,7 +672,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 
 	/**
 	 * Finds the devices wired to this computer (screens, the cards in expansion hubs, robotic
-	 * pistons, paint guns) and puts them on the bus.
+	 * pistons, Disk Stations, photomasks) and puts them on the bus.
 	 */
 	private void scanCables() {
 		List<Cabled> found = new ArrayList<>();
@@ -701,8 +700,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 				}
 			} else if (block instanceof RoboticPistonBlockEntity piston) {
 				addCabled(found, devices, new Cabled(Motherboard.id(piston.id()), at.pos(), at.meters(), at.wireless(), paired, piston.getBlockState().getBlock().asItem(), -1), piston.device());
-			} else if (block instanceof PaintGunBlockEntity gun) {
-				addCabled(found, devices, new Cabled(Motherboard.id(gun.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
 			} else if (block instanceof DiskStationBlockEntity station) {
 				String host = Motherboard.id(station.id());
 				addCabled(found, devices, new Cabled(host, at.pos(), at.meters(), at.wireless(), paired, ModBlocks.DISK_STATION.asItem(), -1), station.device());
@@ -958,6 +955,20 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 				int slot = CaseMenu.EXP_SLOTS + lane;
 				cards[lane].labelFrom(() -> ModComponents.label(parts.getItem(slot))); // read from the card itself
 				cards[lane].idFrom(() -> serial(slot));
+				if (cards[lane] instanceof com.payonel.modularcomputers.device.BluetoothCard bluetooth) {
+					// Its link lives on the card itself; a program's change is a link made, as by hand.
+					bluetooth.linkIn(() -> parts.getItem(slot).get(ModComponents.BLUETOOTH_LINK), id -> {
+						if (id == null) {
+							parts.getItem(slot).remove(ModComponents.BLUETOOTH_LINK);
+						} else {
+							parts.getItem(slot).set(ModComponents.BLUETOOTH_LINK, id);
+						}
+						markChanged();
+						updateBluetooth();
+						Cabling.changed(); // (what's linked, so what's reached, changed)
+					});
+					bluetooth.boardFrom(this::boardId);
+				}
 			}
 			board.plug(Motherboard.exp(lane), cards[lane], serial(CaseMenu.EXP_SLOTS + lane));
 		}

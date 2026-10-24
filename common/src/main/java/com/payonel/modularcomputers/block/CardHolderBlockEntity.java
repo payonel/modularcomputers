@@ -36,7 +36,7 @@ import net.minecraft.world.level.storage.ValueOutput;
 
 /**
  * A block on the network with card slots inside: the screen, the expansion hub, the robotic
- * piston, the paint gun. Each has a <em>radio slot</em>, the only slot that takes a Bluetooth
+ * piston. Each has a <em>radio slot</em>, the only slot that takes a Bluetooth
  * card. The card is its radio: other cards can link to this block's board. When the card itself
  * links somewhere, the block is paired with that board (a computer, or a hub): only the
  * computers that have that board see it (see {@link Bluetooth#pairedTo}), though it still

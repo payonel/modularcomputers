@@ -18,7 +18,7 @@ import net.minecraft.world.level.block.Block;
 /**
  * The card slots of a block on the network, above the player's inventory: an expansion hub's
  * four expansion slots, and every holder's radio slot (a Bluetooth card, which pairs the block
- * with one computer). Screens, robotic pistons and paint guns have just the radio slot.
+ * with one computer). Screens and robotic pistons have just the radio slot.
  */
 public final class CardHolderMenu extends AbstractContainerMenu {
 	public static final int SLOT_Y = 35;
@@ -86,14 +86,6 @@ public final class CardHolderMenu extends AbstractContainerMenu {
 
 	public static CardHolderMenu screen(int id, Inventory inventory, BlockPos pos) {
 		return screen(id, inventory, new SimpleContainer(1), pos, ContainerLevelAccess.NULL);
-	}
-
-	public static CardHolderMenu paintGun(int id, Inventory inventory, Container cards, BlockPos pos, ContainerLevelAccess access) {
-		return new CardHolderMenu(ModMenus.PAINT_GUN, id, inventory, cards, 0, pos, access, ModBlocks.PAINT_GUN);
-	}
-
-	public static CardHolderMenu paintGun(int id, Inventory inventory, BlockPos pos) {
-		return paintGun(id, inventory, new SimpleContainer(1), pos, ContainerLevelAccess.NULL);
 	}
 
 	public int radioSlot() {

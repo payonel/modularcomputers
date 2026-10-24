@@ -184,21 +184,6 @@ public class CardHolderGameTest {
 	}
 
 	@GameTest
-	public void aPaintGunIsOnTheBusAndTakesNoCableAtItsNozzle(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper);
-		cable(helper, new BlockPos(2, 1, 1));
-		helper.setBlock(new BlockPos(3, 1, 1), ModBlocks.PAINT_GUN.defaultBlockState().setValue(com.payonel.modularcomputers.block.PaintGunBlock.FACING, Direction.WEST));
-		helper.assertBlockProperty(new BlockPos(2, 1, 1), CableBlock.EAST, false); // the nozzle faces the cable
-		helper.setBlock(new BlockPos(3, 1, 1), ModBlocks.PAINT_GUN.defaultBlockState().setValue(com.payonel.modularcomputers.block.PaintGunBlock.FACING, Direction.UP));
-		helper.assertBlockProperty(new BlockPos(2, 1, 1), CableBlock.EAST, true);
-		helper.succeedWhen(() -> {
-			var entries = computer.busEntries().stream().filter(AllInOneBlockEntity.BusEntry::cabled).toList();
-			helper.assertValueEqual(entries.stream().map(entry -> entry.name().getString()).toList(), List.of("Paint Gun"), "the paint gun is listed");
-			helper.assertTrue(computer.machine().board().bus().devices().stream().anyMatch(device -> device.type() == DeviceType.ACTUATOR), "on the bus");
-		});
-	}
-
-	@GameTest
 	public void aScreensBackOpensItsRadioSlotAndItsFrontTheDisplay(GameTestHelper helper) {
 		helper.setBlock(new BlockPos(1, 1, 1), ModBlocks.TIER3_SCREEN.defaultBlockState().setValue(ScreenBlock.FACING, Direction.SOUTH));
 		var player = GameTests.serverPlayer(helper);

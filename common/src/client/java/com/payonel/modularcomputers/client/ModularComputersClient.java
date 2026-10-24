@@ -69,7 +69,6 @@ public final class ModularComputersClient {
 		renderers.register(ModBlocks.SCREEN_ENTITY, context -> new DisplayRenderer<>(context, DisplayRenderer.SCREEN));
 		renderers.register(ModBlocks.EXPANSION_HUB_ENTITY, context -> new OutlineRenderer<>());
 		renderers.register(ModBlocks.ROBOTIC_PISTON_ENTITY, context -> new OutlineRenderer<>());
-		renderers.register(ModBlocks.PAINT_GUN_ENTITY, context -> new OutlineRenderer<>());
 		renderers.register(ModBlocks.PHOTOMASK_ENTITY, context -> new PhotomaskRenderer());
 	}
 
@@ -78,7 +77,6 @@ public final class ModularComputersClient {
 		screens.register(ModMenus.EXPANSION_HUB, CardHolderScreen::new);
 		screens.register(ModMenus.ROBOTIC_PISTON, CardHolderScreen::new);
 		screens.register(ModMenus.SCREEN, CardHolderScreen::new);
-		screens.register(ModMenus.PAINT_GUN, CardHolderScreen::new);
 		screens.register(ModMenus.PHOTOMASK, PhotomaskScreen::new);
 		screens.register(ModMenus.DISK_STATION, com.payonel.modularcomputers.client.screen.DiskStationScreen::new);
 	}
