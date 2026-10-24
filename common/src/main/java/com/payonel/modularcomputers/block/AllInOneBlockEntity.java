@@ -803,6 +803,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	private Card cardHere(CardKind kind) {
 		Card card = com.payonel.modularcomputers.device.Cards.make(kind);
 		card.onChange(this::markChanged);
+		card.frontFrom(() -> com.payonel.modularcomputers.device.Face.of(getBlockState().getValue(AllInOneBlock.FACING).getName()));
 		if (card instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
 			redstone.block(side -> CardWorld.redstone(java.util.Arrays.stream(cards).filter(java.util.Objects::nonNull).toList(), side));
 			redstone.onOutput(() -> {

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 /** A redstone card's faces, as programs see and set them (user design, 2026-10-21). */
 class RedstoneCardTest {
 	private static final int NORTH = 0;
-	private static final int BOTTOM = 5;
+	private static final int DOWN = 5;
 
 	private final RedstoneCard card = new RedstoneCard();
 
@@ -29,7 +29,7 @@ class RedstoneCardTest {
 	void everyFaceHasItsLevelAndWhatItPutsOut() {
 		card.sense(NORTH, 6);
 		var sides = sides(card.get(args()).first());
-		assertThat(sides.keySet()).containsExactly("north", "south", "east", "west", "top", "bottom");
+		assertThat(sides.keySet()).containsExactly("north", "south", "east", "west", "up", "down");
 		assertThat(sides.get("north")).containsEntry("level", 6L).containsEntry("powered", 0L);
 	}
 
@@ -47,8 +47,8 @@ class RedstoneCardTest {
 
 	@Test
 	void aCardReadsWhatTheOtherCardsInItsBlockPutOut() {
-		card.block(side -> side == BOTTOM ? 15 : 0); // another card in the block puts out 15 below
-		assertThat(sides(card.get(args()).first()).get("bottom")).containsEntry("level", 15L).containsEntry("powered", 0L);
+		card.block(side -> side == DOWN ? 15 : 0); // another card in the block puts out 15 below
+		assertThat(sides(card.get(args()).first()).get("down")).containsEntry("level", 15L).containsEntry("powered", 0L);
 	}
 
 	@Test
@@ -62,13 +62,13 @@ class RedstoneCardTest {
 		Map<Object, Object> keyed = new LinkedHashMap<>();
 		keyed.put("north", Map.of("powered", 3L)); // its fields aren't filters
 		assertThat(sides(card.get(args(keyed)).first()).keySet()).containsExactly("north");
-		assertThat(sides(card.get(args(List.of("top", "west"))).first()).keySet()).containsExactly("top", "west");
+		assertThat(sides(card.get(args(List.of("up", "west"))).first()).keySet()).containsExactly("up", "west");
 	}
 
 	@Test
 	void aBadTableChangesNothing() {
-		assertThatThrownBy(() -> card.set(args(Map.of("north", Map.of("powered", 3L), "up", Map.of("powered", 1L)))))
-			.hasMessageContaining("no such side: up");
+		assertThatThrownBy(() -> card.set(args(Map.of("north", Map.of("powered", 3L), "sideways", Map.of("powered", 1L)))))
+			.hasMessageContaining("no such face: sideways");
 		assertThatThrownBy(() -> card.set(args(Map.of("north", Map.of("powered", 2.5))))).hasMessageContaining("powered: integer expected");
 		assertThat(card.output(NORTH)).isZero();
 	}
@@ -95,13 +95,24 @@ class RedstoneCardTest {
 	void anyChangeToAFaceIsAnEventFromWhereverItCame() {
 		card.accepting(true);
 		int[] block = {0};
-		card.block(side -> side == BOTTOM ? block[0] : 0);
+		card.block(side -> side == DOWN ? block[0] : 0);
 		card.set(args(Map.of("north", Map.of("powered", 5L))));
 		assertThat(card.pull(args()).first()).as("its own set").isEqualTo(Map.of("name", "redstone", "side", "north", "level", 5L, "powered", 5L));
 		block[0] = 12; // another card in the block puts out 12 below
 		card.report();
-		assertThat(card.pull(args()).first()).as("another card's").isEqualTo(Map.of("name", "redstone", "side", "bottom", "level", 12L, "powered", 0L));
-		card.sense(BOTTOM, 3); // weaker than what's there: no change
+		assertThat(card.pull(args()).first()).as("another card's").isEqualTo(Map.of("name", "redstone", "side", "down", "level", 12L, "powered", 0L));
+		card.sense(DOWN, 3); // weaker than what's there: no change
 		assertThat(card.pull(args()).first()).isNull();
+	}
+
+	@Test
+	void aFaceIsNamedByTheWorldsNameOrByItsBlocksFront() {
+		card.frontFrom(() -> Face.EAST); // (its case faces east: its left is north)
+		card.set(args(Map.of("front", Map.of("powered", 4L), "left", Map.of("powered", 2L))));
+		assertThat(card.output(2)).as("east, its front").isEqualTo(4);
+		assertThat(card.output(NORTH)).as("north, its left").isEqualTo(2);
+		assertThat(sides(card.get(args(List.of("front"))).first()).keySet()).as("answered by the world's names").containsExactly("east");
+		card.frontFrom(() -> null); // (in a hub: no front)
+		assertThatThrownBy(() -> card.set(args(Map.of("back", Map.of("powered", 1L))))).hasMessageContaining("no front");
 	}
 }

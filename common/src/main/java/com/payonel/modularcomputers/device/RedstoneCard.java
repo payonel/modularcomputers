@@ -30,8 +30,8 @@ import java.util.function.IntUnaryOperator;
  * detected, so it's ignored). A change costs power; without power, it puts out nothing.
  */
 public final class RedstoneCard extends Card {
-	/** The faces, as programs name them. */
-	public static final List<String> SIDES = List.of("north", "south", "east", "west", "top", "bottom");
+	/** The faces, in its order (as {@code CardWorld.REDSTONE_FACES}); programs name them as {@link Face} does. */
+	public static final List<Face> SIDES = List.of(Face.NORTH, Face.SOUTH, Face.EAST, Face.WEST, Face.UP, Face.DOWN);
 	/** A redstone signal's strength, at most (Minecraft's 0 to 15). */
 	public static final int MAX_SIGNAL = 15;
 	/** What changing a face's signal costs: a tick of a running CPU. */
@@ -95,7 +95,7 @@ public final class RedstoneCard extends Card {
 				reported[side][1] = output[side];
 				Map<String, Object> event = new LinkedHashMap<>();
 				event.put("name", "redstone");
-				event.put("side", SIDES.get(side));
+				event.put("side", SIDES.get(side).id());
 				event.put("level", (long) level);
 				event.put("powered", (long) output[side]);
 				changed();
@@ -104,7 +104,7 @@ public final class RedstoneCard extends Card {
 		}
 	}
 
-	@Method(doc = "get([sides]): every face as {level (the signal there, coming in or put out by the block's cards), powered (this card's)} by name (north, south, east, west, top, bottom); with a table, only the faces it names (as keys or as a list)")
+	@Method(doc = "get([sides]): every face as {level (the signal there, coming in or put out by the block's cards), powered (this card's)} by name (north, south, east, west, up, down; front, back, left and right are taken too, as the block faces); with a table, only the faces it names (as keys or as a list)")
 	public Result get(Arguments args) {
 		Map<?, ?> asked = args.optTable(0);
 		return Result.ok(sides(asked == null ? allSides() : named(asked)));
@@ -116,12 +116,12 @@ public final class RedstoneCard extends Card {
 		for (Map.Entry<?, ?> entry : args.checkTable(0).entrySet()) {
 			int side = side(entry.getKey());
 			if (!(entry.getValue() instanceof Map<?, ?> fields)) {
-				throw new Arguments.ArgumentError(SIDES.get(side) + ": table expected");
+				throw new Arguments.ArgumentError(SIDES.get(side).id() + ": table expected");
 			}
 			Object value = fields.get("powered");
 			if (value != null) {
 				if (!(value instanceof Long || value instanceof Double d && d == Math.rint(d))) {
-					throw new Arguments.ArgumentError(SIDES.get(side) + ": powered: integer expected");
+					throw new Arguments.ArgumentError(SIDES.get(side).id() + ": powered: integer expected");
 				}
 				settings.put(side, (int) Math.clamp(((Number) value).longValue(), 0, MAX_SIGNAL));
 			}
@@ -148,12 +148,8 @@ public final class RedstoneCard extends Card {
 		return Result.ok(events.pull());
 	}
 
-	private static int side(Object name) {
-		int side = name instanceof String text ? SIDES.indexOf(text) : -1;
-		if (side < 0) {
-			throw new Arguments.ArgumentError("no such side: " + name);
-		}
-		return side;
+	private int side(Object name) {
+		return SIDES.indexOf(face(name));
 	}
 
 	private static Set<Integer> allSides() {
@@ -165,7 +161,7 @@ public final class RedstoneCard extends Card {
 	}
 
 	/** The faces a table names: its string keys, and the names in its list (other values ignored: not filters). */
-	private static Set<Integer> named(Map<?, ?> table) {
+	private Set<Integer> named(Map<?, ?> table) {
 		Set<Integer> sides = new LinkedHashSet<>();
 		for (Map.Entry<?, ?> entry : table.entrySet()) {
 			sides.add(side(entry.getKey() instanceof String ? entry.getKey() : entry.getValue()));
@@ -179,7 +175,7 @@ public final class RedstoneCard extends Card {
 			Map<String, Object> fields = new LinkedHashMap<>();
 			fields.put("level", (long) level(side));
 			fields.put("powered", (long) output[side]);
-			sides.put(SIDES.get(side), fields);
+			sides.put(SIDES.get(side).id(), fields);
 		}
 		return sides;
 	}

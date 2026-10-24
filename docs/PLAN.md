@@ -64,25 +64,31 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   - **Actions** (GUI buttons on the left, in the mod's look; the same as methods): format a
     standard filesystem (hfs); remove the filesystem (raw); clone the source onto the target
     (its mode and contents; refused when they don't fit); install mcos (wipe, then the mod's
-    latest mcos); update mcos (the mod's files written over, everything else left). Every action
+    latest mcos); update mcos (the mod's files written over, everything else left; `/etc` too, not
+    protected: an update is how a player fixes an install). Every action
     that clears files removes them from the host too.
   - **Eject** pushes a disk out of the station's eject face (into a container there, as a
     dropper does), the front by default. The API matches the GUI: `eject()` uses the configured
     face, and the face has its own methods (`getEjectFace`, `setEjectFace`); the GUI sets it in
     the gear-box tab's side picker (Thermal's, Mekanism's, Ender IO's way).
-  - **Open:** whether update mcos keeps a changed `/etc` file (as package managers keep config:
-    the new one written beside it as `.new`) or replaces it; whether other programs ever install
-    from it (copied in, not formatted) or everything ships in mcos; its recipe and tiers.
+  - **Closing the GUI never ejects**: a disk stays in until ejected.
+  - **Recipe:** chips across the top; emerald, a tier 1 disk, emerald across the middle; iron
+    block, piston, iron block across the bottom. Its hint says the disk used loses its files. Its
+    look: iron and emerald, with a chip board on top.
+  - **Open:** whether other programs ever install from it (copied in, not formatted) or everything
+    ships in mcos; tiers.
+- **What a block holds, shown on it** (user): a miniature of each thing in a block's slots, drawn
+  on the block in the world (the Disk Station's disks), on every block that holds objects, maybe
+  even the case (its parts).
 - **Raw disks by byte offset** (user, decided): a raw disk is read and written at any byte offset
   (`write(offset, data)`: the bytes written, bounded by its size; `read(offset, n)`), replacing
   `readSector`/`writeSector`; an hfs disk refuses both. The user's call over real disks' sectors
   (ATA/NVMe LBAs; OC used sectors too): sectors don't make programs better. Byte-addressed storage
   is real elsewhere (NVDIMM, persistent memory), and the hfs refusal is real too (a mounted
   filesystem owns its disk).
-- **Faces named by strings, a concern** (user): APIs name faces as strings (`"north"`, a redstone
-  card's, an eject face's). Fine for now; open whether names should be constants instead (Lua has
-  no enums: a table of names, as OC's `sides`), and whether faces should be relative to the block
-  (front, left: ComputerCraft's way) or the world's (north: Minecraft's `Direction`).
+- **Faces as constants, open** (user's concern): faces are strings (`"north"`, `"front"`: `Face`);
+  open whether programs should have names as constants too (Lua has no enums: a table, as OC's
+  `sides`).
 - **A bell:** terminals ignore BEL, and a full key queue drops keys silently, where a real keyboard
   beeps.
 - **Beep codes:** audible boot errors for headless machines.

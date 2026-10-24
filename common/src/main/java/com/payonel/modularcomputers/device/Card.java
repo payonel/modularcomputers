@@ -37,6 +37,25 @@ public class Card implements Device {
 		return id.get();
 	}
 
+	/** Where its block's front is (null: the block has none), read when asked: the block can turn. */
+	private java.util.function.Supplier<Face> front = () -> null;
+
+	public void frontFrom(java.util.function.Supplier<Face> front) {
+		this.front = front;
+	}
+
+	/** The face a program named (the world's name, or one relative to its block's front: {@link Face}). */
+	protected Face face(Object name) {
+		if (!(name instanceof String text)) {
+			throw new com.payonel.modularcomputers.runtime.Arguments.ArgumentError("a face's name expected, got " + name);
+		}
+		try {
+			return Face.named(text, front.get());
+		} catch (IllegalArgumentException e) {
+			throw new com.payonel.modularcomputers.runtime.Arguments.ArgumentError(e.getMessage());
+		}
+	}
+
 	@Override
 	public String label() {
 		return label.get();

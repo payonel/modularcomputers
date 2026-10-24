@@ -158,7 +158,7 @@ public class CardGameTest {
 		java.util.Map<Runnable, net.minecraft.world.level.chunk.LevelChunk> changes = new java.util.LinkedHashMap<>();
 		changes.put(() -> screen.terminal().press("a"), screenChunk);
 		changes.put(() -> screen.terminal().read(args()), screenChunk);
-		changes.put(() -> card.set(args(Map.of("top", Map.of("powered", 3L)))), hubChunk);
+		changes.put(() -> card.set(args(Map.of("up", Map.of("powered", 3L)))), hubChunk);
 		changes.put(() -> card.sense(0, 5), hubChunk);
 		changes.put(() -> card.pull(args()), hubChunk);
 		changes.forEach((change, chunk) -> {

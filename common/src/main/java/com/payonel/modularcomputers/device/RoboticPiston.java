@@ -8,7 +8,6 @@ import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * A robotic piston on the bus (user design, 2026-10-13): it pushes on any of its six faces but the
@@ -17,8 +16,12 @@ import java.util.Locale;
  * move costs power, whether it moved anything or not; extending an arm that's out already is free.
  */
 public final class RoboticPiston implements Device {
-	/** The sides, as programs name them (world directions). */
-	public static final List<String> SIDES = List.of("down", "up", "north", "south", "west", "east");
+	/** Where its front is: the face opposite its cable port (null until its block says). */
+	private java.util.function.Supplier<Face> front = () -> null;
+
+	public void frontFrom(java.util.function.Supplier<Face> front) {
+		this.front = front;
+	}
 	/** What a push costs, moved or not: five ticks of a running CPU. */
 	public static final int PUSH_COST = 5 * PowerUnits.CPU;
 	public static final String CANNOT_PUSH = "cannot push";
@@ -69,7 +72,7 @@ public final class RoboticPiston implements Device {
 		this.arms = arms;
 	}
 
-	@Method(doc = "push(side): pushes as a piston does on that side (down, up, north, south, west or east), and the arm comes back on its own; true, or false and \"cannot push\" (the cable's side, an arm out there, or something that won't move)")
+	@Method(doc = "push(side): pushes as a piston does on that side (north, south, east, west, up or down; or front, back, left, right: its front is opposite its cable), and the arm comes back on its own; true, or false and \"cannot push\" (the cable's side, an arm out there, or something that won't move)")
 	public Result push(Arguments args) {
 		return move(args, Motion.PUSH);
 	}
@@ -85,9 +88,11 @@ public final class RoboticPiston implements Device {
 	}
 
 	private Result move(Arguments args, Motion motion) {
-		String side = args.checkString(0).toLowerCase(Locale.ROOT);
-		if (!SIDES.contains(side)) {
-			return Result.fail("no such side: " + side);
+		String side;
+		try {
+			side = Face.named(args.checkString(0), front.get()).id();
+		} catch (IllegalArgumentException e) {
+			return Result.fail(e.getMessage());
 		}
 		Moved moved = arms.move(side, motion);
 		if (moved != Moved.ALREADY_OUT) {

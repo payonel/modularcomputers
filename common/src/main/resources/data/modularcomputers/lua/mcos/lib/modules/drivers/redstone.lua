@@ -2,7 +2,7 @@
 -- taking effect at once). A read gives a line a face, "face level powered", in the card's order
 -- (north 7 7: 7 there, 7 of it this card's); a line written, "face powered", sets that face
 -- (north 11).
-local FACES = {"north", "south", "east", "west", "top", "bottom"}
+local FACES = {"north", "south", "east", "west", "up", "down"}
 
 return {
   get = function(faces)

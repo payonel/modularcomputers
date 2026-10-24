@@ -25,6 +25,8 @@ public final class RoboticPistonBlockEntity extends CardHolderBlockEntity {
 
 	public RoboticPistonBlockEntity(BlockPos pos, BlockState state) {
 		super(ModBlocks.ROBOTIC_PISTON_ENTITY, pos, state, 1);
+		// Its front is opposite its cable port (its block's facing).
+		device.frontFrom(() -> com.payonel.modularcomputers.device.Face.of(getBlockState().getValue(RoboticPistonBlock.FACING).getOpposite().getName()));
 		// Device calls come on the server thread: its arms move in the world right then.
 		device.moveWith((side, motion) -> {
 			net.minecraft.core.Direction direction = net.minecraft.core.Direction.byName(side);

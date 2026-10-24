@@ -114,13 +114,25 @@ what the game can't do:
   run on both. **Client tests run on Fabric only**: NeoForge has no client test harness (the one
   port of Fabric's found was unlicensed and abandoned).
 
+### Faces
+
+Every device that takes a face takes it through `Face` (the user's rule for every device, now and
+to come): the world's names (`north`, `south`, `east`, `west`, `up`, `down`: Minecraft's own) or
+names relative to the block's front (`front`, `back`, `left`, `right`, left and right as the block
+sees them looking out of its front: ComputerCraft's), so a program written for a block works however
+it's turned, and configurations compose. A block with no front (an expansion hub) takes only the
+world's names; devices answer with the world's names. A block tells its devices where its front is
+(`Card.frontFrom`): a case's is its facing, a robotic piston's is opposite its cable port.
+
 ### The look
 
 Blocks, items and their GUIs share one aesthetic, and new ones keep to it: a GUI shows the device's
 own insides as real hardware would look (the case view is its motherboard: a green board, gold
 traces, sockets and latches, silkscreen labels in the game's font), its controls are that
 hardware's parts (switches, LEDs, meters), and every texture comes from the scripts in
-`scripts/art/` with their shared palette.
+`scripts/art/` with their shared palette. Every item has a hint (`Hinted`): a summary in its
+tooltip, and with Shift held, details above the crafting grid of how it works and what crafting
+it does (a disk used in a recipe loses its files).
 
 ### Items
 

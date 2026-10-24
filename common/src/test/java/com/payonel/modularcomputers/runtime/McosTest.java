@@ -335,7 +335,7 @@ class McosTest {
 		untilFile(root().resolve("done"), "");
 		assertThat(card.output(0)).as("north, as written").isEqualTo(11);
 		assertThat(read(root().resolve("r"))).as("a line a face: face level powered")
-			.isEqualTo("north 11 11\nsouth 0 0\neast 0 0\nwest 0 0\ntop 0 0\nbottom 0 0\n");
+			.isEqualTo("north 11 11\nsouth 0 0\neast 0 0\nwest 0 0\nup 0 0\ndown 0 0\n");
 		assertThat(read(root().resolve("err"))).as("a line that isn't \"face powered\": the write fails").isNotEmpty();
 		assertThat(card.output(0)).isEqualTo(11);
 	}

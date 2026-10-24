@@ -71,7 +71,7 @@ class SavedStateTest {
 		loaded.restore(card.saved());
 		assertThat(loaded.output(0)).isEqualTo(7);
 		assertThat(loaded.pull(args()).first()).as("its own change, first").isEqualTo(Map.of("name", "redstone", "side", "north", "level", 7L, "powered", 7L));
-		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("name", "redstone", "side", "bottom", "level", 9L, "powered", 0L));
+		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("name", "redstone", "side", "down", "level", 9L, "powered", 0L));
 		loaded.sense(5, 9);
 		assertThat(loaded.pull(args()).first()).as("the same signal after a load is no change").isNull();
 	}
