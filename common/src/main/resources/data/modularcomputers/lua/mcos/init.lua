@@ -74,7 +74,7 @@ end
 -- A device type's driver (lib/modules/drivers/<type>.lua), loaded when it's first needed, as Linux
 -- finds a device's module on disk: nil when the boot disk has none.
 function k.driver(kind)
-  if not kind:match("^%w+$") then
+  if not kind:match("^[%w_]+$") then -- (a name, never a path)
     return nil
   end
   local path = MODULES .. "drivers/" .. kind .. ".lua"

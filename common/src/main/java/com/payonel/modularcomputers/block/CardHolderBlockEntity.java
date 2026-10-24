@@ -99,6 +99,16 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements MenuP
 		return radioCard().has(ModComponents.BLUETOOTH_LINK);
 	}
 
+	/** Whether what goes in a slot gets a serial number (its identity from now on): every slot's but the radio's. */
+	protected boolean stamps(int slot) {
+		return slot != radioSlot();
+	}
+
+	/** The sound of a slot's item going in or out: a card's. */
+	protected net.minecraft.sounds.SoundEvent sound(int slot, boolean inserted) {
+		return inserted ? ModSounds.CARD_INSERT : ModSounds.CARD_REMOVE;
+	}
+
 	/** The cards changed: rebuild whatever they make. Runs on both sides, and after loading. */
 	protected void cardsChanged() {
 	}
@@ -150,7 +160,7 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements MenuP
 		}
 		for (int slot = 0; slot < cards.getContainerSize(); slot++) {
 			ItemStack card = cards.getItem(slot);
-			if (slot != radioSlot() && !card.isEmpty()) {
+			if (stamps(slot) && !card.isEmpty()) {
 				ModComponents.serial(card); // its identity from now on, whatever slot it's in
 			}
 		}
@@ -158,7 +168,7 @@ public abstract class CardHolderBlockEntity extends BlockEntity implements MenuP
 			boolean had = last[slot] != null && !last[slot].isEmpty();
 			boolean has = !cards.getItem(slot).isEmpty();
 			if (has != had) {
-				level.playSound(null, worldPosition, has ? ModSounds.CARD_INSERT : ModSounds.CARD_REMOVE, SoundSource.BLOCKS, 0.8f, 1.0f);
+				level.playSound(null, worldPosition, sound(slot, has), SoundSource.BLOCKS, 0.8f, 1.0f);
 			}
 		}
 		remember();

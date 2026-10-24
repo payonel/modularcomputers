@@ -444,7 +444,12 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	public void setLevel(Level level) {
 		super.setLevel(level);
 		if (level instanceof ServerLevel server) {
-			machine.setServer(server.getServer()); // a Lua CPU's calls are carried out on the server thread, as soon as it can
+			// A Lua CPU's calls are carried out on the server thread, as soon as it can: always queued for it.
+			// (The server's own execute runs a task right there, on the CPU's thread, once the server is
+			// stopping: the task then touched the world off its thread and waited on a chunk the stopping
+			// server was saving, while the save waited for this computer: neither ever went on.)
+			var minecraft = server.getServer();
+			machine.setServer(task -> minecraft.schedule(minecraft.wrapRunnable(task)));
 			// Loaded before it had a level: its disks find their data now.
 			java.util.Arrays.fill(diskSerials, null);
 			installParts();
@@ -691,6 +696,16 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 				addCabled(found, devices, new Cabled(Motherboard.id(piston.id()), at.pos(), at.meters(), at.wireless(), paired, piston.getBlockState().getBlock().asItem(), -1), piston.device());
 			} else if (block instanceof PaintGunBlockEntity gun) {
 				addCabled(found, devices, new Cabled(Motherboard.id(gun.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
+			} else if (block instanceof DiskStationBlockEntity station) {
+				addCabled(found, devices, new Cabled(Motherboard.id(station.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.DISK_STATION.asItem(), -1), station.device());
+				// Its disks, each by its serial number (the source only read).
+				for (int slot : new int[] {DiskStationBlockEntity.TARGET, DiskStationBlockEntity.SOURCE}) {
+					UUID serial = station.cards().getItem(slot).get(ModComponents.SERIAL);
+					if (serial != null && station.disk(slot) != null) {
+						addCabled(found, devices, new Cabled(Motherboard.id(serial), at.pos(), at.meters(), at.wireless(), paired,
+							station.cards().getItem(slot).getItem(), -1), station.disk(slot));
+					}
+				}
 			} else if (block instanceof PhotomaskBlockEntity mask) {
 				addCabled(found, devices, new Cabled(Motherboard.id(mask.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PHOTOMASK.asItem(), -1), mask.device());
 			}
@@ -837,21 +852,31 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	 * them the first time its folder is made, from the mod's Lua files; then the mark goes.
 	 */
 	private void imageDisk(ItemStack stack, java.nio.file.Path folder) {
+		if (imageDisk(stack, folder, level == null ? 0 : level.getGameTime())) {
+			markChanged(); // (from setLevel too, as its chunk loads: never setChanged, which waits for the chunk)
+		}
+	}
+
+	/**
+	 * A disk that comes with files gets them the first time its folder is made (a case's or a Disk
+	 * Station's), made at the world's time {@code ticks}; then the mark goes. Whether it went.
+	 */
+	public static boolean imageDisk(ItemStack stack, java.nio.file.Path folder, long ticks) {
 		String image = stack.get(ModComponents.DISK_IMAGE);
 		if (image == null) {
-			return;
+			return false;
 		}
 		if (!java.nio.file.Files.exists(folder)) {
 			try {
 				com.payonel.modularcomputers.machine.LuaScripts.copyTree(image, folder);
-				com.payonel.modularcomputers.device.Disk.stampAll(folder, level == null ? 0 : level.getGameTime()); // (made now, in the world's time)
+				com.payonel.modularcomputers.device.Disk.stampAll(folder, ticks); // (made now, in the world's time)
 			} catch (RuntimeException e) {
 				com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A disk didn't get its {} files", image, e);
-				return;
+				return false;
 			}
 		}
 		stack.remove(ModComponents.DISK_IMAGE);
-		markChanged(); // (from setLevel too, as its chunk loads: never setChanged, which waits for the chunk)
+		return true;
 	}
 
 	public static java.nio.file.Path diskFolder(net.minecraft.server.MinecraftServer server, UUID id) {

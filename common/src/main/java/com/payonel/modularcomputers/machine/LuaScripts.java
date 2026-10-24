@@ -25,22 +25,41 @@ public final class LuaScripts {
 	 * {@code target}, as they are, folders and all: a disk that comes with files gets them this way.
 	 */
 	public static void copyTree(String name, java.nio.file.Path target) {
+		copyTree(name, target, false);
+	}
+
+	/**
+	 * {@link #copyTree(String, java.nio.file.Path)}, writing over files already there when
+	 * {@code replace} (an update: everything else on the disk is left). Returns what it wrote: the
+	 * files, and the folders it made.
+	 */
+	public static java.util.List<java.nio.file.Path> copyTree(String name, java.nio.file.Path target, boolean replace) {
 		String folder = ROOT + name;
 		java.util.List<String> files = Platform.INSTANCE.files(folder);
 		if (files.isEmpty()) {
 			throw new IllegalStateException("no Lua files " + folder + " in the mod");
 		}
+		java.util.List<java.nio.file.Path> written = new java.util.ArrayList<>();
 		try {
 			for (String file : files) {
 				java.nio.file.Path to = target.resolve(file);
+				for (java.nio.file.Path dir = to.getParent(); dir != null && dir.startsWith(target) && !java.nio.file.Files.exists(dir); dir = dir.getParent()) {
+					written.add(0, dir);
+				}
 				java.nio.file.Files.createDirectories(to.getParent());
 				try (InputStream in = LuaScripts.class.getResourceAsStream(folder + "/" + file)) {
-					java.nio.file.Files.copy(in, to);
+					if (replace) {
+						java.nio.file.Files.copy(in, to, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+					} else {
+						java.nio.file.Files.copy(in, to);
+					}
 				}
+				written.add(to);
 			}
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
+		return written;
 	}
 
 		/** {@code name}'s script ({@code "eeprom/hello"} is {@code eeprom/hello.lua}). A missing one is a bug in the mod. */

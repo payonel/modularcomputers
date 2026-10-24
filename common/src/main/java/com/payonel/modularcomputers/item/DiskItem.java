@@ -29,6 +29,11 @@ public final class DiskItem extends HintedItem {
 	@Override
 	public void onCraftedBy(ItemStack stack, net.minecraft.world.entity.player.Player player) {
 		super.onCraftedBy(stack, player);
+		eraseWiped(stack, player);
+	}
+
+	/** A crafted item that used a disk up (or a disk crafted alone): that disk's files go, now, on the server. */
+	public static void eraseWiped(ItemStack stack, net.minecraft.world.entity.player.Player player) {
 		java.util.UUID wiped = stack.get(ModComponents.WIPED);
 		if (wiped == null) {
 			return;

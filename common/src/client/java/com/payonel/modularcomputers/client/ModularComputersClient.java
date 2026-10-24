@@ -80,6 +80,7 @@ public final class ModularComputersClient {
 		screens.register(ModMenus.SCREEN, CardHolderScreen::new);
 		screens.register(ModMenus.PAINT_GUN, CardHolderScreen::new);
 		screens.register(ModMenus.PHOTOMASK, PhotomaskScreen::new);
+		screens.register(ModMenus.DISK_STATION, com.payonel.modularcomputers.client.screen.DiskStationScreen::new);
 	}
 
 	/** How a tooltip's extra content draws: a hint's crafting grid; null for anything else's. */

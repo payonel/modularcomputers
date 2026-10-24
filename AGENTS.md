@@ -246,6 +246,21 @@ never follows them, the OS's VFS does. A raw disk is read and written at any byt
 better); an hfs disk refuses those, its filesystem owning it. mcos's files are copied onto a disk once, when it's first
 made: a world's disks keep their old mcos; tests copy afresh.
 
+### The Disk Station
+
+A dock for disks (`DiskStationBlockEntity`, its device `DiskStation`), to format, wipe, clone and
+install them without crafting a disk alone, as a drive duplicator does. Its target disk is the one
+it works on; its source, optional, is only read (a forensic dock's write blocker), for cloning. Both
+disks, and the station itself, are on the bus of the computers wired to it. Every action is a method,
+a line written to its `/dev` file and a GUI switch alike: format (hfs), wipe (raw), clone, install
+mcos (formatted, then the mod's latest), update mcos (the mod's files written over, `/etc` too: an
+update is how a player fixes an install). An action is paid from the bus's power while a running
+computer supplies it, else from its battery. Eject pushes a disk out of its eject face (the block's
+state, a slot drawn there; its front at first), into a container there as a dropper does, or out
+into the world; the face is set apart (`setEjectFace`, the GUI's unfolded box), never by eject
+itself. Closing its GUI never ejects. Its recipe uses a disk up, and that disk's files go
+(`DiskUsingRecipe`, as crafting a disk alone does).
+
 ### mcos
 
 - **mcos follows Linux.** The kernel owns every resource and runs only on its own coroutine;
@@ -330,6 +345,12 @@ made: a world's disks keep their old mcos; tests copy afresh.
 - **A new cabled block's entity** holds `CablePorts`, and `Cabling` learns its ports and kind.
 - **A new device with an interrupt line** gets a stimulus in `DeviceInterruptsTest`; **a device whose
   `get`/`set` take tables** gets a driver (`lib/modules/drivers/<type>.lua`).
+- **A new block that holds devices** gets: `Cabling` (its ports, and its kind for the walk), a branch
+  in the case's `scanCables` (its devices on the bus), a loot table keeping its contents, the pickaxe
+  tag, its language entries, and its art from a script.
+- **Work for the server thread is always queued** (`MinecraftServer.schedule`), never handed to
+  `execute`: once the server is stopping, `execute` runs the task on the calling thread (a CPU's),
+  which then touches the world off its thread (a stopping server deadlocked on it).
 - **A test opens a menu or sends as the mod does** (`ModMenus.open`, `ModNetwork.send`,
   `GameTests.serverPlayer`): the loaders need their part.
 - **A change to an mcos program** (`lua/mcos/bin/<name>`) updates its man page

@@ -35,7 +35,7 @@ public class RecipeGameTest {
 		Map.entry('n', "netherite_ingot"), Map.entry('s', "nether_star"), Map.entry('y', "ender_eye"), Map.entry('O', "ender_pearl"),
 		Map.entry('m', "emerald"), Map.entry('l', "lapis_lazuli"), Map.entry('j', "jukebox"), Map.entry('o', "observer"),
 		Map.entry('u', "sculk_sensor"), Map.entry('t', "daylight_detector"), Map.entry('v', "lightning_rod"),
-		Map.entry('W', "modularcomputers:cable"));
+		Map.entry('W', "modularcomputers:cable"), Map.entry('F', "iron_block"), Map.entry('h', "modularcomputers:tier1_hard_disk"));
 
 	private record Craft(String result, int count, String lower, String... rows) {
 	}
@@ -57,6 +57,7 @@ public class RecipeGameTest {
 		upgrade("tier3_ram", "tier2_ram", "QQQ", "D#D", "GGG"),
 		make("eeprom", " Q ", "pRp", "GGG"),
 		make("photomask", "IwI", "QAQ", "CRC"),
+		make("disk_station", "QQQ", "mhm", "FPF"),
 		make("tier1_hard_disk", "IRI", "IPI", "IQI"),
 		upgrade("tier2_hard_disk", "tier1_hard_disk", "IRI", "g#g", "IQI"),
 		upgrade("tier3_hard_disk", "tier2_hard_disk", "IRI", "D#D", "IQI"),

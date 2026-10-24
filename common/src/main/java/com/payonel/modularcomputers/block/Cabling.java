@@ -59,6 +59,9 @@ public final class Cabling {
 		if (block instanceof PaintGunBlock) {
 			return side != state.getValue(DirectionalBlock.FACING); // not the nozzle
 		}
+		if (block instanceof DiskStationBlock) {
+			return side != state.getValue(HorizontalDirectionalBlock.FACING); // not its front
+		}
 		if (block instanceof PhotomaskBlock) {
 			return side != state.getValue(HorizontalDirectionalBlock.FACING); // not the gear's face
 		}
@@ -82,7 +85,7 @@ public final class Cabling {
 					return CableWalk.Kind.RELAY;
 				}
 				return block instanceof AllInOneBlock || block instanceof RoboticPistonBlock || block instanceof PaintGunBlock
-					|| block instanceof PhotomaskBlock ? CableWalk.Kind.DEVICE : CableWalk.Kind.NONE;
+					|| block instanceof PhotomaskBlock || block instanceof DiskStationBlock ? CableWalk.Kind.DEVICE : CableWalk.Kind.NONE;
 			}
 
 			@Override

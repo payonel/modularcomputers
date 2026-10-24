@@ -84,6 +84,14 @@ public final class ModBlocks {
 		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("photomask"),
 		new BlockEntityType<>(PhotomaskBlockEntity::new, Set.of(PHOTOMASK)));
 
+	/** The Disk Station: formats, wipes, clones and installs disks. */
+	public static final Block DISK_STATION = registerWithItem("disk_station", DiskStationBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.5f).sound(SoundType.METAL));
+
+	public static final BlockEntityType<DiskStationBlockEntity> DISK_STATION_ENTITY = Registry.register(
+		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("disk_station"),
+		new BlockEntityType<>(DiskStationBlockEntity::new, Set.of(DISK_STATION)));
+
 	/** A broken computer from the ancient sites: decoration, nothing works; broken, it's gone (no drops). */
 	public static final Block BROKEN_CASE = registerWithItem("broken_case", BrokenCaseBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(1.5f).sound(SoundType.METAL).noOcclusion().noLootTable());

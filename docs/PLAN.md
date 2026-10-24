@@ -53,30 +53,9 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 - **Bluetooth, open:** range limits; whether links show differently in the bus order; what a
   Bluetooth card does on the bus itself.
 - **Disks, open:** disks in expansion hubs; labels set by programs.
-- **The Disk Station** (user, decided in outline): a block holding disks, to format, wipe, clone
-  and install them without crafting a disk alone.
-  - **Slots:** the disk it works on; a second, optional slot for a source disk, read only (for
-    cloning; a write blocker's role, as forensic docks have), drawn so it reads as optional and
-    read-only (a faint outline when empty, a lock and SOURCE in silkscreen), with the clone
-    button beside it, an arrow from source to target. A battery slot; a Bluetooth card slot.
-  - **Power** from a cable or its battery. **On the bus:** it's a device itself (its methods are
-    its actions) and puts its disks on the bus, so a computer mounts them; the source's read only.
-  - **Actions** (GUI buttons on the left, in the mod's look; the same as methods): format a
-    standard filesystem (hfs); remove the filesystem (raw); clone the source onto the target
-    (its mode and contents; refused when they don't fit); install mcos (wipe, then the mod's
-    latest mcos); update mcos (the mod's files written over, everything else left; `/etc` too, not
-    protected: an update is how a player fixes an install). Every action
-    that clears files removes them from the host too.
-  - **Eject** pushes a disk out of the station's eject face (into a container there, as a
-    dropper does), the front by default. The API matches the GUI: `eject()` uses the configured
-    face, and the face has its own methods (`getEjectFace`, `setEjectFace`); the GUI sets it in
-    the gear-box tab's side picker (Thermal's, Mekanism's, Ender IO's way).
-  - **Closing the GUI never ejects**: a disk stays in until ejected.
-  - **Recipe:** chips across the top; emerald, a tier 1 disk, emerald across the middle; iron
-    block, piston, iron block across the bottom. Its hint says the disk used loses its files. Its
-    look: iron and emerald, with a chip board on top.
-  - **Open:** whether other programs ever install from it (copied in, not formatted) or everything
-    ships in mcos; tiers.
+- **The Disk Station, open:** whether other programs ever install from it (copied in, not
+  formatted) or everything ships in mcos; tiers; its disks' change reports aren't saved with it (a
+  case's are).
 - **What a block holds, shown on it** (user): a miniature of each thing in a block's slots, drawn
   on the block in the world (the Disk Station's disks), on every block that holds objects, maybe
   even the case (its parts).

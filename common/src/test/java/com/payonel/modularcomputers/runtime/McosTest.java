@@ -381,6 +381,57 @@ class McosTest {
 	}
 
 	@Test
+	void aDiskStationsFileSaysWhatsInItAndALineWrittenIsAnAction() {
+		Disk target = new Disk(DiskTier.TIER_2, world.resolve("station-disk"));
+		com.payonel.modularcomputers.device.Face[] eject = {com.payonel.modularcomputers.device.Face.NORTH};
+		var station = new com.payonel.modularcomputers.device.DiskStation(new com.payonel.modularcomputers.device.DiskStation.Bay() {
+			@Override
+			public Disk disk(String which) {
+				return which.equals(com.payonel.modularcomputers.device.DiskStation.TARGET) ? target : null;
+			}
+
+			@Override
+			public boolean pay(int cost) {
+				return true;
+			}
+
+			@Override
+			public String eject(String which) {
+				return null;
+			}
+
+			@Override
+			public com.payonel.modularcomputers.device.Face front() {
+				return com.payonel.modularcomputers.device.Face.SOUTH;
+			}
+
+			@Override
+			public com.payonel.modularcomputers.device.Face ejectFace() {
+				return eject[0];
+			}
+
+			@Override
+			public void ejectFace(com.payonel.modularcomputers.device.Face face) {
+				eject[0] = face;
+			}
+
+			@Override
+			public java.util.List<Path> copyImage(String image, Path folder, boolean replace) {
+				return java.util.List.of();
+			}
+		});
+		devices.put("id:station", station); // (cabled, as a station is)
+		boot();
+		type("cat /dev/diskstation0 > /s; echo wipe > /dev/diskstation0; echo eject-face back > /dev/diskstation0; echo $? > /done\r");
+		untilFile(root().resolve("done"), "0\n");
+		assertThat(read(root().resolve("s"))).as("a line a slot, then its eject face")
+			.isEqualTo("target 2 hfs 0 " + DiskTier.TIER_2.bytes() + "\nsource -\neject north\n");
+		assertThat(target.getMode(new Arguments(java.util.List.of())).first()).as("wiped").isEqualTo(Disk.RAW);
+		assertThat(eject[0]).as("its back: north, as it faces south").isEqualTo(com.payonel.modularcomputers.device.Face.NORTH);
+		target.retire();
+	}
+
+	@Test
 	void pollWaitsForARedstoneChangeOrAPipesDataOrItsTime() {
 		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
 		devices.put(Motherboard.exp(0), card); // (a card in a slot, as in a case)

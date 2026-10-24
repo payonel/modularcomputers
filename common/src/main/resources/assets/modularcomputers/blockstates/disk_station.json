@@ -1,0 +1,92 @@
+{
+	"multipart": [
+		{
+			"when": {
+				"facing": "north"
+			},
+			"apply": {
+				"model": "modularcomputers:block/disk_station"
+			}
+		},
+		{
+			"when": {
+				"facing": "east"
+			},
+			"apply": {
+				"model": "modularcomputers:block/disk_station",
+				"y": 90
+			}
+		},
+		{
+			"when": {
+				"facing": "south"
+			},
+			"apply": {
+				"model": "modularcomputers:block/disk_station",
+				"y": 180
+			}
+		},
+		{
+			"when": {
+				"facing": "west"
+			},
+			"apply": {
+				"model": "modularcomputers:block/disk_station",
+				"y": 270
+			}
+		},
+		{
+			"when": {
+				"eject": "north"
+			},
+			"apply": {
+				"model": "modularcomputers:block/disk_station_slot"
+			}
+		},
+		{
+			"when": {
+				"eject": "east"
+			},
+			"apply": {
+				"model": "modularcomputers:block/disk_station_slot",
+				"y": 90
+			}
+		},
+		{
+			"when": {
+				"eject": "south"
+			},
+			"apply": {
+				"model": "modularcomputers:block/disk_station_slot",
+				"y": 180
+			}
+		},
+		{
+			"when": {
+				"eject": "west"
+			},
+			"apply": {
+				"model": "modularcomputers:block/disk_station_slot",
+				"y": 270
+			}
+		},
+		{
+			"when": {
+				"eject": "up"
+			},
+			"apply": {
+				"model": "modularcomputers:block/disk_station_slot",
+				"x": 270
+			}
+		},
+		{
+			"when": {
+				"eject": "down"
+			},
+			"apply": {
+				"model": "modularcomputers:block/disk_station_slot",
+				"x": 90
+			}
+		}
+	]
+}

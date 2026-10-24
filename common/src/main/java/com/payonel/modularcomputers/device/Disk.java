@@ -313,6 +313,25 @@ public final class Disk implements Device {
 		}
 	}
 
+	/** What a write to a read-only disk answers. */
+	public static final String READ_ONLY = "read-only disk";
+	/** A disk only read (a Disk Station's source, as behind a write blocker): every write is refused. */
+	private volatile boolean readOnly;
+
+	public void readOnly(boolean readOnly) {
+		this.readOnly = readOnly;
+	}
+
+	public boolean isReadOnly() {
+		return readOnly;
+	}
+
+	private void writable() {
+		if (readOnly) {
+			throw new Refused(READ_ONLY);
+		}
+	}
+
 	private Path root() {
 		if (storage == null) {
 			throw new Refused("no storage");
@@ -536,29 +555,110 @@ public final class Disk implements Device {
 
 	@Method(doc = "setMode(mode): formats it as \"hfs\" or \"raw\"; everything on it is lost and open files close")
 	public Result setMode(Arguments args) {
-		String mode = args.checkString(0);
+		return format(args.checkString(0));
+	}
+
+	/**
+	 * Formats it (as setMode, for a Disk Station): "hfs", an empty filesystem, or "raw", no
+	 * filesystem; everything on it is gone from the host, and its open files close.
+	 */
+	public Result format(String mode) {
 		if (!mode.equals(HFS) && !mode.equals(RAW)) {
 			return Result.fail("unknown mode: " + mode);
 		}
 		return run(() -> {
-			if (storage == null) {
+			formatted(mode);
+			return Result.ok();
+		});
+	}
+
+	private void formatted(String mode) {
+		if (storage == null) {
+			throw new Refused("no storage");
+		}
+		writable();
+		powerOff();
+		try {
+			wipe(storage);
+			Files.deleteIfExists(image());
+			if (mode.equals(RAW)) {
+				Files.createDirectories(storage.getParent());
+				try (RandomAccessFile file = new RandomAccessFile(image().toFile(), "rw")) {
+					file.setLength(tier.bytes()); // sparse on the host until written
+				}
+			}
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+		used = -1;
+		report("format", "/", "mode", mode);
+	}
+
+	/**
+	 * Files put on it from outside its programs (a Disk Station installing or updating mcos):
+	 * {@code copier} writes into its folder and says what it wrote, which gets the world's time and
+	 * is reported as changed. An hfs disk only.
+	 */
+	public Result copyIn(java.util.function.Function<Path, List<Path>> copier) {
+		return run(() -> {
+			Path folder = root();
+			writable();
+			for (Path written : copier.apply(folder)) {
+				report(Files.isDirectory(written) ? "create" : "modify", named(written));
+			}
+			used = -1;
+			return Result.ok();
+		});
+	}
+
+	/**
+	 * It becomes a copy of {@code source} (a Disk Station's clone): the same mode and the same
+	 * contents, files' times kept. Refused, with nothing changed, when what's on the source
+	 * doesn't fit.
+	 */
+	public Result cloneFrom(Disk source) {
+		return run(() -> {
+			if (storage == null || source.storage == null) {
 				throw new Refused("no storage");
 			}
-			powerOff();
+			writable();
+			String mode = source.mode();
+			long needed = mode.equals(RAW) ? source.tier.bytes() : source.used();
+			if (needed > tier.bytes()) {
+				throw new Refused("doesn't fit: " + needed + " bytes, on a disk of " + tier.bytes());
+			}
+			formatted(mode);
 			try {
-				wipe(storage);
-				Files.deleteIfExists(image());
 				if (mode.equals(RAW)) {
-					Files.createDirectories(storage.getParent());
-					try (RandomAccessFile file = new RandomAccessFile(image().toFile(), "rw")) {
-						file.setLength(tier.bytes()); // sparse on the host until written
+					try (RandomAccessFile from = new RandomAccessFile(source.image().toFile(), "r");
+						RandomAccessFile to = new RandomAccessFile(image().toFile(), "rw")) {
+						byte[] chunk = new byte[64 * 1024];
+						int got;
+						while ((got = from.read(chunk)) > 0) {
+							to.write(chunk, 0, got);
+						}
+					}
+					report("write", null, "offset", 0L, "length", source.tier.bytes());
+				} else if (Files.exists(source.storage)) {
+					Files.createDirectories(storage);
+					try (Stream<Path> paths = Files.walk(source.storage)) {
+						for (Path from : paths.toList()) {
+							Path to = storage.resolve(source.storage.relativize(from).toString());
+							if (!Files.exists(to)) {
+								Files.copy(from, to, java.nio.file.StandardCopyOption.COPY_ATTRIBUTES, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+							}
+						}
+					}
+					try (Stream<Path> paths = Files.walk(source.storage)) { // (filled, a directory's time moved: back to the source's)
+						for (Path from : paths.filter(Files::isDirectory).toList()) {
+							Files.setLastModifiedTime(storage.resolve(source.storage.relativize(from).toString()), Files.getLastModifiedTime(from));
+						}
 					}
 				}
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
 			}
 			used = -1;
-			report("format", "/", "mode", mode);
 			return Result.ok();
 		});
 	}
@@ -598,6 +698,9 @@ public final class Disk implements Device {
 		return run(() -> {
 			if (!List.of("r", "r+", "w", "w+", "a", "a+").contains(mode)) {
 				throw new Refused("bad mode: " + mode);
+			}
+			if (!mode.equals("r")) {
+				writable();
 			}
 			Path file = resolve(path);
 			if (Files.isDirectory(file)) {
@@ -683,6 +786,7 @@ public final class Disk implements Device {
 	public Result mkdir(Arguments args) {
 		String path = args.checkString(0);
 		return run(() -> {
+			writable();
 			Path dir = resolve(path, false);
 			if (Files.exists(dir)) {
 				throw new Refused("already exists: " + path);
@@ -705,6 +809,7 @@ public final class Disk implements Device {
 	public Result remove(Arguments args) {
 		String path = args.checkString(0);
 		return run(() -> {
+			writable();
 			Path at = resolve(path, false);
 			if (at.equals(storage)) {
 				throw new Refused("can't remove the root");
@@ -731,6 +836,7 @@ public final class Disk implements Device {
 		String from = args.checkString(0);
 		String to = args.checkString(1);
 		return run(() -> {
+			writable();
 			Path source = resolve(from, false);
 			Path target = resolve(to, false);
 			if (!Files.exists(source) || source.equals(storage)) {
@@ -759,6 +865,7 @@ public final class Disk implements Device {
 		String target = args.checkString(0);
 		String path = args.checkString(1);
 		return run(() -> {
+			writable();
 			if (target.isEmpty() || target.indexOf('\0') >= 0) {
 				throw new Refused("bad target");
 			}
@@ -846,6 +953,7 @@ public final class Disk implements Device {
 	@Method(doc = "write(offset, data): writes the bytes at that byte offset (from 0), as many as fit before the end; returns how many it wrote (raw)")
 	public Result write(Arguments args) {
 		return run(() -> {
+			writable();
 			long offset = offset(args);
 			byte[] data = args.checkString(1).getBytes(StandardCharsets.ISO_8859_1);
 			int count = (int) Math.min(data.length, tier.bytes() - offset);

@@ -1,0 +1,19 @@
+{
+	"type": "modularcomputers:disk_using",
+	"category": "redstone",
+	"key": {
+		"Q": "modularcomputers:chip",
+		"E": "minecraft:emerald",
+		"D": "modularcomputers:tier1_hard_disk",
+		"I": "minecraft:iron_block",
+		"P": "minecraft:piston"
+	},
+	"pattern": [
+		"QQQ",
+		"EDE",
+		"IPI"
+	],
+	"result": {
+		"id": "modularcomputers:disk_station"
+	}
+}

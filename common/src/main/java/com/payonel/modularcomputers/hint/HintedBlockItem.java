@@ -12,6 +12,13 @@ public class HintedBlockItem extends BlockItem implements Hinted {
 		super(block, properties);
 	}
 
+	/** Taken from the crafting grid: a disk its recipe used up loses its files ({@code DiskUsingRecipe}). */
+	@Override
+	public void onCraftedBy(ItemStack stack, net.minecraft.world.entity.player.Player player) {
+		super.onCraftedBy(stack, player);
+		com.payonel.modularcomputers.item.DiskItem.eraseWiped(stack, player);
+	}
+
 	@Override
 	public Optional<TooltipComponent> getTooltipImage(ItemStack stack) {
 		return Optional.of(new HintTooltip(stack));

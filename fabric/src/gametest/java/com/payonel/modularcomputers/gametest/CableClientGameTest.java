@@ -363,6 +363,35 @@ public class CableClientGameTest implements FabricClientGameTest {
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitFor(client -> client.gui.screen() == null);
 
+			// A Disk Station where the screen was: iron and emerald, its slot on its front; then ejecting up, the slot on its top.
+			setblock(singleplayer, screen, "disk_station[facing=south,eject=south]");
+			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof com.payonel.modularcomputers.block.DiskStationBlockEntity);
+			context.waitTicks(3);
+			BufferedImage station = read(context.takeScreenshot("disk-station"));
+			int emerald = count(station, 0, 0, station.getWidth(), station.getHeight(), EMERALD);
+			check(emerald > 40, "the station's emerald should show, found " + emerald);
+			setblock(singleplayer, screen, "disk_station[facing=south,eject=up]");
+			context.waitTicks(3);
+			context.takeScreenshot("disk-station-eject-up");
+			// Its GUI: a disk and a battery in it, the switches down the left, the source bay faint and locked.
+			singleplayer.getServer().runOnServer(server -> {
+				var bay = (com.payonel.modularcomputers.block.DiskStationBlockEntity) server.overworld().getBlockEntity(screen);
+				bay.cards().setItem(com.payonel.modularcomputers.block.DiskStationBlockEntity.TARGET, new ItemStack(ModItems.TIER2_HARD_DISK));
+				bay.cards().setItem(com.payonel.modularcomputers.block.DiskStationBlockEntity.BATTERY, ModItems.TIER1_BATTERY.charged());
+				ModMenus.open(server.getPlayerList().getPlayers().getFirst(), bay);
+			});
+			context.waitForScreen(com.payonel.modularcomputers.client.screen.DiskStationScreen.class);
+			context.waitTicks(2);
+			BufferedImage gui = read(context.takeScreenshot("disk-station-gui"));
+			int inlay = count(gui, 0, 0, gui.getWidth(), gui.getHeight(), EMERALD);
+			check(inlay > 100, "the station's panel shows its emerald inlay and lit eject face, found " + inlay);
+			moveCursorTo(context, s2 -> ((com.payonel.modularcomputers.client.screen.DiskStationScreen) s2).switchArea(
+				com.payonel.modularcomputers.menu.DiskStationMenu.ACTIONS.indexOf("install")));
+			context.waitTicks(2);
+			context.takeScreenshot("disk-station-gui-tip");
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+			context.waitFor(client -> client.gui.screen() == null);
+
 			// A broken computer from the ancient sites: cracked open, its board showing.
 			setblock(singleplayer, screen, "broken_case[facing=south]");
 			context.waitTicks(3);
@@ -388,6 +417,9 @@ public class CableClientGameTest implements FabricClientGameTest {
 	}
 
 	/** The gear's brass. */
+	/** The Disk Station's emerald: strongly green, as its trim and its GUI's inlay are. */
+	private static final IntPredicate EMERALD = rgb -> AllInOneClientGameTest.green(rgb) > 110 && AllInOneClientGameTest.green(rgb) > AllInOneClientGameTest.red(rgb) + 60
+		&& AllInOneClientGameTest.green(rgb) > AllInOneClientGameTest.blue(rgb) + 30;
 	private static final IntPredicate BRASS = rgb -> AllInOneClientGameTest.red(rgb) > 60
 		&& AllInOneClientGameTest.red(rgb) > AllInOneClientGameTest.green(rgb) + 12 && AllInOneClientGameTest.green(rgb) > AllInOneClientGameTest.blue(rgb) + 15;
 

@@ -31,6 +31,9 @@ public final class ModMenus {
 	public static final MenuType<PhotomaskMenu> PHOTOMASK = Registry.register(BuiltInRegistries.MENU, id("photomask"),
 		Platform.INSTANCE.menuType(PhotomaskMenu::new));
 
+	public static final MenuType<DiskStationMenu> DISK_STATION = Registry.register(BuiltInRegistries.MENU, id("disk_station"),
+		Platform.INSTANCE.menuType(DiskStationMenu::new));
+
 	private ModMenus() {
 	}
 

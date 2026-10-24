@@ -1,0 +1,12 @@
+{
+	"parent": "minecraft:block/cube",
+	"textures": {
+		"particle": "modularcomputers:block/disk_station_side",
+		"north": "modularcomputers:block/disk_station_front",
+		"south": "modularcomputers:block/disk_station_back",
+		"east": "modularcomputers:block/disk_station_side",
+		"west": "modularcomputers:block/disk_station_side",
+		"up": "modularcomputers:block/disk_station_top",
+		"down": "modularcomputers:block/disk_station_bottom"
+	}
+}

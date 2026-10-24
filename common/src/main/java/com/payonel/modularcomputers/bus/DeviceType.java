@@ -23,4 +23,6 @@ public enum DeviceType {
 	ACTUATOR,
 	/** Something that makes things (the photomask, which prints chips). */
 	FABRICATOR,
+	/** A Disk Station: a dock that formats, wipes, clones and installs disks. */
+	DISK_STATION,
 }

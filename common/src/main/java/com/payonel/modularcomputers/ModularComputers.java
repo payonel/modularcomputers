@@ -57,7 +57,8 @@ public final class ModularComputers {
 	 * mod's serializer registers it.)
 	 */
 	public static List<RecipeSerializer<?>> clientRecipeSerializers() {
-		return List.of(ShapedRecipe.SERIALIZER, BatteryUpgradeRecipe.SERIALIZER, BlastingRecipe.SERIALIZER);
+		return List.of(ShapedRecipe.SERIALIZER, BatteryUpgradeRecipe.SERIALIZER, com.payonel.modularcomputers.item.DiskUsingRecipe.SERIALIZER,
+			BlastingRecipe.SERIALIZER);
 	}
 
 	/** The types of {@link #clientRecipeSerializers}' recipes. */
@@ -74,6 +75,7 @@ public final class ModularComputers {
 		BatteryChargingRecipe.init();
 		ClearIdRecipe.init();
 		BatteryUpgradeRecipe.init();
+		com.payonel.modularcomputers.item.DiskUsingRecipe.init();
 		ModBlocks.init();
 		ModMenus.init();
 		ModCreativeTab.init();
