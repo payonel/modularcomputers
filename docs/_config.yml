@@ -1,0 +1,25 @@
+# The Modular Computers manual, built by GitHub Pages' own Jekyll (no plugins, no theme).
+title: Modular Computers
+description: Build computers in Minecraft and program them in Lua.
+url: https://payonel.github.io
+baseurl: /modularcomputers
+permalink: pretty
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+highlighter: rouge
+
+# The sidebar's sections, in order. A page joins one with `section:` and is placed in it by `order:`.
+wiki_sections:
+  - Start
+  - Concepts
+  - Hardware
+  - Devices
+  - mcos
+  - Programs
+  - Tutorials
+
+defaults:
+  - scope: { path: "" }
+    values: { layout: default }

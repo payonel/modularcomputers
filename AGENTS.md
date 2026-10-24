@@ -68,6 +68,10 @@ computers really work.
 - **Commits:** on `master` (`git add -A`), autonomously, when an addition is done and `testAll`
   passes, gated on its exit status (never on grepping its log). Never branch, never push. No model
   identifiers in commits or code. End messages with the co-author line.
+- **The manual (`docs/`) moves with the mod:** a commit that changes the mod's behavior or
+  features (a block, item, device, recipe, mcos program or API) includes the matching update to its
+  `docs/` page, as the wiki is what players read. `.agents/DOCS.md` has the rules and page shapes,
+  `.agents/DOCS-PAGES.md` the page list; `scripts/docs_check.py` checks pages and links.
 - **Words:** "bus" and "device", never "component" (OC's word). **Host**: the Java side.
   **Firmware**: `machine.lua`, layer 0, unbudgeted, unreachable by user code. **User threads**:
   anything budgeted (`user_co` is the root). **Kernel**: mcos's, in user threads. The EEPROM is
@@ -99,6 +103,10 @@ computers really work.
   `eeprom/` (the boot EEPROM), `mcos/` (the OS: `init.lua` the kernel, `lib/modules/` its modules,
   `lib/` libraries, `bin/` programs, `etc/` settings, `usr/share/man/` man pages).
 - `fabric/`, `neoforge/`: each loader's entry point and test mod; `scripts/`: art, sound, host tools.
+- `docs/`: the manual, a Jekyll site GitHub Pages builds from `master` (the wiki: hardware, devices,
+  mcos, tutorials). `docs/programs/` is generated from the man pages by `scripts/docs_programs.py`
+  and never edited by hand. `.agents/`: notes for agents and contributors (the plan, testing,
+  versioning, how to write the manual), kept out of the published site.
 
 ## Decisions, and why
 
@@ -460,7 +468,8 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
 - **A change to an mcos program** (`lua/mcos/bin/<name>`) updates its man page
   (`lua/mcos/usr/share/man/man1/<name>.1`); a new program gets one (options, behavior, exit
   statuses, NOTES where it differs from GNU), using only the macros `/bin/man` supports. A test
-  renders every page. **A program's header comment is its spec:** keep it true.
+  renders every page, and `scripts/docs_programs.py` regenerates its page in the manual
+  (`docs/programs/`). **A program's header comment is its spec:** keep it true.
 - **Data files under `lua/` that aren't Lua** go under a `share/` folder, mcos's `/home` or its `/etc` (settings,
   sh scripts; `/etc/rc.d`'s services are Lua): `LuaScriptsTest` compiles every other file as Lua.
 - **Textures and sounds** change through their script in `scripts/`, then regenerate.

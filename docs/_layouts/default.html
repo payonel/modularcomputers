@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% if page.url != "/" %}{{ page.title }} · {% endif %}{{ site.title }}</title>
+<meta name="description" content="{{ page.description | default: site.description }}">
+<link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="{{ '/' | relative_url }}">Modular Computers</a>
+  <span class="tag">the manual</span>
+  <a class="gh" href="https://github.com/payonel/modularcomputers">GitHub</a>
+</header>
+<div class="wrap">
+  <nav class="side" aria-label="Manual">
+    {% for name in site.wiki_sections %}
+    {% assign items = site.pages | where: "section", name | sort: "order" %}
+    {% if items.size > 0 %}
+    <h2>{{ name }}</h2>
+    <ul>
+      {% for p in items %}{% unless p.hidden %}
+      <li{% if p.url == page.url %} class="here"{% endif %}><a href="{{ p.url | relative_url }}">{{ p.nav | default: p.title }}</a></li>
+      {% endunless %}{% endfor %}
+    </ul>
+    {% endif %}
+    {% endfor %}
+  </nav>
+  <main class="page">
+    {% if page.url != "/" %}<h1>{{ page.title }}</h1>{% endif %}
+    {% assign linkbase = 'href="' | append: site.baseurl | append: '/' %}
+    {% assign srcbase = 'src="' | append: site.baseurl | append: '/' %}
+    {{ content | replace: 'href="/', linkbase | replace: 'src="/', srcbase }}
+    <footer class="foot">
+      <a href="https://github.com/payonel/modularcomputers/edit/master/docs/{{ page.path }}">Edit this page</a>
+      · MIT licensed
+    </footer>
+  </main>
+</div>
+</body>
+</html>

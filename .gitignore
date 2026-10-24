@@ -25,3 +25,10 @@ remappedSrc/
 *.DS_Store
 hs_err_*.log
 logs/
+
+# jekyll
+/docs/_site/
+/docs/.jekyll-cache/
+/docs/.sass-cache/
+/docs/Gemfile.lock
+/docs/.bundle/
