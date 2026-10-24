@@ -57,6 +57,8 @@ public class CableClientGameTest implements FabricClientGameTest {
 	private static final IntPredicate OUTLINE = rgb -> AllInOneClientGameTest.red(rgb) > 110 && AllInOneClientGameTest.green(rgb) > 90
 		&& AllInOneClientGameTest.red(rgb) >= AllInOneClientGameTest.green(rgb) && AllInOneClientGameTest.blue(rgb) < AllInOneClientGameTest.red(rgb) * 0.55;
 
+	/** The test picture's side, in pixels. */
+	private static final int PICTURE_SIZE = 36;
 	/** Ticks a card put in a running computer may take to be on its bus. */
 	private static final int SOUND_CARD_TICKS = 40;
 
@@ -106,6 +108,21 @@ public class CableClientGameTest implements FabricClientGameTest {
 			int lit = whiteOnScreen(read(context.takeScreenshot("screen-hello")));
 			check(lit > 30, "the wired screen should show hello world on its face, found " + lit + " white pixels");
 
+			// A tier 3 screen draws pixels: a sixel picture, a magenta square under the greeting.
+			int[] picture = new int[PICTURE_SIZE * PICTURE_SIZE];
+			java.util.Arrays.fill(picture, 0xFFFF00FF);
+			String sixel = "\u001B[6;3H" + com.payonel.modularcomputers.display.Sixel.encode(picture, PICTURE_SIZE);
+			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
+				.virtualBus().console().write(sixel)); // (as a program's output goes: the console, so its repaints keep it)
+			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof ScreenBlockEntity shown && shown.terminal().buffer().hasTiles());
+			context.waitTicks(5);
+			BufferedImage drawn = read(context.takeScreenshot("screen-sixel"));
+			int cx = drawn.getWidth() / 2;
+			int cy = drawn.getHeight() / 2;
+			int magenta = count(drawn, cx - 140, cy - 140, cx + 140, cy + 60, rgb -> AllInOneClientGameTest.red(rgb) > 200
+				&& AllInOneClientGameTest.green(rgb) < 60 && AllInOneClientGameTest.blue(rgb) > 200);
+			check(magenta > 30, "the screen's face shows its picture, found " + magenta + " magenta pixels");
+
 			// A Sound Card in it plays stereo: two speakers, its left and right as seen facing its
 			// front (it faces south: its left is west), half a block either side.
 			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
@@ -152,6 +169,9 @@ public class CableClientGameTest implements FabricClientGameTest {
 				check(view.viewToggle().width() > 0, "a screen block has a toggle to its slot");
 			});
 			BufferedImage view = read(context.takeScreenshot("screen-view"));
+			int viewMagenta = count(view, 0, 0, view.getWidth(), view.getHeight(), rgb -> AllInOneClientGameTest.red(rgb) > 200
+				&& AllInOneClientGameTest.green(rgb) < 60 && AllInOneClientGameTest.blue(rgb) > 200);
+			check(viewMagenta > 100, "the screen view shows its picture, found " + viewMagenta);
 			int viewText = context.computeOnClient(client -> {
 				DisplayScreen shown = (DisplayScreen) client.gui.screen();
 				double scale = (double) view.getWidth() / shown.width;

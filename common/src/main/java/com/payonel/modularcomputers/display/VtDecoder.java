@@ -37,7 +37,7 @@ public final class VtDecoder {
 	};
 	private static final int TAB = 8;
 
-	private enum Parse { GROUND, ESCAPE, CHARSET, CSI, STRING }
+	private enum Parse { GROUND, ESCAPE, CHARSET, CSI, STRING, DCS, SIXEL }
 
 	private final TextBuffer buffer;
 	private final Consumer<String> reply;
@@ -52,6 +52,14 @@ public final class VtDecoder {
 	private Parse parse = Parse.GROUND;
 	private final StringBuilder params = new StringBuilder();
 	private boolean stringEscape;
+	/** A sixel picture being decoded (tier 3's graphics), or null. */
+	private Sixel sixel;
+	/**
+	 * DEC's sixel display mode (DECSDM, {@code CSI ?80 h}): a picture doesn't scroll the screen
+	 * (what's past the bottom is dropped) and the cursor stays where it was. (xterm's also puts the
+	 * picture at the top left; this one draws it at the cursor.)
+	 */
+	private boolean sixelDisplayMode;
 
 	private int x;
 	private int y;
@@ -281,6 +289,102 @@ public final class VtDecoder {
 			case CHARSET -> parse = Parse.GROUND; // ESC ( B and the like: character sets, ignored
 			case CSI -> csi(c);
 			case STRING -> string(c);
+			case DCS -> dcs(c);
+			case SIXEL -> sixel(c);
+		}
+	}
+
+	/**
+	 * A DCS's parameters, then its final character: {@code q} is sixel graphics, drawn by a
+	 * terminal that shows every color (tier 3, as a VT340's); any other, or sixel on a terminal
+	 * without them, is read to its end and ignored.
+	 */
+	private void dcs(char c) {
+		if (c >= '0' && c <= '9' || c == ';') {
+			if (params.length() < 64) {
+				params.append(c);
+			}
+			return;
+		}
+		if (c == 'q' && depth == ColorDepth.TRUE_COLOR) {
+			String[] args = params.toString().split(";", -1);
+			int p2 = args.length > 1 && args[1].equals("1") ? 1 : 0; // (P2 1: transparent where it draws nothing)
+			sixel = new Sixel(p2, (columns - x) * TextBuffer.TILE_WIDTH, rows * TextBuffer.TILE_HEIGHT);
+			stringEscape = false;
+			parse = Parse.SIXEL;
+			return;
+		}
+		stringEscape = false;
+		parse = Parse.STRING;
+		string(c);
+	}
+
+	/** A sixel picture's data, to ST (ESC \\): then it's drawn at the cursor. */
+	private void sixel(char c) {
+		if (stringEscape) {
+			stringEscape = false;
+			placeSixel();
+			parse = Parse.GROUND;
+			if (c != '\\') {
+				escape(c); // (another escape sequence ended it)
+			}
+			return;
+		}
+		if (c == '\u001B') {
+			stringEscape = true;
+		} else if (c == '\u0018' || c == '\u001A') {
+			sixel = null; // CAN, SUB: dropped
+			parse = Parse.GROUND;
+		} else {
+			sixel.accept(c);
+		}
+	}
+
+	/**
+	 * Draws the picture just decoded at the cursor, over the cells it covers (as their tiles, mixed
+	 * with what tiles they had where it's transparent); a picture past the bottom scrolls the screen
+	 * up, as a VT340's does. The cursor goes to the line below it, at the column it started from.
+	 */
+	private void placeSixel() {
+		Sixel picture = sixel;
+		sixel = null;
+		int[] pixels = picture.finish();
+		int width = picture.width();
+		int height = picture.height();
+		if (width == 0 || height == 0) {
+			return;
+		}
+		pendingWrap = false;
+		int wide = Math.min(Math.ceilDiv(width, TextBuffer.TILE_WIDTH), columns - x);
+		int high = Math.min(Math.ceilDiv(height, TextBuffer.TILE_HEIGHT), sixelDisplayMode ? rows - y : rows);
+		if (y + high > rows) {
+			int n = y + high - rows;
+			scrollUp(0, rows - 1, n);
+			y -= n;
+		}
+		for (int cy = 0; cy < high; cy++) {
+			for (int cx = 0; cx < wide; cx++) {
+				int[] under = buffer.tile(x + cx, y + cy);
+				int[] tile = under != null ? under.clone() : new int[TextBuffer.TILE_PIXELS];
+				for (int ty = 0; ty < TextBuffer.TILE_HEIGHT; ty++) {
+					int py = cy * TextBuffer.TILE_HEIGHT + ty;
+					for (int tx = 0; tx < TextBuffer.TILE_WIDTH; tx++) {
+						int px = cx * TextBuffer.TILE_WIDTH + tx;
+						if (px < width && py < height && (pixels[py * width + px] >>> 24) != 0) {
+							tile[ty * TextBuffer.TILE_WIDTH + tx] = pixels[py * width + px];
+						}
+					}
+				}
+				buffer.setTile(x + cx, y + cy, tile);
+			}
+		}
+		if (sixelDisplayMode) {
+			return; // (the cursor stays)
+		} else if (y + high >= rows) {
+			scrollUp(0, rows - 1, 1);
+			y = rows - 1;
+		} else {
+			y += high;
 		}
 	}
 
@@ -318,9 +422,13 @@ public final class VtDecoder {
 				params.setLength(0);
 				parse = Parse.CSI;
 			}
-			case ']', 'P', '_', '^', 'X' -> {
+			case 'P' -> {
+				params.setLength(0);
+				parse = Parse.DCS; // a device control string: its parameters, then what it is
+			}
+			case ']', '_', '^', 'X' -> {
 				stringEscape = false;
-				parse = Parse.STRING; // OSC, DCS and the like: read to the end, ignored
+				parse = Parse.STRING; // OSC and the like: read to the end, ignored
 			}
 			case '(', ')', '*', '+' -> parse = Parse.CHARSET;
 			case '7' -> saveCursor();
@@ -488,6 +596,7 @@ public final class VtDecoder {
 				case 1 -> cursorKeysApplication = on;
 				case 7 -> autowrap = on;
 				case 25 -> cursorVisible = on;
+				case 80 -> sixelDisplayMode = on;
 				case 47, 1047, 1049 -> alternateScreen(on, mode == 1049);
 				default -> {
 					// not supported: ignored
@@ -645,12 +754,12 @@ public final class VtDecoder {
 	}
 
 	private void copyCell(int from, int to) {
-		buffer.set(to, y, buffer.get(from, y), buffer.foreground(from, y), buffer.background(from, y));
+		buffer.copy(from, y, to, y); // (its picture's tile too)
 	}
 
 	private void copyRow(int from, int to) {
 		for (int column = 0; column < columns; column++) {
-			buffer.set(column, to, buffer.get(column, from), buffer.foreground(column, from), buffer.background(column, from));
+			buffer.copy(column, from, column, to);
 		}
 	}
 
@@ -814,6 +923,9 @@ public final class VtDecoder {
 
 	// ---- saving and redrawing -------------------------------------------------------------
 
+	/** Where DECSDM is kept in {@link #state()}'s flags (past the keyboard's). */
+	private static final int SIXEL_DISPLAY_BIT = 20;
+
 	/** The size of {@link #state()}. */
 	private static final int STATE = 19;
 
@@ -826,9 +938,11 @@ public final class VtDecoder {
 	public int[] state() {
 		int flags = (bold ? 1 : 0) | (reverse ? 2 : 0) | (newLineMode ? 4 : 0) | (autowrap ? 8 : 0)
 			| (cursorVisible ? 16 : 0) | (pendingWrap ? 32 : 0) | (stringEscape ? 64 : 0) | (cursorStyle << 8)
-			| (cursorKeysApplication ? 1 << 11 : 0) | (keyboardFlags << 12);
+			| (cursorKeysApplication ? 1 << 11 : 0) | (keyboardFlags << 12) | (sixelDisplayMode ? 1 << SIXEL_DISPLAY_BIT : 0);
 		int[] state = new int[STATE];
-		int[] registers = {x, y, fgIndex, fgRgb, bgIndex, bgRgb, flags, top, bottom, parse.ordinal(), saved != null ? 1 : 0};
+		// (a picture half decoded isn't kept: the rest of it is read and ignored)
+		Parse saving = parse == Parse.DCS || parse == Parse.SIXEL ? Parse.STRING : parse;
+		int[] registers = {x, y, fgIndex, fgRgb, bgIndex, bgRgb, flags, top, bottom, saving.ordinal(), saved != null ? 1 : 0};
 		System.arraycopy(registers, 0, state, 0, registers.length);
 		if (saved != null) {
 			System.arraycopy(saved, 0, state, registers.length, saved.length);
@@ -867,6 +981,7 @@ public final class VtDecoder {
 		cursorStyle = Math.min((flags >> 8) & 7, 6);
 		cursorKeysApplication = (flags & (1 << 11)) != 0;
 		keyboardFlags = (flags >> 12) & KEYBOARD_FLAGS;
+		sixelDisplayMode = (flags & 1 << SIXEL_DISPLAY_BIT) != 0;
 		if (state[7] >= 0 && state[7] < state[8] && state[8] < rows) {
 			top = state[7];
 			bottom = state[8];
@@ -900,6 +1015,19 @@ public final class VtDecoder {
 				out.append(buffer.get(column, row));
 			}
 		}
+		// Its pictures, a cell's tile a sixel each, drawn where they are (DECSDM: no scrolling, the cursor stays).
+		boolean pictures = false;
+		for (int row = 0; row < rows; row++) {
+			for (int column = 0; column < columns; column++) {
+				int[] tile = buffer.tile(column, row);
+				if (tile != null) {
+					out.append(pictures ? "" : "\u001B[?80h").append("\u001B[").append(row + 1).append(';').append(column + 1).append('H')
+						.append(Sixel.encode(tile, TextBuffer.TILE_WIDTH));
+					pictures = true;
+				}
+			}
+		}
+		out.append(pictures && !sixelDisplayMode ? "\u001B[?80l" : "");
 		out.append(autowrap ? "\u001B[?7h" : "");
 		out.append("\u001B[").append(top + 1).append(';').append(bottom + 1).append('r');
 		out.append("\u001B[").append(y + 1).append(';').append(x + 1).append('H');

@@ -91,6 +91,7 @@ public final class ModularComputersClient {
 		Identify.clear(); // the bulb's outlines belong to this visit to a world
 		ClientRecipes.clear();
 		com.payonel.modularcomputers.client.sound.SoundCardSpeakers.clear(); // (its sounds were this world's)
+		com.payonel.modularcomputers.client.render.PixelLayers.clear(); // (and its screens' pictures)
 		ModConfig.load(); // back to this game's own settings, after a server's
 	}
 }

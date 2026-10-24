@@ -23,12 +23,14 @@ final class ScreenSave {
 	/** A terminal: its screen as it is, even while its glass is scrolled back (the scrollback isn't saved). */
 	static void save(ValueOutput output, String name, com.payonel.modularcomputers.device.Terminal terminal) {
 		save(output, name, terminal.screen(), terminal.decoder());
+		output.putIntArray(name + "_tiles", terminal.tiles()); // (its pictures)
 		output.putBoolean(name + "_cursor_shown", terminal.cursor().shown()); // (for players' copies: whether it shows)
 	}
 
 	/** A terminal: {@link #load(ValueInput, String, TextBuffer, VtDecoder)}, and its cursor as players see it. */
 	static void load(ValueInput input, String name, com.payonel.modularcomputers.device.Terminal terminal) {
 		load(input, name, terminal.buffer(), terminal.decoder());
+		input.getIntArray(name + "_tiles").ifPresent(tiles -> com.payonel.modularcomputers.display.Tiles.screen(tiles, terminal.buffer()));
 		VtDecoder decoder = terminal.decoder();
 		terminal.showCursor(new com.payonel.modularcomputers.device.Terminal.Cursor(
 			Math.min(decoder.column(), terminal.buffer().resolution().columns() - 1), decoder.row(),

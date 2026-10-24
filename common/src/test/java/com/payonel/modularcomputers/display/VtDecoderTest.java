@@ -186,7 +186,7 @@ class VtDecoderTest {
 		for (com.payonel.modularcomputers.device.TerminalTier tier : com.payonel.modularcomputers.device.TerminalTier.values()) {
 			new VtDecoder(new TextBuffer(new Resolution(6, 1)), answers::add, tier.depth(), tier.attributes()).write(ESC + "[c");
 		}
-		assertThat(answers).containsExactly(ESC + "[?6c", ESC + "[?65;22c", ESC + "[?63;22c");
+		assertThat(answers).containsExactly(ESC + "[?6c", ESC + "[?65;22c", ESC + "[?63;4;22c");
 	}
 
 	@Test
@@ -276,5 +276,103 @@ class VtDecoderTest {
 		vt.resize(new Resolution(3, 2));
 		vt.write(ESC + "[?1049l");
 		assertThat(rows()).containsExactly("mai", "   ");
+	}
+
+	/** A tier 3 terminal's decoder, 4x3 cells, for sixel. */
+	private VtDecoder sixelTerminal(TextBuffer cells) {
+		return new VtDecoder(cells, replies::add, ColorDepth.TRUE_COLOR, "");
+	}
+
+	private static final String RED = "#1;2;100;0;0";
+
+	@Test
+	void aSixelPictureIsDrawnAtTheCursorIntoTheCellsItCoversAndTheCursorGoesBelowIt() {
+		TextBuffer cells = new TextBuffer(new Resolution(4, 3));
+		VtDecoder vt = sixelTerminal(cells);
+		vt.write("ab\r\n");
+		vt.write(ESC + "Pq" + RED + "~~" + ESC + "\\"); // two columns of six red pixels
+		int[] tile = cells.tile(0, 1);
+		assertThat(tile).as("on the cell at the cursor").isNotNull();
+		assertThat(tile[0]).isEqualTo(0xFFFF0000);
+		assertThat(tile[5 * TextBuffer.TILE_WIDTH + 1]).as("six down, the second column").isEqualTo(0xFFFF0000);
+		assertThat(tile[6 * TextBuffer.TILE_WIDTH]).as("its height's rest: nothing drawn there").isZero();
+		assertThat(tile[2]).as("past its width").isZero();
+		assertThat(cells.tile(1, 1)).as("only the cells it covers").isNull();
+		assertThat(vt.row()).as("the cursor below it").isEqualTo(2);
+		assertThat(vt.column()).isZero();
+		assertThat(cells.row(0)).startsWith("ab");
+	}
+
+	@Test
+	void repeatsBandsAndWhatsNotDrawnFollowTheSixelRules() {
+		TextBuffer cells = new TextBuffer(new Resolution(4, 3));
+		VtDecoder vt = sixelTerminal(cells);
+		vt.write(ESC + "P0;0q" + RED + "!7~-#2;2;0;0;100@" + ESC + "\\"); // seven columns red, then a blue pixel a band down
+		assertThat(cells.tile(1, 0)[0]).as("the repeat reaches the second cell").isEqualTo(0xFFFF0000);
+		assertThat(cells.tile(0, 0)[6 * TextBuffer.TILE_WIDTH]).as("the next band, its first pixel").isEqualTo(0xFF0000FF);
+		assertThat(cells.tile(0, 0)[6 * TextBuffer.TILE_WIDTH + 1]).as("not drawn: register 0's color (P2 0)").isEqualTo(0xFF000000);
+		TextBuffer clear = new TextBuffer(new Resolution(4, 3));
+		sixelTerminal(clear).write(ESC + "P0;1q" + RED + "!2~-@" + ESC + "\\");
+		assertThat(clear.tile(0, 0)[6 * TextBuffer.TILE_WIDTH + 1]).as("P2 1: what's beneath shows").isZero();
+	}
+
+	@Test
+	void onlyATerminalWithEveryColorDrawsSixelsTheOthersSkipThem() {
+		TextBuffer cells = new TextBuffer(new Resolution(4, 3));
+		VtDecoder vt = new VtDecoder(cells, replies::add, ColorDepth.SIXTEEN, "");
+		vt.write(ESC + "Pq" + RED + "~~" + ESC + "\\" + "x");
+		assertThat(cells.tile(0, 0)).isNull();
+		assertThat(cells.row(0)).as("and goes on after it").startsWith("x");
+	}
+
+	@Test
+	void aPicturesTilesGoWithTheirCellsAndTextOverOneReplacesIt() {
+		TextBuffer cells = new TextBuffer(new Resolution(4, 3));
+		VtDecoder vt = sixelTerminal(cells);
+		vt.write(ESC + "Pq" + RED + "~" + ESC + "\\");
+		int[] tile = cells.tile(0, 0);
+		vt.write(ESC + "[1;1H" + ESC + "[2@"); // insert two cells before it
+		assertThat(cells.tile(2, 0)).as("moved with its cell").isSameAs(tile);
+		assertThat(cells.tile(0, 0)).isNull();
+		vt.write(ESC + "[3;1H\n\n"); // scroll the screen up a line
+		assertThat(cells.tile(2, 0)).as("scrolled off").isNull();
+		vt.write(ESC + "[1;1H" + ESC + "Pq" + RED + "~" + ESC + "\\" + ESC + "[1;1Hz");
+		assertThat(cells.tile(0, 0)).as("text over it").isNull();
+		assertThat(cells.row(0)).startsWith("z");
+	}
+
+	@Test
+	void aRedrawPaintsPicturesWhereTheyAreOntoAnotherTerminalWithoutScrolling() {
+		TextBuffer cells = new TextBuffer(new Resolution(4, 3));
+		VtDecoder vt = sixelTerminal(cells);
+		vt.write("top" + ESC + "[3;2H" + ESC + "Pq#1;2;100;50;0!8~-!8~" + ESC + "\\"); // on the bottom row: the screen scrolls up a line
+		int[] tile = cells.tile(1, 1);
+		assertThat(tile).isNotNull();
+		TextBuffer copy = new TextBuffer(new Resolution(4, 3));
+		sixelTerminal(copy).write(vt.redraw());
+		assertThat(copy.rows()).isEqualTo(cells.rows());
+		for (int i = 0; i < TextBuffer.TILE_PIXELS; i++) {
+			int a = tile[i];
+			int b = copy.tile(1, 1)[i];
+			assertThat(b >>> 24).as("pixel " + i + "'s alpha").isEqualTo(a >>> 24);
+			for (int shift = 0; shift < 24; shift += 8) {
+				assertThat(Math.abs((a >> shift & 0xFF) - (b >> shift & 0xFF))).as("pixel " + i).isLessThanOrEqualTo(2);
+			}
+		}
+		assertThat(copy.tile(2, 1)).as("and its neighbor").isNotNull();
+	}
+
+	@Test
+	void tilesEncodeAndDecodeAsTheyWere() {
+		TextBuffer cells = new TextBuffer(new Resolution(3, 2));
+		int[] tile = new int[TextBuffer.TILE_PIXELS];
+		java.util.Arrays.fill(tile, 0, 10, 0xFF123456);
+		tile[40] = 0xFFABCDEF;
+		cells.setTile(2, 1, tile);
+		TextBuffer back = new TextBuffer(new Resolution(3, 2));
+		Tiles.screen(Tiles.screen(cells), back);
+		assertThat(back.tile(2, 1)).isEqualTo(tile);
+		assertThat(Tiles.row(Tiles.row(cells.rowTiles(1)), 3)[2]).isEqualTo(tile);
+		assertThat(java.util.Arrays.stream(Tiles.row(new int[] {7, 1, 72, 0}, 3)).allMatch(java.util.Objects::isNull)).as("broken: none").isTrue();
 	}
 }

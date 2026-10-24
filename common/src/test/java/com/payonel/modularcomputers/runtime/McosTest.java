@@ -528,6 +528,14 @@ class McosTest {
 	}
 
 	@Test
+	void vtdemoRunsFromUsrBinAndDrawsItsPictureOnATier3Terminal() {
+		boot();
+		type("vtdemo.lua > /dev/tty; echo $? > /st\r");
+		untilFile(root().resolve("st"), "0\n");
+		assertThat(screen.buffer().hasTiles()).as("its sixel picture").isTrue();
+	}
+
+	@Test
 	void dateIsTheWorldsClockOnItsCalendar() {
 		long noonOfTheThirdDay = 2 * 24000 + 6000; // (game time: 0 is the first sunrise, 6000 its noon)
 		machine.board().setChassis(new com.payonel.modularcomputers.machine.Chassis() {

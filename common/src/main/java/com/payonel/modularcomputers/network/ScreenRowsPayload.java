@@ -24,8 +24,27 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 public record ScreenRowsPayload(BlockPos pos, int columns, int lines, List<Row> rows, Terminal.Cursor cursor) implements CustomPacketPayload {
 	public static final Type<ScreenRowsPayload> TYPE = new Type<>(ModularComputers.id("screen_rows"));
 
-	/** One row: its index, characters, and each cell's colors. */
-	public record Row(int index, String text, int[] foregrounds, int[] backgrounds) {
+	/** One row: its index, characters, each cell's colors, and its cells' pictures (sixel), as {@link com.payonel.modularcomputers.display.Tiles#row} encodes them. */
+	public record Row(int index, String text, int[] foregrounds, int[] backgrounds, int[] tiles) {
+		private static final StreamCodec<ByteBuf, int[]> INTS = new StreamCodec<>() {
+			@Override
+			public int[] decode(ByteBuf buf) {
+				int[] values = new int[ByteBufCodecs.VAR_INT.decode(buf)];
+				for (int i = 0; i < values.length; i++) {
+					values[i] = buf.readInt();
+				}
+				return values;
+			}
+
+			@Override
+			public void encode(ByteBuf buf, int[] values) {
+				ByteBufCodecs.VAR_INT.encode(buf, values.length);
+				for (int value : values) {
+					buf.writeInt(value);
+				}
+			}
+		};
+
 		private static final StreamCodec<ByteBuf, int[]> COLORS = new StreamCodec<>() {
 			@Override
 			public int[] decode(ByteBuf buf) {
@@ -50,6 +69,7 @@ public record ScreenRowsPayload(BlockPos pos, int columns, int lines, List<Row> 
 			ByteBufCodecs.STRING_UTF8, Row::text,
 			COLORS, Row::foregrounds,
 			COLORS, Row::backgrounds,
+			INTS, Row::tiles,
 			Row::new);
 	}
 
@@ -79,7 +99,8 @@ public record ScreenRowsPayload(BlockPos pos, int columns, int lines, List<Row> 
 		terminal.showCursor(cursor);
 		List<Row> rows = new ArrayList<>();
 		for (int row = dirty.nextSetBit(0); row >= 0 && row < buffer.resolution().rows(); row = dirty.nextSetBit(row + 1)) {
-			rows.add(new Row(row, buffer.row(row), buffer.rowForegrounds(row), buffer.rowBackgrounds(row)));
+			rows.add(new Row(row, buffer.row(row), buffer.rowForegrounds(row), buffer.rowBackgrounds(row),
+				com.payonel.modularcomputers.display.Tiles.row(buffer.rowTiles(row))));
 		}
 		return new ScreenRowsPayload(pos, buffer.resolution().columns(), buffer.resolution().rows(), rows, cursor);
 	}
@@ -91,6 +112,9 @@ public record ScreenRowsPayload(BlockPos pos, int columns, int lines, List<Row> 
 		}
 		for (Row row : rows) {
 			terminal.buffer().setRow(row.index(), row.text(), row.foregrounds(), row.backgrounds());
+			if (row.tiles().length > 0) {
+				terminal.buffer().setRowTiles(row.index(), com.payonel.modularcomputers.display.Tiles.row(row.tiles(), terminal.buffer().resolution().columns()));
+			}
 		}
 		terminal.showCursor(cursor);
 	}

@@ -272,6 +272,12 @@ public final class DisplayScreen extends Screen {
 				}
 			}
 		}
+		// Its pictures (sixel), over the backgrounds, under the text.
+		net.minecraft.resources.Identifier pixels = com.payonel.modularcomputers.client.render.PixelLayers.of(buffer);
+		if (pixels != null) {
+			graphics.blit(pixels, area.x(), area.y(), area.x() + Math.round(resolution.columns() * grid.cellWidth()),
+				area.y() + Math.round(resolution.rows() * grid.cellHeight()), 0, 1, 0, 1);
+		}
 		var pose = graphics.pose();
 		pose.pushMatrix();
 		pose.translate(area.x(), area.y());

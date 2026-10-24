@@ -23,7 +23,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Draws a screen's display (cell backgrounds and text) onto the glass of its block's front
+ * Draws a screen's display (cell backgrounds, its pictures, and text) onto the glass of its block's front
  * face: the all-in-one's or a screen block's. While the player has the bus order panel's bulb
  * on for it, it also outlines the whole block, through walls, so it's easy to find.
  */
@@ -34,6 +34,8 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 	public static final Glass SCREEN = new Glass(1, 3, 14, 9);
 	/** How far the text floats in front of the face, in blocks. */
 	private static final float TEXT_OFFSET = 0.002f;
+	/** How far its pictures float in front of the cells' backgrounds, in blocks (under the text). */
+	private static final float PIXEL_OFFSET = 0.0005f;
 
 	/** Where the glass is on the front texture, in texels. */
 	public record Glass(float x, float y, float width, float height) {
@@ -58,6 +60,8 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 		String[] rows;
 		int[] foregrounds;
 		int[] backgrounds;
+		/** Its pictures' texture (sixel), or null: none. */
+		net.minecraft.resources.Identifier pixels;
 		/** The cursor's cell when it's lit now (-1: not drawn), and its shape. */
 		int cursorColumn = -1;
 		int cursorRow;
@@ -85,6 +89,7 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 			return;
 		}
 		state.rows = display.rows().toArray(String[]::new);
+		state.pixels = PixelLayers.of(display);
 		// A monochrome terminal's phosphor has one color: the glass glows green (ColorDepth.glow).
 		var depth = host.terminal().tier().depth();
 		state.foregrounds = java.util.Arrays.stream(display.foregrounds()).map(depth::glow).toArray();
@@ -147,6 +152,20 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 					start = column;
 				}
 			}
+		}
+		if (state.pixels != null) {
+			// Its pictures: one quad over the whole grid, its texture transparent where there are none.
+			float right = columns * cellWidth;
+			float down = state.rows.length * cellHeight;
+			pose.pushPose();
+			pose.translate(0, 0, PIXEL_OFFSET / grid.fontScale());
+			collector.submitCustomGeometry(pose, net.minecraft.client.renderer.rendertype.RenderTypes.textPolygonOffset(state.pixels), (at, vertices) -> {
+				vertices.addVertex(at, 0, 0, 0).setColor(0xFFFFFFFF).setUv(0, 0).setLight(LightCoordsUtil.FULL_BRIGHT);
+				vertices.addVertex(at, 0, down, 0).setColor(0xFFFFFFFF).setUv(0, 1).setLight(LightCoordsUtil.FULL_BRIGHT);
+				vertices.addVertex(at, right, down, 0).setColor(0xFFFFFFFF).setUv(1, 1).setLight(LightCoordsUtil.FULL_BRIGHT);
+				vertices.addVertex(at, right, 0, 0).setColor(0xFFFFFFFF).setUv(1, 0).setLight(LightCoordsUtil.FULL_BRIGHT);
+			});
+			pose.popPose();
 		}
 		for (int row = 0; row < state.rows.length; row++) {
 			String text = state.rows[row];

@@ -28,9 +28,9 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   device-reporting rule: today the kernel hears only through `TIOCSWINSZ`, as on a serial line;
   xterm's in-band resize reports, mode 2048, are a way); a 160-column row is ~1.1 KB to send
   (colors per cell), so a full redraw at 160×50 is ~56 KB: run-length colors if it matters.
-- **Tier 3 terminals draw pixels:** sixel is the plan (a VT340's pixel graphics by escape sequence);
-  the terminal answers `;4` in its Device Attributes once it's built, so programs never send pixels
-  to a terminal that would drop them.
+- **Sixel, what's left:** pictures aren't kept in the scrollback (it's text) or on the main screen
+  behind the alternate one; DECSDM draws at the cursor, not xterm's top left; no `img2sixel`-like
+  tool yet (pictures are made by programs).
 - **Multiblock screens that grow** (user idea, undecided): neighboring screens merging into one
   bigger display.
 - **The all-in-one** is a dev kit: it may go away, or become a creative "everything built in" block.
@@ -152,3 +152,8 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   `useradd`/`userdel`, OpenOS's `transforms` and `event`/`keyboard` libraries.
 - **The internet card, open:** raw TCP connections to the internet (OC's `connect`), if wanted;
   rate limits per card or per player, if servers need them.
+- **Threads, maybe** (user, 2026-10-24: not sure yet): OpenOS's thread library let one program run
+  several tasks as straight-line code. mcos does concurrency with poll and processes; threads would
+  be Linux's pthreads: several threads in a process sharing its memory, each blocking in its own
+  syscalls (a blocking syscall freezes the whole process today), so it's kernel work (threads in
+  the process table, each with its own syscall state), with a library shaped like OpenOS's on top.

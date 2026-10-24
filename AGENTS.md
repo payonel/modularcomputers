@@ -294,6 +294,13 @@ the farther it reaches (OC's wirelessCostPerRange); any tier hears any other.
   tool); nothing is wrapped again. The console's group is one size, the largest every member can
   show (UEFI's ConSplitter's common mode). Tests that look at pixels size the console 50×16 first
   (`TestPrograms.READABLE`): sub-pixel text is flaky to count.
+- **Tier 3 draws sixel graphics** (a VT340's: `DCS q`; its Device Attributes say `;4`; lower tiers
+  skip them). A picture lives in the cells it covers, a 6×12 tile of pixels each
+  (`TextBuffer.TILE_*`): it scrolls, moves and is saved with them, text over a cell replaces its
+  tile, so a screen holds at most a screen of pixels. Tiles go to players run-length encoded
+  (`Tiles`), and their games draw them as one texture a screen (`PixelLayers`), rebuilt only when
+  pictures change. DECSDM (`?80`) keeps a picture from scrolling (the console's repaint uses it).
+  `/usr/bin/vtdemo.lua` shows every tier's colors and a picture.
 - **BEL rings the terminal's bell** at its block (`TerminalBell`, a sound from `scripts/art/bell.py`);
   bells closer than 200 ms ring once (xterm's bellSuppressTime: `\a\a\a` is one beep).
 - **The server's decoder is the only one:** only changed rows go to players (the user rejected a

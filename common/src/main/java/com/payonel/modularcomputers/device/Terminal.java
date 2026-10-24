@@ -115,6 +115,8 @@ public final class Terminal implements Device {
 	private int viewOffset;
 	/** The screen as it is while the glass shows the scrollback; null at the bottom. */
 	private VtDecoder.Screen live;
+	/** The screen's pictures (its cells' tiles) while it's scrolled back, row by row; null with {@link #live}. */
+	private int[][][] liveTiles;
 
 	private final TerminalTier tier;
 	/** The size it powers on at, and the largest it can be. */
@@ -199,6 +201,18 @@ public final class Terminal implements Device {
 		return live != null ? live : new VtDecoder.Screen(buffer.rows(), buffer.foregrounds(), buffer.backgrounds());
 	}
 
+	/** The screen's pictures as it is, scrolled back or not (what a save keeps), as {@link com.payonel.modularcomputers.display.Tiles#screen} encodes them. */
+	public int[] tiles() {
+		if (liveTiles == null) {
+			return com.payonel.modularcomputers.display.Tiles.screen(buffer);
+		}
+		TextBuffer copy = new TextBuffer(buffer.resolution());
+		for (int row = 0; row < liveTiles.length; row++) {
+			copy.setRowTiles(row, liveTiles[row]);
+		}
+		return com.payonel.modularcomputers.display.Tiles.screen(copy);
+	}
+
 	/** Lines kept in its scrollback. */
 	public int scrollbackLines() {
 		return history.size();
@@ -220,6 +234,10 @@ public final class Terminal implements Device {
 		}
 		if (viewOffset == 0) {
 			live = screen();
+			liveTiles = new int[buffer.resolution().rows()][][];
+			for (int row = 0; row < liveTiles.length; row++) {
+				liveTiles[row] = buffer.rowTiles(row);
+			}
 		}
 		viewOffset = target;
 		if (viewOffset == 0) {
@@ -240,6 +258,7 @@ public final class Terminal implements Device {
 				int[] foregrounds = java.util.Arrays.copyOfRange(live.foregrounds(), screenRow * columns, (screenRow + 1) * columns);
 				int[] backgrounds = java.util.Arrays.copyOfRange(live.backgrounds(), screenRow * columns, (screenRow + 1) * columns);
 				buffer.setRow(row, live.rows().get(screenRow), foregrounds, backgrounds);
+				buffer.setRowTiles(row, liveTiles[screenRow]); // (the scrollback keeps text: pictures only on the screen)
 			}
 		}
 	}
@@ -265,7 +284,11 @@ public final class Terminal implements Device {
 	private void showLive() {
 		buffer.setRows(live.rows());
 		buffer.setColors(live.foregrounds(), live.backgrounds());
+		for (int row = 0; row < liveTiles.length; row++) {
+			buffer.setRowTiles(row, liveTiles[row]);
+		}
 		live = null;
+		liveTiles = null;
 	}
 
 	/** What rings at a BEL (\a): its block's bell. */
