@@ -313,6 +313,9 @@ made: a world's disks keep their old mcos; tests copy afresh.
 - Typing more than 256 keys at once in a test drops the rest (a terminal's key queue): split lines.
 - Lua 5.5 for-loop variables are constants (a compile error when the script loads: `LuaScriptsTest`
   compiles every script). A `]]` ends a `[[...]]` string: use `[=[...]=]`.
+- mcos's `io` is C's stdio: `file:read(n)` is `fread`, which waits until it has all n bytes or the
+  end. A program passing a stream on (a device's events, a terminal) reads the descriptor
+  (`sys.read(file.fd, n)`: what's there now, as `read(2)`), as `cat` does.
 - Lua inside a Java text block is unescaped twice (Java's, then Lua's): use long strings
   (`[[\d]]`) for patterns, and capture a test program's stderr (`2> /err`) to see why it failed.
 - Mouse buttons are SDL-numbered (left 1, right 3): use the constants. SDL sends typed characters

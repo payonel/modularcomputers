@@ -327,6 +327,17 @@ class McosTest {
 	}
 
 	@Test
+	void catPassesASensorsEventsOnAsTheyComeNotWhenItsReadFills() {
+		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
+		devices.put(Motherboard.exp(0), motion); // (a card in a slot, as in a case)
+		boot();
+		type("cat /dev/motion0 | head -n 1 > /m\r"); // (head ends at its line; cat goes on until it writes again)
+		untilIdle();
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
+		untilFile(root().resolve("m"), "minecraft:pig 1.5 0.0 -3.0\n");
+	}
+
+	@Test
 	void tailFollowsASensorsFileShowingWhatWaitsThenEachEventAsItComes() {
 		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
 		devices.put(Motherboard.exp(0), motion); // (a card in a slot, as in a case)

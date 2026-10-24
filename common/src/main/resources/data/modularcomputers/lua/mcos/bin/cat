@@ -1,11 +1,18 @@
--- cat [file...]: the files' contents, one after another, to stdout; stdin with none (or "-").
+-- cat [file...]: the files' contents, one after another, to stdout; stdin with none (or "-"). Each
+-- read is the descriptor's own (read(2): what's there now, up to READ_SIZE) and goes out at once,
+-- as GNU cat's, so a file that never ends (a sensor's events, a terminal) shows each piece as it
+-- comes; io's read(n) is fread's, which waits until it has all n.
+local sys = require("sys")
+
+local READ_SIZE = 4096 -- the most one read takes
+
 local status = 0
 local files = #arg > 0 and arg or {"-"}
 for _, path in ipairs(files) do
   local file, why = io.stdin, nil
   if path ~= "-" then
     file, why = io.open(path, "r")
-    local st = require("sys").stat(path)
+    local st = sys.stat(path)
     if file and st and st.type == "directory" then
       file:close()
       file, why = nil, path .. ": Is a directory" -- (its reads would fail: EISDIR)
@@ -16,11 +23,16 @@ for _, path in ipairs(files) do
     status = 1
   else
     while true do
-      local data = file:read(4096)
+      local data, failed = sys.read(file.fd, READ_SIZE)
       if not data then
+        io.stderr:write("cat: ", path, ": ", tostring(failed), "\n")
+        status = 1
+        break
+      elseif data == "" then
         break
       end
-      io.write(data)
+      io.stdout:write(data)
+      io.stdout:flush()
     end
     if file ~= io.stdin then
       file:close()

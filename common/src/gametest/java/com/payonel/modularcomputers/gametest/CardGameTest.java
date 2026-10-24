@@ -222,6 +222,26 @@ public class CardGameTest {
 			.thenSucceed();
 	}
 
+	@GameTest(maxTicks = 60)
+	public void aMotionSensorSeesAPlayerMove(GameTestHelper helper) {
+		MotionSensorCard card = computerWith(helper, ModItems.MOTION_SENSOR_CARD, MotionSensorCard.class);
+		var player = GameTests.serverPlayer(helper);
+		BlockPos at = helper.absolutePos(POS.north(3));
+		player.teleportTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5);
+		List<Map<?, ?>> seen = new ArrayList<>();
+		helper.startSequence()
+			.thenIdle(10)
+			.thenExecute(() -> player.teleportTo(player.getX() + 1, player.getY(), player.getZ()))
+			.thenWaitUntil(() -> {
+				Object event;
+				while ((event = card.pull(args()).first()) != null) {
+					seen.add((Map<?, ?>) event);
+				}
+				helper.assertTrue(seen.stream().anyMatch(e -> "minecraft:player".equals(e.get("mob"))), "saw the player: " + seen);
+			})
+			.thenSucceed();
+	}
+
 	/**
 	 * The whole way, in a world: mcos on a case with the least RAM (no cache: every read a call), a
 	 * motion sensor card put in while it runs, a pig, and a program reading the card's file.

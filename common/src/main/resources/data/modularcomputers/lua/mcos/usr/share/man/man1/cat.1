@@ -17,17 +17,23 @@ is
 .BR \- ,
 it reads standard input.
 .PP
-A file that cannot be opened is reported on standard error, and
+Each read takes what the file has now and writes it at once, so a file that
+never ends (a sensor's,
+.BR /dev/motion0 :
+an event a line) shows each piece as it comes.
+.PP
+A file that cannot be opened or read is reported on standard error, and
 .B cat
 goes on with the next one.
 .SH OPTIONS
 None.
 .SH EXIT STATUS
-0 if every file was read; 1 if any could not be opened.
+0 if every file was read; 1 if any could not be opened or read.
 .SH EXAMPLES
 .nf
 cat notes.txt
 cat head.txt \- tail.txt > all.txt
+cat /dev/motion0
 .fi
 .SH NOTES
 GNU
