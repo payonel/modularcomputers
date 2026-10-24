@@ -221,4 +221,41 @@ public class CardGameTest {
 			})
 			.thenSucceed();
 	}
+
+	/**
+	 * The whole way, in a world: mcos on a case with the least RAM (no cache: every read a call), a
+	 * motion sensor card put in while it runs, a pig, and a program reading the card's file.
+	 */
+	@GameTest(maxTicks = 1200) // (mcos boots off the disk: a board call a read)
+	public void mcosReadsAMotionSensorPutInWhileItRunsAsAMobMoves(GameTestHelper helper) {
+		helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
+		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		TestPrograms.withScreen(computer);
+		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
+		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER1_RAM));
+		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
+		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
+		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.TIER1_HARD_DISK));
+		java.util.UUID disk = computer.parts().getItem(CaseMenu.SATA_SLOTS).get(com.payonel.modularcomputers.item.ModComponents.SERIAL);
+		java.nio.file.Path seen = AllInOneBlockEntity.diskFolder(helper.getLevel().getServer(), disk).resolve("seen");
+		computer.pressPower();
+		var pig = helper.spawn(EntityTypes.PIG, POS.north(3));
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(computer.machine().runner().map(r -> r.state() == com.payonel.modularcomputers.runtime.Runner.State.WAITING)
+				.orElse(false) && computer.terminal().buffer().rows().stream().anyMatch(row -> row.contains("$")), "at the shell"))
+			.thenExecute(() -> computer.parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.MOTION_SENSOR_CARD))) // (put in while it runs)
+			.thenIdle(10)
+			.thenExecute(() -> "head -n 2 /dev/motion0 > /seen\r".chars().forEach(c -> computer.terminal().press(String.valueOf((char) c))))
+			.thenIdle(5)
+			.thenExecute(() -> pig.teleportTo(pig.getX() + 1, pig.getY(), pig.getZ())) // (it moved)
+			.thenWaitUntil(() -> {
+				try {
+					helper.assertTrue(java.nio.file.Files.isRegularFile(seen) && java.nio.file.Files.readString(seen).lines().count() == 2,
+						"two motions read; the screen: " + computer.terminal().buffer().rows());
+				} catch (java.io.IOException e) {
+					throw new java.io.UncheckedIOException(e);
+				}
+			})
+			.thenSucceed();
+	}
 }

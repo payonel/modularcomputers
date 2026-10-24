@@ -327,6 +327,19 @@ class McosTest {
 	}
 
 	@Test
+	void tailFollowsASensorsFileShowingWhatWaitsThenEachEventAsItComes() {
+		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
+		devices.put(Motherboard.exp(0), motion); // (a card in a slot, as in a case)
+		boot();
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0))); // (before tail starts)
+		untilIdle();
+		type("tail -f /dev/motion0 | head -n 2 > /m\r"); // (head ends at its second line; tail goes on, as GNU's, until it writes again)
+		untilIdle(); // tail shows the one waiting and follows
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:zombie", "x", 0.0, "y", 0.0, "z", 2.0)));
+		untilFile(root().resolve("m"), "minecraft:pig 1.5 0.0 -3.0\nminecraft:zombie 0.0 0.0 2.0\n");
+	}
+
+	@Test
 	void pollWaitsForARedstoneChangeOrAPipesDataOrItsTime() {
 		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
 		devices.put(Motherboard.exp(0), card); // (a card in a slot, as in a case)

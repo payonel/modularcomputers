@@ -36,7 +36,10 @@ added to (a disk file grown shorter, or a device whose state changed, as a
 redstone card's) is shown again from its start, after
 .BI "tail: " file ": file truncated"
 on standard error. A heading names the file when the text is another
-file's than the last shown. Standard input isn't followed.
+file's than the last shown. Standard input isn't followed. A device file is
+read only as far as it has something now, so one that never ends (a motion
+sensor's: an event a line) shows the last of the events waiting, then each
+as it comes.
 .TP
 .BI \-n " lines"
 The last
@@ -74,6 +77,7 @@ tail \-n 3 /init.lua
 tail \-n +2 list.txt
 ps | tail \-c 100
 tail \-f /dev/redstone0
+tail \-f /dev/motion0
 .fi
 .SH NOTES
 What another program writes to a file on a disk shows when it closes the
@@ -82,11 +86,12 @@ file (a disk's files take writes at close), so
 sees a line once its writer has closed the file;
 .B >>
 in the shell closes it at once.
-A device whose file never ends (a motion sensor's: an event a line) has no
-last lines to find, so
+GNU
 .B tail
-waits on it forever, as GNU's does; read it with
-.BR cat .
+reads a device's file to its end first, so on one that never ends (a
+sensor's events) it shows nothing; with
+.BR \-f ,
+this one reads only what the device has now, then follows it.
 A change made to a disk's file outside the computer (on the disk's host)
 isn't seen until the next change made inside it.
 .SH SEE ALSO

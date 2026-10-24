@@ -1,7 +1,9 @@
 -- tail [-f] [-n [+]lines] [-c [+]bytes] [-N] [file...]: the last lines (10) or bytes of each file,
 -- or of stdin; with +N, from line (or byte) N on. -f follows: once they're shown, it waits and shows
 -- what's added to the files, or a file again when it's rewritten (a redstone card's state changing),
--- until it's stopped (^C); not on stdin when it's a pipe, as tail.
+-- until it's stopped (^C); not on stdin when it's a pipe, as tail. A file that never ends (a
+-- sensor's events) is read, with -f, only as far as it has something now: its last lines of
+-- that, then each as it comes.
 local sys = require("sys")
 
 local READ_SIZE = 4096
@@ -71,13 +73,46 @@ local function last(file)
   return table.concat(kept)
 end
 
+-- With -f, a file that isn't a disk's (a device's) gives only what it has now: a stream that never
+-- ends (a sensor's events) would keep last() waiting for its end, showing nothing.
+local function now(file)
+  local fd, data = file.fd, {}
+  while next(sys.poll({[fd] = {IN = true}}, 0) or {}) do
+    local chunk = sys.read(fd, READ_SIZE)
+    if not chunk or chunk == "" then
+      break
+    end
+    data[#data + 1] = chunk
+  end
+  data = table.concat(data)
+  if bytes then
+    if from then
+      return string.sub(data, math.max(bytes, 1))
+    end
+    return bytes == 0 and "" or string.sub(data, -bytes)
+  end
+  local kept, n = {}, 0
+  for line in data:gmatch("[^\n]*\n?") do
+    if line ~= "" then
+      n = n + 1
+      if not from or n >= lines then
+        kept[#kept + 1] = line
+      end
+      if not from and #kept > lines then
+        table.remove(kept, 1)
+      end
+    end
+  end
+  return table.concat(kept)
+end
+
 local status = 0
 local followed = {} -- {path, file} each file to follow, left open
 for index, path in ipairs(files) do
   local file, why = io.stdin, nil
   if path ~= "-" then
     file, why = io.open(path)
-    local st = require("sys").stat(path)
+    local st = sys.stat(path)
     if file and st and st.type == "directory" then
       file:close()
       file, why = nil, path .. ": Is a directory" -- (its reads would fail: EISDIR)
@@ -90,7 +125,8 @@ for index, path in ipairs(files) do
     if #files > 1 then
       io.write(index > 1 and "\n" or "", "==> ", path == "-" and "standard input" or path, " <==\n")
     end
-    io.write(last(file))
+    local st = path ~= "-" and sys.stat(path)
+    io.write(follow and st and st.type ~= "file" and now(file) or last(file))
     if follow and file ~= io.stdin then
       followed[#followed + 1] = {path = path, file = file}
     elseif file ~= io.stdin then
