@@ -59,7 +59,7 @@ import net.minecraft.world.phys.Vec3;
  */
 public class AllInOneClientGameTest implements FabricClientGameTest {
 	/** Near-white: the display's text color. Nothing else in the checked areas is this bright. */
-	private static final int WHITE_THRESHOLD = 220;
+	private static final int WHITE_THRESHOLD = 200; // (tier 3's paper white, 222 218 208, is above it)
 	/** Ticks between right-clicks; the client ignores use clicks closer together than 4 ticks. */
 	static final int USE_COOLDOWN = 5;
 	/** Ticks between mouse clicks: 300 ms, past the double-click window. */

@@ -316,7 +316,7 @@ the farther it reaches (OC's wirelessCostPerRange); any tier hears any other.
   sized from the tier's own font (`TextGrid`).
 - **Each tier's glass and white** (`ColorDepth.glass`, `white`): a real screen is never pure black
   or white; the defaults (pure black and white, as a theme recolors them) show as the tier's (tier
-  2 a CRT's cool near black and white, tier 3 a charcoal and a warm white), every other color as
+  2 a CRT's cool near black and white, tier 3 a charcoal and a paper white), every other color as
   it is; the block textures' glass matches.
 - **Attributes as each tier's model showed them:** bold is the cell's (`TextBuffer.BOLD`, in the
   foreground's top byte, so it goes wherever the color goes) and drawn in the bold font; tier 1, a

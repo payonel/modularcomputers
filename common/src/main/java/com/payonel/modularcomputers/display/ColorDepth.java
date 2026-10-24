@@ -28,14 +28,14 @@ public enum ColorDepth {
 	/**
 	 * The glass and the default text of the color tiers (user, 2026-10-24: a real screen is never
 	 * pure black or pure white): tier 2's a VT525's CRT, near black with a faint blue cast and a white
-	 * phosphor's cool white; tier 3's a deep charcoal and a soft, slightly warm white. Only the
+	 * phosphor's cool white; tier 3's a deep charcoal and a paper white (the user's pick: warm enough to read as off-white). Only the
 	 * default colors (pure black and pure white, as a terminal's theme recolors its black and white):
 	 * every other color a program sets shows as it is.
 	 */
 	public static final int SIXTEEN_GLASS = 0x0A0C0F;
 	public static final int SIXTEEN_WHITE = 0xD8DEE6;
 	public static final int TRUE_COLOR_GLASS = 0x111315;
-	public static final int TRUE_COLOR_WHITE = 0xE8E6E1;
+	public static final int TRUE_COLOR_WHITE = 0xDEDAD0;
 
 	/**
 	 * The color a cell (its text, or its background) glows on the glass: what the decoder settled
