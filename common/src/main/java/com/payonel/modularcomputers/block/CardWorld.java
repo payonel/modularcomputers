@@ -21,7 +21,6 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.LevelEvent;
 import net.minecraft.world.level.block.SoundType;
@@ -89,8 +88,7 @@ public final class CardWorld {
 					sendSound(sound, level, pos, played);
 					if (!was) {
 						// It starts: audio sensors hear it as players' subtitles show it, once a start.
-						heard(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, com.payonel.modularcomputers.sound.ModSounds.SOUND_CARD,
-							SoundSource.RECORDS, 2);
+						heard(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, com.payonel.modularcomputers.sound.ModSounds.SOUND_CARD, 2);
 					}
 				}
 			}
@@ -201,10 +199,16 @@ public final class CardWorld {
 
 	/**
 	 * A sound the world played at {@code x, y, z}: each audio sensor at work in that world that a
-	 * player standing at its block would hear it from (the sound's own range, the game's) hears it.
+	 * player standing at its block would hear it from (the sound's own range, the game's) hears it,
+	 * as its subtitle ({@link Subtitles}): what it sounds like, not what made it. One without a
+	 * subtitle isn't heard (players get none for it either).
 	 */
-	public static void heard(ServerLevel level, double x, double y, double z, SoundEvent sound, SoundSource source, float volume) {
+	public static void heard(ServerLevel level, double x, double y, double z, SoundEvent sound, float volume) {
 		if (LISTENING.isEmpty()) {
+			return;
+		}
+		String subtitle = Subtitles.of(sound.location().toString());
+		if (subtitle == null) {
 			return;
 		}
 		double range = sound.getRange(volume);
@@ -217,8 +221,7 @@ public final class CardWorld {
 				continue;
 			}
 			Map<String, Object> event = new LinkedHashMap<>();
-			event.put("sound", sound.location().toString());
-			event.put("source", source.getName());
+			event.put("sound", subtitle);
 			event.putAll(where(watch.pos, x, y, z));
 			entry.getKey().hear(event);
 		}
@@ -236,13 +239,13 @@ public final class CardWorld {
 			BlockState state = Block.stateById(data);
 			if (!state.isAir()) {
 				SoundType sounds = state.getSoundType();
-				heard(level, x, y, z, sounds.getBreakSound(), SoundSource.BLOCKS, (sounds.getVolume() + 1) / 2); // (the client's volume)
+				heard(level, x, y, z, sounds.getBreakSound(), (sounds.getVolume() + 1) / 2); // (the client's volume)
 			}
 			return;
 		}
-		LevelSounds.LevelSound sound = LevelSounds.BY_EVENT.get(type);
+		SoundEvent sound = LevelSounds.BY_EVENT.get(type);
 		if (sound != null) {
-			heard(level, x, y, z, sound.sound(), sound.source(), 1);
+			heard(level, x, y, z, sound, 1);
 		}
 	}
 

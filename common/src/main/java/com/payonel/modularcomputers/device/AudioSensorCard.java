@@ -10,10 +10,9 @@ import java.util.Map;
 /**
  * An audio sensor card (user design, 2026-10-24): an event (its interrupt) for each sound the world
  * plays that a player standing at the block it's in would hear (the game's own range for that
- * sound), as the game's subtitles report sounds, and where: which sound ({@code sound}, its id:
- * {@code "minecraft:entity.pig.ambient"}), its category ({@code source}, the game's sound
- * categories: {@code "neutral"}, {@code "hostile"}, {@code "block"}...) and where it came from,
- * relative to the block's center ({@code x, y, z}). Its events wait in a buffer of its own, as the
+ * sound): what it sounds like, as its subtitle says it in English ({@code sound}: {@code "Pig
+ * oinks"}), and where it came from, relative to the block's center ({@code x, y, z}). It's blind,
+ * as the motion sensor is deaf: nothing of what made the sound (no id, no category, no mob). Its events wait in a buffer of its own, as the
  * motion sensor's do, until a program reads them, one each.
  */
 public final class AudioSensorCard extends Card {
@@ -27,12 +26,12 @@ public final class AudioSensorCard extends Card {
 		super(CardKind.AUDIO_SENSOR);
 	}
 
-	/** A sound it heard, in the world: {sound, source, x, y, z}. */
+	/** A sound it heard, in the world: {sound, x, y, z}. */
 	public void hear(Map<String, Object> event) {
 		events.add(event);
 	}
 
-	@Method(doc = "pull(): the oldest sound it heard, as {sound, source, x, y, z} (its id, its category, and where, relative to the block it's in), or nil")
+	@Method(doc = "pull(): the oldest sound it heard, as {sound, x, y, z} (its subtitle, in English: \"Pig oinks\"; and where, relative to the block it's in), or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}

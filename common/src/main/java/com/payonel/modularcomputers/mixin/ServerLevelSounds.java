@@ -23,14 +23,14 @@ public abstract class ServerLevelSounds {
 		at = @At("HEAD"))
 	private void modularcomputers$soundAt(Entity except, double x, double y, double z, Holder<SoundEvent> sound, SoundSource source, float volume,
 		float pitch, long seed, CallbackInfo info) {
-		CardWorld.heard((ServerLevel) (Object) this, x, y, z, sound.value(), source, volume);
+		CardWorld.heard((ServerLevel) (Object) this, x, y, z, sound.value(), volume);
 	}
 
 	@Inject(method = "playSeededSound(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/entity/Entity;Lnet/minecraft/core/Holder;Lnet/minecraft/sounds/SoundSource;FFJ)V",
 		at = @At("HEAD"))
 	private void modularcomputers$soundOn(Entity except, Entity on, Holder<SoundEvent> sound, SoundSource source, float volume, float pitch, long seed,
 		CallbackInfo info) {
-		CardWorld.heard((ServerLevel) (Object) this, on.getX(), on.getY(), on.getZ(), sound.value(), source, volume);
+		CardWorld.heard((ServerLevel) (Object) this, on.getX(), on.getY(), on.getZ(), sound.value(), volume);
 	}
 
 	@Inject(method = "levelEvent", at = @At("HEAD"))
