@@ -13,9 +13,9 @@ The kernel's name for it: its type and its place among devices of that
 type in bus order
 .RB ( terminal0 ,
 .BR storage1 ).
-A device with data to read or write (the EEPROM) has a file by that name
-in
-.IR /dev .
+Every device has a file by that name in
+.IR /dev ,
+whose ioctls are its methods.
 .TP
 .B TYPE
 What kind of device it is.

@@ -18,7 +18,7 @@ hidden: true
 <strong>lsdev</strong> lists the devices on the computer's bus, as a table with a header row:
 
 <strong>NAME</strong>
-: The kernel's name for it: its type and its place among devices of that type in bus order (<strong>terminal0</strong>, <strong>storage1</strong>). A device with data to read or write (the EEPROM) has a file by that name in <em>/dev</em>.
+: The kernel's name for it: its type and its place among devices of that type in bus order (<strong>terminal0</strong>, <strong>storage1</strong>). Every device has a file by that name in <em>/dev</em>, whose ioctls are its methods.
 
 <strong>TYPE</strong>
 : What kind of device it is.

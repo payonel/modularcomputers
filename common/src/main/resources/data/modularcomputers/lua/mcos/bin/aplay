@@ -1,7 +1,7 @@
 -- aplay [-D device] [file...]: plays WAV files on a sound card (/dev/dsp, or -D's), one after
 -- another; stdin with none (or "-"). A file's header says its format: PCM (unsigned 8-bit or signed
 -- 16-bit) or IMA ADPCM, mono or stereo, at a rate the card plays (8000, 11025, 22050, 44100); aplay
--- sets the card to it (OSS's ioctls) and writes the data as it reads it (a write waits while the
+-- sets the card to it (OSS's ioctls, and the card's setFormat for an ADPCM block's size) and writes the data as it reads it (a write waits while the
 -- card's buffer is full), then waits for what it queued to play out (SNDCTL_DSP_SYNC), as ALSA's
 -- aplay drains. A file it can't play is reported, and it goes on with the next.
 local sys = require("sys")

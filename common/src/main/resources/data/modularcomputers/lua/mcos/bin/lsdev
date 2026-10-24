@@ -1,5 +1,5 @@
 -- lsdev [-i]: the devices on the bus, as the kernel knows them (sys.devices: it may be a moment
--- behind a change): each one's name (/dev's, when it has data there), type, path (the slot it's in,
+-- behind a change): each one's name (its /dev file's), type, path (the slot it's in,
 -- or - when it's cabled) and label, in bus order; -i its id too.
 local sys = require("sys")
 

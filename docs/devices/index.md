@@ -49,8 +49,9 @@ There are two ways, and which one you use depends on where your code runs.
 ### In mcos: files in /dev
 
 Programs under [mcos](/mcos/) never call a device directly. The kernel owns every device and shows
-the ones that have data as files in [/dev](/mcos/dev/). You open a file, read it, write it, or poll
-it, as on Linux. Each device page has an *In mcos* section saying what its file does.
+every one as a file in [/dev](/mcos/dev/). You open a file, read it, write it, or poll it, as on
+Linux, and its ioctls are the device's methods by name: `sys.ioctl(fd, "push", "front")` calls a
+piston's `push`. Each device page has an *In mcos* section saying what its file does.
 
 ```sh
 lsdev -i
@@ -59,9 +60,10 @@ echo "north 15" > /dev/redstone0
 ```
 
 A device whose data is a table (a redstone card, a sensor) has a driver that turns it into text: a
-line a face, an event a line. Not every device has a file: a terminal is the console (`/dev/console`),
-a network card is used through sockets ([Networking](/mcos/networking/)), and a robotic piston has
-only methods.
+line a face, an event a line. A device with no data says what it is when read (its type, id and
+methods), and is used through its ioctls. A network card's data goes through sockets
+([Networking](/mcos/networking/)); its file is its traffic. Terminals are merged into the console
+(`/dev/console`).
 
 For everything else mcos offers (processes, sockets, polling), see the [sys API](/mcos/sys-api/).
 

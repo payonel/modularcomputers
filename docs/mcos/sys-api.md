@@ -189,7 +189,8 @@ if ready[sock] then print(sys.recvfrom(sock)) end
 ```
 
 A tty is ready to read when a line is; a pipe when it has data; a device file when an event waits;
-a disk's file is always ready.
+a disk's file is always ready. Any device's file has `PRI` while its device has news (its interrupt
+came since the file was last read or asked), so a program can wait for a device before asking it.
 
 ### sys.inotify() → fd, sys.watch(fd, path)
 `inotify` makes an open file whose reads are file changes, a line each: `CREATE`, `MODIFY`, `DELETE`,
