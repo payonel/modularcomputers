@@ -268,6 +268,11 @@ public final class Terminal implements Device {
 		live = null;
 	}
 
+	/** What rings at a BEL (\a): its block's bell. */
+	public void onBell(Runnable bell) {
+		decoder.onBell(bell);
+	}
+
 	public VtDecoder decoder() {
 		return decoder;
 	}

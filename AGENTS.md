@@ -275,6 +275,8 @@ card it reaches; nothing routes between the two networks.
   tool); nothing is wrapped again. The console's group is one size, the largest every member can
   show (UEFI's ConSplitter's common mode). Tests that look at pixels size the console 50×16 first
   (`TestPrograms.READABLE`): sub-pixel text is flaky to count.
+- **BEL rings the terminal's bell** at its block (`TerminalBell`, a sound from `scripts/art/bell.py`);
+  bells closer than 200 ms ring once (xterm's bellSuppressTime: `\a\a\a` is one beep).
 - **The server's decoder is the only one:** only changed rows go to players (the user rejected a
   client-side decoder: a client-only bug could show what the server never decoded).
 

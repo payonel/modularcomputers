@@ -18,6 +18,15 @@ class VtDecoderTest {
 	}
 
 	@Test
+	void aBelRingsTheTerminalsBellAndShowsNothing() {
+		int[] rang = {0};
+		vt.onBell(() -> rang[0]++);
+		vt.write("a\u0007b");
+		assertThat(rang[0]).isEqualTo(1);
+		assertThat(rows().getFirst()).startsWith("ab");
+	}
+
+	@Test
 	void textGoesAtTheCursorAndLfOnlyMovesDown() {
 		vt.write("ab\ncd");
 		assertThat(rows()).containsExactly("ab    ", "  cd  ", "      ");

@@ -97,6 +97,7 @@
 	"item.modularcomputers.redstone_card": "Redstone Card",
 	"item.modularcomputers.sound_card": "Sound Card",
 	"subtitles.modularcomputers.sound_card": "Sound card plays",
+	"subtitles.modularcomputers.bell": "Terminal beeps",
 	"hint.modularcomputers.details.sound_card": "Plays the samples programs write: PCM or IMA ADPCM, mono or stereo (two speakers, its block's left and right)",
 	"hint.modularcomputers.details.audio_sensor_card": "Hears the sounds a player at its block would, and where they came from",
 	"hint.modularcomputers.details.bluetooth_card": "Links blocks without a cable: right-click one that has a Bluetooth card. In a computer, programs can link it too",

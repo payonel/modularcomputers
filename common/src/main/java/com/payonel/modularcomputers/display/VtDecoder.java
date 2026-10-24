@@ -9,7 +9,7 @@ import java.util.function.Consumer;
  * on a {@link TextBuffer}, as a VT102 does, or a modern terminal emulator (xterm and its kind),
  * whose common subset every pty program assumes:
  * <ul>
- * <li>controls: CR, LF (VT, FF), BS, TAB, BEL (ignored);</li>
+ * <li>controls: CR, LF (VT, FF), BS, TAB, BEL (its terminal's bell: {@link #onBell});</li>
  * <li>cursor: CUP/HVP, CUU/CUD/CUF/CUB, CNL/CPL, CHA, VPA, save and restore (ESC 7/8, CSI s/u),
  * index, next line and reverse index (ESC D/E/M), and xterm's deferred wrap at the right edge;</li>
  * <li>erasing and editing: ED, EL, IL, DL, ICH, DCH, ECH, SU, SD, and a scroll region
@@ -126,6 +126,15 @@ public final class VtDecoder {
 	private final String attributes;
 
 	/** A full-color decoder that answers Device Attributes as a VT102. */
+	/** What a BEL does: its terminal's bell. */
+	private Runnable bell = () -> {
+	};
+
+	/** What rings when a BEL comes (its terminal's bell). */
+	public void onBell(Runnable bell) {
+		this.bell = bell;
+	}
+
 	public VtDecoder(TextBuffer buffer, Consumer<String> reply) {
 		this(buffer, reply, ColorDepth.TRUE_COLOR, "\u001B[?6c");
 	}
@@ -293,9 +302,7 @@ public final class VtDecoder {
 				pendingWrap = false;
 				x = Math.min(columns - 1, (x / TAB + 1) * TAB);
 			}
-			case '\u0007' -> {
-				// BEL: no bell yet
-			}
+			case '\u0007' -> bell.run();
 			default -> {
 				if (c >= ' ') {
 					print(c);

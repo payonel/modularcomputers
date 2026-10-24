@@ -9,6 +9,12 @@
 		],
 		"subtitle": "subtitles.modularcomputers.sound_card"
 	},
+	"bell": {
+		"sounds": [
+			"modularcomputers:bell"
+		],
+		"subtitle": "subtitles.modularcomputers.bell"
+	},
 	"error_beep": {
 		"sounds": [
 			"modularcomputers:error_beep"

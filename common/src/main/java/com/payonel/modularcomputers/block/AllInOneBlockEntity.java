@@ -121,6 +121,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	 * (a new one when a screen of another tier goes in). In a case without one it's off the bus.
 	 */
 	private Terminal display = new Terminal(TerminalTier.TIER_3);
+	/** Its terminal's bell, at the case. */
+	private final TerminalBell bell = new TerminalBell();
 	/** Devices made from the parts in the slots (by lane for drives and cards); null when empty. */
 	private final Disk[] disks = new Disk[CaseMenu.LANES];
 	/** The serials the disks were made for: another disk is another device, with its own data. */
@@ -243,6 +245,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		this.power = new PowerBuffer(tier.bufferCapacity());
 		display.setFlusher(this::syncDisplay);
 		display.onChange(this::markChanged);
+		display.onBell(() -> bell.ring(level, worldPosition));
 		machine.board().setChassis(new CaseChassis());
 		// How a log names it: which board, where.
 		machine.describedBy(() -> "board " + boardId + " at " + worldPosition.toShortString()
@@ -953,6 +956,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 					display = new Terminal(screenTier);
 					display.setFlusher(this::syncDisplay);
 					display.onChange(this::markChanged);
+					display.onBell(() -> bell.ring(level, worldPosition));
 				}
 				cards[lane] = null;
 				display.labelIn(ModComponents.labelOn(() -> parts.getItem(CaseMenu.EXP_SLOTS), this::markChanged)); // the screen's own

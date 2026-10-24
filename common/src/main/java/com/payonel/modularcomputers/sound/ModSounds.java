@@ -31,6 +31,8 @@ public final class ModSounds {
 	/** A tiny zap as a backup battery connects. */
 	public static final SoundEvent BATTERY_INSERT = register("battery_insert");
 	public static final SoundEvent BATTERY_REMOVE = register("battery_remove");
+	/** A terminal's bell: a BEL (\a) rings it (see scripts/art/bell.py). */
+	public static final SoundEvent BELL = register("bell");
 	/** A Sound Card's speaker: what it plays comes from its stream, not a file (its file only stands in). */
 	public static final SoundEvent SOUND_CARD = register("sound_card");
 

@@ -26,6 +26,8 @@ import net.minecraft.world.level.block.RedstoneLampBlock;
 /** Cards that work where they're installed (user design, 2026-10-13): redstone, weather, motion. */
 public class CardGameTest {
 	private static final BlockPos POS = new BlockPos(4, 2, 4);
+	/** How long the bell test waits between its bells, in ticks: past a bell's suppression. */
+	private static final int BELL_GAP_TICKS = 20;
 	/** How long the test computer's program waits at a time (it waits on, so its cards take data). */
 	private static final double WAIT_SECONDS = 1000;
 
@@ -289,6 +291,28 @@ public class CardGameTest {
 			})
 			.thenExecute(() -> helper.assertTrue(heard.stream().anyMatch(event -> "modularcomputers:sound_card".equals(event.get("sound"))),
 				"the sensor heard it start: " + heard))
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 100)
+	public void aBelRingsTheTerminalsBellOnceForBellsCloseTogether(GameTestHelper helper) {
+		var sensor = computerWith(helper, ModItems.AUDIO_SENSOR_CARD, com.payonel.modularcomputers.device.AudioSensorCard.class);
+		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		TestPrograms.withScreen(computer); // (its terminal: a screen in its gold slot)
+		List<Map<?, ?>> heard = new ArrayList<>();
+		helper.startSequence()
+			.thenIdle(BELL_GAP_TICKS) // (the sensor powered and listening)
+			.thenExecute(() -> computer.terminal().write("\u0007\u0007\u0007")) // (as a program's write comes)
+			.thenIdle(BELL_GAP_TICKS)
+			.thenExecute(() -> computer.terminal().write("\u0007"))
+			.thenWaitUntil(() -> {
+				Object event;
+				while ((event = sensor.pull(args()).first()) != null) {
+					heard.add((Map<?, ?>) event);
+				}
+				helper.assertValueEqual(heard.stream().filter(sound -> "modularcomputers:bell".equals(sound.get("sound"))).count(), 2L,
+					"\\a\\a\\a rings once, a \\a later again: " + heard);
+			})
 			.thenSucceed();
 	}
 

@@ -32,7 +32,11 @@ public final class ScreenBlockEntity extends CardHolderBlockEntity implements Di
 		display.setFlusher(this::serverTick); // right after a computer's turn changed it
 		// Minecraft writes only chunks marked changed: what it shows and the keys waiting change as it's used.
 		display.onChange(() -> ChunkMarks.changed(level, worldPosition));
+		display.onBell(() -> bell.ring(level, worldPosition));
 	}
+
+	/** Its bell: a BEL written to it rings here. */
+	private final TerminalBell bell = new TerminalBell();
 
 	@Override
 	public Terminal terminal() {
