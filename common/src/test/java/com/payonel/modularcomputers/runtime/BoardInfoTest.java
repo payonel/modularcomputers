@@ -16,6 +16,7 @@ import com.payonel.modularcomputers.machine.Eeprom;
 import com.payonel.modularcomputers.machine.Hardware;
 import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.machine.Motherboard;
+import com.payonel.modularcomputers.machine.TestBus;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,7 +27,7 @@ import org.junit.jupiter.api.Test;
 
 /** What the board tells a program of its case and devices (ACPI, SMBIOS, udev), and the EEPROM's contents. */
 class BoardInfoTest {
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())));
+	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
 	private final List<Object> seen = new ArrayList<>();
 
 	@AfterEach
@@ -91,18 +92,18 @@ class BoardInfoTest {
 		Disk disk = new Disk(DiskTier.TIER_2);
 		disk.labelFrom(() -> "backups");
 		Terminal terminal = new Terminal(Resolution.DEFAULT, TerminalTier.TIER_2);
-		Map<String, Device> devices = new LinkedHashMap<>();
-		devices.put("sata:0", disk);
-		devices.put("id:screen", terminal);
-		machine.setDevices(devices, Map.of("id:disk-1", "sata:0"));
+		machine.board().setCpu(new Cpu(CpuTier.TIER_2));
+		TestBus bus = new TestBus(machine);
+		String diskId = bus.disk(disk);
+		bus.cable("id:screen", terminal);
 		run(board -> {
-			seen.add(board.info("id:disk-1"));
+			seen.add(board.info(diskId));
 			seen.add(board.info("id:screen"));
 			seen.add(board.info("console"));
 			seen.add(board.info("sata:3"));
 			board.halt();
 		});
-		assertThat(seen.get(0)).isEqualTo(Optional.of(Map.of("address", "sata:0", "id", "id:disk-1", "type", "storage", "label", "backups",
+		assertThat(seen.get(0)).isEqualTo(Optional.of(Map.of("address", "sata:0", "id", diskId, "type", "storage", "label", "backups",
 			"tier", 2L, "capacity", (long) DiskTier.TIER_2.bytes(), "mode", "hfs")));
 		assertThat(seen.get(1)).as("no label unless named").isEqualTo(Optional.of(Map.of("address", "id:screen", "id", "id:screen",
 			"type", "terminal", "tier", 2L, "width", 50L, "height", 16L, "colors", 16L)));
@@ -134,8 +135,7 @@ class BoardInfoTest {
 			board.halt();
 		});
 		machine.board().setCpu(new Cpu(CpuTier.TIER_2));
-		machine.board().setEeprom(eeprom);
-		machine.setDevices(Map.of("eeprom", eeprom));
+		new TestBus(machine).eeprom(eeprom);
 		machine.pressPower();
 		assertThat(seen).containsExactly("", false, "print('hi')", 11L, false, 100_000L);
 		assertThat(written).as("each write goes to its storage").containsExactly("print('hi')", "x".repeat(100_000));

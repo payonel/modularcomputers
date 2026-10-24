@@ -30,7 +30,7 @@ class DiskTest {
 	@TempDir
 	Path world;
 
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())));
+	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
 	private final List<Object> seen = new ArrayList<>();
 	private Disk disk;
 
@@ -47,8 +47,8 @@ class DiskTest {
 
 	private void run(DiskTier tier, Program program) {
 		disk = new Disk(tier, storage());
-		machine.setDevices(Map.of("sata:0", disk));
 		machine.board().setCpu(new Cpu(CpuTier.TIER_3));
+		new com.payonel.modularcomputers.machine.TestBus(machine).disk(disk);
 		machine.board().setEeprom(new Eeprom(program));
 		machine.pressPower();
 		for (int i = 0; i < 20 && machine.runner().isPresent(); i++) {

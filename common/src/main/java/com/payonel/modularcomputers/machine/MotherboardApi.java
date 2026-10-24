@@ -143,21 +143,8 @@ final class MotherboardApi implements Board {
 
 	@Override
 	public List<String> waitForInterrupt(double seconds, String... sources) {
-		// The runner does the waiting; called directly, it doesn't wait. A source is answered by the
-		// name it was asked by (a card's id, or its slot's path).
-		List<String> raised = interrupts();
-		if (sources.length == 0) {
-			return raised;
-		}
-		List<String> ready = new ArrayList<>();
-		for (String address : raised) {
-			for (String source : sources) {
-				if (addressOf(source).equals(address) && !ready.contains(source)) {
-					ready.add(source);
-				}
-			}
-		}
-		return ready;
+		// The runner does the waiting; called directly, it doesn't wait.
+		return com.payonel.modularcomputers.runtime.DeviceNames.ready(this, interrupts(), List.of(sources));
 	}
 
 	@Override

@@ -14,15 +14,14 @@ import java.util.Optional;
  * itself, as on a real PC. The order is set by {@link BusOrder}.
  */
 public final class Bus {
-	private Map<String, Device> devices;
+	private Map<String, Device> devices = Map.of();
 	/** Other names for devices on the bus (a card's id), each to its address. */
 	private Map<String, String> aliases = Map.of();
 	private BusStatus status = BusStatus.EMPTY;
 	private int changes;
 
-	/** A bus of these devices, addressed by position (for tests and before the first real order). */
-	public Bus(List<Device> devices) {
-		this.devices = numbered(devices);
+	/** An empty bus: its motherboard puts the devices on it ({@code Motherboard.layout}), as a case's parts and cables give them. */
+	public Bus() {
 	}
 
 	public List<Device> devices() {
@@ -73,12 +72,10 @@ public final class Bus {
 		this.status = status;
 	}
 
-	/** Replaces the devices, by address, in bus order: a part went in or out, a cable was plugged, a reorder. */
-	public void setDevices(Map<String, Device> devices) {
-		setDevices(devices, Map.of());
-	}
-
-	/** {@link #setDevices(Map)}, with other names for some of them: {@code aliases} maps each to an address. */
+	/**
+	 * Replaces the devices, by address, in bus order (a part went in or out, a cable was plugged, a
+	 * reorder), with other names for some of them: {@code aliases} maps each to an address.
+	 */
 	public void setDevices(Map<String, Device> devices, Map<String, String> aliases) {
 		this.aliases = Map.copyOf(aliases);
 		Map<String, Device> next = new LinkedHashMap<>(devices);
@@ -86,18 +83,5 @@ public final class Bus {
 			changes++;
 		}
 		this.devices = next;
-	}
-
-	/** Replaces the devices, addressed by position. */
-	public void setDevices(List<Device> devices) {
-		setDevices(numbered(devices));
-	}
-
-	private static Map<String, Device> numbered(List<Device> devices) {
-		Map<String, Device> numbered = new LinkedHashMap<>();
-		for (int i = 0; i < devices.size(); i++) {
-			numbered.put("device:" + i, devices.get(i));
-		}
-		return numbered;
 	}
 }

@@ -21,10 +21,17 @@ class BusPowerTest {
 	private final Terminal screen = new Terminal(Resolution.DEFAULT);
 
 	private static Machine machine(Program program) {
-		Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())));
+		Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
 		machine.board().setCpu(new Cpu(CpuTier.TIER_3));
 		machine.board().setEeprom(new Eeprom(program));
 		return machine;
+	}
+
+	/** The screen, cabled to {@code machine}. Returns its bus. */
+	private TestBus cabled(Machine machine) {
+		TestBus bus = new TestBus(machine);
+		bus.cable("id:screen", screen);
+		return bus;
 	}
 
 	private static final Program HALT = board -> {
@@ -48,7 +55,7 @@ class BusPowerTest {
 	@Test
 	void aHaltedCpuDrawsNothingButItsTerminalsDo() {
 		Machine machine = machine(HALT);
-		machine.setDevices(Map.of("id:screen", screen));
+		cabled(machine);
 		machine.pressPower();
 		assertThat(machine.runner()).as("halted").isEmpty();
 		machine.powerUse(1000);
@@ -74,7 +81,7 @@ class BusPowerTest {
 	@Test
 	void eachCpuTierDrawsItsOwnRunningAndWaiting() {
 		for (CpuTier tier : CpuTier.values()) {
-			Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())));
+			Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
 			machine.board().setCpu(new Cpu(tier));
 			machine.board().setEeprom(new Eeprom(board -> {
 				board.list();
@@ -94,7 +101,7 @@ class BusPowerTest {
 	void disksDrawLessAtHigherTiers() {
 		for (DiskTier tier : DiskTier.values()) {
 			Machine machine = machine(HALT);
-			machine.setDevices(Map.of("sata:0", new Disk(tier)));
+			new TestBus(machine).disk(new Disk(tier));
 			machine.pressPower();
 			machine.powerUse(100);
 			assertThat(machine.powerUse(120)).as(tier.name()).isEqualTo(20L * tier.draw());
@@ -112,7 +119,7 @@ class BusPowerTest {
 			}
 			board.waitForInterrupt(3600);
 		});
-		machine.setDevices(Map.of("id:screen", screen));
+		cabled(machine);
 		assertThat(machine.currentDraw()).as("off").isZero();
 		machine.pressPower();
 		machine.tick();
@@ -131,29 +138,31 @@ class BusPowerTest {
 			}
 			board.halt();
 		});
-		machine.setDevices(Map.of("id:screen", screen));
+		cabled(machine);
 		machine.pressPower();
 		assertThat(machine.powerUse(0)).as("one tick of CPU, and 8 writes").isEqualTo(CpuTier.TIER_3.running() + 8 * PowerUnits.TERMINAL_WRITE);
 	}
 
 	@Test
-	void aSharedTerminalIsPaidForOnceAndStaysLitWhileAnyComputerSuppliesIt() {
+	void aTerminalTwoComputersReachIsOnOneBusAtATimeAndPaidForByThatOne() {
 		Machine first = machine(HALT);
 		Machine second = machine(HALT);
-		first.setDevices(Map.of("id:screen", screen));
-		second.setDevices(Map.of("id:screen", screen));
+		cabled(first);
+		TestBus other = cabled(second);
+		assertThat(second.board().bus().devices()).as("the first holds it").doesNotContain(screen);
 		first.pressPower();
 		second.pressPower();
 		first.powerUse(0);
 		second.powerUse(0);
 		assertThat(first.powerUse(40)).isEqualTo(40 * PowerUnits.TERMINAL);
-		assertThat(second.powerUse(40)).as("already paid").isZero();
+		assertThat(second.powerUse(40)).as("not on its bus").isZero();
 
-		first.pressPower(); // off
-		assertThat(screen.buffer().isBlank()).as("the other computer still powers it").isFalse();
-		assertThat(second.powerUse(60)).as("now the other pays").isEqualTo(20 * PowerUnits.TERMINAL);
-		second.pressPower();
-		assertThat(screen.buffer().isBlank()).as("no power: dark").isTrue();
+		first.removed(); // broken: it lets go, and the screen goes dark
+		assertThat(screen.buffer().isBlank()).isTrue();
+		other.cable("id:screen", screen); // the other lays its bus out again, and takes it
+		assertThat(screen.power().powered()).as("the other powers it now").isTrue();
+		second.powerUse(60);
+		assertThat(second.powerUse(80)).as("and pays").isEqualTo(20 * PowerUnits.TERMINAL);
 	}
 
 	@Test
@@ -163,7 +172,7 @@ class BusPowerTest {
 			board.waitForInterrupt(1000, "nothing");
 			board.halt();
 		});
-		machine.setDevices(Map.of("id:screen", screen));
+		cabled(machine);
 		machine.pressPower();
 		screen.press("a");
 		assertThat(screen.interruptPending()).as("a running program's terminal takes keys").isTrue();
@@ -176,7 +185,7 @@ class BusPowerTest {
 	@Test
 	void aComputerThatGoesAwayLeavesItsTerminalsDark() {
 		Machine machine = machine(HALT);
-		machine.setDevices(Map.of("id:screen", screen));
+		cabled(machine);
 		machine.pressPower();
 		assertThat(screen.buffer().isBlank()).isFalse();
 		machine.removed();
@@ -188,10 +197,10 @@ class BusPowerTest {
 	void aTerminalThatLeavesTheBusLosesPowerAndOneThatJoinsGetsIt() {
 		Machine machine = machine(HALT);
 		machine.pressPower();
-		machine.setDevices(Map.of("id:screen", screen));
+		TestBus bus = cabled(machine);
 		assertThat(screen.power().powered()).isTrue();
 		assertThat(screen.buffer().row(0).strip()).as("the console redrawn on it").isEqualTo("hi");
-		machine.setDevices(Map.of());
+		bus.uncable("id:screen");
 		assertThat(screen.power().powered()).isFalse();
 		assertThat(screen.buffer().isBlank()).isTrue();
 	}

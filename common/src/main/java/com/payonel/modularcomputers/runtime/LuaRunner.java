@@ -257,6 +257,8 @@ public final class LuaRunner implements Runner {
 		 * here, with what else of the VM's the host keeps, as the C function finds it from its state.
 		 */
 		volatile List<String> raised = List.of();
+		/** The names the program uses for devices: how a raised address reaches it ({@link DeviceNames}). */
+		final DeviceNames names = new DeviceNames();
 		/** Handles Lua collected unclosed, for the server thread to let go ({@link Handle#abandon}). */
 		final ConcurrentLinkedQueue<Handle> abandoned = new ConcurrentLinkedQueue<>();
 		/** What devices hold for the program outside the VM (a file's buffered writes): any thread. */
@@ -509,6 +511,7 @@ public final class LuaRunner implements Runner {
 		synchronized (memory.push) {
 			int now = (int) Math.max(0, free - memory.push.inFlight.getOrDefault(address, 0));
 			Integer before = memory.push.credit.put(address, now);
+			memory.names.use(address);
 			more = now > 0 && (before == null || before <= 0);
 		}
 		if (more) {
@@ -810,37 +813,10 @@ public final class LuaRunner implements Runner {
 	/** The board it last ran on (server thread): it knows the devices' other names. */
 	private Board board;
 
-	/**
-	 * Interrupts are raised at bus addresses; the program may know a device by another name (a
-	 * card's id, as mcos names every device that has one). Each raised address goes back by the name
-	 * the program used for it (in a wait, a read, a ring), so every comparison with the program's
-	 * names holds. Server thread.
-	 */
+	/** Raised addresses by the program's names ({@link DeviceNames}). Server thread. */
 	private List<String> named(List<String> raised) {
 		Board on = board;
-		if (on == null || raised.isEmpty()) {
-			return raised;
-		}
-		Set<String> names = new java.util.LinkedHashSet<>(wanted);
-		Wait waiting = wait;
-		if (waiting != null) {
-			names.addAll(waiting.sources());
-			names.addAll(waiting.held().keySet());
-		}
-		synchronized (memory.push) {
-			names.addAll(memory.push.credit.keySet());
-		}
-		Map<String, String> byAddress = new java.util.HashMap<>();
-		for (String name : names) {
-			String address = on.addressOf(name);
-			if (!address.equals(name)) {
-				byAddress.putIfAbsent(address, name);
-			}
-		}
-		if (byAddress.isEmpty()) {
-			return raised;
-		}
-		return raised.stream().map(address -> byAddress.getOrDefault(address, address)).toList();
+		return on == null ? raised : memory.names.named(on, raised);
 	}
 
 	/**
@@ -1151,6 +1127,7 @@ public final class LuaRunner implements Runner {
 				Object[] rest = args.size() > 2 ? args.subList(2, args.size()).toArray() : new Object[0];
 				if (rest.length == 0 && target instanceof String address && board.streamMethod(address).filter(method::equals).isPresent()) {
 					wanted.add(address); // the program reads this stream: the inbox may cache it from now on
+					memory.names.use(address);
 				}
 				return target instanceof Handle handle ? board.invoke(handle, method, rest) : board.invoke(String.valueOf(target), method, rest);
 			};
@@ -1215,6 +1192,8 @@ public final class LuaRunner implements Runner {
 			map.forEach((address, count) -> held.put(String.valueOf(address), count instanceof Long n ? n.intValue() : 0));
 		}
 		List<String> sources = said.stream().skip(3).map(String::valueOf).toList();
+		memory.names.useAll(sources);
+		memory.names.useAll(held.keySet());
 		Wait request = new Wait(deadline < 0 ? Long.MAX_VALUE : deadline, sources, held, new CompletableFuture<>());
 		wait = request;
 		serveSoon.run(); // it may be over already

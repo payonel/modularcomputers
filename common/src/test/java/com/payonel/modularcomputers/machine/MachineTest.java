@@ -13,7 +13,11 @@ import org.junit.jupiter.api.Test;
 
 class MachineTest {
 	private final Terminal display = new Terminal(Resolution.DEFAULT);
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of(new Disk(DiskTier.TIER_1), display, new Disk(DiskTier.TIER_1)))));
+	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+	/** The case's devices once it has a CPU: two disks and a cabled screen. */
+	private TestBus bus;
+	private static final String DISPLAY = "id:display";
+	private static final String PLUGGED = "id:plugged";
 
 	/** The tests' own program, not the mod's stand-in firmware (which changes). */
 	private static final String GREETING = "hello world";
@@ -24,6 +28,12 @@ class MachineTest {
 
 	private Machine withParts(boolean cpu, Program program) {
 		machine.board().setCpu(cpu ? new Cpu(CpuTier.TIER_3) : null);
+		if (cpu) {
+			bus = new TestBus(machine);
+			bus.disk(new Disk(DiskTier.TIER_1));
+			bus.cable(DISPLAY, display);
+			bus.disk(new Disk(DiskTier.TIER_1));
+		}
 		machine.board().setEeprom(program == null ? null : new Eeprom(program));
 		return machine;
 	}
@@ -61,9 +71,10 @@ class MachineTest {
 	@Test
 	void withoutPowerPressingPowerDoesNothingEvenWithoutACpu() {
 		boolean[] power = {false};
-		Machine unpowered = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of(display))), () -> power[0]);
+		Machine unpowered = new Machine(new Motherboard(Hardware.allInOne(), new Bus()), () -> power[0]);
 		assertThat(unpowered.pressPower()).isEqualTo(Machine.PowerPress.NO_POWER);
 		unpowered.board().setCpu(new Cpu(CpuTier.TIER_3));
+		new TestBus(unpowered).cable(DISPLAY, display);
 		unpowered.board().setEeprom(new Eeprom(HELLO));
 		assertThat(unpowered.pressPower()).isEqualTo(Machine.PowerPress.NO_POWER);
 		assertThat(unpowered.isPowered()).isFalse();
@@ -98,7 +109,7 @@ class MachineTest {
 		List<List<String>> seen = new java.util.ArrayList<>();
 		withParts(true, board -> { seen.add(board.list().stream().map(com.payonel.modularcomputers.runtime.Board.DeviceInfo::address).toList()); board.halt(); });
 		machine.pressPower();
-		assertThat(seen).containsExactly(List.of("device:0", "device:1", "device:2"));
+		assertThat(seen).containsExactly(List.of(Motherboard.sata(0), Motherboard.sata(1), DISPLAY)); // a case's own, in connector order, then the cabled
 	}
 
 	@Test
@@ -196,9 +207,7 @@ class MachineTest {
 		withParts(true, HELLO);
 		machine.pressPower();
 		Terminal plugged = new Terminal(Resolution.DEFAULT);
-		List<com.payonel.modularcomputers.bus.Device> devices = new java.util.ArrayList<>(machine.board().bus().devices());
-		devices.add(plugged);
-		machine.setDevices(devices);
+		bus.cable(PLUGGED, plugged);
 		assertThat(plugged.buffer().rows()).isEqualTo(screen().rows());
 		assertThat(plugged.buffer().isBlank()).isFalse();
 	}
@@ -208,7 +217,7 @@ class MachineTest {
 		withParts(true, HELLO);
 		Terminal plugged = new Terminal(Resolution.DEFAULT);
 		plugged.buffer().write(0, 0, "other");
-		machine.setDevices(List.of(display, plugged));
+		bus.cable(PLUGGED, plugged);
 		assertThat(plugged.buffer().row(0)).startsWith("other");
 	}
 
@@ -217,9 +226,9 @@ class MachineTest {
 		withParts(true, HELLO);
 		machine.pressPower();
 		Terminal plugged = new Terminal(Resolution.DEFAULT);
-		machine.setDevices(List.of(display, plugged));
+		bus.cable(PLUGGED, plugged);
 		assertThat(plugged.buffer().isBlank()).isFalse();
-		machine.setDevices(List.of(display));
+		bus.uncable(PLUGGED);
 		assertThat(plugged.buffer().isBlank()).isTrue();
 		assertThat(screen().isBlank()).isFalse();
 	}
@@ -227,9 +236,9 @@ class MachineTest {
 	@Test
 	void theConsoleRemembersWhatItShowedWhileHeadless() {
 		withParts(true, HELLO);
-		machine.setDevices(List.of());
+		bus.uncable(DISPLAY);
 		machine.pressPower();
-		machine.setDevices(List.of(display));
+		bus.cable(DISPLAY, display);
 		assertThat(screen().isBlank()).isFalse();
 	}
 }

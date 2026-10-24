@@ -13,8 +13,15 @@ import org.junit.jupiter.api.Test;
 
 /** The console as a tty: it sends text to every terminal in its group, after its output processing. */
 class ConsoleSplitterTest {
+	/** A console over a bus of these devices, cabled (a bus, alone: no case's rules to keep). */
 	private static ConsoleSplitter console(Device... devices) {
-		return new ConsoleSplitter(new Bus(List.of(devices)));
+		java.util.Map<String, Device> cabled = new java.util.LinkedHashMap<>();
+		for (int i = 0; i < devices.length; i++) {
+			cabled.put("id:device-" + i, devices[i]);
+		}
+		Bus bus = new Bus();
+		bus.setDevices(cabled, java.util.Map.of());
+		return new ConsoleSplitter(bus);
 	}
 
 	@Test
@@ -81,8 +88,8 @@ class ConsoleSplitterTest {
 		java.util.Map<String, com.payonel.modularcomputers.bus.Device> devices = new java.util.LinkedHashMap<>();
 		devices.put("id:small", small);
 		devices.put("id:big", big);
-		Bus bus = new Bus(List.of());
-		bus.setDevices(devices);
+		Bus bus = new Bus();
+		bus.setDevices(devices, java.util.Map.of());
 		ConsoleSplitter console = new ConsoleSplitter(bus);
 		assertThat(console.size()).isEqualTo(new Resolution(8, 4));
 		assertThat(big.buffer().resolution()).as("set to the console's size").isEqualTo(new Resolution(8, 4));

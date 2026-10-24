@@ -148,7 +148,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 			return ModComponents.label(parts.getItem(CaseMenu.EEPROM_SLOT));
 		}
 	};
-	private final Bus bus = new Bus(List.of()); // empty until a CPU is in
+	private final Bus bus = new Bus(); // empty until a CPU is in
 	private final PowerBuffer power;
 	private final CaseTier tier;
 	/** The motherboard's id: what Bluetooth cards link to. Made when the computer is placed, and saved. */

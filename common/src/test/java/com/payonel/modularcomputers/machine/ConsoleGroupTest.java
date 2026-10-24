@@ -3,7 +3,6 @@ package com.payonel.modularcomputers.machine;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.payonel.modularcomputers.bus.Bus;
-import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.console.ConsoleSplitter;
 import com.payonel.modularcomputers.device.Disk;
 import com.payonel.modularcomputers.device.DiskTier;
@@ -13,7 +12,6 @@ import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Board;
 import com.payonel.modularcomputers.runtime.Result;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -30,21 +28,24 @@ class ConsoleGroupTest {
 	private final Terminal first = new Terminal(Resolution.DEFAULT);
 	private final Terminal second = new Terminal(Resolution.DEFAULT);
 	private final Disk disk = new Disk(DiskTier.TIER_1);
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())));
+	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
 	private final List<Object> seen = new ArrayList<>();
+
+	private final TestBus bus;
+	/** Where the built-in terminal is: a case's own screen is in an expansion slot. */
+	private static final String BUILT_IN = Motherboard.exp(0);
 
 	ConsoleGroupTest() {
 		machine.board().setCpu(new Cpu(CpuTier.TIER_3));
+		bus = new TestBus(machine);
+		bus.plug(BUILT_IN, builtIn);
+		bus.disk(disk);
 		plug(Map.of("id:first", first, "id:second", second));
 	}
 
-	/** The built-in terminal and a disk, then these external terminals. */
+	/** These external terminals, cabled (in name order), with the built-in terminal and a disk. */
 	private void plug(Map<String, Terminal> external) {
-		Map<String, Device> devices = new LinkedHashMap<>();
-		devices.put("id:builtin", builtIn);
-		devices.put("sata:0", disk);
-		devices.putAll(new TreeMap<>(external));
-		machine.setDevices(devices);
+		bus.cabled(new TreeMap<>(external));
 	}
 
 	private ConsoleSplitter console() {
@@ -91,7 +92,7 @@ class ConsoleGroupTest {
 			seen.add(board.invoke("console", "terminals").first());
 			board.halt();
 		});
-		assertThat(seen).containsExactly(List.of("id:builtin", "id:first", "id:second"));
+		assertThat(seen).containsExactly(List.of(BUILT_IN, "id:first", "id:second"));
 	}
 
 	@Test
@@ -152,7 +153,7 @@ class ConsoleGroupTest {
 	void powerOffPutsEveryTerminalBackInTheGroup() {
 		bootLabellingScreens();
 		machine.pressPower();
-		assertThat(List.of("id:builtin", "id:first", "id:second")).allMatch(console()::isBound);
+		assertThat(List.of(BUILT_IN, "id:first", "id:second")).allMatch(console()::isBound);
 	}
 
 	@Test

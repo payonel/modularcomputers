@@ -386,10 +386,9 @@ local function pump()
   for _, nic in ipairs(interfaces()) do
     nics[nic.id] = true
     while true do
-      local ok, frame = board.invoke(nic.id, "receive")
+      local ok, frame = k.take(nic.id, "receive")
       if not (ok and frame) then
-        k.listen(nic.id)
-        break
+        break -- (k.take listens for the next)
       end
       receive(frame.data, frame.from)
     end

@@ -24,7 +24,7 @@ class CpuLoadTest {
 		}
 	}
 
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())));
+	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
 
 	private String boot(String image) {
 		machine.board().setCpu(new Cpu(CpuTier.TIER_1, Architecture.JAVA));

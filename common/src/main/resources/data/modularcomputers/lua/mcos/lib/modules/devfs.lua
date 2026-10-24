@@ -121,12 +121,11 @@ local function eventfile(id, driver)
     if at < #line then
       return true
     end
-    local ok, event = board.invoke(id, "pull")
+    local ok, event = k.take(id, "pull")
     if not ok then
       return failed(event)
     elseif event == nil then
-      k.listen(id)
-      return false
+      return false -- (k.take listens for the next)
     end
     line, at = driver and driver.get(event) or tostring(event) .. "\n", 0
     return true
@@ -179,7 +178,7 @@ local function devicefile(device, mode)
   local function drain()
     local any = false
     while true do
-      local ok, event = board.invoke(id, "pull")
+      local ok, event = k.take(id, "pull")
       if not ok or event == nil then
         return any or not ok
       end
@@ -204,10 +203,7 @@ local function devicefile(device, mode)
     -- the state changed since it was read from its start (as a GPIO's value file).
     events = function(self)
       if not changed and device.pull then
-        changed = drain()
-        if not changed then
-          k.listen(id)
-        end
+        changed = drain() -- (none: k.take listens for the next)
       end
       return {IN = true, PRI = changed, OUT = device.set ~= nil}
     end,

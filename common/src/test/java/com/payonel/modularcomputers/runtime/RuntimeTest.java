@@ -13,6 +13,7 @@ import com.payonel.modularcomputers.machine.Eeprom;
 import com.payonel.modularcomputers.machine.Hardware;
 import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.machine.Motherboard;
+import com.payonel.modularcomputers.machine.TestBus;
 import com.payonel.modularcomputers.machine.Program;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -58,14 +59,17 @@ class RuntimeTest {
 	private final Terminal display = new Terminal(Resolution.DEFAULT);
 	private final Sensor sensor = new Sensor();
 	private final boolean[] power = {true};
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())), () -> power[0]);
+	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()), () -> power[0]);
+
+	private final TestBus bus;
+	/** The sensor's id, when it's a card in a slot. */
+	private static final java.util.UUID CARD = java.util.UUID.fromString("00000000-0000-0000-0000-000000000007");
 
 	RuntimeTest() {
-		Map<String, Device> devices = new LinkedHashMap<>();
-		devices.put("id:screen", display);
-		devices.put("id:sensor-1", sensor);
-		machine.setDevices(devices);
 		machine.board().setCpu(new Cpu(CpuTier.TIER_3));
+		bus = new TestBus(machine);
+		bus.cable("id:screen", display);
+		bus.cable("id:sensor-1", sensor);
 	}
 
 	@AfterEach
@@ -114,23 +118,24 @@ class RuntimeTest {
 		});
 		assertThat(seen).containsExactly(
 			List.of(new Board.DeviceInfo("id:screen", "id:screen", "terminal"), new Board.DeviceInfo("id:sensor-1", "id:sensor-1", "sensor")),
-			"terminal", "console", List.of("getSize", "read", "write"), "read(): the oldest reading, or nil", List.of(50L, 16L, 50L, 16L), 0);
+			"terminal", "console", List.of("getSize", "read", "write"), "read(): the oldest reading, or nil", List.of(50L, 16L, 50L, 16L), CpuTier.TIER_3.busCapacity());
 	}
 
 	@Test
 	@SuppressWarnings("unchecked")
 	void aCardInACaseSlotAnswersToItsPathAndItsId() {
-		machine.setDevices(Map.of("id:screen", display, "exp:0", sensor), Map.of("id:card-7", "exp:0"));
+		bus.uncable("id:sensor-1");
+		String card = bus.plug(Motherboard.exp(0), sensor, CARD);
 		sensor.measure(7);
 		List<Object> seen = new ArrayList<>();
 		run(board -> {
 			seen.add(board.list());
-			seen.add(board.type("id:card-7").orElseThrow());
-			seen.add(board.invoke("id:card-7", "read").first());
+			seen.add(board.type(card).orElseThrow());
+			seen.add(board.invoke(card, "read").first());
 			board.halt();
 		});
 		assertThat((List<Object>) seen.get(0)).as("listed once, by its path, with its id").containsExactlyInAnyOrder(
-			new Board.DeviceInfo("id:screen", "id:screen", "terminal"), new Board.DeviceInfo("exp:0", "id:card-7", "sensor"));
+			new Board.DeviceInfo("id:screen", "id:screen", "terminal"), new Board.DeviceInfo("exp:0", card, "sensor"));
 		assertThat(seen.subList(1, 3)).containsExactly("sensor", 7L);
 	}
 
@@ -196,9 +201,9 @@ class RuntimeTest {
 			board.halt();
 		});
 		machine.tick();
-		machine.setDevices(Map.of("id:screen", display)); // the sensor was unplugged
+		bus.uncable("id:sensor-1"); // the sensor was unplugged
 		machine.tick();
-		assertThat(seen).containsExactly(List.of(Board.BUS), List.of("id:screen"));
+		assertThat(seen).containsExactly(List.of(Board.BUS), List.of("eeprom", "id:screen")); // (the EEPROM's in its slot, on the bus: laid out again, it's there)
 	}
 
 	@Test

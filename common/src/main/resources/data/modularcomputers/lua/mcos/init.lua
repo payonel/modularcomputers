@@ -985,7 +985,7 @@ end
 -- is gone; ERR; both come asked or not), waiting for one until 'seconds' pass (nil: as long as it
 -- takes); empty: the time passed. Each file says what's true of it now (its events: a tty's line,
 -- a pipe's data, a device's event or change); one that can't, a disk's file, always is readable and
--- writable, as on Linux. A device it waits on is listened to (k.listen).
+-- writable, as on Linux. A device it waits on is listened to (its driver reads it with k.take).
 local ALWAYS = {HUP = true, ERR = true}
 
 function syscalls.poll(p, request, fds, seconds)
@@ -1155,11 +1155,23 @@ local function run(p)
   -- (it yielded at its top: it gave up its turn, sched_yield)
 end
 
--- Devices a blocked read waits on (a sensor's events), by id: the idle wait listens to them too. A
--- read that still waits says so again (k.listen) each time it's retried.
+-- Devices a blocked read waits on (a sensor's events), by id: the idle wait listens to them too,
+-- until it ends; a read retried listens again. k.take is how a driver reads a device's stream, so
+-- a read that finds nothing listens by itself: no driver can block on a device it isn't heard from.
+-- k.listen is for hearing a device nothing reads now (the network's open connections).
 local listening = {}
 function k.listen(id)
   listening[id] = true
+end
+
+-- The next piece of a device's stream ('method': its pull, receive, changes), as board.invoke
+-- answers (ok, value); none waiting, the kernel listens for it.
+function k.take(id, method)
+  local ok, value = board.invoke(id, method)
+  if ok and value == nil then
+    listening[id] = true
+  end
+  return ok, value
 end
 
 -- Idles (the CPU's HLT) until a device has something, or the soonest sleeper's time.

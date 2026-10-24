@@ -33,7 +33,7 @@ public class Card implements Device {
 	}
 
 	/** Its id (its item's serial number), or null before it has one. */
-	protected java.util.UUID id() {
+	public java.util.UUID id() {
 		return id.get();
 	}
 

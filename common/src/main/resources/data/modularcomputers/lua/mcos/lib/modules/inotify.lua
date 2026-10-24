@@ -55,10 +55,9 @@ local function pump()
   for _, mount in ipairs(vfs.mounts) do
     local address = mount.fs.type == "hfs" and mount.fs.address
     while address do
-      local ok, change = board.invoke(address, "changes")
+      local ok, change = k.take(address, "changes")
       if not (ok and change) then
-        k.listen(address)
-        break
+        break -- (k.take listens for the next)
       end
       if change.lost then
         deliver("OVERFLOW")

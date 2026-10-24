@@ -1,513 +1,322 @@
-# Modular Computers: agent handoff
+# Modular Computers: an overview for agents
 
-`CLAUDE.md` imports this file. **What belongs here** (user, 2026-10-20), and nothing else:
+`CLAUDE.md` imports this file. It describes the code as it is and the decisions behind it, briefly,
+so an agent starts with the right picture. It holds no history (git has it) and no plans
+(`docs/PLAN.md` has them). The code and its comments are the truth for names, behavior and values;
+this file says what things are for and why. Keep it current: a change that alters what's here
+updates it in the same commit.
 
-1. the intent of the system: what it's for, its real use cases;
-2. how it's built and tested;
-3. architecture decisions and why they were made;
-4. lessons: when an agent made a bad call that took long to resolve (a test that never finished,
-   time spent root-causing the wrong thing), record what to do instead;
-5. nothing the code already says: **read the code for trusted information** (names, behavior,
-   values, file lists, what a command does); the code and its comments are the truth, this file only
-   says why;
-6. processes that aren't intuitive or are easy to miss (one change that needs another with it);
-7. the plan: what isn't built yet (section 6);
-8. this list.
+## What it is
 
-## 1. Intent
+**Modular Computers** is a mod for the latest Minecraft (Java), on Fabric and NeoForge, by payonel
+(GitHub), one of the original authors of **OpenComputers** (OC). It's OC's idea built again from
+scratch: computers players assemble from parts (case, CPU, RAM, EEPROM, disks, cards, screens,
+cables) and program in Lua, to automate their world (redstone, sensors, pistons) and to learn how
+computers really work.
 
-**Modular Computers** is a mod for the latest Minecraft (Java), on Fabric and NeoForge, by payonel (GitHub), one of
-the original authors of **OpenComputers** (OC). It's OC's idea built again from scratch: computers
-players assemble from parts (case, CPU, RAM, EEPROM, disks, cards, screens, cables) and program in
-Lua, to automate and control their world (redstone, sensors, pistons) and to learn how computers
-really work.
-
-- **Built green.** Never copy OC's code, build, versioning or addon process. Exception: OpenOS (the
-  user wrote it; MIT) may be ported. Use OC (clone at `~/code/OpenComputers`; `master-MC1.12` is
-  newest) only for feature ideas, when the user asks "how did OC do X?".
-- **Real hardware, real Linux.** The user designs by abstracting how real PCs and Linux work, then
-  choosing what to mimic or skip. Steps may be skipped, never invented ("no false steps"). Explain
-  the real-world mechanism first when discussing a design, and **say plainly when the code, or the
-  user's own idea, drifts from the real thing**; recommend the real behavior. Sometimes the user
-  picks convenience over realism (e.g. the REPL printing tables): that's their call.
-- **mcos** is the computers' OS: Linux-like, written in Lua, shipped on a crafted disk. The user
-  reviews it as a Linux user would; OpenOS is a source of ideas, not a model (no OpenOS legacy).
+- **Built green.** None of OC's code, build, versioning or addon process. OpenOS (the user wrote
+  it; MIT) may be ported. OC (`~/code/OpenComputers`, `master-MC1.12` newest) is only for ideas,
+  when the user asks how OC did something.
+- **Real hardware, real Linux.** Designs abstract how real PCs and Linux work, choosing what to
+  mimic or skip: steps may be skipped, never invented. Explain the real mechanism first when
+  discussing a design, and say plainly when the code, or the user's idea, drifts from it; recommend
+  the real behavior. Convenience over realism is sometimes the user's call.
+- **mcos** is the computers' OS: Linux-like, in Lua, on a crafted disk. The user reviews it as a
+  Linux user would; OpenOS is a source of ideas, not a model.
 - The user has been away from modding for years: explain ecosystem changes when relevant.
 
-## 2. Building, testing, working
+## Building and testing
 
-- **Toolchain:** Java 25 (Gradle provisions Temurin); three projects: `common` (all the mod's code,
-  built against the plain game with NeoForge's ModDevGradle in NeoForm mode), `fabric` (Loom) and
-  `neoforge` (ModDevGradle), each compiling common's sources into its own jar. Versions only in
-  `gradle.properties`. Minecraft is unobfuscated since 26.1: Mojang's names, no remapping. Verify
-  Minecraft, Fabric and NeoForge names against the jars (`javap`, or the sources jars in the Gradle
-  cache), not memory; many changed.
-- **Lua engine: LungoLua and StyxLua**, the user's own projects (a Java port of their Lua 5.5 fork,
-  with budgets, freezing and state persistence), taken as published jars from GitHub Packages (needs
-  `gpr.user`/`gpr.key` in `~/.gradle/gradle.properties`). **Never edit them**; report what they need
-  to the "lua thread", another agent session (a teammate: it can't grant permissions). **Always take
-  the latest published build of each** when told to update.
-- **Commands:** `./gradlew build` (seconds: compile + unit tests) while iterating; `./gradlew testAll`
-  (unit tests, the server game tests on both loaders, Fabric's client game tests on Xvfb against the
-  release jar) before claiming anything works. Details: `docs/TESTING.md`.
-- **Tests are the play-testing.** Build every feature around automated tests at the lowest layer
-  that can express it (plain-Java unit tests, then server game tests, then client game tests); a
-  visible feature gets a client test, and its screenshots get looked at. Keep machine logic in plain
-  Java so it's unit-testable; Minecraft glue thin.
-- **Tests bring their own programs** (Java `Program`s, or Lua files put on the test disk) and
-  **never assert on what mcos prints**, which changes. mcos tests check files on the disk and whether
-  the machine runs.
-- **Commits:** commit autonomously on `master` (`git add -A`) whenever an addition is done and
-  `testAll` passes; never with failing tests. **Never create branches; never push** (local only, no
-  remote). No model identifiers in commits or code. End messages with the co-author line.
+- **Projects:** Java 25 (Gradle provisions Temurin). `common` holds all the mod's code, built
+  against the plain game (NeoForge's ModDevGradle in NeoForm mode); `fabric` (Loom) and `neoforge`
+  (ModDevGradle) each compile common's sources into their jar. Versions live only in
+  `gradle.properties`. Minecraft is unobfuscated (Mojang's names); check Minecraft, Fabric and
+  NeoForge names against the jars (`javap`, sources jars in the Gradle cache), not memory.
+- **Lua engine:** LungoLua and StyxLua, the user's projects (a Java port of their Lua 5.5 fork, with
+  budgets, freezing and persistence), from GitHub Packages (`gpr.user`/`gpr.key` in
+  `~/.gradle/gradle.properties`). Never edit them; report needs and bugs to the "lua thread" (another
+  agent session; it can't grant permissions). Take the latest builds when told to update. Their bugs
+  look like ours: check against stock Lua's semantics.
+- **Commands:** `./gradlew build` (compile and unit tests, seconds); `./gradlew testAll` (unit tests,
+  server game tests on both loaders, Fabric client game tests on Xvfb against the release jar)
+  before claiming anything works. `docs/TESTING.md` has the details; `scripts/headless.sh` runs a
+  client on a virtual display (`:fabric:runClient` plays in `fabric/run`).
+- **Tests are the play-testing**, at the lowest layer that can express them: plain-Java unit tests,
+  then server game tests, then client game tests (a visible feature gets one, and its screenshots
+  get looked at). Machine logic stays plain Java; Minecraft glue stays thin.
+- **Tests bring their own programs** (Java `Program`s, or Lua files on the test disk) and never
+  assert on what mcos prints; they check files on the disk and whether the machine runs.
+- **A test's bus is a case's bus** (`TestBus`, in the tests' `machine` package): parts on the
+  motherboard's connectors, each answering to its id too, cabled devices by `id:` name, rebuilt
+  through the bus order. `Machine.setDevices` is private and a `Bus` starts empty, so no test can
+  build a bus no case builds.
+- **Every device type is checked the same way** (`DeviceInterruptsTest`): each card kind and device,
+  in a slot, wakes a program waiting on it by its id and by its slot, at the next tick. A new device
+  with an interrupt line fails until it's given a stimulus there.
+- **What only a real world shows** (a save that won't load, chunk loading): `scripts/devserver.sh`
+  runs a dedicated server on a copy of a world, with commands through a fifo and the server thread's
+  stack on request. A disk is a folder under the world's `modularcomputers/disks/<id>`: put a script
+  there, read what it wrote.
+- **Art and sounds** come from Python scripts in `scripts/` (Pillow, libsndfile via ctypes); their
+  outputs are committed, never edited by hand.
 - **Versioning:** `MAJOR.MINOR.PATCH+MCVERSION` (`docs/VERSIONING.md`), as Fabric API does.
-- **Art and sounds** are generated by Python scripts in `scripts/` (Pillow, libsndfile via ctypes);
-  their outputs are committed.
-- **The dev host:** headless Linux, Xvfb with Mesa llvmpipe for client tests, `sudo` needs the
-  user's password (ask them), **no Lua interpreter** (Lua runs only inside the tests).
-- **Keep this file current** as decisions are made.
+- **The dev host:** headless Linux, Xvfb with Mesa llvmpipe, `sudo` needs the user's password, no
+  Lua interpreter (Lua runs only in the tests).
 
-## 3. Architecture decisions, and why
+## Working rules
 
-**Words.** "Bus" and "device", never "component" (OC's word). **Host**: the Java side. **Firmware**:
-`machine.lua`, layer 0, unbudgeted, unreachable by user code. **User threads**: anything budgeted
-(`user_co` is the root). **Kernel**: mcos's kernel, which runs in user threads. The EEPROM is
-"eeprom" (user-modifiable), not firmware. "Modal mode" is the user's name for the screen view.
+- **Commits:** on `master` (`git add -A`), autonomously, when an addition is done and `testAll`
+  passes, gated on its exit status (never on grepping its log). Never branch, never push. No model
+  identifiers in commits or code. End messages with the co-author line.
+- **Words:** "bus" and "device", never "component" (OC's word). **Host**: the Java side.
+  **Firmware**: `machine.lua`, layer 0, unbudgeted, unreachable by user code. **User threads**:
+  anything budgeted (`user_co` is the root). **Kernel**: mcos's, in user threads. The EEPROM is
+  "eeprom", not firmware. "Modal mode" is the user's name for the screen view.
+- **Data has one home:** code reads and writes data where it lives (an item's component, a disk's
+  folder) through a small source, never a copy synced back. Point out the pattern when seen.
+- **Named constants**, each with a comment, for every tunable; no magic numbers.
+- **No old-save compatibility:** formats change freely, without shims.
+- **Debugging:** run one quick test before a long suite after a risky change
+  (`--tests '*McosTest.haltHalts'`, under `timeout`). A test that fails alone but passes with its
+  class is a timing bug (a cold JVM's slow board calls make a different, legal state): make that
+  state on purpose. Spawns failing at random are usually memory running out. Before shrinking
+  memory peaks, compare what stays resident to the minimum. A hang is a thread dump away.
+- **Subagents** doing file work in parallel get disjoint scopes and no bulk edits.
 
-**Data has one home** (user rule): code reads and writes data where it lives (an item's component,
-a disk's folder) through a small source, never a copy synced back; copies go stale. Point out the
-pattern when seen.
+## Layout
 
-**Named constants, never magic numbers**: tunables are named constants with a comment, until
-settings exist.
+- `common/src/main/java/com/payonel/modularcomputers/`: `block` (block entities, cables:
+  `Cabling`, `CardWorld`), `bus` (`Bus`, `BusOrder`, `BusHolds`, `BusPower`, `Device`,
+  `InterruptLine`), `device` (cards, disks, terminals), `machine` (`Machine`, `Motherboard`,
+  `MotherboardApi`, CPUs, EEPROM), `runtime` (`LuaRunner`, `Board`, `DeviceNames`, device methods),
+  `display` (`TextBuffer`, `VtDecoder`), `console` (`ConsoleSplitter`), `network` (packets), `menu`,
+  `item`, `power`, `platform` (`Platform`: what a loader must do).
+- `common/src/main/resources/data/modularcomputers/lua/`: `cpu/machine.lua` (the firmware),
+  `eeprom/` (the boot EEPROM), `mcos/` (the OS: `init.lua` the kernel, `lib/modules/` its modules,
+  `lib/` libraries, `bin/` programs, `etc/` settings, `usr/share/man/` man pages).
+- `fabric/`, `neoforge/`: each loader's entry point and test mod; `scripts/`: art, sound, host tools.
 
-**No old-save compatibility**: change formats freely, no shims. Old test worlds may break.
+## Decisions, and why
 
-**Two loaders, one mod** (user, 2026-10-20): Fabric and NeoForge (not MinecraftForge: the mods that
-kept up moved to NeoForge). Why NeoForge at all: the mods worth meeting (Ender IO's conduits, More
-Red's and Project Red's bundled cables) are NeoForge-only. The code is written once, against the
-plain game; each loader's project only starts it and adapts what the game can't do itself:
-- **Registration** stays the game's own `Registry.register`: Fabric allows it at any time, and
-  NeoForge keeps every registry open for its whole registration phase, so its entry point runs the
-  common init in its first `RegisterEvent`. No `DeferredRegister` layer.
-- **Packets** are the game's own (`ClientboundCustomPayloadPacket`); only registering them is the
-  loader's, from one list. A packet goes only to a client that takes it (NeoForge refuses otherwise).
-- **World saves** reach the mod through a mixin (`MinecraftServerSaves`), the same on both:
-  NeoForge has no event before a save.
-- **Server game tests are loader-neutral** (the mod's own `@GameTest`, registered by each loader's
-  test mod), so every one runs on both. **Client tests run on Fabric only** (user): NeoForge has no
-  client test harness; the only port of Fabric's found (Wurst-Imperium's, 2026-06) was unlicensed,
-  four commits old and on 26.1.2.
+### Two loaders, one mod
 
-**Items stack to 64**, except what holds data (EEPROMs, disks). A part that's been in a machine
-carries its id and stacks only with identical ones; crafting it alone clears it (a new device).
+Fabric and NeoForge (not MinecraftForge: the mods that kept up moved to NeoForge). Why NeoForge at
+all: the mods worth meeting (Ender IO's conduits, More Red's and Project Red's bundled cables) are
+NeoForge-only. Code is written once against the plain game; each loader only starts it and adapts
+what the game can't do:
+- **Registration** is the game's `Registry.register`: Fabric allows it any time; NeoForge's entry
+  point runs the common init in its first `RegisterEvent`. No `DeferredRegister` layer.
+- **Packets** are the game's (`ClientboundCustomPayloadPacket`); only registering them is the
+  loader's, from one list. A packet goes only to a client that takes it.
+- **World saves** reach the mod through a mixin (`MinecraftServerSaves`) on both: NeoForge has no
+  event before a save.
+- **Server game tests** are the mod's own `@GameTest`, registered by each loader's test mod, so all
+  run on both. **Client tests run on Fabric only**: NeoForge has no client test harness (the one
+  port of Fabric's found was unlicensed and abandoned).
 
-**The machine is a real PC, abstracted.** A CPU does nothing but run what the EEPROM holds (a fixed
-slot, like a reset vector), and aborts (ABRT, like a panic) when it can't. The motherboard owns the
-bus (case types change; the board's firmware doesn't). Devices are addressed three ways, as on a real
-system: by slot path (`sata:0`), by id (`id:<uuid>`, however connected), and virtual names
-(`console`, UEFI's ConSplitter). Bus order is UEFI-like: the case's slots fixed, external devices in
-a saved, player-ordered list kept by id (so late-loading chunks keep their place). A device is on one
-bus at a time; holds are worked out afresh as boards load, never saved (long cables and unloaded
-chunks would desync them).
+### Items
 
-**Power is lazy.** Devices and batteries settle what they owe when someone looks (every 20 ticks, or
-at an event), worked out from game time; nothing ticks per device (the user's worry for big builds).
+Items stack to 64, except what holds data (EEPROMs, disks). A part that's been in a machine carries
+its id and stacks only with identical ones; crafting it alone clears it (a new device).
 
-**The Lua CPU is three layers**, as a real CPU runs firmware under an OS: the host (a VM runner on the
-computer's own thread), the firmware (sandbox, budgets, freezing, device data), and user code. Why:
-- **Board calls run on the server thread** (devices live there), each computer limited by server
-  *time* a tick (1 ms), not by call counts: protects the server's tick fairly.
-- **Syscalls freeze, they don't yield**: a budget callback freezes the whole user chain wherever it
-  is, so no user coroutine sees a yield and `pcall` can't catch it. Traps (`board.trap`) are the
-  syscall instruction; a spent slice stops the same way (the timer).
-- **Interrupts are level-triggered**; device data is pushed into rings by credit (DMA-like) so input
-  needs no call; news "goes cold" at once so a key's latency is one round trip (the user's high bar).
-  Flow control is a handshake, never a silent drop: a device keeps its data until there's room,
-  and what a full device does is its own business (a keyboard could beep). Only the firmware caches
-  device data; with tier 1 RAM there's no cache, and every read is a call (slow, on purpose).
-- **A device reports every change to its state, from wherever it came** (user, 2026-10-21): an event
-  in its own terms (a redstone card's face: its level and powered, whether the change came in, was
-  its own set, or another card's in its block; a motion; a disk's change, by its own paths, or byte
-  ranges when raw), raising its interrupt, taken by a method of its own. The kernel's drivers turn
-  the events into what programs see (poll, /dev lines, inotify), so no kernel has to watch for
-  changes itself, however it's written. A disk's are `changes()`, not `pull()`: its /dev file is
-  its data, never its reports.
-- **Device failures are soft**: no device can stop the machine (a status the driver reads); only the
-  program's own error, or the board's supervision (CPU gone, power gone), ends a run. External
-  devices are hot-plugged by design: one that isn't there isn't on the bus, and calls to it fail at
-  once (never deferred until it "comes online", OC's race and timeout hacks).
-- **Saving a running computer** (Styx) happens at a safe point with no call in flight, so a save
-  never splits a program from its devices; no timeouts, no kills (a persist that never ends is a
-  real bug to fix, not to paper over).
+### The machine is a real PC, abstracted
+
+- A CPU only runs what the EEPROM holds (a fixed slot, like a reset vector) and aborts (ABRT, a
+  panic) when it can't. The motherboard owns the bus (cases change; the board's firmware doesn't).
+- **Devices have several names**, as on a real system: a slot path (`sata:0`, `exp:1`), an id
+  (`id:<uuid>`, however connected), and virtual names (`console`, UEFI's ConSplitter). The bus keys
+  a device by its address (a part's slot path, a cabled device's id); its other names are aliases.
+  mcos names every device by its id (stable when a part moves; an open file holds an id, so a stale
+  name never reaches another device).
+- **Names meet in one place** (`DeviceNames`): everything the host keeps for a program about a
+  device (a wait's sources, streams it reads, its rings) is kept by the program's name. Interrupts
+  are the one thing raised at bus addresses, and each is turned into the program's name before
+  anything compares it. Why: comparing names as strings in many places once let no slotted card
+  wake a computer waiting on its id.
+- **Bus order** is UEFI-like: the case's connectors fixed, external devices in a saved,
+  player-ordered list by id (so late-loading chunks keep their place).
+- **A device is on one bus at a time** (`BusHolds`): whichever board has it first holds it; holds
+  are worked out afresh as boards load, never saved (long cables and unloaded chunks would desync
+  them).
+- **Power is lazy:** devices and batteries settle what they owe when someone looks (every 20 ticks,
+  or at an event), from game time; nothing ticks per device (big builds).
 - **A device takes data only while a program runs on the board holding it** (keys typed at an off
   computer must not appear at boot).
-- Memory is the RAM installed, above a measured baseline, so a stick means the same to a program
+- **Memory** is the RAM installed, above a measured baseline, so a stick means the same to a program
   whatever the firmware costs.
+- **Blocks mark their chunk changed with `ChunkMarks.changed`**, never `setChanged()` or
+  `level.blockEntityChanged()`, from anything a chunk's load can reach (`setLevel`,
+  `loadAdditional`, a device's `onChange`): the game's calls wait for the chunk being loaded, and the
+  server thread deadlocks on itself. Minecraft writes only chunks marked changed.
 
-**Network cards** (user, 2026-10-21; OpenComputers' broadcast and peer-to-peer messages, in a real
-NIC's shape): a wired card sends frames over the cables, a WLAN card through the air (its range),
-each to a card's address (its id, a MAC) or to every card it reaches; nothing routes between the
-two networks. Why over the bus's own cables: a cable is a shared fabric, not one host's private
-bus. Two cases on one cable are two hosts on it, as two Macs on one Thunderbolt cable get both PCIe
-devices and a network, or SAN hosts share a Fibre Channel fabric; the bus devices on it still
-belong to one board at a time (`BusHolds`, a SCSI reservation's role), and the frames go between
-the cards, which are on their own boards' buses. A case ends the walk (a host isn't a switch);
-hubs and screens carry it on. **Ports aren't the card's** (OC's modem opened them): they're UDP's,
-the kernel's, in the frame's data, so the card knows only addresses, as a NIC does, and any kernel
-can put its own protocol on it. **Wake-on-LAN** is a device's wake line (PCI's PME#,
-`Device.wakeLine`), wired by the board whether it's on or off: a card with a wake message keeps
-listening while its computer is off, and a frame holding it presses the power button (at the next
-tick). OC's wake message, not a real card's magic packet (the user asked for OC's idea); matched
-anywhere in the data, as a pattern-matching NIC does.
+### The Lua CPU: three layers
 
-**Terminals are VT102/xterm devices** (a screen and keyboard as one device): programs only write
-escape sequences. Their modes (cursor shape, alternate screen, keyboard reporting) are the
-terminal's, set by escape sequences, as on real terminals; the tty's raw mode is termios, a separate
-thing. Scrollback lives in the terminal, as xterm keeps it (the tty keeps no output). **Sizes** (user, 2026-10-21): each tier has OpenComputers' screen size as its largest (50×16,
-80×25, 160×50) and powers on at it (the user's pick over powering on at a standard size, knowing
-160×50 is a few specks on a block's face and small in the GUI: OC had the same; no multiblock
-screens for now). A program resizes with xterm's sequence (`ESC[8;rows;cols t`, `18t`/`19t`
-report the size and the largest; `resize` is xterm's tool), and nothing is wrapped again. The
-console's group is one size, the largest every member can show, as UEFI's ConSplitter sets every
-console device to a common mode. The kernel's `TIOCSWINSZ` sends SIGWINCH (ignored by default, as
-Linux's). Tests that look at a face size the console 50×16 first (`TestPrograms.READABLE`):
-counting pixels of sub-pixel text is flaky. Only changed
-rows go to players, and the server's decoder is the only one (the user rejected a client-side decoder:
-a client-only bug could show what the server never decoded).
+The host (a VM runner on the computer's own thread), the firmware (sandbox, budgets, freezing,
+device data), and user code, as a real CPU runs firmware under an OS.
+- **Board calls run on the server thread** (devices live there), each computer limited by server
+  *time* a tick (1 ms), not call counts: fair to the server.
+- **Syscalls freeze, they don't yield:** a budget callback freezes the whole user chain wherever it
+  is, so no user coroutine sees a yield and `pcall` can't catch it. Traps (`board.trap`) are the
+  syscall instruction; a spent slice stops the same way.
+- **Interrupts are level-triggered.** Device data is pushed into rings by credit (DMA-like), so
+  input needs no call; news "goes cold" at once, so a key's latency is one round trip. Only the
+  firmware caches device data; tier 1 RAM has no cache (every read is a call, slow on purpose).
+- **Flow control is a handshake, never a silent drop:** a device keeps its data until there's room;
+  what a full device does is its own business.
+- **A device reports every change to its state, from wherever it came:** an event in its own terms
+  (a redstone face's level and whether the change came in, was its own, or another card's; a
+  motion; a disk's change by path, or byte ranges raw), raising its interrupt, taken by a method of
+  its own. The kernel's drivers turn events into what programs see (poll, `/dev` lines, inotify), so
+  no kernel has to watch for changes. A disk's are `changes()`, not `pull()`: its `/dev` file is its
+  data.
+- **Device failures are soft:** no device can stop the machine; only the program's own error or the
+  board's supervision (CPU gone, power gone) ends a run. External devices are hot-plugged: one
+  that isn't there isn't on the bus, and calls to it fail at once.
+- **Saving a running computer** (Styx) happens at a safe point with no call in flight, so a save
+  never splits a program from its devices; no timeouts, no kills (a persist that never ends is a bug).
 
-**Disks in hfs mode serve files themselves** (like 9P): real host files in the world save, so players
-can look at them. A handle never holds a host file open: it buffers writes and commits atomically at
-close (power lost before close loses them, as a power cut). Paths can never leave the disk's folder.
-Symbolic links are stored on the disk in CIFS's Minshall+French format (`XSym` files), never as host
-links (one could point out of the save); the disk never follows them, the OS's VFS does (so a target
-can be on any mount).
+### Network cards
 
-**mcos follows Linux.** The kernel owns every resource and runs only on its own coroutine; programs
-reach it only by syscalls (`sys`), and never get `board`. Every process starts in `/lib/ld.lua` (the
-loader, as ld.so and crt1); `/bin/lua` is just Lua's standalone interpreter (user: not every
-program's start). Commands are programs in `/bin`; the shell holds only shell behavior. Line editing
-is a library (`/lib/readline.lua`), as GNU readline is for bash and lua. When choosing behavior,
-copy Linux/POSIX/GNU (and say where it can't). From OpenOS's experience: **no lazy loading** (OpenOS
-split libraries to fit OC's RAM; it cost speed, complexity and more memory than loading whole) and
-**no legacy compatibility** (supporting old programs made OpenOS complex). 
-**`/dev` holds only data** (user, 2026-10-20), flat, as Linux's: the kernel's `console`, `tty`,
-`null`, `zero`, and a node for each bus device with a `get` or `set` method (the EEPROM sits there too: not
-where Linux keeps one, but convenient for users, the user's call). Reading gives `get`'s answer;
-what's written goes to `set` in one call at close, and **the device decides what `set` means**
-(replace, append). **mcos's interfaces are Linux-shaped; the devices' are for anyone** (user,
-2026-10-21, after a review of where we'd drifted): devices speak tables (their methods, events and
-reports: the hardware's interface, convenient for any kernel), and mcos turns them into what Linux
-would give: text, never Lua's syntax (the kernel loads no user-space library). A device whose data
-is a table has a **driver** (`lib/modules/drivers/<type>.lua`) making it text: the redstone card's
-file is a line a face, `north 7 7` (face, level, powered), and a line written, `north 11`, takes
-effect at once, as a sysfs attribute's write does (a device without a line driver, the EEPROM,
-takes everything written at close: all or nothing, as a firmware load's commit). A device with
-events to `pull` and no `get` (a sensor) has a read-only file, an event a line (`minecraft:pig 1.5
-0.0 -3.0`), and a read with none waiting blocks, as a keyboard's does (the kernel's idle wait
-listens to the devices blocked reads wait on). **`sys.poll(fds, seconds)`** is poll(2): a map of
-files to the events wanted (`IN`, `PRI`, `OUT`), answered with what happened (`HUP`, `ERR` come
-unasked), so a program waits on many files at once (user: Lua has no easy background threads). A
-redstone file is always readable and reports a change as `PRI` (a sysfs GPIO value's way). It's
-in `sys`, not `io` (real Lua's `io` is C's stdio, which has no poll) nor a `posix` library (`sys`
-already is mcos's POSIX layer); `sys.fileno(file)` gives an io file's descriptor (luaposix's, not
-real Lua's). **inotify** (`sys.inotify()`, `sys.watch(fd, path)`, a module loaded at the first)
-gives Linux's notices as lines (`MODIFY /log`; a rename `MOVED_FROM`/`MOVED_TO`; `OVERFLOW`), from
-the disks' reports turned into full paths by their mounts (tmpfs reports through `k.changed`, a
-no-op until then); it watches paths, not inodes as Linux's does, and a change made on a disk's
-host isn't seen.
+OC's broadcast and peer-to-peer messages in a real NIC's shape. A wired card sends frames over the
+cables, a WLAN card through the air (its range), to a card's address (its id, a MAC) or to every
+card it reaches; nothing routes between the two networks.
+- **Over the bus's own cables:** a cable is a shared fabric, not one host's private bus. Two cases
+  on one cable are two hosts on it (two Macs on one Thunderbolt cable, SAN hosts on a Fibre Channel
+  fabric); the bus devices on it still belong to one board at a time, and frames go between the
+  cards. A case ends the walk (a host isn't a switch); hubs and screens carry it on.
+- **Ports aren't the card's** (OC's modem opened them): they're the kernel's, in the frame's data,
+  so any kernel can put its own protocol on a card.
+- **A card never drops a frame:** a unicast frame is taken by the other card or refused at once
+  with why (`busy`: its queue is full or no program takes data there; `unreachable`); the card never
+  retries (software's job, as lossless Ethernet's PAUSE leaves it). A broadcast is best effort (how
+  many took it). "Taken" is the card's, never the program's (end to end: only programs can say).
+- **Wake-on-LAN** is a device's wake line (PCI's PME#, `Device.wakeLine`), wired whether the
+  computer is on or off: a card with a wake message listens while its computer is off, and a frame
+  holding it presses the power button. OC's wake message, not a real magic packet; matched anywhere
+  in the data, as a pattern-matching NIC does.
 
-**rsh, rshd, rcp** (user, 2026-10-21): the user's psh done again, named for Berkeley's r-commands
-because it has what they had: no passwords, no encryption (not ssh's names). `rshd` is a service,
-off until enabled; each connection runs `rshd -s` with the connection as stdin (inetd's way), a
-login on a pty (the kernel does the tty work: rshd only relays) or a command on pipes. One TCP
-connection, framed both ways (`lib/rsh.lua`), so stdout, stderr and the exit status stay apart;
-BSD's used a second connection for stderr and never sent the status. A host is a card's id or a
-unique prefix of it, found by a UDP broadcast probe on port 514 that rshd answers. `rcp` is rsh
-running `cat` on the other side, as BSD's rcp ran rcp there.
+### Terminals and the console
 
-**Services** (user, 2026-10-21, for rshd): the kernel runs `/etc/rc` with sh to its end before
-the console's shell (inittab's sysinit, BSD's `/etc/rc`), which mounts `/run` and runs `rc boot`.
-A service is a Lua script in `/etc/rc.d/<name>` (user, 2026-10-21: as sysvinit's are scripts in
-the system's language, and mcos's is Lua; sh has no `if` or `case`): OpenRC's shape, settings
-(`command`, `command_args`) from which `rc` gives start/stop/status, and functions of its own that
-replace those or add actions. `/etc/rc.conf` (FreeBSD's `name_enable=YES`) says what starts at
-boot, so enabling never rewrites a script. `rc` starts one with `setsid` (spawn's, as glibc's posix_spawn has): a session of its own,
-no controlling tty, so no ^C reaches it. The kernel stays init (it respawns the console's shell):
-a user-space PID 1 would stay resident for nothing.
+- **Terminals are VT102/xterm devices** (a screen and keyboard as one): programs only write escape
+  sequences. Their modes (cursor, alternate screen, keyboard reporting) are the terminal's; the
+  tty's raw mode is termios, a separate thing. Scrollback lives in the terminal, as xterm keeps it.
+- **Sizes:** each tier's largest is OC's screen size (50×16, 80×25, 160×50), and it powers on at it
+  (the user's pick, knowing 160×50 is small; no multiblock screens). A program resizes with
+  xterm's sequence (`ESC[8;rows;cols t`; `18t`/`19t` report size and largest; `resize` is xterm's
+  tool); nothing is wrapped again. The console's group is one size, the largest every member can
+  show (UEFI's ConSplitter's common mode). Tests that look at pixels size the console 50×16 first
+  (`TestPrograms.READABLE`): sub-pixel text is flaky to count.
+- **The server's decoder is the only one:** only changed rows go to players (the user rejected a
+  client-side decoder: a client-only bug could show what the server never decoded).
 
-**ptys** (`sys.openpty`, `lib/modules/pty.lua`, loaded at the first; for rshd): a tty whose
-terminal is a program, its master end: what the master writes goes through the same line
-discipline as a keyboard's (echo, editing, ^C), and the master reads what's shown, bounded (a
-writer waits), so a remote shell is only a relay and the kernel does the tty work (psh's mess was
-doing it in user space). `spawn`'s `setsid` gives the child its stdin's tty as its controlling tty
-when no session holds it (login_tty's step, folded into posix_spawn: mcos has no fork); closing the
-master hangs up (SIGHUP to the foreground group, then EOF and EIO on the terminal end). No
-`/dev/pts` yet. The window size is the pty's (`TIOCSWINSZ` on the master).
+### Disks
 
-**Sockets** are UDP and TCP over the network cards (`lib/modules/net.lua`, loaded at the first
-`sys.socket()`; a frame's data starts with IP's protocol number). **A card never drops a frame** (user, 2026-10-22, for
-custom network scripts; our handshake rule): a unicast frame is taken by the other card or refused
-at once with why (`busy`: its queue is full or no program takes data there; `unreachable`), and
-the card never tries again: retrying is software's, as lossless Ethernet's PAUSE leaves it (Wi-Fi
-cards retry in hardware; skipped). A broadcast is best effort (how many took it). "Taken" is the
-card's, never the program's (end to end: only programs can say). **UDP has no remote dependency**
-(user, 2026-10-23): a datagram's answer is layer 0's alone (the card took it or said why); the
-other computer's kernel never answers one (no ICMP port unreachable), and drops what has no socket
-or no room, as UDP's are. Not wanted: making a full socket hold frames back in the card (the
-sender's answer would hang on a program's pace). TCP is TCP's shape, kept small:
-sequence numbers and acknowledgements, a receive window, a segment no card took tried again in a
-tenth of a second, one taken and unacknowledged again in a second (go back N), reset after 8
-seconds with no progress (a SYN that found no card for 3: EHOSTUNREACH, ARP's time), SYN/FIN/RST;
-no congestion control or TIME_WAIT. A blip (a WLAN computer briefly out of range) is retried, not
-an error. Its
-timers run from kernel hooks (`k.timer`, `k.service`, `k.raised`), so nothing in the kernel knows
-TCP. Sockets: `bind`, `sendto`, `recvfrom`, `listen`, `accept`, `connect`, `shutdown`, `poll`, Linux's names for interfaces (eth0, wlan0)
-and ioctls (`SIOCGIFCONF`, ethtool's wake), with no commands for them (user, 2026-10-21:
-`ifconfig` and `ethtool` have no purpose here; an address is in `lsdev -i`, and a program sets the
-wake message). No IP: an address is a card's. A NIC has no `/dev`
-file, as on Linux (its method is `receive`, not `pull`, so devfs makes none): a program reads the
-network through a socket (`nc -ul 7`), never a device file. **A process's syscall wrappers are
-made at its first use of each** (a metatable on its `sys`): a syscall costs a process nothing
-until it's called, so adding one is free at boot (measured: 20 KiB less with a pipeline running).
-**A device type costs no memory until it's used** (user, 2026-10-21: add devices and drivers
-freely, never paying at boot for one that isn't there, as a real kernel loads a module when its
-device needs it): devfs looks for the type's driver on the boot disk the first time one of its
-files is opened, and remembers what it found; nothing in the kernel lists the types. Descriptions
-of devices aren't data: they come from the kernel (`sys.devices`,
-for `lsdev`), and a `/sys` tree is postponed. **The kernel caches the bus list, eventually
-correct** (as udev fills `/dev` in after a hot-plug): it's read again on the bus's hot-plug
-interrupt (when the kernel idles) and when a call fails because the device is gone; being late is
-intended (user, 2026-10-20), not a gap to close. So no `/dev` lookup ever makes a board
-call (each costs a thread hop, about 50 times a trap). That's safe because **an open file holds the
-device's id, never its name**: a stale name can't send a write to another device; a gone one fails
-with ENODEV. Why not `board` in user space: it would save only the traps (the board calls stay) and
-lose the kernel's ownership of devices; if a fast path is ever needed, grant one device to one
-process (as VFIO does).
-
-## 4. Easy to miss (a change that needs another)
-
-- **The mod's code goes in `common`**, never in a loader's project, unless it can only be written
-  against that loader; then it goes behind `Platform` (one method, implemented in `FabricPlatform`,
-  `NeoForgePlatform` and the unit tests' `TestPlatform`) or into the loader's entry point as an event
-  calling a common hook. `common` can't see a loader's API, so a slip fails its compile.
-- **A device whose `get`/`set` take tables gets a driver** (`lib/modules/drivers/<type>.lua`, found
-  by its type: register it nowhere), or its `/dev` file reads as nothing useful.
-- **A new cabled block's entity holds `CablePorts`** (so its sides can be closed), and `Cabling`
-  learns its ports and kind.
-- **A new packet goes in `ModNetwork`'s lists** (and a client handler in `ModNetworkClient`); a new
-  game test class in `GameTests.CLASSES`. Nothing else registers them.
-- **A block marks its chunk changed with `ChunkMarks.changed`, never `setChanged()` or
-  `level.blockEntityChanged()`, from anything a chunk's load can reach** (`setLevel`, `loadAdditional`,
-  a device's `onChange` as its devices go back on the bus): the game's calls wait for the chunk,
-  which is still loading, and the server thread waits on itself forever (a world with a running
-  computer never loaded, 2026-10-21; a test world can't show it: load a real save on a server).
-- **A test opens a menu or sends as the mod does** (`ModMenus.open`, `ModNetwork.send`,
-  `GameTests.serverPlayer`), never with the game's own call: the loaders need their part of it.
-- **A change to an mcos program (`lua/mcos/bin/<name>`) updates its man page**
-  (`lua/mcos/usr/share/man/man1/<name>.1`), and a new program gets one: options, behavior, exit
-  statuses, NOTES where it differs from GNU. A test renders every page and fails for a program
-  without one. Pages use only the man(7) macros `/bin/man` supports (its header lists them).
-- **A program's header comment is its spec**: keep it true when its behavior changes.
-- **Data files under `lua/` that aren't Lua go under a `share/` folder** (or mcos's `/etc`, its
-  settings and sh scripts; `/etc/rc.d`'s services are Lua): `LuaScriptsTest` compiles every other file there as Lua.
-- **The mcos files are copied onto a disk once**, when the disk is first made: a world's existing
-  disks keep their old mcos. Tests copy afresh each run.
-- **Textures and sounds come from `scripts/`**: change the script and regenerate; never edit the
-  committed PNG/OGG by hand.
-- **New plans and decided-but-unbuilt ideas go in section 6**, and come out of it once built.
-- **A design decision or a time-costly mistake goes in this file** (sections 3 and 5), at once.
-
-## 5. Lessons (record new ones here)
-
-- **Run one simple test before a long suite after a risky change.** A shell change once made every
-  mcos test wait out its timeout (the suite ran past 10 minutes) when the bug (no command ran at all)
-  showed in the first test in 20 seconds. Use `--tests '*McosTest.haltHalts'` and `timeout`.
-- **Measure what stays before shrinking what peaks.** The minimum RAM looked set by compiling `sh`
-  (it was, until the compile stopped copying the source); after that, what stays loaded at the prompt
-  (`free -b`, 20 collections) was within ~20 KiB of the minimum, so more peak work would have bought
-  nothing. Compare resident memory to the minimum first.
-- **Memory exhaustion can look like a race.** Spawns failing intermittently were the VM running out
-  (a new coroutine's stack gets no emergency collection); check memory before chasing ordering.
-- **Typing more than 256 keys at once in a test drops the rest** (a terminal's key queue, as a real
-  keyboard buffer). Split long command lines.
-- **A file on an hfs disk shows its writes only at close.** To watch a program that keeps a file open
-  (`tail -f > f`), write to `/tmp` (tmpfs) instead.
-- **Lua 5.5 for-loop variables are constants**: assigning one is a compile error that only shows when
-  the script loads. `LuaScriptsTest` compiles every script: run it.
-- **A `]]` inside a `[[...]]` string ends it** (usage texts with `[args]]`): use `[=[...]=]`.
-- **A test that makes the same mistake as the code passes anyway.** Mouse buttons are SDL-numbered in
-  26.3 (left 1, right 3); hard-coded 0/1 broke right-click while its test passed. Use the constants.
-- **Minecraft writes only chunks marked changed**, even at unload: a block whose data changes must
-  mark it, or its old copy stays on disk.
-- **SDL sends typed characters only while text input is on** (26.3): a screen that takes typing must
-  turn it on.
-- **`.gitignore` patterns without a leading `/` match at any depth**: `bin/` once hid mcos's `/bin`
-  and a fresh checkout booted without a shell. Anchor root-only rules.
-- **Subagents doing parallel file work need disjoint scopes and no bulk edits**: one ran a cleanup
-  script over every page in a shared folder, touching others' files.
-- **Lua inside a Java text block is unescaped twice** (Java's, then Lua's): a test's `"\\d"` reached Lua
-  as `"\d"`, an invalid escape, and the program failed before writing anything. Use Lua long strings
-  (`[[\d]]`) for patterns in tests, and capture a test program's stderr (`2> /err`) to see why.
-- **A test that fails alone but passes with its class is a timing bug, not noise.** On a cold JVM
-  the first board calls are slow, so a tick's 1 ms of server time runs out sooner and data stays in
-  a device that a warm run would have moved: a different, legal state. Make that state on purpose
-  in a test (it found keys stranded across a restore, 2026-10-21). And commit only on `testAll`'s
-  own exit status: a commit gated on grepping its log once went in with a unit test failing.
-- **A hang at load is a thread dump away.** "The world won't load" with a running computer looked
-  like a stuck restore; restoring its saved state alone took 120 ms. Load the world on a dedicated
-  server (`fabric/run/world`, a `/forceload` through a fifo on stdin) and `jstack` the server
-  thread: it showed the real cause at once. A deadlocked server ignores SIGTERM (`kill -9`).
-- **Put a test's devices where a case puts them.** A case's card is at its slot's path and named by
-  its id too (an alias); mcos names every device by its id. The unit tests put cards on the bus at
-  `id:` addresses, so a wait on a card's id matched the interrupt there, and in a case it never did:
-  a frame woke no computer until its poll's timeout (rsh's probe missed its 0.5 s more than half
-  the time, 2026-10-23). Tests now slot their cards (an alias, as `Motherboard.layout` gives).
-  A behavior that only a real world shows: load the user's save on a dedicated server, and drive its
-  computers with a throwaway server command (type keys, read the screen; never committed). Set
-  `pause-when-empty-seconds=-1`, or an empty server stops ticking after a minute.
-- **LungoLua bugs look like ours.** A pattern `%s` once matched "s"; verify against stock Lua's
-  semantics, report to the lua thread, work around until fixed.
-
-## 6. The plan: what isn't built yet
-
-Only what isn't built: ideas the user has given and questions still open, each with the user's
-reasons where they gave them. Keeping it short (user, 2026-10-20):
-
-- **When an item is built, take it out** in the same commit; if its design had a reason the code
-  doesn't show, move that reason to section 3 first.
-- **No history:** no "done" list, no "built on" notes, no record of how a decision was reached (git
-  has it).
-- **An item is a few lines:** what it is, why (the user's words when they gave them), and whether
-  it's decided or still open.
-- **When a change touches an area, read its items here** and drop or update the ones it settles or
-  makes wrong.
-- **Something the user turned down stays only if it's likely to come up again**, as a short "not
-  wanted" note, so it isn't proposed twice.
-
-### Hardware and blocks
-
-- **Mains power:** a real supply, with the UPS batteries as a backup that takes over when it drops.
-- **Battery ideas, undecided:** refusing to overcharge (extra material is wasted today); a range or
-  rate setting for tier 2's self-charging.
-- **CPU status dots:** the 4 dots left of the CPU socket only light when a CPU is in; a place for
-  more status later.
-- **Narrow windows:** the bus order panel is hidden below about 382 GUI units; maybe a toggle or a
-  smaller layout.
-- **Resizes, what's left:** readline, `less` and `edit` don't redraw on SIGWINCH yet (they see a
-  new size at their next line or start); a terminal doesn't report its own size changes (the
-  device-reporting rule: today the kernel hears only through `TIOCSWINSZ`, as on a serial line;
-  xterm's in-band resize reports, mode 2048, are a way); a 160-column row is ~1.1 KB to send
-  (colors per cell), so a full redraw at 160×50 is ~56 KB: run-length colors if it matters.
-- **Tier 3 terminals draw pixels:** sixel is the plan (a VT340's pixel graphics by escape sequence);
-  the terminal answers `;4` in its Device Attributes once it's built, so programs never send pixels
-  to a terminal that would drop them.
-- **Multiblock screens that grow** (user idea, undecided): neighboring screens merging into one
-  bigger display.
-- **The all-in-one** is a dev kit: it may go away, or become a creative "everything built in" block.
-- **The gear-box tab, next** (user, 2026-10-20): on every block's GUI, a right-side tab (a gear-box
-  icon) showing the block's device type ("tier 3 case", "tier 1 screen"), its device id (or
-  "not assigned"), and a wireframe of the block with a faint render of the world around it, where
-  clicking a side opens or closes its cable port (`CablePorts`, which every cabled block entity is to
-  hold; none does yet).
-- **Bundled redstone, later** (user, 2026-10-20): a face reading one of the 16 colors of a bundled
-  input (Ender IO's conduit on NeoForge, or a bundled cable of ours), maybe as a tier 2 redstone
-  card. No Fabric mod carries bundled signals on 26.x (RSWires stopped at 1.18.2). (A redstone
-  terminal block was built and dropped, 2026-10-21: the user went back to the card.)
-- **Devices that should report their state's changes, not yet:** the robotic piston (its arms), the
-  photomask (its work), the screen (what it shows changes; keys already come as data), the battery
-  of a case (its charge). Each as its own events (the rule in section 3).
-- **Motion sensor, tier 2 maybe** (user, 2026-10-21): finer motion (fluids, drops) and filters (by
-  mob); tier 1 has no settings.
-- **Cards still placeholders:** Audio, Audio Sensor. The paint gun (shoots paint at nearby
-  wool, out of its nozzle face) does nothing yet.
-- **Bluetooth, open:** range limits; whether links show differently in the bus order; what a
-  Bluetooth card does on the bus itself.
-- **Disks, open:** disks in expansion hubs; labels set by programs.
-- **A bell:** terminals ignore BEL, and a full key queue drops keys silently, where a real keyboard
-  beeps.
-- **Beep codes:** audible boot errors for headless machines.
-- **Monospace bitmap font:** text uses Minecraft's proportional font, centered per cell.
-- **Console, open:** a log ring in the console (each reader with its own position, and a "messages
-  dropped" line instead of silent loss, like printk and `/dev/kmsg`); a stored preference for which
-  displays it uses (an NVRAM store, like UEFI's `ConOut`); today it's every display, at the
-  smallest one's size.
-- **The bus walk has no gaps** (disconnected and absent devices are left out). Open: whether
-  firmware should see them, as PCI addresses skip empty slots.
-
-### Getting started in the world
-
-- **The player's introduction** is the next discussion: advancements, archaeology loot, how the
-  first photomask is found.
-- Programs from ruins and traders (disks), and books with programs in them.
-- The photomask gets a device API (programs start and watch its work).
-- Saved for later (user): shulker shells for a robot with deep internal storage.
-
-### The Lua CPU and the server
-
-- **RAM sizes:** settle the tiers' sizes (and their ring sizes) once the VM and mcos are finished,
-  with OC's values as a reference.
-- **mcos's memory** (measured 2026-10-20; tier 1 is 1 MiB now, the user's call): it reaches its prompt
-  in 492 KiB, and holds ~472 KiB there after full collections, mostly compiled code (~341 KB: sh 86,
-  the kernel 70, its modules 88, io+ld 46, readline 27, fs 24). Levers left: stripping debug info
-  (below); LungoLua's compiled size (about 1.4 times the C++ build's: ask the lua thread); the
-  standard libraries shared read-only between processes (each copies string, table, math, utf8,
-  coroutine and its own io/os closures); sh's parser restructured (one splitter for ; && || |, the
-  lexer finding $( )'s end: ~10 KB, from studying OpenOS's); sh and readline needing only a few of
-  fs.lua's functions. Measure with a throwaway probe that varies one stick's size freely (4 KiB
-  steps), not by tier, and a temporary trace of each chunk the firmware compiles (its size, memory
-  after) when the order matters (removed once measured: see git, 0be0dc8).
-- **Stripping debug info from system code** (user, 2026-10-20): debug info is about 30% of compiled
-  code (bytecode measured). Lua has no switch for it at compile time; only `string.dump(f, true)`
-  strips, and loading that back takes bytecode mode, which the sandbox refuses (crafted bytecode
-  escapes VMs). Plan: the firmware strips on request, from text only (compile, dump stripped, drop
-  the full function and collect, load the VM's own bytecode back), so text stays the only way in.
-  The kernel strips the system set (the boot path to the shell, or `/lib` and `/bin`, as a distro
-  ships stripped binaries), user scripts keep their line numbers, and a boot option (`debug=1`)
-  turns it off for chasing a system bug. Watch the compile's peak (drop the full function before
-  reloading). Alternative to ask the lua thread about: a compile flag that never records it.
-- **Server time across many computers:** each computer gets its own server time a tick, with no
-  overall management; later, round robin which machines get time each tick, if many busy
-  computers starve the tick.
-- **Settings:** tunables stay named constants until settings are revisited.
-
-### Other mods
-
-- **Ender IO's conduits** (NeoForge): a conduit carrying our bus cable inside its bundles, as its own
-  AE2 module carries ME cable (an ordinary NeoForge registry, `EnderIORegistries.CONDUIT_TYPE`; the
-  bundle exposes a capability our cable walk would treat as cable), optional, loaded only when Ender
-  IO is. Waits on Ender IO reaching 26.x (its main line is 1.21.1; a 26.2 port is in progress).
-- **A NeoForge release-jar check:** the tests run NeoForge from its dev folders only; nothing starts
-  the shipped NeoForge jar, and nothing starts a NeoForge client at all.
+Disks in hfs mode serve files themselves (like 9P): real host files in the world save, so players
+can look at them. A handle never holds a host file open: writes buffer and commit atomically at
+close (power lost before close loses them). Paths never leave the disk's folder. Symbolic links are
+CIFS's Minshall+French `XSym` files, never host links (one could point out of the save); the disk
+never follows them, the OS's VFS does. mcos's files are copied onto a disk once, when it's first
+made: a world's disks keep their old mcos; tests copy afresh.
 
 ### mcos
 
-- **More devices for user programs:** only devices with `get`/`set` have `/dev` nodes; the rest
-  (cards, terminals' own methods) can't be reached from a program yet. The REPL as a workbench for
-  trying devices without writing a script waits on that. A `/sys` tree (one file per attribute) is
-  postponed (user, 2026-10-20).
-- **A tty per terminal:** the boot option (`console=`) names one device; a tty, interrupt handler
-  and shell per terminal isn't started yet.
-- **Signal handlers run only on the way back from a syscall** (a stopped process can't be made to
-  call one), so a busy process sees its signal at its next syscall; Linux runs them on any return to
-  user mode.
-- **Job control:** `jobs`, `fg`, `bg`, ^Z, SIGTTIN. Background jobs share the shell's group and
-  ignore SIGINT, as sh without job control.
-- **The shell's language:** `if`, `for`, `while`, `case`, functions, here-documents (user: maybe
-  later).
-- **rsh, rcp, what's left:** `rcp` copies one file (BSD's takes several, `-r` directories, `-p`
-  times); a remote-to-remote `rcp`; readline doesn't redraw a line on SIGWINCH.
-- **Networking, later:** a router between wired and wireless networks, raw frames for programs
-  (Linux's packet sockets, for a `tcpdump`), a WLAN card's range as a setting (OC's strength, its
-  power cost).
-- `/proc`; a filesystem on raw disks; permissions and users; `os.date` (no real-time clock: the time
-  is seconds since boot); a page cache.
-- **Later, from the user's review of OpenOS (2026-10-19):**
-  - `type -a`;
-  - `install`, once loot software is worked out;
-  - `sides`, with the redstone card's API;
-  - profile, `.shrc` and motd;
-  - maybe `label`, `primary`, `resolution`, `address`.
-  - The internet card's commands (`wget`, `pastebin`) will be its device's API.
-- **Not wanted** (user, 2026-10-19): `which` (it's `command -v`), `lshw`, `dmesg`,
-  `useradd`/`userdel`, OpenOS's `transforms` and `event`/`keyboard` libraries.
+- **mcos follows Linux.** The kernel owns every resource and runs only on its own coroutine;
+  programs reach it only by syscalls (`sys`), never `board`. Every process starts in `/lib/ld.lua`
+  (ld.so and crt1); `/bin/lua` is just Lua's interpreter. Commands are programs in `/bin`; the
+  shell holds only shell behavior; line editing is a library (`/lib/readline.lua`). Behavior copies
+  Linux/POSIX/GNU, saying where it can't. From OpenOS's experience: no lazy loading of libraries
+  (splitting cost speed, complexity and memory) and no legacy compatibility.
+- **mcos's interfaces are Linux-shaped; the devices' are for anyone:** devices speak tables
+  (methods, events, reports), and mcos turns them into what Linux gives: text, never Lua syntax (the
+  kernel loads no user-space library). A device whose data is a table has a driver
+  (`lib/modules/drivers/<type>.lua`, found by its type) making it text: a redstone card's file is a
+  line a face (`north 7 7`), a line written takes effect at once (a sysfs attribute's write); a
+  device without one (the EEPROM) takes everything written at close, all or nothing.
+- **`/dev` holds only data,** flat: `console`, `tty`, `null`, `zero`, and a node for each device with
+  `get` or `set` (the EEPROM too: convenient, the user's call). Reading gives `get`'s answer; what's
+  written goes to `set` at close, and the device decides what `set` means. A device with events and
+  no `get` (a sensor) has a read-only file, an event a line, and a read with none waiting blocks. A
+  NIC has no `/dev` file (its method is `receive`): the network is read through sockets.
+- **`sys.poll(fds, seconds)`** is poll(2) (`IN`, `PRI`, `OUT`; `HUP`, `ERR` unasked), in `sys` (mcos's
+  POSIX layer), since Lua's `io` is C's stdio; `sys.fileno` gives an io file's descriptor. A
+  redstone file is always readable and reports a change as `PRI` (a sysfs GPIO's way).
+- **inotify** (`sys.inotify()`, `sys.watch`) gives Linux's notices as lines (`MODIFY /log`,
+  `MOVED_FROM`/`MOVED_TO`, `OVERFLOW`), from the disks' reports turned into paths by their mounts;
+  it watches paths, not inodes, and a change on a disk's host isn't seen.
+- **Drivers read a device's stream with `k.take`**, which listens for the device when nothing's
+  there, so a process blocked on a device is woken when it comes; the idle wait hears exactly the
+  devices blocked reads found empty. No driver asks for listening itself (`k.listen` is for a device
+  nothing reads now: the network's open connections).
+- **A device type costs no memory until used:** devfs looks for a type's driver the first time one
+  of its files is opened; nothing in the kernel lists types. **A process's syscall wrappers are made
+  at its first use of each** (a metatable on `sys`), so a new syscall costs nothing at boot.
+- **The kernel caches the bus list, eventually correct** (as udev after a hot-plug): read again on
+  the bus's interrupt and when a call fails because the device is gone. So no `/dev` lookup makes a
+  board call (a thread hop, about 50 traps). Not `board` in user space: it would save only the
+  traps and lose the kernel's ownership (a fast path would grant one device to one process, as VFIO).
+- **Services:** the kernel runs `/etc/rc` with sh before the console's shell (inittab's sysinit,
+  BSD's `/etc/rc`): it mounts `/run` and runs `rc boot`. A service is a Lua script in
+  `/etc/rc.d/<name>` (as sysvinit's are in the system's language; sh has no `if`), OpenRC's shape:
+  settings (`command`, `command_args`) from which `rc` gives start/stop/status, and functions that
+  replace those or add actions. `/etc/rc.conf` (`name_enable=YES`) says what starts at boot. `rc`
+  starts one with `setsid` (no controlling tty, no ^C). The kernel stays init (it respawns the
+  console's shell): a user-space PID 1 would stay resident for nothing.
+- **ptys** (`sys.openpty`): a tty whose terminal is a program, its master end, through the same line
+  discipline as a keyboard's, output bounded (a writer waits), so a remote shell only relays and the
+  kernel does the tty work. `spawn`'s `setsid` gives the child its stdin's tty as its controlling
+  tty when free (login_tty's step: mcos has no fork); closing the master hangs up (SIGHUP, then EOF
+  and EIO). The window size is the pty's (`TIOCSWINSZ`, which sends SIGWINCH, ignored by default).
+- **Sockets** are UDP and TCP over the network cards (`lib/modules/net.lua`; a frame's data starts
+  with IP's protocol number), with Linux's names for interfaces (eth0, wlan0) and ioctls
+  (`SIOCGIFCONF`, ethtool's wake) and no commands for them (`ifconfig`, `ethtool` have no purpose
+  here; an address is in `lsdev -i`). No IP: an address is a card's.
+  **UDP has no remote dependency:** a datagram's answer is the card's alone; the other kernel never
+  answers one (no ICMP), and drops what has no socket or no room, as UDP does. A full socket never
+  holds frames back in the card (the sender's answer would hang on a program's pace).
+  **TCP is TCP's shape, kept small:** sequence numbers and acks, a receive window, a segment no card
+  took tried again in a tenth of a second, one taken and unacknowledged in a second (go back N),
+  reset after 8 seconds without progress (a SYN that found no card for 3: EHOSTUNREACH, ARP's time),
+  SYN/FIN/RST; no congestion control or TIME_WAIT. Its timers run from kernel hooks (`k.timer`,
+  `k.service`, `k.raised`), so the kernel knows nothing of TCP.
+- **rsh, rshd, rcp:** the user's psh done again, named for Berkeley's r-commands because it has what
+  they had: no passwords, no encryption. `rshd` is a service, off until enabled; each connection
+  runs `rshd -s` with the connection as stdin (inetd's way): a login on a pty, or a command on pipes.
+  One TCP connection, framed both ways (`lib/rsh.lua`), so output, errors and the exit status stay
+  apart (BSD's used a second connection for stderr and never sent the status). A host is a card's
+  id or a unique prefix, found by a UDP broadcast probe on port 514 that rshd answers. `rcp` is rsh
+  running `cat` there.
+
+## Easy to miss: a change that needs another
+
+- **Mod code goes in `common`**, unless it can only be written against a loader: then behind
+  `Platform` (implemented in `FabricPlatform`, `NeoForgePlatform` and the tests' `TestPlatform`) or
+  in a loader's entry point calling a common hook. `common` can't see a loader's API.
+- **A new packet** goes in `ModNetwork`'s lists (a client handler in `ModNetworkClient`); **a new
+  game test class** in `GameTests.CLASSES`. Nothing else registers them.
+- **A new cabled block's entity** holds `CablePorts`, and `Cabling` learns its ports and kind.
+- **A new device with an interrupt line** gets a stimulus in `DeviceInterruptsTest`; **a device whose
+  `get`/`set` take tables** gets a driver (`lib/modules/drivers/<type>.lua`).
+- **A test opens a menu or sends as the mod does** (`ModMenus.open`, `ModNetwork.send`,
+  `GameTests.serverPlayer`): the loaders need their part.
+- **A change to an mcos program** (`lua/mcos/bin/<name>`) updates its man page
+  (`lua/mcos/usr/share/man/man1/<name>.1`); a new program gets one (options, behavior, exit
+  statuses, NOTES where it differs from GNU), using only the macros `/bin/man` supports. A test
+  renders every page. **A program's header comment is its spec:** keep it true.
+- **Data files under `lua/` that aren't Lua** go under a `share/` folder or mcos's `/etc` (settings,
+  sh scripts; `/etc/rc.d`'s services are Lua): `LuaScriptsTest` compiles every other file as Lua.
+- **Textures and sounds** change through their script in `scripts/`, then regenerate.
+- **A decision** goes in this file when it's made; **an idea not built yet** in `docs/PLAN.md`.
+
+## Pitfalls
+
+- An hfs file shows its writes only at close: watch a file a program keeps open on `/tmp` (tmpfs).
+- Typing more than 256 keys at once in a test drops the rest (a terminal's key queue): split lines.
+- Lua 5.5 for-loop variables are constants (a compile error when the script loads: `LuaScriptsTest`
+  compiles every script). A `]]` ends a `[[...]]` string: use `[=[...]=]`.
+- Lua inside a Java text block is unescaped twice (Java's, then Lua's): use long strings
+  (`[[\d]]`) for patterns, and capture a test program's stderr (`2> /err`) to see why it failed.
+- Mouse buttons are SDL-numbered (left 1, right 3): use the constants. SDL sends typed characters
+  only while text input is on: a screen that takes typing turns it on.
+- `.gitignore` patterns without a leading `/` match at any depth: anchor root-only rules.
+- An empty dedicated server stops ticking after a minute unless `pause-when-empty-seconds=-1`
+  (`scripts/devserver.sh` sets it).

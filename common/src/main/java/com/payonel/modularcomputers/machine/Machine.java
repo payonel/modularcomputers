@@ -522,20 +522,6 @@ public final class Machine {
 		return true;
 	}
 
-	/**
-	 * Puts these devices on the bus, in order: a part went in or out, a cable was plugged or
-	 * unplugged, or the player reordered them. While the machine runs, devices that left lose
-	 * power (an unplugged screen goes blank), and displays that joined get the console drawn
-	 * onto them (hot-plug, like fbcon taking over a new framebuffer).
-	 */
-	public void setDevices(List<Device> devices) {
-		Map<String, Device> numbered = new LinkedHashMap<>();
-		for (int i = 0; i < devices.size(); i++) {
-			numbered.put("device:" + i, devices.get(i));
-		}
-		setDevices(numbered);
-	}
-
 	/** Puts the motherboard's {@link Motherboard#layout} on the bus, with hot-plug. */
 	public void rebuildBus(long now) {
 		Motherboard.Layout layout = board.layout(now);
@@ -543,13 +529,14 @@ public final class Machine {
 		setDevices(layout.devices(), layout.aliases());
 	}
 
-	/** {@link #setDevices(List)}, with each device at its address. */
-	public void setDevices(Map<String, Device> addressed) {
-		setDevices(addressed, Map.of());
-	}
-
-	/** {@link #setDevices(Map)}, with other names for some devices (see {@link com.payonel.modularcomputers.bus.Bus#setDevices(Map, Map)}). */
-	public void setDevices(Map<String, Device> addressed, Map<String, String> aliases) {
+	/**
+	 * The bus becomes these devices, by address, with other names for some (a part's id). While the
+	 * machine runs, devices that left lose power (an unplugged screen goes blank) and drop their
+	 * data, and displays that joined get the console drawn onto them (hot-plug, as fbcon takes over
+	 * a new framebuffer). Only {@link #rebuildBus}
+	 * calls it, with the motherboard's layout: a bus is only ever what a case's parts and cables make.
+	 */
+	private void setDevices(Map<String, Device> addressed, Map<String, String> aliases) {
 		List<Device> devices = List.copyOf(addressed.values());
 		List<Device> before = board.bus().devices();
 		Map<String, Device> was = new java.util.HashMap<>();

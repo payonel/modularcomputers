@@ -13,6 +13,7 @@ import com.payonel.modularcomputers.machine.Eeprom;
 import com.payonel.modularcomputers.machine.Hardware;
 import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.machine.Motherboard;
+import com.payonel.modularcomputers.machine.TestBus;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -27,14 +28,14 @@ import org.junit.jupiter.api.Test;
  */
 class LuaRunnerTest {
 	private final Terminal screen = new Terminal(Resolution.DEFAULT);
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(java.util.List.of())));
+	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
 	private final ConcurrentLinkedQueue<Runnable> server = new ConcurrentLinkedQueue<>();
 
 	LuaRunnerTest() {
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
-		machine.setDevices(devices);
 		machine.board().setCpu(new Cpu(CpuTier.TIER_3));
+		TestBus.of(machine, devices);
 		machine.setServer(server::add);
 	}
 
@@ -275,7 +276,7 @@ class LuaRunnerTest {
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("eeprom", eeprom);
-		machine.setDevices(devices);
+		TestBus.of(machine, devices);
 		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
 		settle(() -> row(0).equals("again") || row(0).startsWith("ABRT"));
 		assertThat(row(0)).isEqualTo("again");
@@ -322,7 +323,7 @@ class LuaRunnerTest {
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("eeprom", eeprom);
-		machine.setDevices(devices);
+		TestBus.of(machine, devices);
 		machine.board().setEeprom(eeprom);
 		machine.pressPower();
 		untilHalted();
@@ -334,11 +335,11 @@ class LuaRunnerTest {
 
 	/** The same computer after a reload: a new machine with the same CPU and a new screen, on, nothing booted. */
 	private Machine reloaded(Terminal screen) {
-		Machine again = new Machine(new Motherboard(Hardware.allInOne(), new Bus(java.util.List.of())));
+		Machine again = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
-		again.setDevices(devices);
 		again.board().setCpu(new Cpu(CpuTier.TIER_3));
+		TestBus.of(again, devices);
 		again.setServer(server::add);
 		again.restorePowered(true);
 		return again;
@@ -401,7 +402,7 @@ class LuaRunnerTest {
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("id:echo", new Echo());
-		machine.setDevices(devices);
+		TestBus.of(machine, devices);
 		boot("""
 			local bad = 0
 			local finalized = 0
@@ -431,7 +432,7 @@ class LuaRunnerTest {
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("id:counter", counter);
-		machine.setDevices(devices);
+		TestBus.of(machine, devices);
 		boot("""
 			local _, n = board.invoke("id:counter", "hit")
 			board.invoke("console", "write", "hits " .. n)
@@ -446,9 +447,9 @@ class LuaRunnerTest {
 		byte[] saved = machine.persistProgram().orElseThrow();
 		assertThat(counter.hits).as("the save made no call: the device is as the save found it").isZero();
 		machine.unload();
-		Machine again = new Machine(new Motherboard(Hardware.allInOne(), new Bus(java.util.List.of())));
-		again.setDevices(devices);
+		Machine again = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
 		again.board().setCpu(new Cpu(CpuTier.TIER_3));
+		TestBus.of(again, devices);
 		again.setServer(server::add);
 		again.restorePowered(true);
 		again.resumeProgram(saved);
@@ -464,7 +465,7 @@ class LuaRunnerTest {
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("id:counter", counter);
-		machine.setDevices(devices);
+		TestBus.of(machine, devices);
 		boot("""
 			local x = 0
 			for i = 1, 2000000 do x = x + 1 end
@@ -479,9 +480,9 @@ class LuaRunnerTest {
 		settle(() -> counter.hits == 1); // no save happened after all, and its call was made
 		byte[] saved = machine.persistProgram().orElseThrow(); // the old snapshot would miss the call
 		machine.unload();
-		Machine again = new Machine(new Motherboard(Hardware.allInOne(), new Bus(java.util.List.of())));
-		again.setDevices(devices);
+		Machine again = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
 		again.board().setCpu(new Cpu(CpuTier.TIER_3));
+		TestBus.of(again, devices);
 		again.setServer(server::add);
 		again.restorePowered(true);
 		again.resumeProgram(saved);
@@ -535,7 +536,7 @@ class LuaRunnerTest {
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("sata:0", disk);
-		machine.setDevices(devices);
+		TestBus.of(machine, devices);
 		boot("""
 			local _, file = board.invoke("sata:0", "open", "/log.txt", "w")
 			board.invoke(file, "write", "before ")
@@ -550,7 +551,7 @@ class LuaRunnerTest {
 		Machine again = reloaded(new Terminal(Resolution.DEFAULT));
 		Map<String, Device> devices2 = new LinkedHashMap<>();
 		devices2.put("sata:0", new com.payonel.modularcomputers.device.Disk(com.payonel.modularcomputers.device.DiskTier.TIER_1, world.resolve("disk-a")));
-		again.setDevices(devices2);
+		TestBus.of(again, devices2);
 		again.resumeProgram(saved);
 		settle(again, () -> again.runner().isEmpty());
 		assertThat(java.nio.file.Files.readString(world.resolve("disk-a/log.txt"))).as("its handle, writes and all, came back").isEqualTo("before after");
@@ -566,7 +567,7 @@ class LuaRunnerTest {
 		devices.put("id:screen", screen);
 		devices.put("sata:0", new com.payonel.modularcomputers.device.Disk(com.payonel.modularcomputers.device.DiskTier.TIER_1, world.resolve("empty-disk")));
 		devices.put("sata:1", new com.payonel.modularcomputers.device.Disk(com.payonel.modularcomputers.device.DiskTier.TIER_1, folder));
-		machine.setDevices(devices);
+		TestBus.of(machine, devices);
 		boot(com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/boot"));
 		untilHalted();
 		assertThat(row(0)).isEqualTo("booted from sata:1");
@@ -656,7 +657,7 @@ class LuaRunnerTest {
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("id:redstone", card);
-		machine.setDevices(devices);
+		TestBus.of(machine, devices);
 		boot("""
 			local n = 0
 			for i = 1, 3000000 do n = n + 1 end -- (both events come meanwhile)
@@ -682,7 +683,7 @@ class LuaRunnerTest {
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("id:redstone", card);
-		machine.setDevices(devices);
+		TestBus.of(machine, devices);
 		boot("""
 			board.list() -- (so the bus has no interrupt raised: the key alone is news)
 			board.waitForInterrupt(nil, "console", "id:redstone") -- cold: the card's events into the inbox
@@ -751,7 +752,7 @@ class LuaRunnerTest {
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("id:redstone", card);
-		machine.setDevices(devices);
+		TestBus.of(machine, devices);
 		boot(READ_RING + """
 			local ring = board.ring("id:redstone", 2)
 			local n = 0
@@ -986,7 +987,7 @@ class LuaRunnerTest {
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("id:redstone", card);
-		machine.setDevices(devices);
+		TestBus.of(machine, devices);
 		boot("""
 			local n = 0
 			for i = 1, 3000000 do n = n + 1 end -- (the keys and events come meanwhile)

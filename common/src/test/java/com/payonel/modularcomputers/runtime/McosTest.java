@@ -15,6 +15,7 @@ import com.payonel.modularcomputers.machine.Hardware;
 import com.payonel.modularcomputers.machine.LuaScripts;
 import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.machine.Motherboard;
+import com.payonel.modularcomputers.machine.TestBus;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -34,7 +35,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class McosTest {
 	private final Terminal screen = new Terminal(Resolution.DEFAULT);
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(java.util.List.of())));
+	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
 	private final ConcurrentLinkedQueue<Runnable> server = new ConcurrentLinkedQueue<>();
 	private final Map<String, Device> devices = new LinkedHashMap<>();
 
@@ -89,7 +90,7 @@ class McosTest {
 		devices.put("sata:0", new Disk(DiskTier.TIER_1, root()));
 		Eeprom eeprom = new Eeprom(LuaScripts.read("eeprom/boot"));
 		devices.put("eeprom", eeprom); // (on the bus at its slot, as a board puts it)
-		machine.setDevices(new LinkedHashMap<>(devices), Map.copyOf(aliases));
+		TestBus.of(machine, devices);
 		machine.board().setEeprom(eeprom);
 		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
 		untilIdle();
@@ -116,17 +117,13 @@ class McosTest {
 		}
 	}
 
-	/** Other names for devices on the bus (a card in a slot: its id), as a motherboard gives them. */
-	private final Map<String, String> aliases = new LinkedHashMap<>();
-
 	/** What else happens each tick: other computers' ticks, a test's own doings. */
 	private final java.util.List<Runnable> ticks = new java.util.ArrayList<>();
 
 	/** Another computer running mcos from a disk of its own, on this test's server thread, with a network card in {@code world}. */
 	private final class Other {
-		static final String SLOT = "pcie:1";
 		final Terminal screen = new Terminal(Resolution.DEFAULT);
-		final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(java.util.List.of())));
+		final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
 		final Path root;
 		final com.payonel.modularcomputers.device.NetworkCard card;
 
@@ -139,10 +136,10 @@ class McosTest {
 			devices.put("id:screen", screen);
 			devices.put("sata:0", new Disk(DiskTier.TIER_1, root));
 			devices.put("eeprom", eeprom);
-			devices.put(SLOT, card); // (in a slot, as in a case: named by its id too)
+			devices.put(Motherboard.exp(0), card);
 			machine.board().setCpu(new Cpu(CpuTier.TIER_3));
 			machine.setServer(server::add);
-			machine.setDevices(devices, Map.of("id:" + id, SLOT));
+			TestBus.of(machine, devices);
 			machine.board().setEeprom(eeprom);
 			assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
 			ticks.add(machine::tick);
@@ -300,7 +297,7 @@ class McosTest {
 	@Test
 	void aRedstoneCardsFileIsTextALineAFace() {
 		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
-		devices.put("id:redstone", card);
+		devices.put(Motherboard.exp(0), card); // (a card in a slot, as in a case)
 		boot();
 		file("set.txt", "north 11\n");
 		file("bad.txt", "not a face\n");
@@ -316,7 +313,7 @@ class McosTest {
 	@Test
 	void aSensorsFileGivesAnEventALineAndAReadWaitsForOne() {
 		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
-		devices.put("id:motion", motion);
+		devices.put(Motherboard.exp(0), motion); // (a card in a slot, as in a case)
 		boot();
 		type("head -n 2 /dev/motion0 > /m; touch /done\r");
 		untilIdle(); // head waits: nothing has moved
@@ -332,7 +329,7 @@ class McosTest {
 	@Test
 	void pollWaitsForARedstoneChangeOrAPipesDataOrItsTime() {
 		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
-		devices.put("id:redstone", card);
+		devices.put(Motherboard.exp(0), card); // (a card in a slot, as in a case)
 		boot();
 		file("p.lua", """
 			local sys = require("sys")
@@ -375,7 +372,7 @@ class McosTest {
 	@Test
 	void aLineWrittenToARedstoneFileTakesEffectAtOnceSoAPulseWorks() {
 		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
-		devices.put("id:redstone", card);
+		devices.put(Motherboard.exp(0), card); // (a card in a slot, as in a case)
 		boot();
 		file("pulse.lua", """
 			local sys = require("sys")
@@ -398,7 +395,7 @@ class McosTest {
 	@Test
 	void pollWaitsOnASensorAndTheKeyboardAtOnce() {
 		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
-		devices.put("id:motion", motion);
+		devices.put(Motherboard.exp(0), motion); // (a card in a slot, as in a case)
 		boot();
 		file("m.lua", """
 			local sys = require("sys")
@@ -421,7 +418,7 @@ class McosTest {
 	@Test
 	void tailFollowsARedstoneFileShowingItAgainWhenItChanges() {
 		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
-		devices.put("id:redstone", card);
+		devices.put(Motherboard.exp(0), card); // (a card in a slot, as in a case)
 		boot();
 		// (into /tmp: a file on a disk shows its writes at close, and tail -f keeps it open)
 		type("tail -f -n 100 /dev/redstone0 > /tmp/out 2> /tmp/err &\r");
@@ -476,7 +473,7 @@ class McosTest {
 		settle(() -> Files.isRegularFile(root().resolve("before")) && read(root().resolve("before")).contains("storage0"));
 		assertThat(read(root().resolve("before"))).doesNotContain("storage1");
 		devices.put("sata:1", new Disk(DiskTier.TIER_1, world.resolve("late")));
-		machine.setDevices(new LinkedHashMap<>(devices));
+		TestBus.of(machine, devices);
 		untilIdle();
 		type("lsdev > /after\r");
 		settle(() -> Files.isRegularFile(root().resolve("after")) && read(root().resolve("after")).contains("storage1"));
@@ -555,7 +552,7 @@ class McosTest {
 	void aDiskAddedWhileItRunsIsMounted() {
 		boot();
 		Path data = dataDisk();
-		machine.setDevices(new LinkedHashMap<>(devices)); // plugged in: the bus's interrupt
+		TestBus.of(machine, devices); // plugged in: the bus's interrupt
 		untilIdle();
 		type("echo hot > /mnt/sata/1/plugged\r");
 		untilFile(data.resolve("plugged"), "hot\n");
@@ -1110,7 +1107,7 @@ class McosTest {
 		Object world = new Object();
 		java.util.UUID mine = java.util.UUID.randomUUID();
 		var card = networkCard(world, mine);
-		devices.put("id:" + mine, card);
+		devices.put(Motherboard.exp(0), card); // (a card in a slot, as in a case)
 		var peer = networkCard(world, java.util.UUID.randomUUID());
 		peer.power().supply(this); // (a card on a running computer's bus elsewhere)
 		peer.accepting(true);
@@ -1161,7 +1158,7 @@ class McosTest {
 		Object world = new Object();
 		java.util.UUID mine = java.util.UUID.randomUUID();
 		var card = networkCard(world, mine);
-		devices.put("id:" + mine, card);
+		devices.put(Motherboard.exp(0), card); // (a card in a slot, as in a case)
 		var peer = networkCard(world, java.util.UUID.randomUUID());
 		peer.power().supply(this);
 		peer.accepting(true);
@@ -1378,7 +1375,7 @@ class McosTest {
 	@Test
 	void aStreamCarriesEveryByteInOrderAndEndsAtItsShutdown() {
 		java.util.UUID mine = java.util.UUID.randomUUID();
-		devices.put("id:" + mine, networkCard(new Object(), mine));
+		devices.put(Motherboard.exp(0), networkCard(new Object(), mine)); // (a card in a slot, as in a case)
 		file("client.lua", """
 			local sys = require("sys")
 			local s = assert(sys.socket("stream"))
@@ -1430,7 +1427,7 @@ class McosTest {
 	@Test
 	void rshRunsCommandsAndLoginsAndRcpCopiesThroughRshd() {
 		java.util.UUID mine = java.util.UUID.randomUUID();
-		devices.put("id:" + mine, networkCard(new Object(), mine));
+		devices.put(Motherboard.exp(0), networkCard(new Object(), mine)); // (a card in a slot, as in a case)
 		String host = mine.toString().substring(0, 6); // (a prefix: found by asking every rshd in reach)
 		file("f", "a file\n");
 		boot();
@@ -1459,7 +1456,7 @@ class McosTest {
 		java.util.UUID mine = java.util.UUID.randomUUID();
 		java.util.UUID theirs = java.util.UUID.randomUUID();
 		var card = networkCard(world, mine);
-		devices.put("id:" + mine, card);
+		devices.put(Motherboard.exp(0), card); // (a card in a slot, as in a case)
 		file("big.lua", """
 			local out = io.open("/big", "w")
 			for i = 1, 3000 do
@@ -1491,8 +1488,7 @@ class McosTest {
 		java.util.UUID mine = java.util.UUID.randomUUID();
 		java.util.UUID theirs = java.util.UUID.randomUUID();
 		var card = networkCard(world, mine);
-		devices.put("pcie:1", card); // (cards in slots, as in a case: an interrupt is raised at the slot, and mcos names the card by its id)
-		aliases.put("id:" + mine, "pcie:1");
+		devices.put(Motherboard.exp(0), card);
 		file("tries.lua", """
 			local sys = require("sys")
 			local out = io.open("/tries", "w")
@@ -1522,7 +1518,7 @@ class McosTest {
 	void sendtoSaysWhenTheOtherCardIsBusy() {
 		Object world = new Object();
 		java.util.UUID mine = java.util.UUID.randomUUID();
-		devices.put("id:" + mine, networkCard(world, mine));
+		devices.put(Motherboard.exp(0), networkCard(world, mine)); // (a card in a slot, as in a case)
 		var peer = networkCard(world, java.util.UUID.randomUUID());
 		peer.power().supply(this); // on a computer whose program takes no data: it takes nothing
 		file("b.lua", """

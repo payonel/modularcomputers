@@ -111,9 +111,9 @@ class NetworkCardTest {
 		UUID id = UUID.randomUUID();
 		card.idFrom(() -> id);
 		card.place(world, BlockPos.ZERO, NOW);
-		Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus(List.of())));
+		Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
 		machine.board().setCpu(new Cpu(CpuTier.TIER_1));
-		machine.setDevices(List.of(card));
+		new com.payonel.modularcomputers.machine.TestBus(machine).card(card, id);
 		assertThat(sender.send(args(card.address(), "wake up")).first()).as("off, and not listening: nobody hears").isEqualTo(false);
 		assertThat(card.setWake(args("wake")).first()).isNull();
 		assertThat(sender.send(args(card.address(), "no")).first()).as("listening for its wake").isEqualTo(true);
