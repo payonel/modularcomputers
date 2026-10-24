@@ -7,7 +7,7 @@
 -- rows of rsh's terminal), then INPUT (what it reads), END (its input ended), SIZE (its terminal's
 -- size changed: "columns rows"). From rshd: OUTPUT, ERRORS, EXIT ("exited 0", "killed SIGHUP"),
 -- the last thing it sends. Finding a host: rsh broadcasts PROBE to UDP port 514; each rshd answers
--- HERE, from its card's address.
+-- HERE and its host's name ("rshd lab"), from its card's address.
 local rsh = {
   PORT = 514,
   PROBE = "rsh?", HERE = "rshd",
@@ -58,8 +58,8 @@ function rsh.send(sys, fd, kind, data)
   return true
 end
 
--- The address of the computer 'name' names: its card's whole id, or the one rshd in reach whose
--- id starts with it.
+-- The address of the computer 'name' names: its card's whole id, the rshd in reach whose host is
+-- named that (its hostname), or else the one whose id starts with it.
 function rsh.resolve(sys, name)
   name = name:gsub("^id:", ""):gsub("%*$", "")
   if name:match("^%x+%-%x+%-%x+%-%x+%-%x+$") then
@@ -70,20 +70,26 @@ function rsh.resolve(sys, name)
   if not ok then
     return nil, why
   end
-  local found, seen = {}, {}
+  local named, prefixed, seen = {}, {}, {}
   local waited, step = 0, rsh.PROBE_SECONDS / 5
   while waited < rsh.PROBE_SECONDS do
     if next(sys.poll({[probe] = {IN = true}}, step)) then
       local data, from = sys.recvfrom(probe)
-      if data == rsh.HERE and not seen[from] and from:sub(1, #name) == name then
+      local host = data and data:match("^" .. rsh.HERE .. " (.*)$")
+      if host and not seen[from] then
         seen[from] = true
-        found[#found + 1] = from
+        if host == name then
+          named[#named + 1] = from
+        elseif from:sub(1, #name) == name then
+          prefixed[#prefixed + 1] = from
+        end
       end
     else
       waited = waited + step
     end
   end
   sys.close(probe)
+  local found = #named > 0 and named or prefixed -- (a name said in full wins over an id's start)
   if #found == 0 then
     return nil, "unknown host"
   elseif #found > 1 then

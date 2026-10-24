@@ -380,8 +380,9 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   they had: no passwords, no encryption. `rshd` is a service, off until enabled; each connection
   runs `rshd -s` with the connection as stdin (inetd's way): a login on a pty, or a command on pipes.
   One TCP connection, framed both ways (`lib/rsh.lua`), so output, errors and the exit status stay
-  apart (BSD's used a second connection for stderr and never sent the status). A host is a card's
-  id or a unique prefix, found by a UDP broadcast probe on port 514 that rshd answers. `rcp` is rsh
+  apart (BSD's used a second connection for stderr and never sent the status). A host is its name
+  (`hostname`: set in `/etc/hostname`; unset, the first card's address), a card's id, or a unique
+  prefix, found by a UDP broadcast probe on port 514 that rshd answers with its name. `rcp` is rsh
   running `cat` there (and `mkdir -p` and `find` for `-r`), the host found once for the copy
   (`rsh.resolve`).
 

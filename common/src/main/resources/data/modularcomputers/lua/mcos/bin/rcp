@@ -1,6 +1,6 @@
 -- rcp [-r] source... target: copies files between computers (Berkeley's name: no passwords, no
 -- encryption). The sources are all on one side and the target on the other: a remote name is
--- host:path (host as rsh takes it: a card's id, whole or its start, found once); a name without a
+-- host:path (host as rsh takes it: a name, or a card's id, whole or its start, found once); a name without a
 -- colon, or with a / before it, is local. With more than one source the target must be a directory.
 -- A target that's a directory (or ends with /) gets each source's name in it; otherwise the source
 -- becomes the target. -r copies directories, all that's in them (a link is copied as what it

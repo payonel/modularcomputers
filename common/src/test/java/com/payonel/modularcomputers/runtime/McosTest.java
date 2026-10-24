@@ -1681,6 +1681,29 @@ class McosTest {
 	}
 
 	@Test
+	void theHostsNameIsItsCardsAddressUntilSetAndRshFindsItByName() {
+		java.util.UUID mine = java.util.UUID.randomUUID();
+		devices.put(Motherboard.exp(0), networkCard(new Object(), mine));
+		boot();
+		type("hostname > /h1; hostname lab; hostname > /h2; hostname 'bad name' 2> /dev/null; echo $? > /st; "
+			+ "rc rshd start; sleep 0.5; rsh lab 'hostname' > /h3; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("h1"))).as("unset: the first card's address").isEqualTo(mine + "\n");
+		assertThat(read(root().resolve("h2"))).isEqualTo("lab\n");
+		assertThat(read(root().resolve("etc/hostname"))).as("kept for the next boot").isEqualTo("lab\n");
+		assertThat(read(root().resolve("st"))).as("not a name").isEqualTo("1\n");
+		assertThat(read(root().resolve("h3"))).as("rsh finds it by name").isEqualTo("lab\n");
+	}
+
+	@Test
+	void theBootSetsTheHostsNameFromEtcHostname() {
+		boot(() -> file("etc/hostname", "kept\n"));
+		type("hostname > /h; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("h"))).isEqualTo("kept\n");
+	}
+
+	@Test
 	void rshRunsCommandsAndLoginsAndRcpCopiesThroughRshd() {
 		java.util.UUID mine = java.util.UUID.randomUUID();
 		devices.put(Motherboard.exp(0), networkCard(new Object(), mine)); // (a card in a slot, as in a case)

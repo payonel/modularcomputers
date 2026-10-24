@@ -1,5 +1,6 @@
 # /etc/rc: the boot's script. The kernel runs it with sh on the console, to its end, before the
-# console's shell starts (as BSD's /etc/rc; inittab's sysinit): mount what the system needs, then
-# start the services enabled in /etc/rc.conf.
+# console's shell starts (as BSD's /etc/rc; inittab's sysinit): mount what the system needs, name
+# the host (/etc/hostname, if it's there), then start the services enabled in /etc/rc.conf.
 mount tmpfs /run
+hostname -F /etc/hostname 2> /dev/null
 rc boot

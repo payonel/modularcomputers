@@ -1,6 +1,6 @@
 -- rshd: the remote shell's daemon (Berkeley's name: no passwords, no encryption), run as a service
 -- (rc rshd start; off until rc rshd enable). It takes rsh's connections on TCP port 514 and answers
--- rsh's probes on UDP port 514, and for each connection runs itself as a session (rshd -s, the
+-- rsh's probes on UDP port 514 (with its host's name), and for each connection runs itself as a session (rshd -s, the
 -- connection on its standard input, as inetd ran BSD's rshd), in a session of its own.
 --
 -- A session reads rsh's request (lib/rsh.lua's protocol): with no command, a login: sh on a pty as
@@ -193,7 +193,7 @@ while true do
   if ready[probes] then
     local data, from, port = sys.recvfrom(probes)
     if data == rsh.PROBE then
-      sys.sendto(probes, rsh.HERE, from, port)
+      sys.sendto(probes, rsh.HERE .. " " .. sys.gethostname(), from, port)
     end
   end
   if ready[listener] then

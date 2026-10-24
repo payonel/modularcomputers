@@ -8,7 +8,9 @@ rshd \- the remote shell's daemon
 takes
 .BR rsh (1)'s
 connections on TCP port 514, and answers rsh's search for hosts on UDP
-port 514. It's a service:
+port 514 with its host's name
+.RB ( hostname (1)).
+It's a service:
 .B rc rshd start
 runs it, and
 .B rc rshd enable

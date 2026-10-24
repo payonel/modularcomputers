@@ -1,6 +1,6 @@
 -- rsh [-n] host [command...]: the remote shell (Berkeley's name: no passwords, no encryption). host
--- is a computer's network card id, whole or the start of it (as git takes a commit's), found by
--- asking every rshd in reach (a broadcast); a * at its end is allowed. With a command (its words
+-- is a computer's name (its hostname), or its network card id, whole or the start of it (as git
+-- takes a commit's), found by asking every rshd in reach (a broadcast); a * at its end is allowed. With a command (its words
 -- joined by spaces, run by the other computer's sh -c), its input is rsh's (-n: none), its output
 -- and errors are rsh's, and rsh ends as it did. With none, a login: the terminal goes raw and every
 -- key goes to a shell on a pty there (^C included), its window size too; ~. at the start of a line

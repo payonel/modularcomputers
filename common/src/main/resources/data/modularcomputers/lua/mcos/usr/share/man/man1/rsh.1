@@ -12,12 +12,14 @@ connects to
 .BR rshd (1)
 on another computer, over its network cards (TCP, port 514).
 .I host
-is the other computer's network card id
+is the other computer's name (its
+.BR hostname (1)),
+or its network card id
 .RB ( "lsdev \-i"
 shows it), whole, or as much of its start as names one computer that
-answers (rsh asks every rshd in reach); a
+answers (rsh asks every rshd in reach, and each answers with its name); a
 .B *
-at its end is allowed.
+at its end is allowed. A name said in full wins over an id's start.
 .PP
 With a
 .I command

@@ -1,0 +1,65 @@
+.TH HOSTNAME 1 "" "" "mcos Manual"
+.SH NAME
+hostname \- show or set the host's name
+.SH SYNOPSIS
+.B hostname
+.br
+.B hostname
+.I name
+.br
+.B hostname \-F
+.I file
+.SH DESCRIPTION
+With no arguments,
+.B hostname
+prints the host's name. Until one is set, it is the first network card's
+address (in bus order), the address
+.BR rsh (1)
+finds the computer by anyway; with no network card,
+.BR localhost .
+.PP
+With a
+.IR name ,
+it sets the name and keeps it in
+.BR /etc/hostname ,
+so the computer has it again after a reboot (the boot's
+.B /etc/rc
+reads that file). An empty
+.I name
+unsets it.
+.B rsh
+finds a computer by its name, as well as by its card's address.
+.PP
+A name is letters, digits,
+.B \-
+and
+.BR . ,
+at most 64 of them.
+.SH OPTIONS
+.TP
+.BI \-F " file"
+Sets the name from the first line of
+.IR file ,
+keeping nothing.
+.SH EXIT STATUS
+0 when the name was printed or set; 1 for a name that isn't one, or a file
+that cannot be read or written.
+.SH EXAMPLES
+.nf
+hostname
+hostname lab
+rsh lab ls
+.fi
+.SH NOTES
+GNU
+.BR hostname 's
+.I name
+sets it only until the next boot; keeping it is
+.BR "hostnamectl set-hostname" 's
+job.
+mcos's
+.B hostname
+does both.
+.SH SEE ALSO
+.BR rsh (1),
+.BR rshd (1)

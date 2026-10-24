@@ -891,6 +891,32 @@ function syscalls.uptime()
   return board.uptime() / TICKS_PER_SECOND
 end
 
+-- The host's name (uname's nodename): unset until set (/etc/rc sets it from /etc/hostname), and
+-- then, as asked, the first network card's address, in bus order (a name every host has, and
+-- the one rsh finds it by anyway), or "localhost" with none. A name is a hostname's: letters,
+-- digits, '-' and '.', at most HOST_NAME_MAX ("" unsets it).
+local HOST_NAME_MAX = 64 -- Linux's
+local hostname
+function syscalls.gethostname()
+  if hostname then
+    return hostname
+  end
+  for _, device in ipairs(k.devices.list) do
+    if device.type == "network" then
+      return (device.id:gsub("^id:", ""))
+    end
+  end
+  return "localhost"
+end
+
+function syscalls.sethostname(p, request, name)
+  if type(name) ~= "string" or #name > HOST_NAME_MAX or not name:match("^[%w%-%.]*$") then
+    return fail("EINVAL")
+  end
+  hostname = name ~= "" and name or nil
+  return true
+end
+
 -- The real-time clock (the board's RTC: the world's game time), in seconds since the epoch, as
 -- clock_gettime(CLOCK_REALTIME): the time files are stamped with.
 function syscalls.time()

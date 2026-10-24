@@ -1,0 +1,49 @@
+-- hostname [NAME | -F file]: the host's name; with NAME, sets it and keeps it in /etc/hostname
+-- (as hostnamectl set-hostname does: it's there at the next boot, /etc/rc reading it); with -F,
+-- sets it from a file's first line, keeping nothing. Unset, the name is the first network card's
+-- address (in bus order), or "localhost" with none. A name is letters, digits, '-' and '.'.
+local sys = require("sys")
+
+local FILE = "/etc/hostname"
+
+local function usage()
+  io.stderr:write("usage: hostname [NAME | -F file]\n")
+  os.exit(1)
+end
+
+local function set(name)
+  local ok, why = sys.sethostname(name)
+  if not ok then
+    io.stderr:write("hostname: ", name, ": ", tostring(why), "\n")
+    os.exit(1)
+  end
+end
+
+if #arg == 0 then
+  print(sys.gethostname())
+  return 0
+elseif arg[1] == "-F" then
+  if not arg[2] or arg[3] then
+    usage()
+  end
+  local file, why = io.open(arg[2], "r")
+  if not file then
+    io.stderr:write("hostname: ", tostring(why), "\n")
+    return 1
+  end
+  local name = (file:read("l") or ""):match("^%s*(.-)%s*$")
+  file:close()
+  set(name)
+  return 0
+elseif arg[1]:sub(1, 1) == "-" or arg[2] then
+  usage()
+end
+set(arg[1])
+local file, why = io.open(FILE, "w")
+if not file then
+  io.stderr:write("hostname: ", tostring(why), "\n")
+  return 1
+end
+file:write(arg[1], "\n")
+file:close()
+return 0

@@ -12,7 +12,7 @@
 --   builtins   cd [-|dir], pwd, exit [n], export [NAME[=value]...], unset NAME..., . file, source
 --              file, alias [name[=value]...], unalias name..., read [NAME...], set, type name...,
 --              true, false, :
---   prompts    PS1 (default "\w \$ ": \w the working directory, ~ for HOME; \W its last part; \$;
+--   prompts    PS1 (default "\w \$ ": \w the working directory, ~ for HOME; \W its last part; \h the host's name; \$;
 --              \n; \\), PS2 ("> ") while a line goes on (an open quote, a trailing | && || or \)
 --
 -- Errors go to stderr as "sh: <what>: <why>". Status: a command not found 127; found but not
@@ -1330,7 +1330,7 @@ local function prompt(ps)
     shown = "~" .. cwd:sub(#home + 1)
   end
   -- (an escape it doesn't know stays as it is)
-  return (ps:gsub("\\(.)", {w = shown, W = shown == "/" and "/" or fs.name(shown), ["$"] = "$", n = "\n",
+  return (ps:gsub("\\(.)", {w = shown, W = shown == "/" and "/" or fs.name(shown), h = sys.gethostname():match("^[^.]*"), ["$"] = "$", n = "\n",
     ["\\"] = "\\"}))
 end
 
