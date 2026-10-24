@@ -18,6 +18,7 @@ operating system works, because the parts are small enough to read.
 - [The filesystem](/mcos/filesystem/): disks, mounts, `/dev`, `/tmp` and links.
 - [The shell](/mcos/shell/): `sh`, its syntax and its line editing.
 - [/dev](/mcos/dev/): devices as files.
+- [Writing programs](/mcos/programs/): blocking instead of yielding, with complete examples.
 - [Networking](/mcos/networking/): UDP and TCP sockets over the network cards.
 - [Services](/mcos/services/): `/etc/rc`, `/etc/rc.d` and `rc.conf`.
 - [Remote shell](/mcos/remote-shell/): `rsh`, `rshd` and `rcp`.

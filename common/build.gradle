@@ -41,6 +41,8 @@ dependencies {
 
 test {
 	useJUnitPlatform()
+	// The manual's Lua is tested (DocsLuaTest, and McosTest runs docs/examples): its pages are inputs.
+	inputs.dir(rootProject.file('docs')).withPropertyName('manual').withPathSensitivity(PathSensitivity.RELATIVE)
 	testLogging {
 		events "failed", "skipped"
 		exceptionFormat "full"

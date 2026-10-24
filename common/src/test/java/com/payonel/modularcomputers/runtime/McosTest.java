@@ -1987,4 +1987,59 @@ class McosTest {
 		assertThat(read(root().resolve("err"))).isEmpty();
 		assertThat(read(root().resolve("b"))).isEqualTo("ENOBUFS");
 	}
+
+	/** A program of the manual (docs/examples), as a player reads it. */
+	private static String example(String name) {
+		try {
+			Path dir = Path.of("").toAbsolutePath();
+			while (!Files.isDirectory(dir.resolve("docs/examples"))) {
+				dir = dir.getParent();
+			}
+			return Files.readString(dir.resolve("docs/examples/" + name + ".lua"));
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+
+	@Test
+	void theManualsBlinkProgramTurnsAFaceOnAndOffForever() {
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		devices.put(Motherboard.exp(0), card);
+		boot();
+		file("blink.lua", example("redstone-blink"));
+		type("lua /blink.lua &\r");
+		settle(() -> card.output(0) == 15);
+		settle(() -> card.output(0) == 0);
+		settle(() -> card.output(0) == 15); // (and again: it never ends)
+	}
+
+	@Test
+	void theManualsMirrorProgramCopiesTheWestInputToTheEastOutputAsItChanges() {
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		devices.put(Motherboard.exp(0), card);
+		boot();
+		file("mirror.lua", example("redstone-mirror"));
+		type("lua /mirror.lua &\r");
+		untilIdle();
+		server.add(() -> card.sense(3, 9)); // west: 9 comes in
+		settle(() -> card.output(2) == 9); // east: 9 goes out
+		server.add(() -> card.sense(3, 4));
+		settle(() -> card.output(2) == 4);
+	}
+
+	@Test
+	void theManualsMotionAlarmProgramSoundsWhenSomethingMoves() {
+		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		devices.put(Motherboard.exp(0), motion);
+		devices.put(Motherboard.exp(1), card);
+		boot();
+		// (a long pulse, so the alarm is still on when the test looks)
+		file("alarm.lua", example("motion-alarm").replace("local PULSE = 1 ", "local PULSE = 600 "));
+		type("lua /alarm.lua > /tmp/out &\r");
+		untilIdle();
+		assertThat(card.output(0)).as("quiet until something moves").isZero();
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
+		settle(() -> card.output(0) == 15);
+	}
 }

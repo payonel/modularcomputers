@@ -71,7 +71,8 @@ computers really work.
 - **The manual (`docs/`) moves with the mod:** a commit that changes the mod's behavior or
   features (a block, item, device, recipe, mcos program or API) includes the matching update to its
   `docs/` page, as the wiki is what players read. `.agents/DOCS.md` has the rules and page shapes,
-  `.agents/DOCS-PAGES.md` the page list; `scripts/docs_check.py` checks pages and links.
+  `.agents/DOCS-PAGES.md` the page list; `scripts/docs_check.py` checks pages and links. The Lua in
+  pages is tested: `docs/examples/*.lua` run in `McosTest`, and `DocsLuaTest` compiles every block.
 - **Words:** "bus" and "device", never "component" (OC's word). **Host**: the Java side.
   **Firmware**: `machine.lua`, layer 0, unbudgeted, unreachable by user code. **User threads**:
   anything budgeted (`user_co` is the root). **Kernel**: mcos's, in user threads. The EEPROM is

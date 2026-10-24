@@ -85,19 +85,47 @@ card's own `set`, or another card in the block. Its fields are the face as it is
 At most 32 wait. When more come, the oldest is dropped and the next event carries `lost`, the number
 dropped. The events are kept across a save, and dropped when no program runs on the computer.
 
-## Example
+## Examples
 
-Pulse a redstone line north for half a second, as a Lua program under mcos:
+A program drives the card by writing lines to its file, and reads it by reading the file. Run
+these with `lua name.lua`, from a computer with a redstone card and something on its faces. Each is
+a complete program. For why they loop without yielding, see [Writing programs](/mcos/programs/).
+
+### Set an output
 
 ```lua
-local sys = require("sys")
 local f = io.open("/dev/redstone0", "w")
-f:write("north 15\n")
-f:flush()
-sys.sleep(0.5)
-f:write("north 0\n")
+f:write("north 15\n")  -- "face strength": 0 to 15
 f:close()
 ```
 
-`flush` makes the line take effect now, instead of at close. From a shell, `echo "north 15" >
-/dev/redstone0` sets it, and `cat /dev/redstone0` reads every face.
+A line written takes effect when it is flushed (`f:flush()`, or closing the file). From a shell,
+`echo "north 15" > /dev/redstone0` does the same.
+
+### Read an input
+
+```lua
+local f = io.open("/dev/redstone0")
+local text = f:read("a")  -- one line a face: "west 9 0"
+local level = tonumber(text:match("west (%d+)"))
+print("west is " .. level)
+```
+
+Each line is `face level powered`: the signal on that face, and how much of it is this card's own.
+
+### Blink a lamp forever
+
+```lua
+{% include redstone-blink.lua %}
+```
+[Download redstone-blink.lua](/examples/redstone-blink.lua)
+
+### Follow an input
+
+```lua
+{% include redstone-mirror.lua %}
+```
+[Download redstone-mirror.lua](/examples/redstone-mirror.lua)
+
+`sys.poll` blocks until the card reports a change (`PRI`), so the program uses no time while the
+signal is steady. The [redstone tutorial](/tutorials/redstone/) walks through both programs.

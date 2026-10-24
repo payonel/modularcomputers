@@ -59,7 +59,7 @@ def main():
             url = m.group(1) or m.group(2)
             if url.startswith("//"):
                 continue
-            if url.startswith("/assets/"):
+            if url.startswith(("/assets/", "/examples/")):
                 if not (DOCS / url.lstrip("/")).exists():
                     errors.append(f"{rel}: missing file {url}")
             elif not page_exists(url):

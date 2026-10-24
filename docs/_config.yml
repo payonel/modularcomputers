@@ -10,6 +10,10 @@ kramdown:
   hard_wrap: false
 highlighter: rouge
 
+# The example programs live in docs/examples, are published there for download, and are what
+# `{% include name.lua %}` shows in a page (tested: McosTest runs them, DocsLuaTest compiles them).
+includes_dir: examples
+
 # The sidebar's sections, in order. A page joins one with `section:` and is placed in it by `order:`.
 wiki_sections:
   - Start

@@ -86,29 +86,45 @@ echo "west 0" > /dev/redstone0
 and it goes dark. If you write a line that is not a face and a number, the write fails and the shell
 tells you.
 
-### 6. A blinking lamp
+### 6. A blinking lamp, forever
 
-Write a program that pulses the lamp. Run `edit blink.lua` and type:
+A short program is a loop. Run `edit blink.lua` and type this (or copy it, see the download below):
 
 ```lua
-local sys = require("sys")
-local card = io.open("/dev/redstone0", "w")
-for i = 1, 5 do
-  card:write("west 15\n")
-  card:flush()
-  sys.sleep(0.5)
-  card:write("west 0\n")
-  card:flush()
-  sys.sleep(0.5)
-end
-card:close()
+{% include redstone-blink.lua %}
+```
+[Download redstone-blink.lua](/examples/redstone-blink.lua)
+
+Your lamp is on the west side, so change the line `local FACE = "north"` to `local FACE = "west"`.
+Save with `Ctrl+O` and Enter, leave with `Ctrl+X`, and run it:
+
+```
+lua blink.lua
 ```
 
-Save with `Ctrl+O` and Enter, leave with `Ctrl+X`, and run `lua blink.lua`. The lamp flashes five
-times. The file is flushed on each write so the lamp changes while the program runs. See
-[the sys API](/mcos/sys-api/) for `sys.sleep`.
+The lamp blinks, and keeps blinking. Press `Ctrl+C` to stop it.
 
-### 7. Relative faces
+Notice what the program does not have: no event loop, no `yield`, no scheduler to hand control back
+to. It is a plain `while true do` loop, and `sys.sleep` is where it waits. Programs in mcos block
+instead of yielding, and the computer runs other things while one waits. See
+[Writing programs](/mcos/programs/).
+
+### 7. Wait for the lever
+
+A program should not look at the card over and over. It can wait until the card says something
+changed. This one copies the lever's signal on the west face to a lamp on the east face, and uses no
+time at all while the lever stays where it is:
+
+```lua
+{% include redstone-mirror.lua %}
+```
+[Download redstone-mirror.lua](/examples/redstone-mirror.lua)
+
+Put a lamp on the east side, a lever on the west, and run it with `lua mirror.lua`. Flip the lever:
+the lamp follows. The call that waits is `sys.poll`; `PRI` is the event for "this device's state
+changed", which is how a redstone file reports that an input moved.
+
+### 8. Relative faces
 
 A face named `west` is west wherever the case is turned. If you would rather say "the side to my
 right", the card also takes `front`, `back`, `left` and `right`, measured from the case's front, as

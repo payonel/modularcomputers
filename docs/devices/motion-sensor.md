@@ -64,14 +64,26 @@ were lost. Events are kept across a save, and dropped while no program runs.
 The coordinates are the world's (not relative to the block's front). `x` grows east, `y` up and `z`
 south.
 
-## Example
+## Examples
 
-Wait for something to come near, from a Lua program under mcos:
+### Wait for something to come near
 
 ```lua
 local f = io.open("/dev/motion0")
-local line = f:read("l")
+local line = f:read("l")  -- blocks until the sensor has an event
 print("something moved: " .. line)
 ```
 
-`read("l")` waits until the sensor has an event. Run it with `lua /watch.lua`.
+`read("l")` waits until the sensor has an event, then returns it as `mob x y z`. Run it with
+`lua /watch.lua`.
+
+### An alarm that never stops watching
+
+```lua
+{% include motion-alarm.lua %}
+```
+[Download motion-alarm.lua](/examples/motion-alarm.lua)
+
+The `while true do` loop is the program's whole event loop: it sleeps in `read` until something
+moves. It needs a [redstone card](/devices/redstone-card/) as well, for the alarm's output. See
+[Writing programs](/mcos/programs/).

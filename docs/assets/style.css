@@ -4,10 +4,13 @@
   --board: #28683a; --board-dark: #225831; --trace: #429254; --gold: #cca64a; --silk: #eaeade;
   --bg: #f6f5ee; --fg: #20241f; --muted: #5d655b; --card: #fff; --rule: #d9d8cb; --code: #ecebe0;
   --link: #1d6b35;
+  /* code: comments, keywords, strings, numbers, functions, built-ins */
+  --t-com: #66705f; --t-key: #8a5a00; --t-str: #1d6b35; --t-num: #a0402a; --t-fun: #1f5f8b; --t-bi: #5b4aa0;
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #151a16; --fg: #e4e6dc; --muted: #9aa496; --card: #1c231e; --rule: #2e382f;
-          --code: #232c25; --link: #7fcf94; }
+          --code: #232c25; --link: #7fcf94;
+          --t-com: #8a9886; --t-key: #e0b85a; --t-str: #8fd7a0; --t-num: #f0a07a; --t-fun: #7fb8e8; --t-bi: #b8a4f0; }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg);
@@ -67,3 +70,14 @@ th { background: var(--code); }
   .side { flex: none; }
   .infobox { float: none; width: auto; margin: 0 0 1rem; }
 }
+
+/* Syntax highlighting (rouge's token classes): a Lua block reads as it would in an editor. */
+.highlight .c, .highlight .c1, .highlight .cm, .highlight .cs, .highlight .cp { color: var(--t-com); font-style: italic; }
+.highlight .k, .highlight .kd, .highlight .kc, .highlight .kn, .highlight .kr, .highlight .kt,
+.highlight .ow { color: var(--t-key); font-weight: 600; }
+.highlight .s, .highlight .s1, .highlight .s2, .highlight .sb, .highlight .sc, .highlight .sd,
+.highlight .se, .highlight .sh, .highlight .si, .highlight .sx { color: var(--t-str); }
+.highlight .m, .highlight .mi, .highlight .mf, .highlight .mh, .highlight .mo, .highlight .il { color: var(--t-num); }
+.highlight .nf, .highlight .fm, .highlight .nc { color: var(--t-fun); }
+.highlight .nb, .highlight .bp, .highlight .nn { color: var(--t-bi); }
+.highlight .err { color: inherit; background: none; }

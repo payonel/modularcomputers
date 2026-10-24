@@ -11,7 +11,7 @@ Devices: `devices/index.md`, `terminal.md`, `disk.md`, `disk-station.md`, `eepro
   `network-card.md`, `wlan-card.md`, `bluetooth-card.md`, `sound-card.md`, `internet-card.md`,
   `operator-card.md`, `motion-sensor.md`, `audio-sensor.md`, `weather-sensor.md`, `robotic-piston.md`
 mcos: `mcos/index.md`, `boot.md`, `filesystem.md`, `shell.md`, `dev.md`, `networking.md`,
-  `services.md`, `sys-api.md`, `remote-shell.md`
+  `services.md`, `programs.md` (writing programs), `sys-api.md`, `remote-shell.md`
 Programs: `programs/index.md` and `programs/<name>.md` per man page (generated)
 Tutorials: `tutorials/index.md`, `first-computer.md`, `first-program.md`, `redstone.md`,
   `two-computers.md`, `disk-station.md`

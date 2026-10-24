@@ -63,6 +63,17 @@ order: 10                   # place within the section (lower first)
   what goes wrong and how to fix it, and a link to the next tutorial.
 - **Concept:** what it is, why the mod works that way, what a player or program sees.
 
+## Lua in pages
+
+- A page shows a complete program by including it: a fenced `lua` block holding
+  `{% include name.lua %}`, from `docs/examples/` (Jekyll's includes directory; the files are also
+  published there, for download). Show a whole program, not a fragment: the manual teaches that a
+  program blocks (a read, `sys.sleep`, `sys.poll`) and never yields.
+- Every example in `docs/examples/` is run by a test (`McosTest`), and `DocsLuaTest` compiles every
+  `lua` block in every page. A block that is only a fragment (a signature, an ellipsis) has a
+  `<!-- lua-fragment -->` line before it. Add a test when you add an example.
+- Code highlighting comes from rouge, colored by `assets/style.css`.
+
 ## Checking
 
 `scripts/docs_check.py` checks every page's front matter and every internal link and image. With
