@@ -328,6 +328,10 @@ the farther it reaches (OC's wirelessCostPerRange); any tier hears any other.
   `/usr/bin/vtdemo.lua` shows every tier's colors and a picture.
 - **BEL rings the terminal's bell** at its block (`TerminalBell`, a sound from `scripts/art/bell.py`);
   bells closer than 200 ms ring once (xterm's bellSuppressTime: `\a\a\a` is one beep).
+- **Paste** (Ctrl+Shift+V, Shift+Insert in a screen's view; Ctrl+V stays ^V): the clipboard as typed,
+  new lines as Enter, but no control characters or ESC (a paste can't fake its end or send
+  sequences); with bracketed paste on (mode 2004) it comes wrapped, and readline turns that on while
+  it reads a line (as bash does), so a multi-line paste goes into the line and runs only at Enter.
 - **The server's decoder is the only one:** only changed rows go to players (the user rejected a
   client-side decoder: a client-only bug could show what the server never decoded).
 

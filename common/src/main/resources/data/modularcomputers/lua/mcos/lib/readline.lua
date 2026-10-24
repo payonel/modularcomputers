@@ -8,6 +8,9 @@
 --   cursor, ^W the word before it; Up/Down go through the history; ^L clears the screen; ^D on an
 --   empty line is the end of input; ^C drops the line; Tab completes the word before the cursor.
 --   A key's escape sequence that comes in parts is waited for (KEYSEQ_SECONDS, GNU's keyseq-timeout).
+--   Pasted text (bracketed paste, xterm's mode 2004, on while a line is read, as bash turns it on)
+--   goes into the line whole: its new lines stay in it (drawn as a return arrow) and nothing runs
+--   until Enter, then all of it does.
 --
 -- Completion (Tab), as readline's: the program's completer (file names by default) gives the words
 -- the one before the cursor could be. One: it's put in (and a space after it, unless it's a
@@ -30,6 +33,8 @@ local CSI = "\27["
 local REPORT_SECONDS = 0.5 -- how long the terminal has to say where its cursor is (no answer: column 0)
 local KEYSEQ_SECONDS = 0.5 -- how long the rest of an escape sequence is waited for (GNU readline's keyseq-timeout)
 local KEYSEQ_STEP = 0.05 -- (a poll's, while waiting)
+local PASTE_START, PASTE_END = "\27[200~", "\27[201~" -- what a terminal wraps a paste in (bracketed paste)
+local NEWLINE_SHOWN = "\226\134\181" -- a new line in the line, as it's drawn: U+21B5, a return arrow
 local DEFAULT_BREAKS = "[ \t\n\"'`<>;|&()=]" -- what ends a word, for completion (as rl_completer_word_break_characters)
 local SPECIAL = "[ \t\n\"'`<>;|&()$\\*?%[%]#~=!{}]" -- characters a file name has quoted when it's put in
 
@@ -214,7 +219,7 @@ function editor:read(shown)
   -- Draws the line from character 'from' on, clears what's after it, and puts the cursor back.
   local function redraw(from)
     moveto(start + from)
-    local tail = table.concat(buffer, "", from + 1)
+    local tail = table.concat(buffer, "", from + 1):gsub("\n", NEWLINE_SHOWN)
     out[#out + 1] = tail
     at = start + #buffer
     if #tail > 0 and at % width == 0 then
@@ -231,7 +236,7 @@ function editor:read(shown)
   local function finish(line, why)
     self.typeahead = why == "EINTR" and "" or pending -- (^C flushes what was typed, as the tty does)
     moveto(start + #buffer)
-    out[#out + 1] = why == "EINTR" and "^C\r\n" or "\r\n"
+    out[#out + 1] = (why == "EINTR" and "^C\r\n" or "\r\n") .. CSI .. "?2004l" -- (bracketed paste off: the program's again)
     io.stdout:write(table.concat(out))
     io.stdout:flush()
     sys.ioctl(0, "TCSETS", saved)
@@ -296,6 +301,8 @@ function editor:read(shown)
   end
 
   local entry, stash = #history + 1, ""
+  out[#out + 1] = CSI .. "?2004h" -- bracketed paste on while the line is read (as bash does)
+  local pasting = false
   while true do
     io.stdout:write(table.concat(out))
     io.stdout:flush()
@@ -308,6 +315,28 @@ function editor:read(shown)
         return finish(nil)
       end
       pending = data
+    end
+    -- Pasted: everything to its end goes into the line as it is (a new line stays a new line).
+    if pending:sub(1, #PASTE_START) == PASTE_START then
+      pending, pasting = pending:sub(#PASTE_START + 1), true
+    end
+    if pasting then
+      local stop = pending:find(PASTE_END, 1, true)
+      local hold = not stop and pending:find("\27", 1, true) -- (its end, in part: waits for the rest)
+      local text = stop and pending:sub(1, stop - 1) or hold and pending:sub(1, hold - 1) or pending
+      pending = stop and pending:sub(stop + #PASTE_END) or hold and pending:sub(hold) or ""
+      pasting = not stop
+      local from = cursor
+      for _, c in ipairs(characters((text:gsub("\r\n?", "\n")))) do
+        table.insert(buffer, cursor + 1, c)
+        cursor = cursor + 1
+      end
+      redraw(from)
+      if hold and not stop then
+        local more = sys.read(0, READ_SIZE)
+        pending = pending .. (more or "")
+      end
+      goto continue
     end
     -- An escape sequence come only in part (its rest in a later read: a key's bytes over a network,
     -- or typed apart) waits a moment for the rest, as GNU readline's keyseq-timeout does, before
@@ -414,6 +443,7 @@ function editor:read(shown)
       redraw(cursor - 1)
     end
     listing = tabbed
+    ::continue::
   end
 end
 

@@ -89,4 +89,20 @@ class TerminalKeyboardTest {
 		terminal.write("ab\u001B[sxyz\u001B[uQ");
 		assertThat(terminal.buffer().row(0)).startsWith("abQyz");
 	}
+
+	@Test
+	void aPasteIsItsTextAsTypedNewLinesAsEnterAndNothingElse() {
+		terminal.paste("one\r\ntwo\nthree\u001B[201~\u0007\tfour");
+		assertThat(sent()).as("no ESC, no bell; tabs stay").isEqualTo("one\rtwo\rthree[201~\tfour");
+	}
+
+	@Test
+	void withBracketedPasteOnAPasteComesWrapped() {
+		terminal.write("\u001B[?2004h");
+		terminal.paste("a\nb");
+		assertThat(sent()).isEqualTo("\u001B[200~a\rb\u001B[201~");
+		terminal.write("\u001B[?2004l");
+		terminal.paste("c");
+		assertThat(sent()).as("off again").isEqualTo("c");
+	}
 }

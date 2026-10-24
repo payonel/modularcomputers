@@ -135,7 +135,8 @@ public final class DisplayScreen extends Screen {
 	 * Typing goes to this terminal, and only this one: every key, its press, repeats (a press while
 	 * held) and release ({@link #keyReleased}), with the modifiers, and the terminal sends what its
 	 * mode says (by default a VT100's: the characters typed come through {@link #charTyped}). Escape
-	 * still closes the view, and Shift+PageUp/PageDown scroll the glass (the terminal's own).
+	 * still closes the view, Shift+PageUp/PageDown scroll the glass (the terminal's own), and
+	 * Ctrl+Shift+V or Shift+Insert paste the clipboard (Linux terminals' keys: Ctrl+V stays ^V).
 	 */
 	@Override
 	public boolean keyPressed(KeyEvent event) {
@@ -146,6 +147,15 @@ public final class DisplayScreen extends Screen {
 			// the terminal's own: its glass scrolls over its scrollback, a screen at a time; nothing goes down the line
 			int page = resolution.rows();
 			ModNetworkClient.send(new ScrollTerminalPayload(pos, event.key() == InputConstants.KEY_PAGEUP ? page : -page));
+			return true;
+		}
+		if (event.hasShiftDown() && (event.hasControlDown() && event.key() == InputConstants.KEY_V || event.key() == InputConstants.KEY_INSERT)) {
+			String clipboard = minecraft.keyboardHandler.getClipboard();
+			if (!clipboard.isEmpty()) {
+				ModNetworkClient.send(new com.payonel.modularcomputers.network.PasteTerminalPayload(pos,
+					clipboard.length() > com.payonel.modularcomputers.device.Terminal.MAX_PASTE
+						? clipboard.substring(0, com.payonel.modularcomputers.device.Terminal.MAX_PASTE) : clipboard));
+			}
 			return true;
 		}
 		int code = TerminalKeys.code(event);

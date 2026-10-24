@@ -60,6 +60,8 @@ public final class VtDecoder {
 	 * picture at the top left; this one draws it at the cursor.)
 	 */
 	private boolean sixelDisplayMode;
+	/** xterm's bracketed paste ({@code CSI ?2004 h}): a paste comes wrapped in {@code ESC[200~} and {@code ESC[201~}. */
+	private boolean bracketedPaste;
 
 	private int x;
 	private int y;
@@ -597,6 +599,7 @@ public final class VtDecoder {
 				case 7 -> autowrap = on;
 				case 25 -> cursorVisible = on;
 				case 80 -> sixelDisplayMode = on;
+				case 2004 -> bracketedPaste = on;
 				case 47, 1047, 1049 -> alternateScreen(on, mode == 1049);
 				default -> {
 					// not supported: ignored
@@ -931,6 +934,13 @@ public final class VtDecoder {
 
 	/** Where DECSDM is kept in {@link #state()}'s flags (past the keyboard's). */
 	private static final int SIXEL_DISPLAY_BIT = 20;
+	/** And bracketed paste. */
+	private static final int BRACKETED_PASTE_BIT = 21;
+
+	/** Whether a paste comes wrapped (bracketed paste, xterm's mode 2004). */
+	public boolean bracketedPaste() {
+		return bracketedPaste;
+	}
 
 	/** The size of {@link #state()}. */
 	private static final int STATE = 19;
@@ -944,7 +954,8 @@ public final class VtDecoder {
 	public int[] state() {
 		int flags = (bold ? 1 : 0) | (reverse ? 2 : 0) | (newLineMode ? 4 : 0) | (autowrap ? 8 : 0)
 			| (cursorVisible ? 16 : 0) | (pendingWrap ? 32 : 0) | (stringEscape ? 64 : 0) | (cursorStyle << 8)
-			| (cursorKeysApplication ? 1 << 11 : 0) | (keyboardFlags << 12) | (sixelDisplayMode ? 1 << SIXEL_DISPLAY_BIT : 0);
+			| (cursorKeysApplication ? 1 << 11 : 0) | (keyboardFlags << 12) | (sixelDisplayMode ? 1 << SIXEL_DISPLAY_BIT : 0)
+			| (bracketedPaste ? 1 << BRACKETED_PASTE_BIT : 0);
 		int[] state = new int[STATE];
 		// (a picture half decoded isn't kept: the rest of it is read and ignored)
 		Parse saving = parse == Parse.DCS || parse == Parse.SIXEL ? Parse.STRING : parse;
@@ -988,6 +999,7 @@ public final class VtDecoder {
 		cursorKeysApplication = (flags & (1 << 11)) != 0;
 		keyboardFlags = (flags >> 12) & KEYBOARD_FLAGS;
 		sixelDisplayMode = (flags & 1 << SIXEL_DISPLAY_BIT) != 0;
+		bracketedPaste = (flags & 1 << BRACKETED_PASTE_BIT) != 0;
 		if (state[7] >= 0 && state[7] < state[8] && state[8] < rows) {
 			top = state[7];
 			bottom = state[8];

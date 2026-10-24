@@ -261,6 +261,18 @@ class McosTest {
 	}
 
 	@Test
+	void aMultiLinePasteGoesIntoTheLineAndRunsOnlyAtEnter() {
+		boot();
+		untilIdle();
+		screen.paste("touch /p1\ntouch /p2\n");
+		untilIdle();
+		assertThat(root().resolve("p1")).as("pasted: nothing runs yet").doesNotExist();
+		type("\r");
+		untilFile(root().resolve("p2"), "");
+		assertThat(root().resolve("p1")).as("then all of it").exists();
+	}
+
+	@Test
 	void ctrlArrowsMoveAWordAsBashs() {
 		boot();
 		type("echo two > /w");

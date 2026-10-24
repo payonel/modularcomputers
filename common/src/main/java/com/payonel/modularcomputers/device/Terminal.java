@@ -341,6 +341,42 @@ public final class Terminal implements Device {
 		}
 	}
 
+	/** The most a paste takes, in characters (the rest is dropped, as a terminal's paste buffer has a size). */
+	public static final int MAX_PASTE = 4096;
+	/** A paste goes into the keyboard's queue in pieces of this many characters. */
+	private static final int PASTE_PIECE = 64;
+
+	/**
+	 * Text pasted (the player's clipboard): what goes down the line is the text, as if typed, its
+	 * new lines as Enter (\r, as xterm's), but nothing that isn't text (control characters and ESC go,
+	 * tabs stay, so a paste can't fake its own end or send escape sequences). With bracketed paste on
+	 * (a program asked: mode 2004), it comes wrapped in ESC[200~ and ESC[201~, so the program takes it
+	 * as pasted, not typed (a shell puts it in the line and runs nothing until Enter).
+	 */
+	public void paste(String text) {
+		StringBuilder clean = new StringBuilder();
+		String lines = text.replace("\r\n", "\r").replace('\n', '\r');
+		for (int i = 0; i < lines.length() && clean.length() < MAX_PASTE; i++) {
+			char c = lines.charAt(i);
+			if (c >= ' ' && c != 0x7F || c == '\t' || c == '\r') {
+				clean.append(c);
+			}
+		}
+		if (clean.isEmpty()) {
+			return;
+		}
+		boolean bracketed = decoder.bracketedPaste();
+		if (bracketed) {
+			press("\u001B[200~");
+		}
+		for (int i = 0; i < clean.length(); i += PASTE_PIECE) {
+			press(clean.substring(i, Math.min(clean.length(), i + PASTE_PIECE)));
+		}
+		if (bracketed) {
+			press("\u001B[201~");
+		}
+	}
+
 	/** Bytes from its keyboard: they wait in the queue, and the interrupt line wakes its computers. */
 	public void press(String key) {
 		scrollToBottom();
