@@ -1,4 +1,4 @@
--- curl [options] url: makes a request through the internet card and writes what comes back to
+-- curl [options] url: makes a request through the internet card (its /dev file: lib/http.lua) and writes what comes back to
 -- stdout (or -o file). -X method; -H 'Name: value' (a header; again for more); -d data (a body: POST,
 -- with Content-Type application/x-www-form-urlencoded unless -H says); -i the response's headers
 -- first; -I a HEAD request, its headers only; -L follows redirects (each judged by the card again);
@@ -90,15 +90,15 @@ local function status(why)
   return 7
 end
 
-local response, fd = http.request(url, {method = method, headers = headers, body = body, follow = follow})
+local response, reply = http.request(url, {method = method, headers = headers, body = body, follow = follow})
 if not response then
   if not silent then
-    io.stderr:write("curl: ", tostring(fd), "\n")
+    io.stderr:write("curl: ", tostring(reply), "\n")
   end
-  return status(fd)
+  return status(reply)
 end
 if fail and response.status >= 400 then
-  sys.close(fd)
+  reply:close()
   if not silent then
     io.stderr:write("curl: The requested URL returned error: ", response.status, "\n")
   end
@@ -108,7 +108,7 @@ local out = io.stdout
 if output then
   out = io.open(output, "w")
   if not out then
-    sys.close(fd)
+    reply:close()
     return 23
   end
 end
@@ -126,7 +126,7 @@ if include or head then
 end
 local code = 0
 while true do
-  local data, failed = sys.read(fd, READ_SIZE)
+  local data, failed = reply:read(READ_SIZE)
   if not data then
     if not silent then
       io.stderr:write("curl: ", tostring(failed), "\n")
@@ -138,7 +138,7 @@ while true do
   end
   out:write(data)
 end
-sys.close(fd)
+reply:close()
 if out ~= io.stdout then
   out:close()
 end

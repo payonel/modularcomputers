@@ -700,11 +700,18 @@ end
 -- TIOCSTI (bytes put in as if typed), on a tty or a pty's master; a socket's are net's; a device
 -- file's own (a sound card's, OSS's) are its file's.
 local net -- (lib/modules/net.lua, once a socket is made)
-syscalls.ioctl = withfd(function(p, request, d, fd, op, arg)
+syscalls.ioctl = withfd(function(p, request, d, fd, op, arg, ...)
   if d.type == "socket" then
     return net.ioctl(d, op, type(arg) == "table" and fromuser(arg) or arg)
   elseif d.ioctl then
-    return d:ioctl(op, arg) -- (a device file's own: a sound card's)
+    -- a device file's: its own ioctls, and its device's methods (arguments copied in, as a call's)
+    local args = table.pack(arg, ...)
+    for i = 1, args.n do
+      if type(args[i]) == "table" then
+        args[i] = fromuser(args[i], true)
+      end
+    end
+    return d:ioctl(op, table.unpack(args, 1, args.n))
   elseif d.type ~= "tty" and d.type ~= "pty" then
     return fail("ENOTTY")
   end
@@ -952,21 +959,15 @@ function syscalls.uptime()
   return board.uptime() / TICKS_PER_SECOND
 end
 
--- A device's label (by its kernel name, or its id): on its item, set by the board; "" or nil
--- for none. EINVAL for one that can't be (too long, not printable), EPERM for a device that can't
--- have one (no item to keep it on), ENODEV for none.
-function syscalls.setlabel(p, request, name, label)
-  local device = devices.byname[name]
-  if not device then
-    for _, entry in ipairs(devices.list) do
-      if entry.id == name or entry.id == "id:" .. tostring(name) then
-        device = entry
-      end
-    end
-  end
-  if not device then
-    return fail("ENODEV")
-  elseif label ~= nil and type(label) ~= "string" then
+-- Devices whose interrupt came since their files last looked (by id): a device file is ready for
+-- poll (PRI) while its device has news (devfs's).
+k.news = {}
+
+-- A device's label (an entry of k.devices): on its item, set by the board; "" or nil for none
+-- (a device file's setLabel ioctl). EINVAL for one that can't be (too long, not printable), EPERM
+-- for a device that can't have one (no item to keep it on).
+function k.setlabel(device, label)
+  if label ~= nil and type(label) ~= "string" then
     return fail("EINVAL")
   end
   local ok, why = board.setLabel(device.id, label or "")
@@ -1062,26 +1063,6 @@ end)
 -- port), sendto(fd, data, address, port), recvfrom(fd) (data, address, port), listen(fd[, backlog]),
 -- connect(fd, address, port), accept(fd) (a new one, the peer's address and port), shutdown(fd) (no
 -- more to send), and their ioctls (lib/modules/net.lua, loaded at the first).
--- http(url, {method, headers, body}): an internet card's request, as a file (lib/modules/http.lua,
--- loaded at the first): its reads the body, ioctl HTTP_RESPONSE its status and headers.
-local http
-function syscalls.http(p, request, url, options)
-  if type(url) ~= "string" then
-    return fail("EINVAL")
-  end
-  local fd = lowestfd(p)
-  if not fd then
-    return fail("EMFILE")
-  end
-  http = http or module("http", k, vfs)
-  local d, why, errno = http.open(url, fromuser(options, true) or {})
-  if not d then
-    return nil, why, errno
-  end
-  p.fds[fd] = hold(d)
-  return fd
-end
-
 function syscalls.socket(p, request, kind)
   local fd = lowestfd(p)
   if not fd then
@@ -1366,6 +1347,9 @@ local function idle()
   listening = {}
   local raised = board.waitForInterrupt(seconds, table.unpack(sources))
   for _, source in ipairs(raised) do
+    if source ~= "bus" then
+      k.news[source] = true -- (its device file is ready for poll: PRI)
+    end
     if source == "bus" then
       hotplug()
     elseif k.raised then

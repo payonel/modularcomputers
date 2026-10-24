@@ -46,10 +46,9 @@ answers, nothing being dropped, and wake-on-LAN) works as it does for a wired ca
 
 ## In mcos
 
-No file in `/dev`. mcos reaches it through sockets as `wlan0`, and reads and sets its signal strength with the
-`SIOCGIWTXPOW` and `SIOCSIWTXPOW` ioctls (the radio's transmit power, as Linux's wireless extensions
-do; the second takes `{name, txpower}` in blocks). See
-[Networking](/mcos/networking/).
+mcos reaches it through sockets as `wlan0`; see [Networking](/mcos/networking/). Its file in
+`/dev` (`network0`, a network card's) is its traffic, as a wired card's, and its methods are the
+file's ioctls: `sys.ioctl(fd, "setStrength", 16)` sets its range.
 
 ## Methods
 

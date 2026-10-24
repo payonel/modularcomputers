@@ -47,10 +47,19 @@ A broadcast is best effort: it says how many cards took it.
 
 ## In mcos
 
-A network card has no file in `/dev`. mcos uses it through sockets (UDP and TCP), with Linux's names
-for interfaces (`eth0`, `wlan0`). Ports belong to the kernel, in the frame's data: the card knows
-only addresses. The wake message is read and set with ethtool's `ETHTOOL_GWOL` and `ETHTOOL_SWOL`
-ioctls. See [Networking](/mcos/networking/). A card's address is shown by `lsdev -i`.
+mcos sends and receives through sockets (UDP and TCP), with Linux's names for interfaces (`eth0`,
+`wlan0`). Ports belong to the kernel, in the frame's data: the card knows only addresses. See
+[Networking](/mcos/networking/). A card's address is shown by `lsdev -i`.
+
+Its file, `/dev/network0`, is its traffic, read only: a line for each frame in or out, with the
+other card's address (or `broadcast`), how far it is, the frame's size and how it went. The card
+keeps its last 8. Its methods are the file's ioctls, so the wake message is
+`sys.ioctl(fd, "setWake", "letmein")`. See [/dev](/mcos/dev/).
+
+```
+out 5f0c2a9e-... 3.0m 42 taken
+in 5f0c2a9e-... 3.0m 17 busy
+```
 
 ## Methods
 

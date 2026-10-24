@@ -327,8 +327,8 @@ class McosTest {
 		type("ls /dev > /ld; cat /dev/eeprom > /e; lsdev -i > /devs\r");
 		untilFile(root().resolve("e"), image);
 		settle(() -> Files.isRegularFile(root().resolve("devs")) && read(root().resolve("devs")).contains("terminal0"));
-		assertThat(read(root().resolve("ld"))).as("only data: disks' bytes, no terminal files")
-			.contains("console\n", "null\n", "eeprom\n", "storage0\n", "storage1\n").doesNotContain("terminal");
+		assertThat(read(root().resolve("ld"))).as("every device has a file")
+			.contains("console\n", "null\n", "eeprom\n", "storage0\n", "storage1\n", "terminal0\n");
 		assertThat(read(root().resolve("devs"))).contains("storage0", "storage1", "sata:1", "eeprom ", "terminal0", "id:");
 		// written: one set at close, the whole of it (cp writes it in pieces)
 		file("new.lua", "-- " + "x".repeat(9000) + "\nboard.halt()\n");
@@ -473,16 +473,16 @@ class McosTest {
 	}
 
 	@Test
-	void aWlanInterfacesTransmitPowerIsItsCardsStrength() {
+	void aWlanCardsStrengthIsSetByItsDeviceFile() {
 		var card = new com.payonel.modularcomputers.device.NetworkCard(com.payonel.modularcomputers.device.CardKind.TIER1_WLAN);
 		card.idFrom(java.util.UUID::randomUUID);
 		devices.put(Motherboard.exp(0), card);
 		file("tx.lua", """
 			local sys = require("sys")
-			local s = assert(sys.socket())
-			local before = sys.ioctl(s, "SIOCGIWTXPOW", "wlan0")
-			local set = sys.ioctl(s, "SIOCSIWTXPOW", {name = "wlan0", txpower = 999})
-			local lowered = sys.ioctl(s, "SIOCSIWTXPOW", {name = "wlan0", txpower = 4})
+			local card = assert(sys.open("/dev/network0"))
+			local before = sys.ioctl(card, "getStrength")
+			local set = sys.ioctl(card, "setStrength", 999)
+			local lowered = sys.ioctl(card, "setStrength", 4)
 			local out = io.open("/tx", "w")
 			out:write(before, " ", set, " ", lowered)
 			out:close()
@@ -1577,7 +1577,7 @@ class McosTest {
 		peer.accepting(true);
 		file("w.lua", """
 			local sys = require("sys")
-			assert(sys.ioctl(assert(sys.socket()), "ETHTOOL_SWOL", {name = "wlan0", wake = "secret"}))
+			assert(sys.ioctl(assert(sys.open("/dev/network0")), "setWake", "secret"))
 			""");
 		boot();
 		type("lua /w.lua; touch /set\r");

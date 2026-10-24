@@ -121,10 +121,9 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 
 ## mcos
 
-- **More devices for user programs:** only devices with `get`/`set` have `/dev` nodes; the rest
-  (cards, terminals' own methods) can't be reached from a program yet. The REPL as a workbench for
-  trying devices without writing a script waits on that. A `/sys` tree (one file per attribute) is
-  postponed (user, 2026-10-20).
+- **A `/sys` tree:** a device's attributes as files, one each (sysfs's shape: `cat
+  /sys/class/net/wlan0/strength`), beside the `/dev` file's methods; postponed (user, 2026-10-24).
+  The REPL as a workbench for trying devices without writing a script.
 - **A tty per terminal:** the boot option (`console=`) names one device; a tty, interrupt handler
   and shell per terminal isn't started yet.
 - **Signal handlers run only on the way back from a syscall** (a stopped process can't be made to

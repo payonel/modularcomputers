@@ -20,13 +20,18 @@ import java.util.function.Supplier;
 /**
  * An internet card (user design, 2026-10-24, after OpenComputers'): HTTP and HTTPS requests to the
  * real internet, the card doing HTTP itself (a program's Lua can't do TLS; a real card offloading
- * it is the stand-in). A request ({@link #request}) gets a handle at once; what comes back are
- * events, its interrupt saying when there are some to {@link #pull}: the response (status and
- * headers), the body in pieces, its end, or why it failed. Each request runs on a thread of its
- * own ({@link HttpExchange}, which keeps it to the public internet: {@link InternetPolicy}); its
- * events wait in the card, at most {@link #EVENTS}, and a request whose next piece finds the card
- * full waits for room (the handshake: nothing dropped), so a big download goes at the program's
- * pace. At most {@link #MAX_OPEN} requests at a time; closing one ({@link #close}) stops it.
+ * it is the stand-in). A program uses it as any device, through its methods (in mcos, ioctls on
+ * its /dev file), as OpenComputers' handles were used: {@link #request} gives a handle at once;
+ * {@link #response} gives its status and headers once they've come, {@link #read} its body as it
+ * comes (false: not yet; "": its end), and either fails with why the request did; {@link #close}
+ * stops it. Its interrupt says when a request has news. Each request runs on a thread of its own
+ * ({@link HttpExchange}, which keeps it to the public internet: {@link InternetPolicy}); its body
+ * waits in the card, at most {@link #BUFFERED} pieces a request, and a request whose next piece
+ * finds no room waits (the handshake: nothing dropped), so a download goes at the program's pace.
+ * At most {@link #MAX_OPEN} requests at a time.
+ * <p>
+ * Its stream ({@link #pull}) is its access log, as a web server's: each request as it ends, its
+ * method, URL, status (or why it failed), how long it took and the bytes it brought.
  */
 public final class InternetCard extends Card {
 	/** Requests open at once, a card. */
@@ -34,14 +39,18 @@ public final class InternetCard extends Card {
 	/** And on the whole server: however many computers a player builds, its threads are bounded. */
 	public static final int MAX_RUNNING = 64;
 	private static final java.util.concurrent.atomic.AtomicInteger RUNNING = new java.util.concurrent.atomic.AtomicInteger();
-	/** Events the card holds for the program. */
-	public static final int EVENTS = 32;
+	/** Body pieces a request holds unread before its download waits. */
+	public static final int BUFFERED = 16;
+	/** Its access log's entries kept, at most: a small window (past it the oldest go; the user's: a reader sees what's current, at little memory). */
+	public static final int LOG = 8;
 	/** Its draw a tick, at rest. */
 	public static final int DRAW = 4;
 	/** What a request costs. */
 	public static final int REQUEST_COST = PowerUnits.CPU;
 	/** What a piece of a body costs. */
 	public static final int DATA_COST = PowerUnits.CPU / 10;
+	/** How long a downloaded piece waits for room before looking again whether its request was closed, in milliseconds. */
+	private static final long ROOM_MILLIS = 100;
 	/** The servers' settings, as loaded (a test's own). */
 	private static volatile Supplier<InternetPolicy> policy = () -> InternetPolicy.DEFAULT;
 	/** Its requests' threads: daemons, so a stopping server never waits on the internet. */
@@ -52,12 +61,39 @@ public final class InternetCard extends Card {
 	});
 	private final InterruptLine line = new InterruptLine();
 	private final BusPower power = new BusPower(DRAW);
-	private final LinkedBlockingQueue<Map<String, Object>> events = new LinkedBlockingQueue<>(EVENTS);
-	private final Map<Long, HttpExchange> open = new ConcurrentHashMap<>();
+	private final Map<Long, Request> open = new ConcurrentHashMap<>();
+	private final java.util.concurrent.ConcurrentLinkedDeque<Map<String, Object>> log = new java.util.concurrent.ConcurrentLinkedDeque<>();
 	private final HttpExchange.Resolver resolver;
 	private long nextHandle = 1;
-	/** Its interrupt was raised for what's waiting; raised again once it's been emptied and more came. */
-	private volatile boolean announced;
+	/** Something happened on a request's thread since the last tick: its interrupt, at the next. */
+	private final java.util.concurrent.atomic.AtomicBoolean news = new java.util.concurrent.atomic.AtomicBoolean();
+
+	/** A request: what's come of it, as its thread fills it in. */
+	private final class Request {
+		final String method;
+		final String url;
+		final long started = System.nanoTime();
+		final LinkedBlockingQueue<String> body = new LinkedBlockingQueue<>(BUFFERED);
+		volatile Map<String, Object> response;
+		volatile boolean ended;
+		volatile String error;
+		volatile long bytes;
+		/** What's left of a piece a read took only part of (the reader's, on the server thread: it reads first). */
+		String rest;
+		/** News the program hasn't looked at (its interrupt stays pending while any request has some). */
+		volatile boolean fresh;
+		HttpExchange exchange;
+
+		Request(String method, String url) {
+			this.method = method;
+			this.url = url;
+		}
+
+		void told() {
+			fresh = true;
+			news.set(true);
+		}
+	}
 
 	public InternetCard() {
 		this(HttpExchange.SYSTEM);
@@ -74,7 +110,7 @@ public final class InternetCard extends Card {
 		policy = settings;
 	}
 
-	@Method(doc = "request(url[, method[, headers[, body]]]): starts an HTTP or HTTPS request (method GET, or POST with a body; headers a table); returns its handle; what comes back are events to pull")
+	@Method(doc = "request(url[, method[, headers[, body]]]): starts an HTTP or HTTPS request (GET, or POST with a body; headers a table); returns its handle")
 	public Result request(Arguments args) {
 		if (!policy.get().enabled()) {
 			return Result.fail("the internet is turned off on this server");
@@ -91,18 +127,18 @@ public final class InternetCard extends Card {
 		}
 		byte[] body = args.get(3) instanceof String text ? text.getBytes(StandardCharsets.ISO_8859_1) : null;
 		long handle = nextHandle++;
-		HttpExchange exchange;
+		Request request = new Request(method != null ? method.toUpperCase(java.util.Locale.ROOT) : body == null ? "GET" : "POST", url);
 		try {
-			exchange = HttpExchange.of(url, method, headers, body, policy.get(), resolver, listener(handle));
+			request.exchange = HttpExchange.of(url, method, headers, body, policy.get(), resolver, listener(handle, request));
 		} catch (IllegalArgumentException e) {
 			return Result.fail(e.getMessage());
 		}
 		power.charge(REQUEST_COST);
-		open.put(handle, exchange);
+		open.put(handle, request);
 		RUNNING.incrementAndGet();
 		THREADS.execute(() -> {
 			try {
-				exchange.run();
+				request.exchange.run();
 			} finally {
 				RUNNING.decrementAndGet();
 			}
@@ -110,89 +146,123 @@ public final class InternetCard extends Card {
 		return Result.ok(handle);
 	}
 
-	/** What a request's thread tells the card: its events, each waiting for room. */
-	private HttpExchange.Listener listener(long handle) {
+	/** What a request's thread tells it. */
+	private HttpExchange.Listener listener(long handle, Request request) {
 		return new HttpExchange.Listener() {
 			@Override
 			public void response(int status, String message, Map<String, String> headers) {
-				Map<String, Object> event = event(handle, "response");
-				event.put("status", (long) status);
-				event.put("message", message);
-				event.put("headers", new LinkedHashMap<String, Object>(headers));
-				offer(handle, event);
+				Map<String, Object> response = new LinkedHashMap<>();
+				response.put("status", (long) status);
+				response.put("message", message);
+				response.put("headers", new LinkedHashMap<String, Object>(headers));
+				request.response = response;
+				request.told();
 			}
 
 			@Override
 			public boolean data(byte[] bytes) throws InterruptedException {
-				Map<String, Object> event = event(handle, "data");
-				event.put("data", new String(bytes, StandardCharsets.ISO_8859_1));
-				return offer(handle, event);
+				String piece = new String(bytes, StandardCharsets.ISO_8859_1);
+				while (open.get(handle) == request) {
+					if (request.body.offer(piece, ROOM_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+						request.bytes += bytes.length;
+						request.told();
+						return true;
+					}
+				}
+				return false; // (closed: it stops)
 			}
 
 			@Override
 			public void end() {
-				offer(handle, event(handle, "end"));
-				open.remove(handle);
+				request.ended = true;
+				logged(request);
+				request.told();
 			}
 
 			@Override
 			public void failed(String why) {
-				Map<String, Object> event = event(handle, "error");
-				event.put("why", why);
-				offer(handle, event);
-				open.remove(handle);
+				request.error = why;
+				logged(request);
+				request.told();
 			}
 		};
 	}
 
-	private static Map<String, Object> event(long handle, String kind) {
-		Map<String, Object> event = new LinkedHashMap<>();
-		event.put("handle", handle);
-		event.put("event", kind);
-		return event;
-	}
-
-	/** An event, waiting for room; false once its request is closed (it stops). */
-	private boolean offer(long handle, Map<String, Object> event) {
-		try {
-			while (open.containsKey(handle)) {
-				if (events.offer(event, 100, java.util.concurrent.TimeUnit.MILLISECONDS)) {
-					return true;
-				}
-			}
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
+	/** A request ended: its line in the access log. */
+	private void logged(Request request) {
+		Map<String, Object> entry = new LinkedHashMap<>();
+		entry.put("method", request.method);
+		entry.put("url", request.url);
+		Object status = request.response != null ? request.response.get("status") : null;
+		entry.put("status", status != null ? status : 0L);
+		entry.put("millis", (System.nanoTime() - request.started) / 1_000_000);
+		entry.put("bytes", request.bytes);
+		if (request.error != null) {
+			entry.put("why", request.error);
 		}
-		return false;
+		log.addLast(entry);
+		while (log.size() > LOG) {
+			log.pollFirst();
+		}
+		news.set(true); // (its interrupt, once: a reader of its log hears)
 	}
 
-	@Method(doc = "pull(): the oldest event, as {handle, event, ...}: response (status, message, headers), data (data), end, or error (why); or nil")
-	public Result pull(Arguments args) {
-		Map<String, Object> event = events.poll();
-		if (event != null && "data".equals(event.get("event"))) {
+	/** The request a handle names, its news now looked at. */
+	private Request handle(Arguments args) {
+		Request request = open.get(args.checkInteger(0));
+		if (request == null) {
+			throw new Arguments.ArgumentError("no such request: " + args.get(0));
+		}
+		request.fresh = false;
+		return request;
+	}
+
+	@Method(doc = "response(handle): its {status, message, headers} once they've come (headers by name, in lower case); false: not yet; fails with why the request did")
+	public Result response(Arguments args) {
+		Request request = handle(args);
+		if (request.response != null) {
+			return Result.ok(request.response);
+		}
+		return request.error != null ? Result.fail(request.error) : Result.ok(false);
+	}
+
+	@Method(doc = "read(handle[, n]): the next piece of its body (at most n bytes); false: none yet; \"\": its end; fails with why the request did")
+	public Result read(Arguments args) {
+		Request request = handle(args);
+		long most = args.count() > 1 ? Math.max(1, args.checkInteger(1)) : Long.MAX_VALUE;
+		String piece = request.rest != null ? request.rest : request.body.poll();
+		request.rest = null;
+		if (piece != null) {
 			power.charge(DATA_COST);
+			if (piece.length() <= most) {
+				return Result.ok(piece);
+			}
+			request.rest = piece.substring((int) most); // (the next read's, before what's queued)
+			return Result.ok(piece.substring(0, (int) most));
 		}
-		if (events.isEmpty()) {
-			announced = false;
+		if (request.error != null) {
+			return Result.fail(request.error);
 		}
-		return Result.ok(event);
+		return request.ended ? Result.ok("") : Result.ok(false);
 	}
 
-	@Method(doc = "close(handle): stops a request: its connection closes, and its events still waiting go")
+	@Method(doc = "close(handle): stops a request: its connection closes, and what it had waiting goes")
 	public Result close(Arguments args) {
-		long handle = args.checkInteger(0);
-		HttpExchange exchange = open.remove(handle);
-		if (exchange != null) {
-			exchange.close();
+		Request request = open.remove(args.checkInteger(0));
+		if (request != null) {
+			request.exchange.close();
 		}
-		events.removeIf(event -> Long.valueOf(handle).equals(event.get("handle")));
 		return Result.ok();
 	}
 
-	/** Each server tick (its block's): its interrupt, once, for events that came on its requests' threads. */
+	@Method(doc = "pull(): its access log's oldest entry, a request as it ended: {method, url, status, millis, bytes, why (when it failed)}; or nil")
+	public Result pull(Arguments args) {
+		return Result.ok(log.pollFirst());
+	}
+
+	/** Each server tick (its block's): its interrupt, for news that came on its requests' threads. */
 	public void tick() {
-		if (!announced && !events.isEmpty()) {
-			announced = true;
+		if (news.getAndSet(false)) {
 			line.raise();
 		}
 	}
@@ -209,7 +279,13 @@ public final class InternetCard extends Card {
 
 	@Override
 	public boolean interruptPending() {
-		return !events.isEmpty();
+		// (its log isn't held up: an entry is told once, so a program waiting on a request isn't woken over and over by a log nobody reads)
+		for (Request request : open.values()) {
+			if (request.fresh) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override
@@ -217,12 +293,11 @@ public final class InternetCard extends Card {
 		return line;
 	}
 
-	/** Everything stops: its requests close, their events go. */
+	/** Everything stops: its requests close, what they had goes. */
 	private void closeAll() {
-		open.values().forEach(HttpExchange::close);
+		open.values().forEach(request -> request.exchange.close());
 		open.clear();
-		events.clear();
-		announced = false;
+		log.clear();
 	}
 
 	@Override

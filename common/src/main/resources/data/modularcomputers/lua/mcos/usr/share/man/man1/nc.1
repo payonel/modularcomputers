@@ -108,12 +108,12 @@ does.
 .PP
 A network card can turn its computer on while it's off (Wake\-on\-LAN):
 a frame for it holding its wake message, anywhere in the data, presses the
-power button. A program sets the message (an empty one: none) with a
-socket's ioctl, as Linux's ethtool does:
+power button. A program sets the message (an empty one: none) with the
+card's own method, an ioctl on its /dev file:
 .PP
 .nf
 local sys = require("sys")
-sys.ioctl(sys.socket(), "ETHTOOL_SWOL", {name = "wlan0", wake = "letmein"})
+sys.ioctl(sys.open("/dev/network0"), "setWake", "letmein")
 .fi
 .PP
 Then, from another computer:

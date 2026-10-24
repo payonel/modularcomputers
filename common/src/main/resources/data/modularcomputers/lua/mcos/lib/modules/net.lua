@@ -28,11 +28,8 @@
 -- urgent data, options. Its header: protocol, ports, flags, sequence, acknowledgement, window.
 --
 -- Interfaces are named as Linux's: eth0 for the first wired card, wlan0 for the first WLAN card.
--- The ioctls (by their Linux names): SIOCGIFCONF (the interfaces: {name, address, wireless} each),
--- two of ethtool's: ETHTOOL_GWOL (an interface's wake message, or nil) and ETHTOOL_SWOL
--- ({name, wake}: sets it; nil or empty, none); and the wireless extensions' transmit power:
--- SIOCGIWTXPOW (a WLAN interface's, as the blocks its signal reaches: OpenComputers' strength)
--- and SIOCSIWTXPOW ({name, txpower}: up to its card's tier, 16 or 400; answers what it's set to).
+-- The ioctl (by its Linux name): SIOCGIFCONF (the interfaces: {name, address, wireless} each). A
+-- card's own settings (its wake message, its signal's strength) are its methods, by its /dev file.
 local k, vfs = ...
 
 local UDP, TCP = 17, 6
@@ -688,14 +685,6 @@ function net.shutdown(socket)
   return true
 end
 
-local function named(name)
-  for _, nic in ipairs(interfaces()) do
-    if nic.name == name then
-      return nic
-    end
-  end
-end
-
 function net.ioctl(socket, op, arg)
   if op == "SIOCGIFCONF" then
     local list = {}
@@ -703,32 +692,6 @@ function net.ioctl(socket, op, arg)
       list[i] = {name = nic.name, address = nic.address, wireless = nic.wireless or false}
     end
     return list
-  end
-  local nic = named(type(arg) == "table" and arg.name or arg)
-  if not nic then
-    return fail("ENODEV")
-  elseif op == "ETHTOOL_GWOL" then
-    local ok, wake = board.invoke(nic.id, "getWake")
-    return ok and wake or nil
-  elseif op == "ETHTOOL_SWOL" and type(arg) == "table" then
-    if not board.invoke(nic.id, "setWake", arg.wake) then
-      return fail("EINVAL")
-    end
-    return true
-  elseif op == "SIOCGIWTXPOW" or op == "SIOCSIWTXPOW" and type(arg) == "table" and math.type(arg.txpower) == "integer" then
-    if not nic.wireless then
-      return fail("EOPNOTSUPP")
-    end
-    local ok, strength
-    if op == "SIOCGIWTXPOW" then
-      ok, strength = board.invoke(nic.id, "getStrength")
-    else
-      ok, strength = board.invoke(nic.id, "setStrength", arg.txpower)
-    end
-    if not ok then
-      return fail("EIO")
-    end
-    return strength
   end
   return fail("EINVAL")
 end

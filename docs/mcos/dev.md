@@ -4,27 +4,45 @@ section: mcos
 order: 40
 ---
 
-`/dev` holds the computer's devices as files, as Linux's does. It holds only data, and it is flat:
-no subfolders.
+`/dev` holds the computer's devices as files, as Linux's does: every device on the bus has one, and
+it is how a program uses the device. It is flat: no subfolders.
 
 ## What is there
 
 - `console`: the board's console, which merges every terminal on the bus. See [Names](/concepts/names/).
 - `tty`: the terminal of the process that opens it.
 - `null` and `zero`: `null` takes what's written and reads as empty; `zero` reads as zero bytes.
-- One file for each device on the [bus](/concepts/bus/) that has data to read or write, named by
-  type and place: `eeprom`, `storage0`, `redstone0`, `motion0`, `dsp`... [`lsdev`](/programs/lsdev/)
-  lists the names. A device with no data of this kind has no file: a
-  [network card](/devices/network-card/), for one, is used through [sockets](/mcos/networking/).
+- One file for each device on the [bus](/concepts/bus/), named by type and place: `eeprom`,
+  `storage0`, `redstone0`, `network0`, `internet0`, `terminal0`, `dsp`...
+  [`lsdev`](/programs/lsdev/) lists the names.
 
 An open file holds the device's **id**, not its name: it reaches that device or fails with
 `ENODEV`, even if the names are rearranged while it is open.
+
+## A device's methods are its ioctls
+
+Every device file's ioctls are its device's [methods](/concepts/bus/), by name, with the
+method's arguments, in any open mode, as a Linux device's ioctls are its driver's API. The answer is
+the method's (`true` for a method that answers nothing); a method's failure is `EINVAL` with its
+message, and a device gone is `ENODEV`.
+
+```lua
+local sys = require("sys")
+local card = assert(sys.open("/dev/network0"))
+sys.ioctl(card, "setStrength", 16)       -- a WLAN card's range
+print(sys.ioctl(card, "getStrength"))
+sys.close(card)
+```
+
+A device's file is ready for `sys.poll`'s `PRI` while the device has news: its interrupt came
+since the file was last read. The methods each device has are on its page.
 
 ## How a file behaves
 
 Reading gives what the device's `get` returns, taken at the first read. What you write goes to the
 device's `set`, all of it in one call, when the file is closed; the device decides what that
-means (replace, append...). A write to a device that can't be set, or a read from one that can't
+means (replace, append...). A device with nothing to read gives what it is: its type, id, label
+and methods, a line each. A write to a device that can't be set, or a read from one that can't
 be read, fails with `EACCES`. The kernel does not let a read-only open write, or the other way round.
 
 The [EEPROM](/devices/eeprom/)'s file is its image: write it to reflash the chip. Everything
@@ -59,6 +77,20 @@ written names an action: `format`, `wipe`, `clone`, `install` or `update`.
 
 **Operator card.** A line written runs a server command, as a command block does (a leading `/` is
 allowed); a read gives what the last command said.
+
+**Network card, WLAN card.** Read-only: its traffic, a line a frame, in or out: the other card's
+address (or `broadcast`), how far it is, the frame's size and how it went (`taken`, `busy`,
+`unreachable`; a broadcast's: how many took it). The card keeps its last 8 frames. Its data is read
+through [sockets](/mcos/networking/).
+
+```
+out 5f0c2a9e-... 3.0m 42 taken
+in 5f0c2a9e-... 3.0m 17 taken
+out broadcast - 4 2 took it
+```
+
+**Internet card.** Read-only: its access log, a line a request as it ended (method, URL, status,
+time, bytes). See the [internet card](/devices/internet-card/).
 
 **Motion sensor, audio sensor, weather sensor.** Read-only; an event a line, and a read with none
 waiting waits for one, as a keyboard does.
@@ -98,18 +130,14 @@ file. The card is not opened for reading. Its `ioctl`s are OSS's names:
 | `SNDCTL_DSP_GETODELAY` | | the bytes queued |
 | `SNDCTL_DSP_RESET` | | drops what is queued |
 | `SNDCTL_DSP_SYNC` | | waits until what is queued has played |
-| `MCOS_DSP_BLOCK` | bytes | an ADPCM block's size (WAV's block align), mcos's own |
 
-[`aplay`](/programs/aplay/) plays WAV files.
-
-## Internet card
-
-An [internet card](/devices/internet-card/)'s request is a file of its own, opened with
-`sys.http`. [`wget`](/programs/wget/) and [`curl`](/programs/curl/) are built on it.
+An ADPCM block's size (WAV's block align), which OSS never had, is the card's own method:
+`sys.ioctl(fd, "setFormat", {block = 1024})`. [`aplay`](/programs/aplay/) plays WAV files.
 
 ## Events and polling
 
 A device file can be polled with `sys.poll` (see [The sys library](/mcos/sys-api/)). A redstone file
-is always readable and reports a change as `PRI`, as a GPIO's sysfs value does. An event file is
+is always readable and reports a change as `PRI`, as a GPIO's sysfs value does; any other device's
+file reports its device's news as `PRI`. An event file is
 readable while an event waits. When a program blocks on a device and nothing else has work, the
 kernel sleeps the computer until the device's [interrupt](/concepts/interrupts/).

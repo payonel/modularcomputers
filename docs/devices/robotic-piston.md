@@ -39,9 +39,15 @@ free.
 
 ## In mcos
 
-mcos has no file for a robotic piston: it has no data to read or write, only methods, and the
-kernel has no driver for it. Call it from code that can reach the board, such as an
-[EEPROM](/devices/eeprom/) program.
+Its file in `/dev` (`actuator0`, its type `actuator`, as `lsdev` names it) has no data: a read says what it is
+(its type, id and methods). Its methods are the file's ioctls:
+
+```lua
+local sys = require("sys")
+local piston = assert(sys.open("/dev/actuator0"))
+sys.ioctl(piston, "push", "front")
+sys.close(piston)
+```
 
 ## Methods
 

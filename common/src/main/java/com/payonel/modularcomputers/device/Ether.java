@@ -65,9 +65,12 @@ public final class Ether {
 	static String send(NetworkCard from, String to, String data) {
 		for (var entry : reached(from).entrySet()) {
 			if (to.equals(entry.getKey().address())) {
-				return entry.getKey().hear(from.address(), data, entry.getValue(), false);
+				String refused = entry.getKey().hear(from.address(), data, entry.getValue(), false);
+				from.logged("out", to, entry.getValue(), data.length(), refused == null ? "taken" : refused);
+				return refused;
 			}
 		}
+		from.logged("out", to, null, data.length(), NetworkCard.UNREACHABLE);
 		return NetworkCard.UNREACHABLE;
 	}
 

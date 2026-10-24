@@ -43,13 +43,19 @@ and `OPTIONS`.
 
 ## In mcos
 
-A request is a file. `sys.http(url, {method, headers, body})` starts one on the first internet card
-and gives a file descriptor: reading it gives the body as it comes (a read with nothing yet waits),
-the `HTTP_RESPONSE` ioctl gives `{status, message, headers}` (header names in lower case), and
-closing stops the request. A failed request (refused, unknown host, timed out) fails its reads with
-the reason (`EIO`). `wget` and `curl` are built on it; see [curl](/programs/curl/) and
-[wget](/programs/wget/), and the [sys API](/mcos/sys-api/). A card's own `/dev` file has no use: the
-kernel takes the card's events itself.
+The card is used as any device: through its file, `/dev/internet0`, whose ioctls are its methods
+by name (below). Reading the file gives its access log, a line for each request as it ended, as a
+web server's: the method, the URL, the status (or `-` and why it failed), how long it took and the
+bytes it brought.
+
+```
+GET https://example.com/ 200 143ms 1256
+GET http://10.0.0.1/ - 2ms 0 refused: a private address (the server's network)
+```
+
+The card keeps only the last 8 lines, so a reader sees what is current. The log is read only.
+`wget` and `curl` are built on the methods; see [curl](/programs/curl/) and
+[wget](/programs/wget/).
 
 ## Methods
 
@@ -60,32 +66,36 @@ when there is a body. `headers` is a table of names and values. The body is a st
 `http` or `https` with a host. It fails with a message when the request cannot be made:
 `not an http or https URL`, `not a method it sends`, `a header the card writes itself`, a body
 over 1 MiB, `too many requests open (4)`, or `the server's internet is busy: try again soon`.
-Whether the address is allowed is judged as the request runs, and a refusal comes back as an `error`
-event (`refused: ...`).
+Whether the address is allowed is judged as the request runs, and a refusal is the request's
+failure (`refused: ...`).
 
-### pull() → event or nil
+### response(handle) → {status, message, headers} or false
 
-The oldest event, or nil. See Events.
+The status line and headers once they have come (header names in lower case); `false` while they
+have not. It fails with why, when the request did (refused, unknown host, timed out).
+
+### read(handle[, n]) → piece, "" or false
+
+The next piece of the body, at most `n` bytes; `""` at its end; `false` while nothing more has
+come. A failed request fails its reads with why, after what had come.
 
 ### close(handle) → nothing
 
-Stops a request: its connection closes and its events still waiting go.
+Stops a request: its connection closes and what it had waiting goes.
 
-## Events
+### pull() → entry or nil
 
-What comes back are events, in order, each with the request's `handle` and an `event` kind:
+The access log's oldest entry: `{method, url, status, millis, bytes, why}` (`why` when it failed).
 
-| `event` | Other fields |
-|---|---|
-| `response` | `status` (a number), `message`, `headers` (a table by name) |
-| `data` | `data`: a piece of the body (at most 4096 bytes) |
-| `end` | none: the body is complete |
-| `error` | `why`: the reason it failed |
+## Waiting
 
-The card holds at most 32 events. A request whose next piece finds the card full waits for room,
-so nothing is dropped: a big download goes at the program's pace. The interrupt is raised once for
-events that came, and again when the card has been emptied and more come. Everything stops when the
-computer loses power or no program runs: requests close and their events go.
+The interrupt is raised when a request has news (its response came, a piece of its body, its end
+or its failure) and stays raised until the program asks about it. In mcos, the card's file is
+ready for `sys.poll`'s `PRI` while it has news, so a program asks again after each poll.
+
+Each request holds at most 16 pieces of its body unread. A request whose next piece finds no room
+waits for it, so nothing is dropped: a big download goes at the program's pace. Everything stops
+when the computer loses power or no program runs: requests close.
 
 ## Example
 
@@ -95,13 +105,33 @@ Fetch a page into a file from a shell:
 curl -s http://example.com/ > /page.html
 ```
 
-Or from a Lua program under mcos, reading the status and the first bytes:
+Or from a Lua program under mcos, reading the status and the body:
 
 ```lua
 local sys = require("sys")
-local fd = assert(sys.http("http://example.com/"))
-local response = assert(sys.ioctl(fd, "HTTP_RESPONSE"))
-local body = sys.read(fd, 200)
-sys.close(fd)
-print(response.status, #body)
+local card = assert(sys.open("/dev/internet0"))
+
+-- Asks again, after waiting for the card's news, while the answer is "not yet".
+local function await(method, ...)
+  while true do
+    local answer, why = sys.ioctl(card, method, ...)
+    if answer ~= false then
+      return answer, why
+    end
+    sys.poll({[card] = {PRI = true}})
+  end
+end
+
+local handle = assert(sys.ioctl(card, "request", "http://example.com/"))
+local response = assert(await("response", handle))
+local size = 0
+while true do
+  local piece = assert(await("read", handle))
+  if piece == "" then
+    break
+  end
+  size = size + #piece
+end
+sys.ioctl(card, "close", handle)
+print(response.status, size)
 ```

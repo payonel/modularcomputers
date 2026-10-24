@@ -1,13 +1,14 @@
--- devfs: /dev, devices as files, as Linux's devtmpfs: only data. The kernel's own: console (its
--- console tty), tty (the opening process's own terminal), null and zero; and every device on the
--- bus that has data to read or write (a get or a set), by the kernel's name for it (eeprom). Reading
--- a device's file gives what its get returns, taken at the first read; what's written to it goes to
--- its set, all of it in one call, when the file is closed; the device decides what that means
--- (replace, append...). An open file holds the device's id: it reaches that device or fails
--- (ENODEV, and the kernel reads the bus again), whatever happens to the names meanwhile. A disk's
--- file is its bytes, as a block device's: read, written and sought by byte offset (the disk's raw
--- read and write); a disk with a filesystem (hfs) refuses them (EMEDIUMTYPE). A sound card's file
--- (dsp) is OSS's: what's written plays, and its ioctls set the format. The names
+-- devfs: /dev, devices as files, as Linux's devtmpfs. The kernel's own: console (its console tty),
+-- tty (the opening process's own terminal), null and zero; and every device on the bus, by the
+-- kernel's name for it (eeprom, storage0, internet0). What a device's file reads and writes is its
+-- data: a disk's bytes (as a block device's: read, written and sought by byte offset; a disk with a
+-- filesystem, hfs, refuses them: EMEDIUMTYPE), a sound card's samples (OSS's dsp, its ioctls the
+-- format), a sensor's events (a line each), or what its get returns (taken at the first read) and
+-- what's written going to its set (a line at a time through its driver, else all at close); a
+-- device with none of those reads as what it is. Every device file's ioctls are its device's
+-- methods, by name (its own API, as a Linux device's ioctls are), and it's ready for poll (PRI)
+-- while its device has news. An open file holds the device's id: it reaches that device or fails
+-- (ENODEV, and the kernel reads the bus again), whatever happens to the names meanwhile. The names
 -- come from the kernel's view of the bus (k.devices), which may be a moment behind: no lookup here
 -- makes a board call.
 local k, vfs = ...
@@ -85,16 +86,11 @@ local devices = {
 local DISK = "storage" -- a disk's device type: its file is a block device's
 local SOUND = "sound" -- a sound card's: its file is OSS's /dev/dsp
 
--- A bus device with data: a get, a set, events to pull, or a disk's bytes.
-local function hasdata(device)
-  return device.get or device.set or device.pull or device.type == DISK or device.type == SOUND
-end
-
--- What a path in /dev names: one of the kernel's devices (its maker), or a bus device with data.
+-- What a path in /dev names: one of the kernel's devices (its maker), or a bus device (every one
+-- has a file).
 local function find(path)
   local name = path:match("^/([^/]+)$") or ""
-  local device = k.devices.byname[name]
-  return devices[name], device and hasdata(device) and device
+  return devices[name], k.devices.byname[name]
 end
 
 -- A device call's failure as an errno: a device that's gone is ENODEV (and the kernel's view of the
@@ -226,8 +222,8 @@ end
 -- format plays on first. Its ioctls, by OSS's names: SNDCTL_DSP_SPEED (a rate), SNDCTL_DSP_SETFMT
 -- (AFMT_U8, AFMT_S16_LE, AFMT_IMA_ADPCM), SNDCTL_DSP_CHANNELS (1 or 2), each answering what it's
 -- set to; SNDCTL_DSP_GETODELAY (bytes queued), SNDCTL_DSP_RESET (they're dropped), SNDCTL_DSP_SYNC
--- (waits until they've played); and mcos's own MCOS_DSP_BLOCK (an ADPCM block's bytes: WAV's block
--- align, which OSS never had).
+-- (waits until they've played). The card's own settings beyond OSS's (an ADPCM block's bytes) are its
+-- methods, as any device file's ioctls (setFormat).
 local function dspfile(device)
   local id = device.id
   local ok, why = board.invoke(id, "setFormat", {rate = 8000, encoding = "u8", channels = 1})
@@ -257,9 +253,6 @@ local function dspfile(device)
     end,
     SNDCTL_DSP_CHANNELS = function(channels)
       return set("channels", channels, function(format) return format.channels end)
-    end,
-    MCOS_DSP_BLOCK = function(block)
-      return set("block", block, function(format) return format.block end)
     end,
     SNDCTL_DSP_GETODELAY = function()
       local got, delay = board.invoke(id, "getDelay")
@@ -304,7 +297,7 @@ local function dspfile(device)
     ioctl = function(self, op, arg)
       local f = ops[op]
       if not f then
-        return fail("EINVAL")
+        return fail("ENOTTY") -- (not OSS's: the card's own methods, by the device file)
       end
       return f(arg)
     end,
@@ -315,10 +308,44 @@ end
 -- has one); writes, a line at a time as they come with a line driver, otherwise kept for one set at
 -- close (the EEPROM's image: all of it or none, as a firmware load's commit); or an event device's.
 -- (Which of them the open's mode allows is the VFS's to enforce.)
+-- A device with nothing to read or write (no get, set or events): its file says what it is, its
+-- type, id, slot, label and methods, a line each (its methods are its ioctls).
+local function aboutfile(device)
+  local methods = board.methods(device.id) or {}
+  table.sort(methods)
+  local text = table.concat({"type " .. tostring(device.type), "id " .. tostring(device.id), "path " .. (device.path or "-"),
+    "label " .. (device.label or "-"), "methods " .. table.concat(methods, " ")}, "\n") .. "\n"
+  local at = 0
+  return {
+    type = "device",
+    events = function(self)
+      return {IN = true}
+    end,
+    read = function(self, n)
+      local chunk = text:sub(at + 1, at + n)
+      at = at + #chunk
+      return chunk
+    end,
+    seek = function(self, whence, offset)
+      if whence ~= "set" or offset ~= 0 then
+        return fail("ESPIPE")
+      end
+      at = 0
+      return 0
+    end,
+  }
+end
+
 local function devicefile(device, mode)
   local plus = mode:find("+", 1, true)
   local reads, writes = mode:sub(1, 1) == "r" or plus, mode:sub(1, 1) ~= "r" or plus
   local events = device.pull and not device.get
+  if not (device.get or device.set or events) then
+    if writes then
+      return fail("EACCES")
+    end
+    return aboutfile(device)
+  end
   if (reads and not (device.get or events)) or (writes and not device.set) then
     return fail("EACCES")
   end
@@ -426,21 +453,84 @@ local function devicefile(device, mode)
   }
 end
 
+-- Every device file, over what it reads and writes: its device's methods as its ioctls, by name,
+-- with their arguments as given (a device's own operations, as Linux's ioctls are; its own ioctls
+-- come first: OSS's on a sound card's), setLabel (the kernel's: the label on its item), and ready
+-- for poll (PRI) while its device has news (its interrupt came since the file last read or asked;
+-- a file with its own PRI, a GPIO-like one's, keeps its own). An ioctl's answer is the method's
+-- (true for a method that answers nothing, as a Linux ioctl's 0); a failure is EINVAL with why
+-- (ENODEV: the device is gone).
+local function withmethods(d, device)
+  local id, own, events, read = device.id, d.ioctl, d.events, d.read
+  if read then
+    d.read = function(self, ...)
+      k.news[id] = nil -- (read: its news is looked at)
+      return read(self, ...)
+    end
+  end
+  d.ioctl = function(self, op, ...)
+    if own then
+      local answer = table.pack(own(self, op, ...))
+      if not (answer[1] == nil and answer[3] == "ENOTTY") then
+        return table.unpack(answer, 1, answer.n)
+      end
+    end
+    if type(op) ~= "string" then
+      return fail("ENOTTY")
+    end
+    k.news[id] = nil -- (asked: its news is looked at)
+    if op == "setLabel" then
+      return k.setlabel(device, ...)
+    end
+    local answer = table.pack(board.invoke(id, op, ...))
+    if not answer[1] then
+      local why = tostring(answer[2])
+      if why:find("^no such device") then
+        return failed(why)
+      end
+      return nil, why, "EINVAL"
+    end
+    if answer.n == 1 then
+      return true -- (a method that answers nothing: done)
+    end
+    return table.unpack(answer, 2, answer.n)
+  end
+  d.events = function(self)
+    local ready = events and events(self) or {}
+    if ready.PRI == nil then
+      if k.news[id] then
+        ready.PRI = true
+      else
+        k.listen(id) -- (its interrupt wakes a poll waiting on it)
+      end
+    end
+    return ready
+  end
+  return d
+end
+
 function fs:open(path, mode, process)
   local make, device = find(path)
   if make then
     return make(process)
   elseif not device then
     return fail("ENOENT")
-  elseif device.type == DISK then
-    return diskfile(device)
+  end
+  local d, why, errno
+  if device.type == DISK then
+    d = diskfile(device)
   elseif device.type == SOUND then
     if mode:sub(1, 1) == "r" and not mode:find("+", 1, true) then
       return fail("EACCES") -- (it plays; it doesn't record)
     end
-    return dspfile(device)
+    d, why, errno = dspfile(device)
+  else
+    d, why, errno = devicefile(device, mode)
   end
-  return devicefile(device, mode)
+  if not d then
+    return nil, why, errno
+  end
+  return withmethods(d, device)
 end
 
 function fs:stat(path)
@@ -460,9 +550,7 @@ function fs:list()
     entries[#entries + 1] = {name = device, type = "device"}
   end
   for _, device in ipairs(k.devices.list) do
-    if hasdata(device) then
-      entries[#entries + 1] = {name = device.name, type = "device"}
-    end
+    entries[#entries + 1] = {name = device.name, type = "device"}
   end
   return entries
 end

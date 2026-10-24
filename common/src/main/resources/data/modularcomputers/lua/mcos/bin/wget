@@ -1,4 +1,4 @@
--- wget [-q] [-O file] url: downloads what a URL names, through the internet card, following
+-- wget [-q] [-O file] url: downloads what a URL names, through the internet card (lib/http.lua), following
 -- redirects, into a file named as the URL's last part (index.html for none), or -O's ("-": stdout).
 -- Says what it does on stderr unless -q. Exit status as GNU wget's: 0 done, 2 bad usage, 3 a file
 -- that can't be written, 4 a network failure (refused, unknown host, timed out), 8 the server
@@ -46,14 +46,14 @@ local function say(...)
 end
 
 say("--", os.date("%T"), "--  ", url, "\n")
-local response, fd = http.request(url, {follow = true})
+local response, reply = http.request(url, {follow = true})
 if not response then
-  say("wget: ", tostring(fd), "\n")
+  say("wget: ", tostring(reply), "\n")
   return 4
 end
 say("HTTP request sent, awaiting response... ", response.status, " ", response.message, "\n")
 if response.status >= 400 then
-  sys.close(fd)
+  reply:close()
   say(os.date("%T"), " ERROR ", response.status, ": ", response.message, ".\n")
   return 8
 end
@@ -64,7 +64,7 @@ local out, why = io.stdout, nil
 if output ~= "-" then
   out, why = io.open(output, "w")
   if not out then
-    sys.close(fd)
+    reply:close()
     say("wget: ", tostring(why), "\n")
     return 3
   end
@@ -72,9 +72,9 @@ end
 say("Saving to: '", output, "'\n")
 local got = 0
 while true do
-  local data, failed = sys.read(fd, READ_SIZE)
+  local data, failed = reply:read(READ_SIZE)
   if not data then
-    sys.close(fd)
+    reply:close()
     say("wget: ", tostring(failed), "\n")
     return 4
   elseif data == "" then
@@ -83,7 +83,7 @@ while true do
   out:write(data)
   got = got + #data
 end
-sys.close(fd)
+reply:close()
 if out ~= io.stdout then
   out:close()
 end

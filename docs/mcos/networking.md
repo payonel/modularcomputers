@@ -96,16 +96,20 @@ and 6 for TCP), so any kernel can put its own protocol on a card. The cards know
 | op | Argument | Answers |
 |---|---|---|
 | `SIOCGIFCONF` | | a list of the interfaces, `{name, address, wireless}` each |
-| `ETHTOOL_GWOL` | interface name | the interface's wake message, or `nil` |
-| `ETHTOOL_SWOL` | `{name, wake}` | `true`; sets the wake message (`nil` or empty: none) |
-| `SIOCGIWTXPOW` | WLAN interface name | its transmit power, in blocks |
-| `SIOCSIWTXPOW` | `{name, txpower}` | what it is set to, up to its card's tier |
 
-The wake message is **Wake-on-LAN**: a card with a wake message listens while its computer is
-off, and a frame whose data holds the message presses the power button. See the
-[network card](/devices/network-card/) page. A frame reaches as far as its sender's strength
-(`txpower`), and a send costs more power the farther it reaches: see the
-[WLAN card](/devices/wlan-card/).
+A card's settings are its own methods, ioctls on its file in [/dev](/mcos/dev/) (`network0`):
+`setWake` for **Wake-on-LAN** (a card with a wake message listens while its computer is off, and a
+frame whose data holds the message presses the power button; see the
+[network card](/devices/network-card/)), and a WLAN card's `setStrength`: a frame reaches as far as
+its sender's strength, and a send costs more power the farther it reaches (see the
+[WLAN card](/devices/wlan-card/)).
+
+```lua
+local sys = require("sys")
+local card = assert(sys.open("/dev/network0"))
+sys.ioctl(card, "setWake", "letmein")
+sys.close(card)
+```
 
 ## Programs
 
@@ -126,6 +130,6 @@ $ echo hi | nc <the first computer's card id> 7000
 ## The internet
 
 The [internet card](/devices/internet-card/) reaches the real internet, over HTTP and HTTPS only. It
-is not a socket; a request is a file: `sys.http(url, {method, headers, body})` returns a file
-descriptor whose reads give the body. See [The sys library](/mcos/sys-api/);
-[`wget`](/programs/wget/) and [`curl`](/programs/curl/) use it.
+is not a socket: a program uses the card itself, through its methods on `/dev/internet0`. See the
+[internet card](/devices/internet-card/); [`wget`](/programs/wget/) and [`curl`](/programs/curl/)
+use it.

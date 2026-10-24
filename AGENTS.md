@@ -265,8 +265,11 @@ read gives what the last one said.
 
 HTTP and HTTPS to the real internet (OC's internet card; the user's recipe: a cobweb and an eye of
 ender). The card speaks HTTP itself (`HttpExchange`, its own small client), since TLS is beyond a
-program's Lua; in mcos a request is a file (`sys.http`, `lib/modules/http.lua`: reads give the body,
-`HTTP_RESPONSE` the status and headers), and `wget` and `curl` are built on it. **It's a program
+program's Lua. A program uses the card as any device (the user's call: no `sys.http`): its methods
+start a request (a handle), give its status and headers and read its body as it comes (`false`: not
+yet, its interrupt saying when to ask again), and `/dev/internet0`'s read is its access log, an
+Apache-like line a request (method, URL, status, time, bytes), read only. `lib/http.lua` is the
+library on its ioctls; `wget` and `curl` are built on it. **It's a program
 running on the server's network, so it's kept to the public internet** (`InternetPolicy`):
 loopback, private, link-local (cloud metadata), CGNAT, multicast and reserved ranges are refused, in
 IPv4 and IPv6 (embedded IPv4 judged as itself); every address a host resolves to is judged, and the
@@ -283,7 +286,7 @@ OC's broadcast and peer-to-peer messages in a real NIC's shape. A wired card sen
 cables, a WLAN card through the air, to a card's address (its id, a MAC) or to every card it
 reaches; nothing routes between the two networks. WLAN cards come in OC's tiers and ranges (tier 1
 16 blocks, tier 2 400, their recipes after OC's: redstone torches, an ender pearl); a frame reaches
-as far as its sender's strength (OC's `setStrength`, mcos's `SIOCSIWTXPOW`), and a send costs more
+as far as its sender's strength (OC's `setStrength`, a method), and a send costs more
 the farther it reaches (OC's wirelessCostPerRange); any tier hears any other.
 - **Over the bus's own cables:** a cable is a shared fabric, not one host's private bus. Two cases
   on one cable are two hosts on it (two Macs on one Thunderbolt cable, SAN hosts on a Fibre Channel
@@ -385,14 +388,23 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   (`lib/modules/drivers/<type>.lua`, found by its type) making it text: a redstone card's file is a
   line a face (`north 7 7`), a line written takes effect at once (a sysfs attribute's write); a
   device without one (the EEPROM) takes everything written at close, all or nothing.
-- **`/dev` holds only data,** flat: `console`, `tty`, `null`, `zero`, and a node for each device with
-  `get` or `set` (the EEPROM too: convenient, the user's call). Reading gives `get`'s answer; what's
-  written goes to `set` at close, and the device decides what `set` means. A disk's node
+- **Every device has a `/dev` file, and it's the device's API** (the user's call: no `device.*`
+  library, no `/sys` yet): `/dev` is flat, `console`, `tty`, `null`, `zero` and a node for each
+  device by the kernel's name, and its ioctls are the device's methods by name
+  (`sys.ioctl(fd, "setStrength", 4)`, in any open mode; a method answering nothing gives `true`), so
+  nothing mcos makes up stands for a device's method (no invented `SIOC*`). Its file is ready for
+  poll (`PRI`) while its device has news, its interrupt since the file last read. Reading gives the
+  device's data: `get`'s answer (the EEPROM too: convenient, the user's call), what's written going
+  to `set` at close, the device deciding what `set` means; a device with nothing to read says what
+  it is (type, id, label, methods). A disk's node
   (`storage0`) is its bytes, as a block device's: read, written and sought by byte offset (its raw
   methods); an hfs disk's refuses (`EMEDIUMTYPE`, the user's call: Linux would let a mounted disk's
   bytes be read). A device with events and
   no `get` (a sensor) has a read-only file, an event a line, and a read with none waiting blocks. A
-  NIC has no `/dev` file (its method is `receive`): the network is read through sockets.
+  log is a device's own small window (a NIC's traffic, the internet card's requests: the last 8,
+  older ones dropped), so a reader sees what's current and nothing grows: a NIC's file reads its
+  frames, one a line (direction, remote address, distance, bytes, outcome); its data is read
+  through sockets.
 - **`sys.poll(fds, seconds)`** is poll(2) (`IN`, `PRI`, `OUT`; `HUP`, `ERR` unasked), in `sys` (mcos's
   POSIX layer), since Lua's `io` is C's stdio; `sys.fileno` gives an io file's descriptor. A
   redstone file is always readable and reports a change as `PRI` (a sysfs GPIO's way).
@@ -431,8 +443,9 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   tty when free (login_tty's step: mcos has no fork); closing the master hangs up (SIGHUP, then EOF
   and EIO). The window size is the pty's (`TIOCSWINSZ`, which sends SIGWINCH, ignored by default).
 - **Sockets** are UDP and TCP over the network cards (`lib/modules/net.lua`; a frame's data starts
-  with IP's protocol number), with Linux's names for interfaces (eth0, wlan0) and ioctls
-  (`SIOCGIFCONF`, ethtool's wake) and no commands for them (`ifconfig`, `ethtool` have no purpose
+  with IP's protocol number), with Linux's names for interfaces (eth0, wlan0) and `SIOCGIFCONF` to
+  list them; a card's settings (its wake message, its strength) are its methods, on its `/dev` file;
+  no commands for them (`ifconfig`, `ethtool` have no purpose
   here; an address is in `lsdev -i`). No IP: an address is a card's.
   **UDP has no remote dependency:** a datagram's answer is the card's alone; the other kernel never
   answers one (no ICMP), and drops what has no socket or no room, as UDP does. A full socket never

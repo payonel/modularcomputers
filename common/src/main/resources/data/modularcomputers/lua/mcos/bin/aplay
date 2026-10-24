@@ -98,12 +98,13 @@ local function setup(dsp, format)
   end
   local steps = {{"SNDCTL_DSP_SETFMT", afmt}, {"SNDCTL_DSP_CHANNELS", format.channels}, {"SNDCTL_DSP_SPEED", format.rate}}
   if afmt == "AFMT_IMA_ADPCM" then
-    table.insert(steps, 3, {"MCOS_DSP_BLOCK", format.block})
+    table.insert(steps, 3, {"setFormat", {block = format.block}}) -- (the card's own: OSS has no block size)
   end
   for _, step in ipairs(steps) do
     local ok, why = sys.ioctl(dsp, step[1], step[2])
     if not ok then
-      return nil, "unsupported " .. step[1]:match("_(%u+)$"):lower() .. " " .. tostring(step[2]) .. " (" .. tostring(why) .. ")"
+      return nil, "unsupported " .. (step[1]:match("_(%u+)$") or "block"):lower() .. " " .. tostring(type(step[2]) == "table" and step[2].block or step[2])
+        .. " (" .. tostring(why) .. ")"
     end
   end
   return true

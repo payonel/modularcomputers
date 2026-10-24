@@ -221,9 +221,9 @@ A terminal's ioctls, by Linux's names:
 | `TIOCSWINSZ` | A pty's size, `{columns, rows}`; sends `SIGWINCH` to the program in front. |
 | `TIOCSTI` | Puts bytes into the input as if typed. |
 
-A socket's ioctls are described in [Networking](/mcos/networking/). A device file's own are its
-file's (a sound card's: see [/dev](/mcos/dev/)); `HTTP_RESPONSE` is the file `sys.http` returns. Anything else fails with `ENOTTY`
-or `EINVAL`.
+A socket's ioctls are described in [Networking](/mcos/networking/). A device file's are its
+device's methods, by name, with their arguments (`sys.ioctl(fd, "setStrength", 16)`), and a sound
+card's OSS names too: see [/dev](/mcos/dev/). Anything else fails with `ENOTTY` or `EINVAL`.
 
 ## Sockets
 
@@ -239,28 +239,6 @@ See [Networking](/mcos/networking/) for how they behave.
 ### sys.connect(fd, address, port) → true
 ### sys.shutdown(fd) → true
 
-## The internet
-
-### sys.http(url[, options]) → fd
-Starts a request on the first [internet card](/devices/internet-card/). `options` is
-`{method, headers, body}`. A read on the descriptor gives the response's body as it comes, a read with
-nothing yet waits, and the end of the body is the end of the file. `sys.ioctl(fd, "HTTP_RESPONSE")`
-returns `{status, message, headers}`, waiting for them; headers are by name, in lower case. A request
-that failed (refused, unknown host, timed out) fails its reads and the ioctl with `EIO`. Closing the
-descriptor stops the request.
-
-```lua
-local http = require("http")
-local response, fd = http.request("https://example.com/", {follow = true})
-if response then
-  print(response.status)
-  print(sys.read(fd))
-  sys.close(fd)
-end
-```
-
-The internet card keeps to the public internet; see its page for what it refuses.
-
 ## The computer
 
 ### sys.devices() → list
@@ -268,10 +246,9 @@ The devices on the [bus](/concepts/bus/) as the kernel knows them, in bus order:
 label, get, set}` each. `name` is `storage0`, `path` the slot (nil if not in one), `get` and `set` whether
 it has data to read and write. The kernel's list can be a moment behind a hot-plug.
 
-### sys.setlabel(name, label) → true
-Sets a device's label, by its kernel name or its id. `""` or `nil` clears it. The label is kept on the
-device's item. `EINVAL` for one that can't be (more than 32 characters, or not printable), `EPERM`
-for a device with no item to keep it on, `ENODEV` for none.
+A device's label is set with its file's `setLabel` ioctl (`sys.ioctl(fd, "setLabel", "backups")`;
+`""` or `nil` clears it), kept on the device's item. `EINVAL` for one that can't be (more than 32
+characters, or not printable), `EPERM` for a device with no item to keep it on.
 
 ### sys.gethostname() → name, sys.sethostname(name) → true
 The host's name. Until it is set, the first network card's address, or `localhost` with none. A name is

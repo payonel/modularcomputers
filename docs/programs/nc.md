@@ -57,11 +57,11 @@ mcos has UDP and TCP but no IP: an address is a network card's, and the network 
 
 GNU and OpenBSD netcat over UDP stay after standard input ends, until <strong>-q</strong> or <strong>-w</strong> says; this one ends at once, as with <strong>-q 0</strong>. Over TCP it says it's done sending at the end of its input, as OpenBSD's <strong>-N</strong> does.
 
-A network card can turn its computer on while it's off (Wake-on-LAN): a frame for it holding its wake message, anywhere in the data, presses the power button. A program sets the message (an empty one: none) with a socket's ioctl, as Linux's ethtool does:
+A network card can turn its computer on while it's off (Wake-on-LAN): a frame for it holding its wake message, anywhere in the data, presses the power button. A program sets the message (an empty one: none) with the card's own method, an ioctl on its /dev file:
 
 ```text
 local sys = require("sys")
-sys.ioctl(sys.socket(), "ETHTOOL_SWOL", {name = "wlan0", wake = "letmein"})
+sys.ioctl(sys.open("/dev/network0"), "setWake", "letmein")
 ```
 
 Then, from another computer: <strong>echo letmein \| nc -ub broadcast 9</strong> (port 9, discard, is the usual one; any will do). Interfaces are named as Linux's: <strong>eth0</strong> for the first wired card, <strong>wlan0</strong> for the first WLAN card.

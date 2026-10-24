@@ -57,7 +57,9 @@ aplay /clip.wav
 | `SNDCTL_DSP_GETODELAY` | none | gives the bytes queued |
 | `SNDCTL_DSP_RESET` | none | drops what is queued |
 | `SNDCTL_DSP_SYNC` | none | waits until what is queued has played |
-| `MCOS_DSP_BLOCK` | bytes | sets an ADPCM block's size (WAV's block align); mcos's own, OSS never had it |
+
+Its methods below are ioctls too, by name: an ADPCM block's size, which OSS never had, is
+`sys.ioctl(fd, "setFormat", {block = 1024})`.
 
 ## Methods
 

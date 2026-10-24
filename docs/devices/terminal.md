@@ -27,7 +27,8 @@ For the block you place and look at, see [Screen](/hardware/screen/).
 
 ## In mcos
 
-A terminal has no file of its own in `/dev`. Terminals are grouped into the **console**: mcos reads
+A terminal's own file in `/dev` (`terminal0`) has no data: a read says what it is, and its
+methods are the file's ioctls. Terminals are grouped into the **console**: mcos reads
 the keys typed at any of them and writes to all of them through `/dev/console` (and `/dev/tty` for a
 program's own terminal). The console's size is the largest every terminal in the group can show.
 See [/dev](/mcos/dev/).

@@ -11,7 +11,12 @@ if not name or arg[3] or name:sub(1, 1) == "-" then
 end
 name = name:gsub("^/dev/", "")
 if label then
-  local ok, why = sys.setlabel(name, label)
+  local fd, why = sys.open("/dev/" .. name)
+  local ok = fd and true
+  if fd then
+    ok, why = sys.ioctl(fd, "setLabel", label) -- (the device file's: the label on its item)
+    sys.close(fd)
+  end
   if not ok then
     io.stderr:write("label: ", name, ": ", tostring(why), "\n")
     return 1

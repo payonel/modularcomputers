@@ -53,6 +53,8 @@ public final class NetworkCard extends Card {
 	 * running CPU.
 	 */
 	public static final double WIRELESS_SEND_COST_PER_BLOCK = (double) PowerUnits.CPU / TIER1_RANGE;
+	/** Frames its traffic log keeps, at most: a small window (the user's: a reader sees what's current, at little memory). */
+	public static final int TRAFFIC = 8;
 	/** The longest wake message, in bytes. */
 	public static final int MAX_WAKE = 256;
 	private final InterruptLine line = new InterruptLine();
@@ -64,6 +66,8 @@ public final class NetworkCard extends Card {
 	private volatile Map<BlockPos, Integer> reach = Map.of();
 	/** What wakes its computer, or null: it doesn't. */
 	private String wakeMessage;
+	/** Its traffic, its newest frames in and out (its /dev file's: as tcpdump shows a card's). */
+	private final java.util.ArrayDeque<Map<String, Object>> traffic = new java.util.ArrayDeque<>();
 	/** How far a WLAN card's signal reaches now, in blocks: at most its tier's, as set (OpenComputers' strength). */
 	private int strength;
 
@@ -134,7 +138,9 @@ public final class NetworkCard extends Card {
 			if (broadcast) {
 				frame.put("broadcast", true);
 			}
-			return frames.offer(frame) ? null : BUSY;
+			String refused = frames.offer(frame) ? null : BUSY;
+			logged("in", from, distance, data.length(), refused == null ? (broadcast ? "broadcast" : "taken") : refused);
+			return refused;
 		}
 		if (wakeMessage == null) {
 			return UNREACHABLE;
@@ -160,7 +166,32 @@ public final class NetworkCard extends Card {
 
 	@Method(doc = "broadcast(data): a frame to every card it reaches (bytes, at most 8192), as best it can: how many took it")
 	public Result broadcast(Arguments args) {
-		return Result.ok((long) Ether.broadcast(this, checked(args.checkString(0))));
+		String data = checked(args.checkString(0));
+		int took = Ether.broadcast(this, data);
+		logged("out", "broadcast", null, data.length(), took + " took it");
+		return Result.ok((long) took);
+	}
+
+	/** A frame in its traffic log: in or out, the other card (or broadcast), how far, its size, how it went. */
+	void logged(String direction, String address, Double distance, int bytes, String outcome) {
+		Map<String, Object> entry = new LinkedHashMap<>();
+		entry.put("direction", direction);
+		entry.put("address", address);
+		if (distance != null) {
+			entry.put("distance", distance);
+		}
+		entry.put("bytes", (long) bytes);
+		entry.put("outcome", outcome);
+		traffic.addLast(entry);
+		while (traffic.size() > TRAFFIC) {
+			traffic.removeFirst();
+		}
+		line.raise(); // (told once: its frames' interrupt isn't held up by a log nobody reads)
+	}
+
+	@Method(doc = "pull(): its traffic log's oldest frame: {direction (in, out), address, distance, bytes, outcome (taken, busy, unreachable, broadcast)}; or nil")
+	public Result pull(Arguments args) {
+		return Result.ok(traffic.pollFirst());
 	}
 
 	/** A frame's data, if it fits; sending it costs power. */
