@@ -53,21 +53,36 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 - **Bluetooth, open:** range limits; whether links show differently in the bus order; what a
   Bluetooth card does on the bus itself.
 - **Disks, open:** disks in expansion hubs; labels set by programs.
-- **A drive dock** (user, decided in outline; name open): a block holding one disk, to format and
-  wipe it without crafting it alone. A disk slot; power from a cable or its own battery; a
-  Bluetooth card slot; a bus device itself (its methods: its actions) that also puts its disk on
-  the bus, so a computer mounts it. GUI: the actions as buttons on the left, in the mod's look.
-  Actions: format a standard filesystem (hfs); remove the filesystem (raw); write mcos (wipe, then
-  copy the mod's latest mcos). Every action that clears files removes them from the host too.
-  Eject pushes the disk out of a face (into a container there, as a dropper does), front by
-  default; the API takes any face. Open: how the GUI picks the eject face (the gear-box tab's side
-  picker is the likely place); whether other programs ever install from it (copied in, not
-  formatted) or everything ships in mcos.
-- **Byte-addressed raw disks, open:** the user wants a raw disk read and written at any byte offset
-  (write a string at an offset: the bytes written, bounded by its size; an hfs disk refuses). Real
-  disks are sector-addressed (ATA/NVMe LBAs: `readSector`/`writeSector` today) and Linux gives
-  byte offsets on the block device file (`pread`/`pwrite` on `/dev/sda`, the kernel reading and
-  writing whole sectors around them); byte-addressed storage is NVDIMM/persistent memory's.
+- **The Disk Station** (user, decided in outline): a block holding disks, to format, wipe, clone
+  and install them without crafting a disk alone.
+  - **Slots:** the disk it works on; a second, optional slot for a source disk, read only (for
+    cloning; a write blocker's role, as forensic docks have), drawn so it reads as optional and
+    read-only (a faint outline when empty, a lock and SOURCE in silkscreen), with the clone
+    button beside it, an arrow from source to target. A battery slot; a Bluetooth card slot.
+  - **Power** from a cable or its battery. **On the bus:** it's a device itself (its methods are
+    its actions) and puts its disks on the bus, so a computer mounts them; the source's read only.
+  - **Actions** (GUI buttons on the left, in the mod's look; the same as methods): format a
+    standard filesystem (hfs); remove the filesystem (raw); clone the source onto the target
+    (its mode and contents; refused when they don't fit); install mcos (wipe, then the mod's
+    latest mcos); update mcos (the mod's files written over, everything else left). Every action
+    that clears files removes them from the host too.
+  - **Eject** pushes a disk out of the station's eject face (into a container there, as a
+    dropper does), the front by default. The API matches the GUI: `eject()` uses the configured
+    face, and the face has its own methods (`getEjectFace`, `setEjectFace`); the GUI sets it in
+    the gear-box tab's side picker (Thermal's, Mekanism's, Ender IO's way).
+  - **Open:** whether update mcos keeps a changed `/etc` file (as package managers keep config:
+    the new one written beside it as `.new`) or replaces it; whether other programs ever install
+    from it (copied in, not formatted) or everything ships in mcos; its recipe and tiers.
+- **Raw disks by byte offset** (user, decided): a raw disk is read and written at any byte offset
+  (`write(offset, data)`: the bytes written, bounded by its size; `read(offset, n)`), replacing
+  `readSector`/`writeSector`; an hfs disk refuses both. The user's call over real disks' sectors
+  (ATA/NVMe LBAs; OC used sectors too): sectors don't make programs better. Byte-addressed storage
+  is real elsewhere (NVDIMM, persistent memory), and the hfs refusal is real too (a mounted
+  filesystem owns its disk).
+- **Faces named by strings, a concern** (user): APIs name faces as strings (`"north"`, a redstone
+  card's, an eject face's). Fine for now; open whether names should be constants instead (Lua has
+  no enums: a table of names, as OC's `sides`), and whether faces should be relative to the block
+  (front, left: ComputerCraft's way) or the world's (north: Minecraft's `Direction`).
 - **A bell:** terminals ignore BEL, and a full key queue drops keys silently, where a real keyboard
   beeps.
 - **Beep codes:** audible boot errors for headless machines.
