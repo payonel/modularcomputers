@@ -64,6 +64,11 @@ public class TerminalTierClientGameTest implements FabricClientGameTest {
 			int lit = count(shot, 0, 0, shot.getWidth(), shot.getHeight(),
 				rgb -> AllInOneClientGameTest.green(rgb) > LIT && AllInOneClientGameTest.red(rgb) < AllInOneClientGameTest.green(rgb) / 2);
 			check(lit > 200, "reverse video lights its cells green on a tier 1 screen, found " + lit + " lit pixels");
+			// Its view, close up: the text in tier 1's font (Unifont).
+			context.getInput().pressKey(options -> options.keyUse);
+			context.waitForScreen(com.payonel.modularcomputers.client.screen.DisplayScreen.class);
+			context.waitTicks(2);
+			context.takeScreenshot("tier1-view");
 		}
 	}
 

@@ -229,7 +229,8 @@ public final class DisplayScreen extends Screen {
 		var depth = host != null ? host.terminal().tier().depth() : com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR;
 		graphics.fill(display.x(), display.y(), display.right(), display.bottom(), BLACK | depth.glass());
 		if (host != null) {
-			extractText(graphics, host.terminal().buffer(), host.terminal().shownCursor(), depth);
+			extractText(graphics, host.terminal().buffer(), host.terminal().shownCursor(), depth,
+				com.payonel.modularcomputers.client.render.TerminalFonts.of(host.terminal().tier()));
 		}
 		if (minecraft.level != null && computer.isPresent() && minecraft.level.getBlockEntity(computer.get()) instanceof AllInOneBlockEntity machine) {
 			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.CASE, machine.getBlockState(), powerHeld);
@@ -254,7 +255,7 @@ public final class DisplayScreen extends Screen {
 	}
 
 	private void extractText(GuiGraphicsExtractor graphics, TextBuffer buffer, com.payonel.modularcomputers.device.Terminal.Cursor cursor,
-		com.payonel.modularcomputers.display.ColorDepth depth) {
+		com.payonel.modularcomputers.display.ColorDepth depth, Style tierStyle) {
 		boolean lit = com.payonel.modularcomputers.client.render.CursorBlink.lit(cursor);
 		if (buffer.isBlank() && !lit) {
 			return;
@@ -267,7 +268,7 @@ public final class DisplayScreen extends Screen {
 			block && column == cursor.column() && row == cursor.row() ? buffer.background(column, row) : depth.glow(buffer.foreground(column, row));
 		Resolution resolution = buffer.resolution();
 		Viewport area = layout.display();
-		TextGrid grid = TextGrid.of(area.width(), area.height(), resolution, font);
+		TextGrid grid = TextGrid.of(area.width(), area.height(), resolution, font, tierStyle);
 		// Backgrounds first, in runs of equal color; the display is already black.
 		for (int row = 0; row < resolution.rows(); row++) {
 			int top = area.y() + Math.round(row * grid.cellHeight());
@@ -298,8 +299,9 @@ public final class DisplayScreen extends Screen {
 			for (int column = 0; column < resolution.columns(); column++) {
 				char c = buffer.get(column, row);
 				if (c != ' ') {
-					graphics.text(font, FormattedCharSequence.codepoint(c, Style.EMPTY.withBold(TextBuffer.bold(buffer.foreground(column, row)))),
-						(int) grid.x(column, c, font), (int) grid.y(row), 0xFF000000 | foreground.apply(column, row), false);
+					Style style = tierStyle.withBold(TextBuffer.bold(buffer.foreground(column, row)));
+					graphics.text(font, FormattedCharSequence.codepoint(c, style), (int) grid.x(column, c, font, style), (int) grid.y(row),
+						0xFF000000 | foreground.apply(column, row), false);
 				}
 			}
 		}

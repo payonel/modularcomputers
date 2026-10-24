@@ -60,6 +60,8 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 		String[] rows;
 		int[] foregrounds;
 		int[] backgrounds;
+		/** The tier's font ({@link TerminalFonts}). */
+		Style style = Style.EMPTY;
 		/** Which cells' text is bold (drawn in the bold font). */
 		boolean[] bold;
 		/** The glass's own color, where no background is drawn. */
@@ -96,6 +98,7 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 		state.pixels = PixelLayers.of(display);
 		// A monochrome terminal's phosphor has one color: the glass glows green (ColorDepth.glow).
 		var depth = host.terminal().tier().depth();
+		state.style = TerminalFonts.of(host.terminal().tier());
 		int[] foregrounds = display.foregrounds();
 		state.foregrounds = java.util.Arrays.stream(foregrounds).map(depth::glow).toArray();
 		state.bold = new boolean[foregrounds.length];
@@ -136,7 +139,7 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 		float height = width / (float) state.resolution.aspectRatio();
 		float left = glass.x() / 16f + (glassWidth - width) / 2;
 		float top = glass.y() / 16f + (glassHeight - height) / 2;
-		TextGrid grid = TextGrid.of(width, height, state.resolution, font);
+		TextGrid grid = TextGrid.of(width, height, state.resolution, font, state.style);
 
 		pose.pushPose();
 		// Turn so the front face is at +Z, then move to the glass's top-left corner. Font
@@ -182,8 +185,8 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 			for (int column = 0; column < text.length(); column++) {
 				char c = text.charAt(column);
 				if (c != ' ') {
-					collector.submitText(pose, grid.x(column, c, font), grid.y(row),
-						FormattedCharSequence.codepoint(c, Style.EMPTY.withBold(state.bold[row * columns + column])), false,
+					Style style = state.style.withBold(state.bold[row * columns + column]);
+					collector.submitText(pose, grid.x(column, c, font, style), grid.y(row), FormattedCharSequence.codepoint(c, style), false,
 						Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT, 0xFF000000 | state.foregrounds[row * columns + column], 0, 0);
 				}
 			}

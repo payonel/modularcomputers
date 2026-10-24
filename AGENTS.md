@@ -311,6 +311,9 @@ the farther it reaches (OC's wirelessCostPerRange); any tier hears any other.
   tool); nothing is wrapped again. The console's group is one size, the largest every member can
   show (UEFI's ConSplitter's common mode). Tests that look at pixels size the console 50×16 first
   (`TestPrograms.READABLE`): sub-pixel text is flaky to count.
+- **Each tier's font** (`TerminalFonts`): tiers 1 and 2, whose cells are big, draw in Unifont
+  (Minecraft's `uniform`, finer magnified); tier 3, small cells, in the default font. The grid is
+  sized from the tier's own font (`TextGrid`).
 - **Each tier's glass and white** (`ColorDepth.glass`, `white`): a real screen is never pure black
   or white; the defaults (pure black and white, as a theme recolors them) show as the tier's (tier
   2 a CRT's cool near black and white, tier 3 a charcoal and a warm white), every other color as
