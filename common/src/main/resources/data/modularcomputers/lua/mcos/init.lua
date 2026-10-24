@@ -700,12 +700,14 @@ end
 -- TIOCSTI (bytes put in as if typed), on a tty or a pty's master; a socket's are net's; a device
 -- file's own (a sound card's, OSS's) are its file's.
 local net -- (lib/modules/net.lua, once a socket is made)
-syscalls.ioctl = withfd(function(p, request, d, fd, op, arg, ...)
+syscalls.ioctl = withfd(function(p, request, d, fd, op, ...)
+  local arg = ...
   if d.type == "socket" then
     return net.ioctl(d, op, type(arg) == "table" and fromuser(arg) or arg)
   elseif d.ioctl then
-    -- a device file's: its own ioctls, and its device's methods (arguments copied in, as a call's)
-    local args = table.pack(arg, ...)
+    -- a device file's: its own ioctls, and its device's methods (arguments copied in, as a call's;
+    -- as many as given: a method called with none is a stream's take, served from what's come)
+    local args = table.pack(...)
     for i = 1, args.n do
       if type(args[i]) == "table" then
         args[i] = fromuser(args[i], true)

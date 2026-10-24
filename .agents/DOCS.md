@@ -53,10 +53,13 @@ order: 10                   # place within the section (lower first)
 - **Block or item:** one-sentence summary; infobox (kind, stack size, tiers, recipe in words,
   power if any); *Use* (what it is for and how to place or use it); *Crafting* (the recipe, in words,
   with its quirks, e.g. a disk in a recipe loses its files); *Notes*.
-- **Device (card, sensor, disk...):** summary; infobox (slot, tier, power); *In mcos* (its `/dev` file
-  and what reading and writing it do); *Methods* (each as a `### name(args) → results` heading, a
-  sentence, then the notes); *Events* (each event's fields, and its interrupt); *Faces* if it takes
-  them; *Example* (a short, complete Lua program or shell session that was checked against the code).
+- **Device (card, sensor, disk...):** summary; infobox (slot, tier, power); *In mcos* (its `/dev`
+  file's name, what a read gives, with a sample, what a write does or that it's refused, how it
+  polls, and that its ioctls are its methods); *Methods* (every method the device has, none
+  missing, checked against its `@Method`s: each as a `### name(args) → results` heading, a
+  sentence, then the notes and failures); *Events* (each event's fields, and its interrupt); *Faces*
+  if it takes them; *Examples* (several complete programs, the user's ask: through its file and
+  through its methods, real uses, each included from `docs/examples/` and run by a test).
 - **Program:** from its man page and its header comment: synopsis, options, exit statuses, an
   example, and where it differs from GNU. The man page is the source; keep the two in agreement.
 - **Tutorial:** a prerequisites list, numbered steps each saying what to do and what you will see,
@@ -69,8 +72,10 @@ order: 10                   # place within the section (lower first)
   `{% include name.lua %}`, from `docs/examples/` (Jekyll's includes directory; the files are also
   published there, for download). Show a whole program, not a fragment: the manual teaches that a
   program blocks (a read, `sys.sleep`, `sys.poll`) and never yields.
-- Every example in `docs/examples/` is run by a test (`McosTest`), and `DocsLuaTest` compiles every
-  `lua` block in every page. A block that is only a fragment (a signature, an ellipsis) has a
+- Every example in `docs/examples/` is run by a test, and `DocsLuaTest` compiles every `lua` block
+  in every page. The tests are in `common/src/test/.../runtime/` (`ExamplesTest` and one class a
+  group of devices, `*ExamplesTest`, each on `McosHarness`: a computer booting mcos); a device only
+  a world makes runs its examples in a server game test (`*ExamplesGameTest`). A block that is only a fragment (a signature, an ellipsis) has a
   `<!-- lua-fragment -->` line before it. Add a test when you add an example.
 - Code highlighting comes from rouge, colored by `assets/style.css`.
 

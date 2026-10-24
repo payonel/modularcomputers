@@ -71,7 +71,7 @@ $ echo "front 15" > /dev/redstone0
 **Bluetooth card.** A read gives two lines, `link <id>` (the board it links to, `-` for none) and
 `board <id>` (the board it is in). A line written, `link <id>` or `link -`, relinks it.
 
-**Disk Station.** A read gives a line for each slot: `target 2 hfs 40960 2097152 backups`
+**Disk Station.** A read gives a line for each slot: `target 2 hfs 40960 4194304 backups`
 (its disk's tier, mode, bytes used, capacity and label) or `source -` for an empty slot. A line
 written names an action: `format`, `wipe`, `clone`, `install` or `update`.
 

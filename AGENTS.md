@@ -44,6 +44,8 @@ computers really work.
 - **Tests are the play-testing**, at the lowest layer that can express them: plain-Java unit tests,
   then server game tests, then client game tests (a visible feature gets one, and its screenshots
   get looked at). Machine logic stays plain Java; Minecraft glue stays thin.
+- **The manual's programs are tested:** each `docs/examples/*.lua` runs in a `*ExamplesTest` (one
+  class a group of devices, on `McosHarness`: a computer booting mcos, as `McosTest` uses).
 - **Tests bring their own programs** (Java `Program`s, or Lua files on the test disk) and never
   assert on what mcos prints; they check files on the disk and whether the machine runs.
 - **A test's bus is a case's bus** (`TestBus`, in the tests' `machine` package): parts on the
@@ -391,9 +393,14 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
 - **Every device has a `/dev` file, and it's the device's API** (the user's call: no `device.*`
   library, no `/sys` yet): `/dev` is flat, `console`, `tty`, `null`, `zero` and a node for each
   device by the kernel's name, and its ioctls are the device's methods by name
-  (`sys.ioctl(fd, "setStrength", 4)`, in any open mode; a method answering nothing gives `true`), so
+  (`sys.ioctl(fd, "setStrength", 4)`, in any open mode, with the arguments given and no more: a stream
+  method called with none takes what's come; a method answering nothing gives `true`, so one whose
+  answer is "none" (a missing path's `stat`, a read at the end) says nil; a handle stays in the
+  kernel), so
   nothing mcos makes up stands for a device's method (no invented `SIOC*`). Its file is ready for
-  poll (`PRI`) while its device has news, its interrupt since the file last read. Reading gives the
+  poll (`PRI`) while its device has news, its interrupt since the file last read or asked. **Polling
+  takes nothing:** an event a poll found is the file's to give the next `pull` ioctl (or read), so a
+  program waits with `sys.poll` and takes with either. Reading gives the
   device's data: `get`'s answer (the EEPROM too: convenient, the user's call), what's written going
   to `set` at close, the device deciding what `set` means; a device with nothing to read says what
   it is (type, id, label, methods). A disk's node

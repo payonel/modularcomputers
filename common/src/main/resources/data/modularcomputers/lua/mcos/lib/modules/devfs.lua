@@ -114,28 +114,37 @@ local drivers = {}
 
 -- An event device's file (a sensor's, with events to pull and no get): read only; each event is a
 -- line (its driver's), and a read with none waiting waits for one, as a keyboard's does. Ready to
--- poll (IN) while one waits.
+-- poll (IN) while one waits. An event a poll took and nothing read yet is the file's to give a
+-- pull ioctl first (held), so polling never loses one.
 local function eventfile(id, driver)
   local line, at = "", 0
+  local event -- (the one in 'line', while none of it is read)
   -- An event to read: true (one is in 'line'), false (none waiting: the kernel listens for one), or
   -- the device's failure.
   local function take()
     if at < #line then
       return true
     end
-    local ok, event = k.take(id, "pull")
+    local ok, got = k.take(id, "pull")
     if not ok then
-      return failed(event)
-    elseif event == nil then
+      return failed(got)
+    elseif got == nil then
       return false -- (k.take listens for the next)
     end
-    line, at = driver and driver.get(event) or tostring(event) .. "\n", 0
+    line, at, event = driver and driver.get(got) or tostring(got) .. "\n", 0, got
     return true
   end
   return {
     type = "device",
     events = function(self)
       return {IN = take() ~= false}
+    end,
+    held = function(self)
+      local got = event
+      if got ~= nil then
+        line, at, event = "", 0, nil
+      end
+      return got
     end,
     read = function(self, n)
       local got, why, errno = take()
@@ -145,7 +154,7 @@ local function eventfile(id, driver)
         return k.BLOCK
       end
       local chunk = line:sub(at + 1, at + n)
-      at = at + #chunk
+      at, event = at + #chunk, nil
       return chunk
     end,
   }
@@ -362,8 +371,9 @@ local function devicefile(device, mode)
   local data, at = nil, 0
   local written = nil -- what's been written: all of it (kept for close), or a line not yet ended
   local changed = false -- a change came in since the file was last read from its start (poll's PRI)
-  -- Each event the device has waiting (a redstone card's changes), taken and dropped: true if there
-  -- was one. (A failure counts: the next read reports it.)
+  local kept = {} -- the events drain took, for a pull ioctl (held), oldest first
+  -- Each event the device has waiting (a redstone card's changes), taken and kept for a pull
+  -- ioctl: true if there was one. (A failure counts: the next read reports it.)
   local function drain()
     local any = false
     while true do
@@ -371,6 +381,7 @@ local function devicefile(device, mode)
       if not ok or event == nil then
         return any or not ok
       end
+      kept[#kept + 1] = event
       any = true
     end
   end
@@ -394,7 +405,16 @@ local function devicefile(device, mode)
       if not changed and device.pull then
         changed = drain() -- (none: k.take listens for the next)
       end
-      return {IN = true, PRI = changed, OUT = device.set ~= nil}
+      -- (a device without events leaves PRI to its news: withmethods')
+      return {IN = true, PRI = device.pull and changed or nil, OUT = device.set ~= nil}
+    end,
+    -- A change a poll took, for a pull ioctl; the last one pulled is the change looked at (PRI off).
+    held = function(self)
+      local event = table.remove(kept, 1)
+      if event ~= nil and #kept == 0 then
+        changed = false
+      end
+      return event
     end,
     -- Back to the start (the only place it seeks to): the next read takes get anew, and what's
     -- changed so far is in it.
@@ -405,6 +425,7 @@ local function devicefile(device, mode)
       data, at, changed = nil, 0, false
       if device.pull then
         drain()
+        kept = {} -- (read anew: what changed is in the state)
       end
       return 0
     end,
@@ -464,8 +485,11 @@ local function withmethods(d, device)
   local id, own, events, read = device.id, d.ioctl, d.events, d.read
   if read then
     d.read = function(self, ...)
-      k.news[id] = nil -- (read: its news is looked at)
-      return read(self, ...)
+      local got = table.pack(read(self, ...))
+      if got[1] ~= k.BLOCK then
+        k.news[id] = nil -- (read: its news is looked at; a read that waits looked at nothing)
+      end
+      return table.unpack(got, 1, got.n)
     end
   end
   d.ioctl = function(self, op, ...)
@@ -479,6 +503,12 @@ local function withmethods(d, device)
       return fail("ENOTTY")
     end
     k.news[id] = nil -- (asked: its news is looked at)
+    if op == "pull" and d.held then
+      local event = d.held(d)
+      if event ~= nil then
+        return event -- (one a poll took: the file's, first)
+      end
+    end
     if op == "setLabel" then
       return k.setlabel(device, ...)
     end
@@ -492,6 +522,11 @@ local function withmethods(d, device)
     end
     if answer.n == 1 then
       return true -- (a method that answers nothing: done)
+    end
+    for i = 2, answer.n do
+      if type(answer[i]) == "userdata" then
+        return nil, "a handle stays in the kernel: use the filesystem", "EINVAL" -- (a disk's open)
+      end
     end
     return table.unpack(answer, 2, answer.n)
   end

@@ -1,6 +1,6 @@
 -- The Disk Station's driver, for its /dev file (as a sysfs attribute: text, read whole, a write
 -- taking effect at once). A read gives a line a slot:
---   target 2 hfs 40960 2097152 backups   (its disk: tier, mode, bytes used, capacity, label)
+--   target 2 hfs 40960 4194304 backups   (its disk: tier, mode, bytes used, capacity, label)
 --   source -                             (an empty slot)
 -- A line written is an action, as its GUI's buttons and its methods: format, wipe, clone, install,
 -- update.

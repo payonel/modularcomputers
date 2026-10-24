@@ -32,17 +32,30 @@ See [Bus](/concepts/bus/) for how linked blocks join a computer's bus.
 `/dev/bluetooth0` is text. A read gives two lines:
 
 ```
-link 5f0c...
-board 9a21...
+link 5f0c0000-0000-0000-0000-000000000000
+board 9a210000-0000-0000-0000-000000000000
 ```
 
-`link -` means no link, and `board -` means the card has no board. Writing a line relinks the card:
-`link <id>`, or `link -` for none. A line that is not a link fails the write.
+`link -` means no link, and `board -` means the card has no board. The state is taken at the first
+read after the file is opened (or sought back to its start). Writing a line relinks the card as soon
+as the line is written (flushed): `link <id>`, or `link -` for none. A line that is not a link, or
+an id that is not a board's, fails the write with `EINVAL`.
 
 ```sh
 cat /dev/bluetooth0
 echo link - > /dev/bluetooth0
 ```
+
+The card has no events, so `poll` never reports it `PRI`; the file is always readable (`IN`) and
+writable (`OUT`). Its ioctls are the card's methods, by name, in any open mode:
+
+<!-- lua-fragment -->
+```lua
+sys.ioctl(fd, "setLink", "5f0c0000-0000-0000-0000-000000000000")
+```
+
+A method that fails answers `nil`, its message and `EINVAL`; a card that is gone, `ENODEV`.
+`setLabel` labels the card, as for any device (see [The sys library](/mcos/sys-api/)).
 
 ## Methods
 
@@ -52,12 +65,14 @@ The id of the board it links to, or nil.
 
 ### setLink(id) → nothing
 
-Links it to the board with that id. Nil, or no argument, links it to none. An id that is not a UUID
-fails with `not a board id`.
+Links it to the board with that id, as linking it by hand does. Nil, or no argument, links it to
+none. The board need not be there now. An id that is not a UUID, or not a string, fails with
+`not a board id`. Through the ioctl it answers `true`.
 
 ### getBoard() → id or nil
 
-The id of the board it is in: its computer's.
+The id of the board it is in: its computer's, what another card links to, to reach it. Nil if it
+has none.
 
 ### get() → {link, board}
 
@@ -65,15 +80,17 @@ Both, as a table. A missing one is left out.
 
 ### set({link = id}) → nothing
 
-Links it to that board; `{link = false}` links it to none. Same as `setLink`.
+Links it to that board; `{link = false}` (or no `link`) links it to none. Otherwise as `setLink`.
 
 ## Events
 
 None.
 
-## Example
+## Examples
 
-Link to another computer, whose board id you copied from its card, and show the result:
+Run these with `lua name.lua`, from a computer with a Bluetooth card.
+
+### Link from a shell
 
 ```sh
 echo link 5f0c0000-0000-0000-0000-000000000000 > /dev/bluetooth0
@@ -82,3 +99,19 @@ cat /dev/bluetooth0
 
 The first line of the output is `link 5f0c0000-0000-0000-0000-000000000000`. Replace the id with a
 real one: yours are shown by `cat /dev/bluetooth0` on the other computer, in its `board` line.
+
+### Switch between boards
+
+```lua
+{% include bluetooth-switch.lua %}
+```
+[Download bluetooth-switch.lua](/examples/bluetooth-switch.lua)
+
+An [alias](/mcos/shell/) makes it one word: `alias next='lua /home/bluetooth-switch.lua 5f0c... 9a21...'`.
+
+### Remember a link
+
+```lua
+{% include bluetooth-remember.lua %}
+```
+[Download bluetooth-remember.lua](/examples/bluetooth-remember.lua)

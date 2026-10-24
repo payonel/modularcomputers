@@ -25,14 +25,32 @@ while it rains elsewhere, and a cold biome reads `snow`. The sensor does not nee
 
 ## In mcos
 
-`/dev/weather0` is a read-only file, an event a line: the new weather.
+`/dev/weather0` (`weather1` for the next) is a read-only file, an event a line: the new weather.
 
 ```
 rain
 ```
 
-A read with nothing waiting waits for the next change. When events were dropped, a line `lost n`
-comes before the next one. The first look at the weather is not a change.
+A read with nothing waiting waits for the next change, and `poll` reports the file readable (`IN`)
+while one waits. When events were dropped, a line `lost n` comes before the next one. The first
+look at the weather is not a change. Opening it to write fails with `EACCES`.
+
+```sh
+cat /dev/weather0   # waits, then prints each change
+```
+
+The file's ioctls are the sensor's methods, by name, in any open mode. The weather now, without
+waiting for a change, is `getWeather`:
+
+<!-- lua-fragment -->
+```lua
+local now = sys.ioctl(fd, "getWeather")  -- "clear", "rain", "snow" or "thunder"
+```
+
+A sensor that is gone answers `ENODEV`. `setLabel` labels it, as for any device (see
+[The sys library](/mcos/sys-api/)). The file and `pull` take from the same buffer, in order (a change
+read from one is gone from the other); polling loses nothing, so a program can wait with `sys.poll`
+and then `pull`.
 
 ## Methods
 
@@ -42,7 +60,8 @@ The weather now: `clear`, `rain`, `snow` or `thunder`. `clear` before its first 
 
 ### pull() → event or nil
 
-The oldest change, or nil.
+The oldest change waiting, as an event table (see Events), or nil when none waits. Each is taken
+once.
 
 ## Events
 
@@ -53,16 +72,37 @@ The oldest change, or nil.
 | `new` | the weather now |
 | `lost` | present when events were dropped: how many |
 
-At most 32 wait. Events are kept across a save, and the weather the sensor saw last is kept too, so
+Each change raises the sensor's interrupt, which stays raised while any wait. At most 32 wait. Events are kept across a save, and the weather the sensor saw last is kept too, so
 a load is not a change. Events are dropped while no program runs.
 
-## Example
+## Examples
 
-Print each change in the weather, under mcos:
+Run these with `lua name.lua &`, from a computer with a weather sensor. For why they loop without
+yielding, see [Writing programs](/mcos/programs/).
+
+### Print each change
 
 ```lua
 local f = io.open("/dev/weather0")
 while true do
-  print("the weather is now " .. f:read("l"))
+  print("the weather is now " .. f:read("l"))  -- waits for the next change
 end
 ```
+
+### A weather diary
+
+```lua
+{% include weather-log.lua %}
+```
+[Download weather-log.lua](/examples/weather-log.lua)
+
+### A roof that closes in the rain
+
+```lua
+{% include weather-roof.lua %}
+```
+[Download weather-roof.lua](/examples/weather-roof.lua)
+
+It needs a [redstone card](/devices/redstone-card/) in the same computer, and a sticky piston on
+its top face. `getWeather` gives the weather at the start, so a program started in the rain closes
+the roof at once.

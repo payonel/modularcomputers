@@ -39,24 +39,58 @@ So a second card beside one that puts out 15 reads `level = 15, powered = 0`.
 
 ## In mcos
 
-`/dev/redstone0` (`redstone1` for the next card) is text, a line a face:
+`/dev/redstone0` (`redstone1` for the next card) is text, a line a face, in this order:
 
 ```
 north 7 7
 south 0 0
+east 0 0
+west 9 0
+up 0 0
+down 0 0
 ```
 
-Each line is `face level powered`. A line written, `face powered`, sets that face at once, as a sysfs
-attribute does: `north 11`. A line that is not a face and a number fails the write. The file is
-always readable; a change since it was read from its start shows to `poll` as `PRI`, and seeking to
-the start reads the new state. `tail -f` shows it again each time it changes.
+Each line is `face level powered`. The state is taken at the first read after the file is opened
+or sought back to its start, so a read from the start always gives the faces as they are then.
+
+A line written, `face powered`, sets that face as soon as the line is written (flushed), as a sysfs
+attribute does: `north 11`. Relative names work too (`front 15`). A line that is not a face and a
+number fails the write with `EINVAL`, and so does an unknown face (`no such face`).
+
+The file is always readable (`poll`'s `IN`) and writable (`OUT`). A change to any face since the
+file was last sought to its start shows as `PRI`, and stays until the file is sought there again
+(`f:seek("set", 0)`, `sys.lseek(fd, 0, "set")`), as a GPIO's value file does. `tail -f` shows the
+faces again each time they change.
+
+```sh
+cat /dev/redstone0
+echo "north 15" > /dev/redstone0
+tail -f /dev/redstone0
+```
+
+The file's ioctls are the card's methods, by name, in any open mode:
+`sys.ioctl(fd, "set", {north = {powered = 15}})`. A method that fails answers `nil`, its message
+and `EINVAL`; a card that is gone, `ENODEV`. `setLabel` labels the card, as for any device (see
+[The sys library](/mcos/sys-api/)).
+
+The file's `PRI` comes from the card's events, and polling loses none: the events a poll found are
+the next ones `pull` answers, and once a program has pulled them all, `PRI` is off until the next
+change (as reading the file from its start turns it off). So a program can wait with `sys.poll`
+and then take every change with `pull` until it answers nil.
 
 ## Methods
 
 ### get([sides]) → table
 
-Every face as `{level, powered}`, by name: `{north = {level = 7, powered = 7}, ...}`. With a table,
-only the faces it names, as keys or as a list of names.
+Every face as `{level, powered}`, by world name: `{north = {level = 7, powered = 7}, ...}`. With a
+table, only the faces it names, as keys or as a list of names, relative names too (`{"front"}`
+answers the face that is the block's front, by its world name). An unknown face fails with
+`no such face`.
+
+<!-- lua-fragment -->
+```lua
+local west = sys.ioctl(fd, "get", {"west"}).west.level
+```
 
 ### set(sides) → table
 
@@ -64,11 +98,24 @@ Takes a table in the same shape and sets each face it names: `{north = {powered 
 `powered` is the signal to put out; it is clamped to 0 through 15 and must be an integer
 (`north: powered: integer expected`). `level` is what is detected, so it is ignored, and a face the
 table leaves out stays as it was. Returns every face, as `get()`. The arguments are all checked
-before anything changes. An unknown face fails with `no such face`.
+before anything changes, so a table with one bad face changes nothing. An unknown face fails with
+`no such face`; a face that is not a table, with `north: table expected`. Each output that changes
+costs a tick of a running CPU's power.
+
+<!-- lua-fragment -->
+```lua
+sys.ioctl(fd, "set", {north = {powered = 15}, up = {powered = 0}})
+```
 
 ### pull() → event or nil
 
-The oldest change, or nil.
+The oldest change waiting, as an event table (see Events), or nil when none waits. Each is taken
+once.
+
+<!-- lua-fragment -->
+```lua
+local event = sys.ioctl(fd, "pull")  -- {name = "redstone", side = "west", level = 9, powered = 0}
+```
 
 ## Events
 
@@ -87,9 +134,10 @@ dropped. The events are kept across a save, and dropped when no program runs on 
 
 ## Examples
 
-A program drives the card by writing lines to its file, and reads it by reading the file. Run
-these with `lua name.lua`, from a computer with a redstone card and something on its faces. Each is
-a complete program. For why they loop without yielding, see [Writing programs](/mcos/programs/).
+A program drives the card by writing lines to its file and reading it back, or through its methods
+as ioctls. Run these with `lua name.lua`, from a computer with a redstone card and something on its
+faces (add `&` to keep the shell). Each is a complete program. For why they loop without yielding,
+see [Writing programs](/mcos/programs/).
 
 ### Set an output
 
@@ -129,3 +177,22 @@ Each line is `face level powered`: the signal on that face, and how much of it i
 
 `sys.poll` blocks until the card reports a change (`PRI`), so the program uses no time while the
 signal is steady. The [redstone tutorial](/tutorials/redstone/) walks through both programs.
+
+### A door that closes by itself
+
+```lua
+{% include redstone-door.lua %}
+```
+[Download redstone-door.lua](/examples/redstone-door.lua)
+
+The door's own change (its face powered) wakes `poll` too; that only starts the wait again.
+
+### Count pulses
+
+```lua
+{% include redstone-counter.lua %}
+```
+[Download redstone-counter.lua](/examples/redstone-counter.lua)
+
+The card keeps at most 32 changes: a pulse is two, so with more than 16 pulses a period some are
+lost (the log says so). Shorten `PERIOD` for a faster clock.

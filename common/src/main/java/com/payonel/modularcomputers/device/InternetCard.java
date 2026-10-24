@@ -65,6 +65,8 @@ public final class InternetCard extends Card {
 	private final java.util.concurrent.ConcurrentLinkedDeque<Map<String, Object>> log = new java.util.concurrent.ConcurrentLinkedDeque<>();
 	private final HttpExchange.Resolver resolver;
 	private long nextHandle = 1;
+	/** A log entry came that the program hasn't asked the card since (part of its interrupt). */
+	private volatile boolean unseen;
 	/** Something happened on a request's thread since the last tick: its interrupt, at the next. */
 	private final java.util.concurrent.atomic.AtomicBoolean news = new java.util.concurrent.atomic.AtomicBoolean();
 
@@ -204,7 +206,8 @@ public final class InternetCard extends Card {
 		while (log.size() > LOG) {
 			log.pollFirst();
 		}
-		news.set(true); // (its interrupt, once: a reader of its log hears)
+		unseen = true;
+		news.set(true); // (its interrupt: a reader of its log hears)
 	}
 
 	/** The request a handle names, its news now looked at. */
@@ -214,6 +217,7 @@ public final class InternetCard extends Card {
 			throw new Arguments.ArgumentError("no such request: " + args.get(0));
 		}
 		request.fresh = false;
+		unseen = false; // (asked: its news is looked at)
 		return request;
 	}
 
@@ -257,6 +261,7 @@ public final class InternetCard extends Card {
 
 	@Method(doc = "pull(): its access log's oldest entry, a request as it ended: {method, url, status, millis, bytes, why (when it failed)}; or nil")
 	public Result pull(Arguments args) {
+		unseen = false;
 		return Result.ok(log.pollFirst());
 	}
 
@@ -279,7 +284,11 @@ public final class InternetCard extends Card {
 
 	@Override
 	public boolean interruptPending() {
-		// (its log isn't held up: an entry is told once, so a program waiting on a request isn't woken over and over by a log nobody reads)
+		// (a new log entry is pending until the program next asks the card anything: a reader of the log
+		// hears it whenever it came, and a program asking about its requests isn't woken by it again)
+		if (unseen) {
+			return true;
+		}
 		for (Request request : open.values()) {
 			if (request.fresh) {
 				return true;

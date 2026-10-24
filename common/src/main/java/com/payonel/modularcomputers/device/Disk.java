@@ -774,7 +774,7 @@ public final class Disk implements Device {
 				return Result.ok(Map.of("size", 0L, "directory", true, "modified", 0L));
 			}
 			if (!Files.exists(at)) {
-				return Result.ok();
+				return Result.ok((Object) null); // (none: nil, not done)
 			}
 			try {
 				Map<String, Object> stat = new LinkedHashMap<>();
@@ -961,7 +961,7 @@ public final class Disk implements Device {
 			}
 			int count = (int) Math.min(Math.min(n, MAX_READ), tier.bytes() - offset);
 			if (count == 0 && n > 0) {
-				return Result.ok(); // the end
+				return Result.ok((Object) null); // the end (nil: nothing more)
 			}
 			byte[] bytes = new byte[count]; // (zeros past the image's end)
 			if (!Files.isRegularFile(rawImage())) {
@@ -1176,7 +1176,7 @@ public final class Disk implements Device {
 					grown(disk);
 				}
 				if (position >= length) {
-					return Result.ok();
+					return Result.ok((Object) null); // (the end: nil)
 				}
 				byte[] bytes = bytesAt(disk, position, count);
 				position += bytes.length;

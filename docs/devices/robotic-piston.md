@@ -16,7 +16,7 @@ moves blocks.
 | Address | Cabled: it is known by its `id:` name |
 | Faces | Every side but the one with its cable port |
 | Interrupt | None |
-| Power | Nothing at rest; every push, extend or retract that moves costs five ticks of a running CPU |
+| Power | Nothing at rest; every push, extend or retract costs five ticks of a running CPU |
 | Info | none beyond the common ones |
 
 </div>
@@ -39,14 +39,29 @@ free.
 
 ## In mcos
 
-Its file in `/dev` (`actuator0`, its type `actuator`, as `lsdev` names it) has no data: a read says what it is
-(its type, id and methods). Its methods are the file's ioctls:
+Its file is `/dev/actuator0` (`actuator1` for the next; its type is `actuator`, as
+[`lsdev`](/programs/lsdev/) names it).
 
+- **Read:** it has no data, so a read says what it is, a line each:
+
+  ```
+  type actuator
+  id id:3f2a...
+  path -
+  label -
+  methods extend push retract
+  ```
+
+- **Write:** refused: opening it to write fails with `EACCES`.
+- **Poll:** always ready for `IN` (that text). It has no interrupt, so never `PRI`.
+- **ioctls:** its methods below, by name, with the side as their argument. A move that is refused is
+  `nil`, its message (`cannot push`, `not extended`, `no such face: ...`) and `EINVAL`; a piston that
+  has left the bus (its cable cut, say) is `ENODEV`. `setLabel` sets its label, as on every
+  device file.
+
+<!-- lua-fragment -->
 ```lua
-local sys = require("sys")
-local piston = assert(sys.open("/dev/actuator0"))
-sys.ioctl(piston, "push", "front")
-sys.close(piston)
+local done, why = sys.ioctl(piston, "push", "front")
 ```
 
 ## Methods
@@ -67,29 +82,30 @@ Pushes and leaves the arm out until `retract`. Gives `true` also when the arm is
 
 ### retract(side) → true
 
-Takes the arm on that side back in. Fails with `not extended` when there is no arm out there.
+Takes the arm on that side back in; a sticky piston pulls what is in front of it. Fails with
+`not extended` when there is no arm out there.
 
 ## Events
 
 None.
 
-## Example
+## Examples
 
-Find the piston on the bus, push east, and report a refusal (EEPROM code):
+A hidden door: a lever on a redstone card opens it (`retract`) and closes it (`extend`):
 
 ```lua
-local piston
-for _, device in ipairs(board.list()) do
-  if device.type == "actuator" then
-    piston = device.address
-  end
-end
-
-local ok, why = board.invoke(piston, "push", "east")
-if not ok then
-  board.invoke("console", "write", "cannot push: " .. why .. "\r\n")
-end
+{% include piston-door.lua %}
 ```
 
-`board.invoke` gives `true` and the method's results, or `false` and the failure's message, so a
-refused push is `false, "cannot push"`.
+A pusher, as a farm or a conveyor uses: a `push` every few seconds, waiting longer while it is
+blocked:
+
+```lua
+{% include piston-pusher.lua %}
+```
+
+Every piston on the bus, pushed in turn, in bus order:
+
+```lua
+{% include piston-wave.lua %}
+```

@@ -153,7 +153,9 @@ status) or `"killed"` (`value` the signal). With `"nohang"`, `0` if none has end
 there is nothing to wait for.
 
 ### sys.exit([code])
-Ends the process. `os.exit` calls it.
+Ends the process at once, as `_exit(2)`: what `io` still holds in its buffers is not written.
+`os.exit` writes it first and then calls this, as C's `exit(3)` does, so a program that writes with
+`io.write` ends with `os.exit`.
 
 ### sys.getpid() → pid
 ### sys.kill(pid, signal) → true

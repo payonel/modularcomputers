@@ -33,93 +33,7 @@ import org.junit.jupiter.api.io.TempDir;
  * shell. Tests bring their own programs and check what they do (files on the disks, the computer
  * halting or running), never what mcos says.
  */
-class McosTest {
-	private final Terminal screen = new Terminal(Resolution.DEFAULT);
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
-	private final ConcurrentLinkedQueue<Runnable> server = new ConcurrentLinkedQueue<>();
-	private final Map<String, Device> devices = new LinkedHashMap<>();
-
-	@TempDir
-	Path world;
-
-	McosTest() {
-		devices.put("id:screen", screen);
-		machine.board().setCpu(new Cpu(CpuTier.TIER_3));
-		machine.setServer(server::add);
-	}
-
-	@AfterEach
-	void powerOff() {
-		if (machine.isPowered()) {
-			machine.pressPower();
-		}
-	}
-
-	/** The boot disk's folder (mcos's files, and the test's). */
-	private Path root() {
-		return world.resolve("mcos-disk");
-	}
-
-	/** Puts a file on the boot disk before it boots. */
-	private void file(String path, String text) {
-		try {
-			Path at = root().resolve(path);
-			Files.createDirectories(at.getParent());
-			Files.writeString(at, text);
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
-		}
-	}
-
-	/** A second disk, at sata:1, with its folder. */
-	private Path dataDisk() {
-		Path folder = world.resolve("data-disk");
-		devices.put("sata:1", new Disk(DiskTier.TIER_1, folder));
-		return folder;
-	}
-
-	private void boot() {
-		boot(() -> {
-		});
-	}
-
-	/** Boots, with {@code configure} changing mcos's own files on the disk first (its /etc). */
-	private void boot(Runnable configure) {
-		LuaScripts.copyTree("mcos", root());
-		configure.run();
-		devices.put("sata:0", new Disk(DiskTier.TIER_1, root()));
-		Eeprom eeprom = new Eeprom(LuaScripts.read("eeprom/boot"));
-		devices.put("eeprom", eeprom); // (on the bus at its slot, as a board puts it)
-		TestBus.of(machine, devices);
-		machine.board().setEeprom(eeprom);
-		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
-		untilIdle();
-	}
-
-	/** Plays the server thread until {@code done}: its asked-for tasks, and a tick a millisecond. */
-	private void settle(BooleanSupplier done) {
-		long end = System.nanoTime() + 20_000_000_000L;
-		while (!done.getAsBoolean()) {
-			assertThat(System.nanoTime()).as(() -> "settled in time; the screen:\n" + screen()).isLessThan(end);
-			Runnable task;
-			while ((task = server.poll()) != null) {
-				task.run();
-			}
-			machine.tick();
-			for (Runnable tick : ticks) {
-				tick.run(); // (another computer's, and what a test does each tick)
-			}
-			try {
-				Thread.sleep(1);
-			} catch (InterruptedException e) {
-				throw new IllegalStateException(e);
-			}
-		}
-	}
-
-	/** What else happens each tick: other computers' ticks, a test's own doings. */
-	private final java.util.List<Runnable> ticks = new java.util.ArrayList<>();
-
+class McosTest extends McosHarness {
 	/** Another computer running mcos from a disk of its own, on this test's server thread, with a network card in {@code world}. */
 	private final class Other {
 		final Terminal screen = new Terminal(Resolution.DEFAULT);
@@ -150,47 +64,6 @@ class McosTest {
 				screen.press(keys.substring(i, i + 1));
 			}
 		}
-	}
-
-	/** What the console shows (to explain a failure: tests never assert on it). */
-	private String screen() {
-		StringBuilder text = new StringBuilder();
-		var console = machine.board().virtualBus().console().screen();
-		for (int row = 0; row < Resolution.DEFAULT.rows(); row++) {
-			text.append(console.row(row).stripTrailing()).append('\n');
-		}
-		return text.toString();
-	}
-
-	/** Until mcos has read every key and idles, waiting for more (still running). */
-	private void untilIdle() {
-		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
-		settle(() -> machine.runner().isEmpty() || (!screen.hasKeys() && runner.state() == Runner.State.WAITING));
-		assertThat(machine.runner()).as(() -> "still running; the screen:\n" + screen()).isPresent();
-	}
-
-	private void untilHalted() {
-		settle(() -> machine.runner().isEmpty());
-		assertThat(machine.board().virtualBus().console().screen().row(0)).doesNotStartWith("ABRT");
-	}
-
-	private void type(String keys) {
-		for (int i = 0; i < keys.length(); i++) {
-			screen.press(keys.substring(i, i + 1));
-		}
-	}
-
-	private static String read(Path file) {
-		try {
-			return Files.readString(file);
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
-		}
-	}
-
-	/** Until a file is there with this text (a file appears when it's opened, its text when it's closed). */
-	private void untilFile(Path file, String text) {
-		settle(() -> Files.isRegularFile(file) && read(file).equals(text));
 	}
 
 	@Test
@@ -847,6 +720,57 @@ class McosTest {
 		assertThat(read(root().resolve("e"))).isEqualTo("tail: /dev/redstone0: file truncated\n");
 		type("kill $!\r");
 		untilIdle();
+	}
+
+	@Test
+	void pollingADeviceFileLosesNoEventAPullIoctlWouldTake() {
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
+		devices.put(Motherboard.exp(0), card);
+		devices.put(Motherboard.exp(1), motion);
+		boot();
+		file("p.lua", """
+			local sys = require("sys")
+			local out = io.open("/got", "w")
+			local sensor = assert(sys.open("/dev/motion0"))
+			sys.poll({[sensor] = {IN = true}})
+			out:write(sys.ioctl(sensor, "pull").mob, "\\n")
+			local red = assert(sys.open("/dev/redstone0"))
+			sys.poll({[red] = {PRI = true}})
+			local n = 0
+			while sys.ioctl(red, "pull") do n = n + 1 end
+			out:write(n, " ", tostring(sys.poll({[red] = {PRI = true}}, 0)[red] ~= nil), "\\n")
+			out:close()
+			""");
+		type("lua /p.lua 2> /err; touch /done\r");
+		untilIdle();
+		assertThat(Files.exists(root().resolve("done")) ? read(root().resolve("err")) : "").as("still waiting").isEmpty();
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", 0.0)));
+		settle(() -> server.isEmpty());
+		untilIdle();
+		server.add(() -> card.sense(3, 9));
+		untilFile(root().resolve("got"), "minecraft:pig\n1 false\n");
+	}
+
+	@Test
+	void aStreamMethodCalledByIoctlWithNoArgumentsGetsWhatCame() {
+		Path data = dataDisk();
+		boot();
+		file("c.lua", """
+			local sys = require("sys")
+			local disk = assert(sys.open("/dev/storage1"))
+			sys.poll({[disk] = {PRI = true}})
+			local change = sys.ioctl(disk, "changes")
+			local out = io.open("/got", "w")
+			out:write(tostring(type(change) == "table"), "\\n")
+			out:close()
+			""");
+		type("lua /c.lua 2> /err; touch /done\r");
+		untilIdle();
+		assertThat(Files.exists(root().resolve("done")) ? read(root().resolve("err")) : "").as("still waiting").isEmpty();
+		Disk disk = (Disk) devices.get("sata:1");
+		server.add(() -> disk.mkdir(new Arguments(java.util.List.of("/made"))));
+		untilFile(root().resolve("got"), "true\n");
 	}
 
 	@Test
@@ -1998,60 +1922,5 @@ class McosTest {
 		untilFile(root().resolve("done"), "");
 		assertThat(read(root().resolve("err"))).isEmpty();
 		assertThat(read(root().resolve("b"))).isEqualTo("ENOBUFS");
-	}
-
-	/** A program of the manual (docs/examples), as a player reads it. */
-	private static String example(String name) {
-		try {
-			Path dir = Path.of("").toAbsolutePath();
-			while (!Files.isDirectory(dir.resolve("docs/examples"))) {
-				dir = dir.getParent();
-			}
-			return Files.readString(dir.resolve("docs/examples/" + name + ".lua"));
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
-		}
-	}
-
-	@Test
-	void theManualsBlinkProgramTurnsAFaceOnAndOffForever() {
-		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
-		devices.put(Motherboard.exp(0), card);
-		boot();
-		file("blink.lua", example("redstone-blink"));
-		type("lua /blink.lua &\r");
-		settle(() -> card.output(0) == 15);
-		settle(() -> card.output(0) == 0);
-		settle(() -> card.output(0) == 15); // (and again: it never ends)
-	}
-
-	@Test
-	void theManualsMirrorProgramCopiesTheWestInputToTheEastOutputAsItChanges() {
-		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
-		devices.put(Motherboard.exp(0), card);
-		boot();
-		file("mirror.lua", example("redstone-mirror"));
-		type("lua /mirror.lua &\r");
-		untilIdle();
-		server.add(() -> card.sense(3, 9)); // west: 9 comes in
-		settle(() -> card.output(2) == 9); // east: 9 goes out
-		server.add(() -> card.sense(3, 4));
-		settle(() -> card.output(2) == 4);
-	}
-
-	@Test
-	void theManualsMotionAlarmProgramSoundsWhenSomethingMoves() {
-		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
-		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
-		devices.put(Motherboard.exp(0), motion);
-		devices.put(Motherboard.exp(1), card);
-		boot();
-		// (a long pulse, so the alarm is still on when the test looks)
-		file("alarm.lua", example("motion-alarm").replace("local PULSE = 1 ", "local PULSE = 600 "));
-		type("lua /alarm.lua > /tmp/out &\r");
-		untilIdle();
-		assertThat(card.output(0)).as("quiet until something moves").isZero();
-		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
-		settle(() -> card.output(0) == 15);
 	}
 }

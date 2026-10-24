@@ -74,6 +74,23 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 - **The bus walk has no gaps** (disconnected and absent devices are left out). Open: whether
   firmware should see them, as PCI addresses skip empty slots.
 
+## Robots: the bot golem, then drones
+
+- **The bot golem** (user design, 2026-10-24), next to build: an entity a block in size, an iron
+  golem's look, walking as fast as a player. Its GUI is a case's (CPU, RAM, EEPROM, disk, battery,
+  cards: none soldered) in the golem's own art, and it holds only a tier 1 screen. One slot holds a
+  soldered **robotics device**, `/dev/robotics0`, the only way it moves: it never acts on its own.
+  It walks to targets relative to itself with the game's pathfinder (turn, stop; its interrupt says
+  arrived or blocked), and much more later. It knows nothing of where it is: a GPS card later.
+  Creative only until the assembly; a broken one may spawn in the world's ruins.
+- **The charging pad:** a golem on it charges (little green glowing particles around it while it
+  does); power as other devices': its own battery slot, a buffer, and power over a cable from a bus
+  when there is one. Swapping the golem's battery works too.
+- **The Advanced Robotics Assembly:** builds robots; a 3x3 crafting area and output slots in its
+  GUI; animated (little arms moving little parts, lasers). Its recipes need parts not designed yet.
+- **Drones are golems without legs** (the user's idea): the same machine and robotics device,
+  flying instead of walking; maybe more of it soldered (hard-printed).
+
 ## Getting started in the world
 
 - **The player's introduction** is the next discussion: advancements, archaeology loot, how the
