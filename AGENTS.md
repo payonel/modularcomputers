@@ -2,7 +2,7 @@
 
 `CLAUDE.md` imports this file. It describes the code as it is and the decisions behind it, briefly,
 so an agent starts with the right picture. It holds no history (git has it) and no plans
-(`docs/PLAN.md` has them). The code and its comments are the truth for names, behavior and values;
+(`.agents/PLAN.md` has them). The code and its comments are the truth for names, behavior and values;
 this file says what things are for and why. Keep it current: a change that alters what's here
 updates it in the same commit.
 
@@ -39,7 +39,7 @@ computers really work.
   look like ours: check against stock Lua's semantics.
 - **Commands:** `./gradlew build` (compile and unit tests, seconds); `./gradlew testAll` (unit tests,
   server game tests on both loaders, Fabric client game tests on Xvfb against the release jar)
-  before claiming anything works. `docs/TESTING.md` has the details; `scripts/headless.sh` runs a
+  before claiming anything works. `.agents/TESTING.md` has the details; `scripts/headless.sh` runs a
   client on a virtual display (`:fabric:runClient` plays in `fabric/run`).
 - **Tests are the play-testing**, at the lowest layer that can express them: plain-Java unit tests,
   then server game tests, then client game tests (a visible feature gets one, and its screenshots
@@ -59,7 +59,7 @@ computers really work.
   there, read what it wrote.
 - **Art, sounds and data** (structures) come from Python scripts in
   `scripts/` (Pillow, libsndfile via ctypes); their outputs are committed, never edited by hand.
-- **Versioning:** `MAJOR.MINOR.PATCH+MCVERSION` (`docs/VERSIONING.md`), as Fabric API does.
+- **Versioning:** `MAJOR.MINOR.PATCH+MCVERSION` (`.agents/VERSIONING.md`), as Fabric API does.
 - **The dev host:** headless Linux, Xvfb with Mesa llvmpipe, `sudo` needs the user's password, no
   Lua interpreter (Lua runs only in the tests).
 
@@ -464,7 +464,7 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
 - **Data files under `lua/` that aren't Lua** go under a `share/` folder, mcos's `/home` or its `/etc` (settings,
   sh scripts; `/etc/rc.d`'s services are Lua): `LuaScriptsTest` compiles every other file as Lua.
 - **Textures and sounds** change through their script in `scripts/`, then regenerate.
-- **A decision** goes in this file when it's made; **an idea not built yet** in `docs/PLAN.md`.
+- **A decision** goes in this file when it's made; **an idea not built yet** in `.agents/PLAN.md`.
 
 ## Pitfalls
 

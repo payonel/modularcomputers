@@ -4,7 +4,7 @@ plugins {
 }
 
 // Published versions carry the Minecraft version as SemVer build metadata: 0.1.0+26.3 (each loader's
-// jar is named for its loader). See docs/VERSIONING.md.
+// jar is named for its loader). See .agents/VERSIONING.md.
 subprojects {
 	apply plugin: 'java-library'
 

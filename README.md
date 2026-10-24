@@ -13,7 +13,7 @@ Programmable computers for Minecraft, for Fabric and NeoForge. A spiritual succe
 
 ```sh
 ./gradlew build      # compile + unit tests -> fabric/build/libs/, neoforge/build/libs/ (seconds; doesn't start Minecraft)
-./gradlew testAll    # everything: + server game tests on both loaders, headless client tests (needs Xvfb, see docs/TESTING.md)
+./gradlew testAll    # everything: + server game tests on both loaders, headless client tests (needs Xvfb, see .agents/TESTING.md)
 ```
 
 You do not need to install a JDK: Gradle downloads JDK 25 on first run.
@@ -25,5 +25,5 @@ You do not need to install a JDK: Gradle downloads JDK 25 on first run.
 
 ## Docs
 
-- [docs/TESTING.md](docs/TESTING.md): test layers and headless setup
-- [docs/VERSIONING.md](docs/VERSIONING.md): version numbers and branches
+- [.agents/TESTING.md](.agents/TESTING.md): test layers and headless setup
+- [.agents/VERSIONING.md](.agents/VERSIONING.md): version numbers and branches
