@@ -317,6 +317,18 @@ public class CardGameTest {
 	}
 
 	@GameTest(maxTicks = 60)
+	public void anOperatorCardRunsServerCommandsAsACommandBlockDoes(GameTestHelper helper) {
+		var card = computerWith(helper, ModItems.OPERATOR_CARD, com.payonel.modularcomputers.device.OperatorCard.class);
+		Map<?, ?> answer = (Map<?, ?>) card.command(args("time set 1000")).first();
+		helper.assertValueEqual(answer.get("success"), true, "it ran: " + answer);
+		helper.assertValueEqual(helper.getLevel().getOverworldClockTime() % 24000, 1000L, "the world's time is set");
+		helper.assertTrue(String.valueOf(answer.get("output")).contains("1000"), "and it said so: " + answer);
+		Map<?, ?> refused = (Map<?, ?>) card.command(args("op somebody")).first();
+		helper.assertValueEqual(refused.get("success"), false, "an operator's own command is past a command block's permission");
+		helper.succeed();
+	}
+
+	@GameTest(maxTicks = 60)
 	public void aBluetoothCardsLinkIsReadAndSetOnTheCardItself(GameTestHelper helper) {
 		var card = computerWith(helper, ModItems.BLUETOOTH_CARD, com.payonel.modularcomputers.device.BluetoothCard.class);
 		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);

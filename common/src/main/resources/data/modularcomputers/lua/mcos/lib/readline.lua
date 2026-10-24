@@ -7,6 +7,7 @@
 --   bash's do (to the start of the word before, the end of the word after); Backspace, Delete (^D) erase; ^U, ^K cut before/after the
 --   cursor, ^W the word before it; Up/Down go through the history; ^L clears the screen; ^D on an
 --   empty line is the end of input; ^C drops the line; Tab completes the word before the cursor.
+--   A key's escape sequence that comes in parts is waited for (KEYSEQ_SECONDS, GNU's keyseq-timeout).
 --
 -- Completion (Tab), as readline's: the program's completer (file names by default) gives the words
 -- the one before the cursor could be. One: it's put in (and a space after it, unless it's a
@@ -27,6 +28,8 @@ local READ_SIZE = 256
 local GAP = 2 -- spaces between columns of completions
 local CSI = "\27["
 local REPORT_SECONDS = 0.5 -- how long the terminal has to say where its cursor is (no answer: column 0)
+local KEYSEQ_SECONDS = 0.5 -- how long the rest of an escape sequence is waited for (GNU readline's keyseq-timeout)
+local KEYSEQ_STEP = 0.05 -- (a poll's, while waiting)
 local DEFAULT_BREAKS = "[ \t\n\"'`<>;|&()=]" -- what ends a word, for completion (as rl_completer_word_break_characters)
 local SPECIAL = "[ \t\n\"'`<>;|&()$\\*?%[%]#~=!{}]" -- characters a file name has quoted when it's put in
 
@@ -305,6 +308,21 @@ function editor:read(shown)
         return finish(nil)
       end
       pending = data
+    end
+    -- An escape sequence come only in part (its rest in a later read: a key's bytes over a network,
+    -- or typed apart) waits a moment for the rest, as GNU readline's keyseq-timeout does, before
+    -- ESC is taken alone.
+    local waited = 0
+    while (pending == "\27" or pending:match("^\27[%[O][%d;]*$")) and waited < KEYSEQ_SECONDS do
+      if next(sys.poll({[0] = {IN = true}}, KEYSEQ_STEP) or {}) then
+        local more = sys.read(0, READ_SIZE)
+        if not more or more == "" then
+          break
+        end
+        pending = pending .. more
+      else
+        waited = waited + KEYSEQ_STEP
+      end
     end
     -- the next key: an escape sequence, a control character, or a character typed
     local key = pending:match("^\27%[[%d;]*[%a~]") or pending:match("^\27O%a") or pending:match("^\27[bf]")

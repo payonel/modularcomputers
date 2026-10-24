@@ -249,6 +249,7 @@ class McosTest {
 		boot();
 		type("echo bc > /h1\r");
 		untilFile(root().resolve("h1"), "bc\n");
+		untilIdle(); // (the shell back at its prompt: keys typed sooner are the tty's to echo, as bash's are)
 		type("\u001B[A"); // up: the last line again
 		type("\u001B[D\u001B[D\u001B[D\u001B[D\u001B[D\u001B[D\u001B[D\u001B[D"); // left, onto "c > /h1"... back to "bc"
 		type("a"); // inserted mid-line: echo abc > /h1 ... with the file name left to fix
@@ -534,6 +535,27 @@ class McosTest {
 		type("vtdemo.lua > /dev/tty; echo $? > /st\r");
 		untilFile(root().resolve("st"), "0\n");
 		assertThat(screen.buffer().hasTiles()).as("its sixel picture").isTrue();
+	}
+
+	@Test
+	void anOperatorCardsFileRunsALineAsACommandAndReadsWhatItSaid() {
+		var card = new com.payonel.modularcomputers.device.OperatorCard();
+		java.util.List<String> ran = new java.util.ArrayList<>();
+		card.runWith(command -> {
+			ran.add(command);
+			return command.startsWith("time")
+				? new com.payonel.modularcomputers.device.OperatorCard.Outcome(true, 1000, "Set the time to 1000\n")
+				: new com.payonel.modularcomputers.device.OperatorCard.Outcome(false, 0, "Unknown command\n");
+		});
+		devices.put(Motherboard.exp(0), card);
+		boot();
+		file("bogus.txt", "bogus\n");
+		type("echo /time set day > /dev/operator0; cat /dev/operator0 > /o; cp /bogus.txt /dev/operator0 2> /e; cat /dev/operator0 > /why; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(ran).as("each line a command, its / dropped").containsExactly("time set day", "bogus");
+		assertThat(read(root().resolve("o"))).isEqualTo("Set the time to 1000\n");
+		assertThat(read(root().resolve("e"))).as("a command that failed fails its write").isNotEmpty();
+		assertThat(read(root().resolve("why"))).as("and its file says why").isEqualTo("Unknown command\n");
 	}
 
 	@Test

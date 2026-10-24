@@ -46,8 +46,6 @@ public final class ModItems {
 	public static final Item JAVA_EEPROM = register("java_eeprom", properties -> holdsData(properties)
 		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.Mcos.class.getName()));
 	public static final List<Item> EEPROMS = List.of(EEPROM, JAVA_EEPROM);
-	/** Items with no recipe on purpose: the creative tab's (and giveall's). */
-	public static final List<Item> CREATIVE_ONLY = List.of(JAVA_CPU, JAVA_EEPROM);
 	/** RAM sticks: the tier sets the size. */
 	public static final MemoryItem TIER1_RAM = ram("tier1_ram", MemoryTier.TIER_1);
 	public static final MemoryItem TIER2_RAM = ram("tier2_ram", MemoryTier.TIER_2);
@@ -68,6 +66,10 @@ public final class ModItems {
 	public static final Item SOUND_CARD = register("sound_card");
 	/** HTTP and HTTPS to the real internet. */
 	public static final Item INTERNET_CARD = register("internet_card");
+	/** Runs server commands: creative only (OpenComputers' debug card). */
+	public static final Item OPERATOR_CARD = register("operator_card");
+	/** Items with no recipe on purpose: the creative tab's (and giveall's). */
+	public static final List<Item> CREATIVE_ONLY = List.of(JAVA_CPU, JAVA_EEPROM, OPERATOR_CARD);
 	public static final Item MOTION_SENSOR_CARD = register("motion_sensor_card");
 	public static final Item AUDIO_SENSOR_CARD = register("audio_sensor_card");
 	public static final Item WEATHER_SENSOR_CARD = register("weather_sensor_card");
@@ -91,6 +93,7 @@ public final class ModItems {
 		cards.put(REDSTONE_CARD, CardKind.REDSTONE);
 		cards.put(SOUND_CARD, CardKind.SOUND);
 		cards.put(INTERNET_CARD, CardKind.INTERNET);
+		cards.put(OPERATOR_CARD, CardKind.OPERATOR);
 		cards.put(MOTION_SENSOR_CARD, CardKind.MOTION_SENSOR);
 		cards.put(AUDIO_SENSOR_CARD, CardKind.AUDIO_SENSOR);
 		cards.put(WEATHER_SENSOR_CARD, CardKind.WEATHER_SENSOR);

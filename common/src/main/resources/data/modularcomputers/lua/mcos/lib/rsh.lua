@@ -15,6 +15,7 @@ local rsh = {
   OUTPUT = "O", ERRORS = "R", EXIT = "X",
   CHUNK = 4096, -- the most data a frame carries (what one read gives)
   PROBE_SECONDS = 0.5, -- how long a probe listens for rshds answering
+  PROBE_TRIES = 3, -- probes before a host is unknown (as ARP asks three times: a busy host may miss one)
 }
 
 -- A frame of 'kind' carrying 'data'.
@@ -59,33 +60,40 @@ function rsh.send(sys, fd, kind, data)
 end
 
 -- The address of the computer 'name' names: its card's whole id, the rshd in reach whose host is
--- named that (its hostname), or else the one whose id starts with it.
+-- named that (its hostname), or else the one whose id starts with it. Asked up to PROBE_TRIES times,
+-- until something answers.
 function rsh.resolve(sys, name)
   name = name:gsub("^id:", ""):gsub("%*$", "")
   if name:match("^%x+%-%x+%-%x+%-%x+%-%x+$") then
     return name
   end
   local probe = assert(sys.socket())
-  local ok, why = sys.sendto(probe, rsh.PROBE, "broadcast", rsh.PORT)
-  if not ok then
-    return nil, why
-  end
   local named, prefixed, seen = {}, {}, {}
-  local waited, step = 0, rsh.PROBE_SECONDS / 5
-  while waited < rsh.PROBE_SECONDS do
-    if next(sys.poll({[probe] = {IN = true}}, step)) then
-      local data, from = sys.recvfrom(probe)
-      local host = data and data:match("^" .. rsh.HERE .. " (.*)$")
-      if host and not seen[from] then
-        seen[from] = true
-        if host == name then
-          named[#named + 1] = from
-        elseif from:sub(1, #name) == name then
-          prefixed[#prefixed + 1] = from
+  for _ = 1, rsh.PROBE_TRIES do
+    local ok, why = sys.sendto(probe, rsh.PROBE, "broadcast", rsh.PORT)
+    if not ok then
+      sys.close(probe)
+      return nil, why
+    end
+    local waited, step = 0, rsh.PROBE_SECONDS / 5
+    while waited < rsh.PROBE_SECONDS do
+      if next(sys.poll({[probe] = {IN = true}}, step)) then
+        local data, from = sys.recvfrom(probe)
+        local host = data and data:match("^" .. rsh.HERE .. " (.*)$")
+        if host and not seen[from] then
+          seen[from] = true
+          if host == name then
+            named[#named + 1] = from
+          elseif from:sub(1, #name) == name then
+            prefixed[#prefixed + 1] = from
+          end
         end
+      else
+        waited = waited + step
       end
-    else
-      waited = waited + step
+    end
+    if #named > 0 or #prefixed > 0 then
+      break
     end
   end
   sys.close(probe)

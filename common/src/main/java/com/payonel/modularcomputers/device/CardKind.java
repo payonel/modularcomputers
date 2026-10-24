@@ -16,6 +16,8 @@ public enum CardKind {
 	SOUND(DeviceType.SOUND),
 	/** HTTP and HTTPS to the real internet (OpenComputers' internet card). */
 	INTERNET(DeviceType.INTERNET),
+	/** Runs server commands, creative only (OpenComputers' debug card). */
+	OPERATOR(DeviceType.OPERATOR),
 	MOTION_SENSOR(DeviceType.MOTION),
 	AUDIO_SENSOR(DeviceType.HEARING),
 	WEATHER_SENSOR(DeviceType.WEATHER);

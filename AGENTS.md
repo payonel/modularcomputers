@@ -244,6 +244,14 @@ the world. In mcos it's OSS's `/dev/dsp` (`dsp1` the next): an open starts at OS
 u8, mono), so `cat file.raw > /dev/dsp` plays, and OSS's ioctls set the format; `aplay` plays WAV
 files.
 
+### The operator card
+
+Creative only (OC's debug card, named for Minecraft's operators: Lua has its own debug). It runs
+server commands as a command block does, at its block, with a command block's permission
+(gamemaster: `time`, `weather`, `give`..., not `op` or `stop`), and returns how it went and what it
+said; each command is logged on the server. In mcos, `/dev/operator0`: a line written runs one, a
+read gives what the last one said.
+
 ### The internet card
 
 HTTP and HTTPS to the real internet (OC's internet card; the user's recipe: a cobweb and an eye of
@@ -424,7 +432,8 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   One TCP connection, framed both ways (`lib/rsh.lua`), so output, errors and the exit status stay
   apart (BSD's used a second connection for stderr and never sent the status). A host is its name
   (`hostname`: set in `/etc/hostname`; unset, the first card's address), a card's id, or a unique
-  prefix, found by a UDP broadcast probe on port 514 that rshd answers with its name. `rcp` is rsh
+  prefix, found by a UDP broadcast probe on port 514 that rshd answers with its name (asked up to
+  three times, as ARP asks: a busy computer may miss one). `rcp` is rsh
   running `cat` there (and `mkdir -p` and `find` for `-r`), the host found once for the copy
   (`rsh.resolve`).
 

@@ -100,6 +100,8 @@
 	"item.modularcomputers.redstone_card": "Redstone Card",
 	"item.modularcomputers.sound_card": "Sound Card",
 	"item.modularcomputers.internet_card": "Internet Card",
+	"item.modularcomputers.operator_card": "Operator Card",
+	"hint.modularcomputers.details.operator_card": "Runs server commands, as a command block does (time set day, weather clear...)",
 	"hint.modularcomputers.details.internet_card": "HTTP and HTTPS requests to the real internet (wget, curl); never the server's own network",
 	"subtitles.modularcomputers.sound_card": "Sound card plays",
 	"subtitles.modularcomputers.bell": "Terminal beeps",

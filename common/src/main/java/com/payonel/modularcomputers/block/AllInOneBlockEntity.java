@@ -835,6 +835,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	/** A card that works here, at the case: a redstone card's output changes update the case's neighbours. */
 	private Card cardHere(CardKind kind) {
 		Card card = com.payonel.modularcomputers.device.Cards.make(kind);
+		if (card instanceof com.payonel.modularcomputers.device.OperatorCard operator) {
+			operator.runWith(command -> level instanceof net.minecraft.server.level.ServerLevel server
+				? OperatorCommands.run(server, worldPosition, command)
+				: new com.payonel.modularcomputers.device.OperatorCard.Outcome(false, 0, "not in a world"));
+		}
 		card.onChange(this::markChanged);
 		card.frontFrom(() -> com.payonel.modularcomputers.device.Face.of(getBlockState().getValue(AllInOneBlock.FACING).getName()));
 		if (card instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
