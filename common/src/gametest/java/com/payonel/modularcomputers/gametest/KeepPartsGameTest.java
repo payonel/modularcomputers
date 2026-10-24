@@ -108,7 +108,7 @@ public class KeepPartsGameTest {
 		List<ItemStack> dropped = breakBlock(helper, POS);
 		helper.assertValueEqual(dropped.size(), 1, "one item: " + dropped);
 		List<String> hint = com.payonel.modularcomputers.hint.Hint.lines(com.payonel.modularcomputers.hint.Hint.of(dropped.getFirst(), false));
-		helper.assertTrue(hint.contains("Radio: Bluetooth Card"), "its hint lists its radio: " + hint);
+		helper.assertTrue(hint.contains("Bluetooth: Bluetooth Card"), "its hint lists its radio: " + hint);
 		placeBack(helper, dropped.getFirst(), POS);
 		ScreenBlockEntity placed = helper.getBlockEntity(POS, ScreenBlockEntity.class);
 		helper.assertValueEqual(placed.id(), id, "the same screen (id:" + id + ")");

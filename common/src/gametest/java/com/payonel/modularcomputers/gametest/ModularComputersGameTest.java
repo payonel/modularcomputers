@@ -12,4 +12,13 @@ public class ModularComputersGameTest {
 		helper.assertTrue(ModularComputers.isInitialized(), "common initializer did not run");
 		helper.succeed();
 	}
+
+	@GameTest
+	public void everyItemOfTheModIsInItsCreativeTab(GameTestHelper helper) {
+		var listed = com.payonel.modularcomputers.ModCreativeTab.items();
+		for (var item : com.payonel.modularcomputers.command.ModCommands.modItems()) {
+			helper.assertTrue(listed.stream().filter(stack -> stack.is(item)).count() == 1, "once in the tab: " + item);
+		}
+		helper.succeed();
+	}
 }

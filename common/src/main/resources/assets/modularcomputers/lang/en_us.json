@@ -120,11 +120,11 @@
 	"gui.modularcomputers.disk_station.outcome.NONE": "",
 	"gui.modularcomputers.disk_station.outcome.DONE": "Done",
 	"gui.modularcomputers.disk_station.outcome.NO_DISK": "Missing disk",
-	"gui.modularcomputers.disk_station.outcome.NO_SOURCE": "Missing source disk",
-	"gui.modularcomputers.disk_station.outcome.NO_POWER": "No power: a battery, or a running computer's cable",
-	"gui.modularcomputers.disk_station.outcome.NO_FIT": "The source doesn't fit on this disk",
-	"gui.modularcomputers.disk_station.outcome.READ_ONLY": "That disk is only read",
-	"gui.modularcomputers.disk_station.outcome.FAILED": "It didn't work",
+	"gui.modularcomputers.disk_station.outcome.NO_SOURCE": "Missing source",
+	"gui.modularcomputers.disk_station.outcome.NO_POWER": "No Power",
+	"gui.modularcomputers.disk_station.outcome.NO_FIT": "Too big to fit",
+	"gui.modularcomputers.disk_station.outcome.READ_ONLY": "Read-only disk",
+	"gui.modularcomputers.disk_station.outcome.FAILED": "Failed",
 	"gui.modularcomputers.disk_station.charge": "Battery: %s%%",
 	"hint.modularcomputers.disk_station.slot.0": "The disk it works on",
 	"hint.modularcomputers.disk_station.slot.1": "Source disk (optional, only read): for Clone",
@@ -149,5 +149,5 @@
 	"gui.modularcomputers.bus.bluetooth": "bluetooth, %sm",
 	"gui.modularcomputers.bus.paired": "paired",
 	"gui.modularcomputers.bus.hub_paired": "hub %s, paired",
-	"gui.modularcomputers.radio": "Radio"
+	"gui.modularcomputers.radio": "Bluetooth"
 }
