@@ -395,11 +395,12 @@ class McosTest {
 	}
 
 	@Test
-	void theConsolesShellIsALoginShellRunningTheProfileThenTheShrc() {
+	void theConsolesShellIsALoginShellRunningTheProfileGoingHomeThenTheShrc() {
 		boot(() -> file("home/.shrc", "touch /shrc-ran; alias mine='echo mine'\n"));
-		type("echo $HOME > /h; alias ll > /a; mine > /m; touch /done\r");
+		type("echo $HOME > /h; pwd > /p; alias ll > /a; mine > /m; touch /done\r");
 		untilFile(root().resolve("done"), "");
 		assertThat(read(root().resolve("h"))).as("the profile's HOME").isEqualTo("/home\n");
+		assertThat(read(root().resolve("p"))).as("and there it starts").isEqualTo("/home\n");
 		assertThat(read(root().resolve("a"))).as("its aliases").contains("ls -alF");
 		assertThat(root().resolve("shrc-ran")).as("then the file ENV names").exists();
 		assertThat(read(root().resolve("m"))).as("in the shell itself").isEqualTo("mine\n");
@@ -517,7 +518,7 @@ class McosTest {
 				+ "curl -s http://127.0.0.2:1/ > /dev/null; echo $? > /c4; touch /done\r");
 			untilFile(root().resolve("done"), "");
 			assertThat(read(root().resolve("c1"))).as("a POST and its body").isEqualTo("POST hi");
-			assertThat(read(root().resolve("file.txt"))).as("followed, named by its URL, every byte").isEqualTo("x".repeat(10_000));
+			assertThat(read(root().resolve("home/file.txt"))).as("followed, named by its URL, every byte, where the shell is (home)").isEqualTo("x".repeat(10_000));
 			assertThat(read(root().resolve("c3"))).as("-f: an HTTP error, no output").isEqualTo("22\n");
 			assertThat(read(root().resolve("c2"))).isEmpty();
 			assertThat(read(root().resolve("c4"))).as("not allowed: refused").isEqualTo("7\n");
@@ -1889,7 +1890,7 @@ class McosTest {
 		boot();
 		Other other = new Other("other", world, theirs);
 		settle(() -> other.machine.runner().map(r -> r.state() == Runner.State.WAITING).orElse(false));
-		other.type("rc rshd start\r");
+		other.type("rc rshd start; touch /started\r");
 		// Their card goes out of reach half a second in every two: frames to it are lost then, and
 		// TCP sends them again.
 		int[] tick = {0};
@@ -1897,7 +1898,8 @@ class McosTest {
 			tick[0]++;
 			other.card.place(world, net.minecraft.core.BlockPos.ZERO, tick[0] % 40 < 10 ? -100 : 0);
 		});
-		type("sleep 1; lua /big.lua; rcp /big " + theirs + ":/big; rsh " + theirs + " cat /big > /back; echo $? > /st\r");
+		settle(() -> Files.exists(other.root.resolve("started"))); // (its rshd is up)
+		type("lua /big.lua; rcp /big " + theirs + ":/big; rsh " + theirs + " cat /big > /back; echo $? > /st\r");
 		untilFile(root().resolve("st"), "0\n");
 		String sent = read(root().resolve("big"));
 		assertThat(sent).hasSize(3000 * 48);
@@ -1924,14 +1926,15 @@ class McosTest {
 		boot();
 		Other other = new Other("other", world, theirs);
 		settle(() -> other.machine.runner().map(r -> r.state() == Runner.State.WAITING).orElse(false));
-		other.type("rc rshd start\r");
+		other.type("rc rshd start; touch /started\r");
 		long[] tick = {0};
 		ticks.add(() -> { // (each card says where it is every tick, as its block does)
 			tick[0]++;
 			card.place(world, net.minecraft.core.BlockPos.ZERO, tick[0]);
 			other.card.place(world, new net.minecraft.core.BlockPos(3, 0, 0), tick[0]);
 		});
-		type("sleep 1; lua /tries.lua " + theirs.toString().substring(0, 4) + " 2> /err; touch /done\r");
+		settle(() -> Files.exists(other.root.resolve("started"))); // (its rshd is up: not a race with a sleep)
+		type("sleep 0.2; lua /tries.lua " + theirs.toString().substring(0, 4) + " 2> /err; touch /done\r");
 		untilFile(root().resolve("done"), "");
 		assertThat(read(root().resolve("tries"))).as(() -> "errors: " + read(root().resolve("err"))).isEqualTo("exited 0\n".repeat(20));
 	}

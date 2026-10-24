@@ -388,7 +388,8 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   replace those or add actions. `/etc/rc.conf` (`name_enable=YES`) says what starts at boot. `rc`
   starts one with `setsid` (no controlling tty, no ^C). The kernel stays init (it respawns the
   console's shell): a user-space PID 1 would stay resident for nothing.
-- **Login shells** (`sh -l`: the console's, rshd's logins) run `/etc/profile`, then an interactive
+- **Login shells** (`sh -l`: the console's, rshd's logins) run `/etc/profile`, go to `$HOME` (as
+  login does), then an interactive
   shell the file `$ENV` names (POSIX's), as shell commands in the shell: mcos's profile sets
   `HOME=/home`, `ENV=$HOME/.shrc` and a few aliases. `/home` is the user's: an update of mcos never
   writes over it (`LuaScripts.HOME`).

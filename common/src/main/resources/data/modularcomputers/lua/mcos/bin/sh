@@ -20,9 +20,9 @@
 -- (a script stops there; at the prompt nothing on the line runs); a command ended by a signal 128 +
 -- its number. sh -c 'command' [name [args...]] and sh script [args...] run those; interactive on a
 -- tty, ^C drops the line being typed or ends the command in front, and end of file (^D) exits.
--- sh -l is a login shell (the console's, a remote login's): it runs /etc/profile first; an
--- interactive shell then runs the file $ENV names, if there is one (POSIX's), each as shell
--- commands, in the shell itself (as . does).
+-- sh -l is a login shell (the console's, a remote login's): it runs /etc/profile first, then goes
+-- to $HOME (as login does); an interactive shell then runs the file $ENV names, if there is one
+-- (POSIX's), each as shell commands, in the shell itself (as . does).
 local sys = require("sys")
 local fs = require("fs")
 
@@ -1433,6 +1433,9 @@ local function main(...)
   end
   if login then
     startup(PROFILE)
+    if vars.HOME and sys.stat(vars.HOME) then
+      runline("cd") -- (home, as login puts a user there: the profile says where)
+    end
   end
   if interactive then
     startup(vars.ENV)

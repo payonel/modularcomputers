@@ -58,7 +58,12 @@ With
 .B \-l
 it is a login shell (the console's, and a remote login's): before anything
 else it runs
-.BR /etc/profile .
+.BR /etc/profile ,
+then goes to
+.B $HOME
+(as
+.B login
+puts a user there).
 An interactive shell then runs the file the
 .B ENV
 variable names, if there is one (mcos's
