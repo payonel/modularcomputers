@@ -28,6 +28,31 @@ class DiskChangesTest {
 		return all;
 	}
 
+	@SuppressWarnings("unchecked")
+	private static Object modified(Disk disk, String path) {
+		return ((Map<String, Object>) disk.stat(args(path)).first()).get("modified");
+	}
+
+	@Test
+	void aFilesTimeIsTheWorldsWhenItChangedNotTheHosts() {
+		long[] ticks = {1200};
+		Disk disk = new Disk(DiskTier.TIER_1, world.resolve("timed"));
+		disk.clockFrom(() -> ticks[0]);
+		disk.mkdir(args("/dir"));
+		Disk.FileHandle file = (Disk.FileHandle) disk.open(args("/dir/a.txt", "w")).first();
+		ticks[0] = 1300;
+		file.write(args("hello"));
+		file.close(args());
+		assertThat(modified(disk, "/dir/a.txt")).as("written at tick 1300: 50 ms a tick").isEqualTo(1300L * 50);
+		assertThat(modified(disk, "/dir")).as("its directory, as an entry in it changed").isEqualTo(1200L * 50);
+		ticks[0] = 1400;
+		disk.remove(args("/dir/a.txt"));
+		assertThat(modified(disk, "/dir")).as("an entry gone").isEqualTo(1400L * 50);
+		Disk.stampAll(world.resolve("timed"), 1500);
+		assertThat(modified(disk, "/dir")).as("an image copied in: made then").isEqualTo(1500L * 50);
+		disk.retire();
+	}
+
 	@Test
 	void anHfsDiskReportsWhatChangesOnItByItsOwnPaths() {
 		Disk disk = new Disk(DiskTier.TIER_1, world.resolve("disk"));

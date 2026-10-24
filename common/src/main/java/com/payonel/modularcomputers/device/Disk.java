@@ -189,8 +189,64 @@ public final class Disk implements Device {
 		return "/" + storage.relativize(at).toString().replace('\\', '/');
 	}
 
-	/** Something changed on it: reported (a kernel pulls it). */
+	/** What a game tick is in a file's time (milliseconds). */
+	private static final long MILLIS_PER_TICK = 50;
+	/** The world's time, in ticks, as its block reads it (0 with no block: a test's disk). */
+	private java.util.function.LongSupplier clock = () -> 0;
+
+	/** Where its files' times come from: the world's (game time), never the host's. */
+	public void clockFrom(java.util.function.LongSupplier ticks) {
+		this.clock = ticks;
+	}
+
+	/**
+	 * A change on it gets the world's time: the file's (made or written) and, when an entry was
+	 * made, removed or moved, its directory's, as Linux updates a directory's when its entries change (the host's time would be the server's
+	 * clock, which nothing in the world knows). A file's time lives in the host file's own
+	 * modification time, its one home.
+	 */
+	private void stamp(String event, String path, Object... more) {
+		if (storage == null || path == null) {
+			return;
+		}
+		java.nio.file.attribute.FileTime now = java.nio.file.attribute.FileTime.fromMillis(clock.getAsLong() * MILLIS_PER_TICK);
+		List<Path> stamped = new ArrayList<>();
+		Path at = storage.resolve(path.startsWith("/") ? path.substring(1) : path);
+		if (event.equals("create") || event.equals("modify")) {
+			stamped.add(at);
+		}
+		if (!event.equals("modify")) {
+			stamped.add(at.getParent()); // (an entry made, gone or moved: a write isn't one)
+		}
+		if (event.equals("rename") && more.length > 1 && more[1] instanceof String from) {
+			stamped.add(storage.resolve(from.startsWith("/") ? from.substring(1) : from).getParent());
+		}
+		for (Path one : stamped) {
+			try {
+				if (one != null && one.startsWith(storage) && Files.exists(one, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+					Files.setLastModifiedTime(one, now);
+				}
+			} catch (IOException e) {
+				// (a time is no reason to fail a change that happened)
+			}
+		}
+	}
+
+	/** Files put on a disk's folder from outside (an image copied in) get the world's time, as if made then. */
+	public static void stampAll(Path folder, long ticks) {
+		java.nio.file.attribute.FileTime now = java.nio.file.attribute.FileTime.fromMillis(ticks * MILLIS_PER_TICK);
+		try (Stream<Path> paths = Files.walk(folder)) {
+			for (Path path : paths.toList()) {
+				Files.setLastModifiedTime(path, now);
+			}
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+
+	/** Something changed on it: stamped with the world's time, and reported (a kernel pulls it). */
 	private void report(String event, String path, Object... more) {
+		stamp(event, path, more);
 		Map<String, Object> change = new LinkedHashMap<>();
 		change.put("event", event);
 		if (path != null) {
@@ -591,7 +647,7 @@ public final class Disk implements Device {
 		});
 	}
 
-	@Method(doc = "stat(path[, nofollow]): {size, directory, modified} (modified in milliseconds since 1970), or nil if there's nothing there; nofollow: a link itself, with link = its target (and size its length)")
+	@Method(doc = "stat(path[, nofollow]): {size, directory, modified} (modified: the world's time when it last changed, in milliseconds: a tick is 50), or nil if there's nothing there; nofollow: a link itself, with link = its target (and size its length)")
 	public Result stat(Arguments args) {
 		String path = args.checkString(0);
 		boolean nofollow = args.optBoolean(1, false);
@@ -1137,7 +1193,11 @@ public final class Disk implements Device {
 						out.write(write.getValue());
 					}
 				}
+				// (the move into its directory changes the directory's time on the host: a write isn't an
+				// entry made, so its time stays as it was)
+				java.nio.file.attribute.FileTime directory = Files.getLastModifiedTime(target.getParent());
 				Files.move(scratch, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+				Files.setLastModifiedTime(target.getParent(), directory);
 				disk.report("modify", path);
 			} catch (IOException e) {
 				Files.deleteIfExists(scratch);

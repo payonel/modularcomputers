@@ -237,7 +237,9 @@ card it reaches; nothing routes between the two networks.
 
 Disks in hfs mode serve files themselves (like 9P): real host files in the world save, so players
 can look at them. A handle never holds a host file open: writes buffer and commit atomically at
-close (power lost before close loses them). Paths never leave the disk's folder. Symbolic links are
+close (power lost before close loses them). A file's time is the world's (game time, 50 ms a tick), never the host's,
+set as it changes and kept in the host file's own modification time (its one home); an image copied
+onto a disk gets the time it was copied. Paths never leave the disk's folder. Symbolic links are
 CIFS's Minshall+French `XSym` files, never host links (one could point out of the save); the disk
 never follows them, the OS's VFS does. A raw disk is read and written at any byte offset (`read(offset, n)`,
 `write(offset, data)`), the user's call over real disks' sectors (sectors don't make programs

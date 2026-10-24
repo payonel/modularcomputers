@@ -844,6 +844,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		if (!java.nio.file.Files.exists(folder)) {
 			try {
 				com.payonel.modularcomputers.machine.LuaScripts.copyTree(image, folder);
+				com.payonel.modularcomputers.device.Disk.stampAll(folder, level == null ? 0 : level.getGameTime()); // (made now, in the world's time)
 			} catch (RuntimeException e) {
 				com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A disk didn't get its {} files", image, e);
 				return;
@@ -894,6 +895,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 					imageDisk(diskStack, folder);
 				}
 				disks[lane] = new Disk(diskTier, folder);
+				disks[lane].clockFrom(() -> level == null ? 0 : level.getGameTime()); // (its files' times: the world's)
 				disks[lane].onChange(this::markChanged); // its reports of changes, saved with the case
 			}
 			diskSerials[lane] = diskSerial;
