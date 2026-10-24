@@ -1,0 +1,19 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"G": "minecraft:gold_nugget",
+		"Q": "modularcomputers:chip",
+		"c": "minecraft:copper_nugget",
+		"e": "minecraft:ender_eye",
+		"w": "minecraft:cobweb"
+	},
+	"pattern": [
+		"wQe",
+		"ccc",
+		"GGG"
+	],
+	"result": {
+		"id": "modularcomputers:internet_card"
+	}
+}

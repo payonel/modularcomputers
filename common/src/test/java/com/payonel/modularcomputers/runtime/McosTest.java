@@ -481,6 +481,53 @@ class McosTest {
 	}
 
 	@Test
+	void curlAndWgetMakeRequestsThroughTheInternetCardAndTheServersOwnMachineIsRefused() throws IOException {
+		com.sun.net.httpserver.HttpServer web = com.sun.net.httpserver.HttpServer.create(
+			new java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 0);
+		web.createContext("/", exchange -> {
+			byte[] body = switch (exchange.getRequestURI().getPath()) {
+				case "/moved" -> {
+					exchange.getResponseHeaders().add("Location", "/file.txt");
+					exchange.sendResponseHeaders(302, -1);
+					yield null;
+				}
+				case "/file.txt" -> "x".repeat(10_000).getBytes();
+				case "/missing" -> {
+					exchange.sendResponseHeaders(404, -1);
+					yield null;
+				}
+				default -> (exchange.getRequestMethod() + " " + new String(exchange.getRequestBody().readAllBytes())).getBytes();
+			};
+			if (body != null) {
+				exchange.sendResponseHeaders(200, body.length);
+				exchange.getResponseBody().write(body);
+			}
+			exchange.close();
+		});
+		web.start();
+		String url = "http://127.0.0.1:" + web.getAddress().getPort();
+		com.payonel.modularcomputers.device.InternetCard.policyFrom(
+			() -> new com.payonel.modularcomputers.internet.InternetPolicy(true, java.util.List.of("127.0.0.1"), java.util.List.of()));
+		try {
+			var card = new com.payonel.modularcomputers.device.InternetCard();
+			devices.put(Motherboard.exp(0), card);
+			ticks.add(card::tick); // (its block's tick)
+			boot();
+			type("curl -d hi " + url + "/post > /c1; wget -q " + url + "/moved; curl -sf " + url + "/missing > /c2; echo $? > /c3; "
+				+ "curl -s http://127.0.0.2:1/ > /dev/null; echo $? > /c4; touch /done\r");
+			untilFile(root().resolve("done"), "");
+			assertThat(read(root().resolve("c1"))).as("a POST and its body").isEqualTo("POST hi");
+			assertThat(read(root().resolve("file.txt"))).as("followed, named by its URL, every byte").isEqualTo("x".repeat(10_000));
+			assertThat(read(root().resolve("c3"))).as("-f: an HTTP error, no output").isEqualTo("22\n");
+			assertThat(read(root().resolve("c2"))).isEmpty();
+			assertThat(read(root().resolve("c4"))).as("not allowed: refused").isEqualTo("7\n");
+		} finally {
+			com.payonel.modularcomputers.device.InternetCard.policyFrom(() -> com.payonel.modularcomputers.internet.InternetPolicy.DEFAULT);
+			web.stop(0);
+		}
+	}
+
+	@Test
 	void dateIsTheWorldsClockOnItsCalendar() {
 		long noonOfTheThirdDay = 2 * 24000 + 6000; // (game time: 0 is the first sunrise, 6000 its noon)
 		machine.board().setChassis(new com.payonel.modularcomputers.machine.Chassis() {

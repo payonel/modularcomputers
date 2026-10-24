@@ -1062,6 +1062,26 @@ end)
 -- port), sendto(fd, data, address, port), recvfrom(fd) (data, address, port), listen(fd[, backlog]),
 -- connect(fd, address, port), accept(fd) (a new one, the peer's address and port), shutdown(fd) (no
 -- more to send), and their ioctls (lib/modules/net.lua, loaded at the first).
+-- http(url, {method, headers, body}): an internet card's request, as a file (lib/modules/http.lua,
+-- loaded at the first): its reads the body, ioctl HTTP_RESPONSE its status and headers.
+local http
+function syscalls.http(p, request, url, options)
+  if type(url) ~= "string" then
+    return fail("EINVAL")
+  end
+  local fd = lowestfd(p)
+  if not fd then
+    return fail("EMFILE")
+  end
+  http = http or module("http", k, vfs)
+  local d, why, errno = http.open(url, fromuser(options, true) or {})
+  if not d then
+    return nil, why, errno
+  end
+  p.fds[fd] = hold(d)
+  return fd
+end
+
 function syscalls.socket(p, request, kind)
   local fd = lowestfd(p)
   if not fd then

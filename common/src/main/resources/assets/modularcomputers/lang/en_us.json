@@ -99,6 +99,8 @@
 	"item.modularcomputers.bluetooth_card": "Bluetooth Card",
 	"item.modularcomputers.redstone_card": "Redstone Card",
 	"item.modularcomputers.sound_card": "Sound Card",
+	"item.modularcomputers.internet_card": "Internet Card",
+	"hint.modularcomputers.details.internet_card": "HTTP and HTTPS requests to the real internet (wget, curl); never the server's own network",
 	"subtitles.modularcomputers.sound_card": "Sound card plays",
 	"subtitles.modularcomputers.bell": "Terminal beeps",
 	"hint.modularcomputers.details.sound_card": "Plays the samples programs write: PCM or IMA ADPCM, mono or stereo (two speakers, its block's left and right)",

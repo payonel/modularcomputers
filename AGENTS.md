@@ -244,6 +244,22 @@ the world. In mcos it's OSS's `/dev/dsp` (`dsp1` the next): an open starts at OS
 u8, mono), so `cat file.raw > /dev/dsp` plays, and OSS's ioctls set the format; `aplay` plays WAV
 files.
 
+### The internet card
+
+HTTP and HTTPS to the real internet (OC's internet card; the user's recipe: a cobweb and an eye of
+ender). The card speaks HTTP itself (`HttpExchange`, its own small client), since TLS is beyond a
+program's Lua; in mcos a request is a file (`sys.http`, `lib/modules/http.lua`: reads give the body,
+`HTTP_RESPONSE` the status and headers), and `wget` and `curl` are built on it. **It's a program
+running on the server's network, so it's kept to the public internet** (`InternetPolicy`):
+loopback, private, link-local (cloud metadata), CGNAT, multicast and reserved ranges are refused, in
+IPv4 and IPv6 (embedded IPv4 judged as itself); every address a host resolves to is judged, and the
+socket opens to the address judged (no second lookup: no DNS rebinding); redirects are the
+program's, so each hop is judged again; a request can't set the headers that frame it (Host,
+Content-Length, Connection...), carry line breaks, or send credentials in its URL; no proxies,
+cookies or server details are sent. Admins can turn it off and allow or deny hosts and ranges
+(`internet_*` settings). Its events wait in the card with a handshake (a full card pauses the
+download), and the kernel caps what it holds unread.
+
 ### Network cards
 
 OC's broadcast and peer-to-peer messages in a real NIC's shape. A wired card sends frames over the

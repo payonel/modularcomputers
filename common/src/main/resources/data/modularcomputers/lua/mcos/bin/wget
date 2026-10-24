@@ -1,0 +1,91 @@
+-- wget [-q] [-O file] url: downloads what a URL names, through the internet card, following
+-- redirects, into a file named as the URL's last part (index.html for none), or -O's ("-": stdout).
+-- Says what it does on stderr unless -q. Exit status as GNU wget's: 0 done, 2 bad usage, 3 a file
+-- that can't be written, 4 a network failure (refused, unknown host, timed out), 8 the server
+-- answered an error (4xx, 5xx).
+local sys = require("sys")
+local http = require("http")
+
+local READ_SIZE = 4096
+
+local function usage()
+  io.stderr:write("usage: wget [-q] [-O file] url\n")
+  os.exit(2)
+end
+
+local quiet, output, url = false, nil, nil
+local i = 1
+while i <= #arg do
+  local word = arg[i]
+  if word == "-q" then
+    quiet = true
+  elseif word == "-O" then
+    output = arg[i + 1] or usage()
+    i = i + 1
+  elseif word:sub(1, 1) == "-" then
+    io.stderr:write("wget: invalid option '", word, "'\n")
+    usage()
+  elseif url then
+    usage()
+  else
+    url = word
+  end
+  i = i + 1
+end
+if not url then
+  usage()
+end
+if not url:match("^%a[%w+.-]*://") then
+  url = "http://" .. url -- (as wget's: a URL with no scheme is http's)
+end
+
+local function say(...)
+  if not quiet then
+    io.stderr:write(...)
+  end
+end
+
+say("--", os.date("%T"), "--  ", url, "\n")
+local response, fd = http.request(url, {follow = true})
+if not response then
+  say("wget: ", tostring(fd), "\n")
+  return 4
+end
+say("HTTP request sent, awaiting response... ", response.status, " ", response.message, "\n")
+if response.status >= 400 then
+  sys.close(fd)
+  say(os.date("%T"), " ERROR ", response.status, ": ", response.message, ".\n")
+  return 8
+end
+if not output then
+  output = response.url:match("^[^?#]*/([^/?#]+)$") or "index.html"
+end
+local out, why = io.stdout, nil
+if output ~= "-" then
+  out, why = io.open(output, "w")
+  if not out then
+    sys.close(fd)
+    say("wget: ", tostring(why), "\n")
+    return 3
+  end
+end
+say("Saving to: '", output, "'\n")
+local got = 0
+while true do
+  local data, failed = sys.read(fd, READ_SIZE)
+  if not data then
+    sys.close(fd)
+    say("wget: ", tostring(failed), "\n")
+    return 4
+  elseif data == "" then
+    break
+  end
+  out:write(data)
+  got = got + #data
+end
+sys.close(fd)
+if out ~= io.stdout then
+  out:close()
+end
+say(os.date("%T"), " '", output, "' saved [", got, "]\n")
+return 0

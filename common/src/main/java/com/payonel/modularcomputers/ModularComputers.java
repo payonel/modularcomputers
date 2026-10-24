@@ -69,6 +69,7 @@ public final class ModularComputers {
 	/** Registers everything the mod adds (blocks, items, menus...), once. */
 	public static void init() {
 		ModConfig.load();
+		com.payonel.modularcomputers.device.InternetCard.policyFrom(ModConfig::internet); // (the server's settings, as reloaded)
 		ModSounds.init();
 		ModComponents.init();
 		ModItems.init();

@@ -81,6 +81,7 @@ public final class CardWorld {
 					weather.sense(weatherAt(level, pos));
 				}
 			}
+			case com.payonel.modularcomputers.device.InternetCard internet -> internet.tick();
 			case SoundCard sound -> {
 				boolean was = sound.playing();
 				byte[] played = sound.play(now);

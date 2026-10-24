@@ -17,6 +17,8 @@ public enum DeviceType {
 	SOUND,
 	/** An audio sensor: the sounds it hears near it, as the game's subtitles report them (motion's naming). */
 	HEARING,
+	/** An internet card: HTTP(S) requests to the real internet. */
+	INTERNET,
 	/** A Bluetooth card: the link it makes to another block's board. */
 	BLUETOOTH,
 	/** A motion sensor: what moves near it (user, 2026-10-21: motion, not just "sensor"). */

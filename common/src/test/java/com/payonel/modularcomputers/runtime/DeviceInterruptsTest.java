@@ -62,6 +62,15 @@ class DeviceInterruptsTest {
 			card.play(0);
 			card.play(20); // a second played: room for the writer
 		},
+		com.payonel.modularcomputers.device.InternetCard.class, device -> {
+			var card = (com.payonel.modularcomputers.device.InternetCard) device;
+			card.request(new com.payonel.modularcomputers.runtime.Arguments(List.of("http://127.0.0.1/"))); // (refused, on its thread: an event)
+			long until = System.nanoTime() + 5_000_000_000L;
+			while (!card.interruptPending() && System.nanoTime() < until) {
+				Thread.onSpinWait();
+			}
+			card.tick(); // (its block's tick: its interrupt)
+		},
 		com.payonel.modularcomputers.device.AudioSensorCard.class, device -> ((com.payonel.modularcomputers.device.AudioSensorCard) device)
 			.hear(Map.of("sound", "minecraft:entity.pig.ambient", "x", 1.0, "y", 0.0, "z", 0.0)),
 		NetworkCard.class, device -> {

@@ -1,0 +1,86 @@
+.TH CURL 1 "" "" "mcos Manual"
+.SH NAME
+curl \- make an HTTP request
+.SH SYNOPSIS
+.B curl
+.RB [ \-X
+.IR method ]
+.RB [ \-H
+.IR header ]...
+.RB [ \-d
+.IR data ]
+.RB [ \-o
+.IR file ]
+.RB [ \-iIfLs ]
+.RB [ \-A
+.IR agent ]
+.I url
+.SH DESCRIPTION
+.B curl
+makes an HTTP or HTTPS request through the computer's internet card and
+writes what comes back to standard output. A URL without a scheme is
+.BR http:// 's.
+.PP
+The card reaches only the public internet: never the server's own machine
+or network (the server's settings may allow more, or less). It writes the
+headers HTTP needs itself
+.RB ( Host ,
+.BR Content-Length ,
+.BR Connection );
+a request can't set those.
+.SH OPTIONS
+.TP
+.BI \-X " method"
+GET, HEAD, POST, PUT, DELETE, PATCH or OPTIONS.
+.TP
+.BI \-H " 'Name: value'"
+A header; again for more.
+.TP
+.BI \-d " data"
+A body: the request is a POST, with
+.B Content-Type: application/x-www-form-urlencoded
+unless a header says otherwise. Again for more, joined with
+.BR & .
+.TP
+.BI \-o " file"
+Writes to
+.I file
+instead.
+.TP
+.B \-i
+Writes the response's status and headers first.
+.TP
+.B \-I
+Makes a HEAD request: only its status and headers.
+.TP
+.B \-L
+Follows redirects.
+.TP
+.B \-f
+Fails on an HTTP error (400 or more): no output, exit 22.
+.TP
+.B \-s
+Silent: no messages.
+.TP
+.BI \-A " agent"
+The User-Agent header.
+.SH EXIT STATUS
+0 when done; 2 for bad usage; 6 for an unknown host; 7 when it couldn't
+connect (refused, or the server forbids the address); 22 for an HTTP error
+with
+.BR \-f ;
+23 when the output can't be written; 28 when it timed out; 47 for too many
+redirects.
+.SH EXAMPLES
+.nf
+curl https://example.com/
+curl \-i \-X POST \-H 'Content-Type: application/json' \-d '{"a":1}' https://example.com/api
+curl \-sL \-o page.html example.com
+.fi
+.SH NOTES
+Real
+.B curl
+speaks many protocols and has hundreds of options; mcos's speaks HTTP and
+HTTPS, with these.
+.SH SEE ALSO
+.BR wget (1)

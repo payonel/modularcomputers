@@ -1,0 +1,145 @@
+-- curl [options] url: makes a request through the internet card and writes what comes back to
+-- stdout (or -o file). -X method; -H 'Name: value' (a header; again for more); -d data (a body: POST,
+-- with Content-Type application/x-www-form-urlencoded unless -H says); -i the response's headers
+-- first; -I a HEAD request, its headers only; -L follows redirects (each judged by the card again);
+-- -f fails on an HTTP error (exit 22) with no output; -s silent; -A agent. Exit status as curl's: 0
+-- done, 2 bad usage, 6 the host unknown, 7 couldn't connect (refused, or the server forbids it), 22
+-- an HTTP error with -f, 23 the output can't be written, 28 timed out, 47 too many redirects.
+local sys = require("sys")
+local http = require("http")
+
+local READ_SIZE = 4096
+
+local function usage()
+  io.stderr:write("usage: curl [-X method] [-H header]... [-d data] [-o file] [-iIfLs] [-A agent] url\n")
+  os.exit(2)
+end
+
+local method, headers, body, output, url = nil, {}, nil, nil, nil
+local include, head, fail, follow, silent = false, false, false, false, false
+local i = 1
+local function value()
+  i = i + 1
+  return arg[i] or usage()
+end
+while i <= #arg do
+  local word = arg[i]
+  if word == "-X" or word == "--request" then
+    method = value()
+  elseif word == "-H" or word == "--header" then
+    local name, text = value():match("^([^:]+):%s*(.*)$")
+    if not name then
+      usage()
+    end
+    headers[name] = text
+  elseif word == "-d" or word == "--data" then
+    body = (body and body .. "&" or "") .. value()
+  elseif word == "-o" or word == "--output" then
+    output = value()
+  elseif word == "-A" or word == "--user-agent" then
+    headers["User-Agent"] = value()
+  elseif word:match("^%-[iIfLs]+$") then
+    for c in word:sub(2):gmatch(".") do
+      include = include or c == "i"
+      head = head or c == "I"
+      fail = fail or c == "f"
+      follow = follow or c == "L"
+      silent = silent or c == "s"
+    end
+  elseif word:sub(1, 1) == "-" then
+    io.stderr:write("curl: option ", word, ": is unknown\n")
+    usage()
+  elseif url then
+    usage()
+  else
+    url = word
+  end
+  i = i + 1
+end
+if not url then
+  usage()
+end
+if not url:match("^%a[%w+.-]*://") then
+  url = "http://" .. url
+end
+if head then
+  method = "HEAD"
+elseif body and not method then
+  method = "POST"
+end
+if body then
+  local typed = false
+  for name in pairs(headers) do
+    typed = typed or name:lower() == "content-type"
+  end
+  if not typed then
+    headers["Content-Type"] = "application/x-www-form-urlencoded"
+  end
+end
+
+-- What a failure's why means, as curl's exit status.
+local function status(why)
+  why = tostring(why)
+  if why:find("unknown host") then
+    return 6
+  elseif why:find("timed out") then
+    return 28
+  elseif why:find("too many redirects") then
+    return 47
+  end
+  return 7
+end
+
+local response, fd = http.request(url, {method = method, headers = headers, body = body, follow = follow})
+if not response then
+  if not silent then
+    io.stderr:write("curl: ", tostring(fd), "\n")
+  end
+  return status(fd)
+end
+if fail and response.status >= 400 then
+  sys.close(fd)
+  if not silent then
+    io.stderr:write("curl: The requested URL returned error: ", response.status, "\n")
+  end
+  return 22
+end
+local out = io.stdout
+if output then
+  out = io.open(output, "w")
+  if not out then
+    sys.close(fd)
+    return 23
+  end
+end
+if include or head then
+  out:write("HTTP/1.1 ", response.status, " ", response.message, "\r\n")
+  local names = {}
+  for name in pairs(response.headers) do
+    names[#names + 1] = name
+  end
+  table.sort(names)
+  for _, name in ipairs(names) do
+    out:write(name, ": ", response.headers[name], "\r\n")
+  end
+  out:write("\r\n")
+end
+local code = 0
+while true do
+  local data, failed = sys.read(fd, READ_SIZE)
+  if not data then
+    if not silent then
+      io.stderr:write("curl: ", tostring(failed), "\n")
+    end
+    code = status(failed)
+    break
+  elseif data == "" then
+    break
+  end
+  out:write(data)
+end
+sys.close(fd)
+if out ~= io.stdout then
+  out:close()
+end
+return code

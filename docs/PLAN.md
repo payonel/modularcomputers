@@ -150,3 +150,5 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   - The internet card's commands (`wget`, `pastebin`) will be its device's API.
 - **Not wanted** (user, 2026-10-19): `which` (it's `command -v`), `lshw`, `dmesg`,
   `useradd`/`userdel`, OpenOS's `transforms` and `event`/`keyboard` libraries.
+- **The internet card, open:** raw TCP connections to the internet (OC's `connect`), if wanted;
+  rate limits per card or per player, if servers need them.

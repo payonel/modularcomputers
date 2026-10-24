@@ -1,0 +1,52 @@
+.TH WGET 1 "" "" "mcos Manual"
+.SH NAME
+wget \- download a file from the internet
+.SH SYNOPSIS
+.B wget
+.RB [ \-q ]
+.RB [ \-O
+.IR file ]
+.I url
+.SH DESCRIPTION
+.B wget
+downloads what
+.I url
+names, through the computer's internet card, following redirects, into a
+file named as the URL's last part
+.RB ( index.html
+when it has none). A URL without a scheme is
+.BR http:// 's.
+It says what it does on standard error.
+.PP
+The card reaches only the public internet: never the server's own machine
+or network (the server's settings may allow more, or less).
+.SH OPTIONS
+.TP
+.B \-q
+Says nothing.
+.TP
+.BI \-O " file"
+Saves to
+.I file
+instead
+.RB ( \- :
+standard output).
+.SH EXIT STATUS
+0 when it saved the file; 2 for bad usage; 3 when the file can't be written;
+4 for a network failure (refused, an unknown host, timed out); 8 when the
+server answered with an error (4xx, 5xx).
+.SH EXAMPLES
+.nf
+wget https://example.com/
+wget \-O notes.txt https://example.com/notes
+.fi
+.SH NOTES
+GNU
+.BR wget 's
+recursion, retries and resuming
+.RB ( \-r ,
+.BR \-t ,
+.BR \-c )
+are not supported.
+.SH SEE ALSO
+.BR curl (1)

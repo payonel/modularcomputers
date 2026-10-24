@@ -14,6 +14,8 @@ public enum CardKind {
 	/** Emits and detects redstone where it's installed (a computer, or an expansion hub). */
 	REDSTONE(DeviceType.REDSTONE),
 	SOUND(DeviceType.SOUND),
+	/** HTTP and HTTPS to the real internet (OpenComputers' internet card). */
+	INTERNET(DeviceType.INTERNET),
 	MOTION_SENSOR(DeviceType.MOTION),
 	AUDIO_SENSOR(DeviceType.HEARING),
 	WEATHER_SENSOR(DeviceType.WEATHER);

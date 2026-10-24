@@ -34,7 +34,7 @@ public class RecipeGameTest {
 		Map.entry('B', "redstone_block"), Map.entry('x', "prismarine_crystals"), Map.entry('S', "sea_lantern"), Map.entry('z', "blaze_rod"),
 		Map.entry('n', "netherite_ingot"), Map.entry('s', "nether_star"), Map.entry('y', "ender_eye"), Map.entry('O', "ender_pearl"),
 		Map.entry('m', "emerald"), Map.entry('l', "lapis_lazuli"), Map.entry('j', "jukebox"), Map.entry('o', "observer"),
-		Map.entry('u', "sculk_sensor"), Map.entry('t', "daylight_detector"), Map.entry('T', "redstone_torch"), Map.entry('v', "lightning_rod"),
+		Map.entry('u', "sculk_sensor"), Map.entry('t', "daylight_detector"), Map.entry('T', "redstone_torch"), Map.entry('V', "cobweb"), Map.entry('Y', "ender_eye"), Map.entry('v', "lightning_rod"),
 		Map.entry('W', "modularcomputers:cable"), Map.entry('F', "iron_block"), Map.entry('h', "modularcomputers:tier1_hard_disk"));
 
 	private record Craft(String result, int count, String lower, String... rows) {
@@ -72,6 +72,7 @@ public class RecipeGameTest {
 		make("robotic_piston", "IPI", "PQP", "ICI"),
 		make("network_card", "WQ ", "ccc", "GGG"),
 		make("tier1_wlan_card", "TQT", "ccc", "GGG"),
+		make("internet_card", "VQY", "ccc", "GGG"),
 		make("tier2_wlan_card", "OQm", "ccc", "GGG"),
 		make("bluetooth_card", "OQm", "clc", "GGG"),
 		make("redstone_card", "XQ ", "ccc", "GGG"),
