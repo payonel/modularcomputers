@@ -17,18 +17,18 @@ import net.minecraft.world.level.storage.ValueOutput;
  * The values are the runtime's ({@code Values}), each kept with its type, so a 2 comes back an
  * integer and 2.0 a float. A handle can't be kept: it comes back nil.
  */
-final class DeviceSave {
+public final class DeviceSave {
 	private DeviceSave() {
 	}
 
-	static void save(ValueOutput output, String name, Device device) {
+	public static void save(ValueOutput output, String name, Device device) {
 		Map<String, Object> saved = device.saved();
 		if (!saved.isEmpty()) {
 			output.store(name, CompoundTag.CODEC, tag(saved));
 		}
 	}
 
-	static void load(ValueInput input, String name, Device device) {
+	public static void load(ValueInput input, String name, Device device) {
 		input.read(name, CompoundTag.CODEC).ifPresent(tag -> {
 			if (value(tag) instanceof Map<?, ?> map) {
 				Map<String, Object> saved = new LinkedHashMap<>();

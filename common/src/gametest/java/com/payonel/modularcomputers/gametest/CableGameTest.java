@@ -62,7 +62,7 @@ public class CableGameTest {
 		return screen(helper, new BlockPos(4, 1, 1), Direction.SOUTH);
 	}
 
-	private static Optional<AllInOneBlockEntity.BusEntry> entryFor(AllInOneBlockEntity computer, ScreenBlockEntity screen) {
+	private static Optional<com.payonel.modularcomputers.board.BoardAssembly.BusEntry> entryFor(AllInOneBlockEntity computer, ScreenBlockEntity screen) {
 		return computer.busEntries().stream().filter(entry -> entry.key().equals("id:" + screen.id())).findFirst();
 	}
 
@@ -162,7 +162,7 @@ public class CableGameTest {
 		ScreenBlockEntity screen = wiredScreen(helper);
 		String key = "id:" + screen.id();
 		helper.startSequence()
-			.thenWaitUntil(() -> helper.assertTrue(entryFor(computer, screen).filter(AllInOneBlockEntity.BusEntry::online).isPresent(), "found"))
+			.thenWaitUntil(() -> helper.assertTrue(entryFor(computer, screen).filter(com.payonel.modularcomputers.board.BoardAssembly.BusEntry::online).isPresent(), "found"))
 			.thenExecute(() -> {
 				helper.assertTrue(!computer.forgetDevice(key), "an online device can't be forgotten");
 				helper.destroyBlock(new BlockPos(3, 1, 1)); // cut the cable
@@ -173,7 +173,7 @@ public class CableGameTest {
 				helper.assertTrue(!onBus(computer, screen), "not on the bus");
 				cable(helper, new BlockPos(3, 1, 1));
 			})
-			.thenWaitUntil(() -> helper.assertTrue(entryFor(computer, screen).filter(AllInOneBlockEntity.BusEntry::online).isPresent(), "back online"))
+			.thenWaitUntil(() -> helper.assertTrue(entryFor(computer, screen).filter(com.payonel.modularcomputers.board.BoardAssembly.BusEntry::online).isPresent(), "back online"))
 			.thenExecute(() -> helper.destroyBlock(new BlockPos(3, 1, 1)))
 			.thenWaitUntil(() -> helper.assertTrue(entryFor(computer, screen).filter(entry -> !entry.online()).isPresent(), "offline again"))
 			.thenExecute(() -> {

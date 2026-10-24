@@ -10,7 +10,7 @@ import com.payonel.modularcomputers.power.PowerUnits;
  * expansion slot is gold-trimmed: it also takes a screen (a terminal), which then shows on the
  * case's front, as an AGP slot took graphics.
  */
-public enum CaseTier {
+public enum CaseTier implements BoardLayout {
 	TIER_1(1, 1, 2, 2, false, 0.0025),
 	TIER_2(2, 2, 3, 3, true, 0.005),
 	TIER_3(3, 4, 4, 4, true, 0.01); // SATA: 2, 3, 4 (user, 2026-10-14)
@@ -32,32 +32,39 @@ public enum CaseTier {
 	}
 
 	/** Battery bays. */
+	@Override
 	public int bays() {
 		return bays;
 	}
 
+	@Override
 	public int ram() {
 		return ram;
 	}
 
+	@Override
 	public int sata() {
 		return sata;
 	}
 
+	@Override
 	public int expansion() {
 		return expansion;
 	}
 
 	/** Its first expansion slot also takes a screen. */
+	@Override
 	public boolean screenSlot() {
 		return screenSlot;
 	}
 
 	/** How much its power buffer holds: a share of a day of a running all-in-one. */
+	@Override
 	public int bufferCapacity() {
 		return (int) Math.round(bufferDays * PowerUnits.DAY);
 	}
 
+	@Override
 	public int number() {
 		return ordinal() + 1;
 	}

@@ -92,11 +92,17 @@ computers really work.
   same scenario in other devices, blocks, programs or states (disconnected, missing, held by
   another board, over capacity, unloaded, off), and makes the change a rule the code enforces for
   all of them, not a one-off for the case reported. Say which cases were found.
-- **Subagents** doing file work in parallel get disjoint scopes and no bulk edits.
+- **A mistake leaves a lesson and a test** (the user's rule): a bug fixed gets a test that fails
+  without the fix (run it against the old code once to see it fail), and what made the mistake easy
+  goes in this file, as a rule or a pitfall, so the next change doesn't make it again.
+- **Subagents** doing file work in parallel get disjoint scopes and no bulk edits, and each its own
+  test class (they share one Gradle build folder: a run's results may be another's; run your own
+  tests again once they're done). A subagent's prompt is written before it's launched.
 
 ## Layout
 
-- `common/src/main/java/com/payonel/modularcomputers/`: `block` (block entities, cables:
+- `common/src/main/java/com/payonel/modularcomputers/`: `board` (`BoardAssembly`, the populated
+  board: parts, devices, power, saving, whatever holds it; `BoardHost`), `block` (block entities, cables:
   `Cabling`, `CardWorld`), `bus` (`Bus`, `BusOrder`, `BusHolds`, `BusPower`, `Device`,
   `InterruptLine`), `device` (cards, disks, terminals), `machine` (`Machine`, `Motherboard`,
   `MotherboardApi`, CPUs, EEPROM), `runtime` (`LuaRunner`, `Board`, `DeviceNames`, device methods),
@@ -162,6 +168,11 @@ blank, and its files leave the world save when the player takes it.
 
 ### The machine is a real PC, abstracted
 
+- **A board assembly is the computer, whatever holds it** (`BoardAssembly`, a PCBA: the plain-Java
+  `Motherboard` with its parts in, their devices, its power buffer and batteries, its saved program):
+  a case's block entity holds one, and so will a golem; a `BoardHost` says only where it is, which
+  way it faces, and how its holder is saved and shown. Which slots it has is its `BoardLayout`
+  (`CaseTier`'s). One board, so a fix to it is a fix for every holder.
 - A CPU only runs what the EEPROM holds (a fixed slot, like a reset vector) and aborts (ABRT, a
   panic) when it can't. The motherboard owns the bus (cases change; the board's firmware doesn't).
 - **Devices have several names**, as on a real system: a slot path (`sata:0`, `exp:1`), an id
@@ -504,6 +515,22 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
 - **A decision** goes in this file when it's made; **an idea not built yet** in `.agents/PLAN.md`.
 
 ## Pitfalls
+
+Lessons from mistakes, each with its test:
+- **A poll takes nothing:** a device file's `events` must not use up what a read or a method would
+  give; what it had to take is the file's to give next (`held`). (`pollingADeviceFileLoses...`)
+- **An ioctl passes exactly the arguments given:** `table.pack(arg, ...)` adds a nil, and the
+  firmware serves a stream method from what's come only when called with none.
+  (`aStreamMethodCalledByIoctl...`)
+- **News is pending until the program looks:** interrupts are level-triggered, so news a device
+  raises once and doesn't hold pending is lost if nothing was waiting at that moment (an internet
+  card's log entry after its request's end). A read that blocks has looked at nothing.
+  (`theLogProgramKeepsEvery...`, `aProgramBlockedReading...`)
+- **"None" isn't "done":** a method that answers nothing gives `true` through an ioctl, so one whose
+  answer means none says nil (`Result.ok((Object) null)`). (`aMethodWhoseAnswerIsNone...`)
+- **Never drain and refill a bounded queue another thread fills:** keep what's left of an item
+  beside the queue. (`readsSmallerThanAPiece...`)
+- **Edit by matching text, never by line numbers:** an earlier edit moves the lines.
 
 - An hfs file shows its writes only at close: watch a file a program keeps open on `/tmp` (tmpfs).
 - Typing more than 256 keys at once in a test drops the rest (a terminal's key queue): split lines.

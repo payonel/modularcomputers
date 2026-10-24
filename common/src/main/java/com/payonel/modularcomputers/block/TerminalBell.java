@@ -10,14 +10,14 @@ import net.minecraft.world.level.Level;
  * closer together than {@link #SUPPRESS_TICKS} ring once (xterm's bellSuppressTime: a program
  * writing "\a\a\a" gets one beep, not a buzz).
  */
-final class TerminalBell {
+public final class TerminalBell {
 	/** How soon after a bell another rings: xterm's 200 ms. */
 	static final int SUPPRESS_TICKS = 4;
 	private static final float VOLUME = 0.5f;
 	private long rang = -SUPPRESS_TICKS; // (game time starts at 0: the first bell rings)
 
 	/** A BEL, at the terminal's block. */
-	void ring(Level level, BlockPos pos) {
+	public void ring(Level level, BlockPos pos) {
 		if (level == null || level.isClientSide()) {
 			return;
 		}

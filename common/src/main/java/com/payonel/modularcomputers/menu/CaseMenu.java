@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.menu;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.block.AllInOneBlock;
 import com.payonel.modularcomputers.item.ScreenItem;
+import com.payonel.modularcomputers.machine.BoardLayout;
 import com.payonel.modularcomputers.machine.CaseTier;
 import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.item.CpuItem;
@@ -57,9 +58,10 @@ public final class CaseMenu extends AbstractContainerMenu {
 	private final Container parts;
 	private final ContainerData power;
 	private final BlockPos pos;
-	private final ContainerLevelAccess access;
+	/** Whether the player can still use it (in reach, still there). */
+	private final java.util.function.Predicate<Player> valid;
 
-	private final CaseTier tier;
+	private final BoardLayout tier;
 
 	/** Client side: the slots and the case's power are filled in by the server's sync; the tier is the block's. */
 	public CaseMenu(int id, Inventory inventory, BlockPos pos) {
@@ -73,13 +75,21 @@ public final class CaseMenu extends AbstractContainerMenu {
 	 * ({@link #POWER_DATA}).
 	 */
 	public CaseMenu(int id, Inventory inventory, Container parts, ContainerData power, BlockPos pos, ContainerLevelAccess access, CaseTier tier) {
-		super(ModMenus.CASE, id);
+		// Any case (the all-in-one or a tier), still there and in reach.
+		this(ModMenus.CASE, id, inventory, parts, power, pos, player -> access.evaluate((level, at) -> level.getBlockState(at).getBlock() instanceof AllInOneBlock
+			&& player.isWithinBlockInteractionRange(at, 4.0), true), tier);
+	}
+
+	/** A computer's parts view of any kind ({@code type}: whose art it's drawn in), on a board with {@code layout}'s slots. */
+	public CaseMenu(net.minecraft.world.inventory.MenuType<CaseMenu> type, int id, Inventory inventory, Container parts, ContainerData power, BlockPos pos,
+		java.util.function.Predicate<Player> valid, BoardLayout tier) {
+		super(type, id);
 		this.tier = tier;
 		checkContainerSize(parts, PART_SLOTS);
 		this.parts = parts;
 		this.power = power;
 		this.pos = pos;
-		this.access = access;
+		this.valid = valid;
 		addDataSlots(power);
 		for (int slot = 0; slot < PART_SLOTS; slot++) {
 			addSlot(new PartSlot(parts, slot, SLOT_POSITIONS[slot][0], SLOT_POSITIONS[slot][1], tier));
@@ -87,7 +97,7 @@ public final class CaseMenu extends AbstractContainerMenu {
 		addStandardInventorySlots(inventory, 8, INVENTORY_Y);
 	}
 
-	public CaseTier tier() {
+	public BoardLayout tier() {
 		return tier;
 	}
 
@@ -95,7 +105,7 @@ public final class CaseMenu extends AbstractContainerMenu {
 	 * Whether a case of {@code tier} has this slot: the CPU and ROM always, and the first of each
 	 * kind up to the tier's count. The rest are greyed out.
 	 */
-	public static boolean available(CaseTier tier, int slot) {
+	public static boolean available(BoardLayout tier, int slot) {
 		if (slot == CPU_SLOT || slot == EEPROM_SLOT) {
 			return true;
 		} else if (isBatteryBay(slot)) {
@@ -109,12 +119,12 @@ public final class CaseMenu extends AbstractContainerMenu {
 	}
 
 	/** The gold-trimmed expansion slot, which also takes a screen: the first one, on tiers that have it. */
-	public static boolean isScreenSlot(CaseTier tier, int slot) {
+	public static boolean isScreenSlot(BoardLayout tier, int slot) {
 		return tier.screenSlot() && slot == EXP_SLOTS;
 	}
 
 	/** Whether a case of {@code tier} takes this item in this slot. */
-	public static boolean accepts(CaseTier tier, int slot, ItemStack stack) {
+	public static boolean accepts(BoardLayout tier, int slot, ItemStack stack) {
 		if (!available(tier, slot)) {
 			return false;
 		}
@@ -182,16 +192,14 @@ public final class CaseMenu extends AbstractContainerMenu {
 
 	@Override
 	public boolean stillValid(Player player) {
-		// Any case (the all-in-one or a tier), still there and in reach.
-		return access.evaluate((level, at) -> level.getBlockState(at).getBlock() instanceof AllInOneBlock
-			&& player.isWithinBlockInteractionRange(at, 4.0), true);
+		return valid.test(player);
 	}
 
 	/** A slot for one kind of part, holding one item. */
 	private static final class PartSlot extends Slot {
-		private final CaseTier tier;
+		private final BoardLayout tier;
 
-		PartSlot(Container container, int index, int x, int y, CaseTier tier) {
+		PartSlot(Container container, int index, int x, int y, BoardLayout tier) {
 			super(container, index, x, y);
 			this.tier = tier;
 		}

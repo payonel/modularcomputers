@@ -12,23 +12,23 @@ import net.minecraft.world.level.storage.ValueOutput;
  * and everything its decoder needs to carry on exactly where it was (the cursor, colors, modes,
  * a half-received escape sequence, the main screen behind the alternate one).
  */
-final class ScreenSave {
+public final class ScreenSave {
 	private ScreenSave() {
 	}
 
-	static void save(ValueOutput output, String name, TextBuffer buffer, VtDecoder decoder) {
+	public static void save(ValueOutput output, String name, TextBuffer buffer, VtDecoder decoder) {
 		save(output, name, new VtDecoder.Screen(buffer.rows(), buffer.foregrounds(), buffer.backgrounds()), decoder);
 	}
 
 	/** A terminal: its screen as it is, even while its glass is scrolled back (the scrollback isn't saved). */
-	static void save(ValueOutput output, String name, com.payonel.modularcomputers.device.Terminal terminal) {
+	public static void save(ValueOutput output, String name, com.payonel.modularcomputers.device.Terminal terminal) {
 		save(output, name, terminal.screen(), terminal.decoder());
 		output.putIntArray(name + "_tiles", terminal.tiles()); // (its pictures)
 		output.putBoolean(name + "_cursor_shown", terminal.cursor().shown()); // (for players' copies: whether it shows)
 	}
 
 	/** A terminal: {@link #load(ValueInput, String, TextBuffer, VtDecoder)}, and its cursor as players see it. */
-	static void load(ValueInput input, String name, com.payonel.modularcomputers.device.Terminal terminal) {
+	public static void load(ValueInput input, String name, com.payonel.modularcomputers.device.Terminal terminal) {
 		load(input, name, terminal.buffer(), terminal.decoder());
 		input.getIntArray(name + "_tiles").ifPresent(tiles -> com.payonel.modularcomputers.display.Tiles.screen(tiles, terminal.buffer()));
 		VtDecoder decoder = terminal.decoder();
@@ -53,7 +53,7 @@ final class ScreenSave {
 		}
 	}
 
-	static void load(ValueInput input, String name, TextBuffer buffer, VtDecoder decoder) {
+	public static void load(ValueInput input, String name, TextBuffer buffer, VtDecoder decoder) {
 		input.getIntArray(name + "_size").filter(size -> size.length == 2 && size[0] > 0 && size[1] > 0)
 			.ifPresent(size -> decoder.resize(new com.payonel.modularcomputers.display.Resolution(size[0], size[1]))); // first: the cells are this size
 		input.read(name, Codec.STRING.listOf()).ifPresent(buffer::setRows);

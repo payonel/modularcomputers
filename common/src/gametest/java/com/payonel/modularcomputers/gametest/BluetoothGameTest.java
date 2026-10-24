@@ -51,7 +51,7 @@ public class BluetoothGameTest {
 	}
 
 	private static List<String> locations(AllInOneBlockEntity computer) {
-		return computer.busEntries().stream().filter(AllInOneBlockEntity.BusEntry::cabled).map(entry -> entry.location().getString()).toList();
+		return computer.busEntries().stream().filter(com.payonel.modularcomputers.board.BoardAssembly.BusEntry::cabled).map(entry -> entry.location().getString()).toList();
 	}
 
 	@GameTest
@@ -212,7 +212,7 @@ public class BluetoothGameTest {
 		hub1.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(hub2.boardId()));
 		helper.succeedWhen(() -> {
 			helper.assertTrue(onBus(computer, screen), "the screen past hub 2");
-			helper.assertValueEqual(computer.busEntries().stream().filter(AllInOneBlockEntity.BusEntry::cabled)
+			helper.assertValueEqual(computer.busEntries().stream().filter(com.payonel.modularcomputers.board.BoardAssembly.BusEntry::cabled)
 				.map(entry -> entry.name().getString()).toList(), List.of("Sound Card", "Tier 2 WLAN Card", "Tier 3 Screen"), "hub 1's card, hub 2's, the screen");
 		});
 	}

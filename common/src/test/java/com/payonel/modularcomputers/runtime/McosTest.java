@@ -774,6 +774,26 @@ class McosTest extends McosHarness {
 	}
 
 	@Test
+	void aMethodWhoseAnswerIsNoneSaysNilAndAHandleStaysInTheKernel() {
+		dataDisk();
+		boot();
+		file("n.lua", """
+			local sys = require("sys")
+			local disk = assert(sys.open("/dev/storage1"))
+			local missing = sys.ioctl(disk, "stat", "/nothing")
+			local made = sys.ioctl(disk, "mkdir", "/made")
+			local handle, why, errno = sys.ioctl(disk, "open", "/f", "w")
+			local out = io.open("/got", "w")
+			out:write(tostring(missing), " ", tostring(made), " ", tostring(handle), " ", tostring(errno), "\\n")
+			out:close()
+			""");
+		type("lua /n.lua 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("err"))).isEmpty();
+		assertThat(read(root().resolve("got"))).as("none: nil; done: true; a handle: refused").isEqualTo("nil true nil EINVAL\n");
+	}
+
+	@Test
 	void inotifyTellsOfChangesOnADiskAndInTmp() {
 		boot();
 		file("n.lua", """

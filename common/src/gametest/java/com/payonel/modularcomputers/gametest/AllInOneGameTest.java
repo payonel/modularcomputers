@@ -297,7 +297,7 @@ public class AllInOneGameTest {
 
 	/** The bus order's keys. */
 	static List<String> busKeys(AllInOneBlockEntity computer) {
-		return computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::key).toList();
+		return computer.busEntries().stream().map(com.payonel.modularcomputers.board.BoardAssembly.BusEntry::key).toList();
 	}
 
 	@GameTest
@@ -312,7 +312,7 @@ public class AllInOneGameTest {
 		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.STORAGE, DeviceType.NETWORK), "bus");
 
 		helper.assertTrue(!computer.moveDevice("exp:0", true) && !computer.moveDevice("sata:1", false), "the case's devices don't move");
-		helper.assertValueEqual(computer.busEntries().stream().map(AllInOneBlockEntity.BusEntry::position).toList(), List.of(3, 6),
+		helper.assertValueEqual(computer.busEntries().stream().map(com.payonel.modularcomputers.board.BoardAssembly.BusEntry::position).toList(), List.of(3, 6),
 			"numbered by fixed place, with gaps for empty slots");
 
 		java.util.UUID serial = computer.parts().getItem(CaseMenu.EXP_SLOTS).get(com.payonel.modularcomputers.item.ModComponents.SERIAL);

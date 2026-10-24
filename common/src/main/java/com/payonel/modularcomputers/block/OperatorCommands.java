@@ -17,13 +17,13 @@ import net.minecraft.world.phys.Vec3;
  * Card"; what the command says is kept for the program (not sent to anyone), and each command is
  * logged, so a server's admins see what ran.
  */
-final class OperatorCommands {
+public final class OperatorCommands {
 	private static final Component NAME = Component.literal("Operator Card");
 
 	private OperatorCommands() {
 	}
 
-	static OperatorCard.Outcome run(ServerLevel level, BlockPos pos, String command) {
+	public static OperatorCard.Outcome run(ServerLevel level, BlockPos pos, String command) {
 		StringBuilder output = new StringBuilder();
 		CommandSource listener = new CommandSource() {
 			@Override

@@ -227,12 +227,12 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		if (!showBus) {
 			return Optional.empty();
 		}
-		List<AllInOneBlockEntity.BusEntry> entries = busEntries();
+		List<com.payonel.modularcomputers.board.BoardAssembly.BusEntry> entries = busEntries();
 		int firstExternal = firstExternal(entries);
 		ScrollWindow window = busWindow(entries.size());
 		for (int row = 0; row < window.rowsShown(busScroll); row++) {
 			int index = busScroll + row;
-			AllInOneBlockEntity.BusEntry entry = entries.get(index);
+			com.payonel.modularcomputers.board.BoardAssembly.BusEntry entry = entries.get(index);
 			if (!entry.cabled()) {
 				continue; // the case's rows have no buttons
 			}
@@ -330,7 +330,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			? Optional.of(computer) : Optional.empty();
 	}
 
-	private List<AllInOneBlockEntity.BusEntry> busEntries() {
+	private List<com.payonel.modularcomputers.board.BoardAssembly.BusEntry> busEntries() {
 		return minecraft.level != null && minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer
 			? computer.busEntries() : List.of();
 	}
@@ -538,7 +538,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	 * Built-in devices have a row but no slot; RAM, the CPU and such have a slot but no row.
 	 */
 	private void extractLinkedHighlight(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
-		List<AllInOneBlockEntity.BusEntry> entries = busEntries();
+		List<com.payonel.modularcomputers.board.BoardAssembly.BusEntry> entries = busEntries();
 		int row = busRowAt(mouseX, mouseY, entries.size());
 		int index = row >= 0 ? busScroll + row : -1;
 		if (index < 0 && hoveredSlot != null && hoveredSlot.index < CaseMenu.PART_SLOTS) {
@@ -583,7 +583,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		graphics.text(font, summary, 0, 0, status.overflow() ? METER_MEDIUM : SILK_DIM, false);
 		pose.popMatrix();
 		extractLed(graphics, busOverflowLed(), status.overflow());
-		List<AllInOneBlockEntity.BusEntry> entries = busEntries();
+		List<com.payonel.modularcomputers.board.BoardAssembly.BusEntry> entries = busEntries();
 		int firstExternal = firstExternal(entries);
 		ScrollWindow window = busWindow(entries.size());
 		busScroll = window.clamp(busScroll);
@@ -596,7 +596,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			String number = String.valueOf(entries.get(index).position());
 			graphics.text(font, number, panel.x() + 11 - font.width(number) / 2, ry + 5, SILK, false);
 			graphics.blit(RenderPipelines.GUI_TEXTURED, BUS_ROW, panel.x() + BUS_ROW_X, ry, 0, 0, BUS_ROW_W, 18, BUS_ROW_W, 18);
-			AllInOneBlockEntity.BusEntry entry = entries.get(index);
+			com.payonel.modularcomputers.board.BoardAssembly.BusEntry entry = entries.get(index);
 			if (entry.item().isEmpty()) {
 				extractIcon(graphics, entry.builtInIcon(), panel.x() + BUS_ROW_X + 1, ry + 1);
 			} else {
@@ -688,7 +688,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	}
 
 	/** The index of the first external (movable) device, or the size when there's none. */
-	private static int firstExternal(List<AllInOneBlockEntity.BusEntry> entries) {
+	private static int firstExternal(List<com.payonel.modularcomputers.board.BoardAssembly.BusEntry> entries) {
 		for (int i = 0; i < entries.size(); i++) {
 			if (entries.get(i).cabled()) {
 				return i;
@@ -725,12 +725,12 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			return true;
 		}
 		if (showBus && leftOrRight) {
-			List<AllInOneBlockEntity.BusEntry> entries = busEntries();
+			List<com.payonel.modularcomputers.board.BoardAssembly.BusEntry> entries = busEntries();
 			int devices = entries.size();
 			ScrollWindow window = busWindow(devices);
 			for (int row = 0; row < window.rowsShown(busScroll); row++) {
 				int index = busScroll + row;
-				AllInOneBlockEntity.BusEntry entry = entries.get(index);
+				com.payonel.modularcomputers.board.BoardAssembly.BusEntry entry = entries.get(index);
 				if (entry.cabled() && busBulb(row).contains(event.x(), event.y())) {
 					Identify.toggle(entry.device().get());
 					return true;

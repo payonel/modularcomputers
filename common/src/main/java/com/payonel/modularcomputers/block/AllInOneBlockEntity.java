@@ -1,45 +1,20 @@
 package com.payonel.modularcomputers.block;
 
-import net.minecraft.world.item.component.ItemContainerContents;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.component.DataComponentGetter;
-import net.minecraft.core.component.DataComponentMap;
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
-import com.payonel.modularcomputers.bus.Bus;
+import com.payonel.modularcomputers.board.BoardAssembly;
+import com.payonel.modularcomputers.board.BoardHost;
 import com.payonel.modularcomputers.bus.BusOrder;
 import com.payonel.modularcomputers.bus.BusStatus;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.cable.CableWalk;
-import com.payonel.modularcomputers.console.ConsoleSplitter;
-import com.payonel.modularcomputers.device.Card;
-import com.payonel.modularcomputers.device.CardKind;
-import com.payonel.modularcomputers.device.Disk;
 import com.payonel.modularcomputers.device.Terminal;
-import com.payonel.modularcomputers.item.BatteryItem;
-import com.payonel.modularcomputers.item.CpuItem;
-import com.payonel.modularcomputers.item.DiskItem;
-import com.payonel.modularcomputers.device.DiskTier;
-import com.payonel.modularcomputers.item.ModComponents;
-import com.payonel.modularcomputers.item.ModItems;
-import com.payonel.modularcomputers.machine.Cpu;
-import com.payonel.modularcomputers.item.MemoryItem;
-import com.payonel.modularcomputers.power.BatteryTier;
-import com.payonel.modularcomputers.runtime.Board;
-import com.payonel.modularcomputers.machine.Chassis;
-import com.payonel.modularcomputers.machine.CaseTier;
-import com.payonel.modularcomputers.item.ScreenItem;
 import com.payonel.modularcomputers.device.TerminalTier;
-import com.payonel.modularcomputers.machine.CpuTier;
-import com.payonel.modularcomputers.machine.Eeprom;
-import com.payonel.modularcomputers.machine.Hardware;
+import com.payonel.modularcomputers.item.ModComponents;
+import com.payonel.modularcomputers.machine.CaseTier;
 import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.machine.Motherboard;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
-import com.payonel.modularcomputers.power.BatteryCharge;
 import com.payonel.modularcomputers.power.PowerBuffer;
-import com.payonel.modularcomputers.sound.ModSounds;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -48,32 +23,27 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.Container;
-import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.Containers;
 import net.minecraft.world.MenuProvider;
-import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.ContainerLevelAccess;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -82,215 +52,125 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
 /**
- * The all-in-one computer: its built-in terminal (screen and keyboard), and a motherboard whose part
- * slots (CPU, EEPROM, UPS battery, RAM, SATA drives, expansion cards) are filled from the case
- * view. Drives and cards join the physical bus after the built-ins, then the screens wired to
- * it by cable, in an order the player can change (the bus order panel), where cabled devices
- * can also be disconnected. Power, the parts, the bus order, display contents and the console
- * state are saved and synced to clients.
+ * A case (the all-in-one and the tiered ones): a block holding a {@link BoardAssembly}, its board
+ * and parts, filled from the case view. What only a block does is here: the devices it finds along
+ * its cables (screens, hubs' cards, robotic pistons, Disk Stations, photomasks) put on its bus, its
+ * power button's light (the block state), what Bluetooth cards link to, and dropping as one item
+ * that keeps its parts.
  */
 public final class AllInOneBlockEntity extends BlockEntity implements MenuProvider, DisplayHost, Bluetooth.Holder {
-	private static final String POWERED = "powered";
-	private static final String DISPLAY = "display";
-	private static final String CONSOLE = "console";
-	/** The saved external bus order. */
-	private static final String BUS_EXTERNAL = "bus_external";
-	private static final String KNOWN = "known";
-	private static final Codec<BusOrder.Entry> ENTRY_CODEC = RecordCodecBuilder.create(instance -> instance.group(
-		Codec.STRING.fieldOf("key").forGetter(BusOrder.Entry::key),
-		Codec.LONG.fieldOf("last_seen").forGetter(BusOrder.Entry::lastSeen)
-	).apply(instance, BusOrder.Entry::new));
-	private static final String BUS_DISCONNECTED = "bus_disconnected";
-	private static final String CABLED = "cabled";
-	private static final String POWER_BUFFER = "power_buffer";
-	/** A test's bus capacity in place of the CPU's, saved so clients see it too. */
-	private static final String BUS_CAPACITY_OVERRIDE = "bus_capacity_override";
-	private static final String BOARD_ID = "board_id";
 	/** Looks for cabled devices this often, in ticks, even when no cable changed (chunks load and unload). */
 	private static final int RESCAN_TICKS = 20;
-	/** How often the battery is run down or recharged. */
-	private static final int BATTERY_TICKS = 20;
-	private static final float ERROR_BEEP_VOLUME = 0.6f;
-	/** The slots whose parts are bus devices: each gets a serial number, its id. */
-	private static final int[] BUS_PART_SLOTS = {CaseMenu.EEPROM_SLOT,
-		CaseMenu.SATA_SLOTS, CaseMenu.SATA_SLOTS + 1, CaseMenu.SATA_SLOTS + 2, CaseMenu.SATA_SLOTS + 3,
-		CaseMenu.EXP_SLOTS, CaseMenu.EXP_SLOTS + 1, CaseMenu.EXP_SLOTS + 2, CaseMenu.EXP_SLOTS + 3};
+	private static final String BUS_EXTERNAL = "bus_external";
+	private static final String BUS_DISCONNECTED = "bus_disconnected";
 
-	/**
-	 * Its terminal: the all-in-one's built-in one, or the screen in a case's gold expansion slot
-	 * (a new one when a screen of another tier goes in). In a case without one it's off the bus.
-	 */
-	private Terminal display = new Terminal(TerminalTier.TIER_3);
-	/** Its terminal's bell, at the case. */
-	private final TerminalBell bell = new TerminalBell();
-	/** Devices made from the parts in the slots (by lane for drives and cards); null when empty. */
-	private final Disk[] disks = new Disk[CaseMenu.LANES];
-	/** The serials the disks were made for: another disk is another device, with its own data. */
-	private final UUID[] diskSerials = new UUID[CaseMenu.LANES];
-	private final Card[] cards = new Card[CaseMenu.LANES];
-	private Eeprom eeprom;
-	/** The serial of the EEPROM {@link #eeprom} was made for: another EEPROM is another device. */
-	private UUID eepromSerial;
-	/** The EEPROM's storage: the item in the EEPROM slot, read and written in place (not a part change). */
-	private final Eeprom.Storage eepromSlot = new Eeprom.Storage() {
-		@Override
-		public String read() {
-			return parts.getItem(CaseMenu.EEPROM_SLOT).getOrDefault(ModComponents.EEPROM_IMAGE, "");
-		}
-
-		@Override
-		public void write(String image) {
-			parts.getItem(CaseMenu.EEPROM_SLOT).set(ModComponents.EEPROM_IMAGE, image);
-			setChanged();
-		}
-
-		@Override
-		public String label() {
-			return ModComponents.label(parts.getItem(CaseMenu.EEPROM_SLOT));
-		}
-
-		@Override
-		public boolean relabel(String label) {
-			return ModComponents.labelOn(() -> parts.getItem(CaseMenu.EEPROM_SLOT), AllInOneBlockEntity.this::setChanged).set(label);
-		}
-	};
-	private final Bus bus = new Bus(); // empty until a CPU is in
-	private final PowerBuffer power;
 	private final CaseTier tier;
-	/** The motherboard's id: what Bluetooth cards link to. Made when the computer is placed, and saved. */
-	private UUID boardId = UUID.randomUUID();
-	/**
-	 * The buffer's level and the computer's load (what it draws now) for the case view, which sends
-	 * them to the player as they change. Menu data goes as shorts, so each is two: the low 16 bits,
-	 * then the high ({@link CaseMenu#powerLevel}, {@link CaseMenu#load}).
-	 */
-	private final ContainerData powerData = new ContainerData() {
-		@Override
-		public int get(int index) {
-			int value = index < 2 ? power.level() : (int) Math.min(Integer.MAX_VALUE, machine.currentDraw());
-			return index % 2 == 0 ? value & 0xFFFF : value >>> 16;
-		}
-
-		@Override
-		public void set(int index, int value) {
-			if (index < 2) { // the load is only ever read from the machine
-				int old = power.level();
-				power.set(index % 2 == 0 ? old & ~0xFFFF | value & 0xFFFF : (value & 0xFFFF) << 16 | old & 0xFFFF);
-			}
-		}
-
-		@Override
-		public int getCount() {
-			return CaseMenu.POWER_DATA;
-		}
-	};
-	/** The case power clients last saw, in percent: the meter and its time left. */
-	private int syncedPowerPercent;
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), bus), this::hasPower);
-	private final Parts parts = new Parts();
-	/** The cabled devices found last time, nearest first. Saved and synced, for the bus order panel. */
-	private List<Cabled> cabled = List.of();
-	/**
-	 * What was last seen of each external device in the saved bus order, online or not: an
-	 * offline one's row still shows its name, icon and where it was.
-	 */
-	private final Map<String, Cabled> known = new LinkedHashMap<>();
-	/** Server side: the cabled devices, by key. */
-	private final Map<String, Device> cabledDevices = new LinkedHashMap<>();
+	private final BoardAssembly board;
 	private long seenCableChanges = -1;
 	/** The holds version last seen ({@link com.payonel.modularcomputers.bus.BusHolds}). */
 	private long seenHolds;
 	private int ticks;
-	/** A running program's saved state, from a load, to go on with once the bus is found again. */
-	private byte[] savedProgram;
 	/** Writing the client's copy (a sync), not a save: no program state in it. */
 	private boolean syncing;
-	private static final String PROGRAM = "program";
-	/** The machine's clock ({@link Machine#uptime}), saved so it goes on after a load. */
-	private static final String UPTIME = "uptime";
-	/** A card's saved state, by lane ({@link DeviceSave}). */
-	private static final String CARD = "card_";
-	/** A disk's reports of changes, by lane ({@link DeviceSave}). */
-	private static final String DISK = "disk_";
-
-	/**
-	 * A device wired to this computer: where it is, how far the connection runs to it in meters
-	 * (blocks), whether the way crosses a Bluetooth link, whether it's paired with this computer,
-	 * the item it is (for its name and icon), its slot when it's a card in an expansion hub
-	 * (else -1), and the device it's behind (its host's key, a Disk Station's for its disks; else
-	 * empty): on the bus only while its host is ({@link BusOrder}).
-	 */
-	public record Cabled(String key, BlockPos pos, int meters, boolean wireless, boolean paired, Item item, int hubSlot, String host) {
-		/** A device behind nothing. */
-		public Cabled(String key, BlockPos pos, int meters, boolean wireless, boolean paired, Item item, int hubSlot) {
-			this(key, pos, meters, wireless, paired, item, hubSlot, "");
-		}
-
-		static final Codec<Cabled> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-			Codec.STRING.fieldOf("key").forGetter(Cabled::key),
-			BlockPos.CODEC.fieldOf("pos").forGetter(Cabled::pos),
-			Codec.INT.fieldOf("meters").forGetter(Cabled::meters),
-			Codec.BOOL.fieldOf("wireless").forGetter(Cabled::wireless),
-			Codec.BOOL.fieldOf("paired").forGetter(Cabled::paired),
-			BuiltInRegistries.ITEM.byNameCodec().fieldOf("item").forGetter(Cabled::item),
-			Codec.INT.fieldOf("hub_slot").forGetter(Cabled::hubSlot),
-			Codec.STRING.optionalFieldOf("host", "").forGetter(Cabled::host)
-		).apply(instance, Cabled::new));
-	}
 
 	public AllInOneBlockEntity(BlockPos pos, BlockState state) {
 		super(ModBlocks.ALL_IN_ONE_ENTITY, pos, state);
 		AllInOneBlock block = state.getBlock() instanceof AllInOneBlock found ? found : (AllInOneBlock) ModBlocks.ALL_IN_ONE;
 		this.tier = block.tier();
-		this.power = new PowerBuffer(tier.bufferCapacity());
-		display.setFlusher(this::syncDisplay);
-		display.onChange(this::markChanged);
-		display.onBell(() -> bell.ring(level, worldPosition));
-		machine.board().setChassis(new CaseChassis());
-		// How a log names it: which board, where.
-		machine.describedBy(() -> "board " + boardId + " at " + worldPosition.toShortString()
-			+ (level != null ? " in " + level.dimension().identifier() : "") + ", chunk " + net.minecraft.core.SectionPos.blockToSectionCoord(worldPosition.getX())
-			+ "," + net.minecraft.core.SectionPos.blockToSectionCoord(worldPosition.getZ()));
-		machine.wakeWith(this::pressPower); // a network card's wake presses its power button: it clicks and lights
+		this.board = new BoardAssembly(new CaseHost(), tier, TerminalTier.TIER_3);
 	}
 
-	/** What the board's firmware reads from this case (ACPI and SMBIOS): its tier, power and RAM. */
-	private final class CaseChassis implements Chassis {
+	/** What the board needs from the case: where it is, its front, its block state and its chunk. */
+	private final class CaseHost implements BoardHost {
 		@Override
-		public int tier() {
-			return tier.number();
+		public Level level() {
+			return level;
 		}
 
 		@Override
-		public Board.PowerInfo power() {
-			List<Board.BatteryInfo> batteries = new ArrayList<>();
-			for (int bay = 0; bay < CaseMenu.UPS_BAYS; bay++) {
-				ItemStack stack = parts.getItem(CaseMenu.UPS_SLOT + bay);
-				if (stack.getItem() instanceof BatteryItem battery) {
-					BatteryTier batteryTier = battery.tier();
-					Board.Store charge = batteryTier.infinite()
-						? new Board.Store(0, 0, true)
-						: new Board.Store(BatteryItem.charge(stack).units(), batteryTier.capacity(), false);
-					batteries.add(new Board.BatteryInfo(bay, batteryTier.ordinal() + 1, charge));
-				}
+		public BlockPos pos() {
+			return worldPosition;
+		}
+
+		@Override
+		public Direction front() {
+			return getBlockState().getValue(AllInOneBlock.FACING);
+		}
+
+		/**
+		 * Marks its chunk changed, so the next save or unload writes it (Minecraft writes only chunks
+		 * marked changed), at once when a device's data changes. Without {@link #setChanged}'s comparator
+		 * update, which nothing here needs, so it's cheap to do often. Never waits for the chunk: its
+		 * devices change as they go back on the bus while the chunk is still loading ({@link ChunkMarks}).
+		 */
+		@Override
+		public void markChanged() {
+			ChunkMarks.changed(level, worldPosition);
+		}
+
+		@Override
+		public void setChanged() {
+			AllInOneBlockEntity.this.setChanged();
+		}
+
+		@Override
+		public void syncToClients() {
+			level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+		}
+
+		/**
+		 * The power button shows whether the machine could run and whether it is on, and the front a
+		 * screen in the gold slot; the block state carries them to clients.
+		 */
+		@Override
+		public boolean showPowerState(boolean ready, boolean powered, boolean halted, boolean screen) {
+			if (level == null || level.isClientSide()) {
+				return false;
 			}
-			return new Board.PowerInfo(new Board.Store(power.level(), power.capacity(), false), batteries, machine.currentDraw());
-		}
-
-		@Override
-		public long time() {
-			return level == null ? 0 : level.getGameTime();
-		}
-
-		@Override
-		public List<Board.MemoryInfo> memory() {
-			List<Board.MemoryInfo> memory = new ArrayList<>();
-			for (int slot = 0; slot < CaseMenu.SATA_SLOTS - CaseMenu.RAM_SLOTS; slot++) {
-				if (parts.getItem(CaseMenu.RAM_SLOTS + slot).getItem() instanceof MemoryItem stick) {
-					memory.add(new Board.MemoryInfo(slot, stick.tier().number(), stick.tier().bytes()));
-				}
+			BlockState state = getBlockState()
+				.setValue(AllInOneBlock.READY, ready)
+				.setValue(AllInOneBlock.POWERED, powered)
+				.setValue(AllInOneBlock.HALTED, halted)
+				.setValue(AllInOneBlock.SCREEN, screen);
+			if (state == getBlockState()) {
+				return false;
 			}
-			return memory;
+			level.setBlock(worldPosition, state, Block.UPDATE_CLIENTS); // sends this block entity too
+			return true;
+		}
+
+		/**
+		 * Sends the screen's changed rows to the players who have it loaded: each tick, and right
+		 * after a program's turn. Only what changed goes, not the whole block.
+		 */
+		@Override
+		public void syncDisplay(Terminal display) {
+			if (level instanceof ServerLevel server) {
+				ScreenRows.send(server, AllInOneBlockEntity.this, display);
+			}
+		}
+
+		@Override
+		public void redstoneChanged() {
+			level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
+		}
+
+		@Override
+		public void bluetoothChanged() {
+			updateBluetooth();
+			Cabling.changed(); // (what's linked, so what's reached, changed)
+		}
+
+		@Override
+		public boolean stillValid(Player player) {
+			return Container.stillValidBlockEntity(AllInOneBlockEntity.this, player);
+		}
+
+		@Override
+		public String describe() {
+			return "board " + board.boardId() + " at " + worldPosition.toShortString()
+				+ (level != null ? " in " + level.dimension().identifier() : "") + ", chunk " + net.minecraft.core.SectionPos.blockToSectionCoord(worldPosition.getX())
+				+ "," + net.minecraft.core.SectionPos.blockToSectionCoord(worldPosition.getZ());
 		}
 	}
 
@@ -298,207 +178,122 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		return tier;
 	}
 
-	@Override
-	public boolean showsScreen() {
-		return screenInSlot();
+	/** Its board, with its parts. */
+	public BoardAssembly board() {
+		return board;
 	}
 
-	/** A screen is in the gold expansion slot (tiers 2 and 3). */
-	private boolean screenInSlot() {
-		return CaseMenu.isScreenSlot(tier, CaseMenu.EXP_SLOTS) && parts.getItem(CaseMenu.EXP_SLOTS).getItem() instanceof ScreenItem;
+	@Override
+	public boolean showsScreen() {
+		return board.screenInSlot();
 	}
 
 	/** The motherboard's bus order. */
 	public BusOrder busOrder() {
-		return machine.board().order();
+		return board.busOrder();
 	}
 
 	public Machine machine() {
-		return machine;
+		return board.machine();
 	}
 
-	/** Its terminal: built in on the all-in-one, or the screen in a case's gold slot. */
+	/** Its terminal: the screen in its gold slot. */
 	@Override
 	public Terminal terminal() {
-		return display;
+		return board.terminal();
 	}
 
 	/** The part slots (see {@link CaseMenu} for which is which). */
 	public Container parts() {
-		return parts;
+		return board.parts();
+	}
+
+	/** The case's own store of power, which the charge meter shows. */
+	public PowerBuffer power() {
+		return board.power();
 	}
 
 	/** What the server sends to open this computer's screen view. */
 	public OpenDisplayPayload openDisplayPayload() {
-		return new OpenDisplayPayload(worldPosition, display.buffer().resolution(), Optional.of(worldPosition), true);
-	}
-
-	/**
-	 * One line of the bus order panel. {@code item} and {@code slot} are the part's item and
-	 * case slot, or empty and -1 for a built-in device. Cabled devices have a {@code device}
-	 * position (the bulb finds them in the world) and can be disconnected.
-	 */
-	public record BusEntry(String key, Component name, Component location, ItemStack item, int slot, int builtInIcon,
-		Optional<BlockPos> device, boolean connected, boolean online, int position) {
-		/** An external device: it can be reordered, identified, unplugged, and forgotten while offline. */
-		public boolean cabled() {
-			return device.isPresent();
-		}
+		return new OpenDisplayPayload(worldPosition, terminal().buffer().resolution(), Optional.of(worldPosition), true);
 	}
 
 	/** The devices on the bus, in order, as the bus order panel shows them. Works on clients too. */
-	public List<BusEntry> busEntries() {
-		List<BusEntry> entries = new ArrayList<>();
-		if (machine.board().cpu().isEmpty()) {
-			return entries; // no CPU, no bus
-		}
-		BusOrder busOrder = busOrder();
-		Set<String> onBus = Set.copyOf(busOrder.connected());
-		for (String key : busOrder.keys()) {
-			int position = machine.board().position(key);
-			// What's there but left off because the bus is full isn't listed (the summary counts it);
-			// offline and unplugged external devices are, to plug back in or forget.
-			boolean waiting = !onBus.contains(key) && (busOrder.isInternal(key) || busOrder.isOnline(key) && busOrder.isConnected(key));
-			if (waiting) {
-				continue;
-			}
-			if (!busOrder.isInternal(key)) {
-				Optional.ofNullable(known.get(key)).ifPresent(device -> {
-					ItemStack item = new ItemStack(device.item());
-					boolean online = busOrder.isOnline(key);
-					Component location;
-					if (!online) {
-						location = Component.translatable("gui.modularcomputers.bus.offline");
-					} else if (device.paired()) {
-						location = device.hubSlot() >= 0 ? Component.translatable("gui.modularcomputers.bus.hub_paired", device.hubSlot() + 1)
-							: Component.translatable("gui.modularcomputers.bus.paired");
-					} else {
-						location = device.hubSlot() >= 0
-							? Component.translatable("gui.modularcomputers.bus.hub", device.hubSlot() + 1, device.meters())
-							: Component.translatable(device.wireless() ? "gui.modularcomputers.bus.bluetooth" : "gui.modularcomputers.bus.cable", device.meters());
-					}
-					entries.add(new BusEntry(key, item.getHoverName(), location, item, -1, -1, Optional.of(device.pos()), busOrder.isConnected(key), online, position));
-				});
-			} else {
-				int slot = partSlot(key);
-				ItemStack item = parts.getItem(slot);
-				entries.add(new BusEntry(key, item.getHoverName(), partLocation(key), item, slot, -1, Optional.empty(), true, true, position));
-			}
-		}
-		return entries;
+	public List<BoardAssembly.BusEntry> busEntries() {
+		return board.busEntries();
 	}
 
-	/** The case slot holding the part on a motherboard connector. */
-	private static int partSlot(String connector) {
-		if (connector.equals(Motherboard.EEPROM)) {
-			return CaseMenu.EEPROM_SLOT;
-		}
-		return (Motherboard.isSata(connector) ? CaseMenu.SATA_SLOTS : CaseMenu.EXP_SLOTS) + Motherboard.lane(connector);
-	}
-
-	/** Where a part sits, as the bus order panel says it: "ROM", "SATA 1", "EXP 2". */
-	private static Component partLocation(String connector) {
-		if (connector.equals(Motherboard.EEPROM)) {
-			return Component.translatable("gui.modularcomputers.bus.rom");
-		}
-		return Component.translatable(Motherboard.isSata(connector) ? "gui.modularcomputers.bus.sata" : "gui.modularcomputers.bus.expansion",
-			Motherboard.lane(connector) + 1);
-	}
-
-	/** How full the bus is, and whether devices are waiting for room (works on clients too). */
 	public BusStatus busStatus() {
-		return busOrder().status();
+		return board.busStatus();
 	}
 
-	/** Server side: the player forgot an offline device in the bus order panel. */
 	public boolean forgetDevice(String key) {
-		if (!busOrder().forget(key)) {
-			return false;
-		}
-		known.remove(key);
-		rebuildBus();
-		setChanged();
-		syncToClients();
-		return true;
+		return board.forgetDevice(key);
 	}
 
-	/** Server side: the player moved device {@code key} up or down the bus order. */
 	public boolean moveDevice(String key, boolean up) {
-		int index = busOrder().keys().indexOf(key);
-		if (index < 0 || !busOrder().move(index, up)) {
-			return false;
-		}
-		rebuildBus();
-		setChanged();
-		syncToClients();
-		return true;
+		return board.moveDevice(key, up);
+	}
+
+	public boolean setConnected(String key, boolean connected) {
+		return board.setConnected(key, connected);
+	}
+
+	public boolean lowPowerAlarm() {
+		return board.lowPowerAlarm();
+	}
+
+	public int redstoneOut(Direction direction) {
+		return board.redstoneOut(direction);
+	}
+
+	public static SoundEvent dyingSound(Machine.Supervision cause) {
+		return BoardAssembly.dyingSound(cause);
+	}
+
+	public static boolean imageDisk(ItemStack stack, java.nio.file.Path folder, long ticks) {
+		return BoardAssembly.imageDisk(stack, folder, ticks);
+	}
+
+	public static java.nio.file.Path diskFolder(net.minecraft.server.MinecraftServer server, UUID id) {
+		return BoardAssembly.diskFolder(server, id);
 	}
 
 	/** Its Bluetooth cards (in the expansion slots), in bus order. */
 	@Override
 	public List<ItemStack> bluetoothCards() {
-		List<ItemStack> cards = new ArrayList<>();
-		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
-			ItemStack card = parts.getItem(CaseMenu.EXP_SLOTS + lane);
-			if (card.is(ModItems.BLUETOOTH_CARD)) {
-				cards.add(card);
-			}
-		}
-		return cards;
+		return board.bluetoothCards();
 	}
 
 	/** Its board's id, which Bluetooth cards link to. */
 	@Override
 	public UUID boardId() {
-		return boardId;
+		return board.boardId();
 	}
 
 	private void updateBluetooth() {
 		if (level != null) {
-			Bluetooth.update(level, worldPosition, boardId, bluetoothCards(), null);
+			Bluetooth.update(level, worldPosition, board.boardId(), bluetoothCards(), null);
 		}
 	}
 
 	@Override
 	public void setLevel(Level level) {
 		super.setLevel(level);
-		if (level instanceof ServerLevel server) {
-			// A Lua CPU's calls are carried out on the server thread, as soon as it can: always queued for it.
-			// (The server's own execute runs a task right there, on the CPU's thread, once the server is
-			// stopping: the task then touched the world off its thread and waited on a chunk the stopping
-			// server was saving, while the save waited for this computer: neither ever went on.)
-			var minecraft = server.getServer();
-			machine.setServer(task -> minecraft.schedule(minecraft.wrapRunnable(task)));
-			// Loaded before it had a level: its disks find their data now.
-			java.util.Arrays.fill(diskSerials, null);
-			installParts();
-		}
+		board.placed();
 		updateBluetooth();
-	}
-
-	/**
-	 * Marks its chunk changed, so the next save or unload writes it (Minecraft writes only chunks
-	 * marked changed), at once when a device's data changes. Without {@link #setChanged}'s comparator
-	 * update, which nothing here needs, so it's cheap to do often. Never waits for the chunk: its
-	 * devices change as they go back on the bus while the chunk is still loading ({@link ChunkMarks}).
-	 */
-	private void markChanged() {
-		ChunkMarks.changed(level, worldPosition);
 	}
 
 	@Override
 	public void preRemoveSideEffects(BlockPos pos, BlockState state) {
 		super.preRemoveSideEffects(pos, state);
-		machine.removed(); // broken: a power cut (an unload only freezes it)
+		board.removed(); // broken: a power cut (an unload only freezes it)
 	}
 
 	@Override
 	public void setRemoved() {
 		super.setRemoved();
-		machine.unload(); // its program was saved: it stops here, and goes on after a load
-		for (int lane = 0; lane < disks.length; lane++) {
-			retireDisk(lane);
-		}
+		board.unloaded();
 		if (level != null) {
 			Bluetooth.remove(level, worldPosition);
 		}
@@ -510,69 +305,13 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		updateBluetooth();
 	}
 
-	/** The external devices on the bus now. */
-	private Set<String> externalOnBus() {
-		return busOrder().connected().stream().filter(key -> !busOrder().isInternal(key)).collect(Collectors.toSet());
-	}
-
 	/**
-	 * The bus's sounds after a change: a soft hum when an external device joined it (wired up,
-	 * plugged back in, or its chunk loaded), and a deeper, rougher one when one has to wait
-	 * because the bus is full. Leaving is silent.
-	 */
-	private void busSounds(Set<String> before, int waitingBefore) {
-		if (level == null || level.isClientSide()) {
-			return;
-		}
-		if (busOrder().waiting() > waitingBefore) {
-			level.playSound(null, worldPosition, ModSounds.BUS_OVERFLOW, SoundSource.BLOCKS, 1.0f, 1.0f);
-		}
-		if (!before.containsAll(externalOnBus())) {
-			level.playSound(null, worldPosition, ModSounds.DEVICE_CONNECT, SoundSource.BLOCKS, 1.0f, 1.0f);
-		}
-	}
-
-	/** Server side: the player plugged a cabled device in or out in the bus order panel. */
-	public boolean setConnected(String key, boolean connected) {
-		Set<String> before = externalOnBus();
-		if (!busOrder().setConnected(key, connected)) { // external devices only
-			return false;
-		}
-		rebuildBus();
-		busSounds(before, busOrder().waiting());
-		setChanged();
-		syncToClients();
-		return true;
-	}
-
-	/**
-	 * Server side, every tick: looks along the cables again when one changed (or now and then,
-	 * for chunks loading and unloading), and sends the display to clients when it changed.
+	 * Server side, every tick: the board's turn, and the cables looked along again when one changed
+	 * (or now and then, for chunks loading and unloading).
 	 */
 	void serverTick() {
 		ticks++;
-		if (ticks % BATTERY_TICKS == 0) {
-			updateBattery();
-		}
-		for (Card card : cards) {
-			if (card != null) {
-				CardWorld.tick(card, (ServerLevel) level, worldPosition, level.getGameTime()); // cards work where they're installed
-			}
-		}
-		// Minecraft writes only chunks marked changed (at a save, or an unload): an on machine changes
-		// every tick (its clock, its program). Its devices mark it themselves as their data changes.
-		if (machine.isPowered()) {
-			markChanged();
-		}
-		// The motherboard checks its CPU and power every tick, and the program gets its turn.
-		Machine.Supervision supervision = machine.tick();
-		if (supervision != Machine.Supervision.OK) {
-			playAtCase(dyingSound(supervision));
-			setPowerState();
-		} else if (machine.isHalted() != getBlockState().getValue(AllInOneBlock.HALTED)
-			|| machine.isPowered() != getBlockState().getValue(AllInOneBlock.POWERED)) {
-			setPowerState(); // the CPU stopped (or started): the light turns amber (or green); or the program turned it off
-		}
+		board.tick();
 		if (seenCableChanges != Cabling.changes() || ticks % RESCAN_TICKS == 0) {
 			seenCableChanges = Cabling.changes();
 			scanCables();
@@ -580,107 +319,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		if (seenHolds != com.payonel.modularcomputers.bus.BusHolds.version()) {
 			// Another board let go of a device: if it's one of ours, it may join this bus now.
 			seenHolds = com.payonel.modularcomputers.bus.BusHolds.version();
-			relayout(false);
+			board.relayout(false);
 		}
-		if (savedProgram != null) {
-			// Loaded running: the program goes on where it was saved, now its bus is found again.
-			byte[] saved = savedProgram;
-			savedProgram = null;
-			machine.resumeProgram(saved);
-		}
-		syncDisplay();
-	}
-
-	/**
-	 * Sends the built-in screen's changed rows to the players who have it loaded: each tick, and
-	 * right after a program's turn. Only what changed goes, not the whole block.
-	 */
-	private void syncDisplay() {
-		if (level instanceof ServerLevel server) {
-			ScreenRows.send(server, this, display);
-		}
-	}
-
-	/** The computer runs on the case's power buffer. */
-	private boolean hasPower() {
-		return !power.isEmpty();
-	}
-
-	/**
-	 * The low-power alarm, like a UPS on its last minutes: under half its buffer, with a load, the
-	 * case beeps at every battery check (each second). The batteries keep it full, so this means
-	 * they're out or flat.
-	 */
-	public boolean lowPowerAlarm() {
-		return power.isLow() && machine.currentDraw() > 0;
-	}
-
-	/** The case's own store of power, which the charge meter shows. */
-	public PowerBuffer power() {
-		return power;
-	}
-
-	/**
-	 * Server side, now and then: a running computer draws from the case's buffer, and the buffer
-	 * tops itself up from the battery. A self-charging battery recharges while the computer is
-	 * off. With the battery out or flat, the buffer runs down; when it's empty a running computer
-	 * dies with an error beep. Time this chunk wasn't loaded doesn't count.
-	 */
-	private void updateBattery() {
-		// The CPU while it runs a program, and the bus devices it powers (see Machine.powerUse).
-		long used = machine.powerUse(level.getGameTime());
-		power.use(used);
-		pullFromBattery();
-		if (machine.powerLost()) {
-			playAtCase(dyingSound(Machine.Supervision.LOST_POWER));
-		} else if (lowPowerAlarm()) {
-			errorBeep();
-		}
-		setChanged();
-		if (!setPowerState() && power.percent() != syncedPowerPercent) {
-			syncToClients();
-		}
-	}
-
-	/**
-	 * The buffer takes what it's missing from the batteries, up to a day's worth: from the last
-	 * bay first, the first bay last (user's order). While the computer runs, its batteries are in
-	 * use: no self-charging; while it's off, a self-charging one rests.
-	 */
-	private void pullFromBattery() {
-		long now = level.getGameTime();
-		for (int bay = CaseMenu.UPS_BAYS - 1; bay >= 0; bay--) {
-			ItemStack stack = parts.getItem(CaseMenu.UPS_SLOT + bay);
-			if (!(stack.getItem() instanceof BatteryItem battery)) {
-				continue;
-			}
-			if (battery.tier().infinite()) {
-				power.fill(power.capacity());
-				continue;
-			}
-			BatteryCharge charge = BatteryItem.charge(stack);
-			charge = machine.isPowered() ? charge.run(battery.tier(), 0, now) : charge.rest(battery.tier(), now);
-			charge = charge.run(battery.tier(), power.fill(charge.units()), now);
-			stack.set(ModComponents.CHARGE, charge); // in place: not a part change
-		}
-	}
-
-	/**
-	 * The power button shows whether the machine could run and whether it is on; the block
-	 * state carries both to clients. Returns whether it changed.
-	 */
-	private boolean setPowerState() {
-		BlockState state = getBlockState()
-			.setValue(AllInOneBlock.READY, machine.board().cpu().isPresent() && hasPower())
-			.setValue(AllInOneBlock.POWERED, machine.isPowered())
-			.setValue(AllInOneBlock.HALTED, machine.isHalted())
-			.setValue(AllInOneBlock.SCREEN, screenInSlot()); // the front shows a screen in the gold slot
-		if (state == getBlockState()) {
-			return false;
-		}
-		level.setBlock(worldPosition, state, Block.UPDATE_CLIENTS); // sends this block entity too
-		syncedPowerPercent = power.percent();
-		return true;
 	}
 
 	/**
@@ -688,7 +328,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	 * pistons, Disk Stations, photomasks) and puts them on the bus.
 	 */
 	private void scanCables() {
-		List<Cabled> found = new ArrayList<>();
+		List<BoardAssembly.Cabled> found = new ArrayList<>();
 		Map<String, Device> devices = new LinkedHashMap<>();
 		List<CableWalk.Found> reached = Cabling.walk(level, worldPosition);
 		Set<BlockPos> visible = visibleDevices(reached);
@@ -699,7 +339,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 				continue;
 			}
 			if (block instanceof ScreenBlockEntity screen) {
-				addCabled(found, devices, new Cabled(Motherboard.id(screen.id()), at.pos(), at.meters(), at.wireless(), paired, screen.getBlockState().getBlock().asItem(), -1), screen.terminal());
+				addCabled(found, devices, new BoardAssembly.Cabled(Motherboard.id(screen.id()), at.pos(), at.meters(), at.wireless(), paired, screen.getBlockState().getBlock().asItem(), -1), screen.terminal());
 			} else if (block instanceof ExpansionHubBlockEntity hub) {
 				for (int slot = 0; slot < ExpansionHubBlockEntity.SLOTS; slot++) {
 					int hubSlot = slot;
@@ -707,48 +347,28 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 					// order when it moves to another slot (the hub stamps one on as it goes in).
 					UUID serial = hub.cards().getItem(hubSlot).get(ModComponents.SERIAL);
 					if (serial != null) {
-						hub.card(slot).ifPresent(card -> addCabled(found, devices, new Cabled(Motherboard.id(serial), at.pos(), at.meters(),
+						hub.card(slot).ifPresent(card -> addCabled(found, devices, new BoardAssembly.Cabled(Motherboard.id(serial), at.pos(), at.meters(),
 							at.wireless(), paired, hub.cards().getItem(hubSlot).getItem(), hubSlot), card));
 					}
 				}
 			} else if (block instanceof RoboticPistonBlockEntity piston) {
-				addCabled(found, devices, new Cabled(Motherboard.id(piston.id()), at.pos(), at.meters(), at.wireless(), paired, piston.getBlockState().getBlock().asItem(), -1), piston.device());
+				addCabled(found, devices, new BoardAssembly.Cabled(Motherboard.id(piston.id()), at.pos(), at.meters(), at.wireless(), paired, piston.getBlockState().getBlock().asItem(), -1), piston.device());
 			} else if (block instanceof DiskStationBlockEntity station) {
 				String host = Motherboard.id(station.id());
-				addCabled(found, devices, new Cabled(host, at.pos(), at.meters(), at.wireless(), paired, ModBlocks.DISK_STATION.asItem(), -1), station.device());
+				addCabled(found, devices, new BoardAssembly.Cabled(host, at.pos(), at.meters(), at.wireless(), paired, ModBlocks.DISK_STATION.asItem(), -1), station.device());
 				// Its disks, each by its serial number (the source only read), behind it.
 				for (int slot : new int[] {DiskStationBlockEntity.TARGET, DiskStationBlockEntity.SOURCE}) {
 					UUID serial = station.cards().getItem(slot).get(ModComponents.SERIAL);
 					if (serial != null && station.disk(slot) != null) {
-						addCabled(found, devices, new Cabled(Motherboard.id(serial), at.pos(), at.meters(), at.wireless(), paired,
+						addCabled(found, devices, new BoardAssembly.Cabled(Motherboard.id(serial), at.pos(), at.meters(), at.wireless(), paired,
 							station.cards().getItem(slot).getItem(), -1, host), station.disk(slot));
 					}
 				}
 			} else if (block instanceof PhotomaskBlockEntity mask) {
-				addCabled(found, devices, new Cabled(Motherboard.id(mask.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PHOTOMASK.asItem(), -1), mask.device());
+				addCabled(found, devices, new BoardAssembly.Cabled(Motherboard.id(mask.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PHOTOMASK.asItem(), -1), mask.device());
 			}
 		}
-		boolean sameDevices = found.equals(cabled) && devices.keySet().equals(cabledDevices.keySet())
-			&& devices.entrySet().stream().allMatch(entry -> cabledDevices.get(entry.getKey()) == entry.getValue());
-		if (sameDevices) {
-			return;
-		}
-		cabled = List.copyOf(found);
-		cabledDevices.clear();
-		cabledDevices.putAll(devices);
-		relayout(true); // (what was found changed: distances and places too)
-	}
-
-	/** Lays the bus out again, with the join and overflow sounds, and tells clients when something changed. */
-	private void relayout(boolean changed) {
-		Set<String> before = externalOnBus();
-		int waitingBefore = busOrder().waiting();
-		rebuildBus();
-		if (changed || !before.equals(externalOnBus()) || waitingBefore != busOrder().waiting()) {
-			busSounds(before, waitingBefore);
-			setChanged();
-			syncToClients();
-		}
+		board.setExternal(found, devices);
 	}
 
 	/**
@@ -766,9 +386,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 					continue;
 				}
 				boolean paired = level.getBlockEntity(at.pos()) instanceof CardHolderBlockEntity holder && holder.isPaired();
-				Optional<BlockPos> board = paired ? Bluetooth.pairedTo(level, at.pos()) : Optional.empty();
+				Optional<BlockPos> pairedTo = paired ? Bluetooth.pairedTo(level, at.pos()) : Optional.empty();
 				// Paired with this computer, or with a hub it sees; another computer's pairings are its own.
-				boolean mine = board.filter(pos -> pos.equals(worldPosition)
+				boolean mine = pairedTo.filter(pos -> pos.equals(worldPosition)
 					|| visible.contains(pos) && level.getBlockEntity(pos) instanceof ExpansionHubBlockEntity).isPresent();
 				if (!paired || mine) {
 					grew |= visible.add(at.pos());
@@ -778,7 +398,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		return visible;
 	}
 
-		private static void addCabled(List<Cabled> found, Map<String, Device> devices, Cabled cabled, Device device) {
+	private static void addCabled(List<BoardAssembly.Cabled> found, Map<String, Device> devices, BoardAssembly.Cabled cabled, Device device) {
 		if (devices.putIfAbsent(cabled.key(), device) == null) {
 			found.add(cabled);
 		}
@@ -786,318 +406,23 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 
 	/**
 	 * Server side: someone pressed the power button. It clicks either way. Without power nothing
-	 * else happens; without a CPU the machine stays off and beeps an error. Clients learn the
-	 * new state from the block state.
+	 * else happens; without a CPU the machine stays off and beeps an error, the light faded green
+	 * for the moment the attempt lasts. Clients learn the new state from the block state.
 	 */
 	public Machine.PowerPress pressPower() {
-		Machine.PowerPress result = machine.pressPower();
-		setChanged();
+		Machine.PowerPress result = board.pressPower();
 		if (level == null) {
 			return result;
 		}
-		boolean on = result == Machine.PowerPress.ON;
-		level.playSound(null, worldPosition, on ? SoundEvents.STONE_BUTTON_CLICK_ON : SoundEvents.STONE_BUTTON_CLICK_OFF,
-			SoundSource.BLOCKS, 0.3f, on ? 0.6f : 0.5f);
 		if (result == Machine.PowerPress.NO_CPU) {
-			errorBeep();
-			// The light shows faded green for the moment the attempt lasts; the block's tick
-			// sets it back.
+			// The block's tick sets the light back.
 			level.setBlock(worldPosition, getBlockState().setValue(AllInOneBlock.POWERED, true), Block.UPDATE_CLIENTS);
 			level.scheduleTick(worldPosition, getBlockState().getBlock(), AllInOneBlock.ATTEMPT_TICKS);
 		} else if (result != Machine.PowerPress.NO_POWER) {
 			// Changing the block state also sends this block entity's update to clients.
-			level.setBlock(worldPosition, getBlockState().setValue(AllInOneBlock.POWERED, on), Block.UPDATE_CLIENTS);
+			level.setBlock(worldPosition, getBlockState().setValue(AllInOneBlock.POWERED, result == Machine.PowerPress.ON), Block.UPDATE_CLIENTS);
 		}
 		return result;
-	}
-
-	/** One short, low buzz: an error, not a confirmation. */
-	private void errorBeep() {
-		playAtCase(ModSounds.ERROR_BEEP);
-	}
-
-	private void playAtCase(SoundEvent sound) {
-		level.playSound(null, worldPosition, sound, SoundSource.BLOCKS, ERROR_BEEP_VOLUME, 1.0f);
-	}
-
-	/**
-	 * What a running computer sounds as it dies: running out of power, the beep sagging deeper and
-	 * fading out (user, 2026-10-11); anything else (the CPU pulled), the error beep.
-	 */
-	public static SoundEvent dyingSound(Machine.Supervision cause) {
-		return cause == Machine.Supervision.LOST_POWER ? ModSounds.POWER_DOWN : ModSounds.ERROR_BEEP;
-	}
-
-	/**
-	 * Where a disk's data lives: the world save's {@code modularcomputers/disks/<id>} (a folder
-	 * for hfs, with ".img" for raw), so it's the disk's wherever it goes.
-	 */
-	/** A card that works here, at the case: a redstone card's output changes update the case's neighbours. */
-	private Card cardHere(CardKind kind) {
-		Card card = com.payonel.modularcomputers.device.Cards.make(kind);
-		if (card instanceof com.payonel.modularcomputers.device.OperatorCard operator) {
-			operator.runWith(command -> level instanceof net.minecraft.server.level.ServerLevel server
-				? OperatorCommands.run(server, worldPosition, command)
-				: new com.payonel.modularcomputers.device.OperatorCard.Outcome(false, 0, "not in a world"));
-		}
-		card.onChange(this::markChanged);
-		card.frontFrom(() -> com.payonel.modularcomputers.device.Face.of(getBlockState().getValue(AllInOneBlock.FACING).getName()));
-		if (card instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
-			redstone.block(side -> CardWorld.redstone(java.util.Arrays.stream(cards).filter(java.util.Objects::nonNull).toList(), side));
-			redstone.onOutput(() -> {
-				if (level != null && !level.isClientSide()) {
-					level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
-				}
-				for (var other : cards) {
-					if (other instanceof com.payonel.modularcomputers.device.RedstoneCard sibling && sibling != redstone) {
-						sibling.report(); // what the block puts out changed: so may their levels
-					}
-				}
-			});
-		}
-		return card;
-	}
-
-	/** The redstone the case's cards put out toward a neighbour ({@code direction}: from the neighbour to the case). */
-	public int redstoneOut(net.minecraft.core.Direction direction) {
-		return CardWorld.redstone(java.util.Arrays.stream(cards).filter(java.util.Objects::nonNull).toList(), direction);
-	}
-
-	private void retireDisk(int lane) {
-		if (disks[lane] != null) {
-			disks[lane].retire();
-			disks[lane] = null;
-		}
-	}
-
-	/**
-	 * A disk that comes with files (a crafted disk's mcos, {@link ModComponents#DISK_IMAGE}) gets
-	 * them the first time its folder is made, from the mod's Lua files; then the mark goes.
-	 */
-	private void imageDisk(ItemStack stack, java.nio.file.Path folder) {
-		if (imageDisk(stack, folder, level == null ? 0 : level.getGameTime())) {
-			markChanged(); // (from setLevel too, as its chunk loads: never setChanged, which waits for the chunk)
-		}
-	}
-
-	/**
-	 * A disk that comes with files gets them the first time its folder is made (a case's or a Disk
-	 * Station's), made at the world's time {@code ticks}; then the mark goes. Whether it went.
-	 */
-	public static boolean imageDisk(ItemStack stack, java.nio.file.Path folder, long ticks) {
-		String image = stack.get(ModComponents.DISK_IMAGE);
-		if (image == null) {
-			return false;
-		}
-		if (!java.nio.file.Files.exists(folder)) {
-			try {
-				com.payonel.modularcomputers.machine.LuaScripts.copyTree(image, folder);
-				com.payonel.modularcomputers.device.Disk.stampAll(folder, ticks); // (made now, in the world's time)
-			} catch (RuntimeException e) {
-				com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A disk didn't get its {} files", image, e);
-				return false;
-			}
-		}
-		stack.remove(ModComponents.DISK_IMAGE);
-		return true;
-	}
-
-	public static java.nio.file.Path diskFolder(net.minecraft.server.MinecraftServer server, UUID id) {
-		return server.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)
-			.resolve("modularcomputers").resolve("disks").resolve(id.toString());
-	}
-
-	/** Puts the parts in the slots onto the motherboard, and drives and cards onto the bus. */
-	private void installParts() {
-		Motherboard board = machine.board();
-		CpuItem cpuItem = parts.getItem(CaseMenu.CPU_SLOT).getItem() instanceof CpuItem cpu ? cpu : null;
-		if (cpuItem == null) {
-			board.setCpu(null);
-		} else if (board.cpu().map(cpu -> cpu.tier() != cpuItem.tier() || cpu.architecture() != cpuItem.architecture()).orElse(true)) {
-			board.setCpu(new Cpu(cpuItem.tier(), cpuItem.architecture()));
-		}
-		// The EEPROM reads and writes the item in its slot directly (EepromSlot): no copy of its text.
-		ItemStack stack = parts.getItem(CaseMenu.EEPROM_SLOT);
-		boolean hasEeprom = ModItems.isEeprom(stack);
-		UUID serial = hasEeprom ? stack.get(ModComponents.SERIAL) : null;
-		if (!hasEeprom) {
-			eeprom = null;
-		} else if (eeprom == null || !java.util.Objects.equals(eepromSerial, serial)) {
-			eeprom = new Eeprom(eepromSlot); // another EEPROM: another device
-		}
-		eepromSerial = serial;
-		board.setEeprom(eeprom);
-		// Each part answers to its serial number too: a card is found by it here or in a hub.
-		board.plug(Motherboard.EEPROM, eeprom, serial(CaseMenu.EEPROM_SLOT));
-		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
-			DiskTier diskTier = parts.getItem(CaseMenu.SATA_SLOTS + lane).getItem() instanceof DiskItem disk ? disk.tier() : null;
-			UUID diskSerial = serial(CaseMenu.SATA_SLOTS + lane);
-			ItemStack diskStack = parts.getItem(CaseMenu.SATA_SLOTS + lane);
-			if (diskTier == null) {
-				retireDisk(lane);
-			} else if (disks[lane] == null || disks[lane].tier() != diskTier || !java.util.Objects.equals(diskSerials[lane], diskSerial)) {
-				// Another disk: its own data, in the world save by its id (none on a client).
-				retireDisk(lane);
-				java.nio.file.Path folder = level instanceof ServerLevel server && diskSerial != null ? diskFolder(server.getServer(), diskSerial) : null;
-				if (folder != null) {
-					imageDisk(diskStack, folder);
-				}
-				disks[lane] = new Disk(diskTier, folder);
-				disks[lane].clockFrom(() -> level == null ? 0 : level.getGameTime()); // (its files' times: the world's)
-				disks[lane].onChange(this::markChanged); // its reports of changes, saved with the case
-			}
-			diskSerials[lane] = diskSerial;
-			if (disks[lane] != null) {
-				int slot = CaseMenu.SATA_SLOTS + lane;
-				disks[lane].labelIn(ModComponents.labelOn(() -> parts.getItem(slot), this::markChanged)); // the disk's own
-				disks[lane].formatIn(() -> ModComponents.diskFormat(parts.getItem(slot)), format -> ModComponents.diskFormat(parts.getItem(slot), format));
-			}
-			board.plug(Motherboard.sata(lane), disks[lane], serial(CaseMenu.SATA_SLOTS + lane));
-			ItemStack card = parts.getItem(CaseMenu.EXP_SLOTS + lane);
-			if (lane == 0 && screenInSlot()) {
-				// A screen in the gold slot: the case's terminal, on the bus there.
-				TerminalTier screenTier = ((ScreenItem) card.getItem()).screen().tier();
-				if (display.tier() != screenTier) {
-					display = new Terminal(screenTier);
-					display.setFlusher(this::syncDisplay);
-					display.onChange(this::markChanged);
-					display.onBell(() -> bell.ring(level, worldPosition));
-				}
-				cards[lane] = null;
-				display.labelIn(ModComponents.labelOn(() -> parts.getItem(CaseMenu.EXP_SLOTS), this::markChanged)); // the screen's own
-				board.plug(Motherboard.exp(lane), display, serial(CaseMenu.EXP_SLOTS + lane));
-				continue;
-			}
-			CardKind kind = ModItems.cardKind(card).orElse(null);
-			cards[lane] = kind == null ? null : cards[lane] != null && cards[lane].kind() == kind ? cards[lane] : cardHere(kind);
-			if (cards[lane] != null) {
-				int slot = CaseMenu.EXP_SLOTS + lane;
-				cards[lane].labelIn(ModComponents.labelOn(() -> parts.getItem(slot), this::markChanged)); // the card's own
-				cards[lane].idFrom(() -> serial(slot));
-				if (cards[lane] instanceof com.payonel.modularcomputers.device.BluetoothCard bluetooth) {
-					// Its link lives on the card itself; a program's change is a link made, as by hand.
-					bluetooth.linkIn(() -> parts.getItem(slot).get(ModComponents.BLUETOOTH_LINK), id -> {
-						if (id == null) {
-							parts.getItem(slot).remove(ModComponents.BLUETOOTH_LINK);
-						} else {
-							parts.getItem(slot).set(ModComponents.BLUETOOTH_LINK, id);
-						}
-						markChanged();
-						updateBluetooth();
-						Cabling.changed(); // (what's linked, so what's reached, changed)
-					});
-					bluetooth.boardFrom(this::boardId);
-				}
-			}
-			board.plug(Motherboard.exp(lane), cards[lane], serial(CaseMenu.EXP_SLOTS + lane));
-		}
-		rebuildBus();
-	}
-
-	/**
-	 * Puts the bus's devices in order (the motherboard's job: see {@link Motherboard#layout}).
-	 * External devices that went away keep their place, offline, for when they come back, and
-	 * disconnected ones stay off the bus.
-	 */
-	private void rebuildBus() {
-		Map<String, Device> external = new LinkedHashMap<>();
-		Map<String, String> hosts = new LinkedHashMap<>();
-		for (Cabled device : cabled) {
-			// Server side, a device saved as cabled is only on the bus once a scan finds it again.
-			external.put(device.key(), cabledDevices.get(device.key()));
-			if (!device.host().isEmpty()) {
-				hosts.put(device.key(), device.host());
-			}
-		}
-		Motherboard board = machine.board();
-		board.setExternal(external, hosts);
-		long now = level != null ? level.getGameTime() : 0;
-		if (level != null && level.isClientSide()) {
-			board.rebuildBus(now); // clients show what the server sends; they don't run devices
-		} else {
-			machine.rebuildBus(now);
-		}
-		for (Cabled device : cabled) {
-			known.put(device.key(), device);
-		}
-		known.keySet().retainAll(busOrder().external().stream().map(BusOrder.Entry::key).toList());
-		updateBluetooth();
-	}
-
-	/** What each slot held last time, so a change can play the right insert or remove sound. */
-	private final ItemStack[] lastParts = new ItemStack[CaseMenu.PART_SLOTS];
-
-	private void playPartSounds() {
-		for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
-			boolean had = lastParts[slot] != null && !lastParts[slot].isEmpty();
-			boolean has = !parts.getItem(slot).isEmpty();
-			if (has != had) {
-				level.playSound(null, worldPosition, partSound(slot, has), SoundSource.BLOCKS, 0.8f, 1.0f);
-			}
-		}
-		rememberParts();
-	}
-
-	private void rememberParts() {
-		for (int slot = 0; slot < CaseMenu.PART_SLOTS; slot++) {
-			lastParts[slot] = parts.getItem(slot).copy();
-		}
-	}
-
-	private static net.minecraft.sounds.SoundEvent partSound(int slot, boolean inserted) {
-		if (slot == CaseMenu.CPU_SLOT) {
-			return inserted ? ModSounds.CPU_INSERT : ModSounds.CPU_REMOVE;
-		} else if (slot == CaseMenu.EEPROM_SLOT) {
-			return inserted ? ModSounds.EEPROM_INSERT : ModSounds.EEPROM_REMOVE;
-		} else if (CaseMenu.isBatteryBay(slot)) {
-			return inserted ? ModSounds.BATTERY_INSERT : ModSounds.BATTERY_REMOVE;
-		} else if (slot < CaseMenu.SATA_SLOTS) {
-			return inserted ? ModSounds.RAM_INSERT : ModSounds.RAM_REMOVE;
-		} else if (slot < CaseMenu.EXP_SLOTS) {
-			return inserted ? ModSounds.DISK_INSERT : ModSounds.DISK_REMOVE;
-		}
-		return inserted ? ModSounds.CARD_INSERT : ModSounds.CARD_REMOVE;
-	}
-
-	/** Sends this block entity's data (parts, bus order, display) to clients. */
-	private void syncToClients() {
-		if (level != null && !level.isClientSide()) {
-			syncedPowerPercent = power.percent();
-			level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
-		}
-	}
-
-	/** The serial number of the part in a slot, if it has one. */
-	private UUID serial(int slot) {
-		return parts.getItem(slot).get(ModComponents.SERIAL);
-	}
-
-	private void onPartsChanged() {
-		if (level != null && !level.isClientSide()) {
-			for (int slot : BUS_PART_SLOTS) {
-				ItemStack part = parts.getItem(slot);
-				if (!part.isEmpty()) {
-					ModComponents.serial(part); // its id, wherever it goes next
-				}
-			}
-		}
-		installParts();
-		setChanged();
-		if (level == null || level.isClientSide()) {
-			return;
-		}
-		playPartSounds();
-		Cabling.changed(); // a Bluetooth card may have come or gone
-		if (machine.cpuRemoved()) {
-			// Pulling the CPU out of a running machine kills it.
-			errorBeep();
-		} else if (machine.memoryChanged()) {
-			errorBeep(); // RAM in or out under a running program: the CPU aborts
-		}
-		pullFromBattery(); // a battery going in fills the buffer right away
-		if (!setPowerState()) {
-			syncToClients(); // the bus order panel shows the parts
-		}
 	}
 
 	@Override
@@ -1107,9 +432,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 
 	@Override
 	public AbstractContainerMenu createMenu(int id, Inventory inventory, Player player) {
-		return new CaseMenu(id, inventory, parts, powerData, worldPosition, ContainerLevelAccess.create(level, worldPosition), tier);
+		return new CaseMenu(id, inventory, board.parts(), board.powerData(), worldPosition, ContainerLevelAccess.create(level, worldPosition), tier);
 	}
-
 
 	/*
 	 * Broken, a computer drops as one item that keeps its parts, its board id (what Bluetooth
@@ -1121,10 +445,14 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	@Override
 	protected void collectImplicitComponents(DataComponentMap.Builder components) {
 		super.collectImplicitComponents(components);
-		if (parts.getItems().stream().anyMatch(stack -> !stack.isEmpty())) {
-			components.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(parts.getItems()));
+		List<ItemStack> items = new ArrayList<>();
+		for (int slot = 0; slot < parts().getContainerSize(); slot++) {
+			items.add(parts().getItem(slot));
 		}
-		components.set(ModComponents.SERIAL, boardId);
+		if (items.stream().anyMatch(stack -> !stack.isEmpty())) {
+			components.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(items));
+		}
+		components.set(ModComponents.SERIAL, board.boardId());
 		if (!busOrder().external().isEmpty() || !busOrder().disconnected().isEmpty()) {
 			components.set(ModComponents.BUS_ORDER, new ModComponents.SavedBusOrder(busOrder().external(), busOrder().disconnected()));
 		}
@@ -1135,25 +463,21 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		super.applyImplicitComponents(components);
 		UUID serial = components.get(ModComponents.SERIAL);
 		if (serial != null) {
-			boardId = serial;
+			board.restoreBoardId(serial);
 		}
 		ModComponents.SavedBusOrder order = components.get(ModComponents.BUS_ORDER);
 		if (order != null) {
 			busOrder().restore(order.external(), order.disconnected());
 		}
-		parts.getItems().clear(); // not clearContent(): that would fire change handling
-		components.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(parts.getItems());
-		installParts();
-		rememberParts(); // placing isn't inserting: no sounds
-		if (level != null && !level.isClientSide()) {
-			updateBattery(); // a battery that came along fills the buffer
-		}
+		net.minecraft.core.NonNullList<ItemStack> items = net.minecraft.core.NonNullList.withSize(CaseMenu.PART_SLOTS, ItemStack.EMPTY);
+		components.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(items);
+		board.restoreParts(items);
 	}
 
 	@Override
 	public void removeComponentsFromTag(ValueOutput output) {
 		super.removeComponentsFromTag(output);
-		output.discard(BOARD_ID);
+		output.discard(BoardAssembly.BOARD_ID);
 		output.discard("Items");
 		output.discard(BUS_EXTERNAL);
 		output.discard(BUS_DISCONNECTED);
@@ -1162,78 +486,13 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	@Override
 	protected void saveAdditional(ValueOutput output) {
 		super.saveAdditional(output);
-		output.putBoolean(POWERED, machine.isPowered());
-		output.putLong(UPTIME, machine.uptime());
-		output.putInt(POWER_BUFFER, power.level());
-		if (machine.board().busCapacityOverride() != null) {
-			output.putInt(BUS_CAPACITY_OVERRIDE, machine.board().busCapacityOverride());
-		}
-		output.store(BOARD_ID, UUIDUtil.CODEC, boardId);
-		ContainerHelper.saveAllItems(output, parts.getItems());
-		output.store(BUS_EXTERNAL, ENTRY_CODEC.listOf(), busOrder().external());
-		output.store(BUS_DISCONNECTED, Codec.STRING.listOf(), busOrder().disconnected());
-		output.store(CABLED, Cabled.CODEC.listOf(), cabled);
-		output.store(KNOWN, Cabled.CODEC.listOf(), List.copyOf(known.values()));
-		if (!syncing) {
-			// A running Lua program is saved as it runs (its VM, by Styx, with its board's ring), at its
-			// next safe point. First: the calls it makes meanwhile change the devices saved below.
-			machine.persistProgram().or(() -> java.util.Optional.ofNullable(savedProgram))
-				.ifPresent(saved -> output.store(PROGRAM, Codec.BYTE_BUFFER, java.nio.ByteBuffer.wrap(saved)));
-			// What its devices hold for the program (keys, events) and settings it made: a save isn't a power cut.
-			DeviceSave.save(output, DISPLAY + "_device", display);
-			for (int lane = 0; lane < cards.length; lane++) {
-				if (cards[lane] != null) {
-					DeviceSave.save(output, CARD + lane, cards[lane]);
-				}
-			}
-			for (int lane = 0; lane < disks.length; lane++) {
-				if (disks[lane] != null) {
-					DeviceSave.save(output, DISK + lane, disks[lane]);
-				}
-			}
-		}
-		ScreenSave.save(output, DISPLAY, display);
-		ConsoleSplitter console = machine.board().virtualBus().console();
-		ScreenSave.save(output, CONSOLE, console.screen(), console.decoder());
+		board.save(output, syncing);
 	}
 
 	@Override
 	protected void loadAdditional(ValueInput input) {
 		super.loadAdditional(input);
-		machine.restorePowered(input.getBooleanOr(POWERED, false));
-		machine.restoreUptime(input.getLongOr(UPTIME, 0));
-		power.set(input.getIntOr(POWER_BUFFER, 0));
-		machine.board().overrideBusCapacity(input.getInt(BUS_CAPACITY_OVERRIDE).orElse(null));
-		input.read(BOARD_ID, UUIDUtil.CODEC).ifPresent(saved -> boardId = saved);
-		parts.getItems().clear(); // not clearContent(): that would fire change handling mid-load
-		ContainerHelper.loadAllItems(input, parts.getItems());
-		input.read(BUS_EXTERNAL, ENTRY_CODEC.listOf()).ifPresent(order ->
-			busOrder().restore(order, input.read(BUS_DISCONNECTED, Codec.STRING.listOf()).orElse(List.of())));
-		cabled = input.read(CABLED, Cabled.CODEC.listOf()).map(List::copyOf).orElse(List.of());
-		known.clear();
-		input.read(KNOWN, Cabled.CODEC.listOf()).orElse(List.of()).forEach(device -> known.put(device.key(), device));
-		installParts();
-		rememberParts(); // loading isn't inserting: no sounds
-		ScreenSave.load(input, DISPLAY, display);
-		DeviceSave.load(input, DISPLAY + "_device", display);
-		for (int lane = 0; lane < cards.length; lane++) {
-			if (cards[lane] != null) {
-				DeviceSave.load(input, CARD + lane, cards[lane]);
-			}
-		}
-		for (int lane = 0; lane < disks.length; lane++) {
-			if (disks[lane] != null) {
-				DeviceSave.load(input, DISK + lane, disks[lane]);
-			}
-		}
-		ConsoleSplitter console = machine.board().virtualBus().console();
-		ScreenSave.load(input, CONSOLE, console.screen(), console.decoder());
-		console.restored();
-		savedProgram = input.read(PROGRAM, Codec.BYTE_BUFFER).map(buffer -> {
-			byte[] bytes = new byte[buffer.remaining()];
-			buffer.get(bytes);
-			return bytes;
-		}).filter(bytes -> machine.isPowered()).orElse(null);
+		board.load(input);
 	}
 
 	@Override
@@ -1248,30 +507,6 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 			return saveWithoutMetadata(registries);
 		} finally {
 			syncing = false;
-		}
-	}
-
-	/** The part slots. Changes install the parts and update the power button. */
-	private final class Parts extends SimpleContainer {
-		Parts() {
-			super(CaseMenu.PART_SLOTS);
-		}
-
-		@Override
-		public void setChanged() {
-			super.setChanged();
-			onPartsChanged();
-		}
-
-		/** Each slot holds one part, however the items stack elsewhere. */
-		@Override
-		public int getMaxStackSize() {
-			return 1;
-		}
-
-		@Override
-		public boolean stillValid(Player player) {
-			return Container.stillValidBlockEntity(AllInOneBlockEntity.this, player);
 		}
 	}
 }

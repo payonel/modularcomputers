@@ -259,6 +259,41 @@ class NetworkExamplesTest extends McosHarness {
 		void run(String url) throws Exception;
 	}
 
+	@Test
+	void aProgramBlockedReadingTheCardsLogLeavesItsNewsForAnotherThatPolls() throws Exception {
+		withWeb(url -> {
+			type("cat /dev/internet0 > /tmp/log &\r"); // (blocked, read after read: it must not take curl's news)
+			untilIdle();
+			type("curl -s " + url + "/abc > /a; touch /done\r");
+			untilFile(root().resolve("done"), "");
+			assertThat(read(root().resolve("a"))).isEqualTo("abc".repeat(3000));
+		});
+	}
+
+	@Test
+	void readsSmallerThanAPieceGiveTheBodyWholeAndInOrderEvenWithItsQueueFull() throws Exception {
+		withWeb(url -> {
+			file("r.lua", """
+				local sys = require("sys")
+				local card = assert(sys.open("/dev/internet0"))
+				local handle = assert(sys.ioctl(card, "request", "%s/abcdefghijklmnopqrstuvwxyz0123"))
+				sys.sleep(1) -- (its queue fills: every piece it holds waits)
+				local out = io.open("/got", "w")
+				while true do
+				  local piece = sys.ioctl(card, "read", handle, 700) -- (a piece is 4096: each split)
+				  if piece == "" then break end
+				  if piece then out:write(piece) else sys.poll({[card] = {PRI = true}}) end
+				end
+				out:close()
+				""".formatted(url));
+			type("lua /r.lua 2> /err; touch /done\r");
+			untilFile(root().resolve("done"), "");
+			assertThat(read(root().resolve("err"))).isEmpty();
+			assertThat(read(root().resolve("got"))).as("96 KB: more pieces than it holds").isEqualTo("abcdefghijklmnopqrstuvwxyz0123".repeat(3000));
+		});
+	}
+
+	// (the web server)
 	private void withWeb(Web test) throws Exception {
 		HttpServer web = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
 		web.createContext("/", exchange -> {
