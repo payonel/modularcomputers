@@ -3,6 +3,7 @@
 sh \- the shell
 .SH SYNOPSIS
 .B sh
+.RB [ \-l ]
 .br
 .B sh \-c
 .I command
@@ -52,6 +53,21 @@ is skipped), with
 the script's name and the
 .IR arg s
 the positional parameters.
+.PP
+With
+.B \-l
+it is a login shell (the console's, and a remote login's): before anything
+else it runs
+.BR /etc/profile .
+An interactive shell then runs the file the
+.B ENV
+variable names, if there is one (mcos's
+.B /etc/profile
+sets it to
+.BR $HOME/.shrc ).
+Each runs as shell commands in the shell itself, as
+.B .
+runs a file, so the variables and aliases they set stay.
 .PP
 There are no
 .BR if ,
@@ -591,6 +607,9 @@ For
 .B ~
 and the prompt.
 .TP
+.B ENV
+A file an interactive shell runs at its start.
+.TP
 .B IFS
 Field separators.
 .TP
@@ -600,6 +619,27 @@ The prompts.
 .BR PWD ", " OLDPWD
 Set by
 .BR cd .
+.SH FILES
+.TP
+.B /etc/profile
+What a login shell runs first: mcos's sets
+.B HOME
+to
+.BR /home ,
+.B ENV
+to
+.B $HOME/.shrc
+and a few aliases
+.RB ( ll ,
+.BR la ,
+.BR l ).
+.TP
+.B /home/.shrc
+What an interactive shell runs next (by
+.BR ENV ):
+the user's, empty at first. An update of mcos leaves
+.B /home
+as it is.
 .SH EXAMPLES
 .nf
 ls /bin | grep s > names

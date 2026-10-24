@@ -19,6 +19,7 @@ local root, cmdline = ...
 local VERSION = "0.2"
 local CONSOLE = "console" -- the device the console tty is on, unless the command line says (console=)
 local INIT = "/bin/sh" -- what runs on the console, unless the command line says (init=); started again when it ends
+local INIT_ARGS = {"-l"} -- a login shell, as login starts one (its /etc/profile)
 local SHELL = "/bin/sh" -- what runs the boot's script
 local RC = "/etc/rc" -- the boot's script, unless the command line says (rc=): run once, before init
 local LOADER = "/lib/ld.lua" -- where every process starts (an ELF program's PT_INTERP): every program is Lua, native to this CPU
@@ -890,6 +891,12 @@ function syscalls.uptime()
   return board.uptime() / TICKS_PER_SECOND
 end
 
+-- The real-time clock (the board's RTC: the world's game time), in seconds since the epoch, as
+-- clock_gettime(CLOCK_REALTIME): the time files are stamped with.
+function syscalls.time()
+  return board.time() / TICKS_PER_SECOND
+end
+
 -- sysinfo: the memory (the board's: the RAM installed, and what the VM holds of it), in bytes,
 -- and the seconds since boot.
 function syscalls.sysinfo()
@@ -1115,7 +1122,7 @@ function respawn()
   if kernel.respawning == false then
     return
   end
-  local p, why = spawn(kernel, options.init or INIT, {}, {pgid = 0})
+  local p, why = spawn(kernel, options.init or INIT, options.init and {} or INIT_ARGS, {pgid = 0})
   if not p then
     printk((options.init or INIT) .. ": " .. tostring(why))
     retryat = board.uptime() + RESPAWN_RETRY_TICKS

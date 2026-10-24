@@ -270,6 +270,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		}
 
 		@Override
+		public long time() {
+			return level == null ? 0 : level.getGameTime();
+		}
+
+		@Override
 		public List<Board.MemoryInfo> memory() {
 			List<Board.MemoryInfo> memory = new ArrayList<>();
 			for (int slot = 0; slot < CaseMenu.SATA_SLOTS - CaseMenu.RAM_SLOTS; slot++) {

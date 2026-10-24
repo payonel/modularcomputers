@@ -24,14 +24,18 @@ public final class LuaScripts {
 	 * Copies a set of the mod's Lua files ({@code <name>/} under {@link #ROOT}, mcos's say) into
 	 * {@code target}, as they are, folders and all: a disk that comes with files gets them this way.
 	 */
+	/** The user's files in an image: an update leaves them as they are. */
+	public static final String HOME = "home/";
+
 	public static void copyTree(String name, java.nio.file.Path target) {
 		copyTree(name, target, false);
 	}
 
 	/**
 	 * {@link #copyTree(String, java.nio.file.Path)}, writing over files already there when
-	 * {@code replace} (an update: everything else on the disk is left). Returns what it wrote: the
-	 * files, and the folders it made.
+	 * {@code replace} (an update: everything else on the disk is left), except in {@link #HOME}: the
+	 * user's, made if missing and never written over (as Linux's packages never touch /home).
+	 * Returns what it wrote: the files, and the folders it made.
 	 */
 	public static java.util.List<java.nio.file.Path> copyTree(String name, java.nio.file.Path target, boolean replace) {
 		String folder = ROOT + name;
@@ -43,6 +47,9 @@ public final class LuaScripts {
 		try {
 			for (String file : files) {
 				java.nio.file.Path to = target.resolve(file);
+				if (replace && file.startsWith(HOME) && java.nio.file.Files.exists(to)) {
+					continue; // (the user's: left as it is)
+				}
 				for (java.nio.file.Path dir = to.getParent(); dir != null && dir.startsWith(target) && !java.nio.file.Files.exists(dir); dir = dir.getParent()) {
 					written.add(0, dir);
 				}

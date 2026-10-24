@@ -395,6 +395,57 @@ class McosTest {
 	}
 
 	@Test
+	void theConsolesShellIsALoginShellRunningTheProfileThenTheShrc() {
+		boot(() -> file("home/.shrc", "touch /shrc-ran; alias mine='echo mine'\n"));
+		type("echo $HOME > /h; alias ll > /a; mine > /m; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("h"))).as("the profile's HOME").isEqualTo("/home\n");
+		assertThat(read(root().resolve("a"))).as("its aliases").contains("ls -alF");
+		assertThat(root().resolve("shrc-ran")).as("then the file ENV names").exists();
+		assertThat(read(root().resolve("m"))).as("in the shell itself").isEqualTo("mine\n");
+	}
+
+	@Test
+	void anUpdateLeavesTheUsersHomeAsItIs() throws IOException {
+		file("home/.shrc", "mine\n");
+		LuaScripts.copyTree("mcos", root(), true);
+		assertThat(read(root().resolve("home/.shrc"))).isEqualTo("mine\n");
+		assertThat(root().resolve("etc/profile")).as("the rest written").exists();
+	}
+
+	@Test
+	void dateIsTheWorldsClockOnItsCalendar() {
+		long noonOfTheThirdDay = 2 * 24000 + 6000; // (game time: 0 is the first sunrise, 6000 its noon)
+		machine.board().setChassis(new com.payonel.modularcomputers.machine.Chassis() {
+			@Override
+			public int tier() {
+				return 3;
+			}
+
+			@Override
+			public Board.PowerInfo power() {
+				return com.payonel.modularcomputers.machine.Chassis.BENCH.power();
+			}
+
+			@Override
+			public java.util.List<Board.MemoryInfo> memory() {
+				return com.payonel.modularcomputers.machine.Chassis.BENCH.memory();
+			}
+
+			@Override
+			public long time() {
+				return noonOfTheThirdDay;
+			}
+		});
+		boot();
+		type("date > /d1; date +%s > /d2; date +%H:%M > /d3; date +%Q 2> /dev/null; echo $? > /done\r");
+		untilFile(root().resolve("done"), "1\n");
+		assertThat(read(root().resolve("d1"))).isEqualTo("Day 3 12:00:00\n");
+		assertThat(read(root().resolve("d2"))).as("seconds since the epoch: game time's").isEqualTo(noonOfTheThirdDay / 20 + "\n");
+		assertThat(read(root().resolve("d3"))).isEqualTo("12:00\n");
+	}
+
+	@Test
 	void anAudioSensorsFileGivesASoundALine() {
 		com.payonel.modularcomputers.device.AudioSensorCard audio = new com.payonel.modularcomputers.device.AudioSensorCard();
 		devices.put(Motherboard.exp(0), audio); // (a card in a slot, as in a case)

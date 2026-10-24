@@ -20,6 +20,9 @@
 -- (a script stops there; at the prompt nothing on the line runs); a command ended by a signal 128 +
 -- its number. sh -c 'command' [name [args...]] and sh script [args...] run those; interactive on a
 -- tty, ^C drops the line being typed or ends the command in front, and end of file (^D) exits.
+-- sh -l is a login shell (the console's, a remote login's): it runs /etc/profile first; an
+-- interactive shell then runs the file $ENV names, if there is one (POSIX's), each as shell
+-- commands, in the shell itself (as . does).
 local sys = require("sys")
 local fs = require("fs")
 
@@ -1386,8 +1389,21 @@ local function reap()
 end
 
 -- The shell: its exit status (exit's, or its last command's).
+local PROFILE = "/etc/profile" -- what a login shell runs first
+
+-- A startup file, run in the shell (as . runs it), if it's there.
+local function startup(path)
+  if path and path ~= "" and sys.stat(path) then
+    runline(". " .. quote(path))
+  end
+end
+
 local function main(...)
   local args = table.pack(...)
+  local login = args[1] == "-l"
+  if login then
+    args = table.pack(table.unpack(args, 2, args.n))
+  end
   vars.PS1 = vars.PS1 or DEFAULT_PS1
   vars.PS2 = vars.PS2 or DEFAULT_PS2
   vars.PWD = sys.getcwd()
@@ -1414,6 +1430,12 @@ local function main(...)
     sys.signal("SIGINT", function() end) -- ^C: a read returns EINTR; the command in front ends
     readline = require("readline")
     editor = readline.new({complete = completions})
+  end
+  if login then
+    startup(PROFILE)
+  end
+  if interactive then
+    startup(vars.ENV)
   end
   -- A line: at a terminal the shell's own editor, else the input's next line; and why not (EINTR).
   local function nextline(ps)

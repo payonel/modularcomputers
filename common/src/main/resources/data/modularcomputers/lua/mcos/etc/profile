@@ -1,0 +1,7 @@
+# /etc/profile: a login shell (sh -l: the console's, a remote login's) runs this first, as shell
+# commands, in itself; then an interactive one runs the file ENV names.
+export HOME=/home
+export ENV=$HOME/.shrc
+alias ll='ls -alF'
+alias la='ls -a'
+alias l='ls -CF'

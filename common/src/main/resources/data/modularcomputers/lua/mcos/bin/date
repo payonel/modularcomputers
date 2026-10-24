@@ -1,0 +1,18 @@
+-- date [+FORMAT]: the date and time, by the board's real-time clock (the world's): "Day 3 14:05:09"
+-- (the world's calendar: days from 1, its hours as Minecraft counts them, sunrise at 06:00); with
+-- +FORMAT, as os.date formats it (%d the day, %H %M %S %T %R, %s seconds since the epoch, %c, %%).
+local format = "%c"
+if arg[1] then
+  if arg[1]:sub(1, 1) ~= "+" or arg[2] then
+    io.stderr:write("usage: date [+FORMAT]\n")
+    return 1
+  end
+  format = arg[1]:sub(2)
+end
+local ok, text = pcall(os.date, format)
+if not ok then
+  io.stderr:write("date: ", tostring(text):gsub("^.-: ", ""), "\n")
+  return 1
+end
+print(text)
+return 0

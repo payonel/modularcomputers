@@ -124,6 +124,9 @@ public interface Board {
 	/** Ticks since the machine was powered on. */
 	long uptime();
 
+	/** The real-time clock: the world's game time, in ticks ({@link com.payonel.modularcomputers.machine.Chassis#time}). */
+	long time();
+
 	/**
 	 * Halts the CPU for good, like {@code cli; hlt} or Linux's {@code reboot(HALT)}: the program
 	 * ends here and never returns, and power stays on (the screens keep what they show). A

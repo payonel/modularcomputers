@@ -27,7 +27,7 @@ local function login(conn, decoder, columns, rows)
     return "exited 1"
   end
   sys.ioctl(master, "TIOCSWINSZ", {columns, rows})
-  local pid = sys.spawn("/bin/sh", {}, {setsid = true, fds = {[0] = terminal, [1] = terminal, [2] = terminal}})
+  local pid = sys.spawn("/bin/sh", {"-l"}, {setsid = true, fds = {[0] = terminal, [1] = terminal, [2] = terminal}}) -- (a login)
   sys.close(terminal)
   if not pid then
     sys.close(master)

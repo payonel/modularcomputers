@@ -74,12 +74,47 @@ function os.rename(from, to)
   end
   return true
 end
--- With no real-time clock the time is seconds since boot (a board without an RTC starts at the epoch).
+-- The time is the board's real-time clock: the world's, in seconds since the epoch (its start).
+-- Dates are the world's calendar, not the Gregorian one: days numbered from 1, each 24 of the game's
+-- hours (a day of the world is 1200 seconds), the epoch at the first day's sunrise, 06:00, as
+-- Minecraft counts it (its time of day 0). os.date's fields are day, hour, min and sec (and yday,
+-- the day again); its formats %d (the day), %H %M %S %T %R, %s (seconds since the epoch), %c
+-- ("Day %d %T", its default), %n %t %%.
+local DAY_SECONDS = 1200 -- a world's day
+local SUNRISE = 6 -- the hour the epoch is at
 function os.time(t)
-  if t then
-    error("os.time: dates aren't supported yet", 2)
+  if not t then
+    return math.floor(sys.time())
   end
-  return math.floor(sys.uptime())
+  local seconds = ((t.day or 1) - 1) * 24 * 3600 + ((t.hour or 12) - SUNRISE) * 3600 + (t.min or 0) * 60 + (t.sec or 0)
+  return math.floor(seconds * DAY_SECONDS / (24 * 3600))
+end
+function os.date(format, t)
+  format = format or "%c"
+  local utc = format:sub(1, 1) == "!"
+  format = utc and format:sub(2) or format -- (one clock: the world's)
+  t = t or sys.time()
+  local game = math.floor(t * 24 * 3600 / DAY_SECONDS) + SUNRISE * 3600 -- game seconds since the first midnight
+  local d = {day = game // 86400 + 1, hour = game % 86400 // 3600, min = game % 3600 // 60, sec = game % 60}
+  d.yday = d.day
+  if format == "*t" then
+    return d
+  end
+  format = format:gsub("%%c", "Day %%d %%T")
+  return (format:gsub("%%(.)", function(c)
+    if c == "d" then return tostring(d.day)
+    elseif c == "H" then return ("%02d"):format(d.hour)
+    elseif c == "M" then return ("%02d"):format(d.min)
+    elseif c == "S" then return ("%02d"):format(d.sec)
+    elseif c == "T" then return ("%02d:%02d:%02d"):format(d.hour, d.min, d.sec)
+    elseif c == "R" then return ("%02d:%02d"):format(d.hour, d.min)
+    elseif c == "s" then return tostring(math.floor(t))
+    elseif c == "n" then return "\n"
+    elseif c == "t" then return "\t"
+    elseif c == "%" then return "%"
+    end
+    error("os.date: unsupported format %" .. c, 3)
+  end))
 end
 function os.clock()
   return sys.uptime()

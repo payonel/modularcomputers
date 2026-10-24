@@ -1,0 +1,60 @@
+.TH DATE 1 "" "" "mcos Manual"
+.SH NAME
+date \- print the date and time
+.SH SYNOPSIS
+.B date
+.RI [ +FORMAT ]
+.SH DESCRIPTION
+.B date
+prints the date and time by the board's real-time clock, which keeps the world's
+time: the clock files on disks are stamped with.
+.PP
+Dates are the world's calendar: days are numbered from 1, and a day has 24 of
+the game's hours, as Minecraft counts them, so 06:00 is sunrise and 18:00
+sunset.
+The first day's sunrise is the epoch.
+A day of the world is 20 minutes of real time.
+.PP
+With no
+.IR FORMAT ,
+it prints
+.BR "Day 3 14:05:09" .
+.SH OPTIONS
+.TP
+.BI + FORMAT
+What to print, as
+.B os.date
+formats it:
+.B %d
+the day,
+.B %H
+.B %M
+.B %S
+the hour, minute and second,
+.B %T
+all three,
+.B %R
+hours and minutes,
+.B %s
+seconds since the epoch,
+.B %c
+the default,
+.B %%
+a percent sign.
+.SH EXIT STATUS
+0 when it printed; 1 for a format it does not know.
+.SH EXAMPLES
+.nf
+date
+date +%H:%M
+date +%s
+.fi
+.SH NOTES
+GNU
+.B date
+prints the Gregorian calendar's date, and can set the clock
+.RB ( \-s );
+mcos's world has no months or years, and its clock is the world's, which no
+program sets.
+.SH SEE ALSO
+.BR uptime (1)

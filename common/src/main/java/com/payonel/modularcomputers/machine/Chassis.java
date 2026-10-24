@@ -36,4 +36,12 @@ public interface Chassis {
 
 	/** The RAM sticks in its slots. */
 	List<Board.MemoryInfo> memory();
+
+	/**
+	 * Its real-time clock, as a PC's RTC keeps the date through power-off: the world's game time, in
+	 * ticks (the one disks stamp files with). Without a world (a bench), it stays at 0, the epoch.
+	 */
+	default long time() {
+		return 0;
+	}
 }

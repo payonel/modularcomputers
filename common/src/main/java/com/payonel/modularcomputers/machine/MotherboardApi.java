@@ -157,6 +157,11 @@ final class MotherboardApi implements Board {
 		return uptime.getAsLong();
 	}
 
+	@Override
+	public long time() {
+		return board.chassis().time();
+	}
+
 	/** Halting is the program runner's: it stops the program's thread, so it never reaches the host as a call. */
 	@Override
 	public void halt() {

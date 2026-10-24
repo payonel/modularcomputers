@@ -173,6 +173,9 @@ blank, and its files leave the world save when the player takes it.
 - **A device is on one bus at a time** (`BusHolds`): whichever board has it first holds it; holds
   are worked out afresh as boards load, never saved (long cables and unloaded chunks would desync
   them).
+- **The board's real-time clock is the world's:** game time (`Chassis.time`), the one disks stamp
+  files with. mcos's dates are the world's calendar (days from 1, the game's hours, the epoch the
+  first sunrise at 06:00), not the Gregorian one: the world has no months.
 - **Power is lazy:** devices and batteries settle what they owe when someone looks (every 20 ticks,
   or at an event), from game time; nothing ticks per device (big builds).
 - **Power is named in one place** (`PowerUnits.rate`, `amount`): a unit a tick shows as a watt,
@@ -352,6 +355,10 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   replace those or add actions. `/etc/rc.conf` (`name_enable=YES`) says what starts at boot. `rc`
   starts one with `setsid` (no controlling tty, no ^C). The kernel stays init (it respawns the
   console's shell): a user-space PID 1 would stay resident for nothing.
+- **Login shells** (`sh -l`: the console's, rshd's logins) run `/etc/profile`, then an interactive
+  shell the file `$ENV` names (POSIX's), as shell commands in the shell: mcos's profile sets
+  `HOME=/home`, `ENV=$HOME/.shrc` and a few aliases. `/home` is the user's: an update of mcos never
+  writes over it (`LuaScripts.HOME`).
 - **ptys** (`sys.openpty`): a tty whose terminal is a program, its master end, through the same line
   discipline as a keyboard's, output bounded (a writer waits), so a remote shell only relays and the
   kernel does the tty work. `spawn`'s `setsid` gives the child its stdin's tty as its controlling
@@ -401,7 +408,7 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   (`lua/mcos/usr/share/man/man1/<name>.1`); a new program gets one (options, behavior, exit
   statuses, NOTES where it differs from GNU), using only the macros `/bin/man` supports. A test
   renders every page. **A program's header comment is its spec:** keep it true.
-- **Data files under `lua/` that aren't Lua** go under a `share/` folder or mcos's `/etc` (settings,
+- **Data files under `lua/` that aren't Lua** go under a `share/` folder, mcos's `/home` or its `/etc` (settings,
   sh scripts; `/etc/rc.d`'s services are Lua): `LuaScriptsTest` compiles every other file as Lua.
 - **Textures and sounds** change through their script in `scripts/`, then regenerate.
 - **A decision** goes in this file when it's made; **an idea not built yet** in `docs/PLAN.md`.
