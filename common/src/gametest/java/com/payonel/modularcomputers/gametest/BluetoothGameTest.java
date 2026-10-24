@@ -205,7 +205,7 @@ public class BluetoothGameTest {
 		helper.setBlock(new BlockPos(2, 1, 6), ModBlocks.EXPANSION_HUB);
 		ExpansionHubBlockEntity hub2 = helper.getBlockEntity(new BlockPos(2, 1, 6), ExpansionHubBlockEntity.class);
 		hub2.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(null)); // hub 2's radio, to link to
-		hub2.cards().setItem(0, new ItemStack(ModItems.WLAN_CARD));
+		hub2.cards().setItem(0, new ItemStack(ModItems.TIER2_WLAN_CARD));
 		cable(helper, new BlockPos(3, 1, 6));
 		ScreenBlockEntity screen = screen(helper, new BlockPos(4, 1, 6));
 		hub1.cards().setItem(0, new ItemStack(ModItems.SOUND_CARD));
@@ -213,7 +213,7 @@ public class BluetoothGameTest {
 		helper.succeedWhen(() -> {
 			helper.assertTrue(onBus(computer, screen), "the screen past hub 2");
 			helper.assertValueEqual(computer.busEntries().stream().filter(AllInOneBlockEntity.BusEntry::cabled)
-				.map(entry -> entry.name().getString()).toList(), List.of("Sound Card", "WLAN Card", "Tier 3 Screen"), "hub 1's card, hub 2's, the screen");
+				.map(entry -> entry.name().getString()).toList(), List.of("Sound Card", "Tier 2 WLAN Card", "Tier 3 Screen"), "hub 1's card, hub 2's, the screen");
 		});
 	}
 

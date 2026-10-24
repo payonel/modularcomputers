@@ -57,7 +57,7 @@ public class KeepPartsGameTest {
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER1_RAM));
-		computer.parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.WLAN_CARD));
+		computer.parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.TIER2_WLAN_CARD));
 		UUID board = computer.boardId();
 		UUID card = computer.parts().getItem(CaseMenu.EXP_SLOTS + 1).get(ModComponents.SERIAL);
 		computer.busOrder().restore(List.of(new com.payonel.modularcomputers.bus.BusOrder.Entry("id:somewhere", 5)), List.of());
@@ -68,12 +68,12 @@ public class KeepPartsGameTest {
 		helper.assertValueEqual(item.getItem(), ModBlocks.TIER2_CASE.asItem(), "the case");
 		List<Item> inside = item.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).nonEmptyItemCopyStream()
 			.map(ItemStack::getItem).toList();
-		helper.assertValueEqual(inside, List.of(ModItems.TIER2_CPU, ModItems.EEPROM, ModItems.TIER1_BATTERY, ModItems.TIER1_RAM, ModItems.WLAN_CARD),
+		helper.assertValueEqual(inside, List.of(ModItems.TIER2_CPU, ModItems.EEPROM, ModItems.TIER1_BATTERY, ModItems.TIER1_RAM, ModItems.TIER2_WLAN_CARD),
 			"its parts are in the item");
 		helper.assertValueEqual(item.get(ModComponents.SERIAL), board, "its board id is the item's id");
 		// Its hint lists what's inside: the bus devices in bus order, then the rest.
 		List<String> hint = com.payonel.modularcomputers.hint.Hint.lines(com.payonel.modularcomputers.hint.Hint.of(item, false));
-		helper.assertValueEqual(hint.subList(0, 5), List.of("ROM: EEPROM", "EXP 2: WLAN Card", "CPU: Tier 2 CPU", "RAM 1: Tier 1 RAM",
+		helper.assertValueEqual(hint.subList(0, 5), List.of("ROM: EEPROM", "EXP 2: Tier 2 WLAN Card", "CPU: Tier 2 CPU", "RAM 1: Tier 1 RAM",
 			"UPS 1: Tier 1 Battery"), "the hint's list of parts");
 		helper.assertTrue(!item.get(DataComponents.TOOLTIP_DISPLAY).shows(DataComponents.CONTAINER), "vanilla's own list is hidden");
 

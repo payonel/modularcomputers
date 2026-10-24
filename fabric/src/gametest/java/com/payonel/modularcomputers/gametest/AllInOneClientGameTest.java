@@ -160,7 +160,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			BufferedImage cpuHover = read(context.takeScreenshot("all-in-one-case-cpu-hover"));
 			check(slotOutlined(context, cpuHover, CaseMenu.CPU_SLOT), "hovering the CPU should outline its socket");
 			check(!slotOutlined(context, cpuHover, CaseMenu.EEPROM_SLOT), "but not the ROM slot");
-			int card = inventoryMenuSlotOf(context, ModItems.WLAN_CARD);
+			int card = inventoryMenuSlotOf(context, ModItems.TIER2_WLAN_CARD);
 			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(card));
 			context.waitTicks(2);
 			BufferedImage cardHover = read(context.takeScreenshot("all-in-one-case-card-hover"));
@@ -221,7 +221,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 				}
 				parts.setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.TIER1_HARD_DISK));
 				parts.setItem(CaseMenu.SATA_SLOTS + 2, new ItemStack(ModItems.TIER1_HARD_DISK));
-				parts.setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.WLAN_CARD));
+				parts.setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.TIER2_WLAN_CARD));
 				parts.setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 			});
 			context.waitFor(client -> ((CaseScreen) client.gui.screen()).getMenu().slots.get(CaseMenu.UPS_SLOT).hasItem());

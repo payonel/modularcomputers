@@ -10,7 +10,7 @@ import net.minecraft.core.BlockPos;
  * What carries network cards' frames (user design, 2026-10-21): the cables, for network cards
  * (every card the cables reach from its block, as the bus's walk finds devices: through hubs and
  * screens, across Bluetooth links, ending at computers), and the air, for WLAN cards (every one
- * within {@link NetworkCard#RANGE} blocks). A wired card hears only wired ones, a WLAN card only
+ * within the sender's signal strength, {@link NetworkCard#range}). A wired card hears only wired ones, a WLAN card only
  * WLAN ones, as Ethernet and Wi-Fi are separate networks until something routes between them.
  * <p>
  * Each card says where it is as its block ticks ({@link NetworkCard#place}); one that hasn't for
@@ -46,7 +46,7 @@ public final class Ether {
 		}
 		for (NetworkCard card : cards) {
 			Place there = card.place();
-			if (card == from || card.kind() != from.kind() || there == null || there.world() != here.world()
+			if (card == from || card.wireless() != from.wireless() || there == null || there.world() != here.world()
 				|| there.seen() < here.seen() - STALE_TICKS) {
 				continue;
 			}
@@ -86,7 +86,7 @@ public final class Ether {
 	private static Double distance(NetworkCard from, Place here, Place there) {
 		if (from.wireless()) {
 			double meters = Math.sqrt(here.pos().distSqr(there.pos()));
-			return meters <= NetworkCard.RANGE ? Math.round(meters * 10) / 10.0 : null;
+			return meters <= from.range() ? Math.round(meters * 10) / 10.0 : null; // (the sender's strength)
 		}
 		if (here.pos().equals(there.pos())) {
 			return 0.0; // two cards in one block: on the same wire

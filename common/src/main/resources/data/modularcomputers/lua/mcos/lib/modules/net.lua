@@ -29,8 +29,10 @@
 --
 -- Interfaces are named as Linux's: eth0 for the first wired card, wlan0 for the first WLAN card.
 -- The ioctls (by their Linux names): SIOCGIFCONF (the interfaces: {name, address, wireless} each),
--- and two of ethtool's: ETHTOOL_GWOL (an interface's wake message, or nil) and ETHTOOL_SWOL
--- ({name, wake}: sets it; nil or empty, none).
+-- two of ethtool's: ETHTOOL_GWOL (an interface's wake message, or nil) and ETHTOOL_SWOL
+-- ({name, wake}: sets it; nil or empty, none); and the wireless extensions' transmit power:
+-- SIOCGIWTXPOW (a WLAN interface's, as the blocks its signal reaches: OpenComputers' strength)
+-- and SIOCSIWTXPOW ({name, txpower}: up to its card's tier, 16 or 400; answers what it's set to).
 local k, vfs = ...
 
 local UDP, TCP = 17, 6
@@ -713,6 +715,20 @@ function net.ioctl(socket, op, arg)
       return fail("EINVAL")
     end
     return true
+  elseif op == "SIOCGIWTXPOW" or op == "SIOCSIWTXPOW" and type(arg) == "table" and math.type(arg.txpower) == "integer" then
+    if not nic.wireless then
+      return fail("EOPNOTSUPP")
+    end
+    local ok, strength
+    if op == "SIOCGIWTXPOW" then
+      ok, strength = board.invoke(nic.id, "getStrength")
+    else
+      ok, strength = board.invoke(nic.id, "setStrength", arg.txpower)
+    end
+    if not ok then
+      return fail("EIO")
+    end
+    return strength
   end
   return fail("EINVAL")
 end

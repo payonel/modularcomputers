@@ -60,7 +60,9 @@ public final class ModItems {
 	public static final List<DiskItem> HARD_DISKS = List.of(TIER1_HARD_DISK, TIER2_HARD_DISK, TIER3_HARD_DISK);
 	/** Expansion cards, for a computer's expansion slots or an expansion hub. */
 	public static final Item NETWORK_CARD = register("network_card");
-	public static final Item WLAN_CARD = register("wlan_card");
+	/** WLAN cards: tier 1 reaches 16 blocks, tier 2 400 (OpenComputers' wireless cards). */
+	public static final Item TIER1_WLAN_CARD = register("tier1_wlan_card");
+	public static final Item TIER2_WLAN_CARD = register("tier2_wlan_card");
 	public static final Item BLUETOOTH_CARD = register("bluetooth_card", BluetoothCardItem::new, UnaryOperator.identity());
 	public static final Item REDSTONE_CARD = register("redstone_card");
 	public static final Item SOUND_CARD = register("sound_card");
@@ -81,7 +83,8 @@ public final class ModItems {
 	private static Map<Item, CardKind> cards() {
 		Map<Item, CardKind> cards = new LinkedHashMap<>();
 		cards.put(NETWORK_CARD, CardKind.NETWORK);
-		cards.put(WLAN_CARD, CardKind.WLAN);
+		cards.put(TIER1_WLAN_CARD, CardKind.TIER1_WLAN);
+		cards.put(TIER2_WLAN_CARD, CardKind.TIER2_WLAN);
 		cards.put(BLUETOOTH_CARD, CardKind.BLUETOOTH);
 		cards.put(REDSTONE_CARD, CardKind.REDSTONE);
 		cards.put(SOUND_CARD, CardKind.SOUND);

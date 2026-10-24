@@ -44,10 +44,10 @@ class NetworkCardTest {
 
 	@Test
 	void aFrameGoesToTheCardAtItsAddressAcknowledgedAndABroadcastToEveryCardInRange() {
-		NetworkCard a = card(CardKind.WLAN, BlockPos.ZERO);
-		NetworkCard b = card(CardKind.WLAN, new BlockPos(3, 4, 0));
-		NetworkCard c = card(CardKind.WLAN, new BlockPos(0, 0, 10));
-		NetworkCard far = card(CardKind.WLAN, new BlockPos(NetworkCard.RANGE + 1, 0, 0));
+		NetworkCard a = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
+		NetworkCard b = card(CardKind.TIER2_WLAN, new BlockPos(3, 4, 0));
+		NetworkCard c = card(CardKind.TIER2_WLAN, new BlockPos(0, 0, 10));
+		NetworkCard far = card(CardKind.TIER2_WLAN, new BlockPos(NetworkCard.TIER2_RANGE + 1, 0, 0));
 		assertThat(a.send(args(b.address(), "hello")).first()).as("acknowledged").isEqualTo(true);
 		assertThat(received(b)).containsEntry("from", a.address()).containsEntry("data", "hello").containsEntry("distance", 5.0)
 			.doesNotContainKey("broadcast");
@@ -67,7 +67,7 @@ class NetworkCardTest {
 		NetworkCard b = card(CardKind.NETWORK, new BlockPos(100, 0, 0));
 		NetworkCard near = card(CardKind.NETWORK, new BlockPos(1, 0, 0));
 		NetworkCard sibling = card(CardKind.NETWORK, BlockPos.ZERO);
-		NetworkCard wireless = card(CardKind.WLAN, BlockPos.ZERO);
+		NetworkCard wireless = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
 		a.reach(Map.of(new BlockPos(100, 0, 0), 120));
 		a.broadcast(args("on the wire"));
 		assertThat(received(b)).containsEntry("data", "on the wire").containsEntry("distance", 120.0);
@@ -78,10 +78,10 @@ class NetworkCardTest {
 
 	@Test
 	void aCardNotSeenLatelyOrInAnotherWorldIsntThere() {
-		NetworkCard a = card(CardKind.WLAN, BlockPos.ZERO);
-		NetworkCard gone = card(CardKind.WLAN, BlockPos.ZERO);
+		NetworkCard a = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
+		NetworkCard gone = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
 		gone.place(world, BlockPos.ZERO, NOW - Ether.STALE_TICKS - 1);
-		NetworkCard elsewhere = card(CardKind.WLAN, BlockPos.ZERO);
+		NetworkCard elsewhere = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
 		elsewhere.place(new Object(), BlockPos.ZERO, NOW);
 		assertThat(a.send(args(gone.address(), "x")).first()).isEqualTo(false);
 		assertThat(a.send(args(elsewhere.address(), "x")).first()).isEqualTo(false);
@@ -89,8 +89,8 @@ class NetworkCardTest {
 
 	@Test
 	void aFrameTooLongIsRefusedAndFramesWaitInOrderWhileAProgramRuns() {
-		NetworkCard a = card(CardKind.WLAN, BlockPos.ZERO);
-		NetworkCard b = card(CardKind.WLAN, BlockPos.ZERO);
+		NetworkCard a = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
+		NetworkCard b = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
 		Result tooLong = com.payonel.modularcomputers.runtime.DeviceMethods.invoke(a, "send", args(b.address(), "x".repeat(NetworkCard.MTU + 1)));
 		assertThat(tooLong.failed()).isTrue();
 		a.send(args(b.address(), "1"));
@@ -106,8 +106,8 @@ class NetworkCardTest {
 
 	@Test
 	void aFrameHoldingTheWakeMessageTurnsItsComputerOnWhileItsOff() {
-		NetworkCard sender = card(CardKind.WLAN, BlockPos.ZERO);
-		NetworkCard card = new NetworkCard(CardKind.WLAN);
+		NetworkCard sender = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
+		NetworkCard card = new NetworkCard(CardKind.TIER2_WLAN);
 		UUID id = UUID.randomUUID();
 		card.idFrom(() -> id);
 		card.place(world, BlockPos.ZERO, NOW);
@@ -128,8 +128,8 @@ class NetworkCardTest {
 
 	@Test
 	void aFullCardRefusesAFrameAndTheSenderHearsItsBusyNothingDropped() {
-		NetworkCard a = card(CardKind.WLAN, BlockPos.ZERO);
-		NetworkCard b = card(CardKind.WLAN, BlockPos.ZERO);
+		NetworkCard a = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
+		NetworkCard b = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
 		int sent = 0;
 		while (a.send(args(b.address(), "f" + sent)).first().equals(true)) {
 			sent++;
@@ -142,5 +142,21 @@ class NetworkCardTest {
 			assertThat(received(b)).containsEntry("data", "f" + i);
 		}
 		assertThat(received(b)).containsEntry("data", "more");
+	}
+
+	@Test
+	void aWlanCardsTierSetsItsReachAndItsStrengthTurnsItDown() {
+		NetworkCard small = card(CardKind.TIER1_WLAN, BlockPos.ZERO);
+		NetworkCard near = card(CardKind.TIER1_WLAN, new BlockPos(NetworkCard.TIER1_RANGE, 0, 0));
+		NetworkCard beyond = card(CardKind.TIER2_WLAN, new BlockPos(NetworkCard.TIER1_RANGE + 1, 0, 0));
+		assertThat(small.range()).as("OpenComputers' tier 1").isEqualTo(16);
+		assertThat(new NetworkCard(CardKind.TIER2_WLAN).range()).as("and tier 2").isEqualTo(400);
+		assertThat(small.broadcast(new Arguments(List.of("hi"))).first()).as("16 blocks: only the near one").isEqualTo(1L);
+		assertThat(small.setStrength(new Arguments(List.of(1000L))).first()).as("up to its tier's").isEqualTo(16L);
+		assertThat(small.setStrength(new Arguments(List.of(5L))).first()).isEqualTo(5L);
+		assertThat(small.broadcast(new Arguments(List.of("hi"))).first()).as("turned down: none").isEqualTo(0L);
+		assertThat(beyond.broadcast(new Arguments(List.of("hi"))).first()).as("a tier 2 reaches both").isEqualTo(2L);
+		assertThat(card(CardKind.NETWORK, BlockPos.ZERO).getStrength(args()).failed()).as("wired: none").isTrue();
+		assertThat(near.wireless()).isTrue();
 	}
 }

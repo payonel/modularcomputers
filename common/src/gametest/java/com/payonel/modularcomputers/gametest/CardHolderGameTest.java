@@ -77,7 +77,7 @@ public class CardHolderGameTest {
 		AllInOneBlockEntity computer = computer(helper);
 		ExpansionHubBlockEntity hub = hub(helper, new BlockPos(2, 1, 1)); // right against the computer
 		hub.cards().setItem(0, new ItemStack(ModItems.SOUND_CARD));
-		hub.cards().setItem(1, new ItemStack(ModItems.WLAN_CARD));
+		hub.cards().setItem(1, new ItemStack(ModItems.TIER2_WLAN_CARD));
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertValueEqual(locations(computer), List.of("hub 1, 1m", "hub 2, 1m"), "both cards"))
 			.thenExecute(() -> {
@@ -94,10 +94,10 @@ public class CardHolderGameTest {
 	public void aHubCardKeepsItsPlaceWhenItMovesToAnotherSlot(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper);
 		ExpansionHubBlockEntity hub = hub(helper, new BlockPos(2, 1, 1));
-		hub.cards().setItem(0, new ItemStack(ModItems.WLAN_CARD));
+		hub.cards().setItem(0, new ItemStack(ModItems.TIER2_WLAN_CARD));
 		hub.cards().setItem(1, new ItemStack(ModItems.BLUETOOTH_CARD));
 		helper.startSequence()
-			.thenWaitUntil(() -> helper.assertValueEqual(names(computer), List.of("WLAN Card", "Bluetooth Card"), "both cards"))
+			.thenWaitUntil(() -> helper.assertValueEqual(names(computer), List.of("Tier 2 WLAN Card", "Bluetooth Card"), "both cards"))
 			.thenExecute(() -> {
 				helper.assertTrue(hub.cards().getItem(0).has(ModComponents.SERIAL), "a card gets a serial number in a hub");
 				hub.cards().removeItem(1, 1); // the Bluetooth card comes out: missing
@@ -105,7 +105,7 @@ public class CardHolderGameTest {
 			.thenWaitUntil(() -> helper.assertValueEqual(locations(computer), List.of("hub 1, 1m", "offline"), "the Bluetooth card is offline"))
 			.thenExecute(() -> hub.cards().setItem(1, hub.cards().removeItem(0, 1))) // the WLAN card moves into its slot
 			.thenWaitUntil(() -> helper.assertValueEqual(locations(computer), List.of("hub 2, 1m", "offline"), "the WLAN card moved"))
-			.thenExecute(() -> helper.assertValueEqual(names(computer), List.of("WLAN Card", "Bluetooth Card"),
+			.thenExecute(() -> helper.assertValueEqual(names(computer), List.of("Tier 2 WLAN Card", "Bluetooth Card"),
 				"one WLAN row, in its place, and the Bluetooth card still offline"))
 			.thenSucceed();
 	}

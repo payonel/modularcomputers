@@ -1,6 +1,6 @@
 {
 	"parent": "minecraft:item/generated",
 	"textures": {
-		"layer0": "modularcomputers:item/wlan_card"
+		"layer0": "modularcomputers:item/tier2_wlan_card"
 	}
 }

@@ -13,7 +13,7 @@ public final class Cards {
 			case AUDIO_SENSOR -> new AudioSensorCard();
 			case BLUETOOTH -> new BluetoothCard();
 			case SOUND -> new SoundCard();
-			case NETWORK, WLAN -> new NetworkCard(kind);
+			case NETWORK, TIER1_WLAN, TIER2_WLAN -> new NetworkCard(kind);
 			default -> new Card(kind);
 		};
 	}

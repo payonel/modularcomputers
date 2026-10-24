@@ -273,14 +273,18 @@ def hard_disk_item(tier=1):
 	im.putpixel((12, 5), (90, 230, 110, 255))
 	return im
 
-def wlan_card_item():
-	"""An expansion card: green board, metal bracket, antenna, gold fingers."""
+def wlan_card_item(tier):
+	"""An expansion card: green board, metal bracket, gold fingers, and an antenna: tier 1's short
+	(16 blocks, as OpenComputers'), tier 2's long, with a gold stripe on its chip (400)."""
 	im = item_canvas()
 	rect(im, 2, 6, 12, 11, (46, 116, 64, 255))
 	rect(im, 13, 4, 13, 13, (190, 194, 202, 255))  # bracket
-	rect(im, 14, 1, 14, 6, (40, 40, 46, 255))  # antenna
-	im.putpixel((14, 0), (40, 40, 46, 255))
+	top = 4 if tier == 1 else 0
+	rect(im, 14, top + 1, 14, 6, (40, 40, 46, 255))  # antenna
+	im.putpixel((14, top), (40, 40, 46, 255))
 	rect(im, 4, 7, 7, 9, (30, 30, 34, 255))  # chip
+	if tier == 2:
+		rect(im, 4, 8, 7, 8, (214, 170, 40, 255))
 	for x in range(3, 12, 2):
 		im.putpixel((x, 12), (222, 182, 70, 255))
 	return im
@@ -394,7 +398,7 @@ for name, fn in [("tier1_cpu", tier1_cpu_item), ("tier2_cpu", tier2_cpu_item), (
 		("java_cpu", java_cpu_item), ("java_eeprom", java_eeprom_item),
 		("tier1_ram", lambda: ram_item(1)), ("tier2_ram", lambda: ram_item(2)), ("tier3_ram", lambda: ram_item(3)),
 		("tier1_hard_disk", lambda: hard_disk_item(1)), ("tier2_hard_disk", lambda: hard_disk_item(2)), ("tier3_hard_disk", lambda: hard_disk_item(3)),
-		("wlan_card", wlan_card_item), ("network_card", network_card_item), ("tier1_battery", tier1_battery_item), ("tier2_battery", tier2_battery_item), ("tier3_battery", tier3_battery_item), ("redstone_card", redstone_card_item),
+		("tier1_wlan_card", lambda: wlan_card_item(1)), ("tier2_wlan_card", lambda: wlan_card_item(2)), ("network_card", network_card_item), ("tier1_battery", tier1_battery_item), ("tier2_battery", tier2_battery_item), ("tier3_battery", tier3_battery_item), ("redstone_card", redstone_card_item),
 		("sound_card", sound_card_item), ("motion_sensor_card", motion_sensor_card_item), ("audio_sensor_card", audio_sensor_card_item),
 		("weather_sensor_card", weather_sensor_card_item), ("bluetooth_card", bluetooth_card_item)]:
 	fn().save(f"{OUT}/../item/{name}.png")

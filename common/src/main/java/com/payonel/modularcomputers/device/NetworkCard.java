@@ -35,8 +35,10 @@ import net.minecraft.core.BlockPos;
  * pattern-matching NIC does. The setting outlasts power off, as a NIC's does.
  */
 public final class NetworkCard extends Card {
-	/** How far a WLAN card reaches, in blocks. */
-	public static final int RANGE = 64;
+	/** How far a tier 1 WLAN card reaches at most, in blocks (OpenComputers' tier 1 wireless card's). */
+	public static final int TIER1_RANGE = 16;
+	/** And a tier 2 (OpenComputers' tier 2's, its default maxWirelessRange). */
+	public static final int TIER2_RANGE = 400;
 	/** The most data a frame carries, in bytes (OpenComputers' packet size). */
 	public static final int MTU = 8192;
 	/** What a wired card draws a tick, at rest. */
@@ -45,8 +47,12 @@ public final class NetworkCard extends Card {
 	public static final int WIRELESS_DRAW = 5;
 	/** What sending a frame costs a wired card. */
 	public static final int WIRED_SEND_COST = PowerUnits.CPU / 10;
-	/** What sending a frame costs a WLAN card: a tick of a running CPU. */
-	public static final int WIRELESS_SEND_COST = PowerUnits.CPU;
+	/**
+	 * What sending a frame costs a WLAN card for each block its signal reaches (OpenComputers'
+	 * wirelessCostPerRange: a farther signal costs more): a tier 1 at its strongest, a tick of a
+	 * running CPU.
+	 */
+	public static final double WIRELESS_SEND_COST_PER_BLOCK = (double) PowerUnits.CPU / TIER1_RANGE;
 	/** The longest wake message, in bytes. */
 	public static final int MAX_WAKE = 256;
 	private final InterruptLine line = new InterruptLine();
@@ -58,14 +64,31 @@ public final class NetworkCard extends Card {
 	private volatile Map<BlockPos, Integer> reach = Map.of();
 	/** What wakes its computer, or null: it doesn't. */
 	private String wakeMessage;
+	/** How far a WLAN card's signal reaches now, in blocks: at most its tier's, as set (OpenComputers' strength). */
+	private int strength;
 
 	public NetworkCard(CardKind kind) {
 		super(kind);
-		power = new BusPower(kind == CardKind.WLAN ? WIRELESS_DRAW : WIRED_DRAW);
+		power = new BusPower(kind == CardKind.NETWORK ? WIRED_DRAW : WIRELESS_DRAW);
+		strength = maxRange();
 	}
 
 	public boolean wireless() {
-		return kind() == CardKind.WLAN;
+		return kind() != CardKind.NETWORK;
+	}
+
+	/** How far its signal can reach at most, in blocks (a WLAN card's tier; 0 wired). */
+	public int maxRange() {
+		return switch (kind()) {
+			case TIER1_WLAN -> TIER1_RANGE;
+			case TIER2_WLAN -> TIER2_RANGE;
+			default -> 0;
+		};
+	}
+
+	/** How far its signal reaches now (a WLAN card's). */
+	public int range() {
+		return strength;
 	}
 
 	/** Its address: its id, or null before it has one. */
@@ -145,8 +168,23 @@ public final class NetworkCard extends Card {
 		if (data.length() > MTU) {
 			throw new Arguments.ArgumentError("frame too long: " + data.length() + " bytes, at most " + MTU);
 		}
-		power.charge(wireless() ? WIRELESS_SEND_COST : WIRED_SEND_COST);
+		power.charge(wireless() ? (int) Math.ceil(strength * WIRELESS_SEND_COST_PER_BLOCK) : WIRED_SEND_COST);
 		return data;
+	}
+
+	@Method(doc = "getStrength(): how far its signal reaches, in blocks (a WLAN card's; OpenComputers')")
+	public Result getStrength(Arguments args) {
+		return wireless() ? Result.ok((long) strength) : Result.fail("a wired card has no signal strength");
+	}
+
+	@Method(doc = "setStrength(blocks): how far its signal reaches, up to its tier's (16, 400); a send costs more the farther it reaches; returns what it's set to")
+	public Result setStrength(Arguments args) {
+		if (!wireless()) {
+			return Result.fail("a wired card has no signal strength");
+		}
+		strength = (int) Math.clamp(args.checkInteger(0), 0, maxRange());
+		changed(); // (it's kept with the card's state)
+		return Result.ok((long) strength);
 	}
 
 	@Method(doc = "receive(): the oldest frame that came, as {from (its sender's address), data, distance (meters), broadcast (true when it was)}, or nil")
@@ -196,6 +234,9 @@ public final class NetworkCard extends Card {
 		if (wakeMessage != null) {
 			saved.put("wake", wakeMessage);
 		}
+		if (wireless() && strength != maxRange()) {
+			saved.put("strength", (long) strength);
+		}
 		return saved;
 	}
 
@@ -203,6 +244,7 @@ public final class NetworkCard extends Card {
 	public void restore(Map<String, Object> saved) {
 		frames.restore(saved);
 		wakeMessage = saved.get("wake") instanceof String message ? message : null;
+		strength = saved.get("strength") instanceof Number set ? (int) Math.clamp(set.longValue(), 0, maxRange()) : maxRange();
 	}
 
 	/** It stopped taking data: its frames go. */

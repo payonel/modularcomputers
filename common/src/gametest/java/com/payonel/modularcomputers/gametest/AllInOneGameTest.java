@@ -306,7 +306,7 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.SATA_SLOTS + 1, new ItemStack(ModItems.TIER1_HARD_DISK));
-		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.WLAN_CARD));
+		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.TIER2_WLAN_CARD));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER1_RAM)); // RAM is not a bus device
 		helper.assertValueEqual(busKeys(computer), List.of("sata:1", "exp:0"), "attached in default order");
 		helper.assertValueEqual(busTypes(computer), List.of(DeviceType.STORAGE, DeviceType.NETWORK), "bus");
@@ -333,7 +333,7 @@ public class AllInOneGameTest {
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.SATA_SLOTS + 2, new ItemStack(ModItems.TIER1_HARD_DISK));
-		computer.parts().setItem(CaseMenu.EXP_SLOTS + 3, new ItemStack(ModItems.WLAN_CARD));
+		computer.parts().setItem(CaseMenu.EXP_SLOTS + 3, new ItemStack(ModItems.TIER2_WLAN_CARD));
 		var entries = computer.busEntries();
 		TestPrograms.withScreen(computer);
 		entries = computer.busEntries();
@@ -350,7 +350,7 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = place(helper);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
-		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.WLAN_CARD));
+		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModItems.TIER2_WLAN_CARD));
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.TIER1_HARD_DISK));
 		var registries = helper.getLevel().registryAccess();
 		var loaded = (AllInOneBlockEntity) BlockEntity.loadStatic(computer.getBlockPos(), computer.getBlockState(),
@@ -568,7 +568,7 @@ public class AllInOneGameTest {
 		AllInOneBlockEntity computer = install(place(helper), false, true);
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
 			computer.parts().setItem(CaseMenu.SATA_SLOTS + lane, new ItemStack(ModItems.TIER1_HARD_DISK));
-			computer.parts().setItem(CaseMenu.EXP_SLOTS + lane, new ItemStack(ModItems.WLAN_CARD));
+			computer.parts().setItem(CaseMenu.EXP_SLOTS + lane, new ItemStack(ModItems.TIER2_WLAN_CARD));
 		}
 		computer.parts().setItem(CaseMenu.UPS_SLOT + 1, ModItems.TIER1_BATTERY.charged());
 		computer.parts().setItem(CaseMenu.UPS_SLOT + 2, ModItems.TIER1_BATTERY.charged());

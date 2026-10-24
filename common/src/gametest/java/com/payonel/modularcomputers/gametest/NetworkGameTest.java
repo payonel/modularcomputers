@@ -68,7 +68,7 @@ public class NetworkGameTest {
 	public void wiredCardsTalkOverTheCableBetweenTwoCasesAndNotWithoutIt(GameTestHelper helper) {
 		NetworkCard left = computer(helper, LEFT, ModItems.NETWORK_CARD, true);
 		NetworkCard right = computer(helper, RIGHT, ModItems.NETWORK_CARD, true);
-		NetworkCard wireless = computer(helper, new BlockPos(3, 1, 5), ModItems.WLAN_CARD, true);
+		NetworkCard wireless = computer(helper, new BlockPos(3, 1, 5), ModItems.TIER2_WLAN_CARD, true);
 		for (int x = LEFT.getX() + 1; x < RIGHT.getX(); x++) {
 			cable(helper, new BlockPos(x, 1, 2));
 		}
@@ -87,8 +87,8 @@ public class NetworkGameTest {
 
 	@GameTest(maxTicks = 40)
 	public void wlanCardsTalkWithoutCables(GameTestHelper helper) {
-		NetworkCard left = computer(helper, LEFT, ModItems.WLAN_CARD, true);
-		NetworkCard right = computer(helper, RIGHT, ModItems.WLAN_CARD, true);
+		NetworkCard left = computer(helper, LEFT, ModItems.TIER2_WLAN_CARD, true);
+		NetworkCard right = computer(helper, RIGHT, ModItems.TIER2_WLAN_CARD, true);
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertValueEqual(left.send(args(right.address(), "hello")).first(), true, "acknowledged through the air"))
 			.thenExecute(() -> {
@@ -101,8 +101,8 @@ public class NetworkGameTest {
 
 	@GameTest(maxTicks = 40)
 	public void aFrameHoldingTheWakeMessageTurnsAComputerOn(GameTestHelper helper) {
-		NetworkCard left = computer(helper, LEFT, ModItems.WLAN_CARD, true);
-		NetworkCard right = computer(helper, RIGHT, ModItems.WLAN_CARD, false);
+		NetworkCard left = computer(helper, LEFT, ModItems.TIER2_WLAN_CARD, true);
+		NetworkCard right = computer(helper, RIGHT, ModItems.TIER2_WLAN_CARD, false);
 		right.setWake(args("wake"));
 		AllInOneBlockEntity sleeper = helper.getBlockEntity(RIGHT, AllInOneBlockEntity.class);
 		helper.startSequence()

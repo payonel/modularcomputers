@@ -459,6 +459,28 @@ class McosTest {
 	}
 
 	@Test
+	void aWlanInterfacesTransmitPowerIsItsCardsStrength() {
+		var card = new com.payonel.modularcomputers.device.NetworkCard(com.payonel.modularcomputers.device.CardKind.TIER1_WLAN);
+		card.idFrom(java.util.UUID::randomUUID);
+		devices.put(Motherboard.exp(0), card);
+		file("tx.lua", """
+			local sys = require("sys")
+			local s = assert(sys.socket())
+			local before = sys.ioctl(s, "SIOCGIWTXPOW", "wlan0")
+			local set = sys.ioctl(s, "SIOCSIWTXPOW", {name = "wlan0", txpower = 999})
+			local lowered = sys.ioctl(s, "SIOCSIWTXPOW", {name = "wlan0", txpower = 4})
+			local out = io.open("/tx", "w")
+			out:write(before, " ", set, " ", lowered)
+			out:close()
+			""");
+		boot();
+		type("lua /tx.lua 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("tx"))).as("its tier's at first; at most its tier's; turned down").isEqualTo("16 16 4");
+		assertThat(card.range()).isEqualTo(4);
+	}
+
+	@Test
 	void dateIsTheWorldsClockOnItsCalendar() {
 		long noonOfTheThirdDay = 2 * 24000 + 6000; // (game time: 0 is the first sunrise, 6000 its noon)
 		machine.board().setChassis(new com.payonel.modularcomputers.machine.Chassis() {
@@ -1388,7 +1410,7 @@ class McosTest {
 	}
 	/** A network card beside the test computer's (it and the peer: one world, one block), with its id. */
 	private com.payonel.modularcomputers.device.NetworkCard networkCard(Object world, java.util.UUID id) {
-		var card = new com.payonel.modularcomputers.device.NetworkCard(com.payonel.modularcomputers.device.CardKind.WLAN);
+		var card = new com.payonel.modularcomputers.device.NetworkCard(com.payonel.modularcomputers.device.CardKind.TIER2_WLAN);
 		card.idFrom(() -> id);
 		card.place(world, net.minecraft.core.BlockPos.ZERO, 0);
 		return card;

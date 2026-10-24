@@ -247,8 +247,11 @@ files.
 ### Network cards
 
 OC's broadcast and peer-to-peer messages in a real NIC's shape. A wired card sends frames over the
-cables, a WLAN card through the air (its range), to a card's address (its id, a MAC) or to every
-card it reaches; nothing routes between the two networks.
+cables, a WLAN card through the air, to a card's address (its id, a MAC) or to every card it
+reaches; nothing routes between the two networks. WLAN cards come in OC's tiers and ranges (tier 1
+16 blocks, tier 2 400, their recipes after OC's: redstone torches, an ender pearl); a frame reaches
+as far as its sender's strength (OC's `setStrength`, mcos's `SIOCSIWTXPOW`), and a send costs more
+the farther it reaches (OC's wirelessCostPerRange); any tier hears any other.
 - **Over the bus's own cables:** a cable is a shared fabric, not one host's private bus. Two cases
   on one cable are two hosts on it (two Macs on one Thunderbolt cable, SAN hosts on a Fibre Channel
   fabric); the bus devices on it still belong to one board at a time, and frames go between the

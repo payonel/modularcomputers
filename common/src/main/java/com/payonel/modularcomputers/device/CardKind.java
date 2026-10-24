@@ -7,7 +7,9 @@ public enum CardKind {
 	/** A wired network card: frames over the cables ({@link NetworkCard}). */
 	NETWORK(DeviceType.NETWORK),
 	/** A wireless one: frames through the air, without cables ({@link NetworkCard}). */
-	WLAN(DeviceType.NETWORK),
+	/** WLAN cards, by tier: their reach is OpenComputers' (16 blocks, 400). */
+	TIER1_WLAN(DeviceType.NETWORK),
+	TIER2_WLAN(DeviceType.NETWORK),
 	BLUETOOTH(DeviceType.BLUETOOTH),
 	/** Emits and detects redstone where it's installed (a computer, or an expansion hub). */
 	REDSTONE(DeviceType.REDSTONE),

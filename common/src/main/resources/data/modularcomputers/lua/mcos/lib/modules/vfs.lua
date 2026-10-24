@@ -38,6 +38,7 @@ local ERRNO = {
   ESPIPE = "Illegal seek",
   EROFS = "Read-only file system",
   EMEDIUMTYPE = "Wrong medium type",
+  EOPNOTSUPP = "Operation not supported",
   EPIPE = "Broken pipe",
   ENOSYS = "Function not implemented",
   ENOTEMPTY = "Directory not empty",

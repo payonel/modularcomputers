@@ -55,7 +55,7 @@ public class CaseTierGameTest {
 				bays += place.mayPlace(ModItems.TIER1_BATTERY.charged()) ? 1 : 0;
 				sticks += place.mayPlace(new ItemStack(ModItems.TIER1_RAM)) ? 1 : 0;
 				drives += place.mayPlace(new ItemStack(ModItems.TIER1_HARD_DISK)) ? 1 : 0;
-				cards += place.mayPlace(new ItemStack(ModItems.WLAN_CARD)) ? 1 : 0;
+				cards += place.mayPlace(new ItemStack(ModItems.TIER2_WLAN_CARD)) ? 1 : 0;
 			}
 			String name = tier.name();
 			helper.assertValueEqual(List.of(bays, sticks, drives, cards), List.of(tier.bays(), tier.ram(), tier.sata(), tier.expansion()),

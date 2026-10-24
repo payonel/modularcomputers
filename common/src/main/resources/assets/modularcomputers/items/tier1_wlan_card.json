@@ -1,0 +1,6 @@
+{
+	"model": {
+		"type": "minecraft:model",
+		"model": "modularcomputers:item/tier1_wlan_card"
+	}
+}
