@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.payonel.modularcomputers.runtime.Arguments;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,12 +16,10 @@ class DiskStationTest {
 	@TempDir
 	Path world;
 
-	/** Its block, stood in for: two slots, a power supply that can run out, and what it ejected. */
+	/** Its block, stood in for: two slots, and a power supply that can run out. */
 	private final class Bay implements DiskStation.Bay {
 		final Map<String, Disk> disks = new HashMap<>();
 		boolean powered = true;
-		Face eject = Face.NORTH;
-		final List<String> ejected = new ArrayList<>();
 
 		@Override
 		public Disk disk(String which) {
@@ -32,30 +29,6 @@ class DiskStationTest {
 		@Override
 		public boolean pay(int cost) {
 			return powered;
-		}
-
-		@Override
-		public String eject(String which) {
-			if (disks.remove(which) == null) {
-				return DiskStation.NO_DISK;
-			}
-			ejected.add(which + " " + eject.id());
-			return null;
-		}
-
-		@Override
-		public Face front() {
-			return Face.EAST;
-		}
-
-		@Override
-		public Face ejectFace() {
-			return eject;
-		}
-
-		@Override
-		public void ejectFace(Face face) {
-			eject = face;
 		}
 
 		@Override
@@ -130,26 +103,13 @@ class DiskStationTest {
 	}
 
 	@Test
-	void itsEjectFaceIsSetApartByAnyNameAndEjectUsesIt() {
-		bay.disks.put(DiskStation.TARGET, disk("e"));
-		assertThat(station.setEjectFace(args("left")).first()).as("the old one").isEqualTo("north");
-		assertThat(station.getEjectFace(args()).first()).as("left of a station facing east").isEqualTo("north");
-		assertThat(station.setEjectFace(args("down")).failed()).isFalse();
-		assertThat(station.eject(args()).first()).isEqualTo(true);
-		assertThat(bay.ejected).containsExactly("target down");
-		assertThat(station.eject(args("source")).error()).isEqualTo(DiskStation.NO_DISK);
-		assertThat(station.setEjectFace(args("sideways")).error()).startsWith("no such face");
-	}
-
-	@Test
-	void setTakesAnActionOrAnEjectFaceAndGetSaysWhatsInIt() {
+	void setTakesAnActionAndGetSaysWhatsInIt() {
 		bay.disks.put(DiskStation.TARGET, disk("g"));
 		assertThat(station.set(args(Map.of("action", "wipe"))).failed()).isFalse();
-		assertThat(station.set(args(Map.of("ejectFace", "up"))).failed()).isFalse();
 		assertThat(station.set(args(Map.of("action", "explode"))).error()).startsWith("no such action");
 		@SuppressWarnings("unchecked")
 		Map<String, Object> state = (Map<String, Object>) station.get(args()).first();
-		assertThat(state).containsEntry("ejectFace", "up").doesNotContainKey(DiskStation.SOURCE);
+		assertThat(state).doesNotContainKey(DiskStation.SOURCE);
 		@SuppressWarnings("unchecked")
 		Map<String, Object> target = (Map<String, Object>) state.get(DiskStation.TARGET);
 		assertThat(target).containsEntry("mode", Disk.RAW).containsEntry("tier", 1L);

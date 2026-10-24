@@ -7,7 +7,6 @@ import com.payonel.modularcomputers.block.DiskStationBlock;
 import com.payonel.modularcomputers.block.DiskStationBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.device.DiskStation;
-import com.payonel.modularcomputers.device.Face;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.CaseMenu;
@@ -24,14 +23,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.ChestBlockEntity;
 
 /**
- * The Disk Station in the world (user design): its actions on its disk's files (on the host), its
- * eject into a container at its eject face or out into the world, power from its battery, its GUI's
- * buttons, a wired computer's bus holding it and its disks (the source only read), and its recipe
- * using a disk up (its files go).
+ * The Disk Station in the world (user design): its actions on its disk's files (on the host), power
+ * from its battery, its GUI's buttons, a wired computer's bus holding it and its disks (the source
+ * only read), and its recipe using a disk up (its files go).
  */
 public class DiskStationGameTest {
 	private static final BlockPos POS = new BlockPos(3, 1, 3);
@@ -40,8 +36,7 @@ public class DiskStationGameTest {
 
 	/** A station facing south, with a tier 1 disk to work on and, when {@code battery}, a charged battery. */
 	private static DiskStationBlockEntity station(GameTestHelper helper, boolean battery) {
-		helper.setBlock(POS, ModBlocks.DISK_STATION.defaultBlockState().setValue(DiskStationBlock.FACING, Direction.SOUTH)
-			.setValue(DiskStationBlock.EJECT, Direction.SOUTH));
+		helper.setBlock(POS, ModBlocks.DISK_STATION.defaultBlockState().setValue(DiskStationBlock.FACING, Direction.SOUTH));
 		DiskStationBlockEntity station = helper.getBlockEntity(POS, DiskStationBlockEntity.class);
 		station.cards().setItem(DiskStationBlockEntity.TARGET, new ItemStack(ModItems.TIER1_HARD_DISK));
 		if (battery) {
@@ -68,11 +63,11 @@ public class DiskStationGameTest {
 		DiskStationBlockEntity station = station(helper, true);
 		Path folder = folder(helper, station, DiskStationBlockEntity.TARGET);
 		helper.assertTrue(files(folder).contains("init.lua"), "a new disk comes with mcos: " + files(folder));
-		station.act("format", DiskStation.TARGET);
+		station.act("format");
 		helper.assertValueEqual(files(folder), List.of(), "formatted: empty, on the host too");
-		station.act("install", DiskStation.TARGET);
+		station.act("install");
 		helper.assertTrue(files(folder).contains("init.lua") && files(folder).contains("bin"), "mcos installed");
-		station.act("wipe", DiskStation.TARGET);
+		station.act("wipe");
 		helper.assertTrue(!Files.exists(folder), "wiped: no filesystem (a raw disk)");
 		helper.assertValueEqual(station.disk(DiskStationBlockEntity.TARGET).getMode(new com.payonel.modularcomputers.runtime.Arguments(List.of())).first(),
 			"raw", "raw");
@@ -83,28 +78,10 @@ public class DiskStationGameTest {
 	public void withoutPowerItDoesNothing(GameTestHelper helper) {
 		DiskStationBlockEntity station = station(helper, false);
 		Path folder = folder(helper, station, DiskStationBlockEntity.TARGET);
-		station.act("format", DiskStation.TARGET);
+		station.act("format");
 		helper.assertTrue(files(folder).contains("init.lua"), "nothing done");
 		DiskStationMenu menu = (DiskStationMenu) station.createMenu(0, GameTests.serverPlayer(helper).getInventory(), GameTests.serverPlayer(helper));
 		helper.assertValueEqual(menu.outcome(), DiskStationBlockEntity.Outcome.NO_POWER, "it says why");
-		helper.succeed();
-	}
-
-	@GameTest
-	public void ejectPushesTheDiskIntoAContainerAtItsEjectFaceOrOutIntoTheWorld(GameTestHelper helper) {
-		DiskStationBlockEntity station = station(helper, true);
-		helper.assertValueEqual(station.device().setEjectFace(new com.payonel.modularcomputers.runtime.Arguments(List.of("left"))).failed(), false,
-			"its left");
-		helper.assertBlockProperty(POS, DiskStationBlock.EJECT, Direction.EAST); // (facing south: its left is east)
-		helper.setBlock(POS.east(), Blocks.CHEST);
-		station.act("eject", DiskStation.TARGET);
-		helper.assertTrue(station.cards().getItem(DiskStationBlockEntity.TARGET).isEmpty(), "out of it");
-		ChestBlockEntity chest = helper.getBlockEntity(POS.east(), ChestBlockEntity.class);
-		helper.assertTrue(chest.getItem(0).is(ModItems.TIER1_HARD_DISK), "into the chest there");
-		station.cards().setItem(DiskStationBlockEntity.TARGET, new ItemStack(ModItems.TIER2_HARD_DISK));
-		station.device().setEjectFace(new com.payonel.modularcomputers.runtime.Arguments(List.of("up")));
-		station.act("eject", DiskStation.TARGET);
-		helper.assertItemEntityPresent(ModItems.TIER2_HARD_DISK, POS.above(), 2);
 		helper.succeed();
 	}
 
@@ -113,14 +90,12 @@ public class DiskStationGameTest {
 		DiskStationBlockEntity station = station(helper, true);
 		var player = GameTests.serverPlayer(helper);
 		DiskStationMenu menu = (DiskStationMenu) station.createMenu(0, player.getInventory(), player);
-		menu.clickMenuButton(player, DiskStationMenu.EJECT_FACE + Face.UP.ordinal());
-		helper.assertBlockProperty(POS, DiskStationBlock.EJECT, Direction.UP);
 		menu.clickMenuButton(player, DiskStationMenu.ACTIONS.indexOf("format"));
 		helper.assertValueEqual(menu.outcome(), DiskStationBlockEntity.Outcome.DONE, "formatted");
 		helper.assertValueEqual(files(folder(helper, station, DiskStationBlockEntity.TARGET)), List.of(), "empty");
 		menu.clickMenuButton(player, DiskStationMenu.ACTIONS.indexOf("clone"));
 		helper.assertValueEqual(menu.outcome(), DiskStationBlockEntity.Outcome.NO_SOURCE, "no source to clone");
-		menu.removed(player); // closing it never ejects
+		menu.removed(player); // closing it leaves its disks in it
 		helper.assertTrue(station.cards().getItem(DiskStationBlockEntity.TARGET).is(ModItems.TIER1_HARD_DISK), "still in it");
 		helper.succeed();
 	}

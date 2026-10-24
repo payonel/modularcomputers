@@ -2,8 +2,6 @@ package com.payonel.modularcomputers.menu;
 
 import com.payonel.modularcomputers.block.DiskStationBlock;
 import com.payonel.modularcomputers.block.DiskStationBlockEntity;
-import com.payonel.modularcomputers.device.DiskStation;
-import com.payonel.modularcomputers.device.Face;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.Container;
@@ -20,15 +18,12 @@ import net.minecraft.world.item.ItemStack;
 /**
  * A Disk Station's slots (its disk, the source disk, a battery, its radio) above the player's
  * inventory, and its buttons: each is a menu button (vanilla's, as the enchanting table's), so the
- * server does the action as the station's device does it. Closing it never ejects.
+ * server does the action as the station's device does it.
  */
 public final class DiskStationMenu extends AbstractContainerMenu {
 	public static final int INVENTORY_Y = 114;
-	/** The buttons, by their menu button ids: the actions, in {@link #ACTIONS}' order, then eject source. */
-	public static final List<String> ACTIONS = List.of("format", "wipe", "install", "update", "clone", "eject");
-	public static final int EJECT_SOURCE = ACTIONS.size();
-	/** The eject face buttons: this plus a {@link Face}'s ordinal. */
-	public static final int EJECT_FACE = 16;
+	/** The buttons, by their menu button ids: the actions, in this order. */
+	public static final List<String> ACTIONS = List.of("format", "wipe", "install", "update", "clone");
 	/** Where each slot is. */
 	public static final int TARGET_X = 98;
 	public static final int TARGET_Y = 22;
@@ -67,19 +62,14 @@ public final class DiskStationMenu extends AbstractContainerMenu {
 		return pos;
 	}
 
-	/** The face it ejects out of. */
-	public Face ejectFace() {
-		return Face.values()[Math.clamp(data.get(0), 0, Face.values().length - 1)];
-	}
-
 	/** How its last action went. */
 	public DiskStationBlockEntity.Outcome outcome() {
-		return DiskStationBlockEntity.Outcome.values()[Math.clamp(data.get(1), 0, DiskStationBlockEntity.Outcome.values().length - 1)];
+		return DiskStationBlockEntity.Outcome.values()[Math.clamp(data.get(0), 0, DiskStationBlockEntity.Outcome.values().length - 1)];
 	}
 
 	/** Its battery's charge, in percent. */
 	public int charge() {
-		return data.get(2);
+		return data.get(1);
 	}
 
 	/** Server: a button was pressed. */
@@ -89,15 +79,10 @@ public final class DiskStationMenu extends AbstractContainerMenu {
 			if (!(level.getBlockEntity(at) instanceof DiskStationBlockEntity station)) {
 				return false;
 			}
-			if (id >= 0 && id < ACTIONS.size()) {
-				station.act(ACTIONS.get(id), DiskStation.TARGET);
-			} else if (id == EJECT_SOURCE) {
-				station.act("eject", DiskStation.SOURCE);
-			} else if (id >= EJECT_FACE && id < EJECT_FACE + Face.values().length) {
-				station.ejectFace(Face.values()[id - EJECT_FACE].id());
-			} else {
+			if (id < 0 || id >= ACTIONS.size()) {
 				return false;
 			}
+			station.act(ACTIONS.get(id));
 			return true;
 		}, false);
 	}

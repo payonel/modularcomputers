@@ -2,7 +2,6 @@ package com.payonel.modularcomputers.client.screen;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.payonel.modularcomputers.block.DiskStationBlockEntity;
-import com.payonel.modularcomputers.device.Face;
 import com.payonel.modularcomputers.display.Viewport;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.DiskStationMenu;
@@ -21,10 +20,8 @@ import net.minecraft.world.item.ItemStack;
  * A Disk Station's panel, as the machine itself (the mod's look): an iron plate with an emerald
  * inlay, its actions as raised switches down the left, silkscreened; its two drive bays, the source's
  * marked SOURCE with a lock (only read, and optional: faint while empty) and an arrow up to the
- * target beside its Clone switch; Eject beside the target; the battery and the radio; and, under them,
- * the station drawn as an unfolded box (its faces around its front), the eject face lit, a click on
- * another moving it there. Each switch is a menu button: the server does it as the station's device
- * does. The inventory below is vanilla's.
+ * target beside its Clone switch; the battery and the radio. Each switch is a menu button: the server
+ * does it as the station's device does. The inventory below is vanilla's.
  */
 public final class DiskStationScreen extends AbstractContainerScreen<DiskStationMenu> {
 	private static final int WIDTH = 176;
@@ -66,14 +63,6 @@ public final class DiskStationScreen extends AbstractContainerScreen<DiskStation
 	private static final int SWITCH_WIDTH = 66;
 	private static final int SWITCH_TOP = 18;
 	private static final int SWITCH_STEP = 17;
-	/** The eject face picker: cells of an unfolded box, its front in the middle. */
-	private static final int CELL = 5;
-	private static final int PICKER_X = 148;
-	private static final int PICKER_Y = 68;
-	/** Where each face sits in the unfolded box (column, row), named from the station's front. */
-	private static final Map<String, int[]> UNFOLDED = Map.of(
-		"up", new int[] {1, 0}, "left", new int[] {0, 1}, "front", new int[] {1, 1}, "right", new int[] {2, 1}, "back", new int[] {3, 1},
-		"down", new int[] {1, 2});
 	/** What an empty slot shows, and its name. */
 	private static final Map<Integer, ItemStack> GHOSTS = Map.of(
 		DiskStationBlockEntity.TARGET, new ItemStack(ModItems.TIER1_HARD_DISK),
@@ -86,36 +75,18 @@ public final class DiskStationScreen extends AbstractContainerScreen<DiskStation
 		inventoryLabelY = DiskStationMenu.INVENTORY_Y - 10;
 	}
 
-	/** A switch, by its menu button id: the four actions down the left, Clone by the source, Eject by the target. */
+	/** A switch, by its menu button id: the four actions down the left, Clone by the source. */
 	public Viewport switchArea(int id) {
-		String action = DiskStationMenu.ACTIONS.get(id);
-		return switch (action) {
-			case "clone" -> new Viewport(leftPos + DiskStationMenu.SOURCE_X + 20, topPos + DiskStationMenu.SOURCE_Y + 1, 28, SWITCH_HEIGHT);
-			case "eject" -> new Viewport(leftPos + DiskStationMenu.TARGET_X + 20, topPos + DiskStationMenu.TARGET_Y + 1, 32, SWITCH_HEIGHT);
-			default -> new Viewport(leftPos + SWITCH_X, topPos + SWITCH_TOP + id * SWITCH_STEP, SWITCH_WIDTH, SWITCH_HEIGHT);
-		};
-	}
-
-	/** A face's cell in the eject face picker (named from the front). */
-	public Viewport faceCell(String relative) {
-		int[] at = UNFOLDED.get(relative);
-		return new Viewport(leftPos + PICKER_X + at[0] * (CELL + 1), topPos + PICKER_Y + at[1] * (CELL + 1), CELL, CELL);
+		if (DiskStationMenu.ACTIONS.get(id).equals("clone")) {
+			return new Viewport(leftPos + DiskStationMenu.SOURCE_X + 20, topPos + DiskStationMenu.SOURCE_Y + 1, 32, SWITCH_HEIGHT);
+		}
+		return new Viewport(leftPos + SWITCH_X, topPos + SWITCH_TOP + id * SWITCH_STEP, SWITCH_WIDTH, SWITCH_HEIGHT);
 	}
 
 	/** A slot's 16x16 item area on screen. */
 	public Viewport slotArea(int index) {
 		Slot slot = menu.slots.get(index);
 		return new Viewport(leftPos + slot.x, topPos + slot.y, 16, 16);
-	}
-
-	/** The world's face a relative name means, for this station (its front from its block). */
-	private Face face(String relative) {
-		var state = minecraft.level == null ? null : minecraft.level.getBlockState(menu.pos());
-		if (state == null || !state.hasProperty(com.payonel.modularcomputers.block.DiskStationBlock.FACING)) {
-			return Face.NORTH;
-		}
-		Face front = Face.of(state.getValue(com.payonel.modularcomputers.block.DiskStationBlock.FACING).getName());
-		return Face.named(relative, front);
 	}
 
 	@Override
@@ -166,7 +137,6 @@ public final class DiskStationScreen extends AbstractContainerScreen<DiskStation
 		}
 		graphics.text(font, Component.literal("DISK"), x + DiskStationMenu.TARGET_X + 2, y + DiskStationMenu.TARGET_Y - 10, ENGRAVED, false);
 		ChargeBars.extract(graphics, x + DiskStationMenu.BATTERY_X + 8 - ChargeBars.WIDTH / 2, y + DiskStationMenu.BATTERY_Y + 19, menu.charge());
-		extractPicker(graphics, mouseX, mouseY);
 		SlotHints.extract(graphics, menu, hoveredSlot, DiskStationBlockEntity.SLOTS, this::slotArea);
 	}
 
@@ -204,21 +174,6 @@ public final class DiskStationScreen extends AbstractContainerScreen<DiskStation
 		graphics.centeredText(font, label, x0 + area.width() / 2, y0 + (area.height() - font.lineHeight) / 2 + 1, SILK);
 	}
 
-	/** The station as an unfolded box: the eject face lit, the front marked. */
-	private void extractPicker(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
-		Face eject = menu.ejectFace();
-		for (String relative : UNFOLDED.keySet()) {
-			Viewport cell = faceCell(relative);
-			boolean lit = face(relative) == eject;
-			boolean hover = cell.contains(mouseX, mouseY);
-			graphics.fill(cell.x() - 1, cell.y() - 1, cell.x() + cell.width() + 1, cell.y() + cell.height() + 1, OUTLINE);
-			graphics.fill(cell.x(), cell.y(), cell.x() + cell.width(), cell.y() + cell.height(), lit ? EMERALD : hover ? SWITCH_HOVER : IRON_DARK);
-			if (relative.equals("front")) {
-				graphics.fill(cell.x() + 2, cell.y() + 3, cell.x() + 5, cell.y() + 4, lit ? EMERALD_DARK : IRON_LIGHT); // its bays
-			}
-		}
-	}
-
 	@Override
 	protected void extractLabels(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
 		graphics.text(font, title, titleLabelX, titleLabelY, TITLE, false);
@@ -241,13 +196,6 @@ public final class DiskStationScreen extends AbstractContainerScreen<DiskStation
 				return;
 			}
 		}
-		for (String relative : UNFOLDED.keySet()) {
-			if (faceCell(relative).contains(mouseX, mouseY)) {
-				graphics.setTooltipForNextFrame(font, Component.translatable("gui.modularcomputers.disk_station.eject_face",
-					Component.translatable("gui.modularcomputers.disk_station.face." + relative)), mouseX, mouseY);
-				return;
-			}
-		}
 		Slot battery = menu.slots.get(DiskStationBlockEntity.BATTERY);
 		if (hoveredSlot == battery && battery.hasItem()) {
 			return; // (the battery's own tooltip says its charge)
@@ -266,12 +214,6 @@ public final class DiskStationScreen extends AbstractContainerScreen<DiskStation
 			for (int id = 0; id < DiskStationMenu.ACTIONS.size(); id++) {
 				if (switchArea(id).contains(event.x(), event.y())) {
 					press(id);
-					return true;
-				}
-			}
-			for (String relative : UNFOLDED.keySet()) {
-				if (faceCell(relative).contains(event.x(), event.y())) {
-					press(DiskStationMenu.EJECT_FACE + face(relative).ordinal());
 					return true;
 				}
 			}

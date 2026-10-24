@@ -118,9 +118,9 @@ what the game can't do:
 
 Every device that takes a face takes it through `Face` (the user's rule for every device, now and
 to come): the world's names (`north`, `south`, `east`, `west`, `up`, `down`: Minecraft's own) or
-names relative to the block's front (`front`, `back`, `left`, `right`, left and right as the block
-sees them looking out of its front: ComputerCraft's), so a program written for a block works however
-it's turned, and configurations compose. Every block that holds devices has a front, with its own
+names relative to the block's front (`front`, `back`, `left`, `right`, left and right as someone
+facing its front sees them: the user's, as a desktop case's left side panel is on your left), so a
+program written for a block works however it's turned, and configurations compose. Every block that holds devices has a front, with its own
 look, facing the player who placed it (a case's, a hub's card bays), and tells its devices where it
 is (`Card.frontFrom`); a robotic piston's front is opposite its cable port. A device with no block
 to say (a test's) takes only the world's names. Devices answer with the world's names. Faces are
@@ -255,11 +255,8 @@ disks, and the station itself, are on the bus of the computers wired to it. Ever
 a line written to its `/dev` file and a GUI switch alike: format (hfs), wipe (raw), clone, install
 mcos (formatted, then the mod's latest), update mcos (the mod's files written over, `/etc` too: an
 update is how a player fixes an install). An action is paid from the bus's power while a running
-computer supplies it, else from its battery. Eject pushes a disk out of its eject face (the block's
-state, a slot drawn there; its front at first), into a container there as a dropper does, or out
-into the world; the face is set apart (`setEjectFace`, the GUI's unfolded box), never by eject
-itself. Closing its GUI never ejects. Its recipe uses a disk up, and that disk's files go
-(`DiskUsingRecipe`, as crafting a disk alone does).
+computer supplies it, else from its battery. Disks go in and come out by hand, in its GUI. Its
+recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting a disk alone does).
 
 ### mcos
 

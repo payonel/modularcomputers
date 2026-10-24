@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # Draws the Disk Station (needs Pillow): its faces in iron with emerald trim (the user's pick: iron
 # and emerald, as its recipe), a chip board on top, its front with the two drive bays (the target's,
-# with its activity light; the source's, with a lock: only read), a cable socket on its back, and the
-# slot drawn on its eject face; and writes its block and item models and blockstate: the casing turned
-# to face its placer, the slot put on whichever face ejects (a small part over that face, so one
-# model serves every face). The PNGs and JSON are committed; rerun after editing this, then check
-# the preview.
+# with its activity light; the source's, with a lock: only read), and a cable socket on its back; and
+# writes its block and item models and blockstate: the casing turned to face its placer. The PNGs and
+# JSON are committed; rerun after editing this, then check the preview.
 #   scripts/art/disk_station_textures.py common/src/main/resources/assets/modularcomputers preview.png
 import json, random, sys
 from PIL import Image
@@ -108,16 +106,8 @@ def top():
 def bottom():
 	return iron(45)
 
-def slot():
-	"""The eject slot: a dark slit with a lit lip, where disks come out (the model shows only its middle)."""
-	im = Image.new("RGB", (16, 16), (20, 20, 24))
-	rect(im, 0, 0, 15, 15, (20, 20, 24))
-	rect(im, 4, 7, 11, 7, (8, 8, 10))
-	rect(im, 4, 8, 11, 8, EMERALD_DARK)
-	return im
-
 TEXTURES = {"disk_station_front": front, "disk_station_side": side, "disk_station_back": back,
-	"disk_station_top": top, "disk_station_bottom": bottom, "disk_station_slot": slot}
+	"disk_station_top": top, "disk_station_bottom": bottom}
 images = {}
 for name, fn in TEXTURES.items():
 	images[name] = fn()
@@ -137,26 +127,14 @@ write("models/block/disk_station.json", {
 	"textures": {"particle": tex("disk_station_side"), "north": tex("disk_station_front"), "south": tex("disk_station_back"),
 		"east": tex("disk_station_side"), "west": tex("disk_station_side"), "up": tex("disk_station_top"), "down": tex("disk_station_bottom")},
 })
-# The eject slot: a thin part just over the north face (turned to the eject face), 8 by 2 pixels.
-SLOT = [4, 7, 12, 9]
-write("models/block/disk_station_slot.json", {
-	"textures": {"particle": tex("disk_station_slot"), "slot": tex("disk_station_slot")},
-	"elements": [{"from": [SLOT[0], 16 - SLOT[3], -0.05], "to": [SLOT[2], 16 - SLOT[1], 0],
-		"faces": {"north": {"uv": [16 - SLOT[2], SLOT[1], 16 - SLOT[0], SLOT[3]], "texture": "#slot", "cullface": "north"}}}],
-})
-# Its front faces its placer (four turns); the slot goes on the eject face (any of six).
+# Its front faces its placer (four turns).
 FRONT_Y = {"north": 0, "east": 90, "south": 180, "west": 270}
-SLOT_TURN = {"north": {}, "east": {"y": 90}, "south": {"y": 180}, "west": {"y": 270}, "up": {"x": 270}, "down": {"x": 90}}
-parts = [{"when": {"facing": face}, "apply": {"model": "modularcomputers:block/disk_station", **({"y": y} if y else {})}} for face, y in FRONT_Y.items()]
-parts += [{"when": {"eject": face}, "apply": {"model": "modularcomputers:block/disk_station_slot", **turn}} for face, turn in SLOT_TURN.items()]
-write("blockstates/disk_station.json", {"multipart": parts})
-# The item: the casing with its slot on its front, as it's placed.
-write("items/disk_station.json", {"model": {"type": "minecraft:composite", "models": [
-	{"type": "minecraft:model", "model": "modularcomputers:block/disk_station"},
-	{"type": "minecraft:model", "model": "modularcomputers:block/disk_station_slot"}]}})
+write("blockstates/disk_station.json", {"variants": {f"facing={face}": {"model": "modularcomputers:block/disk_station", **({"y": y} if y else {})}
+	for face, y in FRONT_Y.items()}})
+write("items/disk_station.json", {"model": {"type": "minecraft:model", "model": "modularcomputers:block/disk_station"}})
 
 if PREVIEW:
-	order = ["disk_station_front", "disk_station_side", "disk_station_back", "disk_station_top", "disk_station_bottom", "disk_station_slot"]
+	order = ["disk_station_front", "disk_station_side", "disk_station_back", "disk_station_top", "disk_station_bottom"]
 	sheet = Image.new("RGB", (20 * len(order) + 4, 24), (40, 40, 40))
 	for i, name in enumerate(order):
 		sheet.paste(images[name], (4 + 20 * i, 4))

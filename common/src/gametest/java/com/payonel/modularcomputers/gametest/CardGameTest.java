@@ -147,7 +147,7 @@ public class CardGameTest {
 		card.power().supply(this); // (as a running computer's bus powers it)
 		card.set(args(Map.of("front", Map.of("powered", 6L), "left", Map.of("powered", 2L))));
 		helper.assertValueEqual(field(card, "east", "powered"), 6L, "its front: east, the way the hub faces");
-		helper.assertValueEqual(field(card, "north", "powered"), 2L, "its left, as it looks out: north");
+		helper.assertValueEqual(field(card, "south", "powered"), 2L, "its left, as we see it facing its front: south");
 		helper.succeed();
 	}
 

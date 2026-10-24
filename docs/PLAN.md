@@ -56,6 +56,8 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 - **The Disk Station, open:** whether other programs ever install from it (copied in, not
   formatted) or everything ships in mcos; tiers; its disks' change reports aren't saved with it (a
   case's are).
+  Not wanted for now (user): ejecting disks (out of a face, into a container) and choosing an eject
+  face; its slot drawn on the block didn't read as a disk's way out.
 - **What a block holds, shown on it** (user): a miniature of each thing in a block's slots, drawn
   on the block in the world (the Disk Station's disks), on every block that holds objects, maybe
   even the case (its parts).

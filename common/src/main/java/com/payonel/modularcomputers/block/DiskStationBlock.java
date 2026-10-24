@@ -16,33 +16,27 @@ import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * A Disk Station (user design): see {@link DiskStationBlockEntity}. Its front faces the player who
- * placed it; its eject face ({@link #EJECT}, the front at first) shows a slot, where disks come out.
- * It takes a cable on every face but its front. Right-click opens it; with a Bluetooth card in hand,
- * links the card to it.
+ * placed it. It takes a cable on every face but its front. Right-click opens it; with a Bluetooth
+ * card in hand, links the card to it.
  */
 public final class DiskStationBlock extends HorizontalDirectionalBlock implements EntityBlock {
-	/** The face it ejects out of, the world's (a slot is drawn there). */
-	public static final EnumProperty<Direction> EJECT = EnumProperty.create("eject", Direction.class);
-
 	public DiskStationBlock(Properties properties) {
 		super(properties);
-		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(EJECT, Direction.NORTH));
+		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
 	}
 
 	@Override
 	protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-		builder.add(FACING, EJECT);
+		builder.add(FACING);
 	}
 
 	@Override
 	public BlockState getStateForPlacement(BlockPlaceContext context) {
-		Direction front = context.getHorizontalDirection().getOpposite();
-		return defaultBlockState().setValue(FACING, front).setValue(EJECT, front);
+		return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
 	}
 
 	@Override

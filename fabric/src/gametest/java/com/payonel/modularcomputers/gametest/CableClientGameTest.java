@@ -363,16 +363,13 @@ public class CableClientGameTest implements FabricClientGameTest {
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitFor(client -> client.gui.screen() == null);
 
-			// A Disk Station where the screen was: iron and emerald, its slot on its front; then ejecting up, the slot on its top.
-			setblock(singleplayer, screen, "disk_station[facing=south,eject=south]");
+			// A Disk Station where the screen was: iron and emerald, its two bays on its front.
+			setblock(singleplayer, screen, "disk_station[facing=south]");
 			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof com.payonel.modularcomputers.block.DiskStationBlockEntity);
 			context.waitTicks(3);
 			BufferedImage station = read(context.takeScreenshot("disk-station"));
 			int emerald = count(station, 0, 0, station.getWidth(), station.getHeight(), EMERALD);
 			check(emerald > 40, "the station's emerald should show, found " + emerald);
-			setblock(singleplayer, screen, "disk_station[facing=south,eject=up]");
-			context.waitTicks(3);
-			context.takeScreenshot("disk-station-eject-up");
 			// Its GUI: a disk and a battery in it, the switches down the left, the source bay faint and locked.
 			singleplayer.getServer().runOnServer(server -> {
 				var bay = (com.payonel.modularcomputers.block.DiskStationBlockEntity) server.overworld().getBlockEntity(screen);
@@ -384,7 +381,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			context.waitTicks(2);
 			BufferedImage gui = read(context.takeScreenshot("disk-station-gui"));
 			int inlay = count(gui, 0, 0, gui.getWidth(), gui.getHeight(), EMERALD);
-			check(inlay > 100, "the station's panel shows its emerald inlay and lit eject face, found " + inlay);
+			check(inlay > 60, "the station's panel shows its emerald inlay, found " + inlay);
 			moveCursorTo(context, s2 -> ((com.payonel.modularcomputers.client.screen.DiskStationScreen) s2).switchArea(
 				com.payonel.modularcomputers.menu.DiskStationMenu.ACTIONS.indexOf("install")));
 			context.waitTicks(2);

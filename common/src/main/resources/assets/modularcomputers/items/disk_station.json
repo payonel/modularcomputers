@@ -1,15 +1,6 @@
 {
 	"model": {
-		"type": "minecraft:composite",
-		"models": [
-			{
-				"type": "minecraft:model",
-				"model": "modularcomputers:block/disk_station"
-			},
-			{
-				"type": "minecraft:model",
-				"model": "modularcomputers:block/disk_station_slot"
-			}
-		]
+		"type": "minecraft:model",
+		"model": "modularcomputers:block/disk_station"
 	}
 }

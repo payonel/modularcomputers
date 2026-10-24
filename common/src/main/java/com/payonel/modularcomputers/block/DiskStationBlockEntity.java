@@ -2,7 +2,6 @@ package com.payonel.modularcomputers.block;
 
 import com.payonel.modularcomputers.device.Disk;
 import com.payonel.modularcomputers.device.DiskStation;
-import com.payonel.modularcomputers.device.Face;
 import com.payonel.modularcomputers.item.BatteryItem;
 import com.payonel.modularcomputers.item.DiskItem;
 import com.payonel.modularcomputers.item.ModComponents;
@@ -14,9 +13,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -25,7 +22,6 @@ import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.HopperBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -33,9 +29,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * source disk only read, for cloning; a battery bay; and a radio slot (a Bluetooth card), as other
  * blocks on the network have. Its device ({@link DiskStation}) and both disks are on the bus of
  * the computers wired to it. An action is paid from the bus's power while a running computer has it
- * on its bus, else from its battery. Eject pushes a disk out of its eject face (kept in the block's
- * state, {@link DiskStationBlock#EJECT}): into a container there, as a dropper does, or out into the
- * world. Closing its GUI never ejects. Broken, it keeps what's in it, as other card holders do.
+ * on its bus, else from its battery. Disks go in and come out by hand. Broken, it keeps what's in it,
+ * as other card holders do.
  */
 public final class DiskStationBlockEntity extends CardHolderBlockEntity {
 	public static final int TARGET = 0;
@@ -78,41 +73,15 @@ public final class DiskStationBlockEntity extends CardHolderBlockEntity {
 		}
 
 		@Override
-		public String eject(String which) {
-			return DiskStationBlockEntity.this.eject(slot(which));
-		}
-
-		@Override
-		public Face front() {
-			return Face.of(getBlockState().getValue(DiskStationBlock.FACING).getName());
-		}
-
-		@Override
-		public Face ejectFace() {
-			return Face.of(getBlockState().getValue(DiskStationBlock.EJECT).getName());
-		}
-
-		@Override
-		public void ejectFace(Face face) {
-			if (level != null) {
-				level.setBlock(worldPosition, getBlockState().setValue(DiskStationBlock.EJECT, Direction.byName(face.id())), Block.UPDATE_ALL);
-			}
-		}
-
-		@Override
 		public List<Path> copyImage(String image, Path folder, boolean replace) {
 			return com.payonel.modularcomputers.machine.LuaScripts.copyTree(image, folder, replace);
 		}
 	});
-	/** The menu's view: its eject face (a {@link Face}'s ordinal), the last action's {@link Outcome}, its battery's charge in percent. */
+	/** The menu's view: the last action's {@link Outcome}, its battery's charge in percent. */
 	private final ContainerData data = new ContainerData() {
 		@Override
 		public int get(int index) {
-			return switch (index) {
-				case 0 -> Face.of(getBlockState().getValue(DiskStationBlock.EJECT).getName()).ordinal();
-				case 1 -> outcome.ordinal();
-				default -> batteryPercent();
-			};
+			return index == 0 ? outcome.ordinal() : batteryPercent();
 		}
 
 		@Override
@@ -125,7 +94,7 @@ public final class DiskStationBlockEntity extends CardHolderBlockEntity {
 		}
 	};
 	/** How many numbers its menu syncs ({@link #data}). */
-	public static final int DATA = 3;
+	public static final int DATA = 2;
 
 	public DiskStationBlockEntity(BlockPos pos, BlockState state) {
 		super(ModBlocks.DISK_STATION_ENTITY, pos, state, SLOTS);
@@ -258,31 +227,10 @@ public final class DiskStationBlockEntity extends CardHolderBlockEntity {
 		return stack.getItem() instanceof BatteryItem battery ? BatteryItem.charge(stack).percent(battery.tier()) : 0;
 	}
 
-	/** Pushes a disk out of its eject face: into a container there, else into the world. Null when it went, else why not. */
-	private String eject(int slot) {
-		ItemStack stack = cards().getItem(slot);
-		if (stack.isEmpty() || level == null) {
-			return DiskStation.NO_DISK;
-		}
-		Direction face = getBlockState().getValue(DiskStationBlock.EJECT);
-		Container container = HopperBlockEntity.getContainerAt(level, worldPosition.relative(face));
-		ItemStack left = container == null ? stack.copy() : HopperBlockEntity.addItem(null, container, stack.copy(), face.getOpposite());
-		if (!left.isEmpty()) {
-			Block.popResourceFromFace(level, worldPosition, face, left);
-		}
-		cards().setItem(slot, ItemStack.EMPTY);
-		return null;
-	}
-
 	/** A button pressed in its GUI: the action, done as its device does it. */
-	public void act(String action, String which) {
-		outcome = Outcome.of(device.act(action, which));
+	public void act(String action) {
+		outcome = Outcome.of(device.act(action));
 		setChanged();
-	}
-
-	/** Its GUI moved its eject face (by a name relative to its front, or the world's). */
-	public void ejectFace(String face) {
-		outcome = Outcome.of(device.setEjectFace(new com.payonel.modularcomputers.runtime.Arguments(List.of(face))));
 	}
 
 	@Override

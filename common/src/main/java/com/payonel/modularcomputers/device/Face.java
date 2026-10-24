@@ -7,8 +7,9 @@ import java.util.Locale;
  * A block's face, as every device's methods name one (user design): by the world's name
  * ({@code north}, {@code south}, {@code east}, {@code west}, {@code up}, {@code down}: Minecraft's
  * own), or relative to the block's front ({@code front}, {@code back}, {@code left},
- * {@code right}), so a program written for a block works however it's turned. Left and right are the
- * block's own, looking out of its front (ComputerCraft's). A device whose block hasn't said where
+ * {@code right}), so a program written for a block works however it's turned. Left and right are as
+ * someone facing its front sees them (the user's: as a desktop case's left side panel is on your
+ * left as you face it), not the block's own. A device whose block hasn't said where
  * its front is takes only the world's names. Devices answer with the world's names.
  */
 public enum Face {
@@ -74,7 +75,7 @@ public enum Face {
 				if (front == UP || front == DOWN) {
 					throw new IllegalArgumentException(key + ": this block faces " + front.id() + ", so it has no " + key);
 				}
-				yield key.equals("right") ? front.clockwise() : front.clockwise().opposite();
+				yield key.equals("left") ? front.clockwise() : front.clockwise().opposite(); // (facing north, we look south: east is our left)
 			}
 		};
 	}

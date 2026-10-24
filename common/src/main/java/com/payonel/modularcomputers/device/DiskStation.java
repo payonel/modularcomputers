@@ -18,8 +18,7 @@ import java.util.Map;
  * on; its source, optional, is only read (a write blocker's role, as forensic docks have), for
  * cloning. Both are on the bus too, beside it. Every action is a method and a line written to its
  * file ({@code set}), the same as its GUI's buttons; each costs power, the bus's or its battery's.
- * Eject pushes a disk out of its eject face, which is set apart ({@code setEjectFace}), as its GUI
- * sets it.
+ * Disks go in and come out by hand, in its GUI.
  */
 public final class DiskStation implements Device {
 	/** What an action costs: a second of a running CPU. */
@@ -34,7 +33,7 @@ public final class DiskStation implements Device {
 	/** The image a disk gets when it's installed or updated: mcos. */
 	public static final String IMAGE = "mcos";
 	/** The actions, as {@code set} takes them (and the GUI's buttons are). */
-	public static final List<String> ACTIONS = List.of("format", "wipe", "clone", "install", "update", "eject");
+	public static final List<String> ACTIONS = List.of("format", "wipe", "clone", "install", "update");
 
 	/** What its block does for it: its slots, its power, the world. */
 	public interface Bay {
@@ -43,16 +42,6 @@ public final class DiskStation implements Device {
 
 		/** Pays for an action: the bus's power when it has some, else its battery's; false: neither has enough. */
 		boolean pay(int cost);
-
-		/** Pushes a disk out of its eject face: null when it went, else why not. */
-		String eject(String which);
-
-		/** Its front, for faces named from it. */
-		Face front();
-
-		Face ejectFace();
-
-		void ejectFace(Face face);
 
 		/** Copies an image's files into a disk's folder (over what's there, when {@code replace}): what it wrote. */
 		List<Path> copyImage(String image, Path folder, boolean replace);
@@ -123,33 +112,7 @@ public final class DiskStation implements Device {
 		return onTarget(disk -> disk.copyIn(folder -> bay.copyImage(IMAGE, folder, true)));
 	}
 
-	@Method(doc = "eject([which]): pushes a disk out of its eject face (\"target\", the default, or \"source\"), into a container there or into the world")
-	public Result eject(Arguments args) {
-		String which = args.optString(0, TARGET);
-		if (!which.equals(TARGET) && !which.equals(SOURCE)) {
-			return Result.fail("no such slot: " + which + " (target or source)");
-		}
-		String why = bay.eject(which);
-		return why == null ? Result.ok(true) : Result.fail(why);
-	}
-
-	@Method(doc = "getEjectFace(): the face it ejects out of (the world's name)")
-	public Result getEjectFace(Arguments args) {
-		return Result.ok(bay.ejectFace().id());
-	}
-
-	@Method(doc = "setEjectFace(face): the face it ejects out of (north, south, east, west, up, down, or front, back, left, right); returns the old one")
-	public Result setEjectFace(Arguments args) {
-		Face old = bay.ejectFace();
-		try {
-			bay.ejectFace(Face.named(args.checkString(0), bay.front()));
-		} catch (IllegalArgumentException e) {
-			return Result.fail(e.getMessage());
-		}
-		return Result.ok(old.id());
-	}
-
-	@Method(doc = "get(): {target = disk, source = disk, ejectFace} (a disk: {tier, mode, used, capacity, label}, or nothing for an empty slot)")
+	@Method(doc = "get(): {target = disk, source = disk} (a disk: {tier, mode, used, capacity, label}, or nothing for an empty slot)")
 	public Result get(Arguments args) {
 		Map<String, Object> state = new LinkedHashMap<>();
 		for (String which : List.of(TARGET, SOURCE)) {
@@ -166,25 +129,20 @@ public final class DiskStation implements Device {
 				state.put(which, about);
 			}
 		}
-		state.put("ejectFace", bay.ejectFace().id());
 		return Result.ok(state);
 	}
 
-	@Method(doc = "set(action): {action = format | wipe | clone | install | update | eject [, which]} or {ejectFace = face}: does it, as its method does")
+	@Method(doc = "set(action): {action = format | wipe | clone | install | update}: does it, as its method does")
 	public Result set(Arguments args) {
-		Map<?, ?> table = args.checkTable(0);
-		if (table.get("ejectFace") instanceof String face) {
-			return setEjectFace(new Arguments(List.of(face)));
-		}
-		Object action = table.get("action");
+		Object action = args.checkTable(0).get("action");
 		if (!(action instanceof String name) || !ACTIONS.contains(name)) {
 			return Result.fail("no such action: " + action + " (" + String.join(", ", ACTIONS) + ")");
 		}
-		return act(name, table.get("which") instanceof String which ? which : null);
+		return act(name);
 	}
 
-	/** An action by its name (a GUI button's, or set's), with eject's slot. */
-	public Result act(String action, String which) {
+	/** An action by its name (a GUI button's, or set's). */
+	public Result act(String action) {
 		Arguments none = none();
 		return switch (action) {
 			case "format" -> format(none);
@@ -192,7 +150,6 @@ public final class DiskStation implements Device {
 			case "clone" -> clone(none);
 			case "install" -> install(none);
 			case "update" -> update(none);
-			case "eject" -> eject(which == null ? none : new Arguments(List.of(which)));
 			default -> Result.fail("no such action: " + action);
 		};
 	}
