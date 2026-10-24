@@ -88,8 +88,8 @@ public final class Disk implements Device {
 	private final List<FileHandle> handles = new ArrayList<>();
 	/** Space open handles' buffered writes will take when they close (reserved at write, as delayed allocation does). */
 	private long reserved;
-	/** Where its label is (its item's anvil name), read when asked: no copy of it here. */
-	private java.util.function.Supplier<String> label = () -> null;
+	/** Where its label is (its item's), read and written there: no copy of it here. */
+	private com.payonel.modularcomputers.bus.Label label = com.payonel.modularcomputers.bus.Label.NONE;
 	/** Bytes in use, worked out on first need, then kept up to date. */
 	private long used = -1;
 	/**
@@ -137,13 +137,19 @@ public final class Disk implements Device {
 	private java.util.function.Consumer<String> formatWrite = format -> {
 	};
 
-	public void labelFrom(java.util.function.Supplier<String> label) {
+	/** Where its label lives (its item's). */
+	public void labelIn(com.payonel.modularcomputers.bus.Label label) {
 		this.label = label;
 	}
 
 	@Override
 	public String label() {
 		return label.get();
+	}
+
+	@Override
+	public boolean relabel(String text) {
+		return label.set(text);
 	}
 
 	private Path image() {

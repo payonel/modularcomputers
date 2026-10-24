@@ -8,9 +8,14 @@ package com.payonel.modularcomputers.bus;
 public interface Device {
 	DeviceType type();
 
-	/** What the player named it (an anvil's name on its item), if anything: a label, like a disk's. */
+	/** Its label, if it has one (its item's: {@link Label}), as a disk's. */
 	default String label() {
 		return null;
+	}
+
+	/** Gives it a label (null: none); false if it can't have one (no item to keep it on). */
+	default boolean relabel(String label) {
+		return false;
 	}
 
 	/**

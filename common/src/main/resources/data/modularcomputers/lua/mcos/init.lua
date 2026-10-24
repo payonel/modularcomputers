@@ -102,12 +102,16 @@ local tmpfs = module("tmpfs", k, vfs)
 -- device or fails (ENODEV), never another one.
 local devices = {list = {}, byname = {}}
 k.devices = devices
-local described = {} -- by id: {label, get, set}, asked once a device (an id never changes what it is)
+local described = {} -- by id: {label, get, set}, asked once a device (an id never changes what it is; a label is asked again each time it joins: another computer may have relabeled it)
 local SINGLE = {eeprom = "eeprom"} -- the slots of devices there's only ever one of: named without a number
 local LINUX = {sound = "dsp"} -- types Linux names its own way: the first without a number (OSS's dsp, then dsp1)
 
 function k.refreshdevices()
   local list, byname, counts = {}, {}, {}
+  local was = {}
+  for _, entry in ipairs(devices.list) do
+    was[entry.id] = true
+  end
   for _, device in ipairs(board.list()) do
     local kind = (device.type or "device"):gsub("[^%w]", "")
     local n = counts[kind] or 0
@@ -123,6 +127,8 @@ function k.refreshdevices()
         end
       end
       described[id] = about
+    elseif not was[id] then
+      about.label = (board.info(device.address) or {}).label -- (back: relabeled elsewhere, maybe)
     end
     local slot = device.address ~= device.id and not device.address:find("^id:") and device.address or nil
     local name = SINGLE[slot] or LINUX[kind] and LINUX[kind] .. (n == 0 and "" or n) or kind .. n
@@ -885,10 +891,35 @@ function syscalls.processes()
   return list
 end
 
--- Seconds since boot (CLOCK_MONOTONIC; with no real-time clock it's the time, too, as a board
--- without an RTC starts at the epoch).
+-- Seconds since boot (CLOCK_MONOTONIC).
 function syscalls.uptime()
   return board.uptime() / TICKS_PER_SECOND
+end
+
+-- A device's label (by its kernel name, or its id): on its item, set by the board; "" or nil
+-- for none. EINVAL for one that can't be (too long, not printable), EPERM for a device that can't
+-- have one (no item to keep it on), ENODEV for none.
+function syscalls.setlabel(p, request, name, label)
+  local device = devices.byname[name]
+  if not device then
+    for _, entry in ipairs(devices.list) do
+      if entry.id == name or entry.id == "id:" .. tostring(name) then
+        device = entry
+      end
+    end
+  end
+  if not device then
+    return fail("ENODEV")
+  elseif label ~= nil and type(label) ~= "string" then
+    return fail("EINVAL")
+  end
+  local ok, why = board.setLabel(device.id, label or "")
+  if not ok then
+    return fail(tostring(why):find("can't have") and "EPERM" or "EINVAL")
+  end
+  described[device.id].label = label ~= "" and label or nil
+  device.label = described[device.id].label
+  return true
 end
 
 -- The host's name (uname's nodename): unset until set (/etc/rc sets it from /etc/hostname), and

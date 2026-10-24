@@ -15,8 +15,6 @@ import com.payonel.modularcomputers.runtime.Board;
 import com.payonel.modularcomputers.runtime.Handle;
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.network.chat.Component;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -122,7 +120,7 @@ public class CaseTierGameTest {
 		AllInOneBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
 		ItemStack chip = new ItemStack(ModItems.EEPROM);
-		chip.set(DataComponents.CUSTOM_NAME, Component.literal("boot"));
+		chip.set(ModComponents.LABEL, "boot");
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, chip);
 		computer.parts().setItem(CaseMenu.UPS_SLOT + 1, ModItems.TIER1_BATTERY.charged());
 		computer.parts().setItem(CaseMenu.RAM_SLOTS + 1, new ItemStack(ModItems.TIER2_RAM));
@@ -132,6 +130,7 @@ public class CaseTierGameTest {
 			seen.add(board.hardware());
 			seen.add(board.info("eeprom").orElseThrow().get("label"));
 			board.invoke("eeprom", "set", "boot code");
+			seen.add(board.setLabel("eeprom", "flashed").failed());
 			board.halt();
 		});
 		computer.pressPower();
@@ -144,10 +143,12 @@ public class CaseTierGameTest {
 		helper.assertValueEqual(hardware.caseTier(), 2, "case tier");
 		helper.assertValueEqual(hardware.cpu(), new Board.CpuInfo(2, 16), "the CPU");
 		helper.assertValueEqual(hardware.memory(), List.of(new Board.MemoryInfo(1, 2, MemoryTier.TIER_2.bytes())), "the RAM");
-		helper.assertValueEqual(seen.get(2), "boot", "an anvil's name is the device's label");
+		helper.assertValueEqual(seen.get(2), "boot", "its item's label is the device's");
 		ItemStack after = computer.parts().getItem(CaseMenu.EEPROM_SLOT);
 		helper.assertValueEqual(after.get(ModComponents.EEPROM_IMAGE), "boot code", "the write is on the item");
-		after.set(DataComponents.CUSTOM_NAME, Component.literal("renamed")); // the item changes in place
+		helper.assertValueEqual(seen.get(3), false, "a program relabels it");
+		helper.assertValueEqual(after.get(ModComponents.LABEL), "flashed", "on the item");
+		after.set(ModComponents.LABEL, "renamed"); // the item changes in place
 		after.set(ModComponents.EEPROM_IMAGE, "edited");
 		var eeprom = computer.machine().board().eeprom().orElseThrow();
 		helper.assertValueEqual(eeprom.label(), "renamed", "the device reads its label from the item");

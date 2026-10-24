@@ -54,6 +54,7 @@ public final class ClearIdRecipe extends CustomRecipe {
 			}
 			ItemStack wiped = found.copyWithCount(1);
 			wiped.remove(ModComponents.SERIAL);
+			wiped.remove(ModComponents.LABEL); // (a new device: no label either)
 			wiped.set(ModComponents.EEPROM_IMAGE, "");
 			return wiped;
 		}
@@ -64,6 +65,7 @@ public final class ClearIdRecipe extends CustomRecipe {
 			}
 			ItemStack wiped = found.copyWithCount(1);
 			wiped.remove(ModComponents.SERIAL);
+			wiped.remove(ModComponents.LABEL); // (a new device: no label either)
 			wiped.remove(ModComponents.DISK_IMAGE); // blank: not even the files it came with
 			wiped.remove(ModComponents.DISK_FORMAT); // (hfs)
 			if (found.has(ModComponents.SERIAL)) {
@@ -76,6 +78,7 @@ public final class ClearIdRecipe extends CustomRecipe {
 		}
 		ItemStack cleared = found.copyWithCount(1);
 		cleared.remove(ModComponents.SERIAL);
+		cleared.remove(ModComponents.LABEL); // (a new device: no label either)
 		return cleared;
 	}
 

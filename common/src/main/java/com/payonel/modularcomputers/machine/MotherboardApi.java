@@ -158,6 +158,20 @@ final class MotherboardApi implements Board {
 	}
 
 	@Override
+	public Result setLabel(String address, String label) {
+		Optional<?> found = device(address);
+		if (found.isEmpty() || !(found.get() instanceof Device device)) {
+			return Result.fail("no such device: " + address);
+		}
+		String text = label == null || label.isEmpty() ? null : label;
+		String invalid = text == null ? null : com.payonel.modularcomputers.bus.Label.invalid(text);
+		if (invalid != null) {
+			return Result.fail(invalid);
+		}
+		return device.relabel(text) ? Result.ok() : Result.fail("it can't have a label");
+	}
+
+	@Override
 	public long time() {
 		return board.chassis().time();
 	}

@@ -105,10 +105,25 @@ public final class ModComponents {
 	public static void init() {
 	}
 
-	/** What the player named the item (on an anvil), if anything: its device's label. */
+	/** A device's label (user, 2026-10-24: set by programs, shown in its item's details), on its item: its one home. */
+	public static final DataComponentType<String> LABEL = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("label"),
+		DataComponentType.<String>builder().persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.STRING_UTF8).build());
+
+	/** The label of the device an item is, if it has one. */
 	public static String label(ItemStack stack) {
-		net.minecraft.network.chat.Component name = stack.get(net.minecraft.core.component.DataComponents.CUSTOM_NAME);
-		return name == null ? null : name.getString();
+		return stack.get(LABEL);
+	}
+
+	/** Where a device's label lives: on its item, read and written there ({@code changed}: its block marks itself). */
+	public static com.payonel.modularcomputers.bus.Label labelOn(java.util.function.Supplier<ItemStack> stack, Runnable changed) {
+		return new com.payonel.modularcomputers.bus.Label(() -> label(stack.get()), label -> {
+			if (label == null || label.isEmpty()) {
+				stack.get().remove(LABEL);
+			} else {
+				stack.get().set(LABEL, label);
+			}
+			changed.run();
+		});
 	}
 
 	/** The card's serial number, stamping a new one on if it has none yet. Server side only. */

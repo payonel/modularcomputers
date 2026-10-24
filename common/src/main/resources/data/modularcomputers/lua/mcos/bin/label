@@ -1,0 +1,30 @@
+-- label device [label]: a device's label (as lsdev names devices: storage0, eeprom; or its id;
+-- /dev/ before it is allowed); with label, sets it ("" clears it), as e2label names a disk. The
+-- label is kept on the device's item (shown in its details), so it goes where the device goes.
+-- At most 32 printable characters; a device with no item (a cabled block's) can't have one.
+local sys = require("sys")
+
+local name, label = arg[1], arg[2]
+if not name or arg[3] or name:sub(1, 1) == "-" then
+  io.stderr:write("usage: label device [label]\n")
+  return 1
+end
+name = name:gsub("^/dev/", "")
+if label then
+  local ok, why = sys.setlabel(name, label)
+  if not ok then
+    io.stderr:write("label: ", name, ": ", tostring(why), "\n")
+    return 1
+  end
+  return 0
+end
+for _, device in ipairs(sys.devices()) do
+  if device.name == name or device.id == name or device.id == "id:" .. name then
+    if device.label then
+      print(device.label)
+    end
+    return 0
+  end
+end
+io.stderr:write("label: ", name, ": No such device\n")
+return 1

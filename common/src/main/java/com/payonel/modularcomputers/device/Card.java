@@ -10,8 +10,8 @@ import com.payonel.modularcomputers.bus.DeviceType;
  */
 public class Card implements Device {
 	private final CardKind kind;
-	/** Where its label is (its item's anvil name), read when asked: no copy of it here. */
-	private java.util.function.Supplier<String> label = () -> null;
+	/** Where its label is (its item's), read and written there: no copy of it here. */
+	private com.payonel.modularcomputers.bus.Label label = com.payonel.modularcomputers.bus.Label.NONE;
 
 	public Card(CardKind kind) {
 		this.kind = kind;
@@ -21,7 +21,8 @@ public class Card implements Device {
 		return kind;
 	}
 
-	public void labelFrom(java.util.function.Supplier<String> label) {
+	/** Where its label lives (its item's). */
+	public void labelIn(com.payonel.modularcomputers.bus.Label label) {
 		this.label = label;
 	}
 
@@ -64,6 +65,11 @@ public class Card implements Device {
 	@Override
 	public String label() {
 		return label.get();
+	}
+
+	@Override
+	public boolean relabel(String text) {
+		return label.set(text);
 	}
 
 	@Override

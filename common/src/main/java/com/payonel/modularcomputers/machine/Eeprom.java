@@ -29,9 +29,14 @@ public final class Eeprom implements Device {
 
 		void write(String image);
 
-		/** What the player named it (an anvil's name), or null. */
+		/** Its label (its item's), or null. */
 		default String label() {
 			return null;
+		}
+
+		/** Gives the chip a label (null: none); false if it can't have one. */
+		default boolean relabel(String label) {
+			return false;
 		}
 	}
 
@@ -103,6 +108,11 @@ public final class Eeprom implements Device {
 	@Override
 	public String label() {
 		return storage.label();
+	}
+
+	@Override
+	public boolean relabel(String label) {
+		return storage.relabel(label);
 	}
 
 	@Override

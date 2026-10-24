@@ -146,6 +146,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		public String label() {
 			return ModComponents.label(parts.getItem(CaseMenu.EEPROM_SLOT));
 		}
+
+		@Override
+		public boolean relabel(String label) {
+			return ModComponents.labelOn(() -> parts.getItem(CaseMenu.EEPROM_SLOT), AllInOneBlockEntity.this::setChanged).set(label);
+		}
 	};
 	private final Bus bus = new Bus(); // empty until a CPU is in
 	private final PowerBuffer power;
@@ -936,7 +941,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 			diskSerials[lane] = diskSerial;
 			if (disks[lane] != null) {
 				int slot = CaseMenu.SATA_SLOTS + lane;
-				disks[lane].labelFrom(() -> ModComponents.label(parts.getItem(slot))); // read from the disk itself
+				disks[lane].labelIn(ModComponents.labelOn(() -> parts.getItem(slot), this::markChanged)); // the disk's own
 				disks[lane].formatIn(() -> ModComponents.diskFormat(parts.getItem(slot)), format -> ModComponents.diskFormat(parts.getItem(slot), format));
 			}
 			board.plug(Motherboard.sata(lane), disks[lane], serial(CaseMenu.SATA_SLOTS + lane));
@@ -950,7 +955,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 					display.onChange(this::markChanged);
 				}
 				cards[lane] = null;
-				display.labelFrom(() -> ModComponents.label(parts.getItem(CaseMenu.EXP_SLOTS))); // read from the screen itself
+				display.labelIn(ModComponents.labelOn(() -> parts.getItem(CaseMenu.EXP_SLOTS), this::markChanged)); // the screen's own
 				board.plug(Motherboard.exp(lane), display, serial(CaseMenu.EXP_SLOTS + lane));
 				continue;
 			}
@@ -958,7 +963,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 			cards[lane] = kind == null ? null : cards[lane] != null && cards[lane].kind() == kind ? cards[lane] : cardHere(kind);
 			if (cards[lane] != null) {
 				int slot = CaseMenu.EXP_SLOTS + lane;
-				cards[lane].labelFrom(() -> ModComponents.label(parts.getItem(slot))); // read from the card itself
+				cards[lane].labelIn(ModComponents.labelOn(() -> parts.getItem(slot), this::markChanged)); // the card's own
 				cards[lane].idFrom(() -> serial(slot));
 				if (cards[lane] instanceof com.payonel.modularcomputers.device.BluetoothCard bluetooth) {
 					// Its link lives on the card itself; a program's change is a link made, as by hand.

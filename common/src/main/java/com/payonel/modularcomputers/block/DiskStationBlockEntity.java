@@ -188,7 +188,7 @@ public final class DiskStationBlockEntity extends CardHolderBlockEntity {
 				disk.onChange(() -> ChunkMarks.changed(level, worldPosition));
 				disk.readOnly(slot == SOURCE);
 				int at = slot;
-				disk.labelFrom(() -> ModComponents.label(cards().getItem(at)));
+				disk.labelIn(ModComponents.labelOn(() -> cards().getItem(at), () -> ChunkMarks.changed(level, worldPosition)));
 				disk.formatIn(() -> ModComponents.diskFormat(cards().getItem(at)), format -> ModComponents.diskFormat(cards().getItem(at), format));
 				disks[slot] = disk;
 			}

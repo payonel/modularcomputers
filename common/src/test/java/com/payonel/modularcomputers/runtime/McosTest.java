@@ -414,6 +414,22 @@ class McosTest {
 	}
 
 	@Test
+	void labelSetsADevicesLabelOnItsHomeAndShowsIt() {
+		String[] home = {null};
+		dataDisk();
+		((Disk) devices.get("sata:1")).labelIn(new com.payonel.modularcomputers.bus.Label(() -> home[0], label -> home[0] = label));
+		boot();
+		type("label storage1 backups; label /dev/storage1 > /l; lsdev > /d; label storage1 " + "x".repeat(40) + " 2> /dev/null; echo $? > /st; "
+			+ "label storage0 boot 2> /dev/null; echo $? > /st0; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(home[0]).as("on its home: its item").isEqualTo("backups");
+		assertThat(read(root().resolve("l"))).isEqualTo("backups\n");
+		assertThat(read(root().resolve("d"))).as("lsdev shows it").contains("backups");
+		assertThat(read(root().resolve("st"))).as("too long").isEqualTo("1\n");
+		assertThat(read(root().resolve("st0"))).as("a device with no home for one").isEqualTo("1\n");
+	}
+
+	@Test
 	void dateIsTheWorldsClockOnItsCalendar() {
 		long noonOfTheThirdDay = 2 * 24000 + 6000; // (game time: 0 is the first sunrise, 6000 its noon)
 		machine.board().setChassis(new com.payonel.modularcomputers.machine.Chassis() {

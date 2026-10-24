@@ -143,7 +143,9 @@ it does (a disk used in a recipe loses its files).
 ### Items
 
 Items stack to 64, except what holds data (EEPROMs, disks). A part that's been in a machine carries
-its id and stacks only with identical ones; crafting it alone clears it (a new device). Every disk
+its id and stacks only with identical ones; crafting it alone clears it (a new device). A device's label is on its item (`ModComponents.LABEL`, shown in its details), set by programs
+(`setLabel`, mcos's `label`), not its anvil name (that's only the item's name); crafting it alone
+clears it with its id. Every disk
 tier comes with mcos (its files are made when the disk is first installed); crafted alone it's
 blank, and its files leave the world save when the player takes it.
 

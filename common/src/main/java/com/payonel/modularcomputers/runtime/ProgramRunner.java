@@ -271,6 +271,11 @@ public final class ProgramRunner implements Runner {
 		}
 
 		@Override
+		public Result setLabel(String address, String label) {
+			return call(board -> board.setLabel(address, label));
+		}
+
+		@Override
 		public void halt() {
 			runner.request(new Halt());
 			throw new Stopped(); // not reached: the host stops the thread

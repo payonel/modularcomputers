@@ -45,6 +45,7 @@
 	"hint.modularcomputers.shift": "Hold %s for details",
 	"hint.modularcomputers.shift_key": "[Shift]",
 	"hint.modularcomputers.id": "Id: %s",
+	"hint.modularcomputers.label": "Label: %s",
 	"hint.modularcomputers.clear_id": "Craft alone to clear the id",
 	"hint.modularcomputers.eeprom.blank": "Blank",
 	"hint.modularcomputers.eeprom.holds": "Holds: %s",

@@ -90,7 +90,7 @@ class BoardInfoTest {
 	@Test
 	void eachDeviceSaysWhatItIs() {
 		Disk disk = new Disk(DiskTier.TIER_2);
-		disk.labelFrom(() -> "backups");
+		disk.labelIn(new com.payonel.modularcomputers.bus.Label(() -> "backups", null));
 		Terminal terminal = new Terminal(Resolution.DEFAULT, TerminalTier.TIER_2);
 		machine.board().setCpu(new Cpu(CpuTier.TIER_2));
 		TestBus bus = new TestBus(machine);

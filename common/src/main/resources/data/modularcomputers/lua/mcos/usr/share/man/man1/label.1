@@ -1,0 +1,50 @@
+.TH LABEL 1 "" "" "mcos Manual"
+.SH NAME
+label \- show or set a device's label
+.SH SYNOPSIS
+.B label
+.I device
+.RI [ label ]
+.SH DESCRIPTION
+With only a
+.IR device ,
+.B label
+prints its label (nothing when it has none). With a
+.IR label ,
+it sets it; an empty one,
+.BR \(dq\(dq ,
+clears it.
+.PP
+A
+.I device
+is named as
+.BR lsdev (1)
+names it
+.RB ( storage0 ,
+.BR eeprom ),
+with or without
+.B /dev/
+before it, or by its id.
+.PP
+The label is kept on the device's item, and shown in its details (hold
+Shift over it), so it goes wherever the device goes.
+.B lsdev
+shows every device's label.
+A label is at most 32 printable characters.
+.SH EXIT STATUS
+0 when the label was printed or set; 1 for a device that isn't there, a
+label that can't be one, or a device that can't have one (a cabled block's:
+it has no item to keep it on).
+.SH EXAMPLES
+.nf
+label storage1 backups
+label eeprom
+label storage1 ""
+.fi
+.SH NOTES
+Linux labels a disk's filesystem
+.RB ( e2label ,
+.BR fatlabel );
+mcos labels any device that is an item, as OpenOS did.
+.SH SEE ALSO
+.BR lsdev (1)

@@ -84,6 +84,10 @@ public final class Hint {
 		if (stack.is(com.payonel.modularcomputers.block.ModBlocks.PHOTOMASK.asItem())) {
 			elements.add(new Crank()); // its gear turning, its buffer filling
 		}
+		String label = com.payonel.modularcomputers.item.ModComponents.label(stack);
+		if (label != null) {
+			elements.add(text(Component.translatable("hint.modularcomputers.label", label))); // (its device's: programs set it)
+		}
 		if (serial != null) {
 			// Its id (programs address it as id:<uuid>), long, so only in the details (user); crafting it alone clears it.
 			elements.add(text(Component.translatable("hint.modularcomputers.id", serial.toString())));

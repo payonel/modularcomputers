@@ -1120,6 +1120,7 @@ public final class LuaRunner implements Runner {
 			case "info" -> board -> board.info(arg(args, 0));
 			case "uptime" -> Board::uptime;
 			case "time" -> Board::time;
+			case "setLabel" -> board -> board.setLabel(arg(args, 0), arg(args, 1));
 			case "power" -> Board::power;
 			case "hardware" -> Board::hardware;
 			case "invoke" -> board -> {

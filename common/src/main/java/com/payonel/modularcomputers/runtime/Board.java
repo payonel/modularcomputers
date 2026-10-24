@@ -124,6 +124,9 @@ public interface Board {
 	/** Ticks since the machine was powered on. */
 	long uptime();
 
+	/** Gives a device a label (null or "": none); fails for one that can't have one, or a label that can't be one. */
+	Result setLabel(String address, String label);
+
 	/** The real-time clock: the world's game time, in ticks ({@link com.payonel.modularcomputers.machine.Chassis#time}). */
 	long time();
 

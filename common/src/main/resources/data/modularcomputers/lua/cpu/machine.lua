@@ -10,7 +10,7 @@
 --   "slice"                       the slice is spent: a point where the host may save the machine;
 --                                 resumed at once
 --   "call", name, args...         a board call (list, status, type, methods, doc, info, uptime,
---                                 time, power, hardware, invoke), carried out on the server thread, where
+--                                 time, setLabel, power, hardware, invoke), carried out on the server thread, where
 --                                 devices live; answered with its values
 --   "baseline"                    the sandbox is built: the host measures the memory held as the
 --                                 baseline the program's RAM goes on top of; asked once
@@ -284,6 +284,7 @@ sandbox.board = {
   info = function(address) return call("call", "info", address) end,
   uptime = function() return call("call", "uptime") end,
   time = function() return call("call", "time") end,
+  setLabel = function(address, label) return call("call", "setLabel", address, label) end,
   power = function() return call("call", "power") end,
   hardware = function() return call("call", "hardware") end,
   -- true and the method's values, or false and why it failed (a device never stops the machine);
