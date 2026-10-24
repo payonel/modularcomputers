@@ -8,7 +8,6 @@
 local sys = require("sys")
 local rsh = require("rsh")
 
-local PROBE_SECONDS = 0.5 -- how long rsh listens for rshds answering
 local DEFAULT_COLUMNS, DEFAULT_ROWS = 80, 24
 local USAGE = "usage: rsh [-n] host [command...]\n"
 
@@ -35,42 +34,7 @@ local function fail(...)
   return 1
 end
 
--- The address of the computer 'name' names: its card's whole id, or the one rshd in reach whose
--- id starts with it.
-local function resolve(name)
-  name = name:gsub("^id:", ""):gsub("%*$", "")
-  if name:match("^%x+%-%x+%-%x+%-%x+%-%x+$") then
-    return name
-  end
-  local probe = assert(sys.socket())
-  local ok, why = sys.sendto(probe, rsh.PROBE, "broadcast", rsh.PORT)
-  if not ok then
-    return nil, why
-  end
-  local found, seen = {}, {}
-  local waited, step = 0, PROBE_SECONDS / 5
-  while waited < PROBE_SECONDS do
-    if next(sys.poll({[probe] = {IN = true}}, step)) then
-      local data, from = sys.recvfrom(probe)
-      if data == rsh.HERE and not seen[from] and from:sub(1, #name) == name then
-        seen[from] = true
-        found[#found + 1] = from
-      end
-    else
-      waited = waited + step
-    end
-  end
-  sys.close(probe)
-  if #found == 0 then
-    return nil, "unknown host"
-  elseif #found > 1 then
-    table.sort(found)
-    return nil, "ambiguous: " .. table.concat(found, ", ")
-  end
-  return found[1]
-end
-
-local address, why = resolve(host)
+local address, why = rsh.resolve(sys, host)
 if not address then
   return fail(host, ": ", why)
 end

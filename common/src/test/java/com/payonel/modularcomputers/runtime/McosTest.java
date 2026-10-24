@@ -1505,6 +1505,27 @@ class McosTest {
 		untilFile(root().resolve("back2"), "");
 	}
 	@Test
+	void rcpCopiesSeveralFilesAndWithRDirectoriesBothWays() {
+		java.util.UUID mine = java.util.UUID.randomUUID();
+		devices.put(Motherboard.exp(0), networkCard(new Object(), mine)); // (a card in a slot, as in a case)
+		String host = mine.toString().substring(0, 6);
+		file("a/one.txt", "one\n");
+		file("a/sub/two.txt", "two\n");
+		file("f1", "f1\n");
+		file("f2", "f2\n");
+		boot();
+		type("rc rshd start; sleep 0.5; mkdir /many; rcp /f1 /f2 " + host + ":/many; rcp /a " + host + ":/no 2> /refused; echo $? > /st1\r");
+		untilFile(root().resolve("st1"), "1\n");
+		assertThat(read(root().resolve("many/f1")) + read(root().resolve("many/f2"))).isEqualTo("f1\nf2\n");
+		assertThat(root().resolve("no")).as("a directory, without -r: refused").doesNotExist();
+		type("rcp -r /a " + host + ":/copy; mkdir /back; rcp -r " + host + ":/copy /back; echo $? > /st2\r");
+		untilFile(root().resolve("st2"), "0\n");
+		assertThat(read(root().resolve("copy/one.txt")) + read(root().resolve("copy/sub/two.txt"))).as("there").isEqualTo("one\ntwo\n");
+		assertThat(read(root().resolve("back/copy/one.txt")) + read(root().resolve("back/copy/sub/two.txt"))).as("and back, into the directory")
+			.isEqualTo("one\ntwo\n");
+	}
+
+	@Test
 	void twoComputersTalkThroughTheirCardsAndTcpLosesNothingWhenFramesAre() {
 		Object world = new Object();
 		java.util.UUID mine = java.util.UUID.randomUUID();

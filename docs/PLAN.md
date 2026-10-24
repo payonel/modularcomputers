@@ -151,8 +151,8 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   ignore SIGINT, as sh without job control.
 - **The shell's language:** `if`, `for`, `while`, `case`, functions, here-documents (user: maybe
   later).
-- **rsh, rcp, what's left:** `rcp` copies one file (BSD's takes several, `-r` directories, `-p`
-  times); a remote-to-remote `rcp`; readline doesn't redraw a line on SIGWINCH.
+- **rsh, rcp, what's left:** `rcp -p` (keeping times); a remote-to-remote `rcp`; readline doesn't
+  redraw a line on SIGWINCH.
 - **Networking, later:** a router between wired and wireless networks, raw frames for programs
   (Linux's packet sockets, for a `tcpdump`), a WLAN card's range as a setting (OC's strength, its
   power cost).

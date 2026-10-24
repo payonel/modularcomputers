@@ -14,6 +14,7 @@ local rsh = {
   REQUEST = "H", INPUT = "I", END = "E", SIZE = "W",
   OUTPUT = "O", ERRORS = "R", EXIT = "X",
   CHUNK = 4096, -- the most data a frame carries (what one read gives)
+  PROBE_SECONDS = 0.5, -- how long a probe listens for rshds answering
 }
 
 -- A frame of 'kind' carrying 'data'.
@@ -55,6 +56,41 @@ function rsh.send(sys, fd, kind, data)
     at = at + rsh.CHUNK
   until not data or at > #data
   return true
+end
+
+-- The address of the computer 'name' names: its card's whole id, or the one rshd in reach whose
+-- id starts with it.
+function rsh.resolve(sys, name)
+  name = name:gsub("^id:", ""):gsub("%*$", "")
+  if name:match("^%x+%-%x+%-%x+%-%x+%-%x+$") then
+    return name
+  end
+  local probe = assert(sys.socket())
+  local ok, why = sys.sendto(probe, rsh.PROBE, "broadcast", rsh.PORT)
+  if not ok then
+    return nil, why
+  end
+  local found, seen = {}, {}
+  local waited, step = 0, rsh.PROBE_SECONDS / 5
+  while waited < rsh.PROBE_SECONDS do
+    if next(sys.poll({[probe] = {IN = true}}, step)) then
+      local data, from = sys.recvfrom(probe)
+      if data == rsh.HERE and not seen[from] and from:sub(1, #name) == name then
+        seen[from] = true
+        found[#found + 1] = from
+      end
+    else
+      waited = waited + step
+    end
+  end
+  sys.close(probe)
+  if #found == 0 then
+    return nil, "unknown host"
+  elseif #found > 1 then
+    table.sort(found)
+    return nil, "ambiguous: " .. table.concat(found, ", ")
+  end
+  return found[1]
 end
 
 return rsh

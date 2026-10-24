@@ -1,46 +1,59 @@
 .TH RCP 1 "" "" "mcos Manual"
 .SH NAME
-rcp \- copy a file between computers
+rcp \- copy files between computers
 .SH SYNOPSIS
 .B rcp
-.I source target
+.RB [ \-r ]
+.I source
+.RI [ source ...]
+.I target
 .SH DESCRIPTION
 .B rcp
-copies one file to or from another computer. One of
-.I source
-and
-.I target
-is remote,
+copies files to or from another computer. The sources are all on one side
+and the target on the other: a remote name is
 .IB host : path
 .RI ( host
 as
 .BR rsh (1)
-takes it); a name with no colon, or with a
+takes it, found once for the whole copy); a name with no colon, or with a
 .B /
-before its colon, is local. A target that's a directory (or, remote, ends
-with
+before its colon, is local.
+.PP
+A target that's a directory (or ends with
 .BR / )
-gets the source's name in it.
+gets each source by its name in it; otherwise the source becomes the
+target. With more than one source, the target must be a directory.
 .PP
 It's
 .B rsh
-underneath, as BSD's rcp was:
+underneath, as BSD's rcp was: on the other computer,
 .B cat
-on the other computer reads or writes the file.
+reads or writes each file,
+.B mkdir \-p
+makes the directories, and
+.B find
+lists a remote directory's tree.
+.SH OPTIONS
+.TP
+.B \-r
+Copies directories, and everything in them. Without it, a directory
+source is refused. A link is copied as what it leads to (a file's
+contents); it's never followed into a directory.
 .SH EXIT STATUS
-0 on success; 1 when the file can't be read or written, or the other
-computer can't be reached.
+0 when everything was copied; 1 when something couldn't be read or
+written (the rest is still copied), or the other computer can't be
+reached.
 .SH EXAMPLES
 .nf
 rcp /notes 1b9c0e:/notes
 rcp 1b9c0e:/log /tmp/
+rcp /a.lua /b.lua 1b9c0e:/bin/
+rcp \-r /projects 1b9c0e:/backup/
 .fi
 .SH NOTES
-BSD's rcp copies several files and, with
-.BR \-r ,
-directories, and keeps their times with
+BSD's rcp keeps files' times with
 .BR \-p ;
-this one copies one file. Both ends being remote isn't supported.
+this one doesn't. Both ends being remote isn't supported.
 .SH SEE ALSO
 .BR rsh (1),
 .BR cp (1)

@@ -317,7 +317,8 @@ made: a world's disks keep their old mcos; tests copy afresh.
   One TCP connection, framed both ways (`lib/rsh.lua`), so output, errors and the exit status stay
   apart (BSD's used a second connection for stderr and never sent the status). A host is a card's
   id or a unique prefix, found by a UDP broadcast probe on port 514 that rshd answers. `rcp` is rsh
-  running `cat` there.
+  running `cat` there (and `mkdir -p` and `find` for `-r`), the host found once for the copy
+  (`rsh.resolve`).
 
 ## Easy to miss: a change that needs another
 

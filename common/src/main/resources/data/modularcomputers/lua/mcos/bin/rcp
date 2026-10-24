@@ -1,14 +1,19 @@
--- rcp source target: copies a file between computers (Berkeley's name: no passwords, no
--- encryption). One of the two is remote, host:path (host as rsh takes it: a card's id, whole or
--- its start); a path without a colon, or with a / before it, is local. It's rsh underneath, as
--- BSD's was: cat on the other computer reads or writes the file. A target that's a directory (or,
--- remote, ends with /) gets the source's name in it.
+-- rcp [-r] source... target: copies files between computers (Berkeley's name: no passwords, no
+-- encryption). The sources are all on one side and the target on the other: a remote name is
+-- host:path (host as rsh takes it: a card's id, whole or its start, found once); a name without a
+-- colon, or with a / before it, is local. With more than one source the target must be a directory.
+-- A target that's a directory (or ends with /) gets each source's name in it; otherwise the source
+-- becomes the target. -r copies directories, all that's in them (a link is copied as what it
+-- leads to, a file's contents; it's never followed into a directory); without it a directory is
+-- refused. It's rsh underneath, as BSD's was: on the other computer cat
+-- reads or writes each file, mkdir -p makes the directories, and find lists a remote tree.
 local sys = require("sys")
 local fs = require("fs")
+local rsh = require("rsh")
 
-local USAGE = "usage: rcp source target (one of them host:path)\n"
+local USAGE = "usage: rcp [-r] source... target (the sources or the target host:path)\n"
 
--- host, path for a remote one; nil for a local path.
+-- host, path for a remote name; nil for a local one.
 local function remote(name)
   local host, path = name:match("^([^/:]+):(.*)$")
   if host then
@@ -21,71 +26,206 @@ local function quote(path)
   return "'" .. path:gsub("'", "'\\''") .. "'"
 end
 
+local status = 0
 local function fail(...)
   io.stderr:write("rcp: ", ...)
   io.stderr:write("\n")
-  return 1
+  status = 1
 end
 
-if #arg ~= 2 then
+local recursive = false
+local names = {}
+for _, word in ipairs(arg) do
+  if word == "-r" then
+    recursive = true
+  elseif word:sub(1, 1) == "-" and #word > 1 then
+    io.stderr:write("rcp: invalid option -- '", word:sub(2, 2), "'\n", USAGE)
+    return 1
+  else
+    names[#names + 1] = word
+  end
+end
+if #names < 2 then
   io.stderr:write(USAGE)
   return 1
 end
-local source, target = arg[1], arg[2]
-local fromhost, frompath = remote(source)
+local target = table.remove(names)
 local tohost, topath = remote(target)
-if (fromhost and tohost) or not (fromhost or tohost) then
-  io.stderr:write(USAGE)
-  return 1
+local fromhost
+for _, name in ipairs(names) do
+  local host = remote(name)
+  if (host ~= nil) == (tohost ~= nil) or (fromhost and host ~= fromhost) then
+    io.stderr:write(USAGE) -- (both ends remote, or neither, or sources on two computers)
+    return 1
+  end
+  fromhost = host
 end
 
--- Runs rsh with these fds; how it ended.
-local function run(argv, fds)
-  local pid, why = sys.spawn("/bin/rsh", argv, {fds = fds})
+-- The other computer, by its card's whole id (found once: each copy is an rsh of its own).
+local host = tohost or fromhost
+local address, why = rsh.resolve(sys, host)
+if not address then
+  fail(host, ": ", why)
+  return status
+end
+
+-- Runs a command there, with these fds; whether it ended well.
+local function run(command, fds)
+  local null = not (fds and fds[0]) and sys.open("/dev/null", "r")
+  local all = {[0] = null or fds[0], [1] = fds and fds[1] or 1, [2] = 2}
+  local pid = sys.spawn("/bin/rsh", {address, command}, {fds = all})
+  if null then
+    sys.close(null)
+  end
   if not pid then
-    return nil, why
+    return false
   end
   local _, how, value = sys.waitpid(pid)
   return how == "exited" and value == 0
 end
 
+-- A command's output there, its lines (nil when it failed).
+local function lines(command)
+  local r, w = sys.pipe()
+  local null = sys.open("/dev/null", "r")
+  local pid = sys.spawn("/bin/rsh", {address, command}, {fds = {[0] = null, [1] = w, [2] = 2}})
+  sys.close(w)
+  sys.close(null)
+  local out = {}
+  while true do
+    local data = sys.read(r, rsh.CHUNK)
+    if not data or data == "" then
+      break
+    end
+    out[#out + 1] = data
+  end
+  sys.close(r)
+  if not pid then
+    return nil
+  end
+  local _, how, value = sys.waitpid(pid)
+  if how ~= "exited" or value ~= 0 then
+    return nil
+  end
+  local found = {}
+  for line in table.concat(out):gmatch("[^\n]+") do
+    found[#found + 1] = line
+  end
+  return found
+end
+
+-- Where a source goes: in the target, by its name, when the target is a directory.
+local function placed(into, name)
+  if into then
+    return into == "." and fs.name(name) or fs.join(into, fs.name(name))
+  end
+end
+
 if tohost then
-  -- local to remote: cat > path there, the file as its input
-  local st = sys.stat(source)
-  if not st then
-    return fail(source, ": No such file or directory")
-  elseif st.type == "directory" then
-    return fail(source, ": is a directory")
+  -- local to remote: cat > path there, each file as its input
+  local intodir = topath:sub(-1) == "/" or topath == "." or run("cd " .. quote(topath))
+  if #names > 1 and not intodir then
+    fail(target, ": Not a directory")
+    return status
   end
-  if topath:sub(-1) == "/" or topath == "." then
-    topath = (topath == "." and "" or topath) .. fs.name(source)
+  local function send(path, to)
+    local file, why = sys.open(path, "r")
+    if not file then
+      return fail(path, ": ", why)
+    end
+    local ok = run("cat > " .. quote(to), {[0] = file})
+    sys.close(file)
+    if not ok then
+      fail(host, ":", to, ": not copied")
+    end
   end
-  local file, why = sys.open(source, "r")
-  if not file then
-    return fail(source, ": ", why)
+  for _, name in ipairs(names) do
+    local to = intodir and placed(topath, name) or topath
+    local st = sys.stat(name)
+    if not st then
+      fail(name, ": No such file or directory")
+    elseif st.type ~= "directory" then
+      send(name, to)
+    elseif not recursive then
+      fail(name, ": is a directory (use -r)")
+    else
+      -- the directories, made in one go, then each file
+      local dirs, files = {quote(to)}, {}
+      local function walk(at, there)
+        local entries, why = fs.list(at)
+        if not entries then
+          return fail(why)
+        end
+        for _, entry in ipairs(entries) do
+          local path, dest = fs.join(at, entry.name), there .. "/" .. entry.name
+          if entry.type == "directory" then -- (never into a link: one to its parent would never end)
+            dirs[#dirs + 1] = quote(dest)
+            walk(path, dest)
+          else
+            files[#files + 1] = {path, dest}
+          end
+        end
+      end
+      walk(name, to)
+      if not run("mkdir -p " .. table.concat(dirs, " ")) then
+        fail(host, ":", to, ": not made")
+      else
+        for _, file in ipairs(files) do
+          send(file[1], file[2])
+        end
+      end
+    end
   end
-  local ok = run({tohost, "cat > " .. quote(topath)}, {[0] = file})
-  sys.close(file)
-  if not ok then
-    return fail(target, ": not copied")
-  end
-  return 0
+  return status
 end
 
 -- remote to local: cat path there, its output into the file
-local st = sys.stat(target)
-if st and st.type == "directory" then
-  target = fs.join(target, fs.name(frompath))
+local intodir = fs.isdir(target)
+if #names > 1 and not intodir then
+  fail(target, ": Not a directory")
+  return status
 end
-local null = assert(sys.open("/dev/null", "r"))
-local file, why = sys.open(target, "w")
-if not file then
-  return fail(target, ": ", why)
+local function receive(path, to)
+  local file, why = sys.open(to, "w")
+  if not file then
+    return fail(to, ": ", why)
+  end
+  local ok = run("cat " .. quote(path), {[1] = file})
+  sys.close(file)
+  if not ok then
+    fail(host, ":", path, ": not copied")
+  end
 end
-local ok = run({fromhost, "cat " .. quote(frompath)}, {[0] = null, [1] = file})
-sys.close(file)
-sys.close(null)
-if not ok then
-  return fail(source, ": not copied")
+for _, name in ipairs(names) do
+  local _, path = remote(name)
+  local to = intodir and placed(target, path) or target
+  local dirs = lines("find " .. quote(path) .. " -type d")
+  if not dirs then
+    fail(host, ":", path, ": No such file or directory")
+  elseif #dirs == 0 then
+    receive(path, to)
+  elseif not recursive then
+    fail(host, ":", path, ": is a directory (use -r)")
+  else
+    -- each directory made here, then each file (find's paths start with the path asked)
+    local files = lines("find " .. quote(path) .. " -not -type d") or {}
+    local function here(found)
+      return to .. found:sub(#path + 1)
+    end
+    local made = true
+    for _, dir in ipairs(dirs) do
+      local ok, why = fs.mkdir(here(dir), true)
+      if not ok then
+        fail(why)
+        made = false
+        break
+      end
+    end
+    if made then
+      for _, file in ipairs(files) do
+        receive(file, here(file))
+      end
+    end
+  end
 end
-return 0
+return status
