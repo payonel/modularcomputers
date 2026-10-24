@@ -72,6 +72,12 @@ public final class DiskStationMenu extends AbstractContainerMenu {
 		return data.get(1);
 	}
 
+	/** A button can be pressed: the disks its action needs are in (every one the target, Clone the source too). */
+	public boolean ready(int id) {
+		return slots.get(DiskStationBlockEntity.TARGET).hasItem()
+			&& (!ACTIONS.get(id).equals("clone") || slots.get(DiskStationBlockEntity.SOURCE).hasItem());
+	}
+
 	/** Server: a button was pressed. */
 	@Override
 	public boolean clickMenuButton(Player player, int id) {

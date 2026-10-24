@@ -74,8 +74,15 @@ class CableWalkTest {
 	}
 
 	@Test
-	void anAdjacentDeviceWithoutACableIsNotConnected() {
-		device(1, 0, 0, Direction.NORTH);
+	void anAdjacentDeviceWithoutACableIsConnected() {
+		BlockPos touching = device(1, 0, 0, Direction.NORTH);
+		assertThat(CableWalk.from(world, COMPUTER)).containsExactly(new CableWalk.Found(touching, 1));
+	}
+
+	@Test
+	void anAdjacentDevicesFrontDoesntConnect() {
+		device(1, 0, 0, Direction.WEST); // its front against the computer
+		device(0, 0, -1, Direction.SOUTH); // against the computer's front
 		assertThat(CableWalk.from(world, COMPUTER)).isEmpty();
 	}
 

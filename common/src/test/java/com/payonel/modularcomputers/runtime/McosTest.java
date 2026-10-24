@@ -314,8 +314,8 @@ class McosTest {
 		type("ls /dev > /ld; cat /dev/eeprom > /e; lsdev -i > /devs\r");
 		untilFile(root().resolve("e"), image);
 		settle(() -> Files.isRegularFile(root().resolve("devs")) && read(root().resolve("devs")).contains("terminal0"));
-		assertThat(read(root().resolve("ld"))).as("only data: no storage or terminal files")
-			.contains("console\n", "null\n", "eeprom\n").doesNotContain("storage", "terminal");
+		assertThat(read(root().resolve("ld"))).as("only data: disks' bytes, no terminal files")
+			.contains("console\n", "null\n", "eeprom\n", "storage0\n", "storage1\n").doesNotContain("terminal");
 		assertThat(read(root().resolve("devs"))).contains("storage0", "storage1", "sata:1", "eeprom ", "terminal0", "id:");
 		// written: one set at close, the whole of it (cp writes it in pieces)
 		file("new.lua", "-- " + "x".repeat(9000) + "\nboard.halt()\n");
@@ -407,6 +407,42 @@ class McosTest {
 			.isEqualTo("target 2 hfs 0 " + DiskTier.TIER_2.bytes() + "\nsource -\n");
 		assertThat(target.getMode(new Arguments(java.util.List.of())).first()).as("wiped").isEqualTo(Disk.RAW);
 		target.retire();
+	}
+
+	@Test
+	void aDisksFileIsItsBytesByOffsetAndAFilesystemsDiskRefusesIt() {
+		Path folder = world.resolve("raw-disk");
+		Disk raw = new Disk(DiskTier.TIER_1, folder);
+		raw.format(Disk.RAW);
+		devices.put("sata:1", raw);
+		boot();
+		file("d.lua", """
+			local sys = require("sys")
+			local function put(name, text)
+			  local out = io.open(name, "w")
+			  out:write(tostring(text))
+			  out:close()
+			end
+			local disk = io.open("/dev/storage1", "r+")
+			disk:seek("set", 100)
+			disk:write("bytes")
+			disk:flush()
+			disk:seek("set", 98)
+			put("/raw", disk:read(9))
+			put("/end", disk:seek("end"))
+			disk:close()
+			local fs = io.open("/dev/storage0", "r")
+			local data, why, errno = fs:read(4)
+			put("/hfs", tostring(data) .. " " .. tostring(errno))
+			put("/done", "")
+			""");
+		type("lua /d.lua 2> /err; touch /done2\r");
+		untilFile(root().resolve("done2"), "");
+		assertThat(read(root().resolve("raw"))).as("zeros, then what it wrote").isEqualTo("\0\0bytes\0\0");
+		assertThat(raw.read(new Arguments(java.util.List.of(100L, 5L))).first()).as("on the disk").isEqualTo("bytes");
+		assertThat(read(root().resolve("end"))).isEqualTo(String.valueOf(DiskTier.TIER_1.bytes()));
+		assertThat(read(root().resolve("hfs"))).as("a filesystem's disk refuses").endsWith("EMEDIUMTYPE");
+		raw.retire();
 	}
 
 	@Test

@@ -22,6 +22,9 @@ import net.minecraft.core.Direction;
  * Devices come back nearest first, by how far the connection runs to them in meters: one per
  * block along a cable (a device right against the start is 1m away), and the straight-line
  * distance across a Bluetooth link. A new device's default bus position follows the wiring.
+ * <p>
+ * A device right against the start, port to port, is connected without a cable (the user's call:
+ * a block pushed against a computer is plugged in, as a card in a dock).
  */
 public final class CableWalk {
 	/** Gives up past this many blocks, so a huge network can't stall the server. */
@@ -73,9 +76,6 @@ public final class CableWalk {
 		Set<BlockPos> settled = new HashSet<>();
 		PriorityQueue<Step> queue = new PriorityQueue<>(Comparator.comparingInt(Step::meters).thenComparingLong(Step::order));
 		long[] order = {0};
-		// Two devices that don't carry the connection don't connect by touching: something
-		// between them has to (or the start has to be a relay itself).
-		boolean startCarries = world.kind(start) == Kind.RELAY;
 		queue.add(new Step(start, world.kind(start), 0, false, order[0]++));
 		while (!queue.isEmpty() && settled.size() <= MAX_CABLES) {
 			Step step = queue.remove();
@@ -95,7 +95,7 @@ public final class CableWalk {
 					continue;
 				}
 				Kind kind = world.kind(next);
-				if (kind == Kind.NONE || kind == Kind.DEVICE && isStart && !startCarries) {
+				if (kind == Kind.NONE) {
 					continue;
 				}
 				queue.add(new Step(next, kind, step.meters() + 1, step.wireless(), order[0]++));

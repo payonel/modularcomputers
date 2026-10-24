@@ -43,6 +43,27 @@ public final class ModComponents {
 	public static final DataComponentType<String> DISK_IMAGE = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("disk_image"),
 		DataComponentType.<String>builder().persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.STRING_UTF8).build());
 
+	/**
+	 * A disk's format, "raw" (no filesystem); none: hfs. Its one home (the item, so its tooltip can
+	 * say it): the disk device reads and writes it here ({@code Disk.formatIn}).
+	 */
+	public static final DataComponentType<String> DISK_FORMAT = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("disk_format"),
+		DataComponentType.<String>builder().persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.STRING_UTF8).build());
+
+	/** A disk's format: its {@link #DISK_FORMAT}, or hfs. */
+	public static String diskFormat(ItemStack stack) {
+		return stack.getOrDefault(DISK_FORMAT, com.payonel.modularcomputers.device.Disk.HFS);
+	}
+
+	/** Sets a disk's format: none for hfs (the default), as a new disk's. */
+	public static void diskFormat(ItemStack stack, String format) {
+		if (format.equals(com.payonel.modularcomputers.device.Disk.HFS)) {
+			stack.remove(DISK_FORMAT);
+		} else {
+			stack.set(DISK_FORMAT, format);
+		}
+	}
+
 	/** A disk just wiped by crafting it alone: the id whose files go when the player takes it (then gone). */
 	public static final DataComponentType<UUID> WIPED = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("wiped"),
 		DataComponentType.<UUID>builder().persistent(UUIDUtil.CODEC).networkSynchronized(UUIDUtil.STREAM_CODEC).build());

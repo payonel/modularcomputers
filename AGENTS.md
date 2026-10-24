@@ -159,6 +159,9 @@ blank, and its files leave the world save when the player takes it.
   wake a computer waiting on its id.
 - **Bus order** is UEFI-like: the case's connectors fixed, external devices in a saved,
   player-ordered list by id (so late-loading chunks keep their place).
+- **Devices connect by cable, port to port, or by Bluetooth:** a block right against a computer
+  (neither's front between them) is on its bus without a cable, as a drive in a dock is (the user's
+  call). Screens and hubs carry the connection on; other devices end it.
 - **A device is on one bus at a time** (`BusHolds`): whichever board has it first holds it; holds
   are worked out afresh as boards load, never saved (long cables and unloaded chunks would desync
   them).
@@ -243,7 +246,9 @@ onto a disk gets the time it was copied. Paths never leave the disk's folder. Sy
 CIFS's Minshall+French `XSym` files, never host links (one could point out of the save); the disk
 never follows them, the OS's VFS does. A raw disk is read and written at any byte offset (`read(offset, n)`,
 `write(offset, data)`), the user's call over real disks' sectors (sectors don't make programs
-better); an hfs disk refuses those, its filesystem owning it. mcos's files are copied onto a disk once, when it's first
+better); an hfs disk refuses those, its filesystem owning it. A raw image ends where its data does: past
+it are zeros. A disk's format lives on its item (`ModComponents.DISK_FORMAT`, read and written
+through `Disk.formatIn`), its one home, so its tooltip can say it. mcos's files are copied onto a disk once, when it's first
 made: a world's disks keep their old mcos; tests copy afresh.
 
 ### The Disk Station
@@ -255,7 +260,8 @@ disks, and the station itself, are on the bus of the computers wired to it. Ever
 a line written to its `/dev` file and a GUI switch alike: format (hfs), wipe (raw), clone, install
 mcos (formatted, then the mod's latest), update mcos (the mod's files written over, `/etc` too: an
 update is how a player fixes an install). An action is paid from the bus's power while a running
-computer supplies it, else from its battery. Disks go in and come out by hand, in its GUI. Its
+computer supplies it, else from its battery. Disks go in and come out by hand, in its GUI; a switch is dead until the disks it needs are in. A
+clone takes the source's format, refused when it doesn't fit (a raw disk only onto a tier as big). Its
 recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting a disk alone does).
 
 ### mcos
@@ -279,7 +285,10 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   device without one (the EEPROM) takes everything written at close, all or nothing.
 - **`/dev` holds only data,** flat: `console`, `tty`, `null`, `zero`, and a node for each device with
   `get` or `set` (the EEPROM too: convenient, the user's call). Reading gives `get`'s answer; what's
-  written goes to `set` at close, and the device decides what `set` means. A device with events and
+  written goes to `set` at close, and the device decides what `set` means. A disk's node
+  (`storage0`) is its bytes, as a block device's: read, written and sought by byte offset (its raw
+  methods); an hfs disk's refuses (`EMEDIUMTYPE`, the user's call: Linux would let a mounted disk's
+  bytes be read). A device with events and
   no `get` (a sensor) has a read-only file, an event a line, and a read with none waiting blocks. A
   NIC has no `/dev` file (its method is `receive`): the network is read through sockets.
 - **`sys.poll(fds, seconds)`** is poll(2) (`IN`, `PRI`, `OUT`; `HUP`, `ERR` unasked), in `sys` (mcos's

@@ -101,6 +101,8 @@ class DiskFormatsTest {
 		assertThat(target.cloneFrom(source).failed()).isFalse();
 		assertThat(target.getMode(args()).first()).isEqualTo(Disk.RAW);
 		assertThat(target.read(args(100L, 5L)).first()).isEqualTo("bytes");
+		assertThat(target.read(args(105L, 3L)).first()).as("zeros past what was cloned").isEqualTo("\0\0\0");
+		assertThat(world.resolve("dst.img")).as("the image ends at the source's last byte").hasSize(105);
 
 		Disk small = disk("small", DiskTier.TIER_1);
 		Disk big = disk("big", DiskTier.TIER_2);

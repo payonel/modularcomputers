@@ -4,7 +4,9 @@
 -- a device's file gives what its get returns, taken at the first read; what's written to it goes to
 -- its set, all of it in one call, when the file is closed; the device decides what that means
 -- (replace, append...). An open file holds the device's id: it reaches that device or fails
--- (ENODEV, and the kernel reads the bus again), whatever happens to the names meanwhile. The names
+-- (ENODEV, and the kernel reads the bus again), whatever happens to the names meanwhile. A disk's
+-- file is its bytes, as a block device's: read, written and sought by byte offset (the disk's raw
+-- read and write); a disk with a filesystem (hfs) refuses them (EMEDIUMTYPE). The names
 -- come from the kernel's view of the bus (k.devices), which may be a moment behind: no lookup here
 -- makes a board call.
 local k, vfs = ...
@@ -79,9 +81,11 @@ local devices = {
   end),
 }
 
--- A bus device with data: a get, a set, or events to pull.
+local DISK = "storage" -- a disk's device type: its file is a block device's
+
+-- A bus device with data: a get, a set, events to pull, or a disk's bytes.
 local function hasdata(device)
-  return device.get or device.set or device.pull
+  return device.get or device.set or device.pull or device.type == DISK
 end
 
 -- What a path in /dev names: one of the kernel's devices (its maker), or a bus device with data.
@@ -145,6 +149,64 @@ local function eventfile(id, driver)
       local chunk = line:sub(at + 1, at + n)
       at = at + #chunk
       return chunk
+    end,
+  }
+end
+
+-- A disk's file: its bytes from offset 0 to its capacity, as a block device's, read and written
+-- where the file is (the disk's raw read and write, so an hfs disk refuses: EMEDIUMTYPE; a read-only
+-- one refuses writes: EROFS). Past its end, a read gives nothing and a write ENOSPC.
+local function diskfile(device)
+  local id, at = device.id, 0
+  local function refused(why)
+    why = tostring(why)
+    if why:find("^hfs disk") then
+      return fail("EMEDIUMTYPE")
+    elseif why:find("^read%-only") then
+      return fail("EROFS")
+    end
+    return failed(why)
+  end
+  return {
+    type = "device",
+    events = function(self)
+      return {IN = true, OUT = true}
+    end,
+    read = function(self, n)
+      local ok, data = board.invoke(id, "read", at, n)
+      if not ok then
+        return refused(data)
+      end
+      data = data or ""
+      at = at + #data
+      return data
+    end,
+    write = function(self, data)
+      local ok, count = board.invoke(id, "write", at, data)
+      if not ok then
+        return refused(count)
+      elseif count == 0 and #data > 0 then
+        return fail("ENOSPC")
+      end
+      at = at + count
+      return count
+    end,
+    seek = function(self, whence, offset)
+      local base = at
+      if whence == "set" then
+        base = 0
+      elseif whence == "end" then
+        local ok, capacity = board.invoke(id, "getCapacity")
+        if not ok then
+          return failed(capacity)
+        end
+        base = capacity
+      end
+      if base + offset < 0 then
+        return fail("EINVAL")
+      end
+      at = base + offset
+      return at
     end,
   }
 end
@@ -270,6 +332,8 @@ function fs:open(path, mode, process)
     return make(process)
   elseif not device then
     return fail("ENOENT")
+  elseif device.type == DISK then
+    return diskfile(device)
   end
   return devicefile(device, mode)
 end

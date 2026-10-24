@@ -20,8 +20,9 @@ import net.minecraft.world.item.ItemStack;
  * A Disk Station's panel, as the machine itself (the mod's look): an iron plate with an emerald
  * inlay, its actions as raised switches down the left, silkscreened; its two drive bays, the source's
  * marked SOURCE with a lock (only read, and optional: faint while empty) and an arrow up to the
- * target beside its Clone switch; the battery and the radio. Each switch is a menu button: the server
- * does it as the station's device does. The inventory below is vanilla's.
+ * target, its Clone switch beside the target; the battery and the radio. Each switch is a menu
+ * button: the server does it as the station's device does. A switch is dead (flat, unlit) while the
+ * disks it needs aren't in: every one needs the target, Clone the source too. The inventory below is vanilla's.
  */
 public final class DiskStationScreen extends AbstractContainerScreen<DiskStationMenu> {
 	private static final int WIDTH = 176;
@@ -42,6 +43,9 @@ public final class DiskStationScreen extends AbstractContainerScreen<DiskStation
 	/** A switch: raised steel, sunk while the mouse is over it. */
 	private static final int SWITCH = 0xFF8E9298;
 	private static final int SWITCH_HOVER = 0xFFA4A8AE;
+	/** A dead switch: flush with the plate, its label faded. */
+	private static final int SWITCH_DEAD = 0xFF9EA1A6;
+	private static final int SILK_DEAD = 0xFF6E7176;
 	private static final int SILK = 0xFFF6F7F2;
 	/** Lettering engraved in the plate. */
 	private static final int ENGRAVED = 0xFF3A3C42;
@@ -75,10 +79,10 @@ public final class DiskStationScreen extends AbstractContainerScreen<DiskStation
 		inventoryLabelY = DiskStationMenu.INVENTORY_Y - 10;
 	}
 
-	/** A switch, by its menu button id: the four actions down the left, Clone by the source. */
+	/** A switch, by its menu button id: the four actions down the left, Clone by the target (what it writes). */
 	public Viewport switchArea(int id) {
 		if (DiskStationMenu.ACTIONS.get(id).equals("clone")) {
-			return new Viewport(leftPos + DiskStationMenu.SOURCE_X + 20, topPos + DiskStationMenu.SOURCE_Y + 1, 32, SWITCH_HEIGHT);
+			return new Viewport(leftPos + DiskStationMenu.TARGET_X + 20, topPos + DiskStationMenu.TARGET_Y + 1, 32, SWITCH_HEIGHT);
 		}
 		return new Viewport(leftPos + SWITCH_X, topPos + SWITCH_TOP + id * SWITCH_STEP, SWITCH_WIDTH, SWITCH_HEIGHT);
 	}
@@ -102,7 +106,7 @@ public final class DiskStationScreen extends AbstractContainerScreen<DiskStation
 		for (int id = 0; id < DiskStationMenu.ACTIONS.size(); id++) {
 			Viewport area = switchArea(id);
 			extractSwitch(graphics, area, Component.translatable("gui.modularcomputers.disk_station." + DiskStationMenu.ACTIONS.get(id)),
-				area.contains(mouseX, mouseY));
+				area.contains(mouseX, mouseY), menu.ready(id));
 		}
 		// The arrow from the source bay up to the target's: what Clone copies.
 		int ax = x + DiskStationMenu.SOURCE_X + 7;
@@ -162,12 +166,17 @@ public final class DiskStationScreen extends AbstractContainerScreen<DiskStation
 	}
 
 	/** A switch: raised (light above and left, dark below and right), its label silkscreened on it. */
-	private void extractSwitch(GuiGraphicsExtractor graphics, Viewport area, Component label, boolean hover) {
+	private void extractSwitch(GuiGraphicsExtractor graphics, Viewport area, Component label, boolean hover, boolean ready) {
 		int x0 = area.x();
 		int y0 = area.y();
 		int x1 = x0 + area.width();
 		int y1 = y0 + area.height();
 		graphics.fill(x0, y0, x1, y1, OUTLINE);
+		if (!ready) {
+			graphics.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, SWITCH_DEAD);
+			graphics.centeredText(font, label, x0 + area.width() / 2, y0 + (area.height() - font.lineHeight) / 2 + 1, SILK_DEAD);
+			return;
+		}
 		graphics.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, hover ? SHADOW : LIGHT);
 		graphics.fill(x0 + 2, y0 + 2, x1 - 1, y1 - 1, hover ? LIGHT : SHADOW);
 		graphics.fill(x0 + 2, y0 + 2, x1 - 2, y1 - 2, hover ? SWITCH_HOVER : SWITCH);
@@ -213,7 +222,9 @@ public final class DiskStationScreen extends AbstractContainerScreen<DiskStation
 		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && minecraft.gameMode != null) {
 			for (int id = 0; id < DiskStationMenu.ACTIONS.size(); id++) {
 				if (switchArea(id).contains(event.x(), event.y())) {
-					press(id);
+					if (menu.ready(id)) {
+						press(id);
+					}
 					return true;
 				}
 			}

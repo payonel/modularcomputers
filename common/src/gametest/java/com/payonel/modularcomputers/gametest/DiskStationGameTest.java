@@ -71,6 +71,7 @@ public class DiskStationGameTest {
 		helper.assertTrue(!Files.exists(folder), "wiped: no filesystem (a raw disk)");
 		helper.assertValueEqual(station.disk(DiskStationBlockEntity.TARGET).getMode(new com.payonel.modularcomputers.runtime.Arguments(List.of())).first(),
 			"raw", "raw");
+		helper.assertValueEqual(ModComponents.diskFormat(station.cards().getItem(DiskStationBlockEntity.TARGET)), "raw", "the item says it (its tooltip)");
 		helper.succeed();
 	}
 
@@ -102,9 +103,19 @@ public class DiskStationGameTest {
 
 	@GameTest(maxTicks = 100)
 	public void aWiredComputerHasItAndItsDisksOnItsBusTheSourceOnlyRead(GameTestHelper helper) {
+		onABus(helper, true);
+	}
+
+	@GameTest(maxTicks = 100)
+	public void aComputerItTouchesHasItOnItsBusWithoutACable(GameTestHelper helper) {
+		onABus(helper, false);
+	}
+
+	/** A running computer two blocks west with a cable between, or right against it, and the station on its bus, powered. */
+	private static void onABus(GameTestHelper helper, boolean cabled) {
 		DiskStationBlockEntity station = station(helper, false);
 		station.cards().setItem(DiskStationBlockEntity.SOURCE, new ItemStack(ModItems.TIER1_HARD_DISK));
-		BlockPos casePos = POS.west(2);
+		BlockPos casePos = cabled ? POS.west(2) : POS.west();
 		helper.setBlock(casePos, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
 		AllInOneBlockEntity computer = helper.getBlockEntity(casePos, AllInOneBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
@@ -116,8 +127,10 @@ public class DiskStationGameTest {
 				board.waitForInterrupt(WAIT_SECONDS, "nothing");
 			}
 		});
-		BlockPos cable = helper.absolutePos(POS.west());
-		helper.getLevel().setBlock(cable, CableBlock.withConnections(helper.getLevel(), cable, ModBlocks.CABLE.defaultBlockState()), Block.UPDATE_ALL);
+		if (cabled) {
+			BlockPos cable = helper.absolutePos(POS.west());
+			helper.getLevel().setBlock(cable, CableBlock.withConnections(helper.getLevel(), cable, ModBlocks.CABLE.defaultBlockState()), Block.UPDATE_ALL);
+		}
 		computer.pressPower();
 		helper.succeedWhen(() -> {
 			var devices = computer.machine().board().bus().devices();

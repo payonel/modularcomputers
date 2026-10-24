@@ -133,6 +133,10 @@ public final class Disk implements Device {
 		return tier;
 	}
 
+	private java.util.function.Supplier<String> formatRead = () -> Files.isRegularFile(image()) ? RAW : HFS;
+	private java.util.function.Consumer<String> formatWrite = format -> {
+	};
+
 	public void labelFrom(java.util.function.Supplier<String> label) {
 		this.label = label;
 	}
@@ -146,9 +150,18 @@ public final class Disk implements Device {
 		return storage.resolveSibling(storage.getFileName() + ".img");
 	}
 
+	/**
+	 * Where its format lives: its item's ({@code ModComponents.DISK_FORMAT}), read and written there.
+	 * A disk with no item (a test's) keeps it in its folder: raw when it has an image.
+	 */
+	public void formatIn(java.util.function.Supplier<String> read, java.util.function.Consumer<String> write) {
+		this.formatRead = read;
+		this.formatWrite = write;
+	}
+
 	/** hfs, unless it was formatted raw. */
 	public String mode() {
-		return storage != null && Files.isRegularFile(image()) ? RAW : HFS;
+		return storage == null ? HFS : formatRead.get();
 	}
 
 	@Override
@@ -583,13 +596,12 @@ public final class Disk implements Device {
 			Files.deleteIfExists(image());
 			if (mode.equals(RAW)) {
 				Files.createDirectories(storage.getParent());
-				try (RandomAccessFile file = new RandomAccessFile(image().toFile(), "rw")) {
-					file.setLength(tier.bytes()); // sparse on the host until written
-				}
+				Files.createFile(image()); // all zeros: an image ends where its data does, and past its end are zeros
 			}
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
+		formatWrite.accept(mode);
 		used = -1;
 		report("format", "/", "mode", mode);
 	}
@@ -630,15 +642,11 @@ public final class Disk implements Device {
 			formatted(mode);
 			try {
 				if (mode.equals(RAW)) {
-					try (RandomAccessFile from = new RandomAccessFile(source.image().toFile(), "r");
-						RandomAccessFile to = new RandomAccessFile(image().toFile(), "rw")) {
-						byte[] chunk = new byte[64 * 1024];
-						int got;
-						while ((got = from.read(chunk)) > 0) {
-							to.write(chunk, 0, got);
-						}
+					// Its bytes up to the source's last; past them, zeros (the image just ends there).
+					if (Files.isRegularFile(source.image())) {
+						Files.copy(source.image(), image(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 					}
-					report("write", null, "offset", 0L, "length", source.tier.bytes());
+					report("write", null, "offset", 0L, "length", tier.bytes());
 				} else if (Files.exists(source.storage)) {
 					Files.createDirectories(storage);
 					try (Stream<Path> paths = Files.walk(source.storage)) {
@@ -908,12 +916,22 @@ public final class Disk implements Device {
 
 	// ---- device methods: raw -----------------------------------------------------------------
 
-	private RandomAccessFile rawImage(String access) throws IOException {
+	/** Its image's path, on a raw disk; refused on an hfs one. */
+	private Path rawImage() {
 		if (storage == null) {
 			throw new Refused("no storage");
 		}
 		if (!mode().equals(RAW)) {
 			throw new Refused("hfs disk: format it raw to read and write it by offset");
+		}
+		return image();
+	}
+
+	private RandomAccessFile rawImage(String access) throws IOException {
+		rawImage();
+		if (access.equals("rw") && !Files.isRegularFile(image())) {
+			Files.createDirectories(image().getParent());
+			Files.createFile(image()); // (all zeros)
 		}
 		return new RandomAccessFile(image().toFile(), access);
 	}
@@ -939,10 +957,17 @@ public final class Disk implements Device {
 			if (count == 0 && n > 0) {
 				return Result.ok(); // the end
 			}
+			byte[] bytes = new byte[count]; // (zeros past the image's end)
+			if (!Files.isRegularFile(rawImage())) {
+				return Result.ok(new String(bytes, StandardCharsets.ISO_8859_1)); // never written: all zeros
+			}
 			try (RandomAccessFile image = rawImage("r")) {
-				byte[] bytes = new byte[count];
 				image.seek(offset);
-				image.readFully(bytes);
+				int got = 0;
+				int read;
+				while (got < count && (read = image.read(bytes, got, count - got)) > 0) {
+					got += read;
+				}
 				return Result.ok(new String(bytes, StandardCharsets.ISO_8859_1));
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);

@@ -65,6 +65,7 @@ public final class ClearIdRecipe extends CustomRecipe {
 			ItemStack wiped = found.copyWithCount(1);
 			wiped.remove(ModComponents.SERIAL);
 			wiped.remove(ModComponents.DISK_IMAGE); // blank: not even the files it came with
+			wiped.remove(ModComponents.DISK_FORMAT); // (hfs)
 			if (found.has(ModComponents.SERIAL)) {
 				wiped.set(ModComponents.WIPED, found.get(ModComponents.SERIAL));
 			}

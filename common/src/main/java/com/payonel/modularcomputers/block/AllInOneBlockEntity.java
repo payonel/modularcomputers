@@ -927,6 +927,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 			if (disks[lane] != null) {
 				int slot = CaseMenu.SATA_SLOTS + lane;
 				disks[lane].labelFrom(() -> ModComponents.label(parts.getItem(slot))); // read from the disk itself
+				disks[lane].formatIn(() -> ModComponents.diskFormat(parts.getItem(slot)), format -> ModComponents.diskFormat(parts.getItem(slot), format));
 			}
 			board.plug(Motherboard.sata(lane), disks[lane], serial(CaseMenu.SATA_SLOTS + lane));
 			ItemStack card = parts.getItem(CaseMenu.EXP_SLOTS + lane);
