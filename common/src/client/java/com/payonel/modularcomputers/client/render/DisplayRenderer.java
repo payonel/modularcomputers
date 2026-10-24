@@ -60,6 +60,10 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 		String[] rows;
 		int[] foregrounds;
 		int[] backgrounds;
+		/** Which cells' text is bold (drawn in the bold font). */
+		boolean[] bold;
+		/** The glass's own color, where no background is drawn. */
+		int glass;
 		/** Its pictures' texture (sixel), or null: none. */
 		net.minecraft.resources.Identifier pixels;
 		/** The cursor's cell when it's lit now (-1: not drawn), and its shape. */
@@ -92,8 +96,14 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 		state.pixels = PixelLayers.of(display);
 		// A monochrome terminal's phosphor has one color: the glass glows green (ColorDepth.glow).
 		var depth = host.terminal().tier().depth();
-		state.foregrounds = java.util.Arrays.stream(display.foregrounds()).map(depth::glow).toArray();
-		state.backgrounds = display.backgrounds();
+		int[] foregrounds = display.foregrounds();
+		state.foregrounds = java.util.Arrays.stream(foregrounds).map(depth::glow).toArray();
+		state.bold = new boolean[foregrounds.length];
+		for (int i = 0; i < foregrounds.length; i++) {
+			state.bold[i] = TextBuffer.bold(foregrounds[i]);
+		}
+		state.backgrounds = java.util.Arrays.stream(display.backgrounds()).map(depth::glow).toArray(); // (reverse video lights a monochrome cell)
+		state.glass = depth.glow(TextBuffer.DEFAULT_BACKGROUND);
 		state.cursor = cursor;
 		state.cursorColumn = -1;
 		if (lit) {
@@ -145,7 +155,7 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 				if (column == columns || state.backgrounds[row * columns + column] != state.backgrounds[row * columns + start]) {
 					int background = state.backgrounds[row * columns + start];
 					boolean cursorCell = state.cursorColumn >= 0 && state.cursor.block() && row == state.cursorRow && start == state.cursorColumn;
-					if (background != TextBuffer.DEFAULT_BACKGROUND || cursorCell) {
+					if (background != state.glass || cursorCell) {
 						collector.submitTextBackground(pose, start * cellWidth, row * cellHeight, column * cellWidth, (row + 1) * cellHeight,
 							0xFF000000 | background, Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT);
 					}
@@ -172,7 +182,8 @@ public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implemen
 			for (int column = 0; column < text.length(); column++) {
 				char c = text.charAt(column);
 				if (c != ' ') {
-					collector.submitText(pose, grid.x(column, c, font), grid.y(row), FormattedCharSequence.codepoint(c, Style.EMPTY), false,
+					collector.submitText(pose, grid.x(column, c, font), grid.y(row),
+						FormattedCharSequence.codepoint(c, Style.EMPTY.withBold(state.bold[row * columns + column])), false,
 						Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT, 0xFF000000 | state.foregrounds[row * columns + column], 0, 0);
 				}
 			}

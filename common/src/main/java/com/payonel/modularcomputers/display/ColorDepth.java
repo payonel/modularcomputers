@@ -19,13 +19,32 @@ public enum ColorDepth {
 	public static final int PHOSPHOR = 0x33FF66;
 	/** A monochrome terminal's glass, unlit: a dark green. */
 	public static final int PHOSPHOR_GLASS = 0x06210F;
+	/**
+	 * A monochrome terminal's text at normal intensity, as its cells keep it: a VT102 showed bold as
+	 * increased intensity (full, {@link TextBuffer#DEFAULT_FOREGROUND}), so normal text glows a
+	 * little less. Reverse video lights the cell and leaves the text dark.
+	 */
+	public static final int NORMAL_INTENSITY = 0xB8B8B8;
 
 	/**
-	 * The color a cell's text glows on the glass: what the decoder settled on, except that a
-	 * monochrome terminal's phosphor has one color. Drawing only; the cells keep their colors.
+	 * The color a cell (its text, or its background) glows on the glass: what the decoder settled
+	 * on (its attributes left out), except that a monochrome terminal's phosphor has one color, lit
+	 * as brightly as the cell's color is bright (unlit, black: the glass). Drawing only; the cells
+	 * keep their colors.
 	 */
 	public int glow(int rgb) {
-		return this == MONOCHROME ? PHOSPHOR : rgb;
+		int color = TextBuffer.color(rgb);
+		if (this != MONOCHROME) {
+			return color;
+		}
+		float lit = Math.max(color >> 16 & 0xFF, Math.max(color >> 8 & 0xFF, color & 0xFF)) / 255f;
+		int glow = 0;
+		for (int shift = 0; shift < 24; shift += 8) {
+			int dark = PHOSPHOR_GLASS >> shift & 0xFF;
+			int bright = PHOSPHOR >> shift & 0xFF;
+			glow |= Math.round(dark + (bright - dark) * lit) << shift;
+		}
+		return glow;
 	}
 
 	/** The glass's color where nothing is lit. */

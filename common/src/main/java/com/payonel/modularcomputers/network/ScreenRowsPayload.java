@@ -64,10 +64,35 @@ public record ScreenRowsPayload(BlockPos pos, int columns, int lines, List<Row> 
 			}
 		};
 
+		/** Foregrounds: their colors, then which are bold (a foreground's attribute, in its top byte: TextBuffer.BOLD). */
+		private static final StreamCodec<ByteBuf, int[]> FOREGROUNDS = new StreamCodec<>() {
+			@Override
+			public int[] decode(ByteBuf buf) {
+				int[] colors = COLORS.decode(buf);
+				BitSet bold = BitSet.valueOf(ByteBufCodecs.BYTE_ARRAY.decode(buf));
+				for (int i = bold.nextSetBit(0); i >= 0 && i < colors.length; i = bold.nextSetBit(i + 1)) {
+					colors[i] |= com.payonel.modularcomputers.display.TextBuffer.BOLD;
+				}
+				return colors;
+			}
+
+			@Override
+			public void encode(ByteBuf buf, int[] foregrounds) {
+				int[] colors = new int[foregrounds.length];
+				BitSet bold = new BitSet();
+				for (int i = 0; i < foregrounds.length; i++) {
+					colors[i] = com.payonel.modularcomputers.display.TextBuffer.color(foregrounds[i]);
+					bold.set(i, com.payonel.modularcomputers.display.TextBuffer.bold(foregrounds[i]));
+				}
+				COLORS.encode(buf, colors);
+				ByteBufCodecs.BYTE_ARRAY.encode(buf, bold.toByteArray());
+			}
+		};
+
 		static final StreamCodec<ByteBuf, Row> CODEC = StreamCodec.composite(
 			ByteBufCodecs.VAR_INT, Row::index,
 			ByteBufCodecs.STRING_UTF8, Row::text,
-			COLORS, Row::foregrounds,
+			FOREGROUNDS, Row::foregrounds,
 			COLORS, Row::backgrounds,
 			INTS, Row::tiles,
 			Row::new);

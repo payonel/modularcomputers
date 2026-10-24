@@ -810,16 +810,22 @@ public final class VtDecoder {
 
 	private int foreground() {
 		if (depth == ColorDepth.MONOCHROME) {
-			return TextBuffer.DEFAULT_FOREGROUND; // text only
+			// A VT102's: no colors, but its intensities: bold brighter, reverse video dark on lit.
+			return reverse ? TextBuffer.DEFAULT_BACKGROUND : intensity();
 		}
-		return depth.show(reverse ? baseBackground() : baseForeground(), TextBuffer.DEFAULT_FOREGROUND);
+		return depth.show(reverse ? baseBackground() : baseForeground(), TextBuffer.DEFAULT_FOREGROUND) | (bold ? TextBuffer.BOLD : 0);
 	}
 
 	private int background() {
 		if (depth == ColorDepth.MONOCHROME) {
-			return TextBuffer.DEFAULT_BACKGROUND; // text only
+			return reverse ? intensity() : TextBuffer.DEFAULT_BACKGROUND;
 		}
 		return depth.show(reverse ? baseForeground() : baseBackground(), TextBuffer.DEFAULT_BACKGROUND);
+	}
+
+	/** A monochrome terminal's lit text: full for bold, a little less otherwise. */
+	private int intensity() {
+		return bold ? TextBuffer.DEFAULT_FOREGROUND : ColorDepth.NORMAL_INTENSITY;
 	}
 
 	/** Erased cells take the background without reverse video's swap, as xterm does. */
@@ -1002,13 +1008,19 @@ public final class VtDecoder {
 		StringBuilder out = new StringBuilder("\u001B[0m\u001B[?7l\u001B[2J");
 		int lastFg = Integer.MIN_VALUE;
 		int lastBg = Integer.MIN_VALUE;
+		boolean lastBold = false;
 		for (int row = 0; row < rows; row++) {
 			out.append("\u001B[").append(row + 1).append(";1H");
 			for (int column = 0; column < columns; column++) {
 				int fg = buffer.foreground(column, row);
 				int bg = buffer.background(column, row);
 				if (fg != lastFg || bg != lastBg) {
-					out.append(rgb(38, fg)).append(rgb(48, bg));
+					boolean boldNow = TextBuffer.bold(fg);
+					if (boldNow != lastBold) {
+						out.append(boldNow ? "\u001B[1m" : "\u001B[22m");
+						lastBold = boldNow;
+					}
+					out.append(rgb(38, TextBuffer.color(fg))).append(rgb(48, bg));
 					lastFg = fg;
 					lastBg = bg;
 				}

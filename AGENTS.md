@@ -294,6 +294,10 @@ the farther it reaches (OC's wirelessCostPerRange); any tier hears any other.
   tool); nothing is wrapped again. The console's group is one size, the largest every member can
   show (UEFI's ConSplitter's common mode). Tests that look at pixels size the console 50×16 first
   (`TestPrograms.READABLE`): sub-pixel text is flaky to count.
+- **Attributes as each tier's model showed them:** bold is the cell's (`TextBuffer.BOLD`, in the
+  foreground's top byte, so it goes wherever the color goes) and drawn in the bold font; tier 1, a
+  VT102 with one phosphor, shows intensities instead of colors (bold full, normal a little less,
+  reverse video a lit cell with dark text: `ColorDepth.glow`).
 - **Tier 3 draws sixel graphics** (a VT340's: `DCS q`; its Device Attributes say `;4`; lower tiers
   skip them). A picture lives in the cells it covers, a 6×12 tile of pixels each
   (`TextBuffer.TILE_*`): it scrolls, moves and is saved with them, text over a cell replaces its

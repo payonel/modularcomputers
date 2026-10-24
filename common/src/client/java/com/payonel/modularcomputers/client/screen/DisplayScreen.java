@@ -20,6 +20,8 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
+import net.minecraft.util.FormattedCharSequence;
 
 /**
  * Shows a screen's display in the player's view: the all-in-one's or a screen block's. It is
@@ -250,7 +252,7 @@ public final class DisplayScreen extends Screen {
 		// A block cursor is its cell in reverse video.
 		boolean block = lit && cursor.block();
 		java.util.function.BiFunction<Integer, Integer, Integer> background = (column, row) ->
-			block && column == cursor.column() && row == cursor.row() ? depth.glow(buffer.foreground(column, row)) : buffer.background(column, row);
+			block && column == cursor.column() && row == cursor.row() ? depth.glow(buffer.foreground(column, row)) : depth.glow(buffer.background(column, row));
 		java.util.function.BiFunction<Integer, Integer, Integer> foreground = (column, row) ->
 			block && column == cursor.column() && row == cursor.row() ? buffer.background(column, row) : depth.glow(buffer.foreground(column, row));
 		Resolution resolution = buffer.resolution();
@@ -264,7 +266,7 @@ public final class DisplayScreen extends Screen {
 			for (int column = 1; column <= resolution.columns(); column++) {
 				if (column == resolution.columns() || !background.apply(column, row).equals(background.apply(start, row))) {
 					int color = background.apply(start, row);
-					if (color != TextBuffer.DEFAULT_BACKGROUND || (block && row == cursor.row() && start == cursor.column())) {
+					if (color != depth.glow(TextBuffer.DEFAULT_BACKGROUND) || (block && row == cursor.row() && start == cursor.column())) {
 						graphics.fill(area.x() + Math.round(start * grid.cellWidth()), top,
 							area.x() + Math.round(column * grid.cellWidth()), bottom, 0xFF000000 | color);
 					}
@@ -286,8 +288,8 @@ public final class DisplayScreen extends Screen {
 			for (int column = 0; column < resolution.columns(); column++) {
 				char c = buffer.get(column, row);
 				if (c != ' ') {
-					graphics.text(font, String.valueOf(c), (int) grid.x(column, c, font), (int) grid.y(row),
-						0xFF000000 | foreground.apply(column, row), false);
+					graphics.text(font, FormattedCharSequence.codepoint(c, Style.EMPTY.withBold(TextBuffer.bold(buffer.foreground(column, row)))),
+						(int) grid.x(column, c, font), (int) grid.y(row), 0xFF000000 | foreground.apply(column, row), false);
 				}
 			}
 		}

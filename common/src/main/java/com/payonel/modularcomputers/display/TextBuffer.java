@@ -18,6 +18,21 @@ import java.util.List;
 public final class TextBuffer {
 	public static final int DEFAULT_FOREGROUND = 0xFFFFFF;
 	public static final int DEFAULT_BACKGROUND = 0x000000;
+	/**
+	 * A foreground's bold attribute, in its top byte (colors are 24 bits): bold text is drawn in a
+	 * bold font. It goes wherever the foreground goes (saves, the scrollback, players' copies).
+	 */
+	public static final int BOLD = 1 << 24;
+
+	/** A foreground's color, without its attributes. */
+	public static int color(int foreground) {
+		return foreground & 0xFFFFFF;
+	}
+
+	/** Whether a foreground is bold. */
+	public static boolean bold(int foreground) {
+		return (foreground & BOLD) != 0;
+	}
 	/** A cell's pixels across, as a picture covers it (about the font's own cell). */
 	public static final int TILE_WIDTH = 6;
 	/** And down. */

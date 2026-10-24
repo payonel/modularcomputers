@@ -97,11 +97,12 @@ class VtDecoderTest {
 		vt.write(ESC + "[31;44mx" + ESC + "[0my" + ESC + "[42m" + ESC + "[2K");
 		assertThat(buffer.background(0, 0)).as("erased in the current background").isEqualTo(0x00CD00);
 		vt.write(ESC + "[H" + ESC + "[1;31mr" + ESC + "[38;5;196mq" + ESC + "[38;2;1;2;3mt" + ESC + "[7mv");
-		assertThat(buffer.foreground(0, 0)).as("bold brightens red").isEqualTo(0xFF0000);
-		assertThat(buffer.foreground(1, 0)).isEqualTo(0xFF0000);
-		assertThat(buffer.foreground(2, 0)).isEqualTo(0x010203);
+		assertThat(TextBuffer.color(buffer.foreground(0, 0))).as("bold brightens red").isEqualTo(0xFF0000);
+		assertThat(TextBuffer.bold(buffer.foreground(0, 0))).as("and is bold").isTrue();
+		assertThat(TextBuffer.color(buffer.foreground(1, 0))).isEqualTo(0xFF0000);
+		assertThat(TextBuffer.color(buffer.foreground(2, 0))).isEqualTo(0x010203);
 		assertThat(buffer.background(3, 0)).as("reverse").isEqualTo(0x010203);
-		assertThat(buffer.foreground(3, 0)).isEqualTo(0x00CD00);
+		assertThat(TextBuffer.color(buffer.foreground(3, 0))).as("(still bold)").isEqualTo(0x00CD00);
 	}
 
 	@Test
@@ -166,12 +167,17 @@ class VtDecoderTest {
 	@Test
 	void aMonochromeTerminalShowsTextOnlyAndASixteenColorOneTheNearest() {
 		TextBuffer mono = new TextBuffer(new Resolution(6, 1));
-		new VtDecoder(mono, reply -> { }, ColorDepth.MONOCHROME, "").write(ESC + "[31;44mx" + ESC + "[7my" + ESC + "[42m" + ESC + "[K");
-		assertThat(mono.foreground(0, 0)).isEqualTo(TextBuffer.DEFAULT_FOREGROUND);
+		new VtDecoder(mono, reply -> { }, ColorDepth.MONOCHROME, "").write(ESC + "[31;44mx" + ESC + "[7my" + ESC + "[27;1mz" + ESC + "[42m" + ESC + "[K");
+		assertThat(mono.foreground(0, 0)).as("no colors: normal intensity").isEqualTo(ColorDepth.NORMAL_INTENSITY);
 		assertThat(mono.background(0, 0)).isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
-		assertThat(mono.background(1, 0)).as("no reverse either").isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
+		assertThat(mono.foreground(1, 0)).as("reverse video: dark text").isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
+		assertThat(mono.background(1, 0)).as("on a lit cell").isEqualTo(ColorDepth.NORMAL_INTENSITY);
+		assertThat(mono.foreground(2, 0)).as("bold: full intensity, a VT102's").isEqualTo(TextBuffer.DEFAULT_FOREGROUND);
 		assertThat(mono.background(5, 0)).as("erased in the default").isEqualTo(TextBuffer.DEFAULT_BACKGROUND);
-		assertThat(mono.row(0)).startsWith("xy");
+		assertThat(mono.row(0)).startsWith("xyz");
+		assertThat(ColorDepth.MONOCHROME.glow(TextBuffer.DEFAULT_FOREGROUND)).as("bold glows brightest")
+			.isNotEqualTo(ColorDepth.MONOCHROME.glow(ColorDepth.NORMAL_INTENSITY));
+		assertThat(ColorDepth.MONOCHROME.glow(TextBuffer.DEFAULT_BACKGROUND)).as("unlit: the glass").isEqualTo(ColorDepth.PHOSPHOR_GLASS);
 
 		TextBuffer sixteen = new TextBuffer(new Resolution(6, 1));
 		new VtDecoder(sixteen, reply -> { }, ColorDepth.SIXTEEN, "").write(ESC + "[38;2;250;10;5mr" + ESC + "[38;5;21mb" + ESC + "[33my");
