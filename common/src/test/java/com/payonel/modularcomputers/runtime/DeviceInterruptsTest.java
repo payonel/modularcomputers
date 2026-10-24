@@ -63,7 +63,7 @@ class DeviceInterruptsTest {
 			card.play(20); // a second played: room for the writer
 		},
 		com.payonel.modularcomputers.device.AudioSensorCard.class, device -> ((com.payonel.modularcomputers.device.AudioSensorCard) device)
-			.hear(Map.of("sound", "Pig oinks", "x", 1.0, "y", 0.0, "z", 0.0)),
+			.hear(Map.of("sound", "minecraft:entity.pig.ambient", "x", 1.0, "y", 0.0, "z", 0.0)),
 		NetworkCard.class, device -> {
 			NetworkCard card = (NetworkCard) device;
 			card.place(WORLD, net.minecraft.core.BlockPos.ZERO, 0);

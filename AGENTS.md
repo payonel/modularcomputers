@@ -57,7 +57,7 @@ computers really work.
   runs a dedicated server on a copy of a world, with commands through a fifo and the server thread's
   stack on request. A disk is a folder under the world's `modularcomputers/disks/<id>`: put a script
   there, read what it wrote.
-- **Art, sounds and data tables** (structures, the sounds' subtitles) come from Python scripts in
+- **Art, sounds and data** (structures) come from Python scripts in
   `scripts/` (Pillow, libsndfile via ctypes); their outputs are committed, never edited by hand.
 - **Versioning:** `MAJOR.MINOR.PATCH+MCVERSION` (`docs/VERSIONING.md`), as Fabric API does.
 - **The dev host:** headless Linux, Xvfb with Mesa llvmpipe, `sudo` needs the user's password, no
@@ -216,11 +216,9 @@ device data), and user code, as a real CPU runs firmware under an OS.
 ### Sensors and the Bluetooth card
 
 - **The audio sensor hears what a player at its block would** (the game's range for each sound):
-  what it sounds like, its subtitle in English ("Pig oinks", the user's pick), and where, relative
-  to the block. It's blind, as the motion sensor is deaf: nothing of what made it (no sound id, no
-  category). Which subtitle a sound shows is only in the client's sounds.json, so Minecraft's are a
-  table made from it (`scripts/data/sound_subtitles.py`, rerun when Minecraft changes; `Subtitles`);
-  a sound without one isn't heard. It hears every sound the server sends players
+  the sound the game plays, by its id (`minecraft:entity.pig.ambient`), and where, relative to the
+  block; nothing else (no category). Just what the game plays, never a stand-in (the user's call,
+  over subtitles: a skeleton's step is `entity.skeleton.step`, and the stone under it is silent). It hears every sound the server sends players
   (`ServerLevelSounds`, a mixin on `playSeededSound`) and the sounds players make of level events
   (`LevelSounds`, the client's table, kept by hand; a block broken plays its own break sound).
 - **A Bluetooth card in a computer is a device:** its link (the board it links to) and its board

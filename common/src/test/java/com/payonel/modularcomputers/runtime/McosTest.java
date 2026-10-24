@@ -401,10 +401,9 @@ class McosTest {
 		boot();
 		type("head -n 1 /dev/hearing0 > /h; touch /done\r");
 		untilIdle(); // head waits: nothing was heard
-		server.add(() -> audio.hear(Map.of("sound", "Pig \"oinks\"", "x", 1.5, "y", 0.0, "z", -3.0)));
+		server.add(() -> audio.hear(Map.of("sound", "minecraft:entity.pig.ambient", "x", 1.5, "y", 0.0, "z", -3.0)));
 		untilFile(root().resolve("done"), "");
-		assertThat(read(root().resolve("h"))).as("its subtitle quoted (a quote in it escaped), and where")
-			.isEqualTo("\"Pig \\\"oinks\\\"\" 1.5 0.0 -3.0\n");
+		assertThat(read(root().resolve("h"))).isEqualTo("minecraft:entity.pig.ambient 1.5 0.0 -3.0\n");
 	}
 
 	@Test

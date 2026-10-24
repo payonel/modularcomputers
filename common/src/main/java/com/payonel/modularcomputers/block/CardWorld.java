@@ -199,16 +199,11 @@ public final class CardWorld {
 
 	/**
 	 * A sound the world played at {@code x, y, z}: each audio sensor at work in that world that a
-	 * player standing at its block would hear it from (the sound's own range, the game's) hears it,
-	 * as its subtitle ({@link Subtitles}): what it sounds like, not what made it. One without a
-	 * subtitle isn't heard (players get none for it either).
+	 * player standing at its block would hear it from (the sound's own range, the game's) hears it:
+	 * the sound the game plays, by its id.
 	 */
 	public static void heard(ServerLevel level, double x, double y, double z, SoundEvent sound, float volume) {
 		if (LISTENING.isEmpty()) {
-			return;
-		}
-		String subtitle = Subtitles.of(sound.location().toString());
-		if (subtitle == null) {
 			return;
 		}
 		double range = sound.getRange(volume);
@@ -221,7 +216,7 @@ public final class CardWorld {
 				continue;
 			}
 			Map<String, Object> event = new LinkedHashMap<>();
-			event.put("sound", subtitle);
+			event.put("sound", sound.location().toString());
 			event.putAll(where(watch.pos, x, y, z));
 			entry.getKey().hear(event);
 		}

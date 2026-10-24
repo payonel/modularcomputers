@@ -237,7 +237,7 @@ public class CardGameTest {
 	}
 
 	@GameTest(maxTicks = 60)
-	public void anAudioSensorHearsSoundsAndLevelEventsAsTheirSubtitlesWhereRelativeToItsBlockWithinTheirRange(GameTestHelper helper) {
+	public void anAudioSensorHearsSoundsAndLevelEventsByIdWhereRelativeToItsBlockWithinTheirRange(GameTestHelper helper) {
 		var card = computerWith(helper, ModItems.AUDIO_SENSOR_CARD, com.payonel.modularcomputers.device.AudioSensorCard.class);
 		BlockPos near = helper.absolutePos(POS.north(3));
 		BlockPos far = helper.absolutePos(POS.north(40)); // past a sound's range at its usual volume (16 blocks)
@@ -259,10 +259,10 @@ public class CardGameTest {
 				helper.assertValueEqual(heard.size(), 2, "the two near sounds: " + heard);
 			})
 			.thenExecute(() -> {
-				helper.assertValueEqual(heard.getFirst().get("sound"), "Piglin snorts", "what it sounds like: its subtitle, in English");
-				helper.assertValueEqual(heard.getFirst().keySet(), java.util.Set.of("sound", "x", "y", "z"), "and where: nothing of what made it");
+				helper.assertValueEqual(heard.getFirst().get("sound"), "minecraft:entity.piglin.ambient", "the sound the game played, by its id");
+				helper.assertValueEqual(heard.getFirst().keySet(), java.util.Set.of("sound", "x", "y", "z"), "and where: nothing else");
 				helper.assertValueEqual(heard.getFirst().get("z"), -3.0, "three blocks north of it");
-				helper.assertValueEqual(heard.get(1).get("sound"), "Dispensed item", "a level event's sound");
+				helper.assertValueEqual(heard.get(1).get("sound"), "minecraft:block.dispenser.dispense", "a level event's sound");
 			})
 			.thenSucceed();
 	}
@@ -287,7 +287,7 @@ public class CardGameTest {
 				}
 				helper.assertValueEqual(card.getDelay(args()).first(), 0L, "played out, by game time");
 			})
-			.thenExecute(() -> helper.assertTrue(heard.stream().anyMatch(event -> "Sound card plays".equals(event.get("sound"))),
+			.thenExecute(() -> helper.assertTrue(heard.stream().anyMatch(event -> "modularcomputers:sound_card".equals(event.get("sound"))),
 				"the sensor heard it start: " + heard))
 			.thenSucceed();
 	}
