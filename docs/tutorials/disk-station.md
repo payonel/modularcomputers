@@ -25,6 +25,9 @@ works on, and a source below it that is only read), a battery slot, a radio slot
 [Bluetooth card](/devices/bluetooth-card/), and five switches: Format, Wipe, Install mcos, Update
 mcos and Clone.
 
+![The Disk Station window](/assets/img/disk-station-window.png)
+*The Disk Station's window.*
+
 ### 2. Give it power
 
 A station pays for each action. It takes the power from a running computer on its bus, and if no

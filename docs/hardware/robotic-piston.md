@@ -20,6 +20,9 @@ A robotic piston is a piston a computer can push with.
 
 </div>
 
+![The Robotic Piston window: one Bluetooth card slot](/assets/img/robotic-piston-window.png)
+*The Robotic Piston's window: its one slot, for a Bluetooth card.*
+
 ## Use
 
 Place a robotic piston and join it to a computer: a [cable](/hardware/cable/) goes on its one cable

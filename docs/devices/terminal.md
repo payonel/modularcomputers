@@ -20,6 +20,9 @@ text to it, with escape sequences to move the cursor and set colors, and reads b
 
 </div>
 
+![A tier 3 screen block showing text and a small magenta sixel picture](/assets/img/screen-tier3.png)
+*A tier 3 terminal showing text and a sixel picture.*
+
 For the block you place and look at, see [Screen](/hardware/screen/).
 
 ## In mcos

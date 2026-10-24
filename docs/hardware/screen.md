@@ -19,6 +19,9 @@ A screen is a display and keyboard in one block, for a computer to show its cons
 
 </div>
 
+![A tier 3 screen block beside a case, showing text and a small magenta sixel picture](/assets/img/screen-tier3.png)
+*A tier 3 screen beside its case, showing text and a sixel picture.*
+
 ## Use
 
 Place a screen and join it to a computer with [cable](/hardware/cable/), on any side but its glass.

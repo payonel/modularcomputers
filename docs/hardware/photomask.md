@@ -19,6 +19,9 @@ The photomask prints chips from silicon, the way real ones are made. Every part 
 
 </div>
 
+![The Photomask block, a golden gear inside a dark frame](/assets/img/photomask.png)
+*The Photomask, seen from the front.*
+
 ## Use
 
 1. Smelt nether quartz in a blast furnace to get silicon.

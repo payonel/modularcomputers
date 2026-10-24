@@ -13,6 +13,9 @@ in a case, add a disk and a screen, and boot **mcos**, a Linux-like operating sy
 a disk you craft. Then automate your world: read and drive redstone, sense players and sounds,
 move pistons, talk to other computers, or just learn how a computer really works.
 
+![A computer's case view: a motherboard with CPU, RAM, ROM and SATA and expansion sockets, and its bus order beside it](/assets/img/case-view.png)
+*Every computer has a real motherboard. This is the case view: its sockets, and the bus order.*
+
 New here? Start with [Installing](/install/), then build your [first computer](/tutorials/first-computer/).
 
 ## What makes it different
@@ -106,4 +109,5 @@ The ideas behind the mod: the bus, faces, power.
 </div>
 
 Modular Computers is MIT licensed, and its source is on
-[GitHub](https://github.com/payonel/modularcomputers).
+[GitHub](https://github.com/payonel/modularcomputers). It builds on the ideas
+[OpenComputers](https://github.com/MightyPirates/OpenComputers) proved, and owes it a great deal.

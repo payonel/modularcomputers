@@ -18,6 +18,9 @@ An expansion hub is a box of card slots on the cable network, like an external e
 
 </div>
 
+![The Expansion Hub window: four card slots and a Bluetooth slot on a green board](/assets/img/expansion-hub-window.png)
+*The Expansion Hub's window.*
+
 ## Use
 
 Place a hub and join it to a computer with [cable](/hardware/cable/). Right-click to open its slots,

@@ -67,3 +67,10 @@ order: 10                   # place within the section (lower first)
 
 `scripts/docs_check.py` checks every page's front matter and every internal link and image. With
 Ruby installed, `cd docs && bundle exec jekyll build` builds the real site.
+
+## Screenshots
+
+They come from the client game tests (`./gradlew :fabric:runProductionClientGameTest`, then
+`fabric/build/run/productionClientGameTest/screenshots/`): copy one to `docs/assets/img/` under a
+plain name, and look at it before using it. The tests' pictures change when the art does; take them
+again then.

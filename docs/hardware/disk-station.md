@@ -20,6 +20,9 @@ a disk alone.
 
 </div>
 
+![The Disk Station window: Format, Wipe, Install mcos and Update mcos switches, a Clone switch, and the disk and source slots](/assets/img/disk-station-window.png)
+*The Disk Station's window: its switches on the left, the disk and its optional source on the right.*
+
 ## Use
 
 Place the station and right-click to open it. Put a [disk](/hardware/disk/) in the slot for the disk

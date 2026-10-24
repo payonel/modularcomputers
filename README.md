@@ -2,6 +2,8 @@
 
 **Build computers in Minecraft: assemble the parts, then program them in Lua.**
 
+![A computer's case view: a motherboard with CPU, RAM, ROM and SATA and expansion sockets, and its bus order beside it](docs/assets/img/case-view.png)
+
 Modular Computers is a mod for Fabric and NeoForge. Put a CPU, memory and an EEPROM in a case, add a
 disk and a screen, and boot **mcos**, a Linux-like operating system on a disk you craft. Then
 automate your world with redstone, sensors and pistons, connect computers into networks, or just
@@ -46,7 +48,18 @@ For Minecraft 26.3, on Fabric (Loader 0.19.5 or newer, Fabric API 0.162.0+26.3) 
 entry point. Test layers and the headless setup are in [.agents/TESTING.md](.agents/TESTING.md), and
 version numbers in [.agents/VERSIONING.md](.agents/VERSIONING.md).
 
+## Standing on OpenComputers
+
+Modular Computers is built on what [OpenComputers](https://github.com/MightyPirates/OpenComputers)
+worked out: computers you assemble from parts and program in Lua, a network of devices, power that
+matters, a persistent machine that survives a restart, and an operating system to make it all
+usable. Those ideas were solved there, by the MightyPirates team and its many contributors, and
+this mod would not exist without them. payonel, who maintains it, is one of OpenComputers'
+original authors.
+
+This is a new mod written from scratch, with its own Lua engine and its own design. It shares none
+of OpenComputers' code, and credits it for the idea and for years of proving that it works.
+
 ## License
 
-[MIT](LICENSE). Modular Computers was inspired by [OpenComputers](https://github.com/MightyPirates/OpenComputers)
-and shares none of its code.
+[MIT](LICENSE).

@@ -19,6 +19,9 @@ A case is a computer: a block with a motherboard inside, whose slots you fill wi
 
 </div>
 
+![The case view: a motherboard with CPU, RAM, ROM, UPS, SATA and expansion sockets, and the bus order beside it](/assets/img/case-view.png)
+*The case view is the computer's own motherboard. Parts sit in its sockets; the bus order is on the left.*
+
 ## Use
 
 Place the case and open it by right-clicking the window into the case on its back. You see its
