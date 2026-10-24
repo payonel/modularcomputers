@@ -103,6 +103,7 @@ local devices = {list = {}, byname = {}}
 k.devices = devices
 local described = {} -- by id: {label, get, set}, asked once a device (an id never changes what it is)
 local SINGLE = {eeprom = "eeprom"} -- the slots of devices there's only ever one of: named without a number
+local LINUX = {sound = "dsp"} -- types Linux names its own way: the first without a number (OSS's dsp, then dsp1)
 
 function k.refreshdevices()
   local list, byname, counts = {}, {}, {}
@@ -123,7 +124,8 @@ function k.refreshdevices()
       described[id] = about
     end
     local slot = device.address ~= device.id and not device.address:find("^id:") and device.address or nil
-    local entry = {name = SINGLE[slot] or kind .. n, id = id, path = slot,
+    local name = SINGLE[slot] or LINUX[kind] and LINUX[kind] .. (n == 0 and "" or n) or kind .. n
+    local entry = {name = name, id = id, path = slot,
       type = device.type, label = about.label, get = about.get, set = about.set, pull = about.pull}
     list[#list + 1], byname[entry.name] = entry, entry
   end
@@ -637,11 +639,14 @@ end
 -- isatty, and the terminal's ioctls by their Linux names: TCGETS and TCSETS (termios flags, as a
 -- table), TIOCGWINSZ (columns, rows: a terminal's own, asked each time), TIOCSWINSZ ({columns,
 -- rows}: a pty's size, set by its master; on any tty, SIGWINCH to the program in front, as Linux's),
--- TIOCSTI (bytes put in as if typed), on a tty or a pty's master; a socket's are net's.
+-- TIOCSTI (bytes put in as if typed), on a tty or a pty's master; a socket's are net's; a device
+-- file's own (a sound card's, OSS's) are its file's.
 local net -- (lib/modules/net.lua, once a socket is made)
 syscalls.ioctl = withfd(function(p, request, d, fd, op, arg)
   if d.type == "socket" then
     return net.ioctl(d, op, type(arg) == "table" and fromuser(arg) or arg)
+  elseif d.ioctl then
+    return d:ioctl(op, arg) -- (a device file's own: a sound card's)
   elseif d.type ~= "tty" and d.type ~= "pty" then
     return fail("ENOTTY")
   end

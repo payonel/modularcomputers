@@ -1,6 +1,6 @@
 {
 	"model": {
 		"type": "minecraft:model",
-		"model": "modularcomputers:item/audio_card"
+		"model": "modularcomputers:item/sound_card"
 	}
 }

@@ -38,7 +38,8 @@ public final class ModNetwork {
 	public static final List<ToClient<?>> TO_CLIENT = List.of(
 		new ToClient<>(OpenDisplayPayload.TYPE, OpenDisplayPayload.CODEC),
 		new ToClient<>(ScreenRowsPayload.TYPE, ScreenRowsPayload.CODEC),
-		new ToClient<>(SettingsPayload.TYPE, SettingsPayload.CODEC));
+		new ToClient<>(SettingsPayload.TYPE, SettingsPayload.CODEC),
+		new ToClient<>(SoundCardPayload.TYPE, SoundCardPayload.CODEC));
 
 	private ModNetwork() {
 	}

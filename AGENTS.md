@@ -223,6 +223,21 @@ device data), and user code, as a real CPU runs firmware under an OS.
 - **A Bluetooth card in a computer is a device:** its link (the board it links to) and its board
   are read and set by programs as by hand, on the card itself (its item).
 
+### The Sound Card
+
+Phase 1 is a real card's DAC (user design; phase 2, MIDI notes, is in the plan): programs write
+samples, and it plays them at its format's rate (8000 to 44100 a second; unsigned 8-bit, signed
+16-bit, or IMA ADPCM, which it decodes itself, as a Sound Blaster did: no codec dependency). Its
+buffer holds a second; a write takes what fits (the handshake), and its interrupt says when there's
+room, or when what's queued has played out (`sync`). It plays by game time: each tick its block
+sends what's due, still encoded, to the players near it (`SoundCardPayload`), and their games play
+it through a sound whose samples come from a stream (`SoundCardSpeakers`: NeoForge's and Fabric
+API's stream hooks, one class answering both). Stereo is two mono speakers half a block either side
+of the block, its left and right as seen facing its front: OpenAL doesn't place a stereo sound in
+the world. In mcos it's OSS's `/dev/dsp` (`dsp1` the next): an open starts at OSS's defaults (8000,
+u8, mono), so `cat file.raw > /dev/dsp` plays, and OSS's ioctls set the format; `aplay` plays WAV
+files.
+
 ### Network cards
 
 OC's broadcast and peer-to-peer messages in a real NIC's shape. A wired card sends frames over the

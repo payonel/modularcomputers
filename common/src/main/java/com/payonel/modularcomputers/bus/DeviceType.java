@@ -13,7 +13,8 @@ public enum DeviceType {
 	 */
 	EEPROM,
 	REDSTONE,
-	AUDIO,
+	/** A sound card: a DAC, playing the samples programs write (OSS's /dev/dsp in mcos). */
+	SOUND,
 	/** An audio sensor: the sounds it hears near it, as the game's subtitles report them (motion's naming). */
 	HEARING,
 	/** A Bluetooth card: the link it makes to another block's board. */

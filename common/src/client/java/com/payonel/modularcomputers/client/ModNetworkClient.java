@@ -23,7 +23,8 @@ public final class ModNetworkClient {
 	public static final List<Handler<?>> HANDLERS = List.of(
 		new Handler<>(OpenDisplayPayload.TYPE, ModNetworkClient::openDisplay),
 		new Handler<>(SettingsPayload.TYPE, SettingsPayload::apply),
-		new Handler<>(ScreenRowsPayload.TYPE, ModNetworkClient::screenRows));
+		new Handler<>(ScreenRowsPayload.TYPE, ModNetworkClient::screenRows),
+		new Handler<>(com.payonel.modularcomputers.network.SoundCardPayload.TYPE, com.payonel.modularcomputers.client.sound.SoundCardSpeakers::receive));
 
 	private ModNetworkClient() {
 	}

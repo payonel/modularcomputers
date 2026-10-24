@@ -267,6 +267,31 @@ public class CardGameTest {
 			.thenSucceed();
 	}
 
+	@GameTest(maxTicks = 100)
+	public void aSoundCardPlaysWhatsWrittenByGameTimeAndAnAudioSensorHearsItStart(GameTestHelper helper) {
+		var card = computerWith(helper, ModItems.SOUND_CARD, com.payonel.modularcomputers.device.SoundCard.class);
+		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		computer.parts().setItem(CaseMenu.EXP_SLOTS + 2, new ItemStack(ModItems.AUDIO_SENSOR_CARD));
+		List<Map<?, ?>> heard = new ArrayList<>();
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(computer.machine().board().bus().devices().stream()
+				.anyMatch(com.payonel.modularcomputers.device.AudioSensorCard.class::isInstance), "the sensor on the bus"))
+			.thenIdle(2) // (powered: its computer runs)
+			.thenExecute(() -> helper.assertValueEqual(card.write(args("x".repeat(4000))).first(), 4000L, "half a second at 8000 a second"))
+			.thenWaitUntil(() -> {
+				var sensor = computer.machine().board().bus().devices().stream()
+					.filter(com.payonel.modularcomputers.device.AudioSensorCard.class::isInstance).findFirst().orElseThrow();
+				Object event;
+				while ((event = ((com.payonel.modularcomputers.device.AudioSensorCard) sensor).pull(args()).first()) != null) {
+					heard.add((Map<?, ?>) event);
+				}
+				helper.assertValueEqual(card.getDelay(args()).first(), 0L, "played out, by game time");
+			})
+			.thenExecute(() -> helper.assertTrue(heard.stream().anyMatch(event -> "modularcomputers:sound_card".equals(event.get("sound"))
+				&& "record".equals(event.get("source"))), "the sensor heard it start: " + heard))
+			.thenSucceed();
+	}
+
 	@GameTest(maxTicks = 60)
 	public void aBluetoothCardsLinkIsReadAndSetOnTheCardItself(GameTestHelper helper) {
 		var card = computerWith(helper, ModItems.BLUETOOTH_CARD, com.payonel.modularcomputers.device.BluetoothCard.class);

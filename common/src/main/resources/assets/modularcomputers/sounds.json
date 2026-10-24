@@ -1,4 +1,14 @@
 {
+	"sound_card": {
+		"sounds": [
+			{
+				"name": "modularcomputers:device_connect",
+				"stream": true,
+				"attenuation_distance": 32
+			}
+		],
+		"subtitle": "subtitles.modularcomputers.sound_card"
+	},
 	"error_beep": {
 		"sounds": [
 			"modularcomputers:error_beep"

@@ -314,7 +314,7 @@ def redstone_card_item():
 	im.putpixel((14, 4), (255, 60, 40, 255))
 	return im
 
-def audio_card_item():
+def sound_card_item():
 	"""Three colored jacks on the bracket, like a sound card."""
 	im = card_base()
 	rect(im, 4, 7, 7, 9, (30, 30, 34, 255))
@@ -395,7 +395,7 @@ for name, fn in [("tier1_cpu", tier1_cpu_item), ("tier2_cpu", tier2_cpu_item), (
 		("tier1_ram", lambda: ram_item(1)), ("tier2_ram", lambda: ram_item(2)), ("tier3_ram", lambda: ram_item(3)),
 		("tier1_hard_disk", lambda: hard_disk_item(1)), ("tier2_hard_disk", lambda: hard_disk_item(2)), ("tier3_hard_disk", lambda: hard_disk_item(3)),
 		("wlan_card", wlan_card_item), ("network_card", network_card_item), ("tier1_battery", tier1_battery_item), ("tier2_battery", tier2_battery_item), ("tier3_battery", tier3_battery_item), ("redstone_card", redstone_card_item),
-		("audio_card", audio_card_item), ("motion_sensor_card", motion_sensor_card_item), ("audio_sensor_card", audio_sensor_card_item),
+		("sound_card", sound_card_item), ("motion_sensor_card", motion_sensor_card_item), ("audio_sensor_card", audio_sensor_card_item),
 		("weather_sensor_card", weather_sensor_card_item), ("bluetooth_card", bluetooth_card_item)]:
 	fn().save(f"{OUT}/../item/{name}.png")
 

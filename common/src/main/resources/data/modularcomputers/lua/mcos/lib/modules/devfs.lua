@@ -6,7 +6,8 @@
 -- (replace, append...). An open file holds the device's id: it reaches that device or fails
 -- (ENODEV, and the kernel reads the bus again), whatever happens to the names meanwhile. A disk's
 -- file is its bytes, as a block device's: read, written and sought by byte offset (the disk's raw
--- read and write); a disk with a filesystem (hfs) refuses them (EMEDIUMTYPE). The names
+-- read and write); a disk with a filesystem (hfs) refuses them (EMEDIUMTYPE). A sound card's file
+-- (dsp) is OSS's: what's written plays, and its ioctls set the format. The names
 -- come from the kernel's view of the bus (k.devices), which may be a moment behind: no lookup here
 -- makes a board call.
 local k, vfs = ...
@@ -82,10 +83,11 @@ local devices = {
 }
 
 local DISK = "storage" -- a disk's device type: its file is a block device's
+local SOUND = "sound" -- a sound card's: its file is OSS's /dev/dsp
 
 -- A bus device with data: a get, a set, events to pull, or a disk's bytes.
 local function hasdata(device)
-  return device.get or device.set or device.pull or device.type == DISK
+  return device.get or device.set or device.pull or device.type == DISK or device.type == SOUND
 end
 
 -- What a path in /dev names: one of the kernel's devices (its maker), or a bus device with data.
@@ -207,6 +209,104 @@ local function diskfile(device)
       end
       at = base + offset
       return at
+    end,
+  }
+end
+
+-- OSS's sample formats, by their names, and the card's for each.
+local AFMT = {AFMT_U8 = "u8", AFMT_S16_LE = "s16le", AFMT_IMA_ADPCM = "ima_adpcm"}
+local AFMT_NAME = {}
+for name, encoding in pairs(AFMT) do
+  AFMT_NAME[encoding] = name
+end
+
+-- A sound card's file, OSS's /dev/dsp: what's written plays (a write waits while the card's
+-- buffer is full, as a pipe's writer does); an open starts at OSS's defaults (8000 a second,
+-- unsigned 8-bit, mono), so a raw file plays as written, and what another left queued in the same
+-- format plays on first. Its ioctls, by OSS's names: SNDCTL_DSP_SPEED (a rate), SNDCTL_DSP_SETFMT
+-- (AFMT_U8, AFMT_S16_LE, AFMT_IMA_ADPCM), SNDCTL_DSP_CHANNELS (1 or 2), each answering what it's
+-- set to; SNDCTL_DSP_GETODELAY (bytes queued), SNDCTL_DSP_RESET (they're dropped), SNDCTL_DSP_SYNC
+-- (waits until they've played); and mcos's own MCOS_DSP_BLOCK (an ADPCM block's bytes: WAV's block
+-- align, which OSS never had).
+local function dspfile(device)
+  local id = device.id
+  local ok, why = board.invoke(id, "setFormat", {rate = 8000, encoding = "u8", channels = 1})
+  if not ok then
+    return failed(why)
+  end
+  local function set(field, value, answer)
+    local done, err = board.invoke(id, "setFormat", {[field] = value})
+    if not done then
+      return failed(err, "EINVAL")
+    end
+    local got, format = board.invoke(id, "getFormat")
+    if not got then
+      return failed(format)
+    end
+    return answer(format)
+  end
+  local ops = {
+    SNDCTL_DSP_SPEED = function(rate)
+      return set("rate", rate, function(format) return format.rate end)
+    end,
+    SNDCTL_DSP_SETFMT = function(name)
+      if not AFMT[name] then
+        return fail("EINVAL")
+      end
+      return set("encoding", AFMT[name], function(format) return AFMT_NAME[format.encoding] end)
+    end,
+    SNDCTL_DSP_CHANNELS = function(channels)
+      return set("channels", channels, function(format) return format.channels end)
+    end,
+    MCOS_DSP_BLOCK = function(block)
+      return set("block", block, function(format) return format.block end)
+    end,
+    SNDCTL_DSP_GETODELAY = function()
+      local got, delay = board.invoke(id, "getDelay")
+      if not got then
+        return failed(delay)
+      end
+      return delay
+    end,
+    SNDCTL_DSP_RESET = function()
+      local done, err = board.invoke(id, "reset")
+      if not done then
+        return failed(err)
+      end
+      return true
+    end,
+    SNDCTL_DSP_SYNC = function()
+      local done, drained = board.invoke(id, "sync")
+      if not done then
+        return failed(drained)
+      elseif not drained then
+        k.listen(id) -- (its interrupt says when it's played out)
+        return k.BLOCK
+      end
+      return true
+    end,
+  }
+  return {
+    type = "device",
+    events = function(self)
+      return {OUT = true}
+    end,
+    write = function(self, data)
+      local done, count = board.invoke(id, "write", data)
+      if not done then
+        return failed(count)
+      elseif count == 0 and #data > 0 then
+        k.listen(id) -- full: its interrupt says when there's room
+        return k.BLOCK
+      end
+      return count
+    end,
+    ioctl = function(self, op, arg)
+      local f = ops[op]
+      if not f then
+        return fail("EINVAL")
+      end
+      return f(arg)
     end,
   }
 end
@@ -334,6 +434,11 @@ function fs:open(path, mode, process)
     return fail("ENOENT")
   elseif device.type == DISK then
     return diskfile(device)
+  elseif device.type == SOUND then
+    if mode:sub(1, 1) == "r" and not mode:find("+", 1, true) then
+      return fail("EACCES") -- (it plays; it doesn't record)
+    end
+    return dspfile(device)
   end
   return devicefile(device, mode)
 end

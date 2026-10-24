@@ -12,6 +12,7 @@ public final class Cards {
 			case MOTION_SENSOR -> new MotionSensorCard();
 			case AUDIO_SENSOR -> new AudioSensorCard();
 			case BLUETOOTH -> new BluetoothCard();
+			case SOUND -> new SoundCard();
 			case NETWORK, WLAN -> new NetworkCard(kind);
 			default -> new Card(kind);
 		};

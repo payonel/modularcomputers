@@ -1,0 +1,63 @@
+.TH APLAY 1 "" "" "mcos Manual"
+.SH NAME
+aplay \- play WAV files on a sound card
+.SH SYNOPSIS
+.B aplay
+.RB [ \-D
+.IR device ]
+.RI [ file ...]
+.SH DESCRIPTION
+.B aplay
+plays each WAV
+.I file
+on a sound card, one after another.
+With no
+.IR file ,
+or where a
+.I file
+is
+.BR \- ,
+it reads standard input.
+.PP
+A file's header says its format, and
+.B aplay
+sets the card to it: PCM (unsigned 8-bit or signed 16-bit) or IMA ADPCM, mono
+or stereo, at 8000, 11025, 22050 or 44100 samples a second.
+It writes the file's data as it reads it (a write waits while the card's buffer
+is full), then waits for what it queued to play out before the next file.
+.PP
+A stereo sound comes from two speakers, the block's left and right as seen
+facing its front; a mono one from the block.
+Any other music can be converted on another computer, for example with
+.BR ffmpeg :
+.PP
+.nf
+ffmpeg \-i song.mp3 \-ar 22050 \-ac 2 \-acodec adpcm_ima_wav song.wav
+.fi
+.PP
+A file that cannot be opened, read or played is reported on standard error, and
+.B aplay
+goes on with the next one.
+.SH OPTIONS
+.TP
+.BI \-D " device"
+The sound card's file (\fB/dev/dsp\fR, the first card's, unless given).
+.SH EXIT STATUS
+0 if every file was played; 1 if any could not be, or the card could not be
+opened.
+.SH EXAMPLES
+.nf
+aplay song.wav
+aplay \-D /dev/dsp1 alarm.wav
+.fi
+.SH NOTES
+ALSA's
+.B aplay
+has many more options (raw formats, recording with
+.BR arecord ,
+devices by name); mcos's takes WAV files only.
+A raw file plays as it is with
+.BR "cat file > /dev/dsp" ,
+at OSS's defaults: 8000 samples a second, unsigned 8-bit, mono.
+.SH SEE ALSO
+.BR cat (1)

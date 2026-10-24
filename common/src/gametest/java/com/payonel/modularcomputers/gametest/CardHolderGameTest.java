@@ -57,14 +57,14 @@ public class CardHolderGameTest {
 		AllInOneBlockEntity computer = computer(helper);
 		cable(helper, new BlockPos(2, 1, 1));
 		ExpansionHubBlockEntity hub = hub(helper, new BlockPos(3, 1, 1));
-		hub.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
+		hub.cards().setItem(0, new ItemStack(ModItems.SOUND_CARD));
 		hub.cards().setItem(2, new ItemStack(ModItems.REDSTONE_CARD));
 		helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.TIER3_SCREEN.defaultBlockState().setValue(ScreenBlock.FACING, Direction.SOUTH));
 		ScreenBlockEntity screen = helper.getBlockEntity(new BlockPos(4, 1, 1), ScreenBlockEntity.class);
 		helper.succeedWhen(() -> {
 			var cabled = computer.busEntries().stream().filter(AllInOneBlockEntity.BusEntry::cabled).toList();
 			helper.assertValueEqual(cabled.stream().map(entry -> entry.name().getString()).toList(),
-				List.of("Audio Card", "Redstone Card", "Tier 3 Screen"), "the hub's cards, then the screen beyond it");
+				List.of("Sound Card", "Redstone Card", "Tier 3 Screen"), "the hub's cards, then the screen beyond it");
 			helper.assertValueEqual(locations(computer), List.of("hub 1, 2m", "hub 3, 2m", "cable, 3m"), "where each is");
 			helper.assertTrue(computer.machine().board().bus().devices().stream().anyMatch(device -> device.type() == DeviceType.REDSTONE),
 				"the redstone card is on the bus");
@@ -76,14 +76,14 @@ public class CardHolderGameTest {
 	public void aHubCardCanBeUnpluggedOnItsOwn(GameTestHelper helper) {
 		AllInOneBlockEntity computer = computer(helper);
 		ExpansionHubBlockEntity hub = hub(helper, new BlockPos(2, 1, 1)); // right against the computer
-		hub.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
+		hub.cards().setItem(0, new ItemStack(ModItems.SOUND_CARD));
 		hub.cards().setItem(1, new ItemStack(ModItems.WLAN_CARD));
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertValueEqual(locations(computer), List.of("hub 1, 1m", "hub 2, 1m"), "both cards"))
 			.thenExecute(() -> {
-				helper.assertTrue(computer.setConnected("id:" + hub.cards().getItem(0).get(ModComponents.SERIAL), false), "unplug the audio card");
+				helper.assertTrue(computer.setConnected("id:" + hub.cards().getItem(0).get(ModComponents.SERIAL), false), "unplug the sound card");
 				var types = computer.machine().board().bus().devices().stream().map(device -> device.type()).toList();
-				helper.assertTrue(!types.contains(DeviceType.AUDIO) && types.contains(DeviceType.NETWORK), "only the audio card leaves the bus");
+				helper.assertTrue(!types.contains(DeviceType.SOUND) && types.contains(DeviceType.NETWORK), "only the sound card leaves the bus");
 				hub.cards().setItem(1, ItemStack.EMPTY);
 			})
 			.thenWaitUntil(() -> helper.assertValueEqual(locations(computer), List.of("hub 1, 1m", "offline"), "a card taken out of the hub goes offline"))
@@ -134,7 +134,7 @@ public class CardHolderGameTest {
 			}
 		}
 		helper.assertValueEqual(hub.cards().getContainerSize(), ExpansionHubBlockEntity.SLOTS + 1, "four slots and the radio slot");
-		helper.assertTrue(!hub.cards().canPlaceItem(ExpansionHubBlockEntity.RADIO_SLOT, new ItemStack(ModItems.AUDIO_CARD)), "the radio slot takes only Bluetooth");
+		helper.assertTrue(!hub.cards().canPlaceItem(ExpansionHubBlockEntity.RADIO_SLOT, new ItemStack(ModItems.SOUND_CARD)), "the radio slot takes only Bluetooth");
 		helper.assertTrue(hub.cards().canPlaceItem(ExpansionHubBlockEntity.RADIO_SLOT, new ItemStack(ModItems.BLUETOOTH_CARD)), "the radio slot takes Bluetooth");
 		helper.assertValueEqual(piston.cards().getContainerSize(), 1, "one slot");
 		helper.succeed();

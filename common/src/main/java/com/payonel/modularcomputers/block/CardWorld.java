@@ -5,6 +5,7 @@ import com.payonel.modularcomputers.device.Card;
 import com.payonel.modularcomputers.device.MotionSensorCard;
 import com.payonel.modularcomputers.device.NetworkCard;
 import com.payonel.modularcomputers.device.RedstoneCard;
+import com.payonel.modularcomputers.device.SoundCard;
 import com.payonel.modularcomputers.device.WeatherCard;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -41,6 +42,8 @@ public final class CardWorld {
 		Direction.WEST, Direction.UP, Direction.DOWN);
 	/** Motion sensors at work: where each is, and what it saw last. */
 	private static final Map<MotionSensorCard, Watch> WATCHING = new WeakHashMap<>();
+	/** How far from a Sound Card players are sent what it plays, in blocks: past where they can hear it ({@code sound_card}'s attenuation, 32). */
+	private static final double SOUND_SEND_RANGE = 40;
 	/** Audio sensors at work: where each is, and when it last was (a sensor not ticked lately has stopped). */
 	private static final Map<AudioSensorCard, Watch> LISTENING = new WeakHashMap<>();
 	/** How often a wired network card's cables are walked again, though none changed (chunks load and unload), in ticks. */
@@ -79,6 +82,18 @@ public final class CardWorld {
 					weather.sense(weatherAt(level, pos));
 				}
 			}
+			case SoundCard sound -> {
+				boolean was = sound.playing();
+				byte[] played = sound.play(now);
+				if (played != null) {
+					sendSound(sound, level, pos, played);
+					if (!was) {
+						// It starts: audio sensors hear it as players' subtitles show it, once a start.
+						heard(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, com.payonel.modularcomputers.sound.ModSounds.SOUND_CARD,
+							SoundSource.RECORDS, 2);
+					}
+				}
+			}
 			case AudioSensorCard audio -> {
 				Watch watch = LISTENING.computeIfAbsent(audio, a -> new Watch());
 				watch.level = level;
@@ -95,6 +110,21 @@ public final class CardWorld {
 				}
 			}
 			default -> {
+			}
+		}
+	}
+
+	/** What a Sound Card played this tick, to the players near it, with where its left speaker is. */
+	private static void sendSound(SoundCard sound, ServerLevel level, BlockPos pos, byte[] played) {
+		int left = -1;
+		if (sound.front() != null && sound.front() != com.payonel.modularcomputers.device.Face.UP && sound.front() != com.payonel.modularcomputers.device.Face.DOWN) {
+			left = Direction.valueOf(com.payonel.modularcomputers.device.Face.named("left", sound.front()).name()).ordinal();
+		}
+		UUID card = sound.id() != null ? sound.id() : new UUID(pos.asLong(), 0); // (a card without a serial: by its block)
+		var payload = new com.payonel.modularcomputers.network.SoundCardPayload(card, pos.immutable(), left, sound.format(), played);
+		for (var player : level.players()) {
+			if (player.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(pos)) <= SOUND_SEND_RANGE * SOUND_SEND_RANGE) {
+				com.payonel.modularcomputers.network.ModNetwork.send(player, payload);
 			}
 		}
 	}

@@ -63,7 +63,7 @@ public final class ModItems {
 	public static final Item WLAN_CARD = register("wlan_card");
 	public static final Item BLUETOOTH_CARD = register("bluetooth_card", BluetoothCardItem::new, UnaryOperator.identity());
 	public static final Item REDSTONE_CARD = register("redstone_card");
-	public static final Item AUDIO_CARD = register("audio_card");
+	public static final Item SOUND_CARD = register("sound_card");
 	public static final Item MOTION_SENSOR_CARD = register("motion_sensor_card");
 	public static final Item AUDIO_SENSOR_CARD = register("audio_sensor_card");
 	public static final Item WEATHER_SENSOR_CARD = register("weather_sensor_card");
@@ -84,7 +84,7 @@ public final class ModItems {
 		cards.put(WLAN_CARD, CardKind.WLAN);
 		cards.put(BLUETOOTH_CARD, CardKind.BLUETOOTH);
 		cards.put(REDSTONE_CARD, CardKind.REDSTONE);
-		cards.put(AUDIO_CARD, CardKind.AUDIO);
+		cards.put(SOUND_CARD, CardKind.SOUND);
 		cards.put(MOTION_SENSOR_CARD, CardKind.MOTION_SENSOR);
 		cards.put(AUDIO_SENSOR_CARD, CardKind.AUDIO_SENSOR);
 		cards.put(WEATHER_SENSOR_CARD, CardKind.WEATHER_SENSOR);

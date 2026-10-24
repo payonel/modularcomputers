@@ -1,0 +1,160 @@
+-- aplay [-D device] [file...]: plays WAV files on a sound card (/dev/dsp, or -D's), one after
+-- another; stdin with none (or "-"). A file's header says its format: PCM (unsigned 8-bit or signed
+-- 16-bit) or IMA ADPCM, mono or stereo, at a rate the card plays (8000, 11025, 22050, 44100); aplay
+-- sets the card to it (OSS's ioctls) and writes the data as it reads it (a write waits while the
+-- card's buffer is full), then waits for what it queued to play out (SNDCTL_DSP_SYNC), as ALSA's
+-- aplay drains. A file it can't play is reported, and it goes on with the next.
+local sys = require("sys")
+
+local READ_SIZE = 4096 -- the most one read takes
+local WAVE_PCM = 1 -- WAV's format tags
+local WAVE_IMA_ADPCM = 0x11
+local RIFF_HEADER = 12 -- "RIFF", its size, "WAVE"
+local CHUNK_HEADER = 8 -- a chunk's id and size
+
+local function usage()
+  io.stderr:write("usage: aplay [-D device] [file...]\n")
+  os.exit(1)
+end
+
+local device = "/dev/dsp"
+local files = {}
+local i = 1
+while i <= #arg do
+  local word = arg[i]
+  if word == "-D" then
+    device = arg[i + 1] or usage()
+    i = i + 1
+  elseif word:sub(1, 1) == "-" and word ~= "-" then
+    io.stderr:write("aplay: invalid option '", word, "'\n")
+    usage()
+  else
+    files[#files + 1] = word
+  end
+  i = i + 1
+end
+if #files == 0 then
+  files[1] = "-"
+end
+
+-- Exactly n bytes from a file, or fewer at its end.
+local function readn(file, n)
+  local parts, got = {}, 0
+  while got < n do
+    local data, why = sys.read(file.fd, math.min(READ_SIZE, n - got))
+    if not data then
+      return nil, why
+    elseif data == "" then
+      break
+    end
+    parts[#parts + 1] = data
+    got = got + #data
+  end
+  return table.concat(parts)
+end
+
+-- A WAV file's format ({tag, channels, rate, bits, block}), its data chunk's size, and the file
+-- there; or nil and why.
+local function header(file)
+  local riff = readn(file, RIFF_HEADER)
+  if not riff or #riff < RIFF_HEADER or riff:sub(1, 4) ~= "RIFF" or riff:sub(9, 12) ~= "WAVE" then
+    return nil, "not a WAV file"
+  end
+  local format
+  while true do
+    local chunk = readn(file, CHUNK_HEADER)
+    if not chunk or #chunk < CHUNK_HEADER then
+      return nil, "no data in it"
+    end
+    local id, size = chunk:sub(1, 4), string.unpack("<I4", chunk, 5)
+    if id == "data" then
+      if not format then
+        return nil, "its data comes before its format"
+      end
+      return format, size
+    end
+    local body = readn(file, size + size % 2) -- (a chunk is padded to an even size)
+    if not body or #body < size then
+      return nil, "cut short"
+    end
+    if id == "fmt " then
+      local tag, channels, rate, _, block, bits = string.unpack("<I2I2I4I4I2I2", body)
+      format = {tag = tag, channels = channels, rate = rate, bits = bits, block = block}
+    end
+  end
+end
+
+-- The card set to a WAV's format, or why not.
+local function setup(dsp, format)
+  local afmt
+  if format.tag == WAVE_PCM and format.bits == 8 then
+    afmt = "AFMT_U8"
+  elseif format.tag == WAVE_PCM and format.bits == 16 then
+    afmt = "AFMT_S16_LE"
+  elseif format.tag == WAVE_IMA_ADPCM then
+    afmt = "AFMT_IMA_ADPCM"
+  else
+    return nil, "unsupported format (tag " .. format.tag .. ", " .. format.bits .. " bits)"
+  end
+  local steps = {{"SNDCTL_DSP_SETFMT", afmt}, {"SNDCTL_DSP_CHANNELS", format.channels}, {"SNDCTL_DSP_SPEED", format.rate}}
+  if afmt == "AFMT_IMA_ADPCM" then
+    table.insert(steps, 3, {"MCOS_DSP_BLOCK", format.block})
+  end
+  for _, step in ipairs(steps) do
+    local ok, why = sys.ioctl(dsp, step[1], step[2])
+    if not ok then
+      return nil, "unsupported " .. step[1]:match("_(%u+)$"):lower() .. " " .. tostring(step[2]) .. " (" .. tostring(why) .. ")"
+    end
+  end
+  return true
+end
+
+local dsp, why = sys.open(device, "w")
+if not dsp then
+  io.stderr:write("aplay: ", device, ": ", tostring(why), "\n")
+  return 1
+end
+local status = 0
+for _, path in ipairs(files) do
+  local file, err = io.stdin, nil
+  if path ~= "-" then
+    file, err = io.open(path, "r")
+  end
+  local format, size
+  if file then
+    format, size = header(file)
+    if not format then
+      err = size
+    end
+  end
+  local ok, problem = format and setup(dsp, format)
+  if not file or not format or not ok then
+    io.stderr:write("aplay: ", path, ": ", tostring(err or problem), "\n")
+    status = 1
+  else
+    local left = size
+    while left > 0 do
+      local data, failed = sys.read(file.fd, math.min(READ_SIZE, left))
+      if not data then
+        io.stderr:write("aplay: ", path, ": ", tostring(failed), "\n")
+        status = 1
+        break
+      elseif data == "" then
+        break -- (a file cut short plays what it has)
+      end
+      local wrote, failure = sys.write(dsp, data)
+      if not wrote then
+        io.stderr:write("aplay: ", device, ": ", tostring(failure), "\n")
+        status = 1
+        break
+      end
+      left = left - #data
+    end
+    sys.ioctl(dsp, "SNDCTL_DSP_SYNC") -- what it queued plays out before the next file's format
+  end
+  if file and file ~= io.stdin then
+    file:close()
+  end
+end
+sys.close(dsp)
+return status

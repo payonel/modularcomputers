@@ -144,7 +144,7 @@ public class BluetoothGameTest {
 		helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.EXPANSION_HUB);
 		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(4, 1, 1), ExpansionHubBlockEntity.class);
 		hub.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(computer.boardId()));
-		hub.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
+		hub.cards().setItem(0, new ItemStack(ModItems.SOUND_CARD));
 		ScreenBlockEntity screen = screen(helper, new BlockPos(4, 1, 5));
 		screen.cards().setItem(0, card(hub.boardId()));
 		helper.succeedWhen(() -> {
@@ -174,7 +174,7 @@ public class BluetoothGameTest {
 		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(4, 1, 1), ExpansionHubBlockEntity.class);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(hub.boardId()));
 		hub.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(null));
-		hub.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
+		hub.cards().setItem(0, new ItemStack(ModItems.SOUND_CARD));
 		cable(helper, new BlockPos(4, 1, 2));
 		screen(helper, new BlockPos(4, 1, 3));
 		helper.succeedWhen(() -> helper.assertValueEqual(locations(computer), List.of("hub 1, 3m", "bluetooth, 5m"),
@@ -188,7 +188,7 @@ public class BluetoothGameTest {
 		helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.EXPANSION_HUB);
 		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(4, 1, 1), ExpansionHubBlockEntity.class);
 		hub.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(null));
-		hub.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
+		hub.cards().setItem(0, new ItemStack(ModItems.SOUND_CARD));
 		helper.startSequence()
 			.thenIdle(5)
 			.thenExecute(() -> helper.assertTrue(locations(computer).isEmpty(), "no link, no connection"))
@@ -208,12 +208,12 @@ public class BluetoothGameTest {
 		hub2.cards().setItem(0, new ItemStack(ModItems.WLAN_CARD));
 		cable(helper, new BlockPos(3, 1, 6));
 		ScreenBlockEntity screen = screen(helper, new BlockPos(4, 1, 6));
-		hub1.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
+		hub1.cards().setItem(0, new ItemStack(ModItems.SOUND_CARD));
 		hub1.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(hub2.boardId()));
 		helper.succeedWhen(() -> {
 			helper.assertTrue(onBus(computer, screen), "the screen past hub 2");
 			helper.assertValueEqual(computer.busEntries().stream().filter(AllInOneBlockEntity.BusEntry::cabled)
-				.map(entry -> entry.name().getString()).toList(), List.of("Audio Card", "WLAN Card", "Tier 3 Screen"), "hub 1's card, hub 2's, the screen");
+				.map(entry -> entry.name().getString()).toList(), List.of("Sound Card", "WLAN Card", "Tier 3 Screen"), "hub 1's card, hub 2's, the screen");
 		});
 	}
 
@@ -229,7 +229,7 @@ public class BluetoothGameTest {
 		second.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		first.parts().setItem(CaseMenu.EXP_SLOTS, card(null)); // the first computer's radio, for later
 		hub.cards().setItem(ExpansionHubBlockEntity.RADIO_SLOT, card(null)); // a radio, linked nowhere: the hub is shared
-		hub.cards().setItem(0, new ItemStack(ModItems.AUDIO_CARD));
+		hub.cards().setItem(0, new ItemStack(ModItems.SOUND_CARD));
 		piston(helper, new BlockPos(2, 1, 6)).cards().setItem(0, card(hub.boardId()));
 		helper.startSequence()
 			.thenWaitUntil(() -> {

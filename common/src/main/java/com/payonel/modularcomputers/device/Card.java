@@ -44,6 +44,11 @@ public class Card implements Device {
 		this.front = front;
 	}
 
+	/** Where its block's front is, now (null: none). */
+	public Face front() {
+		return front.get();
+	}
+
 	/** The face a program named (the world's name, or one relative to its block's front: {@link Face}). */
 	protected Face face(Object name) {
 		if (!(name instanceof String text)) {

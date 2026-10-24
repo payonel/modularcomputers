@@ -74,7 +74,7 @@ public class RecipeGameTest {
 		make("wlan_card", "OQm", "ccc", "GGG"),
 		make("bluetooth_card", "OQm", "clc", "GGG"),
 		make("redstone_card", "XQ ", "ccc", "GGG"),
-		make("audio_card", "jQ ", "ccc", "GGG"),
+		make("sound_card", "jQ ", "ccc", "GGG"),
 		make("motion_sensor_card", "oQ ", "ccc", "GGG"),
 		make("audio_sensor_card", "uQ ", "ccc", "GGG"),
 		make("weather_sensor_card", "tQv", "ccc", "GGG"),

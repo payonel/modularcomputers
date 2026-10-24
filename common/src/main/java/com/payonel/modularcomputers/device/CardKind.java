@@ -11,7 +11,7 @@ public enum CardKind {
 	BLUETOOTH(DeviceType.BLUETOOTH),
 	/** Emits and detects redstone where it's installed (a computer, or an expansion hub). */
 	REDSTONE(DeviceType.REDSTONE),
-	AUDIO(DeviceType.AUDIO),
+	SOUND(DeviceType.SOUND),
 	MOTION_SENSOR(DeviceType.MOTION),
 	AUDIO_SENSOR(DeviceType.HEARING),
 	WEATHER_SENSOR(DeviceType.WEATHER);

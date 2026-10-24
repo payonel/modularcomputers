@@ -340,6 +340,60 @@ class McosTest {
 		assertThat(card.output(0)).isEqualTo(11);
 	}
 
+	/** A WAV file: its format chunk (tag, channels, rate, bits, block align) and its data. */
+	private static byte[] wav(int tag, int channels, int rate, int bits, int block, byte[] data) {
+		java.nio.ByteBuffer out = java.nio.ByteBuffer.allocate(44 + data.length).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+		out.put("RIFF".getBytes()).putInt(36 + data.length).put("WAVE".getBytes());
+		out.put("fmt ".getBytes()).putInt(16).putShort((short) tag).putShort((short) channels).putInt(rate).putInt(rate * block)
+			.putShort((short) block).putShort((short) bits);
+		out.put("data".getBytes()).putInt(data.length).put(data);
+		return out.array();
+	}
+
+	private static byte[] noise(int length, long seed) {
+		byte[] data = new byte[length];
+		new java.util.Random(seed).nextBytes(data);
+		return data;
+	}
+
+	@Test
+	void aplayPlaysWavFilesOnTheSoundCardInTheirFormatAndCatARawOneAtOssDefaults() throws IOException {
+		com.payonel.modularcomputers.device.SoundCard card = new com.payonel.modularcomputers.device.SoundCard();
+		devices.put(Motherboard.exp(0), card);
+		java.io.ByteArrayOutputStream played = new java.io.ByteArrayOutputStream();
+		java.util.List<com.payonel.modularcomputers.device.SoundFormat> formats = new java.util.ArrayList<>();
+		long[] time = {0};
+		ticks.add(() -> {
+			byte[] out = card.play(time[0]++); // (its block's tick: a game tick each)
+			if (out != null) {
+				played.writeBytes(out);
+				if (formats.isEmpty() || !formats.getLast().equals(card.format())) {
+					formats.add(card.format());
+				}
+			}
+		});
+		boot();
+		byte[] stereo = noise(22050 * 4 * 3 / 2, 1); // a second and a half of 16-bit stereo: more than its buffer holds
+		byte[] adpcm = noise(256 * 6, 2); // six blocks of mono ADPCM
+		byte[] raw = noise(4000, 3);
+		Files.write(root().resolve("s.wav"), wav(1, 2, 22050, 16, 4, stereo));
+		Files.write(root().resolve("a.wav"), wav(0x11, 1, 8000, 4, 256, adpcm));
+		Files.write(root().resolve("r.raw"), raw);
+		type("aplay /s.wav /a.wav 2> /err; echo $? > /status; cat /r.raw > /dev/dsp; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		settle(() -> card.format().equals(com.payonel.modularcomputers.device.SoundFormat.DEFAULT) && !card.playing() && played.size() > stereo.length + adpcm.length);
+		assertThat(read(root().resolve("status"))).as("played: " + read(root().resolve("err"))).isEqualTo("0\n");
+		java.io.ByteArrayOutputStream expected = new java.io.ByteArrayOutputStream();
+		expected.writeBytes(stereo);
+		expected.writeBytes(adpcm);
+		expected.writeBytes(raw);
+		assertThat(played.toByteArray()).as("every byte, in order").isEqualTo(expected.toByteArray());
+		assertThat(formats).as("each in its own format").containsExactly(
+			new com.payonel.modularcomputers.device.SoundFormat(22050, "s16le", 2, 0),
+			new com.payonel.modularcomputers.device.SoundFormat(8000, "ima_adpcm", 1, 256),
+			com.payonel.modularcomputers.device.SoundFormat.DEFAULT);
+	}
+
 	@Test
 	void anAudioSensorsFileGivesASoundALine() {
 		com.payonel.modularcomputers.device.AudioSensorCard audio = new com.payonel.modularcomputers.device.AudioSensorCard();

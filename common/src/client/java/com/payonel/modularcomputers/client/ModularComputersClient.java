@@ -90,6 +90,7 @@ public final class ModularComputersClient {
 	public static void disconnected() {
 		Identify.clear(); // the bulb's outlines belong to this visit to a world
 		ClientRecipes.clear();
+		com.payonel.modularcomputers.client.sound.SoundCardSpeakers.clear(); // (its sounds were this world's)
 		ModConfig.load(); // back to this game's own settings, after a server's
 	}
 }

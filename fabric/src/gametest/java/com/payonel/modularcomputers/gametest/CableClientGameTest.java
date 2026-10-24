@@ -57,6 +57,9 @@ public class CableClientGameTest implements FabricClientGameTest {
 	private static final IntPredicate OUTLINE = rgb -> AllInOneClientGameTest.red(rgb) > 110 && AllInOneClientGameTest.green(rgb) > 90
 		&& AllInOneClientGameTest.red(rgb) >= AllInOneClientGameTest.green(rgb) && AllInOneClientGameTest.blue(rgb) < AllInOneClientGameTest.red(rgb) * 0.55;
 
+	/** Ticks a card put in a running computer may take to be on its bus. */
+	private static final int SOUND_CARD_TICKS = 40;
+
 	@Override
 	public void runTest(ClientGameTestContext context) {
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().setUseConsistentSettings(true)
@@ -102,6 +105,32 @@ public class CableClientGameTest implements FabricClientGameTest {
 			context.waitTicks(5);
 			int lit = whiteOnScreen(read(context.takeScreenshot("screen-hello")));
 			check(lit > 30, "the wired screen should show hello world on its face, found " + lit + " white pixels");
+
+			// A Sound Card in it plays stereo: two speakers, its left and right as seen facing its
+			// front (it faces south: its left is west), half a block either side.
+			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
+				.setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.SOUND_CARD)));
+			for (int tick = 0; !singleplayer.getServer().computeOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
+				.machine().board().bus().devices().stream().anyMatch(com.payonel.modularcomputers.device.SoundCard.class::isInstance)); tick++) {
+				check(tick < SOUND_CARD_TICKS, "the sound card on the bus");
+				context.waitTicks(1);
+			}
+			singleplayer.getServer().runOnServer(server -> {
+				var card = (com.payonel.modularcomputers.device.SoundCard) ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
+					.machine().board().bus().devices().stream().filter(com.payonel.modularcomputers.device.SoundCard.class::isInstance).findFirst().orElseThrow();
+				card.setFormat(new com.payonel.modularcomputers.runtime.Arguments(java.util.List.of(java.util.Map.of("rate", 22050L, "encoding", "s16le", "channels", 2L))));
+				card.write(new com.payonel.modularcomputers.runtime.Arguments(java.util.List.of("\0".repeat(4 * 22050 / 2)))); // half a second
+			});
+			context.waitFor(client -> com.payonel.modularcomputers.client.sound.SoundCardSpeakers.playing().size() == 2);
+			context.runOnClient(client -> {
+				var speakers = com.payonel.modularcomputers.client.sound.SoundCardSpeakers.playing();
+				double center = computer.getX() + 0.5;
+				check(Math.abs(speakers.get(0).x - (center - 0.5)) < 1e-6 && Math.abs(speakers.get(1).x - (center + 0.5)) < 1e-6,
+					"the left channel's speaker west of it, the right's east: " + speakers);
+				check(speakers.stream().allMatch(at -> Math.abs(at.z - (computer.getZ() + 0.5)) < 1e-6), "in line with its center: " + speakers);
+			});
+			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
+				.setItem(CaseMenu.EXP_SLOTS + 1, ItemStack.EMPTY)); // (what follows counts the bus without it)
 
 			// With the battery out the case's own power runs down, and clients see it drop.
 			singleplayer.getServer().runOnServer(server -> {
