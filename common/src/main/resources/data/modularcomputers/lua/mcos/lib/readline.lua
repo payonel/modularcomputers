@@ -3,7 +3,8 @@
 -- (no canonical editing or echo; ^C still signals) while a line is typed, and back before the line is
 -- returned. It draws the line, so it's edited anywhere in it, across rows it wrapped onto (the tty's
 -- own erase, as Linux's, stops at a row's start), with a history.
---   Left/Right, Home/End (^A/^E) move; Backspace, Delete (^D) erase; ^U, ^K cut before/after the
+--   Left/Right, Home/End (^A/^E) move; Ctrl+Left/Right (Alt+Left/Right, ESC b/f) move a word, as
+--   bash's do (to the start of the word before, the end of the word after); Backspace, Delete (^D) erase; ^U, ^K cut before/after the
 --   cursor, ^W the word before it; Up/Down go through the history; ^L clears the screen; ^D on an
 --   empty line is the end of input; ^C drops the line; Tab completes the word before the cursor.
 --
@@ -111,7 +112,9 @@ local function grid(words, width)
 end
 
 -- Keys that do the same as another: Home and End's other codes, ^H, and LF.
-local SAME = {["\27[H"] = "\1", ["\27[1~"] = "\1", ["\27[F"] = "\5", ["\27[4~"] = "\5", ["\8"] = "\127", ["\n"] = "\r"}
+local SAME = {["\27[H"] = "\1", ["\27[1~"] = "\1", ["\27[F"] = "\5", ["\27[4~"] = "\5", ["\8"] = "\127", ["\n"] = "\r",
+  ["\27[1;5D"] = "\27b", ["\27[1;3D"] = "\27b", ["\27[1;5C"] = "\27f", ["\27[1;3C"] = "\27f"} -- (a word back, a word on)
+local WORD = "[%w_]" -- what a word is made of, for moving by words (readline's: letters and digits)
 
 local editor = {}
 editor.__index = editor
@@ -304,7 +307,7 @@ function editor:read(shown)
       pending = data
     end
     -- the next key: an escape sequence, a control character, or a character typed
-    local key = pending:match("^\27%[[%d;]*[%a~]") or pending:match("^\27O%a")
+    local key = pending:match("^\27%[[%d;]*[%a~]") or pending:match("^\27O%a") or pending:match("^\27[bf]")
       or pending:match("^[\0-\127\194-\244][\128-\191]*") or pending:sub(1, 1)
     pending = pending:sub(#key + 1)
     key = key:gsub("^\27O", "\27[") -- (ESC O x, as in cursor-keys application mode: the same keys)
@@ -367,6 +370,24 @@ function editor:read(shown)
         entry = entry + 1
         set(entry == #history + 1 and stash or history[entry])
       end
+    elseif key == "\27b" then -- back to the start of this word, or the one before
+      local to = cursor
+      while to > 0 and not buffer[to]:find(WORD) do
+        to = to - 1
+      end
+      while to > 0 and buffer[to]:find(WORD) do
+        to = to - 1
+      end
+      go(to)
+    elseif key == "\27f" then -- on to the end of this word, or the one after
+      local to = cursor
+      while to < #buffer and not buffer[to + 1]:find(WORD) do
+        to = to + 1
+      end
+      while to < #buffer and buffer[to + 1]:find(WORD) do
+        to = to + 1
+      end
+      go(to)
     elseif #key > 1 and key:sub(1, 1) == "\27" then
       -- (a key it has no use for)
     elseif key:byte() >= 32 and key ~= "\127" then

@@ -260,6 +260,17 @@ class McosTest {
 	}
 
 	@Test
+	void ctrlArrowsMoveAWordAsBashs() {
+		boot();
+		type("echo two > /w");
+		type("\u001B[1;5D\u001B[1;5D"); // a word back (to w's start), and another (to two's start)
+		type("one ");
+		type("\u001B[1;5C"); // a word on: to two's end
+		type("s\r");
+		untilFile(root().resolve("w"), "one twos\n");
+	}
+
+	@Test
 	void whatsTypedAheadGoesToTheCommand() {
 		boot();
 		type("cat > /typed\rhello\r\u0004"); // at once: the shell's line, then cat's input and its end

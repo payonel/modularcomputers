@@ -226,6 +226,11 @@ made: a world's disks keep their old mcos; tests copy afresh.
   shell holds only shell behavior; line editing is a library (`/lib/readline.lua`). Behavior copies
   Linux/POSIX/GNU, saying where it can't. From OpenOS's experience: no lazy loading of libraries
   (splitting cost speed, complexity and memory) and no legacy compatibility.
+- **The shell and line editing behave as bash's** where shells differ (the user's pick, over zsh's
+  and fish's): keys typed ahead are echoed by the tty where the cursor is, then the prompt and the
+  line follow on that row (`cat/ $ cat`, not a fresh row); readline's keys are GNU readline's
+  defaults with bash's usual bindings (Ctrl+Left/Right move a word). readline asks the terminal
+  where its cursor is (`ESC[6n`) before drawing, so it draws from where the prompt really is.
 - **mcos's interfaces are Linux-shaped; the devices' are for anyone:** devices speak tables
   (methods, events, reports), and mcos turns them into what Linux gives: text, never Lua syntax (the
   kernel loads no user-space library). A device whose data is a table has a driver
