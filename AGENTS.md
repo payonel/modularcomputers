@@ -128,7 +128,10 @@ what the game can't do:
 - **Registration** is the game's `Registry.register`: Fabric allows it any time; NeoForge's entry
   point runs the common init in its first `RegisterEvent`. No `DeferredRegister` layer.
 - **Packets** are the game's (`ClientboundCustomPayloadPacket`); only registering them is the
-  loader's, from one list. A packet goes only to a client that takes it.
+  loader's, from one list. A packet goes only to a client that takes it. One about a terminal or a
+  computer names it by `HostRef` (a block's position or an entity's id), found on each side and
+  checked for reach on the server; views find it as a `ViewHost` (a screen view and a parts view)
+  or a `BoardHolder` (its board and power light), so a golem's screen works as a block's.
 - **World saves** reach the mod through a mixin (`MinecraftServerSaves`) on both: NeoForge has no
   event before a save.
 - **Server game tests** are the mod's own `@GameTest`, registered by each loader's test mod, so all

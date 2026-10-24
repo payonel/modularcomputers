@@ -7,7 +7,6 @@ import io.netty.buffer.ByteBuf;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -21,7 +20,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
  * shows). The first view of a screen comes with its block's data; after that only changes come
  * this way, instead of the whole block.
  */
-public record ScreenRowsPayload(BlockPos pos, int columns, int lines, List<Row> rows, Terminal.Cursor cursor) implements CustomPacketPayload {
+public record ScreenRowsPayload(HostRef host, int columns, int lines, List<Row> rows, Terminal.Cursor cursor) implements CustomPacketPayload {
 	public static final Type<ScreenRowsPayload> TYPE = new Type<>(ModularComputers.id("screen_rows"));
 
 	/** One row: its index, characters, each cell's colors, and its cells' pictures (sixel), as {@link com.payonel.modularcomputers.display.Tiles#row} encodes them. */
@@ -106,7 +105,7 @@ public record ScreenRowsPayload(BlockPos pos, int columns, int lines, List<Row> 
 		Terminal.Cursor::new);
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, ScreenRowsPayload> CODEC = StreamCodec.composite(
-		BlockPos.STREAM_CODEC, ScreenRowsPayload::pos,
+		HostRef.STREAM_CODEC, ScreenRowsPayload::host,
 		ByteBufCodecs.VAR_INT, ScreenRowsPayload::columns,
 		ByteBufCodecs.VAR_INT, ScreenRowsPayload::lines,
 		Row.CODEC.apply(ByteBufCodecs.list()), ScreenRowsPayload::rows,
@@ -114,7 +113,7 @@ public record ScreenRowsPayload(BlockPos pos, int columns, int lines, List<Row> 
 		ScreenRowsPayload::new);
 
 	/** The rows of a terminal's glass that changed since last time, and its cursor; null if nothing changed. */
-	public static ScreenRowsPayload changes(BlockPos pos, Terminal terminal) {
+	public static ScreenRowsPayload changes(HostRef host, Terminal terminal) {
 		TextBuffer buffer = terminal.buffer();
 		BitSet dirty = buffer.takeDirtyRows();
 		Terminal.Cursor cursor = terminal.cursor();
@@ -127,7 +126,7 @@ public record ScreenRowsPayload(BlockPos pos, int columns, int lines, List<Row> 
 			rows.add(new Row(row, buffer.row(row), buffer.rowForegrounds(row), buffer.rowBackgrounds(row),
 				com.payonel.modularcomputers.display.Tiles.row(buffer.rowTiles(row))));
 		}
-		return new ScreenRowsPayload(pos, buffer.resolution().columns(), buffer.resolution().rows(), rows, cursor);
+		return new ScreenRowsPayload(host, buffer.resolution().columns(), buffer.resolution().rows(), rows, cursor);
 	}
 
 	/** Puts the rows and the cursor into a player's copy. */

@@ -18,7 +18,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.core.BlockPos;
+import com.payonel.modularcomputers.network.HostRef;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 import net.minecraft.util.FormattedCharSequence;
@@ -57,11 +57,12 @@ public final class DisplayScreen extends Screen {
 	private final java.util.Set<Integer> held = new java.util.HashSet<>();
 	/** Lines a notch of the mouse wheel scrolls the terminal's glass. */
 	private static final int WHEEL_LINES = 3;
-	private final BlockPos pos;
+	/** Whose terminal it shows: a block or an entity (a golem). */
+	private final HostRef pos;
 	/** The terminal's size as the layout was made for it: a program may change it while it shows. */
 	private Resolution resolution;
 	/** The computer whose power button shows, if any. */
-	private final Optional<BlockPos> computer;
+	private final Optional<HostRef> computer;
 	private final boolean caseView;
 	private static final Viewport NONE = new Viewport(0, 0, 0, 0);
 	private DisplayLayout layout = new DisplayLayout(NONE, NONE, NONE, NONE);
@@ -69,13 +70,13 @@ public final class DisplayScreen extends Screen {
 
 	public DisplayScreen(OpenDisplayPayload payload) {
 		super(Component.translatable("gui.modularcomputers.display"));
-		this.pos = payload.pos();
+		this.pos = payload.host();
 		this.resolution = payload.resolution();
 		this.computer = payload.computer();
 		this.caseView = payload.caseView();
 	}
 
-	public BlockPos pos() {
+	public HostRef host() {
 		return pos;
 	}
 
@@ -216,7 +217,7 @@ public final class DisplayScreen extends Screen {
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-		DisplayHost host = minecraft.level != null && minecraft.level.getBlockEntity(pos) instanceof DisplayHost found ? found : null;
+		DisplayHost host = pos.find(minecraft.level, DisplayHost.class).orElse(null);
 		// The bezel is the block's (a case's or the screen's own era); the glass and its glow, the terminal's.
 		int tier = host instanceof AllInOneBlockEntity computer ? computer.tier().number()
 			: host != null ? host.terminal().tier().number() : 1;
@@ -232,8 +233,9 @@ public final class DisplayScreen extends Screen {
 			extractText(graphics, host.terminal().buffer(), host.terminal().shownCursor(), depth,
 				com.payonel.modularcomputers.client.render.TerminalFonts.of(host.terminal().tier()));
 		}
-		if (minecraft.level != null && computer.isPresent() && minecraft.level.getBlockEntity(computer.get()) instanceof AllInOneBlockEntity machine) {
-			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.CASE, machine.getBlockState(), powerHeld);
+		var machine = computer.flatMap(ref -> ref.find(minecraft.level, com.payonel.modularcomputers.block.BoardHolder.class));
+		if (machine.isPresent()) {
+			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.CASE, machine.get().powerLight(), powerHeld);
 		} else {
 			ComputerButtons.extract(graphics, NONE, viewToggle(), ComputerButtons.Target.CASE, null, false);
 		}
@@ -327,8 +329,7 @@ public final class DisplayScreen extends Screen {
 	public void tick() {
 		// Close when the screen block is gone or the player walked away.
 		var player = minecraft.player;
-		if (player == null || !(player.level().getBlockEntity(pos) instanceof DisplayHost)
-			|| !player.isWithinBlockInteractionRange(pos, 1.0)) {
+		if (player == null || pos.find(player.level(), DisplayHost.class).isEmpty() || !pos.reachable(player, 1.0)) {
 			onClose();
 		}
 	}

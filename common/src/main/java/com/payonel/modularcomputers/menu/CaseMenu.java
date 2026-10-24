@@ -58,6 +58,8 @@ public final class CaseMenu extends AbstractContainerMenu {
 	private final Container parts;
 	private final ContainerData power;
 	private final BlockPos pos;
+	/** Whose parts these are: a block (a case) or an entity (a golem). */
+	private final com.payonel.modularcomputers.network.HostRef host;
 	/** Whether the player can still use it (in reach, still there). */
 	private final java.util.function.Predicate<Player> valid;
 
@@ -76,19 +78,20 @@ public final class CaseMenu extends AbstractContainerMenu {
 	 */
 	public CaseMenu(int id, Inventory inventory, Container parts, ContainerData power, BlockPos pos, ContainerLevelAccess access, CaseTier tier) {
 		// Any case (the all-in-one or a tier), still there and in reach.
-		this(ModMenus.CASE, id, inventory, parts, power, pos, player -> access.evaluate((level, at) -> level.getBlockState(at).getBlock() instanceof AllInOneBlock
+		this(ModMenus.CASE, id, inventory, parts, power, pos, com.payonel.modularcomputers.network.HostRef.of(pos), player -> access.evaluate((level, at) -> level.getBlockState(at).getBlock() instanceof AllInOneBlock
 			&& player.isWithinBlockInteractionRange(at, 4.0), true), tier);
 	}
 
 	/** A computer's parts view of any kind ({@code type}: whose art it's drawn in), on a board with {@code layout}'s slots. */
 	public CaseMenu(net.minecraft.world.inventory.MenuType<CaseMenu> type, int id, Inventory inventory, Container parts, ContainerData power, BlockPos pos,
-		java.util.function.Predicate<Player> valid, BoardLayout tier) {
+		com.payonel.modularcomputers.network.HostRef host, java.util.function.Predicate<Player> valid, BoardLayout tier) {
 		super(type, id);
 		this.tier = tier;
 		checkContainerSize(parts, PART_SLOTS);
 		this.parts = parts;
 		this.power = power;
 		this.pos = pos;
+		this.host = host;
 		this.valid = valid;
 		addDataSlots(power);
 		for (int slot = 0; slot < PART_SLOTS; slot++) {
@@ -162,6 +165,11 @@ public final class CaseMenu extends AbstractContainerMenu {
 	/** What the computer draws now, in power units a tick (its load). */
 	public int load() {
 		return (power.get(3) & 0xFFFF) << 16 | power.get(2) & 0xFFFF;
+	}
+
+	/** Whose parts these are. */
+	public com.payonel.modularcomputers.network.HostRef host() {
+		return host;
 	}
 
 	public BlockPos pos() {

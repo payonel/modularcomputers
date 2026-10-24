@@ -51,7 +51,7 @@ final class ComputerButtons {
 
 	/** @param powerHeld the mouse is still down on the power button */
 	/** An empty area (no width) leaves its button out; {@code state} is only needed for the power button. */
-	static void extract(GuiGraphicsExtractor graphics, Viewport power, Viewport toggle, Target target, BlockState state, boolean powerHeld) {
+	static void extract(GuiGraphicsExtractor graphics, Viewport power, Viewport toggle, Target target, com.payonel.modularcomputers.block.PowerLight state, boolean powerHeld) {
 		if (power.width() > 0) {
 			extractPower(graphics, power, state, powerHeld);
 		}
@@ -61,7 +61,7 @@ final class ComputerButtons {
 	}
 
 	/** Sends the button's action to the server if the click hit one, and says which it hit. */
-	static Hit click(MouseButtonEvent event, Viewport power, Viewport toggle, Target target, BlockPos pos) {
+	static Hit click(MouseButtonEvent event, Viewport power, Viewport toggle, Target target, com.payonel.modularcomputers.network.HostRef pos) {
 		if (event.button() != InputConstants.MOUSE_BUTTON_LEFT && event.button() != InputConstants.MOUSE_BUTTON_RIGHT) {
 			return Hit.NONE;
 		}
@@ -77,12 +77,12 @@ final class ComputerButtons {
 		return Hit.NONE;
 	}
 
-	private static void extractPower(GuiGraphicsExtractor graphics, Viewport button, BlockState state, boolean held) {
+	private static void extractPower(GuiGraphicsExtractor graphics, Viewport button, com.payonel.modularcomputers.block.PowerLight state, boolean held) {
 		// Ready (a CPU and a charged battery): lit red or green. Otherwise the machine can't be
 		// on: faded red, or faded green while the button is held down and for the moment a
 		// refused press lasts. On with its CPU stopped (halted): amber.
-		boolean green = state.getValue(AllInOneBlock.POWERED);
-		int frame = state.getValue(AllInOneBlock.READY) ? (green ? (state.getValue(AllInOneBlock.HALTED) ? 4 : 1) : 0) : (held || green ? 3 : 2);
+		boolean green = state.powered();
+		int frame = state.ready() ? (green ? (state.halted() ? 4 : 1) : 0) : (held || green ? 3 : 2);
 		var pose = graphics.pose();
 		pose.pushMatrix();
 		pose.translate(button.x(), button.y());

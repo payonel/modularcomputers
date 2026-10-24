@@ -552,7 +552,7 @@ public class AllInOneGameTest {
 		}
 		computer.terminal().buffer().takeDirtyRows(); // sent already
 		computer.terminal().write("a");
-		var payload = com.payonel.modularcomputers.network.ScreenRowsPayload.changes(computer.getBlockPos(), computer.terminal());
+		var payload = com.payonel.modularcomputers.network.ScreenRowsPayload.changes(com.payonel.modularcomputers.network.HostRef.of(computer.getBlockPos()), computer.terminal());
 		var buf = new net.minecraft.network.RegistryFriendlyByteBuf(io.netty.buffer.Unpooled.buffer(), registries);
 		com.payonel.modularcomputers.network.ScreenRowsPayload.CODEC.encode(buf, payload);
 		int rows = buf.readableBytes();

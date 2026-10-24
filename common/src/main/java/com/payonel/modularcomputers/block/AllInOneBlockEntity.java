@@ -58,7 +58,7 @@ import net.minecraft.world.level.storage.ValueOutput;
  * power button's light (the block state), what Bluetooth cards link to, and dropping as one item
  * that keeps its parts.
  */
-public final class AllInOneBlockEntity extends BlockEntity implements MenuProvider, DisplayHost, Bluetooth.Holder {
+public final class AllInOneBlockEntity extends BlockEntity implements MenuProvider, BoardHolder, Bluetooth.Holder {
 	/** Looks for cabled devices this often, in ticks, even when no cable changed (chunks load and unload). */
 	private static final int RESCAN_TICKS = 20;
 	private static final String BUS_EXTERNAL = "bus_external";
@@ -179,13 +179,15 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	}
 
 	/** Its board, with its parts. */
+	@Override
 	public BoardAssembly board() {
 		return board;
 	}
 
 	@Override
-	public boolean showsScreen() {
-		return board.screenInSlot();
+	public PowerLight powerLight() {
+		BlockState state = getBlockState();
+		return new PowerLight(state.getValue(AllInOneBlock.READY), state.getValue(AllInOneBlock.POWERED), state.getValue(AllInOneBlock.HALTED));
 	}
 
 	/** The motherboard's bus order. */
@@ -214,8 +216,20 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	}
 
 	/** What the server sends to open this computer's screen view. */
+	@Override
 	public OpenDisplayPayload openDisplayPayload() {
-		return new OpenDisplayPayload(worldPosition, terminal().buffer().resolution(), Optional.of(worldPosition), true);
+		var here = com.payonel.modularcomputers.network.HostRef.of(worldPosition);
+		return new OpenDisplayPayload(here, terminal().buffer().resolution(), Optional.of(here), true);
+	}
+
+	@Override
+	public void openParts(net.minecraft.server.level.ServerPlayer player) {
+		com.payonel.modularcomputers.menu.ModMenus.open(player, this);
+	}
+
+	@Override
+	public Optional<Machine.PowerPress> pressPowerButton() {
+		return Optional.of(pressPower());
 	}
 
 	/** The devices on the bus, in order, as the bus order panel shows them. Works on clients too. */

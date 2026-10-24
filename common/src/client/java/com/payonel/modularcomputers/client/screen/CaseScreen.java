@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.payonel.modularcomputers.machine.Motherboard;
 import com.payonel.modularcomputers.ModularComputers;
 import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.BoardHolder;
 import com.payonel.modularcomputers.bus.BusStatus;
 import com.payonel.modularcomputers.client.Identify;
 import com.payonel.modularcomputers.display.ScrollWindow;
@@ -135,8 +136,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	}
 
 	public Viewport viewToggle() {
-		if (!(minecraft != null && minecraft.level != null && minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer
-			&& computer.showsScreen())) {
+		if (!(minecraft != null && computer().map(BoardHolder::showsScreen).orElse(false))) {
 			return new Viewport(0, 0, 0, 0); // no screen in the slot: no screen view to switch to
 		}
 		Viewport power = powerButton();
@@ -325,14 +325,13 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		return new ScrollWindow(devices, BUS_VISIBLE_ROWS);
 	}
 
-	private Optional<AllInOneBlockEntity> computer() {
-		return minecraft.level != null && minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer
-			? Optional.of(computer) : Optional.empty();
+	/** What these parts are in: a case, a golem. */
+	private Optional<BoardHolder> computer() {
+		return menu.host().find(minecraft.level, BoardHolder.class);
 	}
 
 	private List<com.payonel.modularcomputers.board.BoardAssembly.BusEntry> busEntries() {
-		return minecraft.level != null && minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer
-			? computer.busEntries() : List.of();
+		return computer().map(computer -> computer.board().busEntries()).orElse(List.of());
 	}
 
 	// ---- drawing -------------------------------------------------------------------------
@@ -364,8 +363,8 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		}
 		extractLinkedHighlight(graphics, mouseX, mouseY);
 		SlotHints.extract(graphics, menu, hoveredSlot, CaseMenu.PART_SLOTS, this::slotArea);
-		if (minecraft.level != null && minecraft.level.getBlockEntity(menu.pos()) instanceof AllInOneBlockEntity computer) {
-			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.SCREEN, computer.getBlockState(), powerHeld);
+		if (computer().isPresent()) {
+			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.SCREEN, computer().get().powerLight(), powerHeld);
 		}
 	}
 
@@ -570,7 +569,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		Viewport panel = busPanel();
 		graphics.blit(RenderPipelines.GUI_TEXTURED, BUS_PANEL, panel.x(), panel.y(), 0, 0, BUS_W, BUS_H, BUS_W, BUS_H);
 		graphics.text(font, Component.translatable("gui.modularcomputers.bus.title"), panel.x() + 10, panel.y() + 6, SILK, false);
-		BusStatus status = computer().map(AllInOneBlockEntity::busStatus).orElse(BusStatus.EMPTY);
+		BusStatus status = computer().map(computer -> computer.board().busStatus()).orElse(BusStatus.EMPTY);
 		// How full the external part of the bus is. A wired device that can't join a full bus
 		// would otherwise look broken: the warning light comes on, and the line says so.
 		Component summary = busSummary(status);
@@ -711,7 +710,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		var hit = ComputerButtons.click(event, powerButton(), viewToggle(), ComputerButtons.Target.SCREEN, menu.pos());
+		var hit = ComputerButtons.click(event, powerButton(), viewToggle(), ComputerButtons.Target.SCREEN, menu.host());
 		powerHeld = hit == ComputerButtons.Hit.POWER;
 		if (hit != ComputerButtons.Hit.NONE) {
 			return true;

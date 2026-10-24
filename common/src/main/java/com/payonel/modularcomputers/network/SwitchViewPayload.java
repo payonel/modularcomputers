@@ -1,11 +1,6 @@
 package com.payonel.modularcomputers.network;
 
 import com.payonel.modularcomputers.ModularComputers;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
-import com.payonel.modularcomputers.block.ScreenBlock;
-import com.payonel.modularcomputers.block.ScreenBlockEntity;
-import com.payonel.modularcomputers.menu.ModMenus;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -13,42 +8,38 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * Client to server: the player pressed the view toggle on the all-in-one or screen block at
- * {@code pos}. The server opens the case view (a menu, since it has item slots: a screen's is
+ * Client to server: the player pressed the view toggle on the computer or screen
+ * {@code host} names. The server opens the case view (a menu, since it has item slots: a screen's is
  * its radio slot) or goes back to the screen view.
  */
-public record SwitchViewPayload(BlockPos pos, boolean toCase) implements CustomPacketPayload {
+public record SwitchViewPayload(HostRef host, boolean toCase) implements CustomPacketPayload {
 	public static final Type<SwitchViewPayload> TYPE = new Type<>(ModularComputers.id("switch_view"));
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, SwitchViewPayload> CODEC = StreamCodec.composite(
-		BlockPos.STREAM_CODEC, SwitchViewPayload::pos,
+		HostRef.STREAM_CODEC, SwitchViewPayload::host,
 		ByteBufCodecs.BOOL, SwitchViewPayload::toCase,
 		SwitchViewPayload::new);
 
 	/** On the server's thread, from {@code player}'s client ({@link ModNetwork}). */
 	public static void handle(SwitchViewPayload payload, ServerPlayer player) {
-		if (!player.isWithinBlockInteractionRange(payload.pos(), 1.0)) {
+		if (!payload.host().reachable(player, 1.0)) {
 			return;
 		}
-		var block = player.level().getBlockEntity(payload.pos());
-		OpenDisplayPayload display;
-		if (block instanceof AllInOneBlockEntity computer) {
-			display = computer.openDisplayPayload();
-		} else if (block instanceof ScreenBlockEntity screen) {
-			display = ScreenBlock.openDisplayPayload(screen);
-		} else {
+		var found = payload.host().find(player.level(), com.payonel.modularcomputers.block.ViewHost.class);
+		if (found.isEmpty()) {
 			return;
 		}
+		var host = found.get();
 		if (payload.toCase()) {
-			ModMenus.open(player, block);
-		} else if (block instanceof AllInOneBlockEntity computer && !computer.showsScreen()) {
+			host.openParts(player);
+		} else if (!host.showsScreen()) {
 			return; // no screen in the slot: no screen view
 		} else {
 			// Close the menu without telling the client: it swaps the case view straight for the
 			// screen view. Closing it there first would pass through "no screen", which grabs the
 			// mouse and recenters the cursor.
 			player.doCloseContainer();
-			ModNetwork.send(player, display);
+			ModNetwork.send(player, host.openDisplayPayload());
 		}
 	}
 

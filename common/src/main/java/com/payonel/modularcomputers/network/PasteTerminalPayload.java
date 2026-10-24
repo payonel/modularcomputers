@@ -3,7 +3,6 @@ package com.payonel.modularcomputers.network;
 import com.payonel.modularcomputers.ModularComputers;
 import com.payonel.modularcomputers.block.DisplayHost;
 import com.payonel.modularcomputers.device.Terminal;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -15,18 +14,18 @@ import net.minecraft.server.level.ServerPlayer;
  * Ctrl+Shift+V or Shift+Insert in its screen view): the terminal sends it as pasted text
  * ({@link Terminal#paste}). At most {@link Terminal#MAX_PASTE} characters.
  */
-public record PasteTerminalPayload(BlockPos pos, String text) implements CustomPacketPayload {
+public record PasteTerminalPayload(HostRef host, String text) implements CustomPacketPayload {
 	public static final Type<PasteTerminalPayload> TYPE = new Type<>(ModularComputers.id("paste_terminal"));
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, PasteTerminalPayload> CODEC = StreamCodec.composite(
-		BlockPos.STREAM_CODEC, PasteTerminalPayload::pos,
+		HostRef.STREAM_CODEC, PasteTerminalPayload::host,
 		ByteBufCodecs.stringUtf8(Terminal.MAX_PASTE), PasteTerminalPayload::text,
 		PasteTerminalPayload::new);
 
 	/** On the server's thread, from {@code player}'s client ({@link ModNetwork}). */
 	public static void handle(PasteTerminalPayload payload, ServerPlayer player) {
 		// Trust nothing from the client: the player must be able to reach a terminal there.
-		if (player.isWithinBlockInteractionRange(payload.pos(), 1.0) && player.level().getBlockEntity(payload.pos()) instanceof DisplayHost host) {
+		if (payload.host().reachable(player, 1.0) && payload.host().find(player.level()) instanceof DisplayHost host) {
 			host.terminal().paste(payload.text());
 		}
 	}

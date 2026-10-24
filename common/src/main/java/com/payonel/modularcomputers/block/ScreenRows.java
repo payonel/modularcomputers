@@ -12,7 +12,7 @@ final class ScreenRows {
 	}
 
 	static void send(ServerLevel level, BlockEntity block, com.payonel.modularcomputers.device.Terminal terminal) {
-		ScreenRowsPayload payload = ScreenRowsPayload.changes(block.getBlockPos(), terminal);
+		ScreenRowsPayload payload = ScreenRowsPayload.changes(com.payonel.modularcomputers.network.HostRef.of(block.getBlockPos()), terminal);
 		if (payload == null) {
 			return;
 		}

@@ -56,7 +56,7 @@ public final class CardHolderScreen extends AbstractContainerScreen<CardHolderMe
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		var none = new Viewport(0, 0, 0, 0);
-		if (ComputerButtons.click(event, none, viewToggle(), ComputerButtons.Target.SCREEN, menu.pos()) != ComputerButtons.Hit.NONE) {
+		if (ComputerButtons.click(event, none, viewToggle(), ComputerButtons.Target.SCREEN, com.payonel.modularcomputers.network.HostRef.of(menu.pos())) != ComputerButtons.Hit.NONE) {
 			return true;
 		}
 		return super.mouseClicked(event, doubleClick);

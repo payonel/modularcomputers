@@ -20,7 +20,18 @@ import net.minecraft.world.level.storage.ValueOutput;
  * sends changes to clients. Its one slot (opened from the back) is the radio slot: a
  * Bluetooth card there gives the screen to one computer.
  */
-public final class ScreenBlockEntity extends CardHolderBlockEntity implements DisplayHost {
+public final class ScreenBlockEntity extends CardHolderBlockEntity implements ViewHost {
+	@Override
+	public com.payonel.modularcomputers.network.OpenDisplayPayload openDisplayPayload() {
+		return ScreenBlock.openDisplayPayload(this);
+	}
+
+	/** Its parts view: its radio slot. */
+	@Override
+	public void openParts(net.minecraft.server.level.ServerPlayer player) {
+		com.payonel.modularcomputers.menu.ModMenus.open(player, this);
+	}
+
 	private static final String DISPLAY = "display";
 
 	private final Terminal display;

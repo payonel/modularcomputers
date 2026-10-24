@@ -45,8 +45,6 @@ public final class ModNetworkClient {
 
 	private static void screenRows(ScreenRowsPayload payload) {
 		var level = Minecraft.getInstance().level;
-		if (level != null && level.getBlockEntity(payload.pos()) instanceof DisplayHost host) {
-			payload.apply(host.terminal());
-		}
+		payload.host().find(level, DisplayHost.class).ifPresent(host -> payload.apply(host.terminal()));
 	}
 }
