@@ -432,8 +432,9 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   One TCP connection, framed both ways (`lib/rsh.lua`), so output, errors and the exit status stay
   apart (BSD's used a second connection for stderr and never sent the status). A host is its name
   (`hostname`: set in `/etc/hostname`; unset, the first card's address), a card's id, or a unique
-  prefix, found by a UDP broadcast probe on port 514 that rshd answers with its name (asked up to
-  three times, as ARP asks: a busy computer may miss one). `rcp` is rsh
+  prefix, found by a UDP broadcast probe on port 514 that rshd answers with its name (asked once:
+  the networks don't lose frames, and asking before rshd is up is the asker's mistake, the user's
+  call; no retries to hide it). `rcp` is rsh
   running `cat` there (and `mkdir -p` and `find` for `-r`), the host found once for the copy
   (`rsh.resolve`).
 

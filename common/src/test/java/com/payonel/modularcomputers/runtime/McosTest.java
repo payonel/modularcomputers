@@ -1937,6 +1937,11 @@ class McosTest {
 		devices.put(Motherboard.exp(0), card);
 		file("tries.lua", """
 			local sys = require("sys")
+			-- First, until it answers (its rshd up and warm: asking sooner is the asker's mistake).
+			repeat
+			  local pid = assert(sys.spawn("/bin/rsh", {arg[1], "true"}, {fds = {[2] = assert(sys.open("/dev/null", "w"))}}))
+			  local _, how, value = sys.waitpid(pid)
+			until how == "exited" and value == 0
 			local out = io.open("/tries", "w")
 			for i = 1, 20 do
 			  local pid = assert(sys.spawn("/bin/rsh", {arg[1], "true"}, {}))
