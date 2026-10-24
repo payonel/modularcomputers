@@ -210,10 +210,16 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	/**
 	 * A device wired to this computer: where it is, how far the connection runs to it in meters
 	 * (blocks), whether the way crosses a Bluetooth link, whether it's paired with this computer,
-	 * the item it is (for its name and icon), and its slot when it's a card in an expansion hub
-	 * (else -1).
+	 * the item it is (for its name and icon), its slot when it's a card in an expansion hub
+	 * (else -1), and the device it's behind (its host's key, a Disk Station's for its disks; else
+	 * empty): on the bus only while its host is ({@link BusOrder}).
 	 */
-	public record Cabled(String key, BlockPos pos, int meters, boolean wireless, boolean paired, Item item, int hubSlot) {
+	public record Cabled(String key, BlockPos pos, int meters, boolean wireless, boolean paired, Item item, int hubSlot, String host) {
+		/** A device behind nothing. */
+		public Cabled(String key, BlockPos pos, int meters, boolean wireless, boolean paired, Item item, int hubSlot) {
+			this(key, pos, meters, wireless, paired, item, hubSlot, "");
+		}
+
 		static final Codec<Cabled> CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Codec.STRING.fieldOf("key").forGetter(Cabled::key),
 			BlockPos.CODEC.fieldOf("pos").forGetter(Cabled::pos),
@@ -221,7 +227,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 			Codec.BOOL.fieldOf("wireless").forGetter(Cabled::wireless),
 			Codec.BOOL.fieldOf("paired").forGetter(Cabled::paired),
 			BuiltInRegistries.ITEM.byNameCodec().fieldOf("item").forGetter(Cabled::item),
-			Codec.INT.fieldOf("hub_slot").forGetter(Cabled::hubSlot)
+			Codec.INT.fieldOf("hub_slot").forGetter(Cabled::hubSlot),
+			Codec.STRING.optionalFieldOf("host", "").forGetter(Cabled::host)
 		).apply(instance, Cabled::new));
 	}
 
@@ -697,13 +704,14 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 			} else if (block instanceof PaintGunBlockEntity gun) {
 				addCabled(found, devices, new Cabled(Motherboard.id(gun.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PAINT_GUN.asItem(), -1), gun.device());
 			} else if (block instanceof DiskStationBlockEntity station) {
-				addCabled(found, devices, new Cabled(Motherboard.id(station.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.DISK_STATION.asItem(), -1), station.device());
-				// Its disks, each by its serial number (the source only read).
+				String host = Motherboard.id(station.id());
+				addCabled(found, devices, new Cabled(host, at.pos(), at.meters(), at.wireless(), paired, ModBlocks.DISK_STATION.asItem(), -1), station.device());
+				// Its disks, each by its serial number (the source only read), behind it.
 				for (int slot : new int[] {DiskStationBlockEntity.TARGET, DiskStationBlockEntity.SOURCE}) {
 					UUID serial = station.cards().getItem(slot).get(ModComponents.SERIAL);
 					if (serial != null && station.disk(slot) != null) {
 						addCabled(found, devices, new Cabled(Motherboard.id(serial), at.pos(), at.meters(), at.wireless(), paired,
-							station.cards().getItem(slot).getItem(), -1), station.disk(slot));
+							station.cards().getItem(slot).getItem(), -1, host), station.disk(slot));
 					}
 				}
 			} else if (block instanceof PhotomaskBlockEntity mask) {
@@ -963,12 +971,16 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	 */
 	private void rebuildBus() {
 		Map<String, Device> external = new LinkedHashMap<>();
+		Map<String, String> hosts = new LinkedHashMap<>();
 		for (Cabled device : cabled) {
 			// Server side, a device saved as cabled is only on the bus once a scan finds it again.
 			external.put(device.key(), cabledDevices.get(device.key()));
+			if (!device.host().isEmpty()) {
+				hosts.put(device.key(), device.host());
+			}
 		}
 		Motherboard board = machine.board();
-		board.setExternal(external);
+		board.setExternal(external, hosts);
 		long now = level != null ? level.getGameTime() : 0;
 		if (level != null && level.isClientSide()) {
 			board.rebuildBus(now); // clients show what the server sends; they don't run devices

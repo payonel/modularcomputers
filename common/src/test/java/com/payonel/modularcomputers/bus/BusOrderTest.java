@@ -112,6 +112,34 @@ class BusOrderTest {
 		assertThat(order.isConnected("id:a")).isFalse();
 	}
 
+	/** A dock and the two disks behind it, and a device of its own. */
+	private static final java.util.Map<String, String> BEHIND = java.util.Map.of("id:d1", "id:dock", "id:d2", "id:dock");
+
+	@Test
+	void aDeviceBehindAHostIsOnTheBusOnlyWhileItsHostIs() {
+		List<String> attached = List.of("id:dock", "id:d1", "id:d2", "id:a");
+		order.sync(CASE, attached, BEHIND, 0);
+		assertThat(order.connected()).containsExactly("edp", "kbd", "sata:0", "id:dock", "id:d1", "id:d2", "id:a");
+
+		order.setConnected("id:dock", false);
+		assertThat(order.connected()).as("its host disconnected").containsExactly("edp", "kbd", "sata:0", "id:a");
+		assertThat(order.isOnline("id:d1")).as("shown missing").isFalse();
+		assertThat(order.isConnected("id:d1")).as("its own setting kept").isTrue();
+		order.setConnected("id:dock", true);
+
+		order.sync(CASE, List.of("id:d1", "id:d2", "id:a"), BEHIND, 1); // the dock missing (or another board's)
+		assertThat(order.connected()).as("its host missing").containsExactly("edp", "kbd", "sata:0", "id:a");
+		assertThat(order.isOnline("id:d2")).isFalse();
+	}
+
+	@Test
+	void aDeviceWhoseHostTheBusHasNoRoomForIsOffAndItsPlaceGoesOn() {
+		BusOrder small = new BusOrder(CASE.size() + 3);
+		small.sync(CASE, List.of("id:d1", "id:a", "id:dock"), BEHIND, 0);
+		small.setCapacity(CASE.size() + 2); // a smaller CPU: d1 and a would fit, the dock not
+		assertThat(small.connected()).as("d1 is off without its dock, which takes the place").containsExactly("edp", "kbd", "sata:0", "id:a", "id:dock");
+	}
+
 	@Test
 	void restoresTheSavedListAndDisconnections() {
 		order.restore(List.of(new BusOrder.Entry("id:b", 4), new BusOrder.Entry("id:a", 3)), List.of("id:a", "id:gone"));

@@ -54,6 +54,8 @@ public final class Motherboard {
 	private final Map<String, String> ids = new HashMap<>();
 	/** The external devices found now, in the order new ones join (nearest first); null where they don't run here (a client). */
 	private Map<String, Device> external = Map.of();
+	/** Each external device behind another, and its host's address. */
+	private Map<String, String> hosts = Map.of();
 
 	public static String sata(int lane) {
 		return SATA + lane;
@@ -160,7 +162,13 @@ public final class Motherboard {
 	 * one that's there but doesn't run here (a client knows of it, from the server).
 	 */
 	public void setExternal(Map<String, Device> found) {
+		setExternal(found, Map.of());
+	}
+
+	/** As {@link #setExternal(Map)}, with each device behind another and its host's address (see {@link BusOrder}). */
+	public void setExternal(Map<String, Device> found, Map<String, String> hosts) {
 		external = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(found));
+		this.hosts = Map.copyOf(hosts);
 	}
 
 	/**
@@ -202,7 +210,7 @@ public final class Motherboard {
 		List<String> present = external.entrySet().stream()
 			.filter(entry -> entry.getValue() == null || !com.payonel.modularcomputers.bus.BusHolds.heldByAnother(entry.getValue(), this))
 			.map(Map.Entry::getKey).toList();
-		order.sync(List.copyOf(internal.keySet()), present, now);
+		order.sync(List.copyOf(internal.keySet()), present, hosts, now);
 		bus.setStatus(order.status());
 		Map<String, Device> devices = new LinkedHashMap<>();
 		for (String address : order.connected()) {

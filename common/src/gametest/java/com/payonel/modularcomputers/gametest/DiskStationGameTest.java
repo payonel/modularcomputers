@@ -103,16 +103,38 @@ public class DiskStationGameTest {
 
 	@GameTest(maxTicks = 100)
 	public void aWiredComputerHasItAndItsDisksOnItsBusTheSourceOnlyRead(GameTestHelper helper) {
-		onABus(helper, true);
+		AllInOneBlockEntity computer = onABus(helper, true);
+		helper.succeedWhen(() -> onItsBus(helper, computer));
 	}
 
 	@GameTest(maxTicks = 100)
 	public void aComputerItTouchesHasItOnItsBusWithoutACable(GameTestHelper helper) {
-		onABus(helper, false);
+		AllInOneBlockEntity computer = onABus(helper, false);
+		helper.succeedWhen(() -> onItsBus(helper, computer));
 	}
 
-	/** A running computer two blocks west with a cable between, or right against it, and the station on its bus, powered. */
-	private static void onABus(GameTestHelper helper, boolean cabled) {
+	@GameTest(maxTicks = 100)
+	public void disconnectedItsDisksAreOffTheBusToo(GameTestHelper helper) {
+		AllInOneBlockEntity computer = onABus(helper, true);
+		DiskStationBlockEntity station = helper.getBlockEntity(POS, DiskStationBlockEntity.class);
+		boolean[] disconnected = {false};
+		helper.onEachTick(() -> {
+			if (!disconnected[0] && computer.machine().board().bus().devices().contains(station.device())) {
+				disconnected[0] = true; // on its bus: now the player disconnects it (the bus order panel's switch)
+				computer.setConnected(com.payonel.modularcomputers.machine.Motherboard.id(station.id()), false);
+			}
+		});
+		helper.succeedWhen(() -> {
+			helper.assertTrue(disconnected[0], "on its bus first");
+			var devices = computer.machine().board().bus().devices();
+			helper.assertTrue(!devices.contains(station.device()), "the station off its bus");
+			helper.assertTrue(!devices.contains(station.disk(DiskStationBlockEntity.TARGET)), "its disk too");
+			helper.assertTrue(!devices.contains(station.disk(DiskStationBlockEntity.SOURCE)), "and its source");
+		});
+	}
+
+	/** A running computer two blocks west with a cable between, or right against it, pressed on: what it has on its bus is the test's. */
+	private static AllInOneBlockEntity onABus(GameTestHelper helper, boolean cabled) {
 		DiskStationBlockEntity station = station(helper, false);
 		station.cards().setItem(DiskStationBlockEntity.SOURCE, new ItemStack(ModItems.TIER1_HARD_DISK));
 		BlockPos casePos = cabled ? POS.west(2) : POS.west();
@@ -132,14 +154,18 @@ public class DiskStationGameTest {
 			helper.getLevel().setBlock(cable, CableBlock.withConnections(helper.getLevel(), cable, ModBlocks.CABLE.defaultBlockState()), Block.UPDATE_ALL);
 		}
 		computer.pressPower();
-		helper.succeedWhen(() -> {
-			var devices = computer.machine().board().bus().devices();
-			helper.assertTrue(devices.contains(station.device()), "the station on its bus");
-			helper.assertTrue(devices.contains(station.disk(DiskStationBlockEntity.TARGET)), "its disk");
-			helper.assertTrue(devices.contains(station.disk(DiskStationBlockEntity.SOURCE)), "its source");
-			helper.assertTrue(station.disk(DiskStationBlockEntity.SOURCE).isReadOnly(), "only read");
-			helper.assertTrue(station.device().power().powered(), "powered by the bus");
-		});
+		return computer;
+	}
+
+	/** The station and both its disks on the computer's bus, powered. */
+	private static void onItsBus(GameTestHelper helper, AllInOneBlockEntity computer) {
+		DiskStationBlockEntity station = helper.getBlockEntity(POS, DiskStationBlockEntity.class);
+		var devices = computer.machine().board().bus().devices();
+		helper.assertTrue(devices.contains(station.device()), "the station on its bus");
+		helper.assertTrue(devices.contains(station.disk(DiskStationBlockEntity.TARGET)), "its disk");
+		helper.assertTrue(devices.contains(station.disk(DiskStationBlockEntity.SOURCE)), "its source");
+		helper.assertTrue(station.disk(DiskStationBlockEntity.SOURCE).isReadOnly(), "only read");
+		helper.assertTrue(station.device().power().powered(), "powered by the bus");
 	}
 
 	@GameTest

@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -24,6 +25,11 @@ import java.util.Set;
  * <p>
  * The player can also disconnect an external device: it stays listed, in its place, but isn't
  * on the bus.
+ * <p>
+ * <b>A device behind another</b> (its host: a Disk Station's disks behind the station, as a USB
+ * dock's drives are behind the dock) is on the bus only while its host is: a host disconnected,
+ * missing (or held by another board) shows its devices offline, and a host the bus has no room for
+ * leaves them off too. The rule is here, for every host, not in each block.
  */
 public final class BusOrder {
 	/** An external device in the saved list, and the game time it was last seen on the bus. */
@@ -34,6 +40,8 @@ public final class BusOrder {
 	private final List<Entry> external = new ArrayList<>();
 	private final Set<String> present = new HashSet<>();
 	private final Set<String> disconnected = new LinkedHashSet<>();
+	/** Each device behind another, and its host's key. */
+	private Map<String, String> hosts = Map.of();
 	private int waiting;
 	private int capacity;
 
@@ -78,15 +86,42 @@ public final class BusOrder {
 	 */
 	public List<String> connected() {
 		List<String> keys = new ArrayList<>(internal.subList(0, Math.min(internal.size(), capacity)));
-		external.stream().map(Entry::key).filter(key -> present.contains(key) && !disconnected.contains(key))
-			.limit(Math.max(0, capacity - keys.size())).forEach(keys::add);
-		return keys;
+		List<String> wanted = new ArrayList<>(external.stream().map(Entry::key).filter(this::wanted).toList());
+		while (true) {
+			List<String> taken = wanted.stream().limit(Math.max(0, capacity - keys.size())).toList();
+			// A device whose host didn't fit is off too, and its place goes to the next.
+			List<String> orphans = taken.stream().filter(key -> hosts.containsKey(key) && !taken.contains(hosts.get(key))).toList();
+			if (orphans.isEmpty()) {
+				keys.addAll(taken);
+				return keys;
+			}
+			wanted.removeAll(orphans);
+		}
+	}
+
+	/** An external device that should be on the bus, room allowing: there, connected, and so is its host. */
+	private boolean wanted(String key) {
+		return present.contains(key) && !disconnected.contains(key) && hostOn(key);
+	}
+
+	/** Its host (if it has one) is wanted on the bus: the device can be. */
+	private boolean hostOn(String key) {
+		String at = key;
+		for (int depth = 0; depth <= hosts.size(); depth++) { // (a loop of hosts is never on)
+			String host = hosts.get(at);
+			if (host == null) {
+				return true;
+			} else if (!present.contains(host) || disconnected.contains(host)) {
+				return false;
+			}
+			at = host;
+		}
+		return false;
 	}
 
 	/** Listed devices that are there and connected but don't fit (the capacity went down). */
 	private int overCapacity() {
-		long wanted = Math.min(internal.size(), capacity)
-			+ external.stream().filter(entry -> present.contains(entry.key()) && !disconnected.contains(entry.key())).count();
+		long wanted = Math.min(internal.size(), capacity) + external.stream().map(Entry::key).filter(this::wanted).count();
 		return (int) Math.max(0, wanted - connected().size()) + Math.max(0, internal.size() - capacity);
 	}
 
@@ -99,9 +134,9 @@ public final class BusOrder {
 		return internal.contains(key);
 	}
 
-	/** Online: internal, or an external device that's there now. */
+	/** Online: internal, or an external device that's there now, behind a host that's on (if it has one). */
 	public boolean isOnline(String key) {
-		return internal.contains(key) || present.contains(key);
+		return internal.contains(key) || present.contains(key) && hostOn(key);
 	}
 
 	public boolean isConnected(String key) {
@@ -142,7 +177,13 @@ public final class BusOrder {
 	 * in the order new ones should be added (nearest first).
 	 */
 	public void sync(List<String> internal, List<String> attached, long now) {
+		sync(internal, attached, Map.of(), now);
+	}
+
+	/** As {@link #sync(List, List, long)}, with each device behind another and its host ({@code hosts}). */
+	public void sync(List<String> internal, List<String> attached, Map<String, String> hosts, long now) {
 		this.internal = List.copyOf(internal);
+		this.hosts = Map.copyOf(hosts);
 		present.clear();
 		present.addAll(attached);
 		for (int i = 0; i < external.size(); i++) {

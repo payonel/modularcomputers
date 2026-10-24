@@ -81,6 +81,10 @@ computers really work.
   class is a timing bug (a cold JVM's slow board calls make a different, legal state): make that
   state on purpose. Spawns failing at random are usually memory running out. Before shrinking
   memory peaks, compare what stays resident to the minimum. A hang is a thread dump away.
+- **Every fix, feature and design change looks for its similar cases** (the user's rule): the
+  same scenario in other devices, blocks, programs or states (disconnected, missing, held by
+  another board, over capacity, unloaded, off), and makes the change a rule the code enforces for
+  all of them, not a one-off for the case reported. Say which cases were found.
 - **Subagents** doing file work in parallel get disjoint scopes and no bulk edits.
 
 ## Layout
@@ -162,6 +166,10 @@ blank, and its files leave the world save when the player takes it.
 - **Devices connect by cable, port to port, or by Bluetooth:** a block right against a computer
   (neither's front between them) is on its bus without a cable, as a drive in a dock is (the user's
   call). Screens and hubs carry the connection on; other devices end it.
+- **A device behind another is on the bus only while its host is** (a Disk Station's disks behind
+  the station, as a dock's drives): `Cabled.host` names the host, and `BusOrder` keeps the device
+  off, shown offline, whenever its host is disconnected, missing or another board's, and off when
+  the bus has no room for its host. One rule in the bus order, for every host to come.
 - **A device is on one bus at a time** (`BusHolds`): whichever board has it first holds it; holds
   are worked out afresh as boards load, never saved (long cables and unloaded chunks would desync
   them).
@@ -355,7 +363,8 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
 - **A new device with an interrupt line** gets a stimulus in `DeviceInterruptsTest`; **a device whose
   `get`/`set` take tables** gets a driver (`lib/modules/drivers/<type>.lua`).
 - **A new block that holds devices** gets: `Cabling` (its ports, and its kind for the walk), a branch
-  in the case's `scanCables` (its devices on the bus), a loot table keeping its contents, the pickaxe
+  in the case's `scanCables` (its devices on the bus; those behind its own device name it as their
+  host), a loot table keeping its contents, the pickaxe
   tag, its language entries, and its art from a script.
 - **Work for the server thread is always queued** (`MinecraftServer.schedule`), never handed to
   `execute`: once the server is stopping, `execute` runs the task on the calling thread (a CPU's),
