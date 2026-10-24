@@ -1,7 +1,8 @@
--- ls [-1aClF] [path...]: what's in directories (a file lists itself). On a terminal, names go in
+-- ls [-1aClFS] [path...]: what's in directories (a file lists itself). On a terminal, names go in
 -- columns down then across, as wide as the terminal (as GNU ls), directories in blue; into a pipe or
 -- a file, one a line. -1 one a line, -C columns anyway, -l long (type, size, name; a link's target
--- after ->), -a names starting with a dot too, -F a / after directories, an @ after links.
+-- after ->), -a names starting with a dot too, -F a / after directories, an @ after links, -S by
+-- size, largest first (ties by name), as GNU ls's.
 local sys = require("sys")
 local fs = require("fs")
 
@@ -16,7 +17,7 @@ local paths = {}
 for _, word in ipairs(arg) do
   if string.sub(word, 1, 1) == "-" and #word > 1 then
     for c in string.gmatch(string.sub(word, 2), ".") do
-      if not string.find("1aClF", c, 1, true) then
+      if not string.find("1aClFS", c, 1, true) then
         io.stderr:write("ls: invalid option -- '" .. c .. "'\n")
         return 2
       end
@@ -89,12 +90,32 @@ local function grid(entries)
   end
 end
 
+-- An entry's size (a link's own, as -l shows it).
+local function size(entry, dir)
+  if entry.size then
+    return entry.size
+  end
+  local st = dir and fs.lstat(fs.join(dir, entry.name))
+  return st and st.size or 0
+end
+
 local function show(entries, dir)
   local visible = {}
   for _, entry in ipairs(entries) do
     if flags.a or string.sub(entry.name, 1, 1) ~= "." then
       visible[#visible + 1] = entry
     end
+  end
+  if flags.S then
+    for _, entry in ipairs(visible) do
+      entry.bytes = size(entry, dir)
+    end
+    table.sort(visible, function(a, b)
+      if a.bytes ~= b.bytes then
+        return a.bytes > b.bytes
+      end
+      return a.name < b.name
+    end)
   end
   if flags.l then
     for _, entry in ipairs(visible) do

@@ -3,7 +3,7 @@
 ls \- list directory contents
 .SH SYNOPSIS
 .B ls
-.RB [ \-1aClF ]
+.RB [ \-1aClFS ]
 .RI [ path ...]
 .SH DESCRIPTION
 .B ls
@@ -60,6 +60,9 @@ Append
 to directories and
 .B @
 to symbolic links.
+.TP
+.B \-S
+Sort by size, largest first (names in order where sizes are the same).
 .SH EXIT STATUS
 0 on success; 2 on a bad option, or if any path could not be read.
 .SH NOTES

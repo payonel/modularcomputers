@@ -447,6 +447,18 @@ class McosTest {
 	}
 
 	@Test
+	void lsDashSSortsBySizeLargestFirst() {
+		file("s/small", "a");
+		file("s/big", "abcdef");
+		file("s/mid", "abc");
+		file("s/also", "abc");
+		boot();
+		type("ls -S /s > /o; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("o"))).as("largest first; ties by name").isEqualTo("big\nalso\nmid\nsmall\n");
+	}
+
+	@Test
 	void dateIsTheWorldsClockOnItsCalendar() {
 		long noonOfTheThirdDay = 2 * 24000 + 6000; // (game time: 0 is the first sunrise, 6000 its noon)
 		machine.board().setChassis(new com.payonel.modularcomputers.machine.Chassis() {
