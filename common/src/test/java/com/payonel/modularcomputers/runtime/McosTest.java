@@ -194,6 +194,25 @@ class McosTest {
 	}
 
 	@Test
+	void keysTypedWhileItBootsShowAfterThePromptAndTheLineRuns() {
+		LuaScripts.copyTree("mcos", root());
+		devices.put("sata:0", new Disk(DiskTier.TIER_1, root()));
+		Eeprom eeprom = new Eeprom(LuaScripts.read("eeprom/boot"));
+		devices.put("eeprom", eeprom);
+		TestBus.of(machine, devices);
+		machine.pressPower();
+		machine.tick();
+		type("echo"); // (before the shell reads: the tty echoes them where the cursor is)
+		settle(() -> !screen.hasKeys() && machine.runner().map(r -> r.state() == Runner.State.WAITING).orElse(false)
+			&& screen().lines().anyMatch(row -> row.contains("$")));
+		untilIdle();
+		String row = screen().lines().filter(r -> r.contains("$")).reduce((a, b) -> b).orElseThrow().stripTrailing();
+		assertThat(row).as("the line, after the prompt, where readline drew it: not over the prompt").endsWith(" echo");
+		type(" ahead > /ahead\r");
+		untilFile(root().resolve("ahead"), "ahead\n");
+	}
+
+	@Test
 	void haltHalts() {
 		boot();
 		type("halt\r");

@@ -25,6 +25,7 @@ local DEFAULT_COLUMNS = 80
 local READ_SIZE = 256
 local GAP = 2 -- spaces between columns of completions
 local CSI = "\27["
+local REPORT_SECONDS = 0.5 -- how long the terminal has to say where its cursor is (no answer: column 0)
 local DEFAULT_BREAKS = "[ \t\n\"'`<>;|&()=]" -- what ends a word, for completion (as rl_completer_word_break_characters)
 local SPECIAL = "[ \t\n\"'`<>;|&()$\\*?%[%]#~=!{}]" -- characters a file name has quoted when it's put in
 
@@ -149,15 +150,44 @@ function editor:read(shown)
   local width = sys.ioctl(1, "TIOCGWINSZ") or DEFAULT_COLUMNS
   local history = self.history
 
-  -- The screen as a line of cells from the prompt's last line's start: the text starts after the
-  -- prompt; 'at' is where the terminal's cursor is.
-  local start = columns(shown:match("[^\n]*$"))
   local buffer, cursor = {}, 0
   local pending = self.typeahead -- keys read and not yet handled
   self.typeahead = ""
+  -- The column the cursor is at (from 0), as the terminal reports it (DSR, ESC[6n: ESC[row;colR),
+  -- as linenoise asks: the prompt may not start a row (keys typed ahead were echoed by the tty, or
+  -- a program's output had no newline at its end). Keys that come meanwhile stay pending.
+  local function column()
+    if not sys.isatty(1) then
+      return 0
+    end
+    io.stdout:write(CSI .. "6n")
+    io.stdout:flush()
+    local got, waited, step = "", 0, REPORT_SECONDS / 5
+    while waited < REPORT_SECONDS do
+      if next(sys.poll({[0] = {IN = true}}, step) or {}) then
+        got = got .. (sys.read(0, READ_SIZE) or "")
+        local a, b, col = got:find("\27%[%d+;(%d+)R")
+        if a then
+          pending = pending .. got:sub(1, a - 1) .. got:sub(b + 1)
+          return (math.tointeger(tonumber(col)) or 1) - 1
+        end
+      else
+        waited = waited + step
+      end
+    end
+    pending = pending .. got
+    return 0
+  end
+  -- The screen as a line of cells from the start of the row the prompt's last line is on: the text
+  -- starts after the prompt; 'at' is where the terminal's cursor is.
+  local start = columns(shown:match("[^\n]*$"))
+  local origin = shown:find("\n") and 0 or column() -- (where the prompt's last line starts)
   local at = start
   local out = {}
+  -- The prompt, drawn where the cursor is: 'origin' its column (0: a row's start).
   local function prompt()
+    start = origin + columns(shown:match("[^\n]*$"))
+    origin = 0 -- (drawn again, it's after a newline or a cleared screen)
     out[#out + 1] = shown
     at = start
     if start > 0 and start % width == 0 then
