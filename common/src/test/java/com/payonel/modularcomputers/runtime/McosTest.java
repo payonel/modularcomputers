@@ -430,6 +430,23 @@ class McosTest {
 	}
 
 	@Test
+	void dmesgShowsDevicesJoiningAndTheirEventsAndMountsAndClears() {
+		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
+		devices.put(Motherboard.exp(0), motion);
+		boot();
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
+		type("head -n 1 /dev/motion0 > /dev/null; dmesg > /d; dmesg -C; dmesg > /e; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		String log = read(root().resolve("d"));
+		assertThat(log).as("a device joining").containsPattern("motion0 +" + "[0-9a-f-]+ +attached: motion at exp:0");
+		assertThat(log).as("its event").contains("mob=minecraft:pig x=1.5 y=0.0 z=-3.0");
+		assertThat(log).as("a mount").contains("mount");
+		assertThat(log).as("plain into a file: no colors").doesNotContain("\u001b[");
+		assertThat(log.lines().findFirst().orElse("")).as("[time] first").matches("\\[\\d\\d:\\d\\d:\\d\\d\\] .*");
+		assertThat(read(root().resolve("e"))).as("cleared").isEmpty();
+	}
+
+	@Test
 	void dateIsTheWorldsClockOnItsCalendar() {
 		long noonOfTheThirdDay = 2 * 24000 + 6000; // (game time: 0 is the first sunrise, 6000 its noon)
 		machine.board().setChassis(new com.payonel.modularcomputers.machine.Chassis() {

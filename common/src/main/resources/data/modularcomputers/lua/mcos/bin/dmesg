@@ -1,0 +1,67 @@
+-- dmesg [-w] [-c | -C]: the kernel's log (sys.klog): devices joining and leaving the bus, each
+-- event the kernel takes from one, mounts, a process that crashed, the kernel's messages.
+-- A line an entry, as OpenOS's dmesg showed events: [time] (the world's clock) in red, where it
+-- came from (a device's name, mount, kernel, a process) in green, the device's id in yellow, then
+-- what happened; plain into a pipe or a file. -w follows it (as Linux's --follow, and OpenOS's,
+-- which always did) until ^C; -c clears it after printing it; -C clears it, printing nothing.
+local sys = require("sys")
+
+local FOLLOW_SECONDS = 0.25 -- how often -w looks for more
+local SOURCE_WIDTH = 10 -- OpenOS's columns: an event's name, then an address
+local ID_WIDTH = 37
+local TIME_COLOR, SOURCE_COLOR, ID_COLOR, RESET = "\27[31m", "\27[32m", "\27[33m", "\27[0m" -- (OpenOS's red, green, yellow, white)
+
+local follow, clear, only = false, false, false
+for _, word in ipairs(arg) do
+  if word == "-w" or word == "--follow" then
+    follow = true
+  elseif word == "-c" then
+    clear = true
+  elseif word == "-C" then
+    only = true
+  else
+    io.stderr:write("dmesg: invalid option '", word, "'\nusage: dmesg [-w] [-c | -C]\n")
+    return 1
+  end
+end
+if only then
+  sys.klog("clear")
+  return 0
+end
+
+local colored = sys.isatty(1)
+local function paint(color, text)
+  return colored and color .. text .. RESET or text
+end
+
+local function pad(text, width)
+  return text .. string.rep(" ", math.max(width - #text, 0) + 1)
+end
+
+local function show(entry)
+  local id = entry.id:gsub("^id:", "")
+  io.write(paint(TIME_COLOR, "[" .. os.date("%T", entry.time) .. "]"), " ", paint(SOURCE_COLOR, pad(entry.source, SOURCE_WIDTH)),
+    paint(ID_COLOR, pad(id, ID_WIDTH)), " ", entry.text, "\n")
+end
+
+local last = 0
+local function more()
+  for _, entry in ipairs(sys.klog(last)) do
+    show(entry)
+    last = entry.seq
+  end
+  io.flush()
+end
+
+if follow and colored then
+  io.write("Press 'Ctrl-C' to exit\n") -- (OpenOS's)
+end
+more()
+if clear then
+  sys.klog("clear")
+end
+while follow do
+  sys.sleep(FOLLOW_SECONDS)
+  more()
+end
+return 0

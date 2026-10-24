@@ -345,6 +345,9 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   there, so a process blocked on a device is woken when it comes; the idle wait hears exactly the
   devices blocked reads found empty. No driver asks for listening itself (`k.listen` is for a device
   nothing reads now: the network's open connections).
+- **The kernel's log** (`k.log`, `sys.klog`; `dmesg`, after OpenOS's: colors, columns, `-w`): devices
+  joining and leaving, each event it takes from a device (`k.take`), mounts, crashes, `printk`; the
+  last 200, timed by the world's clock (one board call at its first entry, then the machine's tick).
 - **A device type costs no memory until used:** devfs looks for a type's driver the first time one
   of its files is opened; nothing in the kernel lists types. **A process's syscall wrappers are made
   at its first use of each** (a metatable on `sys`), so a new syscall costs nothing at boot.

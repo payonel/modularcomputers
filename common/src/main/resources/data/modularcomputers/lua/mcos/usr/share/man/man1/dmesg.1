@@ -1,0 +1,51 @@
+.TH DMESG 1 "" "" "mcos Manual"
+.SH NAME
+dmesg \- print the kernel's log
+.SH SYNOPSIS
+.B dmesg
+.RB [ \-w ]
+.RB [ \-c " | " \-C ]
+.SH DESCRIPTION
+.B dmesg
+prints the kernel's log, oldest first: devices joining and leaving the bus,
+each event the kernel takes from a device (a motion, a key, a frame), mounts,
+a process that crashed (past its own error handler: a program's error is
+reported by the program, as an exit), and the kernel's own messages. It keeps the
+last 200.
+.PP
+Each line is an entry, as OpenOS's
+.B dmesg
+showed events: the time by the world's clock, in brackets; where it came
+from (a device's name as
+.BR lsdev (1)
+gives it, or
+.BR mount ,
+.BR kernel ,
+a process as its path and pid); the device's id; and what happened. On a
+terminal they're in color, OpenOS's: the time red, where green, the id
+yellow.
+.SH OPTIONS
+.TP
+.BR \-w ", " \-\-follow
+Waits for more, printing each entry as it comes, until ^C.
+.TP
+.B \-c
+Clears the log after printing it.
+.TP
+.B \-C
+Clears the log, printing nothing.
+.SH EXIT STATUS
+0; 1 for an option it does not know.
+.SH EXAMPLES
+.nf
+dmesg
+dmesg \-w
+dmesg | grep storage
+.fi
+.SH NOTES
+Linux's
+.B dmesg
+shows seconds since boot and the kernel's subsystems' messages; mcos's
+shows the world's time, and the devices' events as OpenOS's did.
+.SH SEE ALSO
+.BR lsdev (1)

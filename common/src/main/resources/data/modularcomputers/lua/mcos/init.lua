@@ -100,14 +100,56 @@ local tmpfs = module("tmpfs", k, vfs)
 -- interrupt comes and when a call to a device fails because the device is gone, never on a /dev
 -- lookup. Nothing depends on it being fresh: an open file holds a device's id, so it reaches that
 -- device or fails (ENODEV), never another one.
-local devices = {list = {}, byname = {}}
+-- The kernel's log (Linux's ring buffer, which dmesg reads): what it saw, newest last, the oldest
+-- dropped past KLOG_SIZE. Each: {seq, time (the world's clock, in seconds: its ticks counted from
+-- the machine's, asked once), source (a device's name, or the kernel's part: kernel, mount, a
+-- process), id (a device's, or ""), text}. What goes in: devices joining and leaving the bus, each
+-- event the kernel takes from one (as OpenOS's dmesg showed every signal), mounts, a process that
+-- crashed past its own handler (ld's reports a program's error itself, as an exit), and the
+-- kernel's own messages.
+local KLOG_SIZE = 200
+local KLOG_TEXT = 160 -- the most of an entry's text kept
+local KLOG_VALUE = 32 -- the most of one value in an event's text (a frame's data: its start)
+local klog, klogseq, clockoffset = {}, 0, nil
+function k.log(source, id, text)
+  if not clockoffset then
+    clockoffset = board.time() - board.uptime() -- (once: the world's clock and the machine's tick together)
+  end
+  klogseq = klogseq + 1
+  klog[#klog + 1] = {seq = klogseq, time = (clockoffset + k.now()) / TICKS_PER_SECOND, source = source, id = id or "",
+    text = text:sub(1, KLOG_TEXT)}
+  if #klog > KLOG_SIZE then
+    table.remove(klog, 1)
+  end
+end
+
+-- An event as the log's text: a table's fields in order of name ("x=1.5 z=-3.0"), each value cut
+-- short past KLOG_VALUE.
+local function describe(value)
+  if type(value) ~= "table" then
+    local text = tostring(value)
+    return #text > KLOG_VALUE and text:sub(1, KLOG_VALUE) .. "..." or text
+  end
+  local keys, parts = {}, {}
+  for key in pairs(value) do
+    keys[#keys + 1] = tostring(key)
+  end
+  table.sort(keys)
+  for _, key in ipairs(keys) do
+    local v = value[key] ~= nil and value[key] or value[tonumber(key)]
+    parts[#parts + 1] = key .. "=" .. (type(v) == "table" and "{...}" or describe(v))
+  end
+  return table.concat(parts, " ")
+end
+
+local devices = {list = {}, byname = {}, byid = {}}
 k.devices = devices
 local described = {} -- by id: {label, get, set}, asked once a device (an id never changes what it is; a label is asked again each time it joins: another computer may have relabeled it)
 local SINGLE = {eeprom = "eeprom"} -- the slots of devices there's only ever one of: named without a number
 local LINUX = {sound = "dsp"} -- types Linux names its own way: the first without a number (OSS's dsp, then dsp1)
 
 function k.refreshdevices()
-  local list, byname, counts = {}, {}, {}
+  local list, byname, byid, counts = {}, {}, {}, {}
   local was = {}
   for _, entry in ipairs(devices.list) do
     was[entry.id] = true
@@ -134,15 +176,24 @@ function k.refreshdevices()
     local name = SINGLE[slot] or LINUX[kind] and LINUX[kind] .. (n == 0 and "" or n) or kind .. n
     local entry = {name = name, id = id, path = slot,
       type = device.type, label = about.label, get = about.get, set = about.set, pull = about.pull}
-    list[#list + 1], byname[entry.name] = entry, entry
+    list[#list + 1], byname[entry.name], byid[id] = entry, entry, entry
+    if not was[id] then
+      k.log(entry.name, id, "attached: " .. tostring(device.type) .. (slot and " at " .. slot or "") .. (about.label and ' "' .. about.label .. '"' or ""))
+    end
   end
-  devices.list, devices.byname = list, byname
+  for _, entry in ipairs(devices.list) do
+    if not byid[entry.id] then
+      k.log(entry.name, entry.id, "detached")
+    end
+  end
+  devices.list, devices.byname, devices.byid = list, byname, byid
   return list
 end
 
 -- printk: the kernel's messages go to the console.
 local console
 local function printk(text)
+  k.log("kernel", "", text)
   console:write("mcos: " .. text .. "\n")
 end
 
@@ -771,7 +822,12 @@ function syscalls.mount(p, request, source, target, fstype)
     end
     fs = hfs(source)
   end
-  return vfs.mount(vfs.realpath(at) or at, fs, source)
+  local ok, why, errno = vfs.mount(vfs.realpath(at) or at, fs, source)
+  if ok then
+    local device = devices.byid[source] or devices.byid["id:" .. source]
+    k.log("mount", device and device.id or "", (fstype or source) .. " on " .. (vfs.realpath(at) or at))
+  end
+  return ok, why, errno
 end
 
 -- What's mounted (Linux's /proc/mounts): {source, path, type} each.
@@ -1168,6 +1224,7 @@ local function hotplug()
     local mount = vfs.mounts[i]
     if mount.fs.type == "hfs" and not present[mount.source] then
       vfs.umount(mount.path, true) -- the disk's gone: what was open on it fails (EIO)
+      k.log("mount", "", mount.path .. ": unmounted, its disk gone")
     end
   end
 end
@@ -1218,6 +1275,7 @@ local function run(p)
       if stderr and stderr.write then
         stderr:write(p.path .. ": " .. tostring(result) .. "\n")
       end
+      k.log(p.path .. "[" .. p.pid .. "]", "", "crashed: " .. tostring(result)) -- (past ld's handler: as Linux logs a segfault)
       exit(p, "exited", 1)
     end
   end
@@ -1239,8 +1297,27 @@ function k.take(id, method)
   local ok, value = board.invoke(id, method)
   if ok and value == nil then
     listening[id] = true
+  elseif ok then
+    local device = devices.byid[id]
+    k.log(device and device.name or id, id, describe(value))
   end
   return ok, value
+end
+
+-- The kernel's log since entry 'after' (its seq; 0: all of it), oldest first, copies (syslog(2)'s
+-- READ_ALL); with "clear", it's emptied (CLEAR).
+function syscalls.klog(p, request, after)
+  if after == "clear" then
+    klog = {}
+    return {}
+  end
+  local list = {}
+  for _, entry in ipairs(klog) do
+    if entry.seq > (tonumber(after) or 0) then
+      list[#list + 1] = copy(entry)
+    end
+  end
+  return list
 end
 
 -- Idles (the CPU's HLT) until a device has something, or the soonest sleeper's time.
