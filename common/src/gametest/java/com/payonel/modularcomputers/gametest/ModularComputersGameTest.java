@@ -8,7 +8,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 public class ModularComputersGameTest {
 	@GameTest
 	public void modIsLoadedAndInitialized(GameTestHelper helper) {
-		helper.assertTrue(BuiltInRegistries.BLOCK.containsKey(ModularComputers.id("all_in_one")), "mod not loaded");
+		helper.assertTrue(BuiltInRegistries.BLOCK.containsKey(ModularComputers.id("tier3_case")), "mod not loaded");
 		helper.assertTrue(ModularComputers.isInitialized(), "common initializer did not run");
 		helper.succeed();
 	}

@@ -1,9 +1,9 @@
 package com.payonel.modularcomputers.gametest;
 
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.check;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.count;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.read;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.teleport;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.check;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.count;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.read;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.teleport;
 
 import com.payonel.modularcomputers.entity.BotGolem;
 import com.payonel.modularcomputers.entity.ModEntities;
@@ -98,7 +98,7 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			context.waitTicks(5);
 			BufferedImage shot = read(context.takeScreenshot("bot-golems"));
 			int lit = count(shot, 0, 0, shot.getWidth(), shot.getHeight(),
-				rgb -> AllInOneClientGameTest.green(rgb) > LIT && AllInOneClientGameTest.red(rgb) < AllInOneClientGameTest.green(rgb) / 2);
+				rgb -> CaseClientGameTest.green(rgb) > LIT && CaseClientGameTest.red(rgb) < CaseClientGameTest.green(rgb) / 2);
 			check(lit > LIT_PIXELS, "its face shows its screen's text, found " + lit + " lit pixels");
 			// The other, charging on its pad: its green particles round it.
 			String padState = singleplayer.getServer().computeOnServer(server -> {
@@ -151,7 +151,7 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 				for (int x = 0; x < held.getWidth(); x++) {
 					int was = bare.getRGB(x, y);
 					int now = held.getRGB(x, y);
-					if (AllInOneClientGameTest.blue(now) - AllInOneClientGameTest.red(now) > AllInOneClientGameTest.blue(was) - AllInOneClientGameTest.red(was) + FIELD_BLUE) {
+					if (CaseClientGameTest.blue(now) - CaseClientGameTest.red(now) > CaseClientGameTest.blue(was) - CaseClientGameTest.red(was) + FIELD_BLUE) {
 						blue++;
 					}
 				}
@@ -184,7 +184,7 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			context.waitTicks(2);
 			context.takeScreenshot("bot-golem-parts");
 			// Its crafting card's tab: its panel, right of the buttons.
-			AllInOneClientGameTest.clickOnScreen(context, com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT,
+			CaseClientGameTest.clickOnScreen(context, com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT,
 				screen -> ((com.payonel.modularcomputers.client.screen.CaseScreen) screen).craftTab(CRAFTING_LANE));
 			String grid = context.computeOnClient(c -> {
 				CaseMenu menu = (CaseMenu) c.player.containerMenu;

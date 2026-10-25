@@ -1,8 +1,8 @@
 package com.payonel.modularcomputers.gametest;
 
 import com.payonel.modularcomputers.machine.Motherboard;
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.CableBlock;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.block.ScreenBlock;
@@ -29,9 +29,9 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 public class CableGameTest {
 	private static final BlockPos COMPUTER = new BlockPos(1, 1, 1);
 
-	private static AllInOneBlockEntity computer(GameTestHelper helper, BlockPos pos, boolean parts) {
-		helper.setBlock(pos, ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity computer = helper.getBlockEntity(pos, AllInOneBlockEntity.class);
+	private static CaseBlockEntity computer(GameTestHelper helper, BlockPos pos, boolean parts) {
+		helper.setBlock(pos, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(pos, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU)); // no CPU, no bus
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		TestPrograms.withScreen(computer); // its own screen, in the gold slot
@@ -62,11 +62,11 @@ public class CableGameTest {
 		return screen(helper, new BlockPos(4, 1, 1), Direction.SOUTH);
 	}
 
-	private static Optional<com.payonel.modularcomputers.board.BoardAssembly.BusEntry> entryFor(AllInOneBlockEntity computer, ScreenBlockEntity screen) {
+	private static Optional<com.payonel.modularcomputers.board.BoardAssembly.BusEntry> entryFor(CaseBlockEntity computer, ScreenBlockEntity screen) {
 		return computer.busEntries().stream().filter(entry -> entry.key().equals("id:" + screen.id())).findFirst();
 	}
 
-	private static boolean onBus(AllInOneBlockEntity computer, ScreenBlockEntity screen) {
+	private static boolean onBus(CaseBlockEntity computer, ScreenBlockEntity screen) {
 		return computer.machine().board().bus().devices().contains(screen.terminal());
 	}
 
@@ -95,7 +95,7 @@ public class CableGameTest {
 
 	@GameTest
 	public void aComputerListsTheScreensWiredToItAndShowsHelloWorldOnThem(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
+		CaseBlockEntity computer = computer(helper, COMPUTER, true);
 		ScreenBlockEntity screen = wiredScreen(helper);
 		helper.succeedWhen(() -> {
 			var entry = entryFor(computer, screen).orElseThrow(() -> helper.assertionException("the screen should be in the bus order"));
@@ -114,7 +114,7 @@ public class CableGameTest {
 
 	@GameTest
 	public void aScreenWiredToARunningComputerShowsTheConsole(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
+		CaseBlockEntity computer = computer(helper, COMPUTER, true);
 		computer.pressPower();
 		ScreenBlockEntity screen = wiredScreen(helper);
 		helper.succeedWhen(() -> helper.assertTrue(showsText(screen.terminal()), "a screen plugged into a running computer shows its console"));
@@ -122,7 +122,7 @@ public class CableGameTest {
 
 	@GameTest(maxTicks = 60)
 	public void breakingTheComputerLeavesItsScreensDark(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
+		CaseBlockEntity computer = computer(helper, COMPUTER, true);
 		computer.pressPower();
 		ScreenBlockEntity screen = wiredScreen(helper);
 		helper.startSequence()
@@ -137,7 +137,7 @@ public class CableGameTest {
 
 	@GameTest
 	public void disconnectingAScreenTakesItOffTheBusAndBlanksIt(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
+		CaseBlockEntity computer = computer(helper, COMPUTER, true);
 		computer.pressPower();
 		ScreenBlockEntity screen = wiredScreen(helper);
 		String key = "id:" + screen.id();
@@ -158,7 +158,7 @@ public class CableGameTest {
 
 	@GameTest
 	public void aScreenThatGoesAwayStaysListedOfflineInItsPlaceUntilForgotten(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper, COMPUTER, false);
+		CaseBlockEntity computer = computer(helper, COMPUTER, false);
 		ScreenBlockEntity screen = wiredScreen(helper);
 		String key = "id:" + screen.id();
 		helper.startSequence()
@@ -185,7 +185,7 @@ public class CableGameTest {
 
 	@GameTest(maxTicks = 100)
 	public void aFullBusMakesNewDevicesWaitAndSaysSo(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper, COMPUTER, false);
+		CaseBlockEntity computer = computer(helper, COMPUTER, false);
 		computer.machine().board().overrideBusCapacity(2); // its built-in terminal, and room for one external device
 		ScreenBlockEntity first = wiredScreen(helper);
 		helper.startSequence()
@@ -208,26 +208,26 @@ public class CableGameTest {
 		@GameTest(maxTicks = 200)
 	public void aScreenWiredToTwoComputersIsOnOneBusAtATime(GameTestHelper helper) {
 		// A device is on one bus (user, 2026-10-13): the first board to have it holds it, the other finds it missing.
-		AllInOneBlockEntity first = computer(helper, COMPUTER, true);
+		CaseBlockEntity first = computer(helper, COMPUTER, true);
 		cable(helper, new BlockPos(2, 1, 1));
 		ScreenBlockEntity screen = screen(helper, new BlockPos(3, 1, 1), Direction.SOUTH);
 		cable(helper, new BlockPos(4, 1, 1));
-		AllInOneBlockEntity second = computer(helper, new BlockPos(5, 1, 1), false);
-		AllInOneBlockEntity[] holder = new AllInOneBlockEntity[1];
+		CaseBlockEntity second = computer(helper, new BlockPos(5, 1, 1), false);
+		CaseBlockEntity[] holder = new CaseBlockEntity[1];
 		helper.startSequence()
 			.thenWaitUntil(() -> {
 				helper.assertTrue(onBus(first, screen) != onBus(second, screen), "exactly one computer has the screen");
 				holder[0] = onBus(first, screen) ? first : second;
-				AllInOneBlockEntity other = holder[0] == first ? second : first;
+				CaseBlockEntity other = holder[0] == first ? second : first;
 				helper.assertTrue(entryFor(other, screen).isEmpty(), "the other never had it: not on its bus, not listed");
 			})
 			.thenExecute(() -> helper.setBlock(holder[0] == first ? COMPUTER : new BlockPos(5, 1, 1), net.minecraft.world.level.block.Blocks.AIR))
 			.thenWaitUntil(() -> helper.assertTrue(onBus(holder[0] == first ? second : first, screen), "its holder gone, the other takes it"))
 			.thenExecute(() -> {
-				AllInOneBlockEntity taker = holder[0] == first ? second : first;
+				CaseBlockEntity taker = holder[0] == first ? second : first;
 				holder[0] = taker == first ? second : first;
-				helper.setBlock(holder[0] == first ? COMPUTER : new BlockPos(5, 1, 1), ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-				AllInOneBlockEntity again = helper.getBlockEntity(holder[0] == first ? COMPUTER : new BlockPos(5, 1, 1), AllInOneBlockEntity.class);
+				helper.setBlock(holder[0] == first ? COMPUTER : new BlockPos(5, 1, 1), ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+				CaseBlockEntity again = helper.getBlockEntity(holder[0] == first ? COMPUTER : new BlockPos(5, 1, 1), CaseBlockEntity.class);
 				again.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 				again.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 				holder[0] = again;
@@ -239,7 +239,7 @@ public class CableGameTest {
 
 	@GameTest
 	public void screensPassTheConnectionOnLikeACable(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
+		CaseBlockEntity computer = computer(helper, COMPUTER, true);
 		ScreenBlockEntity near = screen(helper, new BlockPos(2, 1, 1), Direction.SOUTH); // against the computer's side
 		ScreenBlockEntity next = screen(helper, new BlockPos(3, 1, 1), Direction.SOUTH);
 		cable(helper, new BlockPos(4, 1, 1));
@@ -262,7 +262,7 @@ public class CableGameTest {
 	@GameTest(maxTicks = 100)
 	public void aDisconnectedScreenStillPassesTheConnectionOn(GameTestHelper helper) {
 		// Disconnecting is one computer's choice; the screen is still physically there for others.
-		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
+		CaseBlockEntity computer = computer(helper, COMPUTER, true);
 		ScreenBlockEntity near = screen(helper, new BlockPos(2, 1, 1), Direction.SOUTH);
 		ScreenBlockEntity far = screen(helper, new BlockPos(3, 1, 1), Direction.SOUTH);
 		helper.startSequence()
@@ -278,7 +278,7 @@ public class CableGameTest {
 
 	@GameTest(maxTicks = 100)
 	public void aScreensGlassDoesNotConnect(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper, COMPUTER, false);
+		CaseBlockEntity computer = computer(helper, COMPUTER, false);
 		ScreenBlockEntity facing = screen(helper, new BlockPos(2, 1, 1), Direction.WEST); // glass against the computer
 		helper.startSequence()
 			.thenIdle(45) // a couple of scans
@@ -288,7 +288,7 @@ public class CableGameTest {
 
 	@GameTest
 	public void cabledDevicesAndDisconnectionsSurviveSaveAndLoad(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper, COMPUTER, true);
+		CaseBlockEntity computer = computer(helper, COMPUTER, true);
 		ScreenBlockEntity screen = wiredScreen(helper);
 		String key = "id:" + screen.id();
 		helper.startSequence()
@@ -297,7 +297,7 @@ public class CableGameTest {
 				computer.pressPower();
 				computer.setConnected(key, false);
 				var registries = helper.getLevel().registryAccess();
-				var loaded = (AllInOneBlockEntity) BlockEntity.loadStatic(computer.getBlockPos(), computer.getBlockState(),
+				var loaded = (CaseBlockEntity) BlockEntity.loadStatic(computer.getBlockPos(), computer.getBlockState(),
 					computer.saveWithFullMetadata(registries), registries);
 				var entry = loaded.busEntries().stream().filter(e -> e.key().equals(key)).findFirst()
 					.orElseThrow(() -> helper.assertionException("the screen's row after reload"));

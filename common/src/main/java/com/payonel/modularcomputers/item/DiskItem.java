@@ -40,7 +40,7 @@ public final class DiskItem extends HintedItem {
 		}
 		stack.remove(ModComponents.WIPED);
 		if (player.level() instanceof net.minecraft.server.level.ServerLevel level) {
-			com.payonel.modularcomputers.device.Disk.erase(com.payonel.modularcomputers.block.AllInOneBlockEntity.diskFolder(level.getServer(), wiped));
+			com.payonel.modularcomputers.device.Disk.erase(com.payonel.modularcomputers.block.CaseBlockEntity.diskFolder(level.getServer(), wiped));
 		}
 	}
 

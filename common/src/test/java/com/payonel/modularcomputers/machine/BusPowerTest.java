@@ -21,7 +21,7 @@ class BusPowerTest {
 	private final Terminal screen = new Terminal(Resolution.DEFAULT);
 
 	private static Machine machine(Program program) {
-		Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+		Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 		machine.board().setCpu(new Cpu(CpuTier.TIER_3));
 		machine.board().setEeprom(new Eeprom(program));
 		return machine;
@@ -81,7 +81,7 @@ class BusPowerTest {
 	@Test
 	void eachCpuTierDrawsItsOwnRunningAndWaiting() {
 		for (CpuTier tier : CpuTier.values()) {
-			Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+			Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 			machine.board().setCpu(new Cpu(tier));
 			machine.board().setEeprom(new Eeprom(board -> {
 				board.list();

@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.gametest;
 
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.CableBlock;
 import com.payonel.modularcomputers.block.DiskStationBlock;
 import com.payonel.modularcomputers.block.DiskStationBlockEntity;
@@ -47,7 +47,7 @@ public class DiskStationGameTest {
 
 	private static Path folder(GameTestHelper helper, DiskStationBlockEntity station, int slot) {
 		UUID serial = station.cards().getItem(slot).get(ModComponents.SERIAL);
-		return AllInOneBlockEntity.diskFolder(helper.getLevel().getServer(), serial);
+		return CaseBlockEntity.diskFolder(helper.getLevel().getServer(), serial);
 	}
 
 	private static List<String> files(Path folder) {
@@ -103,19 +103,19 @@ public class DiskStationGameTest {
 
 	@GameTest(maxTicks = 100)
 	public void aWiredComputerHasItAndItsDisksOnItsBusTheSourceOnlyRead(GameTestHelper helper) {
-		AllInOneBlockEntity computer = onABus(helper, true);
+		CaseBlockEntity computer = onABus(helper, true);
 		helper.succeedWhen(() -> onItsBus(helper, computer));
 	}
 
 	@GameTest(maxTicks = 100)
 	public void aComputerItTouchesHasItOnItsBusWithoutACable(GameTestHelper helper) {
-		AllInOneBlockEntity computer = onABus(helper, false);
+		CaseBlockEntity computer = onABus(helper, false);
 		helper.succeedWhen(() -> onItsBus(helper, computer));
 	}
 
 	@GameTest(maxTicks = 100)
 	public void disconnectedItsDisksAreOffTheBusToo(GameTestHelper helper) {
-		AllInOneBlockEntity computer = onABus(helper, true);
+		CaseBlockEntity computer = onABus(helper, true);
 		DiskStationBlockEntity station = helper.getBlockEntity(POS, DiskStationBlockEntity.class);
 		boolean[] disconnected = {false};
 		helper.onEachTick(() -> {
@@ -134,12 +134,12 @@ public class DiskStationGameTest {
 	}
 
 	/** A running computer two blocks west with a cable between, or right against it, pressed on: what it has on its bus is the test's. */
-	private static AllInOneBlockEntity onABus(GameTestHelper helper, boolean cabled) {
+	private static CaseBlockEntity onABus(GameTestHelper helper, boolean cabled) {
 		DiskStationBlockEntity station = station(helper, false);
 		station.cards().setItem(DiskStationBlockEntity.SOURCE, new ItemStack(ModItems.TIER1_HARD_DISK));
 		BlockPos casePos = cabled ? POS.west(2) : POS.west();
-		helper.setBlock(casePos, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity computer = helper.getBlockEntity(casePos, AllInOneBlockEntity.class);
+		helper.setBlock(casePos, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(casePos, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM));
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
@@ -158,7 +158,7 @@ public class DiskStationGameTest {
 	}
 
 	/** The station and both its disks on the computer's bus, powered. */
-	private static void onItsBus(GameTestHelper helper, AllInOneBlockEntity computer) {
+	private static void onItsBus(GameTestHelper helper, CaseBlockEntity computer) {
 		DiskStationBlockEntity station = helper.getBlockEntity(POS, DiskStationBlockEntity.class);
 		var devices = computer.machine().board().bus().devices();
 		helper.assertTrue(devices.contains(station.device()), "the station on its bus");
@@ -173,7 +173,7 @@ public class DiskStationGameTest {
 		ItemStack used = new ItemStack(ModItems.TIER1_HARD_DISK);
 		UUID serial = UUID.randomUUID();
 		used.set(ModComponents.SERIAL, serial);
-		Path folder = AllInOneBlockEntity.diskFolder(helper.getLevel().getServer(), serial);
+		Path folder = CaseBlockEntity.diskFolder(helper.getLevel().getServer(), serial);
 		Files.createDirectories(folder);
 		Files.writeString(folder.resolve("notes.txt"), "old");
 		List<ItemStack> cells = new ArrayList<>();

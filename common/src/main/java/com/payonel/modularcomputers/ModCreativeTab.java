@@ -28,13 +28,12 @@ public final class ModCreativeTab {
 	/** What it lists, in order. */
 	public static List<ItemStack> items() {
 		List<ItemLike> things = new ArrayList<>();
-		things.add(ModBlocks.ALL_IN_ONE);
 		things.addAll(ModBlocks.CASES);
 		things.addAll(ModBlocks.SCREENS);
 		things.addAll(List.of(ModBlocks.CABLE, ModBlocks.EXPANSION_HUB, ModBlocks.ROBOTIC_PISTON, ModBlocks.ROBOTIC_STICKY_PISTON,
 			ModBlocks.PHOTOMASK, ModBlocks.DISK_STATION, ModItems.SILICON, ModItems.CHIP));
 		things.addAll(ModItems.CPUS);
-		things.addAll(List.of(ModItems.JAVA_CPU, ModItems.EEPROM, ModItems.JAVA_EEPROM));
+		things.addAll(List.of(ModItems.EEPROM));
 		things.addAll(ModItems.RAMS);
 		things.addAll(ModItems.HARD_DISKS);
 		things.addAll(ModItems.CARDS.keySet());

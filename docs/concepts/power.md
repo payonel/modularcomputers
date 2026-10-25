@@ -14,8 +14,8 @@ in watt-hours. Every draw, load and charge you see in a screen or tooltip goes t
 conversions, so the unit's name is one change in the mod. (The names may change; the
 numbers will stay as they are.)
 
-The yardstick is a running [all-in-one](/hardware/all-in-one/): its CPU plus its built-in
-terminal, 110 W. [Batteries](/hardware/battery/) are rated in days of it.
+The yardstick is a running computer: a tier 1 CPU running plus one terminal,
+110 W. [Batteries](/hardware/battery/) are rated in days of it.
 
 ## What draws power
 
@@ -37,8 +37,8 @@ rate, not the running one.
 
 ## What stores it
 
-[Batteries](/hardware/battery/) sit in the case's battery bays. By default, a full tier 1 runs an
-all-in-one for ten Minecraft days, a full tier 2 for twenty and also recharges itself while the
+[Batteries](/hardware/battery/) sit in the case's battery bays. By default, a full tier 1 runs a
+computer for ten Minecraft days, a full tier 2 for twenty and also recharges itself while the
 computer isn't running anything (two seconds of rest charge one second of running), and a tier 3
 never runs out. These are defaults that a server's configuration can change.
 

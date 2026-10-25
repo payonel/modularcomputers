@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.gametest;
 
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.entity.BotGolem;
 import com.payonel.modularcomputers.item.ModComponents;
@@ -30,9 +30,9 @@ public class PartHoldsGameTest {
 	private static final BlockPos OTHER = new BlockPos(4, 1, 1);
 
 	/** A tier 3 case at {@code pos}, facing south, with a CPU, RAM, an EEPROM, a battery and a disk. */
-	private static AllInOneBlockEntity computer(GameTestHelper helper, BlockPos pos, ItemStack disk) {
-		helper.setBlock(pos, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity computer = helper.getBlockEntity(pos, AllInOneBlockEntity.class);
+	private static CaseBlockEntity computer(GameTestHelper helper, BlockPos pos, ItemStack disk) {
+		helper.setBlock(pos, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(pos, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM));
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
@@ -85,7 +85,7 @@ public class PartHoldsGameTest {
 
 	@GameTest
 	public void aCopyOfAComputerInTheWorldCantBePlaced(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper, POS, new ItemStack(ModItems.TIER1_HARD_DISK));
+		CaseBlockEntity computer = computer(helper, POS, new ItemStack(ModItems.TIER1_HARD_DISK));
 		// A creative copy: the case's item with all it holds (as Ctrl and pick block makes it), the case still there.
 		ItemStack copy = new ItemStack(ModBlocks.TIER3_CASE.asItem());
 		copy.applyComponents(computer.collectComponents());
@@ -100,8 +100,8 @@ public class PartHoldsGameTest {
 	public void aCopiedDiskInASecondComputerWaitsOffItsBusUntilTheFirstGoes(GameTestHelper helper) {
 		ItemStack disk = new ItemStack(ModItems.TIER1_HARD_DISK);
 		ModComponents.serial(disk);
-		AllInOneBlockEntity first = computer(helper, POS, disk.copy());
-		AllInOneBlockEntity second = computer(helper, OTHER, disk.copy()); // (a creative copy: the same disk)
+		CaseBlockEntity first = computer(helper, POS, disk.copy());
+		CaseBlockEntity second = computer(helper, OTHER, disk.copy()); // (a creative copy: the same disk)
 		String sata = com.payonel.modularcomputers.machine.Motherboard.sata(0);
 		helper.startSequence()
 			.thenExecute(() -> {

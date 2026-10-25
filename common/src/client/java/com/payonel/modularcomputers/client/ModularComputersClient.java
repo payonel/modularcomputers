@@ -69,7 +69,7 @@ public final class ModularComputersClient {
 	}
 
 	public static void renderers(Renderers renderers) {
-		renderers.register(ModBlocks.ALL_IN_ONE_ENTITY, context -> new DisplayRenderer<>(context, DisplayRenderer.ALL_IN_ONE));
+		renderers.register(ModBlocks.CASE_ENTITY, context -> new DisplayRenderer<>(context, DisplayRenderer.CASE));
 		renderers.register(ModBlocks.SCREEN_ENTITY, context -> new DisplayRenderer<>(context, DisplayRenderer.SCREEN));
 		renderers.register(ModBlocks.EXPANSION_HUB_ENTITY, context -> new OutlineRenderer<>());
 		renderers.register(ModBlocks.ROBOTIC_PISTON_ENTITY, context -> new OutlineRenderer<>());

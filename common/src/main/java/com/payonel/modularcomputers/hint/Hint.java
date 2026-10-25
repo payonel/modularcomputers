@@ -8,7 +8,7 @@ import net.minecraft.core.NonNullList;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.block.ExpansionHubBlockEntity;
 import com.payonel.modularcomputers.block.ExpansionHubBlock;
-import com.payonel.modularcomputers.block.AllInOneBlock;
+import com.payonel.modularcomputers.block.CaseBlock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -62,7 +62,7 @@ public final class Hint {
 		hinted.summary(stack, elements::add);
 		contents(stack, elements::add);
 		if (com.payonel.modularcomputers.item.ModItems.isEeprom(stack)) {
-			// What's on the chip: its first line (a Lua comment, say, or the Java CPU's program class), or blank.
+			// What's on the chip: its first line (a Lua comment, say), or blank.
 			String image = stack.getOrDefault(ModComponents.EEPROM_IMAGE, "").strip();
 			String first = image.lines().findFirst().orElse("");
 			first = first.length() > 28 ? "\u2026" + first.substring(first.length() - 27) : first;
@@ -120,7 +120,7 @@ public final class Hint {
 		List<Integer> order = new ArrayList<>();
 		java.util.function.IntFunction<Component> label;
 		NonNullList<ItemStack> slots;
-		if (item.getBlock() instanceof AllInOneBlock) {
+		if (item.getBlock() instanceof CaseBlock) {
 			slots = NonNullList.withSize(CaseMenu.PART_SLOTS, ItemStack.EMPTY);
 			order.add(CaseMenu.EEPROM_SLOT);
 			for (int slot = CaseMenu.SATA_SLOTS; slot < CaseMenu.PART_SLOTS; slot++) {

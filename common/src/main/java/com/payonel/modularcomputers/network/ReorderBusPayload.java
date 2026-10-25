@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.network;
 
 import com.payonel.modularcomputers.ModularComputers;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -22,7 +22,7 @@ public record ReorderBusPayload(BlockPos pos, String key, boolean up) implements
 	/** On the server's thread, from {@code player}'s client ({@link ModNetwork}). */
 	public static void handle(ReorderBusPayload payload, ServerPlayer player) {
 		if (player.isWithinBlockInteractionRange(payload.pos(), 1.0)
-			&& player.level().getBlockEntity(payload.pos()) instanceof AllInOneBlockEntity computer) {
+			&& player.level().getBlockEntity(payload.pos()) instanceof CaseBlockEntity computer) {
 			computer.moveDevice(payload.key(), payload.up());
 		}
 	}

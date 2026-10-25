@@ -15,7 +15,7 @@ public final class Durations {
 		return String.format("%02d:%02d:%02d", clamped / BatteryCharge.DAY_TICKS, seconds / 60, seconds % 60);
 	}
 
-	/** How long {@code units} of power run an all-in-one, as {@link #clock}. */
+	/** How long {@code units} of power run a computer, as {@link #clock}. */
 	public static String ofUnits(long units) {
 		return clock(PowerUnits.ticks(units));
 	}

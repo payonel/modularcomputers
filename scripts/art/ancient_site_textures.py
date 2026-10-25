@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Draws the broken case found in the ancient sites, from the tier 1 case's textures (needs Pillow):
 # cracked glass, missing keys, grime and rust, an empty board behind the back window. The PNGs
-# are committed; rerun after all_in_one_textures.py, then check the preview.
+# are committed; rerun after computer_textures.py, then check the preview.
 #   scripts/art/ancient_site_textures.py common/src/main/resources/assets/modularcomputers/textures/block preview.png
 import random, sys
 from PIL import Image
@@ -22,7 +22,7 @@ def grime(im, seed, count):
 	return im
 
 def front():
-	im = src("all_in_one_front")
+	im = src("case_front_screen")
 	# A crack across the glass, from a point of impact.
 	for x, y in ((5, 4), (6, 5), (7, 5), (8, 6), (9, 6), (10, 7), (11, 8), (6, 3), (6, 2), (4, 5), (3, 6), (7, 6), (7, 7), (7, 8), (8, 9), (5, 4)):
 		im.putpixel((x, y), CRACK)
@@ -34,21 +34,21 @@ def front():
 	return grime(im, 41, 14)
 
 def side():
-	im = grime(src("all_in_one_side"), 42, 18)
+	im = grime(src("case_side"), 42, 18)
 	for x, y in ((3, 2), (4, 3), (4, 4), (5, 5), (5, 6), (6, 7)):
 		im.putpixel((x, y), (120, 110, 84))   # a split in the plastic
 	im.putpixel((12, 13), RUST); im.putpixel((13, 13), RUST); im.putpixel((12, 14), RUST)
 	return im
 
 def top():
-	im = grime(src("all_in_one_top"), 43, 22)
+	im = grime(src("case_top"), 43, 22)
 	rnd = random.Random(44)
 	for _ in range(6):
 		im.putpixel((rnd.randrange(1, 15), rnd.randrange(1, 15)), (88, 110, 60))  # moss
 	return im
 
 def back():
-	im = src("all_in_one_back")
+	im = src("case_back")
 	# The board's gone: just its empty bay, and a rusted power button housing.
 	for y in range(3, 7):
 		for x in range(4, 12):

@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.gametest;
 
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.CableBlock;
 import com.payonel.modularcomputers.block.ChargingPadBlock;
 import com.payonel.modularcomputers.block.ChargingPadBlockEntity;
@@ -114,8 +114,8 @@ public class ChargingPadGameTest {
 	public void aRunningComputerPowersItByCableAndHearsARobotDockAndLeave(GameTestHelper helper) {
 		ChargingPadBlockEntity pad = pad(helper, false); // (no battery: the bus's power)
 		BlockPos casePos = PAD.west(2);
-		helper.setBlock(casePos, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity computer = helper.getBlockEntity(casePos, AllInOneBlockEntity.class);
+		helper.setBlock(casePos, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(casePos, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM));
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));

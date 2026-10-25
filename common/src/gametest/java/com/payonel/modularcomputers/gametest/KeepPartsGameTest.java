@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.gametest;
 
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.block.ScreenBlockEntity;
 import com.payonel.modularcomputers.item.ModComponents;
@@ -50,8 +50,8 @@ public class KeepPartsGameTest {
 
 	@GameTest
 	public void aBrokenComputerKeepsItsPartsIdAndBusOrder(GameTestHelper helper) {
-		helper.setBlock(POS, ModBlocks.TIER2_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		helper.setBlock(POS, ModBlocks.TIER2_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(POS, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
@@ -78,7 +78,7 @@ public class KeepPartsGameTest {
 		helper.assertTrue(!item.get(DataComponents.TOOLTIP_DISPLAY).shows(DataComponents.CONTAINER), "vanilla's own list is hidden");
 
 		placeBack(helper, item, POS);
-		AllInOneBlockEntity placed = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		CaseBlockEntity placed = helper.getBlockEntity(POS, CaseBlockEntity.class);
 		helper.assertValueEqual(placed.boardId(), board, "the same board: Bluetooth links still find it");
 		helper.assertValueEqual(placed.parts().getItem(CaseMenu.EXP_SLOTS + 1).get(ModComponents.SERIAL), card, "the card is the same device");
 		helper.assertTrue(placed.machine().board().cpu().isPresent(), "its CPU is installed");
@@ -89,7 +89,7 @@ public class KeepPartsGameTest {
 
 	@GameTest
 	public void anEmptyComputerStillStacksWithNewOnesOnlyWithoutItsId(GameTestHelper helper) {
-		helper.setBlock(POS, ModBlocks.TIER1_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
+		helper.setBlock(POS, ModBlocks.TIER1_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
 		ItemStack item = breakBlock(helper, POS).getFirst();
 		helper.assertTrue(!item.has(DataComponents.CONTAINER), "nothing inside: no contents");
 		helper.assertTrue(item.has(ModComponents.SERIAL), "but it's that board");

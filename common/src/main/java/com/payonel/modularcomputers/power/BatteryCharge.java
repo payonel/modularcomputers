@@ -43,7 +43,7 @@ public record BatteryCharge(int units, long settledAt) {
 
 	/**
 	 * The battery spent the time until {@code now} resting: a self-charging one gains its
-	 * recharge rate (a share of a running all-in-one's draw) for each tick. Rest too short to earn
+	 * recharge rate (a share of a running computer's draw) for each tick. Rest too short to earn
 	 * a whole unit carries over to next time.
 	 */
 	public BatteryCharge rest(BatteryTier tier, long now) {
@@ -53,7 +53,7 @@ public record BatteryCharge(int units, long settledAt) {
 		if (!tier.selfCharging() || settledAt == UNSETTLED || now <= settledAt) {
 			return new BatteryCharge(units, now);
 		}
-		double rate = tier.rechargeRate() * PowerUnits.ALL_IN_ONE;
+		double rate = tier.rechargeRate() * PowerUnits.COMPUTER;
 		long gained = (long) Math.floor((now - settledAt) * rate);
 		long total = units + gained;
 		if (total >= tier.capacity()) {

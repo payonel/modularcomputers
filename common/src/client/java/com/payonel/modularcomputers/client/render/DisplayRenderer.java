@@ -24,12 +24,12 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Draws a screen's display (cell backgrounds, its pictures, and text) onto the glass of its block's front
- * face: the all-in-one's or a screen block's. While the player has the bus order panel's bulb
+ * face: a case's or a screen block's. While the player has the bus order panel's bulb
  * on for it, it also outlines the whole block, through walls, so it's easy to find.
  */
 public final class DisplayRenderer<T extends BlockEntity & DisplayHost> implements BlockEntityRenderer<T, DisplayRenderer.State> {
-	/** The all-in-one's glass, above its keyboard, in texels from the face's top-left corner. */
-	public static final Glass ALL_IN_ONE = new Glass(2, 2, 12, 8);
+	/** A case's glass, where a screen in its gold slot shows, in texels from the face's top-left corner. */
+	public static final Glass CASE = new Glass(2, 2, 12, 8);
 	/** The screen block's glass: a 14x9 pane across the middle of the face. */
 	public static final Glass SCREEN = new Glass(1, 3, 14, 9);
 	/** How far the text floats in front of the face, in blocks. */

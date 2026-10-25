@@ -33,7 +33,6 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   tool yet (pictures are made by programs).
 - **Multiblock screens that grow** (user idea, undecided): neighboring screens merging into one
   bigger display.
-- **The all-in-one** is a dev kit: it may go away, or become a creative "everything built in" block.
 - **The gear-box tab, next** (user, 2026-10-20): on every block's GUI, a right-side tab (a gear-box
   icon) showing the block's device type ("tier 3 case", "tier 1 screen"), its device id (or
   "not assigned"), and a wireframe of the block with a faint render of the world around it, where

@@ -30,7 +30,7 @@ class DiskTest {
 	@TempDir
 	Path world;
 
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+	private final Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 	private final List<Object> seen = new ArrayList<>();
 	private Disk disk;
 

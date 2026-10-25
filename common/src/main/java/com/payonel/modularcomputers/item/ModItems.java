@@ -32,9 +32,6 @@ public final class ModItems {
 	public static final CpuItem TIER2_CPU = cpu("tier2_cpu", CpuTier.TIER_2);
 	public static final CpuItem TIER3_CPU = cpu("tier3_cpu", CpuTier.TIER_3);
 	public static final List<CpuItem> CPUS = List.of(TIER1_CPU, TIER2_CPU, TIER3_CPU);
-	/** Creative only (user, 2026-10-12): a tier 3 that runs Java programs, not Lua. */
-	public static final CpuItem JAVA_CPU = (CpuItem) register("java_cpu",
-		properties -> new CpuItem(properties, CpuTier.TIER_3, com.payonel.modularcomputers.machine.Architecture.JAVA), UnaryOperator.identity());
 	/** Refined from nether quartz in a blast furnace: what chips are printed on. */
 	public static final Item SILICON = register("silicon");
 	/** A die, printed from silicon through a photomask: the chip in every part. */
@@ -42,10 +39,7 @@ public final class ModItems {
 	/** Comes from the factory flashed with a bootloader (eeprom/boot.lua), as real boards ship with firmware (crafting it alone wipes it). */
 	public static final Item EEPROM = register("eeprom", properties -> holdsData(properties)
 		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/boot")));
-	/** Creative only, for the Java CPU: flashed with mcos's Java version (its class name). */
-	public static final Item JAVA_EEPROM = register("java_eeprom", properties -> holdsData(properties)
-		.component(ModComponents.EEPROM_IMAGE, com.payonel.modularcomputers.machine.Mcos.class.getName()));
-	public static final List<Item> EEPROMS = List.of(EEPROM, JAVA_EEPROM);
+	public static final List<Item> EEPROMS = List.of(EEPROM);
 	/** RAM sticks: the tier sets the size. */
 	public static final MemoryItem TIER1_RAM = ram("tier1_ram", MemoryTier.TIER_1);
 	public static final MemoryItem TIER2_RAM = ram("tier2_ram", MemoryTier.TIER_2);
@@ -71,7 +65,7 @@ public final class ModItems {
 	/** A bot golem, picked up (its parts in it): creative only until the Advanced Robotics Assembly makes them. */
 	public static final Item BOT_GOLEM = register("bot_golem", BotGolemItem::new, ModItems::holdsData);
 	/** Items with no recipe on purpose: the creative tab's (and giveall's). */
-	public static final List<Item> CREATIVE_ONLY = List.of(JAVA_CPU, JAVA_EEPROM, OPERATOR_CARD, BOT_GOLEM);
+	public static final List<Item> CREATIVE_ONLY = List.of(OPERATOR_CARD, BOT_GOLEM);
 	public static final Item MOTION_SENSOR_CARD = register("motion_sensor_card");
 	public static final Item AUDIO_SENSOR_CARD = register("audio_sensor_card");
 	public static final Item WEATHER_SENSOR_CARD = register("weather_sensor_card");

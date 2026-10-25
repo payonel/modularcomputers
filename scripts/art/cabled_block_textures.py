@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Draws the 16x16 textures of the blocks on the cable network: the screen, the cable, the
-# expansion hub and the robotic piston (needs Pillow), in the all-in-one's beige. Screens come
+# expansion hub and the robotic piston (needs Pillow), in the tier 1 case's beige. Screens come
 # in their tier's era, matching the cases (scripts/art/case_tier_textures.py; user's pick,
 # 2026-10-12): an 80s beige terminal with green-phosphor glass, a 90s platinum color monitor
 # with an RGB badge, a modern graphite flat panel. The PNGs are

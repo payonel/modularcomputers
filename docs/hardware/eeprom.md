@@ -35,4 +35,5 @@ Craft an EEPROM alone in the crafting grid to wipe it: it comes out blank, with 
 
 ## Notes
 
-- A creative-only Java EEPROM also exists, for the Java CPU.
+- The CPU runs what the EEPROM holds as Lua: text that isn't Lua stops it with Lua's own error
+  message, and a blank EEPROM stops it too.

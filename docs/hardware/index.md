@@ -26,7 +26,6 @@ or by Bluetooth.
 ## Pages
 
 - [Case](/hardware/case/): tiers 1 to 3, the block everything goes in.
-- [All-in-One Computer](/hardware/all-in-one/): a creative tier 3 computer with its screen built in.
 - [Broken Computer](/hardware/broken-case/): decoration found in the world.
 - [Screen](/hardware/screen/): tiers 1 to 3, a display and keyboard.
 - [CPU](/hardware/cpu/): sets the bus size and how much power the computer draws.

@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.gametest;
 
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.CableBlock;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.device.NetworkCard;
@@ -34,8 +34,8 @@ public class NetworkGameTest {
 
 	/** A computer with {@code card}, its program waiting forever; switched on when {@code on}. */
 	private static NetworkCard computer(GameTestHelper helper, BlockPos pos, Item card, boolean on) {
-		helper.setBlock(pos, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity computer = helper.getBlockEntity(pos, AllInOneBlockEntity.class);
+		helper.setBlock(pos, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(pos, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM));
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
@@ -104,11 +104,11 @@ public class NetworkGameTest {
 		NetworkCard left = computer(helper, LEFT, ModItems.TIER2_WLAN_CARD, true);
 		NetworkCard right = computer(helper, RIGHT, ModItems.TIER2_WLAN_CARD, false);
 		right.setWake(args("wake"));
-		AllInOneBlockEntity sleeper = helper.getBlockEntity(RIGHT, AllInOneBlockEntity.class);
+		CaseBlockEntity sleeper = helper.getBlockEntity(RIGHT, CaseBlockEntity.class);
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertValueEqual(left.send(args(right.address(), "please wake up")).first(), true,
 				"its card listens while it's off"))
-			.thenWaitUntil(() -> helper.assertBlockProperty(RIGHT, AllInOneBlock.POWERED, true))
+			.thenWaitUntil(() -> helper.assertBlockProperty(RIGHT, CaseBlock.POWERED, true))
 			.thenExecute(() -> helper.assertTrue(sleeper.machine().isPowered(), "on"))
 			.thenSucceed();
 	}

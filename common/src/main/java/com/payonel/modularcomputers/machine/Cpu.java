@@ -11,8 +11,7 @@ import java.util.Optional;
  * motherboard's EEPROM slot (a fixed place, like a real CPU's reset vector, so no bus walk) and
  * starts executing it.
  * <p>
- * The EEPROM holds plain text, run as the CPU's {@link Architecture} reads it: a Lua CPU runs it as
- * a Lua chunk ({@link LuaRunner}); the Java CPU runs the program class it names ({@link #load}).
+ * The EEPROM holds plain text, which the CPU runs as a Lua chunk ({@link LuaRunner}).
  * <p>
  * Its only behavior of its own is the abort screen, like a kernel panic: with no EEPROM, when
  * the program crashes, or when it returns instead of halting (Linux panics when init exits), it
@@ -20,24 +19,13 @@ import java.util.Optional;
  */
 public final class Cpu {
 	private final CpuTier tier;
-	private final Architecture architecture;
 
-	/** A Lua CPU, as every crafted one is. */
 	public Cpu(CpuTier tier) {
-		this(tier, Architecture.LUA);
-	}
-
-	public Cpu(CpuTier tier, Architecture architecture) {
 		this.tier = tier;
-		this.architecture = architecture;
 	}
 
 	public CpuTier tier() {
 		return tier;
-	}
-
-	public Architecture architecture() {
-		return architecture;
 	}
 
 	public static final String ABORT = "ABRT: ";
@@ -50,8 +38,6 @@ public final class Cpu {
 	public static final String RETURNED = "EEPROM returned without halting";
 	/** A wiped EEPROM: nothing to run, like a BIOS's "no bootable device". */
 	public static final String BLANK = "EEPROM is blank";
-	/** The image isn't a program for this CPU (Linux's ENOEXEC: a binary of another architecture). */
-	public static final String EXEC_FORMAT = "EEPROM: exec format error";
 	/** Before what's wrong with the EEPROM's text, such as Lua's syntax error. */
 	public static final String EEPROM = "EEPROM: ";
 	public static final int ABORT_FOREGROUND = 0x2E2E2E;
@@ -80,41 +66,12 @@ public final class Cpu {
 			abort(board, BLANK);
 			return Optional.empty();
 		}
-		if (architecture == Architecture.LUA) {
-			return Optional.of(new LuaRunner(image)); // its firmware loads the image (and aborts when it doesn't compile)
-		}
-		Optional<Program> program = load(image);
-		if (program.isEmpty()) {
-			abort(board, EXEC_FORMAT);
-			return Optional.empty();
-		}
-		return Optional.of(new ProgramRunner(program.get()::run, "cpu"));
+		return Optional.of(new LuaRunner(image)); // its firmware loads the image (and aborts when it doesn't compile)
 	}
 
-	/** A saved program, going on (a Lua CPU's: its VM restored); the Java CPU's programs aren't saved. */
+	/** A saved program, going on: its VM restored. */
 	public Optional<Runner> resume(byte[] saved) {
-		return architecture == Architecture.LUA ? Optional.of(LuaRunner.restore(saved)) : Optional.empty();
-	}
-
-		/**
-	 * The Java CPU's reading: the EEPROM's text names the program's class (its first line), which
-	 * must be a {@link Program} with a public no-argument constructor. The class is looked at before
-	 * it's initialized, so naming anything else runs nothing. Empty when it isn't a Java program.
-	 */
-	public static Optional<Program> load(String image) {
-		String name = image.strip().lines().findFirst().orElse("").strip();
-		if (!name.matches("[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*")) {
-			return Optional.empty();
-		}
-		try {
-			Class<?> type = Class.forName(name, false, Program.class.getClassLoader());
-			if (!Program.class.isAssignableFrom(type)) {
-				return Optional.empty();
-			}
-			return Optional.of((Program) type.getConstructor().newInstance());
-		} catch (ReflectiveOperationException | LinkageError | RuntimeException e) {
-			return Optional.empty();
-		}
+		return Optional.of(LuaRunner.restore(saved));
 	}
 
 	/** The program threw: the abort screen. */

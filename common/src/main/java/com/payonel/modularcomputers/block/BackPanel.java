@@ -5,9 +5,9 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * The clickable parts of the all-in-one's back face, in texels as seen from behind (u to the
+ * The clickable parts of a case's back face, in texels as seen from behind (u to the
  * right, v down). They match the back texture and the block model; see
- * scripts/art/all_in_one_textures.py.
+ * scripts/art/computer_textures.py.
  */
 public final class BackPanel {
 	public enum Region {

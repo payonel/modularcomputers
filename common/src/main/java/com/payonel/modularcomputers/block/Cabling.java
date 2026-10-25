@@ -50,7 +50,7 @@ public final class Cabling {
 		if (block instanceof CableBlock || block instanceof ExpansionHubBlock) {
 			return true;
 		}
-		if (block instanceof ScreenBlock || block instanceof AllInOneBlock) {
+		if (block instanceof ScreenBlock || block instanceof CaseBlock) {
 			return side != state.getValue(HorizontalDirectionalBlock.FACING);
 		}
 		if (block instanceof RoboticPistonBlock) {
@@ -84,7 +84,7 @@ public final class Cabling {
 				if (block instanceof ScreenBlock || block instanceof ExpansionHubBlock) {
 					return CableWalk.Kind.RELAY;
 				}
-				return block instanceof AllInOneBlock || block instanceof RoboticPistonBlock
+				return block instanceof CaseBlock || block instanceof RoboticPistonBlock
 					|| block instanceof PhotomaskBlock || block instanceof DiskStationBlock || block instanceof ChargingPadBlock
 					? CableWalk.Kind.DEVICE : CableWalk.Kind.NONE;
 			}

@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.menu;
 
 import com.payonel.modularcomputers.block.ModBlocks;
-import com.payonel.modularcomputers.block.AllInOneBlock;
+import com.payonel.modularcomputers.block.CaseBlock;
 import com.payonel.modularcomputers.item.ScreenItem;
 import com.payonel.modularcomputers.machine.BoardLayout;
 import com.payonel.modularcomputers.machine.CaseTier;
@@ -99,7 +99,7 @@ public final class CaseMenu extends AbstractContainerMenu {
 	/** Client side: the slots and the case's power are filled in by the server's sync; the tier is the block's. */
 	public CaseMenu(int id, Inventory inventory, BlockPos pos) {
 		this(id, inventory, new SimpleContainer(PART_SLOTS), new SimpleContainerData(POWER_DATA), pos, ContainerLevelAccess.NULL,
-			inventory.player.level().getBlockState(pos).getBlock() instanceof AllInOneBlock block ? block.tier() : CaseTier.TIER_3);
+			inventory.player.level().getBlockState(pos).getBlock() instanceof CaseBlock block ? block.tier() : CaseTier.TIER_3);
 	}
 
 	/**
@@ -108,8 +108,8 @@ public final class CaseMenu extends AbstractContainerMenu {
 	 * ({@link #POWER_DATA}).
 	 */
 	public CaseMenu(int id, Inventory inventory, Container parts, ContainerData power, BlockPos pos, ContainerLevelAccess access, CaseTier tier) {
-		// Any case (the all-in-one or a tier), still there and in reach.
-		this(ModMenus.CASE, id, inventory, parts, power, pos, com.payonel.modularcomputers.network.HostRef.of(pos), player -> access.evaluate((level, at) -> level.getBlockState(at).getBlock() instanceof AllInOneBlock
+		// Any case, still there and in reach.
+		this(ModMenus.CASE, id, inventory, parts, power, pos, com.payonel.modularcomputers.network.HostRef.of(pos), player -> access.evaluate((level, at) -> level.getBlockState(at).getBlock() instanceof CaseBlock
 			&& player.isWithinBlockInteractionRange(at, 4.0), true), tier);
 	}
 

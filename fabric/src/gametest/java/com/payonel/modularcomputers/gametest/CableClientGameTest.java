@@ -1,19 +1,19 @@
 package com.payonel.modularcomputers.gametest;
 
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.CLICK_PAUSE;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.check;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.clickOnScreen;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.count;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.hex;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.isWhite;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.machinePowered;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.moveCursorTo;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.read;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.screenPixel;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.teleport;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.CLICK_PAUSE;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.check;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.clickOnScreen;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.count;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.hex;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.isWhite;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.machinePowered;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.moveCursorTo;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.read;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.screenPixel;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.teleport;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.Bluetooth;
 import com.payonel.modularcomputers.block.CardHolderBlockEntity;
 import com.payonel.modularcomputers.block.RoboticPistonBlockEntity;
@@ -50,12 +50,12 @@ import net.minecraft.world.level.block.PipeBlock;
  */
 public class CableClientGameTest implements FabricClientGameTest {
 	/** The Bluetooth outline's color (DisplayRenderer, OutlineRenderer). */
-	private static final IntPredicate BLUE = rgb -> AllInOneClientGameTest.blue(rgb) > 200 && AllInOneClientGameTest.red(rgb) < 120
-		&& AllInOneClientGameTest.green(rgb) > 100 && AllInOneClientGameTest.green(rgb) < 190;
+	private static final IntPredicate BLUE = rgb -> CaseClientGameTest.blue(rgb) > 200 && CaseClientGameTest.red(rgb) < 120
+		&& CaseClientGameTest.green(rgb) > 100 && CaseClientGameTest.green(rgb) < 190;
 	/** The bulb's outline color (DisplayRenderer). */
 	/** The pulsing yellow outline, by hue: it blends with the frame under it, beige or graphite. */
-	private static final IntPredicate OUTLINE = rgb -> AllInOneClientGameTest.red(rgb) > 110 && AllInOneClientGameTest.green(rgb) > 90
-		&& AllInOneClientGameTest.red(rgb) >= AllInOneClientGameTest.green(rgb) && AllInOneClientGameTest.blue(rgb) < AllInOneClientGameTest.red(rgb) * 0.55;
+	private static final IntPredicate OUTLINE = rgb -> CaseClientGameTest.red(rgb) > 110 && CaseClientGameTest.green(rgb) > 90
+		&& CaseClientGameTest.red(rgb) >= CaseClientGameTest.green(rgb) && CaseClientGameTest.blue(rgb) < CaseClientGameTest.red(rgb) * 0.55;
 
 	/** The test picture's side, in pixels. */
 	private static final int PICTURE_SIZE = 36;
@@ -75,11 +75,11 @@ public class CableClientGameTest implements FabricClientGameTest {
 			BlockPos screen = feet.north(2).above();
 			BlockPos cable = screen.west();
 			BlockPos computer = screen.west(2);
-			setblock(singleplayer, computer, "all_in_one[facing=south]");
+			setblock(singleplayer, computer, "tier3_case[facing=south]");
 			setblock(singleplayer, screen, "tier3_screen[facing=south]");
 			setblock(singleplayer, cable, "cable");
 			singleplayer.getServer().runOnServer(server -> {
-				var be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
+				var be = (CaseBlockEntity) server.overworld().getBlockEntity(computer);
 				var parts = be.parts();
 				parts.setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 				parts.setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
@@ -112,28 +112,28 @@ public class CableClientGameTest implements FabricClientGameTest {
 			int[] picture = new int[PICTURE_SIZE * PICTURE_SIZE];
 			java.util.Arrays.fill(picture, 0xFFFF00FF);
 			String sixel = "\u001B[6;3H" + com.payonel.modularcomputers.display.Sixel.encode(picture, PICTURE_SIZE);
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
 				.virtualBus().console().write(sixel)); // (as a program's output goes: the console, so its repaints keep it)
 			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof ScreenBlockEntity shown && shown.terminal().buffer().hasTiles());
 			context.waitTicks(5);
 			BufferedImage drawn = read(context.takeScreenshot("screen-sixel"));
 			int cx = drawn.getWidth() / 2;
 			int cy = drawn.getHeight() / 2;
-			int magenta = count(drawn, cx - 140, cy - 140, cx + 140, cy + 60, rgb -> AllInOneClientGameTest.red(rgb) > 200
-				&& AllInOneClientGameTest.green(rgb) < 60 && AllInOneClientGameTest.blue(rgb) > 200);
+			int magenta = count(drawn, cx - 140, cy - 140, cx + 140, cy + 60, rgb -> CaseClientGameTest.red(rgb) > 200
+				&& CaseClientGameTest.green(rgb) < 60 && CaseClientGameTest.blue(rgb) > 200);
 			check(magenta > 30, "the screen's face shows its picture, found " + magenta + " magenta pixels");
 
 			// A Sound Card in it plays stereo: two speakers, its left and right as seen facing its
 			// front (it faces south: its left is west), half a block either side.
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).parts()
 				.setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.SOUND_CARD)));
-			for (int tick = 0; !singleplayer.getServer().computeOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
+			for (int tick = 0; !singleplayer.getServer().computeOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer))
 				.machine().board().bus().devices().stream().anyMatch(com.payonel.modularcomputers.device.SoundCard.class::isInstance)); tick++) {
 				check(tick < SOUND_CARD_TICKS, "the sound card on the bus");
 				context.waitTicks(1);
 			}
 			singleplayer.getServer().runOnServer(server -> {
-				var card = (com.payonel.modularcomputers.device.SoundCard) ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
+				var card = (com.payonel.modularcomputers.device.SoundCard) ((CaseBlockEntity) server.overworld().getBlockEntity(computer))
 					.machine().board().bus().devices().stream().filter(com.payonel.modularcomputers.device.SoundCard.class::isInstance).findFirst().orElseThrow();
 				card.setFormat(new com.payonel.modularcomputers.runtime.Arguments(java.util.List.of(java.util.Map.of("rate", 22050L, "encoding", "s16le", "channels", 2L))));
 				card.write(new com.payonel.modularcomputers.runtime.Arguments(java.util.List.of("\0".repeat(4 * 22050 / 2)))); // half a second
@@ -146,12 +146,12 @@ public class CableClientGameTest implements FabricClientGameTest {
 					"the left channel's speaker west of it, the right's east: " + speakers);
 				check(speakers.stream().allMatch(at -> Math.abs(at.z - (computer.getZ() + 0.5)) < 1e-6), "in line with its center: " + speakers);
 			});
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).parts()
 				.setItem(CaseMenu.EXP_SLOTS + 1, ItemStack.EMPTY)); // (what follows counts the bus without it)
 
 			// With the battery out the case's own power runs down, and clients see it drop.
 			singleplayer.getServer().runOnServer(server -> {
-				AllInOneBlockEntity be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
+				CaseBlockEntity be = (CaseBlockEntity) server.overworld().getBlockEntity(computer);
 				be.power().set(PowerBuffer.CAPACITY / 2 + 10); // just over 50%: the next draw crosses it
 				be.parts().setItem(CaseMenu.UPS_SLOT, ItemStack.EMPTY);
 			});
@@ -169,22 +169,22 @@ public class CableClientGameTest implements FabricClientGameTest {
 				check(view.viewToggle().width() > 0, "a screen block has a toggle to its slot");
 			});
 			BufferedImage view = read(context.takeScreenshot("screen-view"));
-			int viewMagenta = count(view, 0, 0, view.getWidth(), view.getHeight(), rgb -> AllInOneClientGameTest.red(rgb) > 200
-				&& AllInOneClientGameTest.green(rgb) < 60 && AllInOneClientGameTest.blue(rgb) > 200);
+			int viewMagenta = count(view, 0, 0, view.getWidth(), view.getHeight(), rgb -> CaseClientGameTest.red(rgb) > 200
+				&& CaseClientGameTest.green(rgb) < 60 && CaseClientGameTest.blue(rgb) > 200);
 			check(viewMagenta > 100, "the screen view shows its picture, found " + viewMagenta);
 			int viewText = context.computeOnClient(client -> {
 				DisplayScreen shown = (DisplayScreen) client.gui.screen();
 				double scale = (double) view.getWidth() / shown.width;
 				var area = shown.viewport();
 				return count(view, (int) (area.x() * scale), (int) (area.y() * scale), (int) (area.right() * scale),
-					(int) ((area.y() + area.height() / 16.0) * scale), AllInOneClientGameTest::isWhite);
+					(int) ((area.y() + area.height() / 16.0) * scale), CaseClientGameTest::isWhite);
 			});
 			check(viewText > 50, "the screen view shows hello world, found " + viewText);
 			// At tier 3's own size (160x50, as it powers on), its view's text: Unifont, crisp, where the
 			// cells are drawn big (the user's report: the default font, magnified, was blocky).
 			String page = "\u001B[8;50;160t\u001B[2J\u001B[H" + ("The quick brown fox jumps over the lazy dog. 0123456789 ~!@#$%^&*()_+ "
 				+ "Modular Computers, tier 3: 160 by 50.   ").repeat(2).substring(0, 158).concat("\r\n").repeat(12);
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
 				.virtualBus().console().write(page));
 			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof com.payonel.modularcomputers.block.ScreenBlockEntity shown
 				&& shown.terminal().buffer().resolution().columns() == 160 && shown.terminal().buffer().row(0).startsWith("The quick"));
@@ -206,7 +206,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			});
 			context.runOnClient(client -> client.getWindow().setWindowed(854, 480));
 			context.waitTicks(5);
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
 				.virtualBus().console().write("\u001B[8;16;50t\u001B[2J\u001B[Hhello world\r\n")); // (back as the test had it)
 			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof com.payonel.modularcomputers.block.ScreenBlockEntity shown
 				&& shown.terminal().buffer().resolution().columns() == 50);
@@ -215,7 +215,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			String unicode = "\u001B[2J\u001B[H\u250F\u2501\u2501\u2501\u2513 \u4E2D\u6587 \uD83D\uDE00 caf\u00E9 cafe\u0301\r\n"
 				+ "\u2503ok \u2503 \u65E5\u672C\u8A9E \u2500\u2502\u253C \u03C0\u2248\u221E\r\n\u2517\u2501\u2501\u2501\u251B "
 				+ "\u001B(0lqqk\u001B(B\r\n";
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
 				.virtualBus().console().write(com.payonel.modularcomputers.device.Terminal.utf8(unicode)));
 			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof com.payonel.modularcomputers.block.ScreenBlockEntity shown
 				&& shown.terminal().buffer().get(6, 0) == 0x4E2D);
@@ -232,7 +232,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 				+ "\u2554\u2550\u2566\u2550\u2557 \u250C\u2504\u2510 \u2571\u2572\u2573 \u256D\u2500\u256E\r\n"
 				+ "\u2560\u2550\u256C\u2550\u2563 \u2506 \u2506 \u2588\u2588\u2588 \u2502 \u2502\r\n"
 				+ "\u255A\u2550\u2569\u2550\u255D \u2514\u2504\u2518     \u2570\u2500\u256F\r\n";
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
 				.virtualBus().console().write(com.payonel.modularcomputers.device.Terminal.utf8(shapes)));
 			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof com.payonel.modularcomputers.block.ScreenBlockEntity shown
 				&& shown.terminal().buffer().get(0, 1) == 0x2554);
@@ -266,7 +266,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(CaseScreen.class);
 			context.waitTicks(2);
 			int row = context.computeOnClient(client -> {
-				var entries = ((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busEntries();
+				var entries = ((CaseBlockEntity) client.level.getBlockEntity(computer)).busEntries();
 				for (int i = 0; i < entries.size(); i++) {
 					if (entries.get(i).cabled()) {
 						check(entries.get(i).name().getString().equals("Tier 3 Screen"), "the cabled row names the screen");
@@ -311,26 +311,26 @@ public class CableClientGameTest implements FabricClientGameTest {
 			int ledOff = screenPixel(context, bulbOn, s -> ((CaseScreen) s).busOverflowLed());
 			check(summary(context, computer).equals("bus: 2 of 64 (1 internal, 1 external)"), "the summary line, got " + summary(context, computer));
 			check((ledOff & 0xFFFFFF) == 0x3A2E1A, "the overflow light is dark, got " + hex(ledOff));
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer))
 				.machine().board().overrideBusCapacity(2)); // its ROM, and room for one
 			BlockPos second = screen.east();
 			setblock(singleplayer, second, "tier3_screen[facing=south]");
-			context.waitFor(client -> client.level.getBlockEntity(computer) instanceof AllInOneBlockEntity be && be.busStatus().overflow());
+			context.waitFor(client -> client.level.getBlockEntity(computer) instanceof CaseBlockEntity be && be.busStatus().overflow());
 			context.waitTicks(2);
 			BufferedImage full = read(context.takeScreenshot("case-bus-full"));
 			int ledOn = screenPixel(context, full, s -> ((CaseScreen) s).busOverflowLed());
 			check((ledOn & 0xFFFFFF) == 0xF0A020, "the overflow light is lit, got " + hex(ledOn));
-			check(context.computeOnClient(client -> ((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busStatus().waiting()) == 1,
+			check(context.computeOnClient(client -> ((CaseBlockEntity) client.level.getBlockEntity(computer)).busStatus().waiting()) == 1,
 				"one screen waits");
 			check(summary(context, computer).equals("bus: 2 of 2 (1 internal, 1 external), overflow 1"), "the summary says so, got " + summary(context, computer));
 			setblock(singleplayer, second, "minecraft:air");
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer))
 				.machine().board().overrideBusCapacity(null));
-			context.waitFor(client -> !((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busStatus().overflow());
+			context.waitFor(client -> !((CaseBlockEntity) client.level.getBlockEntity(computer)).busStatus().overflow());
 
 			// Cut the cable: the screen stays listed, offline, its row's display gray.
 			setblock(singleplayer, cable, "minecraft:air");
-			context.waitFor(client -> ((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busEntries().get(row).online() == false);
+			context.waitFor(client -> ((CaseBlockEntity) client.level.getBlockEntity(computer)).busEntries().get(row).online() == false);
 			context.waitTicks(2);
 			BufferedImage offline = read(context.takeScreenshot("case-screen-offline"));
 			int gray = screenPixel(context, offline, s -> {
@@ -341,7 +341,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 			check(tipAt(context, s -> ((CaseScreen) s).busPlug(row)).equals("Forget"), "and its plug is a forget button");
 			check(summary(context, computer).equals("bus: 1 of 64 (1 internal, 0 external), missing 1"), "missing in the summary, got " + summary(context, computer));
 			setblock(singleplayer, cable, "cable");
-			context.waitFor(client -> ((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busEntries().get(row).online());
+			context.waitFor(client -> ((CaseBlockEntity) client.level.getBlockEntity(computer)).busEntries().get(row).online());
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitFor(client -> client.gui.screen() == null);
 			context.waitTicks(3);
@@ -501,8 +501,8 @@ public class CableClientGameTest implements FabricClientGameTest {
 			context.waitTicks(3);
 			BufferedImage broken = read(context.takeScreenshot("broken-case"));
 			int board = count(broken, 0, 0, broken.getWidth(), broken.getHeight(),
-				rgb -> AllInOneClientGameTest.green(rgb) > AllInOneClientGameTest.red(rgb) + 25 && AllInOneClientGameTest.green(rgb) > AllInOneClientGameTest.blue(rgb) + 15
-					&& AllInOneClientGameTest.green(rgb) < 140);
+				rgb -> CaseClientGameTest.green(rgb) > CaseClientGameTest.red(rgb) + 25 && CaseClientGameTest.green(rgb) > CaseClientGameTest.blue(rgb) + 15
+					&& CaseClientGameTest.green(rgb) < 140);
 			check(board > 40, "the broken computer's board shows through, found " + board);
 
 			// A robotic sticky piston, its cable away from us, pushing to the side: its arm comes out, and goes back.
@@ -522,10 +522,10 @@ public class CableClientGameTest implements FabricClientGameTest {
 
 	/** The gear's brass. */
 	/** The Disk Station's emerald: strongly green, as its trim and its GUI's inlay are. */
-	private static final IntPredicate EMERALD = rgb -> AllInOneClientGameTest.green(rgb) > 110 && AllInOneClientGameTest.green(rgb) > AllInOneClientGameTest.red(rgb) + 60
-		&& AllInOneClientGameTest.green(rgb) > AllInOneClientGameTest.blue(rgb) + 30;
-	private static final IntPredicate BRASS = rgb -> AllInOneClientGameTest.red(rgb) > 60
-		&& AllInOneClientGameTest.red(rgb) > AllInOneClientGameTest.green(rgb) + 12 && AllInOneClientGameTest.green(rgb) > AllInOneClientGameTest.blue(rgb) + 15;
+	private static final IntPredicate EMERALD = rgb -> CaseClientGameTest.green(rgb) > 110 && CaseClientGameTest.green(rgb) > CaseClientGameTest.red(rgb) + 60
+		&& CaseClientGameTest.green(rgb) > CaseClientGameTest.blue(rgb) + 30;
+	private static final IntPredicate BRASS = rgb -> CaseClientGameTest.red(rgb) > 60
+		&& CaseClientGameTest.red(rgb) > CaseClientGameTest.green(rgb) + 12 && CaseClientGameTest.green(rgb) > CaseClientGameTest.blue(rgb) + 15;
 
 	/** How many pixels differ between two screenshots of the same view. */
 	private static int differ(BufferedImage a, BufferedImage b) {
@@ -548,7 +548,7 @@ public class CableClientGameTest implements FabricClientGameTest {
 
 	/** The bus order panel's summary line, as the client would draw it now. */
 	private static String summary(ClientGameTestContext context, BlockPos computer) {
-		return context.computeOnClient(client -> CaseScreen.busSummary(((AllInOneBlockEntity) client.level.getBlockEntity(computer)).busStatus()).getString());
+		return context.computeOnClient(client -> CaseScreen.busSummary(((CaseBlockEntity) client.level.getBlockEntity(computer)).busStatus()).getString());
 	}
 
 	/** The bus order panel's tip for the middle of an area, or "" for none. */
@@ -561,11 +561,11 @@ public class CableClientGameTest implements FabricClientGameTest {
 	}
 
 		private static int casePercent(Minecraft client, BlockPos computer) {
-		return client.level.getBlockEntity(computer) instanceof AllInOneBlockEntity be ? be.power().percent() : -1;
+		return client.level.getBlockEntity(computer) instanceof CaseBlockEntity be ? be.power().percent() : -1;
 	}
 
 		private static void pressPower(TestSingleplayerContext singleplayer, BlockPos computer) {
-		singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).pressPower());
+		singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).pressPower());
 	}
 
 	private static boolean showsHello(Minecraft client, BlockPos screen) {
@@ -581,6 +581,6 @@ public class CableClientGameTest implements FabricClientGameTest {
 	private static int whiteOnScreen(BufferedImage image) {
 		int cx = image.getWidth() / 2;
 		int cy = image.getHeight() / 2;
-		return count(image, cx - 140, cy - 140, cx + 140, cy + 60, AllInOneClientGameTest::isWhite);
+		return count(image, cx - 140, cy - 140, cx + 140, cy + 60, CaseClientGameTest::isWhite);
 	}
 }

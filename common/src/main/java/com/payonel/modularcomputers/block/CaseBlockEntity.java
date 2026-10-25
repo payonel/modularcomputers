@@ -52,13 +52,13 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
 /**
- * A case (the all-in-one and the tiered ones): a block holding a {@link BoardAssembly}, its board
+ * A case, of any tier: a block holding a {@link BoardAssembly}, its board
  * and parts, filled from the case view. What only a block does is here: the devices it finds along
  * its cables (screens, hubs' cards, robotic pistons, Disk Stations, photomasks) put on its bus, its
  * power button's light (the block state), what Bluetooth cards link to, and dropping as one item
  * that keeps its parts.
  */
-public final class AllInOneBlockEntity extends BlockEntity implements MenuProvider, BoardHolder, Bluetooth.Holder {
+public final class CaseBlockEntity extends BlockEntity implements MenuProvider, BoardHolder, Bluetooth.Holder {
 	/** Looks for cabled devices this often, in ticks, even when no cable changed (chunks load and unload). */
 	private static final int RESCAN_TICKS = 20;
 	private static final String BUS_EXTERNAL = "bus_external";
@@ -73,9 +73,9 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	/** Writing the client's copy (a sync), not a save: no program state in it. */
 	private boolean syncing;
 
-	public AllInOneBlockEntity(BlockPos pos, BlockState state) {
-		super(ModBlocks.ALL_IN_ONE_ENTITY, pos, state);
-		AllInOneBlock block = state.getBlock() instanceof AllInOneBlock found ? found : (AllInOneBlock) ModBlocks.ALL_IN_ONE;
+	public CaseBlockEntity(BlockPos pos, BlockState state) {
+		super(ModBlocks.CASE_ENTITY, pos, state);
+		CaseBlock block = state.getBlock() instanceof CaseBlock found ? found : (CaseBlock) ModBlocks.TIER3_CASE;
 		this.tier = block.tier();
 		this.board = new BoardAssembly(new CaseHost(), tier, TerminalTier.TIER_3);
 	}
@@ -94,7 +94,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 
 		@Override
 		public Direction front() {
-			return getBlockState().getValue(AllInOneBlock.FACING);
+			return getBlockState().getValue(CaseBlock.FACING);
 		}
 
 		/**
@@ -110,7 +110,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 
 		@Override
 		public void setChanged() {
-			AllInOneBlockEntity.this.setChanged();
+			CaseBlockEntity.this.setChanged();
 		}
 
 		@Override
@@ -128,10 +128,10 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 				return false;
 			}
 			BlockState state = getBlockState()
-				.setValue(AllInOneBlock.READY, ready)
-				.setValue(AllInOneBlock.POWERED, powered)
-				.setValue(AllInOneBlock.HALTED, halted)
-				.setValue(AllInOneBlock.SCREEN, screen);
+				.setValue(CaseBlock.READY, ready)
+				.setValue(CaseBlock.POWERED, powered)
+				.setValue(CaseBlock.HALTED, halted)
+				.setValue(CaseBlock.SCREEN, screen);
 			if (state == getBlockState()) {
 				return false;
 			}
@@ -146,7 +146,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		@Override
 		public void syncDisplay(Terminal display) {
 			if (level instanceof ServerLevel server) {
-				ScreenRows.send(server, AllInOneBlockEntity.this, display);
+				ScreenRows.send(server, CaseBlockEntity.this, display);
 			}
 		}
 
@@ -163,7 +163,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 
 		@Override
 		public boolean stillValid(Player player) {
-			return Container.stillValidBlockEntity(AllInOneBlockEntity.this, player);
+			return Container.stillValidBlockEntity(CaseBlockEntity.this, player);
 		}
 
 		@Override
@@ -187,7 +187,7 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 	@Override
 	public PowerLight powerLight() {
 		BlockState state = getBlockState();
-		return new PowerLight(state.getValue(AllInOneBlock.READY), state.getValue(AllInOneBlock.POWERED), state.getValue(AllInOneBlock.HALTED));
+		return new PowerLight(state.getValue(CaseBlock.READY), state.getValue(CaseBlock.POWERED), state.getValue(CaseBlock.HALTED));
 	}
 
 	/** The motherboard's bus order. */
@@ -432,11 +432,11 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 		}
 		if (result == Machine.PowerPress.NO_CPU) {
 			// The block's tick sets the light back.
-			level.setBlock(worldPosition, getBlockState().setValue(AllInOneBlock.POWERED, true), Block.UPDATE_CLIENTS);
-			level.scheduleTick(worldPosition, getBlockState().getBlock(), AllInOneBlock.ATTEMPT_TICKS);
+			level.setBlock(worldPosition, getBlockState().setValue(CaseBlock.POWERED, true), Block.UPDATE_CLIENTS);
+			level.scheduleTick(worldPosition, getBlockState().getBlock(), CaseBlock.ATTEMPT_TICKS);
 		} else if (result != Machine.PowerPress.NO_POWER) {
 			// Changing the block state also sends this block entity's update to clients.
-			level.setBlock(worldPosition, getBlockState().setValue(AllInOneBlock.POWERED, result == Machine.PowerPress.ON), Block.UPDATE_CLIENTS);
+			level.setBlock(worldPosition, getBlockState().setValue(CaseBlock.POWERED, result == Machine.PowerPress.ON), Block.UPDATE_CLIENTS);
 		}
 		return result;
 	}

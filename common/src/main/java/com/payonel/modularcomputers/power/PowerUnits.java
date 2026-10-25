@@ -2,8 +2,8 @@ package com.payonel.modularcomputers.power;
 
 /**
  * Power is counted in whole units. What draws it, per tick: a CPU while it executes
- * ({@link #CPU}), ten times a terminal ({@link #TERMINAL}). A running all-in-one (its CPU and its
- * built-in terminal) is the yardstick: batteries are rated in days of it ({@link #DAY}), so a full
+ * ({@link #CPU}), ten times a terminal ({@link #TERMINAL}). A running computer (its CPU and one
+ * terminal) is the yardstick: batteries are rated in days of it ({@link #DAY}), so a full
  * tier 1 runs one for ten days by default. Times shown to players ("DD:MM:SS") are at that rate.
  */
 public final class PowerUnits {
@@ -13,10 +13,10 @@ public final class PowerUnits {
 	public static final int TERMINAL = 10;
 	/** One write to a terminal, flat. */
 	public static final int TERMINAL_WRITE = 1;
-	/** A running all-in-one, each tick: the yardstick. */
-	public static final int ALL_IN_ONE = CPU + TERMINAL;
-	/** A day of a running all-in-one. */
-	public static final int DAY = BatteryCharge.DAY_TICKS * ALL_IN_ONE;
+	/** A running computer (a CPU and a terminal), each tick: the yardstick. */
+	public static final int COMPUTER = CPU + TERMINAL;
+	/** A day of a running computer. */
+	public static final int DAY = BatteryCharge.DAY_TICKS * COMPUTER;
 
 	private PowerUnits() {
 	}
@@ -71,8 +71,8 @@ public final class PowerUnits {
 		return load <= 0 ? -1 : stored / load;
 	}
 
-	/** How long {@code units} run an all-in-one, in ticks. */
+	/** How long {@code units} run a computer, in ticks. */
 	public static long ticks(long units) {
-		return units / ALL_IN_ONE;
+		return units / COMPUTER;
 	}
 }

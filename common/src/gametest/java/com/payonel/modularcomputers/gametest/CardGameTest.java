@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.gametest;
 
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.device.MotionSensorCard;
 import com.payonel.modularcomputers.device.RedstoneCard;
@@ -34,8 +34,8 @@ public class CardGameTest {
 	/** A running computer (its program waits on: its devices take data only while one runs) with {@code card} in its first expansion slot. */
 	@SuppressWarnings("unchecked")
 	private static <T> T computerWith(GameTestHelper helper, Item card, Class<T> type) {
-		helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(POS, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
@@ -66,7 +66,7 @@ public class CardGameTest {
 	@GameTest(maxTicks = 40)
 	public void twoRedstoneCardsInABlockPutOutTheStrongestAndEachReadsTheOthers(GameTestHelper helper) {
 		RedstoneCard first = computerWith(helper, ModItems.REDSTONE_CARD, RedstoneCard.class);
-		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		CaseBlockEntity computer = helper.getBlockEntity(POS, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 2, new ItemStack(ModItems.REDSTONE_CARD));
 		helper.setBlock(POS.east(), Blocks.REDSTONE_LAMP);
 		helper.startSequence()
@@ -119,10 +119,10 @@ public class CardGameTest {
 			.thenExecute(() -> {
 				helper.assertTrue(card.interruptPending(), "the changes wait for the program");
 				// Saved as the world is, then gone, and loaded again: a save isn't a power cut.
-				net.minecraft.nbt.CompoundTag saved = helper.getBlockEntity(POS, AllInOneBlockEntity.class).saveWithoutMetadata(registries);
+				net.minecraft.nbt.CompoundTag saved = helper.getBlockEntity(POS, CaseBlockEntity.class).saveWithoutMetadata(registries);
 				helper.setBlock(POS, Blocks.AIR);
-				helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-				AllInOneBlockEntity again = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+				helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+				CaseBlockEntity again = helper.getBlockEntity(POS, CaseBlockEntity.class);
 				again.loadWithComponents(net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, registries, saved));
 				RedstoneCard loaded = again.machine().board().bus().devices().stream()
 					.filter(RedstoneCard.class::isInstance).map(RedstoneCard.class::cast).findFirst().orElseThrow();
@@ -272,7 +272,7 @@ public class CardGameTest {
 	@GameTest(maxTicks = 100)
 	public void aSoundCardPlaysWhatsWrittenByGameTimeAndAnAudioSensorHearsItStart(GameTestHelper helper) {
 		var card = computerWith(helper, ModItems.SOUND_CARD, com.payonel.modularcomputers.device.SoundCard.class);
-		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		CaseBlockEntity computer = helper.getBlockEntity(POS, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 2, new ItemStack(ModItems.AUDIO_SENSOR_CARD));
 		List<Map<?, ?>> heard = new ArrayList<>();
 		helper.startSequence()
@@ -297,7 +297,7 @@ public class CardGameTest {
 	@GameTest(maxTicks = 100)
 	public void aBelRingsTheTerminalsBellOnceForBellsCloseTogether(GameTestHelper helper) {
 		var sensor = computerWith(helper, ModItems.AUDIO_SENSOR_CARD, com.payonel.modularcomputers.device.AudioSensorCard.class);
-		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		CaseBlockEntity computer = helper.getBlockEntity(POS, CaseBlockEntity.class);
 		TestPrograms.withScreen(computer); // (its terminal: a screen in its gold slot)
 		List<Map<?, ?>> heard = new ArrayList<>();
 		helper.startSequence()
@@ -331,7 +331,7 @@ public class CardGameTest {
 	@GameTest(maxTicks = 60)
 	public void aBluetoothCardsLinkIsReadAndSetOnTheCardItself(GameTestHelper helper) {
 		var card = computerWith(helper, ModItems.BLUETOOTH_CARD, com.payonel.modularcomputers.device.BluetoothCard.class);
-		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		CaseBlockEntity computer = helper.getBlockEntity(POS, CaseBlockEntity.class);
 		java.util.UUID other = java.util.UUID.randomUUID();
 		helper.assertTrue(card.getLink(args()).first() == null, "linked to nothing");
 		helper.assertValueEqual(card.getBoard(args()).first(), computer.boardId().toString(), "its computer's board");
@@ -371,8 +371,8 @@ public class CardGameTest {
 	 */
 	@GameTest(maxTicks = 1200) // (mcos boots off the disk: a board call a read)
 	public void mcosReadsAMotionSensorPutInWhileItRunsAsAMobMoves(GameTestHelper helper) {
-		helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+		helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(POS, CaseBlockEntity.class);
 		TestPrograms.withScreen(computer);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER1_RAM));
@@ -380,7 +380,7 @@ public class CardGameTest {
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.TIER1_HARD_DISK));
 		java.util.UUID disk = computer.parts().getItem(CaseMenu.SATA_SLOTS).get(com.payonel.modularcomputers.item.ModComponents.SERIAL);
-		java.nio.file.Path seen = AllInOneBlockEntity.diskFolder(helper.getLevel().getServer(), disk).resolve("seen");
+		java.nio.file.Path seen = CaseBlockEntity.diskFolder(helper.getLevel().getServer(), disk).resolve("seen");
 		computer.pressPower();
 		var pig = helper.spawn(EntityTypes.PIG, POS.north(3));
 		helper.startSequence()

@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.gametest;
 
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.bus.DeviceType;
 import com.payonel.modularcomputers.device.Terminal;
@@ -30,12 +30,12 @@ import net.minecraft.world.level.block.Block;
 public class CaseTierGameTest {
 	private static final BlockPos POS = new BlockPos(1, 1, 1);
 
-	private static AllInOneBlockEntity place(GameTestHelper helper, Block block) {
-		helper.setBlock(POS, block.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		return helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+	private static CaseBlockEntity place(GameTestHelper helper, Block block) {
+		helper.setBlock(POS, block.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		return helper.getBlockEntity(POS, CaseBlockEntity.class);
 	}
 
-	private static CaseMenu menu(GameTestHelper helper, AllInOneBlockEntity computer) {
+	private static CaseMenu menu(GameTestHelper helper, CaseBlockEntity computer) {
 		ServerPlayer player = GameTests.serverPlayer(helper);
 		return (CaseMenu) computer.createMenu(0, player.getInventory(), player);
 	}
@@ -43,7 +43,7 @@ public class CaseTierGameTest {
 	@GameTest
 	public void eachTierOffersItsOwnSlotsOfTheSameBoard(GameTestHelper helper) {
 		for (Block block : ModBlocks.CASES) {
-			AllInOneBlockEntity computer = place(helper, block);
+			CaseBlockEntity computer = place(helper, block);
 			CaseTier tier = computer.tier();
 			CaseMenu menu = menu(helper, computer);
 			int bays = 0;
@@ -76,7 +76,7 @@ public class CaseTierGameTest {
 	public void onlyTheGoldSlotOfTiers2And3TakesAScreen(GameTestHelper helper) {
 		ItemStack screen = new ItemStack(ModBlocks.TIER2_SCREEN);
 		for (Block block : ModBlocks.CASES) {
-			AllInOneBlockEntity computer = place(helper, block);
+			CaseBlockEntity computer = place(helper, block);
 			CaseMenu menu = menu(helper, computer);
 			boolean gold = computer.tier().screenSlot();
 			helper.assertValueEqual(menu.slots.get(CaseMenu.EXP_SLOTS).mayPlace(screen), gold, computer.tier() + ": its first expansion slot");
@@ -87,17 +87,17 @@ public class CaseTierGameTest {
 
 	@GameTest
 	public void aScreenInTheGoldSlotIsTheCasesTerminalOnItsFront(GameTestHelper helper) {
-		AllInOneBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
+		CaseBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		TestPrograms.flash(computer, TestPrograms.HELLO);
-		helper.assertBlockProperty(POS, AllInOneBlock.SCREEN, false);
+		helper.assertBlockProperty(POS, CaseBlock.SCREEN, false);
 		helper.assertTrue(!computer.showsScreen(), "no screen: a blank front");
 
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(ModBlocks.TIER2_SCREEN));
-		helper.assertBlockProperty(POS, AllInOneBlock.SCREEN, true);
+		helper.assertBlockProperty(POS, CaseBlock.SCREEN, true);
 		var bus = computer.machine().board().bus();
 		helper.assertValueEqual(bus.device("exp:0").map(device -> device.type()).orElse(null), DeviceType.TERMINAL, "on the bus in the gold slot");
 		Terminal terminal = computer.terminal();
@@ -109,7 +109,7 @@ public class CaseTierGameTest {
 		helper.assertValueEqual(terminal.buffer().row(0).strip(), TestPrograms.GREETING, "the console shows on it");
 
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, ItemStack.EMPTY);
-		helper.assertBlockProperty(POS, AllInOneBlock.SCREEN, false);
+		helper.assertBlockProperty(POS, CaseBlock.SCREEN, false);
 		helper.assertTrue(bus.device("exp:0").isEmpty(), "gone from the bus");
 		helper.assertTrue(terminal.buffer().isBlank(), "and dark");
 		helper.succeed();
@@ -117,7 +117,7 @@ public class CaseTierGameTest {
 
 	@GameTest
 	public void theBoardReportsItsCaseAndTheEepromKeepsWhatAProgramWrites(GameTestHelper helper) {
-		AllInOneBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
+		CaseBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
 		ItemStack chip = new ItemStack(ModItems.EEPROM);
 		chip.set(ModComponents.LABEL, "boot");
@@ -158,7 +158,7 @@ public class CaseTierGameTest {
 
 	@GameTest
 	public void aDisksFilesAreInTheWorldSaveByItsIdAndGoWithIt(GameTestHelper helper) {
-		AllInOneBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
+		CaseBlockEntity computer = place(helper, ModBlocks.TIER2_CASE);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
@@ -174,15 +174,15 @@ public class CaseTierGameTest {
 			board.halt();
 		});
 		computer.pressPower();
-		java.nio.file.Path folder = AllInOneBlockEntity.diskFolder(helper.getLevel().getServer(), id);
+		java.nio.file.Path folder = CaseBlockEntity.diskFolder(helper.getLevel().getServer(), id);
 		helper.assertTrue(java.nio.file.Files.isRegularFile(folder.resolve("hello.txt")), "the file is in the world save: " + folder);
 		computer.pressPower(); // off
 
 		// The same disk in another computer reads it.
 		ItemStack disk = computer.parts().removeItemNoUpdate(CaseMenu.SATA_SLOTS);
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, ItemStack.EMPTY);
-		helper.setBlock(POS.east(), ModBlocks.TIER2_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity other = helper.getBlockEntity(POS.east(), AllInOneBlockEntity.class);
+		helper.setBlock(POS.east(), ModBlocks.TIER2_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity other = helper.getBlockEntity(POS.east(), CaseBlockEntity.class);
 		other.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
 		other.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		other.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));

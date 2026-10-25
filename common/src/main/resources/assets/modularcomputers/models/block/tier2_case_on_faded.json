@@ -1,5 +1,5 @@
 {
-	"parent": "modularcomputers:block/all_in_one_base_faded",
+	"parent": "modularcomputers:block/case_base_faded",
 	"textures": {
 		"north": "modularcomputers:block/tier2_case_front",
 		"south": "modularcomputers:block/tier2_case_back",
@@ -8,6 +8,6 @@
 		"up": "modularcomputers:block/tier2_case_top",
 		"down": "modularcomputers:block/tier2_case_bottom",
 		"particle": "modularcomputers:block/tier2_case_side",
-		"button": "modularcomputers:block/all_in_one_power_on_faded"
+		"button": "modularcomputers:block/case_power_on_faded"
 	}
 }

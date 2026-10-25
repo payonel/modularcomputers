@@ -7,7 +7,7 @@ package com.payonel.modularcomputers.runtime;
  * arguments ({@link Arguments#account}).
  */
 public interface MemoryAccount {
-	/** No limit: a program with no memory to count (the Java CPU's, tests'). */
+	/** No limit: a program with no memory to count (a test's Java program). */
 	MemoryAccount UNLIMITED = new MemoryAccount() {
 		@Override
 		public boolean charge(long bytes) {

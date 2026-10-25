@@ -1,5 +1,5 @@
 {
-	"parent": "modularcomputers:block/all_in_one_base",
+	"parent": "modularcomputers:block/case_base",
 	"textures": {
 		"north": "modularcomputers:block/tier3_case_front_screen",
 		"south": "modularcomputers:block/tier3_case_back",
@@ -8,6 +8,6 @@
 		"up": "modularcomputers:block/tier3_case_top",
 		"down": "modularcomputers:block/tier3_case_bottom",
 		"particle": "modularcomputers:block/tier3_case_side",
-		"button": "modularcomputers:block/all_in_one_power_halted"
+		"button": "modularcomputers:block/case_power_halted"
 	}
 }

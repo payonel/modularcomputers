@@ -4,7 +4,7 @@ Section / path (under `docs/`) — owner
 
 Start: `index.md` (front page), `install.md`
 Concepts: `concepts/index.md`, `bus.md`, `faces.md`, `power.md`, `interrupts.md`, `names.md`, `persistence.md`
-Hardware: `hardware/index.md`, `case.md` (tiers 1-3), `all-in-one.md`, `broken-case.md`, `screen.md`,
+Hardware: `hardware/index.md`, `case.md` (tiers 1-3), `broken-case.md`, `screen.md`,
   `cpu.md`, `memory.md`, `eeprom.md`, `disk.md`, `battery.md`, `cable.md`, `expansion-hub.md`,
   `disk-station.md`, `photomask.md`, `robotic-piston.md`, `bot-golem.md`, `charging-pad.md`
 Devices: `devices/index.md`, `terminal.md`, `disk.md`, `disk-station.md`, `eeprom.md`, `redstone-card.md`,

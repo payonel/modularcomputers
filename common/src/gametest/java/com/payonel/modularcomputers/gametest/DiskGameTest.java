@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.gametest;
 
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
@@ -23,9 +23,9 @@ import net.minecraft.world.item.crafting.RecipeType;
 public class DiskGameTest {
 	private static final BlockPos POS = new BlockPos(1, 1, 1);
 
-	private static AllInOneBlockEntity computer(GameTestHelper helper) {
-		helper.setBlock(POS, ModBlocks.TIER1_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity computer = helper.getBlockEntity(POS, AllInOneBlockEntity.class);
+	private static CaseBlockEntity computer(GameTestHelper helper) {
+		helper.setBlock(POS, ModBlocks.TIER1_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(POS, CaseBlockEntity.class);
 		TestPrograms.withScreen(computer);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
@@ -38,11 +38,11 @@ public class DiskGameTest {
 		for (var tier : List.of(ModItems.TIER1_HARD_DISK, ModItems.TIER2_HARD_DISK, ModItems.TIER3_HARD_DISK)) {
 			helper.assertValueEqual(new ItemStack(tier).get(ModComponents.DISK_IMAGE), "mcos", "a new disk comes with mcos, every tier");
 		}
-		AllInOneBlockEntity computer = computer(helper);
+		CaseBlockEntity computer = computer(helper);
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.TIER1_HARD_DISK));
 		ItemStack disk = computer.parts().getItem(CaseMenu.SATA_SLOTS);
 		UUID id = disk.get(ModComponents.SERIAL);
-		Path folder = AllInOneBlockEntity.diskFolder(helper.getLevel().getServer(), id);
+		Path folder = CaseBlockEntity.diskFolder(helper.getLevel().getServer(), id);
 		helper.assertTrue(Files.isRegularFile(folder.resolve("init.lua")) && Files.isRegularFile(folder.resolve("bin/sh")), "its files, in its folder");
 		helper.assertTrue(!disk.has(ModComponents.DISK_IMAGE), "then the mark goes");
 		helper.succeed();
@@ -50,7 +50,7 @@ public class DiskGameTest {
 
 	@GameTest(maxTicks = 400) // (mcos reads its kernel, modules, interpreter and shell off the disk: a board call a read)
 	public void aNewEepromBootsMcosFromATier1Disk(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper);
+		CaseBlockEntity computer = computer(helper);
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
 		computer.parts().setItem(CaseMenu.SATA_SLOTS, new ItemStack(ModItems.TIER1_HARD_DISK));
 		computer.pressPower();
@@ -66,7 +66,7 @@ public class DiskGameTest {
 		ItemStack used = new ItemStack(ModItems.TIER2_HARD_DISK);
 		UUID id = UUID.randomUUID();
 		used.set(ModComponents.SERIAL, id);
-		Path folder = AllInOneBlockEntity.diskFolder(helper.getLevel().getServer(), id);
+		Path folder = CaseBlockEntity.diskFolder(helper.getLevel().getServer(), id);
 		Files.createDirectories(folder);
 		Files.writeString(folder.resolve("notes.txt"), "old");
 		CraftingInput input = CraftingInput.of(1, 1, List.of(used));

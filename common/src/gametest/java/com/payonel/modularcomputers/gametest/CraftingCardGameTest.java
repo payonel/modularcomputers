@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.gametest;
 
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.device.CraftingCard;
 import com.payonel.modularcomputers.entity.BotGolem;
@@ -216,8 +216,8 @@ public class CraftingCardGameTest {
 	@GameTest(maxTicks = 100)
 	public void inACaseItsMethodsNeedRoboticsButAPlayerCraftsByHand(GameTestHelper helper) {
 		BlockPos pos = new BlockPos(4, 2, 4);
-		helper.setBlock(pos, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity computer = helper.getBlockEntity(pos, AllInOneBlockEntity.class);
+		helper.setBlock(pos, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(pos, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + LANE, card(sticks(1)));
 		CraftingCard card = crafting(computer.board(), LANE);
 		same(helper, card.list(args()).error(), CraftingCard.NO_ROBOTICS, "a program's call");

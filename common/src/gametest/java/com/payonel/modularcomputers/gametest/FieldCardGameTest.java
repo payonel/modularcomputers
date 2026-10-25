@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.gametest;
 
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.device.FieldCard;
 import com.payonel.modularcomputers.entity.BotGolem;
@@ -48,8 +48,8 @@ public class FieldCardGameTest {
 				helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
 			}
 		}
-		helper.setBlock(CASE, ModBlocks.TIER3_CASE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity computer = helper.getBlockEntity(CASE, AllInOneBlockEntity.class);
+		helper.setBlock(CASE, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(CASE, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM));
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
@@ -163,7 +163,7 @@ public class FieldCardGameTest {
 	public void itsComputerStoppingLetsGo(GameTestHelper helper) {
 		FieldCard card = fieldCase(helper);
 		Pig pig = helper.spawn(EntityTypes.PIG, PIG);
-		AllInOneBlockEntity computer = helper.getBlockEntity(CASE, AllInOneBlockEntity.class);
+		CaseBlockEntity computer = helper.getBlockEntity(CASE, CaseBlockEntity.class);
 		helper.startSequence()
 			.thenExecuteAfter(2, () -> card.capture(args(pig.getStringUUID())))
 			.thenExecuteAfter(2, () -> computer.pressPower()) // off

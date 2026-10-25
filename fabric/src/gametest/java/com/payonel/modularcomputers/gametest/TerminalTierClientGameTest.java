@@ -1,11 +1,11 @@
 package com.payonel.modularcomputers.gametest;
 
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.check;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.count;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.read;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.teleport;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.check;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.count;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.read;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.teleport;
 
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.ScreenBlockEntity;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.CaseMenu;
@@ -35,11 +35,11 @@ public class TerminalTierClientGameTest implements FabricClientGameTest {
 			BlockPos feet = singleplayer.getServer().computeOnServer(server -> singleplayer.getConnection().getServerPlayer().blockPosition());
 			BlockPos screen = feet.north(2).above();
 			BlockPos computer = screen.west(2);
-			setblock(singleplayer, computer, "modularcomputers:all_in_one[facing=south]");
+			setblock(singleplayer, computer, "modularcomputers:tier3_case[facing=south]");
 			setblock(singleplayer, screen, "modularcomputers:tier1_screen[facing=south]");
 			setblock(singleplayer, screen.west(), "modularcomputers:cable");
 			singleplayer.getServer().runOnServer(server -> {
-				var be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
+				var be = (CaseBlockEntity) server.overworld().getBlockEntity(computer);
 				be.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 				be.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM));
 				be.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
@@ -49,7 +49,7 @@ public class TerminalTierClientGameTest implements FabricClientGameTest {
 			});
 			teleport(singleplayer, feet, 180);
 			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof ScreenBlockEntity shown && !shown.terminal().buffer().isBlank());
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
 				.virtualBus().console().write(ATTRIBUTES));
 			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof ScreenBlockEntity shown && shown.terminal().buffer().row(0).startsWith("plain"));
 			context.getInput().lookAt(screen);
@@ -62,7 +62,7 @@ public class TerminalTierClientGameTest implements FabricClientGameTest {
 			context.waitTicks(5);
 			BufferedImage shot = read(context.takeScreenshot("tier1-attributes"));
 			int lit = count(shot, 0, 0, shot.getWidth(), shot.getHeight(),
-				rgb -> AllInOneClientGameTest.green(rgb) > LIT && AllInOneClientGameTest.red(rgb) < AllInOneClientGameTest.green(rgb) / 2);
+				rgb -> CaseClientGameTest.green(rgb) > LIT && CaseClientGameTest.red(rgb) < CaseClientGameTest.green(rgb) / 2);
 			check(lit > 200, "reverse video lights its cells green on a tier 1 screen, found " + lit + " lit pixels");
 			// Its view, close up: the text in tier 1's font (Unifont).
 			context.getInput().pressKey(options -> options.keyUse);

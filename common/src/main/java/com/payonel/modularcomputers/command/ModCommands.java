@@ -57,7 +57,7 @@ public final class ModCommands {
 
 	/** What it takes to build a working computer and wire a screen to it: these go in the hotbar first, in this order. */
 	public static List<Item> hotbarFirst() {
-		return List.of(ModBlocks.ALL_IN_ONE.asItem(), ModItems.TIER3_CPU, ModItems.TIER3_RAM, ModItems.EEPROM, ModItems.TIER1_BATTERY,
+		return List.of(ModBlocks.TIER3_CASE.asItem(), ModItems.TIER3_CPU, ModItems.TIER3_RAM, ModItems.EEPROM, ModItems.TIER1_BATTERY,
 			ModBlocks.TIER3_SCREEN.asItem(), ModBlocks.CABLE.asItem());
 	}
 

@@ -32,7 +32,7 @@ import net.minecraft.world.phys.Vec3;
  * Right-click opens its display. On the back, the power button (or sneak + right-click
  * anywhere) turns it on or off, and the window into the case opens the case view.
  */
-public final class AllInOneBlock extends HorizontalDirectionalBlock implements EntityBlock {
+public final class CaseBlock extends HorizontalDirectionalBlock implements EntityBlock {
 	/**
 	 * The power light shows green. When {@link #READY} that means the machine is on; otherwise it
 	 * only flashes, for {@link #ATTEMPT_TICKS}, when someone presses power and the press is refused.
@@ -56,7 +56,7 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 	private final CaseTier tier;
 
 	/** A case of a tier. Its front shows a screen only when one is in its gold expansion slot. */
-	public AllInOneBlock(Properties properties, CaseTier tier) {
+	public CaseBlock(Properties properties, CaseTier tier) {
 		super(properties);
 		this.tier = tier;
 		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false).setValue(READY, false)
@@ -86,21 +86,21 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 	@Override
 	protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
 		// End of a refused power press: the light goes back to what the machine really is.
-		if (level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer) {
+		if (level.getBlockEntity(pos) instanceof CaseBlockEntity computer) {
 			level.setBlock(pos, state.setValue(POWERED, computer.machine().isPowered()), Block.UPDATE_CLIENTS);
 		}
 	}
 
 	@Override
 	public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-		return new AllInOneBlockEntity(pos, state);
+		return new CaseBlockEntity(pos, state);
 	}
 
 	@Override
 	@SuppressWarnings("unchecked")
 	public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-		return level.isClientSide() || type != ModBlocks.ALL_IN_ONE_ENTITY ? null
-			: (BlockEntityTicker<T>) (BlockEntityTicker<AllInOneBlockEntity>) (tickLevel, pos, tickState, computer) -> computer.serverTick();
+		return level.isClientSide() || type != ModBlocks.CASE_ENTITY ? null
+			: (BlockEntityTicker<T>) (BlockEntityTicker<CaseBlockEntity>) (tickLevel, pos, tickState, computer) -> computer.serverTick();
 	}
 
 	/** Its redstone cards put out redstone (user, 2026-10-13). */
@@ -111,7 +111,7 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 
 	@Override
 	protected int getSignal(BlockState state, net.minecraft.world.level.BlockGetter level, BlockPos pos, net.minecraft.core.Direction direction) {
-		return level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer ? computer.redstoneOut(direction) : 0;
+		return level.getBlockEntity(pos) instanceof CaseBlockEntity computer ? computer.redstoneOut(direction) : 0;
 	}
 
 	@Override
@@ -135,7 +135,7 @@ public final class AllInOneBlock extends HorizontalDirectionalBlock implements E
 
 	@Override
 	protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-		if (level.isClientSide() || !(level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer)) {
+		if (level.isClientSide() || !(level.getBlockEntity(pos) instanceof CaseBlockEntity computer)) {
 			return InteractionResult.SUCCESS;
 		}
 		var region = BackPanel.hit(state.getValue(FACING), hit.getDirection(), hit.getLocation().subtract(Vec3.atLowerCornerOf(pos)));

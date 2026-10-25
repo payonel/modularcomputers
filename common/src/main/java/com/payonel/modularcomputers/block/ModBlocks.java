@@ -22,18 +22,15 @@ import java.util.List;
 
 /** Block, block item and block entity registrations. */
 public final class ModBlocks {
-	/** The dev kit: a tier 3 case (it may become a creative, everything-in block later). */
-	public static final Block ALL_IN_ONE = registerWithItem("all_in_one", properties -> new AllInOneBlock(properties, CaseTier.TIER_3),
-		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(2.0f).sound(SoundType.METAL));
 	/** Cases, by tier: the same board, with more of it at higher tiers. */
 	public static final Block TIER1_CASE = caseBlock("tier1_case", CaseTier.TIER_1);
 	public static final Block TIER2_CASE = caseBlock("tier2_case", CaseTier.TIER_2);
 	public static final Block TIER3_CASE = caseBlock("tier3_case", CaseTier.TIER_3);
 	public static final List<Block> CASES = List.of(TIER1_CASE, TIER2_CASE, TIER3_CASE);
 
-	public static final BlockEntityType<AllInOneBlockEntity> ALL_IN_ONE_ENTITY = Registry.register(
-		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("all_in_one"),
-		new BlockEntityType<>(AllInOneBlockEntity::new, Set.of(ALL_IN_ONE, TIER1_CASE, TIER2_CASE, TIER3_CASE)));
+	public static final BlockEntityType<CaseBlockEntity> CASE_ENTITY = Registry.register(
+		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("case"),
+		new BlockEntityType<>(CaseBlockEntity::new, Set.of(TIER1_CASE, TIER2_CASE, TIER3_CASE)));
 
 	/** Screens (terminals: a display and keyboard), by tier: what colors they show. */
 	public static final ScreenBlock TIER1_SCREEN = screen("tier1_screen", TerminalTier.TIER_1);
@@ -105,7 +102,7 @@ public final class ModBlocks {
 	}
 
 	private static Block caseBlock(String name, CaseTier tier) {
-		return registerWithItem(name, properties -> new AllInOneBlock(properties, tier),
+		return registerWithItem(name, properties -> new CaseBlock(properties, tier),
 			BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(2.0f).sound(SoundType.METAL));
 	}
 

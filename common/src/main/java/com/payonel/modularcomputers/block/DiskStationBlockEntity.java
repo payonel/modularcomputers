@@ -192,8 +192,8 @@ public final class DiskStationBlockEntity extends CardHolderBlockEntity {
 			UUID serial = ModComponents.serial(stack);
 			if (disks[slot] == null || disks[slot].tier() != item.tier() || !serial.equals(serials[slot])) {
 				retire(slot);
-				Path folder = AllInOneBlockEntity.diskFolder(server.getServer(), serial);
-				AllInOneBlockEntity.imageDisk(stack, folder, level.getGameTime());
+				Path folder = CaseBlockEntity.diskFolder(server.getServer(), serial);
+				CaseBlockEntity.imageDisk(stack, folder, level.getGameTime());
 				Disk disk = new Disk(item.tier(), folder);
 				disk.clockFrom(() -> level == null ? 0 : level.getGameTime());
 				disk.onChange(() -> ChunkMarks.changed(level, worldPosition));

@@ -106,7 +106,7 @@ class DeviceInterruptsTest {
 	private static final String BY_SLOT = "by its slot";
 
 	private final Terminal screen = new Terminal(Resolution.DEFAULT);
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+	private final Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 	private final ConcurrentLinkedQueue<Runnable> server = new ConcurrentLinkedQueue<>();
 
 	/** A device of every type (a new one each time: a test changes it), and the connector a case puts it on. */

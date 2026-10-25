@@ -1,12 +1,12 @@
 package com.payonel.modularcomputers.gametest;
 
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.check;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.read;
-import static com.payonel.modularcomputers.gametest.AllInOneClientGameTest.teleport;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.check;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.read;
+import static com.payonel.modularcomputers.gametest.CaseClientGameTest.teleport;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.item.ModItems;
@@ -39,7 +39,7 @@ public class CaseTierClientGameTest implements FabricClientGameTest {
 			singleplayer.getServer().runCommand("setblock %d %d %d modularcomputers:tier2_case[facing=south]".formatted(tier2.getX(), tier2.getY(), tier2.getZ()));
 			singleplayer.getServer().runCommand("setblock %d %d %d modularcomputers:tier1_case[facing=south]".formatted(tier1.getX(), tier1.getY(), tier1.getZ()));
 			singleplayer.getServer().runOnServer(server -> {
-				var be = (AllInOneBlockEntity) server.overworld().getBlockEntity(tier2);
+				var be = (CaseBlockEntity) server.overworld().getBlockEntity(tier2);
 				be.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
 				be.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 				be.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
@@ -55,8 +55,8 @@ public class CaseTierClientGameTest implements FabricClientGameTest {
 					client.gui.hud.toggle();
 				}
 			});
-			context.waitFor(client -> client.level.getBlockEntity(tier2) instanceof AllInOneBlockEntity be
-				&& client.level.getBlockState(tier2).getValue(AllInOneBlock.SCREEN) && be.terminal().buffer().row(0).contains("hello"));
+			context.waitFor(client -> client.level.getBlockEntity(tier2) instanceof CaseBlockEntity be
+				&& client.level.getBlockState(tier2).getValue(CaseBlock.SCREEN) && be.terminal().buffer().row(0).contains("hello"));
 			singleplayer.getConnection().waitForChunksRender();
 			context.waitTicks(5);
 			context.takeScreenshot("case-tiers-front");

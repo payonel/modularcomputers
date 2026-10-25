@@ -1,6 +1,6 @@
 package com.payonel.modularcomputers.client.screen;
 
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.DisplayHost;
 import com.payonel.modularcomputers.client.render.TextGrid;
 import com.payonel.modularcomputers.display.DisplayLayout;
@@ -24,7 +24,7 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.util.FormattedCharSequence;
 
 /**
- * Shows a screen's display in the player's view: the all-in-one's or a screen block's. It is
+ * Shows a screen's display in the player's view: a case's or a screen block's. It is
  * sized from the screen's resolution as soon as it opens (no placeholder box) and fills most of
  * the window. It shows the same text as the block's face; an off computer shows black.
  * <p>
@@ -222,7 +222,7 @@ public final class DisplayScreen extends Screen {
 	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
 		DisplayHost host = pos.find(minecraft.level, DisplayHost.class).orElse(null);
 		// The bezel is the block's (a case's or the screen's own era); the glass and its glow, the terminal's.
-		int tier = host instanceof AllInOneBlockEntity computer ? computer.tier().number()
+		int tier = host instanceof CaseBlockEntity computer ? computer.tier().number()
 			: host != null ? host.terminal().tier().number() : 1;
 		if (host != null && !host.terminal().buffer().resolution().equals(resolution)) {
 			resolution = host.terminal().buffer().resolution(); // a program resized it: the glass takes its new shape

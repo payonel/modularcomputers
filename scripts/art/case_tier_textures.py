@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Draws the tier 2 and 3 case textures from the tier 1 (beige) ones that all_in_one_textures.py
+# Draws the tier 2 and 3 case textures from the tier 1 (beige) ones that computer_textures.py
 # draws, and writes the case models and blockstates (needs Pillow). Each tier is an era of the PC
 # (user's pick, 2026-10-12), matching its screens (cabled_block_textures.py):
 #   tier 1: the 80s beige box (the originals, unchanged);
@@ -10,7 +10,7 @@
 # player looking for the back isn't misled (user, 2026-10-12).
 # The shapes stay the tier 1 ones (the glass the display is drawn on, the back's window and power
 # button housing, which BackPanel maps clicks to); only colors and the era's details change.
-# Rerun after all_in_one_textures.py, then check the preview.
+# Rerun after computer_textures.py, then check the preview.
 #   scripts/art/case_tier_textures.py common/src/main/resources/assets/modularcomputers preview.png
 import json, random, sys
 from PIL import Image
@@ -62,9 +62,9 @@ def src(name):
 
 made = {}
 for tier in (2, 3):
-	front = recolor(src("all_in_one_case_front"), tier)
-	front_screen = recolor(src("all_in_one_front"), tier)
-	side = recolor(src("all_in_one_side"), tier)
+	front = recolor(src("case_front"), tier)
+	front_screen = recolor(src("case_front_screen"), tier)
+	side = recolor(src("case_side"), tier)
 	if tier == 2:
 		mhz(front)
 	else:
@@ -83,15 +83,15 @@ for tier in (2, 3):
 	made[f"tier{tier}_case_front_screen"] = front_screen
 	made[f"tier{tier}_case_side"] = side
 	for face in ("top", "bottom", "back"):
-		made[f"tier{tier}_case_{face}"] = recolor(src(f"all_in_one_{face}"), tier)
+		made[f"tier{tier}_case_{face}"] = recolor(src(f"case_{face}"), tier)
 for name, im in made.items():
 	im.save(f"{TEX}/{name}.png")
 
 # Models: one per tier, front (with or without a screen in the gold slot), power and readiness.
 def faces(tier, screen):
 	if tier == 1:
-		return {"north": "all_in_one_case_front_plain", "south": "all_in_one_back", "east": "all_in_one_side",
-			"west": "all_in_one_side", "up": "all_in_one_top", "down": "all_in_one_bottom"}
+		return {"north": "case_front_plain", "south": "case_back", "east": "case_side",
+			"west": "case_side", "up": "case_top", "down": "case_bottom"}
 	return {"north": f"tier{tier}_case_front" + ("_screen" if screen else ""), "south": f"tier{tier}_case_back",
 		"east": f"tier{tier}_case_side", "west": f"tier{tier}_case_side", "up": f"tier{tier}_case_top", "down": f"tier{tier}_case_bottom"}
 
@@ -107,15 +107,15 @@ for tier in (1, 2, 3):
 				name = f"tier{tier}_case" + ("_screen" if screen else "") + ("_on" if on else "") + ("_faded" if faded else "")
 				textures = {face: f"modularcomputers:block/{tex}" for face, tex in faces(tier, screen).items()}
 				textures["particle"] = textures["east"]
-				textures["button"] = "modularcomputers:block/all_in_one_power_" + ("on" if on else "off") + ("_faded" if faded else "")
+				textures["button"] = "modularcomputers:block/case_power_" + ("on" if on else "off") + ("_faded" if faded else "")
 				write(f"{ROOT}/models/block/{name}.json",
-					{"parent": "modularcomputers:block/all_in_one_base" + ("_faded" if faded else ""), "textures": textures})
+					{"parent": "modularcomputers:block/case_base" + ("_faded" if faded else ""), "textures": textures})
 		# On with its CPU halted: the button lit amber (only a ready machine can be on).
 		textures = {face: f"modularcomputers:block/{tex}" for face, tex in faces(tier, screen).items()}
 		textures["particle"] = textures["east"]
-		textures["button"] = "modularcomputers:block/all_in_one_power_halted"
+		textures["button"] = "modularcomputers:block/case_power_halted"
 		write(f"{ROOT}/models/block/tier{tier}_case" + ("_screen" if screen else "") + "_halted.json",
-			{"parent": "modularcomputers:block/all_in_one_base", "textures": textures})
+			{"parent": "modularcomputers:block/case_base", "textures": textures})
 	variants = {}
 	for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270)):
 		for halted in (False, True):
@@ -128,15 +128,11 @@ for tier in (1, 2, 3):
 						variants[key] = {"model": model} | ({"y": y} if y else {})
 	states = {"variants": variants}
 	write(f"{ROOT}/blockstates/tier{tier}_case.json", states)
-	if tier == 3:
-		write(f"{ROOT}/blockstates/all_in_one.json", states)  # the dev kit is a tier 3 case
 	item = {"model": {"type": "minecraft:model", "model": f"modularcomputers:block/tier{tier}_case_faded"}}
 	write(f"{ROOT}/items/tier{tier}_case.json", item)
-	if tier == 3:
-		write(f"{ROOT}/items/all_in_one.json", item)
 
 # Preview: each tier's faces, scaled up.
-names = ["all_in_one_case_front_plain", "all_in_one_side", "all_in_one_back"] + [n for t in (2, 3) for n in (
+names = ["case_front_plain", "case_side", "case_back"] + [n for t in (2, 3) for n in (
 	f"tier{t}_case_front", f"tier{t}_case_front_screen", f"tier{t}_case_side", f"tier{t}_case_back", f"tier{t}_case_top")]
 sheet = Image.new("RGBA", (20 * len(names) + 4, 24), (40, 40, 40, 255))
 for i, n in enumerate(names):

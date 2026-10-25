@@ -2,7 +2,7 @@ package com.payonel.modularcomputers.client.screen;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.payonel.modularcomputers.ModularComputers;
-import com.payonel.modularcomputers.block.AllInOneBlock;
+import com.payonel.modularcomputers.block.CaseBlock;
 import com.payonel.modularcomputers.display.Viewport;
 import com.payonel.modularcomputers.network.SwitchViewPayload;
 import com.payonel.modularcomputers.network.PressPowerPayload;

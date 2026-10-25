@@ -5,8 +5,8 @@ import java.util.function.Supplier;
 
 /**
  * A program running on a CPU, as the host drives it: each tick (and when it asks) the server thread
- * carries out its motherboard calls. A Java CPU's programs run as coroutines on virtual threads, a
- * fixed number of calls a tick ({@link ProgramRunner}); a Lua CPU's on the computer's own thread,
+ * carries out its motherboard calls. A Java program attached to an EEPROM (a test's) runs as a
+ * coroutine on a virtual thread, a fixed number of calls a tick ({@link ProgramRunner}); Lua on the computer's own thread,
  * its calls limited by server time ({@link LuaRunner}).
  */
 public interface Runner {

@@ -243,7 +243,7 @@ public final class BoardAssembly {
 		this.host = host;
 		this.layout = layout;
 		this.power = new PowerBuffer(layout.bufferCapacity());
-		this.machine = new Machine(new Motherboard(Hardware.allInOne(), bus), this::hasPower);
+		this.machine = new Machine(new Motherboard(Hardware.computer(), bus), this::hasPower);
 		display = newDisplay(screen);
 		machine.board().setChassis(new BoardChassis());
 		machine.describedBy(host::describe);
@@ -810,8 +810,8 @@ public final class BoardAssembly {
 		CpuItem cpuItem = parts.getItem(CaseMenu.CPU_SLOT).getItem() instanceof CpuItem cpu ? cpu : null;
 		if (cpuItem == null) {
 			board.setCpu(null);
-		} else if (board.cpu().map(cpu -> cpu.tier() != cpuItem.tier() || cpu.architecture() != cpuItem.architecture()).orElse(true)) {
-			board.setCpu(new Cpu(cpuItem.tier(), cpuItem.architecture()));
+		} else if (board.cpu().map(cpu -> cpu.tier() != cpuItem.tier()).orElse(true)) {
+			board.setCpu(new Cpu(cpuItem.tier()));
 		}
 		// The EEPROM reads and writes the item in its slot directly (EepromSlot): no copy of its text.
 		ItemStack stack = parts.getItem(CaseMenu.EEPROM_SLOT);

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-# Draws the all-in-one computer's 16x16 block textures and the GUI power button (needs Pillow).
-# The PNGs are committed; rerun after editing this to regenerate them, then check the preview.
-#   scripts/art/all_in_one_textures.py common/src/main/resources/assets/modularcomputers/textures/block preview.png
+# Draws the case's 16x16 block textures (tier 1's beige, which case_tier_textures.py recolors for
+# the other tiers), the GUI power and case buttons, and the parts' and cards' item textures (needs
+# Pillow). The PNGs are committed; rerun after editing this to regenerate them, then check the preview.
+#   scripts/art/computer_textures.py common/src/main/resources/assets/modularcomputers/textures/block preview.png
 import random, sys
 from PIL import Image
 
@@ -27,12 +28,13 @@ def rect(im, x0, y0, x1, y1, c):
 		for x in range(x0, x1 + 1):
 			im.putpixel((x, y), c)
 
-def front():
+def front_screen():
+	"""A case's front with a screen in its gold slot: the glass, and a keyboard tray below."""
 	im = casing(1)
 	# Recessed bezel: shadow on top/left, light on bottom/right.
 	rect(im, 1, 1, 14, 1, DARK); rect(im, 1, 1, 1, 10, DARK)
 	rect(im, 2, 10, 14, 10, LIGHT); rect(im, 14, 2, 14, 10, LIGHT)
-	# Glass: unlit, its built-in screen's (tier 3's, as ColorDepth's). Display text is drawn over x 2..13, y 2..9.
+	# Glass: unlit, its screen's (tier 3's, as ColorDepth's). Display text is drawn over x 2..13, y 2..9.
 	rect(im, 2, 2, 13, 9, (17, 19, 21))
 	# Power LED (off).
 	im.putpixel((13, 11), (74, 44, 40))
@@ -49,7 +51,7 @@ def front():
 
 def case_front():
 	"""A case's front with no screen in it: a blank panel where the screen would go, two drive
-	bay slots and vents below, and the power LED in the same place as on the all-in-one."""
+	bay slots and vents below, and the power LED in the same place as with a screen."""
 	im = casing(2)
 	rect(im, 2, 2, 13, 9, SHADE)  # the blank where a screen goes
 	rect(im, 2, 2, 13, 2, DARK); rect(im, 2, 2, 2, 9, DARK)
@@ -83,7 +85,7 @@ def top():
 	return casing(3)
 
 # Power button: a dark housing (5x5) at the back's bottom right, with a 3x3 lit button in it.
-# The button itself is a separate emissive model element using all_in_one_power_{off,on}.
+# The button itself is a separate emissive model element using case_power_{off,on}.
 HOUSING = (9, 9)  # top-left texel; keep in sync with PowerButton.java and the block model
 RING = (56, 56, 60)
 LIT = {
@@ -206,29 +208,6 @@ def tier2_cpu_item():
 def tier3_cpu_item():
 	"""A diamond lid."""
 	return cpu_item((70, 200, 200, 255), (160, 240, 236, 255), (40, 140, 140, 255))
-
-FONT_3X3 = {
-	"J": ["..x", "x.x", ".x."],
-	"A": [".x.", "xxx", "x.x"],
-	"V": ["x.x", "x.x", ".x."],
-}
-
-def java_cpu_item():
-	"""The Java CPU (creative only): no lid, its package printed JAVA, in two lines."""
-	im = cpu_item()
-	rect(im, 4, 4, 11, 11, (44, 46, 52, 255))  # no lid: the package shows
-	ink = (236, 150, 60, 255)
-	for word, y in (("JA", 4), ("VA", 8)):
-		for i, letter in enumerate(word):
-			for dy, line in enumerate(FONT_3X3[letter]):
-				for dx, c in enumerate(line):
-					if c == "x":
-						im.putpixel((4 + i * 5 + dx, y + dy), ink)
-	return im
-
-def java_eeprom_item(writing=(220, 120, 40, 255)):
-	"""The Java EEPROM (creative only): the EEPROM, its label written in orange."""
-	return eeprom_item(writing)
 
 def eeprom_item(writing=(90, 110, 170, 255)):
 	"""A small DIP chip: black body with silver legs and a paper label."""
@@ -430,14 +409,13 @@ def tier3_battery_item():
 	im.putpixel((11, 9), (60, 160, 120, 255))
 	return im
 
-for name, fn in [("front", front), ("case_front", case_front), ("case_front_plain", case_front_plain), ("side", side), ("top", top), ("back", back), ("bottom", bottom)]:
-	fn().save(f"{OUT}/all_in_one_{name}.png")
+for name, fn in [("front_screen", front_screen), ("front", case_front), ("front_plain", case_front_plain), ("side", side), ("top", top), ("back", back), ("bottom", bottom)]:
+	fn().save(f"{OUT}/case_{name}.png")
 for state in LIT:
-	power(state).save(f"{OUT}/all_in_one_power_{state}.png")
+	power(state).save(f"{OUT}/case_power_{state}.png")
 gui_button().save(f"{OUT}/../gui/power_button.png")
 case_button().save(f"{OUT}/../gui/case_button.png")
 for name, fn in [("tier1_cpu", tier1_cpu_item), ("tier2_cpu", tier2_cpu_item), ("tier3_cpu", tier3_cpu_item), ("eeprom", eeprom_item),
-		("java_cpu", java_cpu_item), ("java_eeprom", java_eeprom_item),
 		("tier1_ram", lambda: ram_item(1)), ("tier2_ram", lambda: ram_item(2)), ("tier3_ram", lambda: ram_item(3)),
 		("tier1_hard_disk", lambda: hard_disk_item(1)), ("tier2_hard_disk", lambda: hard_disk_item(2)), ("tier3_hard_disk", lambda: hard_disk_item(3)),
 		("tier1_wlan_card", lambda: wlan_card_item(1)), ("tier2_wlan_card", lambda: wlan_card_item(2)), ("network_card", network_card_item), ("tier1_battery", tier1_battery_item), ("tier2_battery", tier2_battery_item), ("tier3_battery", tier3_battery_item), ("redstone_card", redstone_card_item),
@@ -447,6 +425,6 @@ for name, fn in [("tier1_cpu", tier1_cpu_item), ("tier2_cpu", tier2_cpu_item), (
 
 # Preview sheet, scaled up, for review.
 sheet = Image.new("RGB", (16 * 5 + 4 * 6, 24), (40, 40, 40))
-for i, name in enumerate(["front", "side", "top", "back", "bottom"]):
-	sheet.paste(Image.open(f"{OUT}/all_in_one_{name}.png"), (4 + i * 20, 4))
+for i, name in enumerate(["front_screen", "side", "top", "back", "bottom"]):
+	sheet.paste(Image.open(f"{OUT}/case_{name}.png"), (4 + i * 20, 4))
 sheet.resize((sheet.width * 8, sheet.height * 8), Image.NEAREST).save(sys.argv[2])

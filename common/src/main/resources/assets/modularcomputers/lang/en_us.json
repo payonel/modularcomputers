@@ -1,6 +1,5 @@
 {
 	"itemGroup.modularcomputers": "Modular Computers",
-	"block.modularcomputers.all_in_one": "All-in-One Computer",
 	"block.modularcomputers.tier1_case": "Tier 1 Case",
 	"block.modularcomputers.tier2_case": "Tier 2 Case",
 	"block.modularcomputers.tier3_case": "Tier 3 Case",
@@ -11,10 +10,6 @@
 	"item.modularcomputers.cpu.bus": "Bus: %s devices",
 	"item.modularcomputers.cpu.draw": "Draw: %s running, %s waiting, none halted",
 	"item.modularcomputers.eeprom": "EEPROM",
-	"item.modularcomputers.java_cpu": "Java CPU",
-	"item.modularcomputers.java_eeprom": "Java EEPROM",
-	"hint.modularcomputers.details.java_cpu": "Runs the Java program its EEPROM names, not Lua",
-	"hint.modularcomputers.details.java_eeprom": "Holds mcos's Java version, for the Java CPU",
 	"hint.modularcomputers.creative_only": "Creative only",
 	"commands.modularcomputers.giveall": "Gave %s Modular Computers items",
 	"commands.modularcomputers.reload": "Reloaded %s",

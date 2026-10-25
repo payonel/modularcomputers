@@ -1,13 +1,13 @@
 {
 	"parent": "minecraft:block/block",
 	"textures": {
-		"particle": "modularcomputers:block/all_in_one_side",
-		"north": "modularcomputers:block/all_in_one_front",
-		"south": "modularcomputers:block/all_in_one_back",
-		"east": "modularcomputers:block/all_in_one_side",
-		"west": "modularcomputers:block/all_in_one_side",
-		"up": "modularcomputers:block/all_in_one_top",
-		"down": "modularcomputers:block/all_in_one_bottom"
+		"particle": "modularcomputers:block/case_side",
+		"north": "modularcomputers:block/case_front_screen",
+		"south": "modularcomputers:block/case_back",
+		"east": "modularcomputers:block/case_side",
+		"west": "modularcomputers:block/case_side",
+		"up": "modularcomputers:block/case_top",
+		"down": "modularcomputers:block/case_bottom"
 	},
 	"elements": [
 		{
@@ -25,8 +25,6 @@
 		{
 			"from": [10, 3, 16],
 			"to": [13, 6, 16.5],
-			"shade": false,
-			"light_emission": 15,
 			"faces": {
 				"south": { "uv": [10, 10, 13, 13], "texture": "#button" },
 				"east": { "uv": [12, 10, 12.5, 13], "texture": "#button" },

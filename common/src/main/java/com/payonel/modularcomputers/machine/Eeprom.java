@@ -12,13 +12,13 @@ import java.util.Map;
  * at power-on (a fixed place, so it never walks the bus for it); it's also on the bus, so programs
  * can find it to read or reflash it. Flashing takes effect at the next power-on.
  * <p>
- * Its contents (its image) are plain text, whatever the CPU's architecture: what {@code get} and
+ * Its contents (its image) are plain text: what {@code get} and
  * {@code set} read and write, like {@code flashrom -r} and {@code -w} on a board's SPI flash, one
  * character a byte (ISO-8859-1, as Lua's strings are). It keeps no copy: every read and write goes
  * straight to its {@link Storage}, in a case the EEPROM item in the slot (user, 2026-10-13: read and
  * write directly, no extra layers). No size limit for now (user, 2026-10-12): the whole OS lives on
- * it until EEPROMs hold a bootloader and the OS is installed on a disk. A Lua CPU runs it as Lua; the
- * Java CPU loads the class it names ({@link Cpu#load}). Tests and tools can also attach a Java
+ * it until EEPROMs hold a bootloader and the OS is installed on a disk. The CPU runs it as Lua.
+ * Tests and tools can also attach a Java
  * program object directly ({@link #flash}), like an in-circuit programmer; the CPU then runs that
  * instead.
  */

@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 
 /** What the board tells a program of its case and devices (ACPI, SMBIOS, udev), and the EEPROM's contents. */
 class BoardInfoTest {
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+	private final Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 	private final List<Object> seen = new ArrayList<>();
 
 	@AfterEach

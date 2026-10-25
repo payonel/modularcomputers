@@ -2,11 +2,11 @@ package com.payonel.modularcomputers.power;
 
 /**
  * The batteries that power a computer, by how much they hold, in power units
- * ({@link PowerUnits}). How many Minecraft days of a running all-in-one each tier lasts is
+ * ({@link PowerUnits}). How many Minecraft days of a running computer each tier lasts is
  * configurable ({@link #setDays}; 0 means it never runs out). By default a full tier 1 runs one
  * for ten days (10% a day), tier 2 holds twice that and recharges itself while it isn't running
  * anything, and tier 3 never runs out. Tier 2 recharges itself at a configurable rate
- * ({@link #setRechargeRate}), as a share of a running all-in-one's draw: by default half, so two
+ * ({@link #setRechargeRate}), as a share of a running computer's draw: by default half, so two
  * seconds of rest charge one second of running.
  */
 public enum BatteryTier {
@@ -30,7 +30,7 @@ public enum BatteryTier {
 		return defaultRechargeRate;
 	}
 
-	/** What it regains each tick it rests, as a share of a running all-in-one's draw; 0 means it doesn't recharge itself. */
+	/** What it regains each tick it rests, as a share of a running computer's draw; 0 means it doesn't recharge itself. */
 	public double rechargeRate() {
 		return rechargeRate;
 	}
@@ -46,7 +46,7 @@ public enum BatteryTier {
 		return defaultDays;
 	}
 
-	/** How many days a full one runs an all-in-one; 0 means forever. */
+	/** How many days a full one runs a computer; 0 means forever. */
 	public double days() {
 		return days;
 	}

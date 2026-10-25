@@ -37,7 +37,7 @@ class McosTest extends McosHarness {
 	/** Another computer running mcos from a disk of its own, on this test's server thread, with a network card in {@code world}. */
 	private final class Other {
 		final Terminal screen = new Terminal(Resolution.DEFAULT);
-		final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+		final Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 		final Path root;
 		final com.payonel.modularcomputers.device.NetworkCard card;
 

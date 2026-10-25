@@ -59,7 +59,7 @@ class RuntimeTest {
 	private final Terminal display = new Terminal(Resolution.DEFAULT);
 	private final Sensor sensor = new Sensor();
 	private final boolean[] power = {true};
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()), () -> power[0]);
+	private final Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()), () -> power[0]);
 
 	private final TestBus bus;
 	/** The sensor's id, when it's a card in a slot. */

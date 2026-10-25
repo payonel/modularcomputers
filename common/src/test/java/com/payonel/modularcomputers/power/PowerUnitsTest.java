@@ -20,7 +20,7 @@ class PowerUnitsTest {
 
 	@Test
 	void runtimeIsWhatsStoredAtTheLoad() {
-		assertThat(PowerUnits.runtime(PowerUnits.DAY, PowerUnits.ALL_IN_ONE)).as("a running all-in-one: a day").isEqualTo(BatteryCharge.DAY_TICKS);
+		assertThat(PowerUnits.runtime(PowerUnits.DAY, PowerUnits.COMPUTER)).as("a running computer: a day").isEqualTo(BatteryCharge.DAY_TICKS);
 		assertThat(PowerUnits.runtime(PowerUnits.DAY, PowerUnits.TERMINAL)).as("just a terminal: 11 days").isEqualTo(11L * BatteryCharge.DAY_TICKS);
 		assertThat(PowerUnits.runtime(1000, 0)).as("no load: no estimate").isNegative();
 	}

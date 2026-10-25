@@ -1,8 +1,8 @@
 package com.payonel.modularcomputers.gametest;
 
-import com.payonel.modularcomputers.block.AllInOneBlock;
+import com.payonel.modularcomputers.block.CaseBlock;
 import com.payonel.modularcomputers.menu.CaseMenu;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.CableBlock;
 import com.payonel.modularcomputers.block.ExpansionHubBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
@@ -24,9 +24,9 @@ import net.minecraft.world.level.block.Block;
 public class CardHolderGameTest {
 	private static final BlockPos COMPUTER = new BlockPos(1, 1, 1);
 
-	private static AllInOneBlockEntity computer(GameTestHelper helper) {
-		helper.setBlock(COMPUTER, ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity computer = helper.getBlockEntity(COMPUTER, AllInOneBlockEntity.class);
+	private static CaseBlockEntity computer(GameTestHelper helper) {
+		helper.setBlock(COMPUTER, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(COMPUTER, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU)); // no CPU, no bus
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		return computer;
@@ -48,13 +48,13 @@ public class CardHolderGameTest {
 		return helper.getBlockEntity(pos, RoboticPistonBlockEntity.class);
 	}
 
-	private static List<String> locations(AllInOneBlockEntity computer) {
+	private static List<String> locations(CaseBlockEntity computer) {
 		return computer.busEntries().stream().filter(com.payonel.modularcomputers.board.BoardAssembly.BusEntry::cabled).map(entry -> entry.location().getString()).toList();
 	}
 
 	@GameTest
 	public void aHubsCardsAreOnTheBusOfEveryComputerWiredToIt(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper);
+		CaseBlockEntity computer = computer(helper);
 		cable(helper, new BlockPos(2, 1, 1));
 		ExpansionHubBlockEntity hub = hub(helper, new BlockPos(3, 1, 1));
 		hub.cards().setItem(0, new ItemStack(ModItems.SOUND_CARD));
@@ -74,7 +74,7 @@ public class CardHolderGameTest {
 
 	@GameTest
 	public void aHubCardCanBeUnpluggedOnItsOwn(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper);
+		CaseBlockEntity computer = computer(helper);
 		ExpansionHubBlockEntity hub = hub(helper, new BlockPos(2, 1, 1)); // right against the computer
 		hub.cards().setItem(0, new ItemStack(ModItems.SOUND_CARD));
 		hub.cards().setItem(1, new ItemStack(ModItems.TIER2_WLAN_CARD));
@@ -92,7 +92,7 @@ public class CardHolderGameTest {
 
 	@GameTest(maxTicks = 100)
 	public void aHubCardKeepsItsPlaceWhenItMovesToAnotherSlot(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper);
+		CaseBlockEntity computer = computer(helper);
 		ExpansionHubBlockEntity hub = hub(helper, new BlockPos(2, 1, 1));
 		hub.cards().setItem(0, new ItemStack(ModItems.TIER2_WLAN_CARD));
 		hub.cards().setItem(1, new ItemStack(ModItems.BLUETOOTH_CARD));
@@ -110,7 +110,7 @@ public class CardHolderGameTest {
 			.thenSucceed();
 	}
 
-	private static List<String> names(AllInOneBlockEntity computer) {
+	private static List<String> names(CaseBlockEntity computer) {
 		return computer.busEntries().stream().filter(com.payonel.modularcomputers.board.BoardAssembly.BusEntry::cabled).map(entry -> entry.name().getString()).toList();
 	}
 
@@ -142,7 +142,7 @@ public class CardHolderGameTest {
 
 	@GameTest(maxTicks = 100)
 	public void aPistonConnectsOnlyAtItsPort(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper);
+		CaseBlockEntity computer = computer(helper);
 		cable(helper, new BlockPos(2, 1, 1));
 		piston(helper, new BlockPos(3, 1, 1), Direction.EAST); // port away from the cable
 		helper.assertBlockProperty(new BlockPos(2, 1, 1), CableBlock.EAST, false);

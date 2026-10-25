@@ -3,8 +3,8 @@ package com.payonel.modularcomputers.gametest;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.payonel.modularcomputers.ModCreativeTab;
 import com.payonel.modularcomputers.ModularComputers;
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.client.hint.ClientRecipes;
 import com.payonel.modularcomputers.client.hint.HintComponent;
@@ -41,7 +41,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * The all-in-one computer in the real client, checked through screenshots pixel by pixel:
+ * A computer (a tier 3 case, a screen in its gold slot) in the real client, checked through screenshots pixel by pixel:
  * <ul>
  * <li>It's in the creative inventory.</li>
  * <li>Right-click opens the display at full size from its first frame.</li>
@@ -57,7 +57,7 @@ import net.minecraft.world.phys.Vec3;
  * <li>Breaking the computer closes its display.</li>
  * </ul>
  */
-public class AllInOneClientGameTest implements FabricClientGameTest {
+public class CaseClientGameTest implements FabricClientGameTest {
 	/** Near-white: the display's text color. Nothing else in the checked areas is this bright. */
 	private static final int WHITE_THRESHOLD = 200; // (tier 3's paper white, 222 218 208, is above it)
 	/** Ticks between right-clicks; the client ignores use clicks closer together than 4 ticks. */
@@ -94,10 +94,10 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			BlockPos feet = singleplayer.getServer().computeOnServer(server ->
 				singleplayer.getConnection().getServerPlayer().blockPosition());
 			BlockPos computer = feet.north(2).above();
-			singleplayer.getServer().runCommand("setblock %d %d %d modularcomputers:all_in_one[facing=south]"
+			singleplayer.getServer().runCommand("setblock %d %d %d modularcomputers:tier3_case[facing=south]"
 				.formatted(computer.getX(), computer.getY(), computer.getZ()));
 			teleport(singleplayer, feet, 180);
-			context.waitFor(client -> client.level.getBlockEntity(computer) instanceof AllInOneBlockEntity);
+			context.waitFor(client -> client.level.getBlockEntity(computer) instanceof CaseBlockEntity);
 			context.getInput().lookAt(computer);
 			context.runOnClient(client -> {
 				if (!client.gui.hud.isHidden()) {
@@ -108,37 +108,37 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			context.waitTicks(5);
 
 			// Off: the face shows no text.
-			check(whitePixelsOnFace(context.takeScreenshot("all-in-one-off")) == 0, "an off computer's face should show no text");
+			check(whitePixelsOnFace(context.takeScreenshot("case-off")) == 0, "an off computer's face should show no text");
 
 			// A new computer has no CPU: right-click opens a black display at full size from the
 			// first frame, with a faded red power button. Pressing it is refused (an error beep):
 			// faded green only while the mouse is held, then faded red again, and it stays off.
 			// It has a battery for now, so the refusal is about the CPU, not power.
 			singleplayer.getServer().runOnServer(server -> {
-				var be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
+				var be = (CaseBlockEntity) server.overworld().getBlockEntity(computer);
 				be.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 				TestPrograms.withScreen(be); // a screen in the gold slot: the screen view opens
 			});
-			context.waitFor(client -> client.level.getBlockState(computer).getValue(AllInOneBlock.SCREEN));
+			context.waitFor(client -> client.level.getBlockState(computer).getValue(CaseBlock.SCREEN));
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(DisplayScreen.class);
 			checkDisplayLayout(context);
-			DisplayShot empty = displayShot(context, "all-in-one-display-no-cpu", com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR_GLASS);
+			DisplayShot empty = displayShot(context, "case-display-no-cpu", com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR_GLASS);
 			check(FADED_RED.test(empty.buttonCenter()), "without a CPU the power button should be faded red, got " + hex(empty.buttonCenter()));
 			moveCursorTo(context, screen -> ((DisplayScreen) screen).powerButton());
 			context.getInput().holdMouse(InputConstants.MOUSE_BUTTON_RIGHT);
 			context.waitTicks(CLICK_PAUSE);
-			DisplayShot held = displayShot(context, "all-in-one-display-no-cpu-held", com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR_GLASS);
+			DisplayShot held = displayShot(context, "case-display-no-cpu-held", com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR_GLASS);
 			check(FADED_GREEN.test(held.buttonCenter()), "held without a CPU the button should be faded green, got " + hex(held.buttonCenter()));
 			context.getInput().releaseMouse(InputConstants.MOUSE_BUTTON_RIGHT);
 			// The refused press also flashes faded green briefly (the block state); wait it out.
-			context.waitFor(client -> !client.level.getBlockState(computer).getValue(AllInOneBlock.POWERED));
+			context.waitFor(client -> !client.level.getBlockState(computer).getValue(CaseBlock.POWERED));
 			context.waitTicks(2);
-			DisplayShot released = displayShot(context, "all-in-one-display-no-cpu-released", com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR_GLASS);
+			DisplayShot released = displayShot(context, "case-display-no-cpu-released", com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR_GLASS);
 			check(FADED_RED.test(released.buttonCenter()), "released, the button should be faded red again, got " + hex(released.buttonCenter()));
 			check(!context.computeOnClient(client -> machinePowered(client, computer)), "without a CPU the computer must stay off");
 			check(released.whitePixels(0, released.rows()) == 0, "nothing runs without a CPU");
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).parts()
 				.setItem(CaseMenu.UPS_SLOT, ItemStack.EMPTY));
 
 			// The player gets every part with the cheat command, typed as they would.
@@ -151,19 +151,19 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			// The view toggle opens the case view; the parts go in with real mouse clicks.
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((DisplayScreen) screen).viewToggle());
 			context.waitForScreen(CaseScreen.class);
-			context.takeScreenshot("all-in-one-case-empty");
+			context.takeScreenshot("case-empty");
 			int hotbar = CaseMenu.PART_SLOTS + 27; // the case menu's first hotbar slot
 
 			// Hovering an item in the inventory outlines the slots it fits.
 			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(hotbar + cpuHotbar));
 			context.waitTicks(2);
-			BufferedImage cpuHover = read(context.takeScreenshot("all-in-one-case-cpu-hover"));
+			BufferedImage cpuHover = read(context.takeScreenshot("case-cpu-hover"));
 			check(slotOutlined(context, cpuHover, CaseMenu.CPU_SLOT), "hovering the CPU should outline its socket");
 			check(!slotOutlined(context, cpuHover, CaseMenu.EEPROM_SLOT), "but not the ROM slot");
 			int card = inventoryMenuSlotOf(context, ModItems.TIER2_WLAN_CARD);
 			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(card));
 			context.waitTicks(2);
-			BufferedImage cardHover = read(context.takeScreenshot("all-in-one-case-card-hover"));
+			BufferedImage cardHover = read(context.takeScreenshot("case-card-hover"));
 			for (int lane = 0; lane < CaseMenu.LANES; lane++) {
 				check(slotOutlined(context, cardHover, CaseMenu.EXP_SLOTS + lane), "hovering a card should outline expansion slot " + (lane + 1));
 			}
@@ -172,12 +172,12 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			// And the other way: hovering a slot outlines the items in the inventory that fit it.
 			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(CaseMenu.CPU_SLOT));
 			context.waitTicks(2);
-			BufferedImage socketHover = read(context.takeScreenshot("all-in-one-case-socket-hover"));
+			BufferedImage socketHover = read(context.takeScreenshot("case-socket-hover"));
 			check(slotOutlined(context, socketHover, hotbar + cpuHotbar, 1), "hovering the CPU socket should outline the CPU in the hotbar");
 			check(!slotOutlined(context, socketHover, hotbar + eepromHotbar, 1), "but not the EEPROM");
 			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(CaseMenu.EXP_SLOTS));
 			context.waitTicks(2);
-			BufferedImage expHover = read(context.takeScreenshot("all-in-one-case-exp-hover"));
+			BufferedImage expHover = read(context.takeScreenshot("case-exp-hover"));
 			check(slotOutlined(context, expHover, card, 1), "hovering an expansion slot should outline a card");
 			check(!slotOutlined(context, expHover, hotbar + cpuHotbar, 1), "but not the CPU");
 
@@ -185,10 +185,10 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			int battery = inventoryMenuSlotOf(context, ModItems.TIER2_BATTERY);
 			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(battery));
 			context.waitTicks(2);
-			context.takeScreenshot("all-in-one-battery-hint");
+			context.takeScreenshot("case-battery-hint");
 			HintComponent.detailsOverride = true;
 			context.waitTicks(2);
-			context.takeScreenshot("all-in-one-battery-hint-details");
+			context.takeScreenshot("case-battery-hint-details");
 			HintComponent.detailsOverride = null;
 			// The shaped recipes reach the client, so the grid shows the real recipe.
 			context.runOnClient(client -> {
@@ -206,16 +206,16 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(hotbar + cpuHotbar)); // pick up the CPU
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).slotArea(CaseMenu.CPU_SLOT));
 			shiftClickOnScreen(context, screen -> ((CaseScreen) screen).slotArea(hotbar + eepromHotbar)); // the EEPROM finds its slot
-			singleplayer.getServer().waitFor(server -> server.overworld().getBlockEntity(computer) instanceof AllInOneBlockEntity be
+			singleplayer.getServer().waitFor(server -> server.overworld().getBlockEntity(computer) instanceof CaseBlockEntity be
 				&& be.machine().board().cpu().isPresent() && be.machine().board().eeprom().isPresent());
 			context.waitTicks(2);
-			BufferedImage caseShot = read(context.takeScreenshot("all-in-one-case-parts"));
+			BufferedImage caseShot = read(context.takeScreenshot("case-parts"));
 			int caseButton = pixelAt(context, caseShot, screen -> ((CaseScreen) screen).powerButton());
 			check(RED.test(caseButton), "with a CPU, and power the case kept from the battery, the button should be lit red, got " + hex(caseButton));
 
 			// The board shows what's installed. Fill the rest of the case, then check each indicator.
 			singleplayer.getServer().runOnServer(server -> {
-				var parts = ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts();
+				var parts = ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).parts();
 				for (int lane = 0; lane < 3; lane++) {
 					parts.setItem(CaseMenu.RAM_SLOTS + lane, new ItemStack(ModItems.TIER1_RAM));
 				}
@@ -227,7 +227,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			context.waitFor(client -> ((CaseScreen) client.gui.screen()).getMenu().slots.get(CaseMenu.UPS_SLOT).hasItem());
 			context.getInput().setCursorPos(0, 0); // no slot tooltip over the board
 			context.waitTicks(2);
-			BufferedImage full = read(context.takeScreenshot("all-in-one-case-full"));
+			BufferedImage full = read(context.takeScreenshot("case-full"));
 			checkBoardPixel(context, full, 4, 20, 0xC8FFD2, "CPU dots lit");
 			checkBoardPixel(context, full, 57, 26, 0xCCA64A, "RAM lane 1 seated: gold contacts");
 			checkBoardPixel(context, full, 54, 12, 0x2A6C3C, "RAM lane 1 seated: latch closed in");
@@ -241,7 +241,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			// Hovering the meter tells the case's power and the batteries', and the runtime at the recent draw.
 			moveCursorTo(context, screen -> ((CaseScreen) screen).chargeMeter());
 			context.waitTicks(2);
-			context.takeScreenshot("all-in-one-case-power-hint");
+			context.takeScreenshot("case-power-hint");
 			List<String> hint = context.computeOnClient(client -> ((CaseScreen) client.gui.screen()).powerTooltip().stream()
 				.map(line -> line.getString()).toList());
 			check(hint.equals(List.of("Case: 100%", "Batteries: 100%", "Stored: 367 Wh", "Load: 0 W", "Time: -")),
@@ -252,17 +252,17 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			// The meter shows the case's own power, not the battery: nearly drained, with a flat
 			// battery in, one red bar. The case view's menu sends the case's power as it changes.
 			singleplayer.getServer().runOnServer(server -> {
-				AllInOneBlockEntity be = (AllInOneBlockEntity) server.overworld().getBlockEntity(computer);
+				CaseBlockEntity be = (CaseBlockEntity) server.overworld().getBlockEntity(computer);
 				TestPrograms.flash(be, TestPrograms.ECHO); // the test's own program, not the mod's stand-in
 				be.power().set(PowerBuffer.CAPACITY / 20);
 				be.parts().setItem(CaseMenu.UPS_SLOT, new ItemStack(ModItems.TIER1_BATTERY));
 			});
 			context.waitFor(client -> ((CaseScreen) client.gui.screen()).getMenu().powerLevel() == PowerBuffer.CAPACITY / 20);
 			context.waitTicks(2);
-			BufferedImage drainedShot = read(context.takeScreenshot("all-in-one-case-power-low"));
+			BufferedImage drainedShot = read(context.takeScreenshot("case-power-low"));
 			checkBoardPixel(context, drainedShot, 22, 121, 0xDC3C32, "low case power: one red bar");
 			checkBoardPixel(context, drainedShot, 26, 121, 0x1E2621, "low case power: second bar off");
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).parts()
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).parts()
 				.setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged())); // charged again, to run on
 
 			// The bus order panel lists the devices; its arrows reorder them on the server.
@@ -274,7 +274,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			context.waitTicks(4);
 			check(serverBusKeys(singleplayer, computer).equals(slotOrder), "clicking where an arrow would be moves nothing");
 			context.waitTicks(2);
-			BufferedImage reordered = read(context.takeScreenshot("all-in-one-case-reordered"));
+			BufferedImage reordered = read(context.takeScreenshot("case-reordered"));
 			// One row per device: five devices, five rows; the sixth position is bare board. No
 			// scrollbar, since they all fit.
 			int fifthRow = screenPixel(context, reordered, screen -> {
@@ -293,12 +293,12 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			// A part slot and its bus order row light up together, whichever one is hovered.
 			moveCursorTo(context, screen -> ((CaseScreen) screen).slotArea(CaseMenu.SATA_SLOTS));
 			context.waitTicks(2);
-			BufferedImage slotHover = read(context.takeScreenshot("all-in-one-case-hover-slot"));
+			BufferedImage slotHover = read(context.takeScreenshot("case-hover-slot"));
 			int rowCorner = screenPixel(context, slotHover, screen -> corner(((CaseScreen) screen).busRow(1), 1));
 			check((rowCorner & 0xFFFFFF) == 0xF2F2E6, "hovering SATA 1 should outline its bus row, got " + hex(rowCorner));
 			moveCursorTo(context, screen -> ((CaseScreen) screen).busRow(4));
 			context.waitTicks(2);
-			BufferedImage rowHover = read(context.takeScreenshot("all-in-one-case-hover-row"));
+			BufferedImage rowHover = read(context.takeScreenshot("case-hover-row"));
 			int slotCorner = screenPixel(context, rowHover, screen -> corner(((CaseScreen) screen).slotArea(CaseMenu.EXP_SLOTS + 1), 2));
 			check((slotCorner & 0xFFFFFF) == 0xF2F2E6, "hovering the WLAN card's row should outline its slot, got " + hex(slotCorner));
 			int otherRow = screenPixel(context, rowHover, screen -> corner(((CaseScreen) screen).busRow(1), 1));
@@ -321,25 +321,25 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			clickOnScreen(context, InputConstants.MOUSE_BUTTON_RIGHT, screen -> ((DisplayScreen) screen).powerButton());
 			context.waitFor(client -> machinePowered(client, computer));
 			context.waitTicks(2);
-			DisplayShot on = displayShot(context, "all-in-one-display-on", com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR_GLASS);
+			DisplayShot on = displayShot(context, "case-display-on", com.payonel.modularcomputers.display.ColorDepth.TRUE_COLOR_GLASS);
 			check(GREEN.test(on.buttonCenter()), "the power button should be lit green when on, got " + hex(on.buttonCenter()));
 			check(on.whitePixels(0, 1) >= 50, "the display's first row should show text, found " + on.whitePixels(0, 1));
 			check(on.whitePixels(1, 2) > 0, "the cursor should show (a steady block) at the start of the second row");
 			check(on.whitePixels(3, on.rows()) == 0, "the rest of the display should be black"); // (from row 3: the cursor's cell rounds a pixel into row 2's band)
 			// Typing in the screen view goes to this terminal; the program echoes it to the console.
 			// SDL only sends typed characters while text input is on: the view turns it on.
-			check(context.computeOnClient(AllInOneClientGameTest::textInputOn), "the screen view should turn text input on");
+			check(context.computeOnClient(CaseClientGameTest::textInputOn), "the screen view should turn text input on");
 			context.getInput().typeChars("hi");
 			context.getInput().pressKey(InputConstants.KEY_RETURN);
 			context.getInput().typeChars("ok");
-			context.waitFor(client -> client.level.getBlockEntity(computer) instanceof AllInOneBlockEntity be
+			context.waitFor(client -> client.level.getBlockEntity(computer) instanceof CaseBlockEntity be
 				&& be.terminal().buffer().row(1).startsWith("hi") && be.terminal().buffer().row(2).startsWith("ok"));
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitFor(client -> client.gui.screen() == null);
-			check(!context.computeOnClient(AllInOneClientGameTest::textInputOn), "and off again when it closes");
+			check(!context.computeOnClient(CaseClientGameTest::textInputOn), "and off again when it closes");
 
 			// On: the face shows "hello world".
-			int onFace = whitePixelsOnFace(context.takeScreenshot("all-in-one-on"));
+			int onFace = whitePixelsOnFace(context.takeScreenshot("case-on"));
 			check(onFace >= 20, "a running computer's face should show text, found " + onFace + " white pixels");
 
 			// Behind it, the power button glows green; right-clicking it turns the computer off.
@@ -348,27 +348,27 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			context.waitFor(client -> client.player.blockPosition().equals(behind));
 			aimAtBack(context, computer, 11.5, 11.5); // the power button
 			context.waitTicks(5);
-			int[] back = buttonColors(context.takeScreenshot("all-in-one-back-on"));
+			int[] back = buttonColors(context.takeScreenshot("case-back-on"));
 			check(back[1] > 100 && back[0] == 0, "the back button should glow green when on, red/green pixels: " + back[0] + "/" + back[1]);
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitFor(client -> !machinePowered(client, computer));
 			context.waitTicks(USE_COOLDOWN);
 			check(context.computeOnClient(client -> client.gui.screen() == null), "the power button should not open the display");
-			back = buttonColors(context.takeScreenshot("all-in-one-back-off"));
+			back = buttonColors(context.takeScreenshot("case-back-off"));
 			check(back[0] > 100 && back[1] == 0, "the back button should glow red when off, red/green pixels: " + back[0] + "/" + back[1]);
 
 			// The window into the case, across the top of the back, opens the case view.
 			aimAtBack(context, computer, 7.5, 4.5);
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(CaseScreen.class);
-			context.takeScreenshot("all-in-one-case-from-back");
+			context.takeScreenshot("case-from-back");
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitFor(client -> client.gui.screen() == null);
 			check(!context.computeOnClient(client -> machinePowered(client, computer)), "the case window should not toggle power");
 			context.waitTicks(USE_COOLDOWN);
 
 			// Without an EEPROM the CPU shows the abort screen: soft gray with dark text.
-			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer))
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer))
 				.parts().setItem(CaseMenu.EEPROM_SLOT, ItemStack.EMPTY));
 			aimAtBack(context, computer, 11.5, 11.5);
 			context.getInput().pressKey(options -> options.keyUse);
@@ -378,7 +378,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(DisplayScreen.class);
 			context.waitTicks(2);
-			DisplayShot abort = displayShot(context, "all-in-one-display-abort", Cpu.ABORT_BACKGROUND);
+			DisplayShot abort = displayShot(context, "case-display-abort", Cpu.ABORT_BACKGROUND);
 			int abortText = abort.pixels(0, 1, rgb -> (rgb & 0xFFFFFF) == Cpu.ABORT_FOREGROUND);
 			check(abortText >= 30, "the abort message should show in dark text, found " + abortText);
 
@@ -389,7 +389,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 			context.waitFor(client -> client.player.blockPosition().equals(feet));
 			context.getInput().lookAt(computer);
 			context.waitTicks(5);
-			BufferedImage abortFace = read(context.takeScreenshot("all-in-one-abort-face"));
+			BufferedImage abortFace = read(context.takeScreenshot("case-abort-face"));
 			int cx = abortFace.getWidth() / 2;
 			int cy = abortFace.getHeight() / 2;
 			int gray = count(abortFace, cx - 100, cy - 105, cx + 100, cy, rgb -> near(rgb, Cpu.ABORT_BACKGROUND, 16));
@@ -418,12 +418,12 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		context.getInput().pressKey(options -> options.keyInventory);
 		context.waitForScreen(CreativeModeInventoryScreen.class);
 		context.runOnClient(client -> {
-			ItemStack computer = new ItemStack(ModBlocks.ALL_IN_ONE);
+			ItemStack computer = new ItemStack(ModBlocks.TIER3_CASE);
 			CreativeModeTab tab = BuiltInRegistries.CREATIVE_MODE_TAB.getValueOrThrow(ModCreativeTab.KEY);
-			check(tab.contains(computer), "the all-in-one should be in the Modular Computers tab");
+			check(tab.contains(computer), "the tier 3 case should be in the Modular Computers tab");
 			check(tab.contains(new ItemStack(ModItems.TIER3_CPU)) && tab.contains(new ItemStack(ModItems.EEPROM)), "the CPU and EEPROM should be in the tab");
 			check(CreativeModeTabs.tabs().contains(tab), "the Modular Computers tab should be shown");
-			check(CreativeModeTabs.searchTab().contains(computer), "the all-in-one should be in creative search");
+			check(CreativeModeTabs.searchTab().contains(computer), "the tier 3 case should be in creative search");
 			var screen = (FabricCreativeModeInventoryScreen) client.gui.screen();
 			check(screen.setSelectedTab(tab), "could not select the Modular Computers tab");
 		});
@@ -460,7 +460,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	}
 
 	private static List<String> serverBusKeys(net.minecraft.server.MinecraftServer server, BlockPos computer) {
-		return AllInOneGameTest.busKeys((AllInOneBlockEntity) server.overworld().getBlockEntity(computer));
+		return CaseGameTest.busKeys((CaseBlockEntity) server.overworld().getBlockEntity(computer));
 	}
 
 	/** The 1x1 spot just outside an area's top-left corner, {@code gap} units out. */
@@ -523,7 +523,7 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 	}
 
 	static boolean machinePowered(Minecraft client, BlockPos pos) {
-		return client.level.getBlockEntity(pos) instanceof AllInOneBlockEntity computer && computer.machine().isPowered();
+		return client.level.getBlockEntity(pos) instanceof CaseBlockEntity computer && computer.machine().isPowered();
 	}
 
 	/** Checked on the same tick the screen opened, so there's no placeholder size. The bezel frames the display. */
@@ -613,13 +613,13 @@ public class AllInOneClientGameTest implements FabricClientGameTest {
 		BufferedImage image = read(screenshot);
 		int cx = image.getWidth() / 2;
 		int cy = image.getHeight() / 2;
-		return count(image, cx - 100, cy - 105, cx + 100, cy, AllInOneClientGameTest::isWhite);
+		return count(image, cx - 100, cy - 105, cx + 100, cy, CaseClientGameTest::isWhite);
 	}
 
 	private record DisplayShot(BufferedImage image, Viewport display, Viewport button, int rows) {
 		/** White pixels in display rows [from, to). */
 		int whitePixels(int fromRow, int toRow) {
-			return pixels(fromRow, toRow, AllInOneClientGameTest::isWhite);
+			return pixels(fromRow, toRow, CaseClientGameTest::isWhite);
 		}
 
 		/** Pixels of a color in display rows [from, to). */

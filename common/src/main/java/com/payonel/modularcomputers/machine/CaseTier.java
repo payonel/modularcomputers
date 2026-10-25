@@ -58,7 +58,7 @@ public enum CaseTier implements BoardLayout {
 		return screenSlot;
 	}
 
-	/** How much its power buffer holds: a share of a day of a running all-in-one. */
+	/** How much its power buffer holds: a share of a day of a running computer. */
 	@Override
 	public int bufferCapacity() {
 		return (int) Math.round(bufferDays * PowerUnits.DAY);

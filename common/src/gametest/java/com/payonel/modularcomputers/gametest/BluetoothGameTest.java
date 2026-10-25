@@ -1,7 +1,7 @@
 package com.payonel.modularcomputers.gametest;
 
-import com.payonel.modularcomputers.block.AllInOneBlock;
-import com.payonel.modularcomputers.block.AllInOneBlockEntity;
+import com.payonel.modularcomputers.block.CaseBlock;
+import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.CableBlock;
 import com.payonel.modularcomputers.block.ExpansionHubBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
@@ -28,9 +28,9 @@ import net.minecraft.world.phys.Vec3;
 public class BluetoothGameTest {
 	private static final BlockPos COMPUTER = new BlockPos(1, 1, 1);
 
-	private static AllInOneBlockEntity computer(GameTestHelper helper) {
-		helper.setBlock(COMPUTER, ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity computer = helper.getBlockEntity(COMPUTER, AllInOneBlockEntity.class);
+	private static CaseBlockEntity computer(GameTestHelper helper) {
+		helper.setBlock(COMPUTER, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(COMPUTER, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU)); // no CPU, no bus
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		return computer;
@@ -50,7 +50,7 @@ public class BluetoothGameTest {
 		return card;
 	}
 
-	private static List<String> locations(AllInOneBlockEntity computer) {
+	private static List<String> locations(CaseBlockEntity computer) {
 		return computer.busEntries().stream().filter(com.payonel.modularcomputers.board.BoardAssembly.BusEntry::cabled).map(entry -> entry.location().getString()).toList();
 	}
 
@@ -76,9 +76,9 @@ public class BluetoothGameTest {
 
 	@GameTest(maxTicks = 200)
 	public void linksStayWithTheBoardNotTheCard(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper);
-		helper.setBlock(new BlockPos(1, 1, 3), ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity other = helper.getBlockEntity(new BlockPos(1, 1, 3), AllInOneBlockEntity.class);
+		CaseBlockEntity computer = computer(helper);
+		helper.setBlock(new BlockPos(1, 1, 3), ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity other = helper.getBlockEntity(new BlockPos(1, 1, 3), CaseBlockEntity.class);
 		other.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		other.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(null));
@@ -100,7 +100,7 @@ public class BluetoothGameTest {
 
 	@GameTest
 	public void aPairedPistonBelongsToTheComputerItsCardLinksTo(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper);
+		CaseBlockEntity computer = computer(helper);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(null));
 		piston(helper, new BlockPos(1, 1, 6)).cards().setItem(0, card(computer.boardId())); // 5 blocks away, no cable
 		helper.succeedWhen(() -> helper.assertValueEqual(locations(computer), List.of("paired"), "found over Bluetooth, paired"));
@@ -109,15 +109,15 @@ public class BluetoothGameTest {
 	@GameTest(maxTicks = 100)
 	public void aPairedScreenIsOnlyOnItsOwnersBusButStillCarriesTheCable(GameTestHelper helper) {
 		// A - cable - screen - cable - B, and a second, unpaired screen on top of the first.
-		AllInOneBlockEntity owner = computer(helper);
+		CaseBlockEntity owner = computer(helper);
 		owner.parts().setItem(CaseMenu.EXP_SLOTS, card(null));
 		cable(helper, new BlockPos(2, 1, 1));
 		ScreenBlockEntity paired = screen(helper, new BlockPos(3, 1, 1));
 		paired.cards().setItem(0, card(owner.boardId()));
 		ScreenBlockEntity shared = screen(helper, new BlockPos(3, 2, 1));
 		cable(helper, new BlockPos(4, 1, 1));
-		helper.setBlock(new BlockPos(5, 1, 1), ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity other = helper.getBlockEntity(new BlockPos(5, 1, 1), AllInOneBlockEntity.class);
+		helper.setBlock(new BlockPos(5, 1, 1), ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity other = helper.getBlockEntity(new BlockPos(5, 1, 1), CaseBlockEntity.class);
 		other.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		other.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		helper.startSequence()
@@ -139,7 +139,7 @@ public class BluetoothGameTest {
 	public void pairingChainsThroughAHub(GameTestHelper helper) {
 		// The screen's card links to the hub's board, and the hub's radio card to the computer's:
 		// the computer owns both, with no cable anywhere.
-		AllInOneBlockEntity computer = computer(helper);
+		CaseBlockEntity computer = computer(helper);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(null));
 		helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.EXPANSION_HUB);
 		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(4, 1, 1), ExpansionHubBlockEntity.class);
@@ -155,7 +155,7 @@ public class BluetoothGameTest {
 
 	@GameTest(maxTicks = 100)
 	public void anUnlinkedRadioLeavesADeviceShared(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper);
+		CaseBlockEntity computer = computer(helper);
 		cable(helper, new BlockPos(2, 1, 1));
 		ScreenBlockEntity screen = screen(helper, new BlockPos(3, 1, 1));
 		screen.cards().setItem(0, card(null)); // a radio, linked nowhere: not paired
@@ -169,7 +169,7 @@ public class BluetoothGameTest {
 	public void cardsDaisyChainThroughAHub(GameTestHelper helper) {
 		// Unpaired: the computer's card links to the hub's board (the hub's radio receives); the
 		// hub passes it on by cable.
-		AllInOneBlockEntity computer = computer(helper);
+		CaseBlockEntity computer = computer(helper);
 		helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.EXPANSION_HUB);
 		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(4, 1, 1), ExpansionHubBlockEntity.class);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(hub.boardId()));
@@ -183,7 +183,7 @@ public class BluetoothGameTest {
 
 	@GameTest
 	public void anUnlinkedCardJoinsNothing(GameTestHelper helper) {
-		AllInOneBlockEntity computer = computer(helper);
+		CaseBlockEntity computer = computer(helper);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS, card(UUID.randomUUID())); // a board that isn't there
 		helper.setBlock(new BlockPos(4, 1, 1), ModBlocks.EXPANSION_HUB);
 		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(4, 1, 1), ExpansionHubBlockEntity.class);
@@ -199,7 +199,7 @@ public class BluetoothGameTest {
 	public void hubsDaisyChain(GameTestHelper helper) {
 		// The user's case: hub 1's radio links to hub 2, and a computer wired to hub 1 sees hub 2's
 		// devices too, out past it by cable.
-		AllInOneBlockEntity computer = computer(helper);
+		CaseBlockEntity computer = computer(helper);
 		helper.setBlock(new BlockPos(2, 1, 1), ModBlocks.EXPANSION_HUB);
 		ExpansionHubBlockEntity hub1 = helper.getBlockEntity(new BlockPos(2, 1, 1), ExpansionHubBlockEntity.class);
 		helper.setBlock(new BlockPos(2, 1, 6), ModBlocks.EXPANSION_HUB);
@@ -220,11 +220,11 @@ public class BluetoothGameTest {
 		@GameTest(maxTicks = 100)
 	public void aDevicePairedWithAHubGoesWithTheHub(GameTestHelper helper) {
 		// Two computers share a hub by cable; a piston, far off, is paired with the hub.
-		AllInOneBlockEntity first = computer(helper);
+		CaseBlockEntity first = computer(helper);
 		helper.setBlock(new BlockPos(2, 1, 1), ModBlocks.EXPANSION_HUB);
 		ExpansionHubBlockEntity hub = helper.getBlockEntity(new BlockPos(2, 1, 1), ExpansionHubBlockEntity.class);
-		helper.setBlock(new BlockPos(3, 1, 1), ModBlocks.ALL_IN_ONE.defaultBlockState().setValue(AllInOneBlock.FACING, Direction.SOUTH));
-		AllInOneBlockEntity second = helper.getBlockEntity(new BlockPos(3, 1, 1), AllInOneBlockEntity.class);
+		helper.setBlock(new BlockPos(3, 1, 1), ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity second = helper.getBlockEntity(new BlockPos(3, 1, 1), CaseBlockEntity.class);
 		second.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		second.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		first.parts().setItem(CaseMenu.EXP_SLOTS, card(null)); // the first computer's radio, for later
@@ -257,7 +257,7 @@ public class BluetoothGameTest {
 			net.minecraft.world.level.block.Block.UPDATE_ALL);
 	}
 
-	private static boolean onBus(AllInOneBlockEntity computer, ScreenBlockEntity screen) {
+	private static boolean onBus(CaseBlockEntity computer, ScreenBlockEntity screen) {
 		return computer.machine().board().bus().devices().contains(screen.terminal());
 	}
 }

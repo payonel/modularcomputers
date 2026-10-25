@@ -18,7 +18,7 @@ class BusHoldsTest {
 	private final Terminal screen = new Terminal(Resolution.DEFAULT);
 
 	private Machine machine() {
-		Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+		Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 		machine.board().setCpu(new Cpu(CpuTier.TIER_3));
 		machine.board().setExternal(Map.of("id:screen", screen));
 		return machine;

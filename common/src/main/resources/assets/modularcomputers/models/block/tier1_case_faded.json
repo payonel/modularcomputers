@@ -1,13 +1,13 @@
 {
-	"parent": "modularcomputers:block/all_in_one_base_faded",
+	"parent": "modularcomputers:block/case_base_faded",
 	"textures": {
-		"north": "modularcomputers:block/all_in_one_case_front_plain",
-		"south": "modularcomputers:block/all_in_one_back",
-		"east": "modularcomputers:block/all_in_one_side",
-		"west": "modularcomputers:block/all_in_one_side",
-		"up": "modularcomputers:block/all_in_one_top",
-		"down": "modularcomputers:block/all_in_one_bottom",
-		"particle": "modularcomputers:block/all_in_one_side",
-		"button": "modularcomputers:block/all_in_one_power_off_faded"
+		"north": "modularcomputers:block/case_front_plain",
+		"south": "modularcomputers:block/case_back",
+		"east": "modularcomputers:block/case_side",
+		"west": "modularcomputers:block/case_side",
+		"up": "modularcomputers:block/case_top",
+		"down": "modularcomputers:block/case_bottom",
+		"particle": "modularcomputers:block/case_side",
+		"button": "modularcomputers:block/case_power_off_faded"
 	}
 }

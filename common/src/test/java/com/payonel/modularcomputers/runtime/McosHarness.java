@@ -36,7 +36,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 abstract class McosHarness {
 	final Terminal screen = new Terminal(Resolution.DEFAULT);
-	final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+	final Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 	final ConcurrentLinkedQueue<Runnable> server = new ConcurrentLinkedQueue<>();
 	final Map<String, Device> devices = new LinkedHashMap<>();
 

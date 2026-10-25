@@ -2,7 +2,7 @@ package com.payonel.modularcomputers.block;
 
 import com.payonel.modularcomputers.device.Terminal;
 
-/** A block entity with a screen on its front: the all-in-one and the screen block. */
+/** A block entity with a screen on its front: a case (a screen in its gold slot) and the screen block. */
 public interface DisplayHost {
 	Terminal terminal();
 

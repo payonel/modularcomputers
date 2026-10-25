@@ -47,4 +47,3 @@ A halted CPU draws nothing. See [Power](/concepts/power/).
 
 - A CPU only runs what the EEPROM holds, and stops with an error when it cannot.
 - Hold Shift over a CPU in the game to see its draw.
-- A creative-only Java CPU also exists. It runs the Java program its EEPROM names, not Lua.

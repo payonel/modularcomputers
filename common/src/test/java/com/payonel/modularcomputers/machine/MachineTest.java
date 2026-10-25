@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 class MachineTest {
 	private final Terminal display = new Terminal(Resolution.DEFAULT);
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+	private final Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 	/** The case's devices once it has a CPU: two disks and a cabled screen. */
 	private TestBus bus;
 	private static final String DISPLAY = "id:display";
@@ -43,8 +43,8 @@ class MachineTest {
 	}
 
 	@Test
-	void allInOneHasSolderedUnlimitedMemory() {
-		assertThat(Hardware.allInOne().parts()).singleElement().satisfies(part -> {
+	void aComputerHasSolderedUnlimitedMemory() {
+		assertThat(Hardware.computer().parts()).singleElement().satisfies(part -> {
 			assertThat(part.kind()).isEqualTo(PartKind.MEMORY);
 			assertThat(part.soldered()).isTrue();
 			assertThat(part.isUnlimited()).isTrue();
@@ -71,7 +71,7 @@ class MachineTest {
 	@Test
 	void withoutPowerPressingPowerDoesNothingEvenWithoutACpu() {
 		boolean[] power = {false};
-		Machine unpowered = new Machine(new Motherboard(Hardware.allInOne(), new Bus()), () -> power[0]);
+		Machine unpowered = new Machine(new Motherboard(Hardware.computer(), new Bus()), () -> power[0]);
 		assertThat(unpowered.pressPower()).isEqualTo(Machine.PowerPress.NO_POWER);
 		unpowered.board().setCpu(new Cpu(CpuTier.TIER_3));
 		new TestBus(unpowered).cable(DISPLAY, display);

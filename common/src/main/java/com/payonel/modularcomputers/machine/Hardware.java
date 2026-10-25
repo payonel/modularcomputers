@@ -9,8 +9,8 @@ public record Hardware(List<Part> parts) {
 		parts = List.copyOf(parts);
 	}
 
-	/** The all-in-one computer: memory soldered in, no limit. The CPU goes in a socket. */
-	public static Hardware allInOne() {
+	/** Every computer's board: memory soldered in, no limit (the RAM installed sets what a program gets). The CPU goes in a socket. */
+	public static Hardware computer() {
 		return new Hardware(List.of(Part.soldered(PartKind.MEMORY)));
 	}
 

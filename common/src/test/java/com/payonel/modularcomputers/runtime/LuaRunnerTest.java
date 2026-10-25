@@ -6,7 +6,6 @@ import com.payonel.modularcomputers.bus.Bus;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.device.Terminal;
 import com.payonel.modularcomputers.display.Resolution;
-import com.payonel.modularcomputers.machine.Architecture;
 import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.machine.CpuTier;
 import com.payonel.modularcomputers.machine.Eeprom;
@@ -28,7 +27,7 @@ import org.junit.jupiter.api.Test;
  */
 class LuaRunnerTest {
 	private final Terminal screen = new Terminal(Resolution.DEFAULT);
-	private final Machine machine = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+	private final Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 	private final ConcurrentLinkedQueue<Runnable> server = new ConcurrentLinkedQueue<>();
 
 	LuaRunnerTest() {
@@ -335,7 +334,7 @@ class LuaRunnerTest {
 
 	/** The same computer after a reload: a new machine with the same CPU and a new screen, on, nothing booted. */
 	private Machine reloaded(Terminal screen) {
-		Machine again = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+		Machine again = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		again.board().setCpu(new Cpu(CpuTier.TIER_3));
@@ -447,7 +446,7 @@ class LuaRunnerTest {
 		byte[] saved = machine.persistProgram().orElseThrow();
 		assertThat(counter.hits).as("the save made no call: the device is as the save found it").isZero();
 		machine.unload();
-		Machine again = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+		Machine again = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 		again.board().setCpu(new Cpu(CpuTier.TIER_3));
 		TestBus.of(again, devices);
 		again.setServer(server::add);
@@ -480,7 +479,7 @@ class LuaRunnerTest {
 		settle(() -> counter.hits == 1); // no save happened after all, and its call was made
 		byte[] saved = machine.persistProgram().orElseThrow(); // the old snapshot would miss the call
 		machine.unload();
-		Machine again = new Machine(new Motherboard(Hardware.allInOne(), new Bus()));
+		Machine again = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 		again.board().setCpu(new Cpu(CpuTier.TIER_3));
 		TestBus.of(again, devices);
 		again.setServer(server::add);
@@ -1059,7 +1058,7 @@ class LuaRunnerTest {
 
 	@Test
 	void textThatIsntLuaShowsLuasMessage() {
-		boot("com.payonel.modularcomputers.machine.Mcos\n");
+		boot("This is not a Lua program.\n");
 		untilHalted();
 		assertThat(row(0)).startsWith(Cpu.ABORT + Cpu.EEPROM + "eeprom:");
 	}
@@ -1072,12 +1071,5 @@ class LuaRunnerTest {
 			""");
 		untilHalted();
 		assertThat(row(0)).isEqualTo("nilnilnilnilnil");
-	}
-
-	@Test
-	void theJavaCpuCantRunLua() {
-		machine.board().setCpu(new Cpu(CpuTier.TIER_3, Architecture.JAVA));
-		boot("board.halt()\n");
-		assertThat(row(0)).isEqualTo(Cpu.ABORT + Cpu.EXEC_FORMAT);
 	}
 }

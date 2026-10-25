@@ -130,8 +130,8 @@ public class PhotomaskGameTest {
 	public void aRunningComputerPowersItOverTheBus(GameTestHelper helper) {
 		// A computer, a cable, and the photomask, its gear facing away from the cable.
 		helper.setBlock(new BlockPos(1, 1, 1), ModBlocks.TIER2_CASE.defaultBlockState()
-			.setValue(com.payonel.modularcomputers.block.AllInOneBlock.FACING, net.minecraft.core.Direction.SOUTH));
-		var computer = helper.getBlockEntity(new BlockPos(1, 1, 1), com.payonel.modularcomputers.block.AllInOneBlockEntity.class);
+			.setValue(com.payonel.modularcomputers.block.CaseBlock.FACING, net.minecraft.core.Direction.SOUTH));
+		var computer = helper.getBlockEntity(new BlockPos(1, 1, 1), com.payonel.modularcomputers.block.CaseBlockEntity.class);
 		computer.parts().setItem(com.payonel.modularcomputers.menu.CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER2_CPU));
 		computer.parts().setItem(com.payonel.modularcomputers.menu.CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		computer.parts().setItem(com.payonel.modularcomputers.menu.CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));

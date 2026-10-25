@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 
 class BatteryChargeTest {
-	/** A day of a running all-in-one, in power units. */
+	/** A day of a running computer, in power units. */
 	private static final int DAY = PowerUnits.DAY;
 	private static final long DAY_TICKS = BatteryCharge.DAY_TICKS;
 
@@ -41,10 +41,10 @@ class BatteryChargeTest {
 	}
 
 	@Test
-	void tier2RegainsHalfAnAllInOnesDrawForEveryTickItRests() {
+	void tier2RegainsHalfAComputersDrawForEveryTickItRests() {
 		assertThat(BatteryTier.TIER_2.rechargeRate()).isEqualTo(0.5);
 		BatteryCharge charge = new BatteryCharge(1000, 500).rest(BatteryTier.TIER_2, 800);
-		assertThat(charge).isEqualTo(new BatteryCharge(1000 + 300 * PowerUnits.ALL_IN_ONE / 2, 800));
+		assertThat(charge).isEqualTo(new BatteryCharge(1000 + 300 * PowerUnits.COMPUTER / 2, 800));
 		assertThat(charge.rest(BatteryTier.TIER_2, 800 + 100 * DAY_TICKS).units()).as("up to full").isEqualTo(BatteryTier.TIER_2.capacity());
 		// Run a day, rest two: back where it started.
 		BatteryCharge cycled = new BatteryCharge(5 * DAY, 0).run(BatteryTier.TIER_2, DAY, DAY_TICKS).rest(BatteryTier.TIER_2, 3 * DAY_TICKS);
@@ -54,7 +54,7 @@ class BatteryChargeTest {
 	@Test
 	void restTooShortForAWholeUnitCarriesOver() {
 		try {
-			BatteryTier.TIER_2.setRechargeRate(0.3 / PowerUnits.ALL_IN_ONE); // 0.3 units a tick
+			BatteryTier.TIER_2.setRechargeRate(0.3 / PowerUnits.COMPUTER); // 0.3 units a tick
 			BatteryCharge charge = new BatteryCharge(0, 0);
 			for (long now = 20; now <= 1000; now += 20) {
 				charge = charge.rest(BatteryTier.TIER_2, now);

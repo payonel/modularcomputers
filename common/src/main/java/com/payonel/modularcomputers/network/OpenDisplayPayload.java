@@ -12,7 +12,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
  * Server to client: open the display of the screen {@code host} names. Carries the resolution so the
  * client can size the display correctly from the first frame, the computer whose power button
  * to show (none for a screen that isn't connected to one), and whether there's a case view to
- * switch to (the all-in-one has one; a screen block doesn't).
+ * switch to (a case has one; a screen block doesn't).
  */
 public record OpenDisplayPayload(HostRef host, Resolution resolution, Optional<HostRef> computer, boolean caseView) implements CustomPacketPayload {
 	public static final Type<OpenDisplayPayload> TYPE = new Type<>(ModularComputers.id("open_display"));
