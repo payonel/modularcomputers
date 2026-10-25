@@ -226,6 +226,29 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			context.getInput().setCursorPos(0, 0); // (off the board: no part's tooltip in the picture)
 			context.waitTicks(2);
 			context.takeScreenshot("bot-golem-parts");
+			// A golem in hand: sneaking and using it opens its parts view, on the item (the user's), its hands too.
+			context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE);
+			context.waitFor(c -> c.gui.screen() == null);
+			singleplayer.getServer().runOnServer(s -> {
+				var player = s.getPlayerList().getPlayers().getFirst();
+				ItemStack inHand = ((BotGolem) s.overworld().getEntity(id)).asItem();
+				inHand.remove(com.payonel.modularcomputers.item.ModComponents.SERIAL); // (another golem's: not this one, which is in the world)
+				player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, inHand);
+			});
+			context.runOnClient(c -> c.player.setXRot(-90)); // (at the sky: nothing to use it on)
+			context.waitTicks(2);
+			context.getInput().holdKey(options -> options.keyShift);
+			context.waitTicks(2);
+			context.getInput().pressKey(options -> options.keyUse);
+			context.waitForScreen(com.payonel.modularcomputers.client.screen.CaseScreen.class);
+			context.getInput().releaseKey(options -> options.keyShift);
+			context.waitTicks(2);
+			String heldView = context.computeOnClient(c -> c.player.containerMenu instanceof CaseMenu menu && menu.hasHand()
+				? menu.slots.get(CaseMenu.HAND_SLOT).getItem() + " " + menu.slots.get(CaseMenu.CPU_SLOT).getItem() : "no golem view: " + c.player.containerMenu);
+			check(heldView.contains("iron_pickaxe") && heldView.contains("cpu"), "the held golem's view, its hand and its CPU: " + heldView);
+			context.getInput().setCursorPos(0, 0);
+			context.waitTicks(2);
+			context.takeScreenshot("bot-golem-held");
 		}
 	}
 

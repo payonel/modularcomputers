@@ -30,8 +30,10 @@ board is the only way it moves. It never acts on its own: a program drives it.
 
 Use the golem item on a block: the golem stands there, facing you. Right-click it to see its
 screen (when its face has one), or crouch and right-click for its parts. Hit it to pick it up: it
-drops as its item, its parts and its board's id kept in it, as a broken case keeps them. Nothing
-else harms it. It's solid: you walk into it, not through it, and can stand on it. While it
+drops as its item, its parts and its board's id kept in it, as a broken case keeps them. Holding
+that item (a golem's or a torso's), crouch and right-click, in the air or at a block, to open its
+parts right there: change its parts, what it holds and its crafting cards' slots without setting it
+down (it's off while it's an item: no bus till it's set down). Nothing else harms it. It's solid: you walk into it, not through it, and can stand on it. While it
 stands on its legs nothing shoves it: not a player walking into it, a mob, or a blast.
 
 Its parts view is a case's, seen through its iron chest: the same board, the same slots, those its

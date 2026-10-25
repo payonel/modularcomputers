@@ -688,7 +688,8 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		BusStatus status = computer().map(computer -> computer.board().busStatus()).orElse(BusStatus.EMPTY);
 		// How full the external part of the bus is. A wired device that can't join a full bus
 		// would otherwise look broken: the warning light comes on, and the line says so.
-		Component summary = busSummary(status);
+		// (no computer to ask: a golem held in a hand, its parts on its item: no bus until it's set down)
+		Component summary = computer().isPresent() ? busSummary(status) : Component.translatable("gui.modularcomputers.bus.held");
 		int room = BUS_W - 10 - 6;
 		float scale = Math.min(1f, (float) room / font.width(summary)); // a long line shrinks to fit
 		var pose = graphics.pose();

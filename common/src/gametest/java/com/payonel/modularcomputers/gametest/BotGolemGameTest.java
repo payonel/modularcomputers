@@ -207,6 +207,8 @@ public class BotGolemGameTest {
 	@GameTest
 	public void aPlayersHitPicksItUpWithItsParts(GameTestHelper helper) {
 		BotGolem golem = golem(helper, board -> board.halt());
+		golem.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(net.minecraft.world.item.Items.IRON_PICKAXE));
+		golem.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, new ItemStack(net.minecraft.world.item.Items.COBBLESTONE));
 		var player = GameTests.serverPlayer(helper);
 		java.util.UUID board = golem.board().boardId();
 		golem.hurtServer(helper.getLevel(), helper.getLevel().damageSources().playerAttack(player), 1);
@@ -217,7 +219,21 @@ public class BotGolemGameTest {
 		List<ItemStack> parts = item.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).nonEmptyItemCopyStream().toList();
 		helper.assertTrue(parts.stream().anyMatch(part -> part.is(ModItems.TIER3_CPU)), "its CPU in it: " + parts);
 		helper.assertValueEqual(item.get(ModComponents.SERIAL), board, "its board's id (what Bluetooth cards link to)");
+		helper.assertTrue(hands(item).get(ModComponents.MAIN_HAND).is(net.minecraft.world.item.Items.IRON_PICKAXE)
+			&& hands(item).get(ModComponents.OFF_HAND).is(net.minecraft.world.item.Items.COBBLESTONE), "what it held, kept: " + hands(item));
+		// Set down again, it holds them still.
+		BotGolem again = ModEntities.BOT_GOLEM.create(helper.getLevel(), EntitySpawnReason.SPAWN_ITEM_USE);
+		again.fromItem(item);
+		helper.assertTrue(again.getMainHandItem().is(net.minecraft.world.item.Items.IRON_PICKAXE) && again.getOffhandItem().is(net.minecraft.world.item.Items.COBBLESTONE),
+			"set down, it holds them: " + again.getMainHandItem() + ", " + again.getOffhandItem());
 		helper.succeed();
+	}
+
+	/** What a golem's item keeps of its hands, its main hand's then its off hand's. */
+	private static net.minecraft.core.NonNullList<ItemStack> hands(ItemStack golem) {
+		net.minecraft.core.NonNullList<ItemStack> hands = net.minecraft.core.NonNullList.withSize(ModComponents.HAND_SLOTS, ItemStack.EMPTY);
+		golem.getOrDefault(ModComponents.HANDS, ItemContainerContents.EMPTY).copyInto(hands);
+		return hands;
 	}
 
 	@GameTest
@@ -225,6 +241,67 @@ public class BotGolemGameTest {
 		helper.assertTrue(CaseMenu.accepts(GolemLayout.BOT_GOLEM, CaseMenu.EXP_SLOTS, new ItemStack(com.payonel.modularcomputers.block.ModBlocks.TIER1_SCREEN)), "a tier 1 screen");
 		helper.assertTrue(!CaseMenu.accepts(GolemLayout.BOT_GOLEM, CaseMenu.EXP_SLOTS, new ItemStack(com.payonel.modularcomputers.block.ModBlocks.TIER2_SCREEN)), "not a tier 2");
 		helper.assertTrue(!CaseMenu.available(GolemLayout.BOT_GOLEM, CaseMenu.EXP_SLOTS + GolemLayout.ROBOTICS_LANE), "its robotics lane: no slot");
+		helper.succeed();
+	}
+
+	/**
+	 * Sneaking with a golem in hand (its torso here) opens its parts view on the item (the user's), on
+	 * a block too (not placed): its parts, its hands and a crafting card's slots are the item's, taken
+	 * out and put back there, and the view closes once that stack's out of the hand.
+	 */
+	@GameTest
+	public void sneakingWithAGolemInHandOpensItsPartsViewOnTheItem(GameTestHelper helper) {
+		int lane = 1; // (its crafting card's: the second card slot)
+		net.minecraft.core.NonNullList<ItemStack> grid = net.minecraft.core.NonNullList.withSize(com.payonel.modularcomputers.device.CraftingCard.SLOTS, ItemStack.EMPTY);
+		grid.set(0, new ItemStack(net.minecraft.world.item.Items.OAK_PLANKS));
+		grid.set(3, new ItemStack(net.minecraft.world.item.Items.OAK_PLANKS)); // (one above the other: sticks)
+		ItemStack card = new ItemStack(ModItems.CRAFTING_CARD);
+		card.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(grid));
+		net.minecraft.core.NonNullList<ItemStack> parts = net.minecraft.core.NonNullList.withSize(CaseMenu.PART_SLOTS, ItemStack.EMPTY);
+		parts.set(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
+		parts.set(CaseMenu.EXP_SLOTS + lane, card);
+		ItemStack golem = new ItemStack(ModItems.BOT_GOLEM_TORSO);
+		golem.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(parts));
+		golem.set(ModComponents.HANDS, ItemContainerContents.fromItems(List.of(new ItemStack(net.minecraft.world.item.Items.IRON_AXE))));
+		var player = GameTests.serverPlayer(helper);
+		player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, golem);
+		player.setShiftKeyDown(true);
+		BlockPos floor = new BlockPos(2, 1, 2);
+		helper.setBlock(floor, Blocks.STONE);
+		BlockPos at = helper.absolutePos(floor);
+		player.gameMode.useItemOn(player, helper.getLevel(), golem, net.minecraft.world.InteractionHand.MAIN_HAND,
+			new net.minecraft.world.phys.BlockHitResult(Vec3.atCenterOf(at).add(0, 0.5, 0), net.minecraft.core.Direction.UP, at, false));
+		helper.assertTrue(player.containerMenu instanceof CaseMenu menu && menu.hasHand(), "its parts view, with its hands: " + player.containerMenu);
+		helper.assertTrue(helper.getLevel().getEntitiesOfClass(BotGolem.class, new net.minecraft.world.phys.AABB(at).inflate(3)).isEmpty(), "not placed");
+		helper.assertTrue(player.getMainHandItem() == golem, "still in hand");
+		CaseMenu menu = (CaseMenu) player.containerMenu;
+		var input = net.minecraft.world.inventory.ContainerInput.PICKUP;
+		// Its hand: the axe taken off the item, and put back.
+		menu.clicked(CaseMenu.HAND_SLOT, 0, input, player);
+		helper.assertTrue(menu.getCarried().is(net.minecraft.world.item.Items.IRON_AXE) && !golem.has(ModComponents.HANDS), "its axe taken from the item: " + golem.get(ModComponents.HANDS));
+		menu.clicked(CaseMenu.HAND_SLOT, 0, input, player);
+		helper.assertTrue(hands(golem).get(ModComponents.MAIN_HAND).is(net.minecraft.world.item.Items.IRON_AXE), "and back on it: " + hands(golem));
+		// Its crafting card's grid, crafted from by hand: the card on the item keeps what's left.
+		menu.openTab(lane);
+		int craft = CaseMenu.CRAFT_SLOTS + lane * CaseMenu.CRAFT_LANE_SLOTS;
+		menu.slotsChanged(menu.slots.get(craft).container);
+		menu.clicked(craft + CaseMenu.CRAFT_RESULT, 0, input, player);
+		helper.assertTrue(menu.getCarried().is(net.minecraft.world.item.Items.STICK), "sticks made: " + menu.getCarried());
+		menu.setCarried(ItemStack.EMPTY);
+		net.minecraft.core.NonNullList<ItemStack> now = net.minecraft.core.NonNullList.withSize(CaseMenu.PART_SLOTS, ItemStack.EMPTY);
+		golem.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(now);
+		net.minecraft.core.NonNullList<ItemStack> left = net.minecraft.core.NonNullList.withSize(com.payonel.modularcomputers.device.CraftingCard.SLOTS, ItemStack.EMPTY);
+		now.get(CaseMenu.EXP_SLOTS + lane).getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(left);
+		helper.assertTrue(left.get(0).isEmpty() && left.get(3).isEmpty(), "its card's grid used, on the item: " + left);
+		// A part: its CPU taken out of the item.
+		menu.clicked(CaseMenu.CPU_SLOT, 0, input, player);
+		helper.assertTrue(menu.getCarried().is(ModItems.TIER3_CPU), "its CPU taken: " + menu.getCarried());
+		golem.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(now);
+		helper.assertTrue(now.get(CaseMenu.CPU_SLOT).isEmpty(), "gone from the item: " + now);
+		// Out of the hand, the view's done.
+		helper.assertTrue(menu.stillValid(player), "open while it's in hand");
+		player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+		helper.assertTrue(!menu.stillValid(player), "closed once it's out of the hand");
 		helper.succeed();
 	}
 }

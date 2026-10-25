@@ -81,7 +81,8 @@ computers really work.
   anything budgeted (`user_co` is the root). **Kernel**: mcos's, in user threads. The EEPROM is
   "eeprom", not firmware. "Modal mode" is the user's name for the screen view.
 - **Data has one home:** code reads and writes data where it lives (an item's component, a disk's
-  folder) through a small source, never a copy synced back. Point out the pattern when seen.
+  folder) through a small source, never a copy synced back. Point out the pattern when seen. Slots
+  kept on an item are an `ItemContents` (a crafting card's, a held golem's parts and hands).
 - **Named constants**, each with a comment, for every tunable; no magic numbers.
 - **No old-save compatibility:** formats change freely, without shims.
 - **Debugging:** run one quick test before a long suite after a risky change
@@ -305,7 +306,9 @@ in the world, and the `broke` event says whether it kept it all.
   (swing refused; a tool in hand used as an empty hand: buttons, doors, its legs popped up),
   ignoring block triggers (pressure plates). `attachLegs` within 3 blocks goes onto them (a field
   holding it lets go). Picked up legless it's a torso item; torso over legs is a golem again
-  (`GolemAssemblyRecipe`, the torso's components kept).
+  (`GolemAssemblyRecipe`, the torso's components kept). Either item, used crouching in a hand,
+  opens its parts view on the item (the user's): parts, hands and cards' slots read and written
+  there (`ItemContents`), its board off (an item runs nothing).
 - **Mobs fear it** (the user's): spiders (a skeleton riding one with them) avoid any golem, chickens
   and cows a flying one (legs off, off the ground), sheep none: an `AvoidEntityGoal` added as each
   registers its goals (`GolemFear`; mixins `SpiderFear`, `ChickenFear`, `CowFear`).
@@ -668,6 +671,10 @@ Lessons from mistakes, each with its test:
   render thread (textures, sounds) goes to the client's thread (`Minecraft.execute`). Timing-bound,
   so no test catches it reliably: the client test's log showed it.
 
+- **An item's data component is immutable and compares by value** (records, strings,
+  `ItemContainerContents`), never an `ItemStack`: NeoForge refuses one when it's set, so a golem
+  picked up holding something crashed there (Fabric doesn't check). Items on an item go in an
+  `ItemContainerContents` (`ModComponents.HANDS`). (`aPlayersHitPicksItUpWithItsParts`, on NeoForge)
 - **Compare a view's tabs by lane, not identity:** `SideTabs` makes its tabs afresh at each call,
   so `tab == open` is never true (the open tab's mark never showed). (`BotGolemClientGameTest`: the
   crafting tab ringed)

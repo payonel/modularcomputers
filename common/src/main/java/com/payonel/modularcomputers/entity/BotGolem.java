@@ -735,11 +735,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			item.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(parts));
 		}
 		item.set(ModComponents.SERIAL, board.boardId());
-		if (!getMainHandItem().isEmpty()) {
-			item.set(ModComponents.HELD, getMainHandItem().copy());
-		}
-		if (!getOffhandItem().isEmpty()) {
-			item.set(ModComponents.OFF_HELD, getOffhandItem().copy());
+		if (!getMainHandItem().isEmpty() || !getOffhandItem().isEmpty()) {
+			item.set(ModComponents.HANDS, ItemContainerContents.fromItems(List.of(getMainHandItem().copy(), getOffhandItem().copy())));
 		}
 		if (hasCustomName()) {
 			item.set(DataComponents.CUSTOM_NAME, getCustomName());
@@ -756,8 +753,10 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		NonNullList<ItemStack> parts = NonNullList.withSize(CaseMenu.PART_SLOTS, ItemStack.EMPTY);
 		item.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(parts);
 		board.restoreParts(parts);
-		setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, item.getOrDefault(ModComponents.HELD, ItemStack.EMPTY).copy());
-		setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, item.getOrDefault(ModComponents.OFF_HELD, ItemStack.EMPTY).copy());
+		NonNullList<ItemStack> hands = NonNullList.withSize(ModComponents.HAND_SLOTS, ItemStack.EMPTY);
+		item.getOrDefault(ModComponents.HANDS, ItemContainerContents.EMPTY).copyInto(hands);
+		setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, hands.get(ModComponents.MAIN_HAND));
+		setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, hands.get(ModComponents.OFF_HAND));
 		if (item.has(DataComponents.CUSTOM_NAME)) {
 			setCustomName(item.get(DataComponents.CUSTOM_NAME));
 		}

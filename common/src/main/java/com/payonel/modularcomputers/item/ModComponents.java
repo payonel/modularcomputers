@@ -17,13 +17,20 @@ import net.minecraft.world.item.ItemStack;
 
 /** Item data components. */
 public final class ModComponents {
-	/** What a robot held in its hand, kept on its item while it's one (its main hand's home in the world is the robot). */
-	public static final DataComponentType<ItemStack> HELD = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("held"),
-		DataComponentType.<ItemStack>builder().persistent(ItemStack.CODEC).networkSynchronized(ItemStack.STREAM_CODEC).build());
-
-	/** What a robot held in its off hand (what it caught with nowhere else to put it), kept on its item as {@link #HELD}. */
-	public static final DataComponentType<ItemStack> OFF_HELD = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("off_held"),
-		DataComponentType.<ItemStack>builder().persistent(ItemStack.CODEC).networkSynchronized(ItemStack.STREAM_CODEC).build());
+	/**
+	 * What a robot held, kept on its item while it's one (their home in the world is the robot): its
+	 * main hand ({@link #MAIN_HAND}) and its off hand ({@link #OFF_HAND}, what it caught with nowhere
+	 * else to put it), as a container's two slots. Not an ItemStack each: a component must be
+	 * immutable and compare by value (NeoForge refuses a stack).
+	 */
+	public static final DataComponentType<net.minecraft.world.item.component.ItemContainerContents> HANDS = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE,
+		id("hands"), DataComponentType.<net.minecraft.world.item.component.ItemContainerContents>builder()
+			.persistent(net.minecraft.world.item.component.ItemContainerContents.CODEC)
+			.networkSynchronized(net.minecraft.world.item.component.ItemContainerContents.STREAM_CODEC).build());
+	/** {@link #HANDS}' slots. */
+	public static final int MAIN_HAND = 0;
+	public static final int OFF_HAND = 1;
+	public static final int HAND_SLOTS = 2;
 
 	/** A battery's charge: ticks of running a CPU, and when it was last worked out. */
 	public static final DataComponentType<BatteryCharge> CHARGE = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("battery_charge"),
