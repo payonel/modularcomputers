@@ -53,4 +53,23 @@ class ExamplesTest extends McosHarness {
 		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
 		settle(() -> card.output(0) == 15);
 	}
+
+	/**
+	 * The service tutorial's daemon: a loop forever, sleeping between lines, until rc stops it; its
+	 * SIGTERM handler ends the loop at once (the sleep returns early), so its last line is its own
+	 * and not rc's SIGKILL five seconds on.
+	 */
+	@Test
+	void theTickerServiceLoopsAndSleepsUntilRcStopsItAndItsLoopEndsCleanly() {
+		boot();
+		file("home/ticker.lua", example("service-ticker"));
+		file("etc/rc.d/ticker", example("service-ticker-rc"));
+		java.nio.file.Path log = root().resolve("home/ticker.log");
+		type("rc ticker start\r");
+		settle(() -> java.nio.file.Files.exists(log) && read(log).contains(" tick 2\n"));
+		untilIdle();
+		type("rc ticker stop; rc ticker status; echo $? > /status\r");
+		untilFile(root().resolve("status"), "3\n"); // (LSB's "not running")
+		assertThat(read(log)).as("started, its ticks, then its own last line").containsPattern("started, a line every 2 seconds\n(.* tick \\d+\n)+.* stopped after \\d+ ticks\n$");
+	}
 }

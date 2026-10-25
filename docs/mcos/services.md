@@ -68,16 +68,30 @@ again at the next boot.
 
 ## Writing your own
 
-The tutorial [Your own service](/tutorials/service/) walks through one. In short: put a Lua script in `/etc/rc.d` named after the service, with a `command`:
+The tutorial [Your own service](/tutorials/service/) has two complete ones, each with its program,
+its `/etc/rc.d` definition and every command. In short: put a Lua script in `/etc/rc.d` named after
+the service, with a `command`:
 
 ```lua
-description = "my sensor logger"
-command = "/home/logger.lua"
-output_log = "/tmp/logger.log"
+{% include service-ticker-rc.lua %}
 ```
 
-Then `rc logger start` runs it, and `rc logger enable` starts it at boot. A daemon should handle SIGTERM
-(see `sys.signal` in [The sys library](/mcos/sys-api/)) or simply let it end it.
+And the program, a daemon that loops forever, sleeps between turns, and ends cleanly when stopped:
+
+```lua
+{% include service-ticker.lua %}
+```
+
+Then `rc ticker start` runs it, `rc ticker stop` stops it, and `rc ticker enable` starts it at boot.
+
+- **A loop forever is right for a daemon.** mcos runs processes in turns, so it never freezes the
+  computer.
+- **Sleep, or wait on something** (`sys.sleep`, a device's file, `sys.poll`, a socket): a waiting
+  process uses no CPU, so the computer draws its waiting power.
+- **`rc stop` sends `SIGTERM`.** With no handler it ends the process wherever it is. With a handler
+  (`sys.signal`, in [The sys library](/mcos/sys-api/)) the handler runs and a waiting call returns
+  early with `EINTR`, so the loop can finish and clean up. Five seconds later, `SIGKILL` ends it
+  regardless.
 
 The kernel stays init: it runs the console's shell and starts it again when it ends. A user-space
 PID 1 would stay in memory for nothing, so there is none.

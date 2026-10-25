@@ -74,6 +74,71 @@ A function returns the action's exit status (0: it went well). A function the fi
 `rc` does itself, so you can write just the one you want to change (a `stop` that saves something
 first, say) and leave the rest out.
 
+## A daemon that loops forever
+
+The visitor log waits on a sensor, so a read is its loop. Most daemons you write will instead do
+something, sleep, and do it again, forever, until they're stopped. Here is one whole: a ticker that
+writes the world's time to a log every few seconds, and ends cleanly on `rc ticker stop`.
+
+**1. The program,** `/home/ticker.lua`:
+
+```lua
+{% include service-ticker.lua %}
+```
+
+**2. The service,** `/etc/rc.d/ticker`:
+
+```lua
+{% include service-ticker-rc.lua %}
+```
+
+**3. Use it:**
+
+```
+$ rc ticker start
+$ tail -f /home/ticker.log         # Ctrl+C to stop watching (the service goes on)
+Day 3 14:02:11 started, a line every 2 seconds
+Day 3 14:02:11 tick 1
+Day 3 14:02:13 tick 2
+^C
+$ rc ticker stop
+$ tail -1 /home/ticker.log
+Day 3 14:02:16 stopped after 3 ticks
+```
+
+### Can it loop forever?
+
+Yes. A service is meant to: `while not stopping do ... end` (or `while true do ... end`) is the
+daemon's whole life. mcos runs every process in turns, so a loop never freezes the computer or your
+shell, and `rc stop` reaches it wherever it is.
+
+### Can it sleep?
+
+Yes, and it should. `sys.sleep(seconds)` waits that long (the world's seconds: 20 ticks each) without
+using the CPU, so the computer draws its waiting power, not its running power (see
+[Power](/concepts/power/)). Any call that waits does the same: reading a device's file (as the
+visitor log does), `sys.poll`, reading a socket. A loop that never waits (`while true do end`)
+still works and still stops, but keeps the CPU busy and the computer at its running power the whole
+time, for nothing.
+
+### How does `rc stop` end the loop?
+
+`rc ticker stop` sends the process `SIGTERM`, then waits up to five seconds for it to end, then sends
+`SIGKILL`, which nothing can catch. What `SIGTERM` does is up to the program:
+
+- **No handler:** it ends the process at once, wherever it is: mid-sleep, mid-read, mid-loop. Fine
+  when there's nothing to finish.
+- **A handler** (`sys.signal("SIGTERM", function() ... end)`): the handler runs instead, in your
+  program, and a call that was waiting (the `sys.sleep`) returns early, with `nil` and `EINTR`. So
+  the ticker's handler only sets `stopping = true`; the sleep ends, the loop checks `stopping`, and
+  the program writes its last line and returns. Keep a handler this small, and do the cleanup after
+  the loop, where you know what state you're in.
+- **Exit from the handler**, as the visitor log does (`os.exit(0)` after its last line), when the
+  program has no loop of its own to finish.
+
+A handler that doesn't end the program (one that ignores the signal) gets `SIGKILL` after five
+seconds anyway. `rc ticker status` then says it's stopped, its status 3.
+
 ## What each part does
 
 ### The program
