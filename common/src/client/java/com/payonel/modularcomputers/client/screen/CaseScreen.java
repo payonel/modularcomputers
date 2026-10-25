@@ -96,7 +96,6 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int HAND_MARGIN = 3;
 	/** Crafting cards' panel and tab buttons (scripts/art/case_gui_textures.py), and where the tabs start without a hand. */
 	private static final Identifier CRAFT_PANEL = ModularComputers.id("textures/gui/crafting_panel.png");
-	private static final Identifier CRAFT_TABS = ModularComputers.id("textures/gui/crafting_tabs.png");
 	private static final int CRAFT_TABS_Y = 48;
 	/**
 	 * Outlines a part slot and its bus order row together while either is hovered, and the
@@ -149,6 +148,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	@Override
 	protected void init() {
 		super.init();
+		if (tabToOpen >= 0) {
+			menu.openTab(tabToOpen);
+			tabToOpen = -1;
+		}
 		layout();
 	}
 
@@ -158,10 +161,27 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	 */
 	private void layout() {
 		int buttons = ComputerButtons.GAP + ComputerButtons.SIZE;
-		int crafting = openCraftTab() >= 0 ? ComputerButtons.GAP + CaseMenu.CRAFT_W : 0;
-		showBus = width >= BUS_W + BUS_GAP + imageWidth + buttons + crafting;
-		int total = (showBus ? BUS_W + BUS_GAP : 0) + imageWidth + buttons + crafting;
+		laidOutCrafting = openCraftTab() >= 0;
+		if (laidOutCrafting) {
+			// An open crafting card takes the bus panel's place, left of the case: the buttons stay right.
+			showBus = false;
+			int total = CaseMenu.CRAFT_W + BUS_GAP + imageWidth + buttons;
+			leftPos = (width - total) / 2 + CaseMenu.CRAFT_W + BUS_GAP;
+			return;
+		}
+		showBus = width >= BUS_W + BUS_GAP + imageWidth + buttons;
+		int total = (showBus ? BUS_W + BUS_GAP : 0) + imageWidth + buttons;
 		leftPos = (width - total) / 2 + (showBus ? BUS_W + BUS_GAP : 0);
+	}
+
+	/** The crafting tab to open when this view opens (a tab clicked in the screen view), or -1. */
+	static int tabToOpen = -1;
+	/** Whether it's laid out with a crafting card open: the parts it's sent come after it opens, so it's laid out again when that changes. */
+	private boolean laidOutCrafting;
+
+	/** Whether the bus order panel shows (not while a crafting card is open, nor on a narrow window). */
+	public boolean showsBus() {
+		return showBus;
 	}
 
 	/** The open crafting tab's lane, while its card is still in (-1: none). */
@@ -396,6 +416,9 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 
 	@Override
 	public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+		if ((openCraftTab() >= 0) != laidOutCrafting) {
+			layout(); // (its card came, or went, after it was laid out)
+		}
 		super.extractBackground(graphics, mouseX, mouseY, partialTick);
 		int x = leftPos;
 		int y = topPos;
@@ -593,9 +616,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
 			Viewport tab = craftTab(lane);
 			if (tab.width() > 0) {
-				int state = lane == openCraftTab() ? 1 : 0;
-				graphics.blit(RenderPipelines.GUI_TEXTURED, CRAFT_TABS, tab.x(), tab.y(), state * ComputerButtons.SIZE, 0, tab.width(), tab.height(),
-					2 * ComputerButtons.SIZE, ComputerButtons.SIZE);
+				ComputerButtons.extractCraftTab(graphics, tab, lane == openCraftTab());
 			}
 		}
 		if (openCraftTab() >= 0) {

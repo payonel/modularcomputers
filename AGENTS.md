@@ -635,6 +635,9 @@ Lessons from mistakes, each with its test:
   read's (a program says it's ready with a file). (`rawReadsWaitAsVminAndVtimeSay`)
 - **A buffer fills on demand, not only on its cadence:** a pad whose battery filled its buffer once
   a second charged nothing for up to a second. (`aBatteryPutInChargesAtOnce`)
+- **A menu's contents come after its screen opens:** a layout made in `init` from what the menu
+  holds (a crafting card in a slot) sees an empty menu; lay out again when what it depends on
+  changes. (`BotGolemClientGameTest`: the crafting panel in the bus panel's place)
 - **A loader's event may come on the network's thread** (Fabric's disconnect does): work for the
   render thread (textures, sounds) goes to the client's thread (`Minecraft.execute`). Timing-bound,
   so no test catches it reliably: the client test's log showed it.

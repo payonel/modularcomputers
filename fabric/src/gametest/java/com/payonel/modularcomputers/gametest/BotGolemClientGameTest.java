@@ -164,14 +164,29 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(com.payonel.modularcomputers.client.screen.DisplayScreen.class);
 			context.waitTicks(2);
 			context.takeScreenshot("bot-golem-view");
-			// Its parts view: its view's toggle (the server opens it).
-			singleplayer.getServer().runOnServer(server -> {
-				if (server.overworld().getEntity(id) instanceof BotGolem golem) {
-					golem.openParts(singleplayer.getConnection().getServerPlayer());
-				}
-			});
+			// Its crafting card's tab, under the screen view's buttons: it opens the parts view, that card open,
+			// its panel left of the board (in the bus panel's place: the buttons stay right).
+			CaseClientGameTest.clickOnScreen(context, com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT,
+				screen -> ((com.payonel.modularcomputers.client.screen.DisplayScreen) screen).craftTab(CRAFTING_LANE));
 			context.waitForScreen(com.payonel.modularcomputers.client.screen.CaseScreen.class);
 			context.waitTicks(2);
+			String grid = context.computeOnClient(c -> {
+				CaseMenu menu = (CaseMenu) c.player.containerMenu;
+				int lane = CaseMenu.CRAFT_SLOTS + CRAFTING_LANE * CaseMenu.CRAFT_LANE_SLOTS;
+				var planks = menu.slots.get(lane);
+				var result = menu.slots.get(lane + CaseMenu.CRAFT_RESULT);
+				var screen = (com.payonel.modularcomputers.client.screen.CaseScreen) c.gui.screen();
+				return planks.isActive() + " " + planks.getItem() + " " + result.isActive() + " " + result.getItem() + " panel "
+					+ (screen.craftPanel().right() < screen.board().x() && screen.craftTab(CRAFTING_LANE).x() > screen.board().right() && !screen.showsBus());
+			});
+			check(grid.startsWith("true") && grid.contains("oak_planks") && grid.contains("true 4 minecraft:stick") && grid.endsWith("panel true"),
+				"its crafting tab shows its grid and what it makes, left of the board in the bus panel's place, the tabs right: " + grid);
+			context.getInput().setCursorPos(0, 0);
+			context.waitTicks(2);
+			context.takeScreenshot("bot-golem-crafting");
+			// Its tab again closes it: the bus panel's back.
+			CaseClientGameTest.clickOnScreen(context, com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT,
+				screen -> ((com.payonel.modularcomputers.client.screen.CaseScreen) screen).craftTab(CRAFTING_LANE));
 			// What its bus panel lists: the client's copy of its board, as the server's.
 			var server = singleplayer.getServer().computeOnServer(s -> keys((BotGolem) s.overworld().getEntity(id)));
 			var client = context.computeOnClient(c -> keys((BotGolem) c.level.getEntity(id)));
@@ -183,21 +198,6 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			context.getInput().setCursorPos(0, 0); // (off the board: no part's tooltip in the picture)
 			context.waitTicks(2);
 			context.takeScreenshot("bot-golem-parts");
-			// Its crafting card's tab: its panel, right of the buttons.
-			CaseClientGameTest.clickOnScreen(context, com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT,
-				screen -> ((com.payonel.modularcomputers.client.screen.CaseScreen) screen).craftTab(CRAFTING_LANE));
-			String grid = context.computeOnClient(c -> {
-				CaseMenu menu = (CaseMenu) c.player.containerMenu;
-				int lane = CaseMenu.CRAFT_SLOTS + CRAFTING_LANE * CaseMenu.CRAFT_LANE_SLOTS;
-				var planks = menu.slots.get(lane);
-				var result = menu.slots.get(lane + CaseMenu.CRAFT_RESULT);
-				return planks.isActive() + " " + planks.getItem() + " " + result.isActive() + " " + result.getItem();
-			});
-			check(grid.startsWith("true") && grid.contains("oak_planks") && grid.contains("true 4 minecraft:stick"),
-				"its crafting tab shows its grid and what it makes: " + grid);
-			context.getInput().setCursorPos(0, 0);
-			context.waitTicks(2);
-			context.takeScreenshot("bot-golem-crafting");
 		}
 	}
 

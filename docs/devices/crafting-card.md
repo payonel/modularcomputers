@@ -29,10 +29,11 @@ computer or robot. Several cards craft at once: two crafting side by side make t
 
 ## In its computer's view
 
-Each crafting card in a computer gets a tab right of the view's buttons (under a golem's hands),
-named for its expansion slot. Click it to open the card: its grid, what the grid makes, and its
-storage, as a crafting table's. Take what it makes as from a crafting table (Shift-click makes as
-many as it can). On a narrow window the bus order panel is left out while a card is open.
+Each crafting card in a computer gets a tab under the view's buttons (under a golem's hands), in
+its screen view too. Click it to open the card, left of the board in the bus order panel's place
+(the buttons stay right; click the tab again for the bus panel): its grid, what the grid makes, and
+its storage, as a crafting table's. Take what it makes as from a crafting table (Shift-click makes
+as many as it can). A tab in the screen view opens the parts view with that card open.
 
 ![A golem's view with its crafting card's tab open: planks in its grid, four sticks as its result, logs in its storage](/assets/img/crafting-card.png)
 *A golem's crafting card, its tab open: two planks make four sticks.*

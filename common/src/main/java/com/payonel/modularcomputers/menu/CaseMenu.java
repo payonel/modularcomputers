@@ -63,9 +63,9 @@ public final class CaseMenu extends AbstractContainerMenu {
 	public static final int CRAFT_LANE_SLOTS = CraftingCard.SLOTS + 1;
 	/** A lane's result slot, after its card's. */
 	public static final int CRAFT_RESULT = CraftingCard.SLOTS;
-	/** Where a crafting card's panel is: right of the buttons' column; its grid, result and storage in it. */
-	public static final int CRAFT_X = 204;
+	/** Where a crafting card's panel is: left of the board, in the bus panel's place (the buttons stay right); its grid, result and storage in it. */
 	public static final int CRAFT_W = 116;
+	public static final int CRAFT_X = -6 - CRAFT_W;
 	public static final int CRAFT_H = 168;
 	public static final int CRAFT_GRID_X = CRAFT_X + 12;
 	public static final int CRAFT_GRID_Y = 22;

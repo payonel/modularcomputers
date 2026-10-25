@@ -132,7 +132,36 @@ public final class DisplayScreen extends Screen {
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		var hit = ComputerButtons.click(event, powerButton(), viewToggle(), ComputerButtons.Target.CASE, pos);
 		powerHeld = hit == ComputerButtons.Hit.POWER;
+		if (hit == ComputerButtons.Hit.NONE && event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT) {
+			for (int lane = 0; lane < com.payonel.modularcomputers.menu.CaseMenu.LANES; lane++) {
+				if (craftTab(lane).contains(event.x(), event.y())) {
+					// Its card's crafting is in the parts view: that, its tab open.
+					CaseScreen.tabToOpen = lane;
+					com.payonel.modularcomputers.client.ModNetworkClient.send(new com.payonel.modularcomputers.network.SwitchViewPayload(pos, true));
+					return true;
+				}
+			}
+		}
 		return hit != ComputerButtons.Hit.NONE || super.mouseClicked(event, doubleClick);
+	}
+
+	/** Its computer's crafting cards' tabs, under its buttons, as the parts view has them: a lane holding one, by lane (others empty). */
+	public Viewport craftTab(int lane) {
+		var machine = computer.flatMap(ref -> ref.find(minecraft.level, com.payonel.modularcomputers.block.BoardHolder.class));
+		if (!caseView || machine.isEmpty()) {
+			return NONE;
+		}
+		boolean[] lanes = ComputerButtons.craftingLanes(machine.get().board().parts());
+		if (!lanes[lane]) {
+			return NONE;
+		}
+		int shown = 0;
+		for (int before = 0; before < lane; before++) {
+			shown += lanes[before] ? 1 : 0;
+		}
+		Viewport toggle = viewToggle();
+		return new Viewport(toggle.x(), toggle.bottom() + ComputerButtons.GAP + shown * (ComputerButtons.SIZE + ComputerButtons.GAP), ComputerButtons.SIZE,
+			ComputerButtons.SIZE);
 	}
 
 	/**
@@ -241,6 +270,12 @@ public final class DisplayScreen extends Screen {
 		var machine = computer.flatMap(ref -> ref.find(minecraft.level, com.payonel.modularcomputers.block.BoardHolder.class));
 		if (machine.isPresent()) {
 			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.CASE, machine.get().powerLight(), powerHeld);
+			for (int lane = 0; lane < com.payonel.modularcomputers.menu.CaseMenu.LANES; lane++) {
+				Viewport tab = craftTab(lane);
+				if (tab.width() > 0) {
+					ComputerButtons.extractCraftTab(graphics, tab, false);
+				}
+			}
 		} else {
 			ComputerButtons.extract(graphics, NONE, viewToggle(), ComputerButtons.Target.CASE, null, false);
 		}
