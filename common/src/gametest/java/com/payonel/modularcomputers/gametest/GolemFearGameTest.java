@@ -11,7 +11,7 @@ import net.minecraft.world.entity.ai.goal.AvoidEntityGoal;
 
 /**
  * Which mobs fear bot golems (the user's): spiders run from any golem; chickens and cows from a
- * flying one, not one on its legs; sheep from none. A mob's fear is its avoid goal starting
+ * flying one (its thrusters firing), not one on its legs, held in its field or not; sheep from none. A mob's fear is its avoid goal starting
  * (AvoidEntityGoal.canUse: a golem near that it fears, and somewhere away to go).
  */
 public class GolemFearGameTest {
@@ -27,13 +27,12 @@ public class GolemFearGameTest {
 			.anyMatch(goal -> goal.getGoal() instanceof AvoidEntityGoal<?> avoid && avoid.canUse());
 	}
 
+	/** A golem: on its legs, or flying (its thrusters holding it up, its legs left below). */
 	private static BotGolem golem(GameTestHelper helper, boolean flying) {
-		BotGolem golem = BotGolemGameTest.golem(helper, board -> {
+		BotGolem golem = flying ? GolemFlightGameTest.golem(helper, false) : BotGolemGameTest.golem(helper, board -> {
 		});
 		if (flying) {
-			golem.legs(false);
-			golem.setNoGravity(true);
-			golem.setPos(golem.getX(), golem.getY() + 1, golem.getZ()); // (in the air, its legs off: as a field holds it)
+			helper.runAfterDelay(3, () -> golem.robotics().fly(new com.payonel.modularcomputers.runtime.Arguments(java.util.List.of(0.0, 0.0, 1.0))));
 		}
 		return golem;
 	}
@@ -69,6 +68,21 @@ public class GolemFearGameTest {
 	@GameTest(maxTicks = 100)
 	public void aCowDoesntMindAGolemOnItsLegs(GameTestHelper helper) {
 		unafraid(helper, EntityTypes.COW, false);
+	}
+
+	/** One held up in its own field, its legs on, isn't flying (the user's): a cow doesn't mind it. */
+	@GameTest(maxTicks = 100)
+	public void aCowDoesntMindAGolemInItsOwnField(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, true);
+		helper.runAfterDelay(3, () -> {
+			var field = golem.board().cards().stream().filter(com.payonel.modularcomputers.device.FieldCard.class::isInstance)
+				.map(com.payonel.modularcomputers.device.FieldCard.class::cast).findFirst().orElseThrow();
+			field.capture(new com.payonel.modularcomputers.runtime.Arguments(java.util.List.of(com.payonel.modularcomputers.device.FieldCard.SELF)));
+			field.move(new com.payonel.modularcomputers.runtime.Arguments(java.util.List.of(0.0, 0.0, 1.0)));
+		});
+		PathfinderMob mob = helper.spawn(EntityTypes.COW, MOB);
+		helper.onEachTick(() -> helper.assertTrue(!afraid(mob), "a cow doesn't mind the golem"));
+		helper.runAfterDelay(WATCH, helper::succeed);
 	}
 
 	@GameTest(maxTicks = 100)

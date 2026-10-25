@@ -314,17 +314,21 @@ its swing's strength from the time since its last), a container's items in and o
 moves them. What a broken block drops (or its hand is given) is caught: its storage first, else its
 off hand (a background catch, the user's: atypical, so storage is always preferred), else it stays
 in the world, and the `broke` event says whether it kept it all.
-- **Its legs come off** (`detachLegs`; the user's design): its legs an entity of their own
-  (`GolemLegs`, a boat's kind of object), the golem its torso alone (`LEGS`, saved; shorter). In
-  its own field it flies; with nothing holding it, it powers off. Legless: no walking, no tools
-  (swing refused; a tool in hand used as an empty hand: buttons, doors, its legs popped up),
-  ignoring block triggers (pressure plates). `attachLegs` within 3 blocks goes onto them (a field
-  holding it lets go). Picked up legless it's a torso item; torso over legs is a golem again
-  (`GolemAssemblyRecipe`, the torso's components kept). Either item, used crouching in a hand,
-  opens its parts view on the item (the user's): parts, hands and cards' slots read and written
-  there (`ItemContents`), its board off (an item runs nothing).
+- **It flies two ways, each with its price** (the user's design, 2026-10-25), never with its legs
+  on and its tools whole: on its **thrusters**, built into every golem, no card (`fly`, `hover`,
+  `land`), its legs left standing where it took off (`GolemLegs`, a boat's kind of object), red
+  beams from their sockets, 25 blocks a second, five CPUs' power a tick; legless it walks nowhere,
+  swings no tool (one in hand works as an empty hand: buttons, doors, its legs popped up), ignores
+  block triggers, and can be shoved; `land` comes down onto its legs below it and refuses with none
+  there. Or held in **its own field**, legs and all (10 blocks a second): it keeps its tools, but off
+  the ground its fake player digs at a fifth, as a player in the air; nothing shoves it; it isn't
+  flying. Legless with nothing holding it up (its program ended, its power gone, a field let go), it
+  falls and powers off, a torso on the ground. Picked up legless it's a torso item; torso over legs
+  is a golem again (`GolemAssemblyRecipe`, the torso's components kept). Either item, used crouching
+  in a hand, opens its parts view on the item (the user's): parts, hands and cards' slots read and
+  written there (`ItemContents`), its board off (an item runs nothing).
 - **Mobs fear it** (the user's): spiders (a skeleton riding one with them) avoid any golem, chickens
-  and cows a flying one (legs off, off the ground), sheep none: an `AvoidEntityGoal` added as each
+  and cows a flying one (on its thrusters; held in its field isn't flying), sheep none: an `AvoidEntityGoal` added as each
   registers its goals (`GolemFear`; mixins `SpiderFear`, `ChickenFear`, `CowFear`).
 - **One answer says it all** (the user's): a program never checks twice. `store` answers `true, 0`
   when nothing it was asked to move is left, else `false` and how many are (never `false, 0`);

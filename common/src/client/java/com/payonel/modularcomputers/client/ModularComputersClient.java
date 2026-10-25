@@ -81,6 +81,7 @@ public final class ModularComputersClient {
 		com.payonel.modularcomputers.client.screen.SideTabs.register(com.payonel.modularcomputers.device.CardKind.CRAFTING,
 			com.payonel.modularcomputers.client.screen.SideTabs::crafting);
 		com.payonel.modularcomputers.entity.EnergyField.clientHum = com.payonel.modularcomputers.client.sound.FieldHum::start;
+		com.payonel.modularcomputers.entity.BotGolem.clientRoar = com.payonel.modularcomputers.client.sound.ThrusterRoar::start;
 	}
 
 	public static void screens(Screens screens) {

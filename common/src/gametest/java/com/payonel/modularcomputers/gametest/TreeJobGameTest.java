@@ -28,8 +28,8 @@ import net.minecraft.world.phys.Vec3;
 /**
  * The user's big test: a bot golem running mcos, its manual's program (docs/examples/golem-tree.lua)
  * as a service started at boot, takes an axe from the chest in front of it, flies up to a tree on a
- * ledge (holding itself in its energy field, its legs off and carried in its crafting card's
- * storage), stands on its legs to cut the trunk, flies home, stands on its legs again at the chest,
+ * ledge (holding itself in its energy field, legs and all: it keeps its tools, off the ground at a
+ * fifth of their speed), cuts the trunk from the air, flies home, lands on its legs at the chest,
  * and puts the wood and the axe in it. Smaller than the user's (10 up, 5 ahead): a test's space is
  * 8 blocks.
  */

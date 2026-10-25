@@ -55,22 +55,36 @@ A [crafting card](/devices/crafting-card/) gives it storage (a tiny chest appear
 crafting grid its programs craft with; what it breaks goes there first. Each card has a tab under
 its hands.
 
-## Its legs, and flight
+## Flight
 
-A program can detach the golem's legs (`detachLegs`). With an [energy field card](/devices/energy-field-card/)
-holding the golem itself first, it flies on, much faster than it walks, its program moving the field,
-its legs left standing below; in flight it still runs, crafts and works buttons and doors, but uses
-no tools (it has no footing) and presses no pressure plates. With nothing holding it up, it falls
-over and powers off. Its legs, emerald and redstone clamps on top, plug into sockets under its
-torso: `attachLegs`, within three blocks of them, takes it to them and onto them.
+A golem flies two ways, each with its price:
+
+- **Its thrusters, legs off.** Every golem has them. `fly` leaves its legs standing where it was and
+  fires red beams from their empty sockets: it flies at 25 blocks a second, much faster than it
+  walks or its field flies it, needs no card, and costs five running CPUs' power a tick. On its
+  thrusters it has no footing: it uses no tools (buttons, doors and levers yes: a tool in its hand
+  works as an empty hand), presses no pressure plates, and can be shoved. `hover` holds it where it
+  is; `land` brings it down onto its legs, below it, and won't with no legs there. Chickens and cows
+  run from it. If its program ends or its power runs out while its thrusters hold it up, it falls
+  and powers off.
+- **Its own field, legs on.** An [energy field card](/devices/energy-field-card/) holding the golem
+  itself (`capture("self")`) carries it, legs and all, at 10 blocks a second, faster than a player
+  runs. It keeps its tools, but off the ground it works them as a player in the air does: it digs
+  at a fifth of its speed. Nothing shoves it (the field holds it), and its field is busy holding it.
+  Mobs don't mind it.
+
+![A golem on its thrusters, red beams from its leg sockets, its legs left on the ground](/assets/img/bot-golem-thrusters.png)
+*A golem on its thrusters, its legs left on the ground below.*
+
+Its legs, emerald and redstone clamps on top, plug into sockets under its torso.
 
 ![A golem's torso on the ground beside its legs](/assets/img/bot-golem-legs.png)
 *A golem's torso, beside its legs.*
 
 A right click on legs pops them up into your inventory (the golem's `use` pops them into its own),
-and their item, used on a block, stands them there. If its power runs out or it's turned off in
-flight, its field lets go and its torso falls: hit it to pick it up as a Bot Golem Torso (its parts
-in it), or right-click it for its view. A torso crafted over its legs, in any crafting grid (2x2 is
+and their item, used on a block, stands them there. A fallen torso lies on the ground, off, as its
+legs do: hit it to pick it up as a Bot Golem Torso (its parts in it), or right-click it for its
+view. A torso crafted over its legs, in any crafting grid (2x2 is
 enough), is the golem again, with all it kept.
 
 It runs on its battery, as a case does: swap the battery, or walk it onto a
@@ -81,7 +95,8 @@ what a program can do with it, and its examples.
 ## A whole job: a tree on a ledge
 
 This program uses all of it: the robotics device, a [crafting card](/devices/crafting-card/) for
-storage, and an [energy field card](/devices/energy-field-card/) to fly. Set it up:
+storage, and an [energy field card](/devices/energy-field-card/) to fly with its legs on, so it can
+cut. Set it up:
 
 1. A golem with a CPU, RAM, an EEPROM, a battery, a disk with mcos, a crafting card and an energy
    field card (a screen in its gold slot to watch it).
@@ -91,9 +106,9 @@ storage, and an [energy field card](/devices/energy-field-card/) to fly. Set it 
 
 Save the program as `/home/golem-tree.lua` and run `lua /home/golem-tree.lua` (or `lua
 /home/golem-tree.lua 6 3` for a tree 6 up and 3 ahead). The golem takes the axe, holds itself in
-its field and picks up its legs, flies up beside the trunk, stands on its legs there, cuts the
-logs (its field lifting it, legs and all, to reach the ones above), flies home, stands on its legs
-at the chest, and puts the wood and the axe away. It says each step as it goes, and why it stopped
+its field, legs and all, flies up beside the trunk, cuts the logs from the air (at a fifth of its
+speed, off the ground; its field lifting it to reach the ones above), flies home, lets its field
+go to land on its legs at the chest, and puts the wood and the axe away. It says each step as it goes, and why it stopped
 if something's in its way.
 
 ```lua

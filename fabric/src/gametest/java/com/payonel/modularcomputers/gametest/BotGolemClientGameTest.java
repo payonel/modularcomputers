@@ -127,6 +127,28 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			context.getInput().lookAt(torsoAt);
 			context.waitTicks(10);
 			context.takeScreenshot("bot-golem-legs");
+			// A golem on its thrusters (the user's): its legs left standing, red beams from its sockets.
+			BlockPos flierAt = feet.north(3).east(1);
+			int flierId = singleplayer.getServer().computeOnServer(server -> {
+				BotGolem flier = golem(server.overworld(), flierAt);
+				flier.robotics().fly(new com.payonel.modularcomputers.runtime.Arguments(java.util.List.of(0.0, 0.0, 1.5)));
+				return flier.getId();
+			});
+			context.waitFor(client -> client.level.getEntity(flierId) instanceof BotGolem shown && shown.thrusting());
+			context.getInput().lookAt(flierAt.above());
+			context.waitTicks(10);
+			var flight = CaseClientGameTest.read(context.takeScreenshot("bot-golem-thrusters"));
+			int red = 0;
+			for (int y = 0; y < flight.getHeight(); y++) {
+				for (int x = 0; x < flight.getWidth(); x++) {
+					int rgb = flight.getRGB(x, y);
+					int r = CaseClientGameTest.red(rgb);
+					if (r > 120 && r > 2 * CaseClientGameTest.green(rgb) && r > 2 * CaseClientGameTest.blue(rgb)) { // (red: its beams, nothing else in the view is)
+						red++;
+					}
+				}
+			}
+			check(red > 20, "its beams, red under it: " + red + " red pixels");
 			// A pig held up in an energy field, in front of the player.
 			BlockPos pigAt = feet.north(3).west(2).above(2);
 			int pigId = singleplayer.getServer().computeOnServer(server -> {

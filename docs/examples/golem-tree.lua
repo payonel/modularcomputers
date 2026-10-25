@@ -3,18 +3,19 @@
 -- ahead of it: its trunk FORWARD blocks ahead and its lowest log UP blocks up, standing on the
 -- ledge, the golem's way there clear.
 --   lua golem-tree.lua [up [forward]]       (10 and 5)
--- It takes the axe, holds itself in its field and leaves its legs (picking them up: no tools while
--- it flies), flies up to the ledge beside the trunk, sets its legs down and stands on them, cuts
--- the trunk (its field lifting it, legs and all, to reach the logs above), flies home, stands on
--- its legs at the chest again, and puts the wood and the axe in it (what else the tree dropped, its
--- saplings and sticks, it keeps).
+-- It takes the axe and holds itself in its field, legs and all (so it keeps its tools: off the
+-- ground, it cuts at a fifth of its speed, as a player in the air does), flies up beside the trunk,
+-- cuts it from the air (its field lifting it to reach the logs above, clearing the leaves over it),
+-- flies home, lets its field go to land on its legs at the chest, and puts the wood and the axe in
+-- it (what else the tree dropped, its saplings and sticks, it keeps).
 local sys = require("sys")
 local devices = require("devices")
 
 local UP = tonumber(arg[1] or "10")
 local FORWARD = tonumber(arg[2] or "5")
 local LOG = "_log$" -- what wood's name ends with (minecraft:oak_log)
-local SETTLE = 1 -- seconds legs dropped mid-air take to land
+local LEAVES = "_leaves$"
+local SETTLE = 1 -- seconds it takes to drop the last of the way onto its legs, its field let go
 
 local robot = assert(devices.open("robotics0"))
 local field = assert(devices.open("field0"))
@@ -54,6 +55,20 @@ local function fly(forward, up)
   need(moved.event == "arrived", "flying " .. forward .. " forward, " .. up .. " up: " .. moved.event .. " (" .. tostring(moved.why) .. ")")
 end
 
+-- Breaks the block at a face with what it holds, and says what it broke.
+local function chop(face)
+  need(robot.swing(face))
+  local swung = event(robot)
+  need(swung.event == "broke", "cutting " .. face .. ": " .. swung.event .. " (" .. tostring(swung.why) .. ")")
+  return swung.block
+end
+
+-- What's at a face matches a pattern.
+local function at(face, pattern)
+  local name = robot.scan(face).name
+  return name and name:match(pattern)
+end
+
 -- The storage slot holding something whose name matches 'pattern', or nil.
 local function slot(pattern)
   for _, item in ipairs(storage.list()) do
@@ -63,83 +78,36 @@ local function slot(pattern)
   end
 end
 
--- Off its legs, in its own field, holding them (it flies; a block up, they're below it to pop up).
-local function takeOff()
-  if not robot.get().legs then
-    return
-  end
-  if field.get().state == "idle" then
-    need(field.capture("self"))
-  end
-  need(robot.detachLegs())
-  sys.sleep(SETTLE) -- (left mid-air, they fall to whatever's below)
-  fly(0, 1)
-  need(robot.use("down")) -- popped up into its storage
-end
-
--- Onto its legs, set down below it.
-local function land()
-  local held = robot.held()
-  need(storage.equip(need(slot("bot_golem_legs$"), "its legs aren't in its storage")))
-  need(robot.use("down"))
-  need(robot.attachLegs())
-  local on = event(robot)
-  need(on.event == "attached", "landing: " .. on.event .. " (" .. tostring(on.why) .. ")")
-  repeat until not field.pull() -- (its field let go as it landed: that's said, and done with)
-  if held then
-    need(storage.equip(need(slot(held.name), "what it held is gone"))) -- back in its hand
-  end
-end
-
--- Breaks the block in front with what it holds, and says what it broke.
-local function chop()
-  need(robot.swing("front"))
-  local swung = event(robot)
-  need(swung.event == "broke", "cutting: " .. swung.event .. " (" .. tostring(swung.why) .. ")")
-  return swung.block
-end
-
-say("taking the axe")
 -- 1. The axe, from the chest.
+say("taking the axe")
 need(robot.take("front") > 0 or nil, "no axe in the chest")
 
--- 2. Up to the ledge, beside the trunk, and onto its legs there.
-say("taking off")
-takeOff()
+-- 2. Up beside the trunk, in its own field, on its legs.
+say("flying up")
+need(field.capture("self"))
 fly(0, UP)
 fly(FORWARD - 1, 0)
-say("landing by the tree")
-land()
 
--- 3. The trunk: its lowest log, then each above it, its field lifting it (on its legs: it can cut),
--- clearing the leaves over its head as it goes up.
-local LEAVES = "_leaves$"
-local function ahead(pattern)
-  local name = robot.scan("front").name
-  return name and name:match(pattern)
-end
+-- 3. The trunk: its lowest log, then each above it, from the air (a fifth of its speed), clearing
+-- the leaves over its head as its field lifts it.
 local cut = 0
-need(field.capture("self"))
-while ahead(LOG) do
+while at("front", LOG) do
   say("cutting a log")
-  chop()
+  chop("front")
   cut = cut + 1
-  local above = robot.scan("up").name
-  if above and above:match(LEAVES) then
-    need(robot.swing("up"))
-    local swung = event(robot)
-    need(swung.event == "broke", "clearing the leaves: " .. swung.event .. " (" .. tostring(swung.why) .. ")")
+  if at("up", LEAVES) then
+    chop("up")
   end
   fly(0, 1)
 end
-fly(0, -cut)
 
--- 4. Home: off its legs again, back over the chest's side, down, and onto them.
+-- 4. Home: back down and over the chest's side, and onto its feet, its field let go.
 say("flying home")
-takeOff()
+fly(0, -cut)
 fly(-(FORWARD - 1), 0)
 fly(0, -UP)
-land()
+need(field.release())
+sys.sleep(SETTLE)
 
 -- 5. The wood, then the axe, into the chest.
 say("putting it away")

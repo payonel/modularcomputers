@@ -20,8 +20,11 @@ import java.util.Map;
  * it, named in its own frame ({@link #FACES}: it knows no compass), and works with what's in its
  * hand: uses it on a space (places a block, opens a door, presses a button), breaks a block with it
  * (in a player's time: {@code broke}, or {@code failed} and why), and moves it in and out of a
- * container. Its state is what it's doing now. A body ({@link Body}: a golem) does the work, and
- * tells it how it went. Every block walked, and every action, costs power.
+ * container. It flies on its thrusters (the user's design, 2026-10-25): {@code fly} and {@code hover}
+ * leave its legs standing where it is and fire beams from their sockets (no tools, and it can be
+ * shoved, while it does), {@code land} brings it down onto its legs. Its state is what it's doing
+ * now. A body ({@link Body}: a golem) does the work, and tells it how it went. Every block walked,
+ * every action and every tick its thrusters fire costs power.
  */
 public final class RoboticsDevice implements Device {
 	/** What walking a block costs: a running CPU's tick. */
@@ -34,7 +37,13 @@ public final class RoboticsDevice implements Device {
 	public static final String WALKING = "walking";
 	public static final String TURNING = "turning";
 	public static final String BREAKING = "breaking";
-	public static final String ATTACHING = "attaching";
+	public static final String FLYING = "flying";
+	public static final String HOVERING = "hovering";
+	public static final String LANDING = "landing";
+	/** What its thrusters cost, each tick they fire (flying or hovering): five running CPUs' ticks. */
+	public static final int THRUST_COST = 5 * PowerUnits.CPU;
+	/** The farthest a flight may go, in blocks each way. */
+	public static final double MAX_FLIGHT = 64;
 	/** What an action with its hand costs (a use, a swing, a move to or from a container): a running CPU's tick. */
 	public static final int ACTION_COST = PowerUnits.CPU;
 	/** The spaces round it, in its own frame: its left and right its own, as it turns and walks. */
@@ -67,16 +76,31 @@ public final class RoboticsDevice implements Device {
 		}
 
 		/**
-		 * Detaches its legs, leaving them standing where it is: true; in a field of its own it flies on,
-		 * else it falls over and powers off.
+		 * Starts flying on its thrusters to the point {@code forward}, {@code right} and {@code up}
+		 * blocks from it, in its own frame, its legs left standing where it was if it stood on them:
+		 * null when it started, else why not.
 		 */
-		default Result detachLegs() {
-			return Result.fail("no body");
+		default String fly(double forward, double right, double up) {
+			return "no thrusters";
 		}
 
-		/** Starts going to its legs, close by, and onto them (its event: attached, or failed): true, or false and why. */
-		default Result attachLegs() {
-			return Result.fail("no body");
+		/** Holds itself where it is on its thrusters, its legs left standing if it stood on them: null, or why not. */
+		default String hover() {
+			return "no thrusters";
+		}
+
+		/** Starts coming down onto its legs, below it (its event: landed, or blocked): null, or why not. */
+		default String land() {
+			return "no thrusters";
+		}
+
+		/** Its thrusters stop: what they held up falls (the program that flew it ended). */
+		default void release() {
+		}
+
+		/** Whether its thrusters hold it up, still (flying stopped: hovering). */
+		default boolean hovering() {
+			return false;
 		}
 
 		/** Whether it stands on its legs. */
@@ -195,11 +219,14 @@ public final class RoboticsDevice implements Device {
 		return Result.ok(true);
 	}
 
-	@Method(doc = "stop(): stops walking or turning, where it is (its event: stopped, when it was)")
+	@Method(doc = "stop(): stops walking, turning, flying or landing, where it is (its event: stopped, when it was); flying, it hovers there")
 	public Result stop(Arguments args) {
 		body.stop();
-		if (!state.equals(IDLE)) {
+		if (!state.equals(IDLE) && !state.equals(HOVERING)) {
 			event("stopped", null);
+		}
+		if (body.hovering()) {
+			state(HOVERING);
 		}
 		return Result.ok();
 	}
@@ -288,34 +315,58 @@ public final class RoboticsDevice implements Device {
 		return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
 	}
 
-	@Method(doc = "detachLegs(): detaches its legs, leaving them standing where it is (a right click pops them up, its own too); held in its own energy field it flies on, else it falls over and powers off. Without legs it walks nowhere, uses no tools (buttons and doors yes) and presses no pressure plates")
-	public Result detachLegs(Arguments args) {
-		if (!body.legs()) {
-			return Result.fail("no legs to detach");
+	@Method(doc = "fly(forward[, right[, up]]): flies on its thrusters to the point that many blocks from it, in its own frame, straight there (never through blocks); its legs, if it stands on them, are left standing where it was, and its thrusters fire beams from their sockets. Flying or hovering it uses no tools (buttons and doors yes) and can be shoved. True at once (its event: arrived, or blocked and why), or false and why")
+	public Result fly(Arguments args) {
+		double forward = args.checkNumber(0);
+		double right = args.count() > 1 ? args.checkNumber(1) : 0;
+		double up = args.count() > 2 ? args.checkNumber(2) : 0;
+		if (Math.abs(forward) > MAX_FLIGHT || Math.abs(right) > MAX_FLIGHT || Math.abs(up) > MAX_FLIGHT) {
+			return Result.fail("too far: at most " + (int) MAX_FLIGHT + " blocks each way");
 		}
-		body.stop();
-		state(IDLE);
-		return body.detachLegs();
+		String why = body.fly(forward, right, up);
+		if (why != null) {
+			return Result.fail(why);
+		}
+		state(FLYING);
+		return Result.ok(true);
 	}
 
-	@Method(doc = "attachLegs(): goes to its legs, standing within three blocks of it, and onto them; a field holding it lets go as it lands; true at once (its event: attached, or failed and why), or false and why (no legs near)")
-	public Result attachLegs(Arguments args) {
-		if (body.legs()) {
-			return Result.fail("already on its legs");
+	@Method(doc = "hover(): holds itself where it is on its thrusters (its legs, if it stands on them, left standing there), until it flies, lands, or its program ends: then it falls, and powers off")
+	public Result hover(Arguments args) {
+		String why = body.hover();
+		if (why != null) {
+			return Result.fail(why);
 		}
-		Result started = body.attachLegs();
-		if (!started.failed()) {
-			state(ATTACHING);
-		}
-		return started;
+		state(HOVERING);
+		return Result.ok(true);
 	}
 
-	/** The body got onto its legs. */
-	public void attached() {
-		event("attached", null);
+	@Method(doc = "land(): comes down onto its legs, standing below it (within three blocks to the side), and onto them; true at once (its event: landed, or blocked and why), or false and why (no legs there: it goes on hovering)")
+	public Result land(Arguments args) {
+		String why = body.land();
+		if (why != null) {
+			return Result.fail(why);
+		}
+		state(LANDING);
+		return Result.ok(true);
 	}
 
-	@Method(doc = "get(): {state, legs}: what it's doing now (idle, walking, turning, breaking or attaching), and whether it stands on its legs")
+	/** The body got down onto its legs. */
+	public void landed() {
+		event("landed", null);
+	}
+
+	/** Its thrusters fired a tick (flying or hovering): their cost. */
+	public void thrusted() {
+		power.charge(THRUST_COST);
+	}
+
+	/** The body hovers again (a flight given up, a landing blocked). */
+	public void hovering() {
+		state(HOVERING);
+	}
+
+	@Method(doc = "get(): {state, legs}: what it's doing now (idle, walking, turning, breaking, flying, hovering or landing), and whether it stands on its legs")
 	public Result get(Arguments args) {
 		Map<String, Object> now = new LinkedHashMap<>();
 		now.put("state", state);
@@ -323,7 +374,7 @@ public final class RoboticsDevice implements Device {
 		return Result.ok(now);
 	}
 
-	@Method(doc = "set(action): does an action, as a table: {action = \"walk\", forward, right, up}, {action = \"turn\", way}, {action = \"use\", face}, {action = \"swing\", face}, or {action = \"stop\"}")
+	@Method(doc = "set(action): does an action, as a table: {action = \"walk\" or \"fly\", forward, right, up}, {action = \"turn\", way}, {action = \"use\", face}, {action = \"swing\", face}, or {action = \"hover\"}, {action = \"land\"}, {action = \"stop\"}")
 	public Result set(Arguments args) {
 		Object value = args.get(0);
 		if (!(value instanceof Map<?, ?> action)) {
@@ -331,12 +382,14 @@ public final class RoboticsDevice implements Device {
 		}
 		java.util.List<Object> rest = new java.util.ArrayList<>();
 		return switch (String.valueOf(action.get("action"))) {
-			case "walk" -> {
+			case "walk", "fly" -> {
 				rest.add(number(action.get("forward")));
 				rest.add(number(action.get("right")));
 				rest.add(number(action.get("up")));
-				yield walk(new Arguments(rest));
+				yield action.get("action").equals("walk") ? walk(new Arguments(rest)) : fly(new Arguments(rest));
 			}
+			case "hover" -> hover(new Arguments(rest));
+			case "land" -> land(new Arguments(rest));
 			case "turn" -> {
 				rest.add(action.get("way"));
 				yield turn(new Arguments(rest));
@@ -346,7 +399,7 @@ public final class RoboticsDevice implements Device {
 				yield action.get("action").equals("use") ? use(new Arguments(rest)) : swing(new Arguments(rest));
 			}
 			case "stop" -> stop(new Arguments(rest));
-			default -> Result.fail("not an action: " + action.get("action") + " (walk, turn, use, swing or stop)");
+			default -> Result.fail("not an action: " + action.get("action") + " (walk, fly, turn, use, swing, hover, land or stop)");
 		};
 	}
 
@@ -354,7 +407,7 @@ public final class RoboticsDevice implements Device {
 		return value == null ? 0L : value;
 	}
 
-	@Method(doc = "pull(): its oldest event, {event} (arrived, turned, stopped, attached), {event = \"broke\", block, kept, dropped}, {event = \"blocked\" or \"failed\", why}, or nil")
+	@Method(doc = "pull(): its oldest event, {event} (arrived, turned, stopped, landed), {event = \"broke\", block, kept, dropped}, {event = \"blocked\" or \"failed\", why}, or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -462,6 +515,7 @@ public final class RoboticsDevice implements Device {
 		if (!accepting) {
 			events.clear();
 			body.stop();
+			body.release(); // (its thrusters stop with its program: what they held up falls)
 			state(IDLE);
 		}
 	}

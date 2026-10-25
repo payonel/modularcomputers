@@ -37,6 +37,9 @@ public final class ModSounds {
 	public static final SoundEvent FIELD_ON = register("field_on");
 	public static final SoundEvent FIELD_OFF = register("field_off");
 	public static final SoundEvent FIELD_HUM = register("field_hum");
+	/** A bot golem's thrusters: their ignition, and their roar while they fire, a loop (scripts/art/thruster_sounds.py). */
+	public static final SoundEvent THRUSTER_ON = register("thruster_on");
+	public static final SoundEvent THRUSTER_ROAR = register("thruster_roar");
 	/** A Sound Card's speaker: what it plays comes from its stream, not a file (its file only stands in). */
 	public static final SoundEvent SOUND_CARD = register("sound_card");
 

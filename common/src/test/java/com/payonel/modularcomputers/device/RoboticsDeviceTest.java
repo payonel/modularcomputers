@@ -106,7 +106,7 @@ class RoboticsDeviceTest {
 		device.set(args(Map.of("action", "turn", "way", "right")));
 		device.set(args(Map.of("action", "stop")));
 		assertThat(asked).containsExactly("walk 4.0 0.0 0.0", "turn 90.0", "stop");
-		assertThat(device.set(args(Map.of("action", "fly"))).error()).startsWith("not an action");
+		assertThat(device.set(args(Map.of("action", "jump"))).error()).startsWith("not an action");
 	}
 
 	@Test

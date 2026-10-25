@@ -66,6 +66,20 @@ class RoboticsExamplesTest extends McosHarness {
 			}
 
 			@Override
+			public String fly(double forward, double right, double up) {
+				asked.add("fly " + (long) forward + " " + (long) right + " " + (long) up);
+				server.add(robotics::arrived);
+				return null;
+			}
+
+			@Override
+			public String land() {
+				asked.add("land");
+				server.add(robotics::landed);
+				return null;
+			}
+
+			@Override
 			public Result held(boolean off) {
 				return Result.ok(java.util.Map.of("name", "minecraft:iron_pickaxe", "count", 1));
 			}
@@ -100,6 +114,16 @@ class RoboticsExamplesTest extends McosHarness {
 		type("lua /goto.lua 5 > /out; echo $? > /status\r");
 		untilFile(root().resolve("status"), "1\n");
 		assertThat(read(root().resolve("out"))).isEqualTo("blocked: no way there\n");
+	}
+
+	@Test
+	void theFlyProgramFliesUpLooksRoundAndLandsBackOnItsLegs() {
+		boot();
+		file("fly.lua", example("robotics-fly"));
+		type("lua /fly.lua 4 > /out; echo $? > /status\r");
+		untilFile(root().resolve("status"), "0\n");
+		assertThat(asked).containsExactly("fly 0 0 4", "land");
+		assertThat(read(root().resolve("out"))).contains("front\tblock\tminecraft:stone\n").endsWith("back on its legs\n");
 	}
 
 	@Test

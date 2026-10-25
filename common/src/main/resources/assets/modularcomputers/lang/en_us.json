@@ -105,6 +105,8 @@
 	"hint.modularcomputers.details.internet_card": "HTTP and HTTPS requests to the real internet (wget, curl); never the server's own network",
 	"subtitles.modularcomputers.sound_card": "Sound card plays",
 	"subtitles.modularcomputers.bell": "Terminal beeps",
+	"subtitles.modularcomputers.thruster_on": "Thrusters fire",
+	"subtitles.modularcomputers.thruster_roar": "Thrusters roar",
 	"subtitles.modularcomputers.field_on": "Energy field hums up",
 	"subtitles.modularcomputers.field_off": "Energy field powers down",
 	"subtitles.modularcomputers.field_hum": "Energy field hums",

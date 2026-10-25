@@ -131,5 +131,20 @@
 			"modularcomputers:device_connect"
 		],
 		"subtitle": "subtitles.modularcomputers.device_connect"
+	},
+	"thruster_on": {
+		"sounds": [
+			"modularcomputers:thruster_on"
+		],
+		"subtitle": "subtitles.modularcomputers.thruster_on"
+	},
+	"thruster_roar": {
+		"sounds": [
+			{
+				"name": "modularcomputers:thruster_roar",
+				"attenuation_distance": 24
+			}
+		],
+		"subtitle": "subtitles.modularcomputers.thruster_roar"
 	}
 }

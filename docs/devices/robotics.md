@@ -28,16 +28,19 @@ turns and walks), and a block's direction it reads (a door's `facing`) is in tha
 
 ## In mcos
 
-`/dev/robotics0` reads as what it's doing now, a word: `idle`, `walking`, `turning` or
-`breaking`. A line written is an action, taking effect as it's written:
+`/dev/robotics0` reads as what it's doing now, a word: `idle`, `walking`, `turning`, `breaking`,
+`flying`, `hovering` or `landing`. A line written is an action, taking effect as it's written:
 
 | Line | Does |
 |---|---|
 | `walk forward [right [up]]` | Walks to the point that many blocks from it, in its own frame |
+| `fly forward [right [up]]` | Flies on its thrusters to the point that many blocks from it, its legs left standing |
+| `hover` | Holds itself where it is on its thrusters |
+| `land` | Comes down onto its legs, below it |
 | `turn left`, `turn right`, `turn around`, `turn degrees` | Turns in place (degrees: to its right; negative, its left) |
 | `use face` | Uses what it holds on the space at a face |
 | `swing face` | Swings what it holds at a face: hits a mob, or breaks the block |
-| `stop` | Stops, where it is |
+| `stop` | Stops, where it is (flying: it hovers there) |
 
 A line that isn't one fails the write with `EINVAL`. How an action went comes as an event: the
 file is ready for `sys.poll`'s `PRI` while one waits, and the `pull` ioctl takes it. The file's
@@ -145,32 +148,42 @@ Takes items from the container at a face (in front, when none is given) into its
 same as it holds, when it holds something); all its hand can hold, or `count`. How many came: 0
 when there were none it could take. It fails with `no container there` or `no slot`.
 
-### detachLegs() → true, or nil and why
+### fly(forward[, right[, up]]) → true, or nil and why
 
-Detaches its legs, leaving them standing where it is. Held in its own
-[energy field](/devices/energy-field-card/) (`capture("self")` first), it flies on, the field
-moving it; with nothing holding it up, it falls over and powers off. Without its legs it walks
-nowhere (`no legs`), swings nothing (no tools: `no legs: it can't swing without its footing`), and
-presses no pressure plates; it still uses what's round it (buttons, doors, levers: a tool in its
-hand works as an empty hand), places what it holds, and its other cards work. A right click pops
-legs up into an inventory, its own `use` too. Fails with `no legs to detach`.
+Flies on its thrusters to the point that many blocks from it, in its own frame, straight there and
+never through blocks, at 25 blocks a second (its field flies it at 10; a player sprints at under
+6). If it stands on its legs, they're left standing where it was: the thrusters fire red beams from
+their sockets. On its thrusters it walks nowhere (`no legs`), swings nothing (no tools: `no legs:
+it can't swing without its footing`), presses no pressure plates, and can be shoved; it still uses
+what's round it (buttons, doors, levers: a tool in its hand works as an empty hand), places what it
+holds, and its other cards work. Its event: `arrived` (then it hovers there), or `blocked`, `something
+in the way`. Its thrusters cost five running CPUs' power a tick. Fails with `held in a field: its
+field moves it`, or `too far` beyond 64 blocks each way. Up to 64 blocks each way.
 
-### attachLegs() → true, or nil and why
+### hover() → true, or nil and why
 
-Goes to its legs, standing within three blocks of it, and onto them; a field holding it lets go
-as it lands (its event there: `lost`, `landing on its legs`). Its event: `attached`, or `failed`
-and why (`its legs are gone`). Fails with `no legs within 3 blocks` or `already on its legs`.
+Holds itself where it is on its thrusters (its legs, if it stands on them, left standing there),
+until it flies or lands. A shove moves it, and it drifts to a stop. If its program ends while its
+thrusters hold it up, or its power runs out, it falls and powers off: its torso lies on the ground,
+off, to be picked up as a Bot Golem Torso.
+
+### land() → true, or nil and why
+
+Comes down onto its legs, standing below it (within three blocks to its side), and onto them; a
+field holding it lets go. Its event: `landed`, or `blocked` and why (`something in the way`, `its
+legs are gone`: it hovers there). Fails with `no legs there to land on` (it goes on hovering) or
+`already on its legs`. A right click pops legs up into an inventory, its own `use` too.
 
 ### get() → {state, legs}
 
-What it's doing now (`idle`, `walking`, `turning`, `breaking` or `attaching`), and whether it stands
-on its legs.
+What it's doing now (`idle`, `walking`, `turning`, `breaking`, `flying`, `hovering` or `landing`),
+and whether it stands on its legs.
 
 ### set(action) → true
 
-An action as a table: `{action = "walk", forward, right, up}`, `{action = "turn", way}`,
-`{action = "use", face}`, `{action = "swing", face}`, or `{action = "stop"}` (the file's lines are
-these).
+An action as a table: `{action = "walk", forward, right, up}`, `{action = "fly", forward, right,
+up}`, `{action = "turn", way}`, `{action = "use", face}`, `{action = "swing", face}`,
+`{action = "hover"}`, `{action = "land"}`, or `{action = "stop"}` (the file's lines are these).
 
 ### pull() → event or nil
 
@@ -180,13 +193,13 @@ Its oldest event, or nil.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `arrived` | | a walk got there |
-| `blocked` | `why` | a walk can't go on: `no way there`; `interrupted` when its world was saved during it |
+| `arrived` | | a walk or a flight got there |
+| `blocked` | `why` | a walk can't go on: `no way there`; a flight or a landing: `something in the way`; `interrupted` when its world was saved during it |
 | `turned` | | a turn is done |
-| `stopped` | | `stop` ended a walk, turn or swing |
+| `stopped` | | `stop` ended a walk, turn, swing, flight or landing |
 | `broke` | `block`, `kept`, `dropped` | a swing broke the block (its name); whether it caught all it dropped, and how many it didn't |
-| `failed` | `why` | a swing couldn't go on, or it couldn't get onto its legs |
-| `attached` | | it's on its legs again |
+| `failed` | `why` | a swing couldn't go on |
+| `landed` | | it's down on its legs again |
 
 Its interrupt is raised when an event comes, and stays raised while one waits. With no program
 running on its board it takes no data: its events go, and it stops.
@@ -197,6 +210,12 @@ Walk to a point and say how it went, through the device's file (a write is the a
 
 ```lua
 {% include robotics-goto.lua %}
+```
+
+Fly up on its thrusters, look round, and land back on its legs:
+
+```lua
+{% include robotics-fly.lua %}
 ```
 
 Walk round a square with the device's methods, waiting for each move:

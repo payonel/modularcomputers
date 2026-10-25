@@ -1,5 +1,11 @@
 package com.payonel.modularcomputers.client.entity;
 
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.util.Mth;
+
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.payonel.modularcomputers.ModularComputers;
@@ -14,8 +20,9 @@ import net.minecraft.resources.Identifier;
 
 /**
  * Draws a bot golem: its model, and on its head's front its screen's glass (the tier 1 screen in
- * its gold slot), as a case's front shows its terminal; with no screen in, an empty bezel; and what
- * it holds, in its right hand.
+ * its gold slot), as a case's front shows its terminal; with no screen in, an empty bezel; what
+ * it holds, in its right hand; and while its thrusters fire, their beams: glowing red columns down
+ * from its leg sockets, tapering and flickering.
  */
 public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRenderer.State, BotGolemModel> {
 	private static final Identifier TEXTURE = ModularComputers.id("textures/entity/bot_golem.png");
@@ -33,6 +40,24 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 	/** How far the text floats in front of the face, in blocks. */
 	private static final float TEXT_OFFSET = 0.002f;
 	private static final float PIXEL = 1 / 16f;
+	/** Its beams: the field's shimmer (scripts/art/energy_field_textures.py), tinted red, glowing. */
+	private static final RenderType BEAM = RenderTypes.entityTranslucentEmissive(ModularComputers.id("textures/entity/energy_field.png"));
+	private static final int BEAM_COLOR = 0xD0FF2A1E;
+	/** Its hot core, inside it: brighter, narrower, a little shorter. */
+	private static final int CORE_COLOR = 0xF0FFB89A;
+	private static final float CORE_WIDTH = 0.4f;
+	private static final float CORE_LENGTH = 0.75f;
+	/** Each socket's beam: how far to its side of its middle, how long, how wide at the socket and at the tip (half widths), in blocks. */
+	private static final float SOCKET_SIDE = 0.2f;
+	private static final float BEAM_LENGTH = 0.9f;
+	private static final float BEAM_ROOT = 0.07f;
+	private static final float BEAM_TIP = 0.015f;
+	/** How much its length flickers (a share of it), and how fast (a tick's phase). */
+	private static final float FLICKER = 0.2f;
+	private static final float FLICKER_SPEED = 1.7f;
+	/** How fast its shimmer runs down it, a tick (of its texture's height). */
+	private static final float BEAM_FLOW = 0.08f;
+	private static final int FULL_BRIGHT = 0xF000F0;
 
 	private final Font font;
 
@@ -79,6 +104,10 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 		boolean chest;
 		/** It stands on its legs (else its torso sits on the ground, lower). */
 		boolean legs = true;
+		/** Its thrusters fire: their beams show. */
+		boolean thrusting;
+		/** Its age this frame, in ticks: what its beams flicker by. */
+		float time;
 		final TerminalFace.State face = new TerminalFace.State();
 	}
 
@@ -94,6 +123,8 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 		state.screen = golem.showsScreen();
 		state.chest = golem.hasCraftingCard();
 		state.legs = golem.legs();
+		state.thrusting = golem.thrusting();
+		state.time = golem.tickCount + partialTick;
 		TerminalFace.extract(golem.terminal(), state.screen, state.face);
 	}
 
@@ -105,6 +136,20 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 	@Override
 	public void submit(State state, PoseStack pose, SubmitNodeCollector collector, CameraRenderState camera) {
 		super.submit(state, pose, collector, camera);
+		if (state.thrusting) {
+			pose.pushPose();
+			pose.rotateDegrees(Axis.YP, 180 - state.bodyRot);
+			for (int side = -1; side <= 1; side += 2) {
+				float x = side * SOCKET_SIDE;
+				float length = BEAM_LENGTH * (1 - FLICKER * (0.5f + 0.5f * Mth.sin(state.time * FLICKER_SPEED + side)));
+				float flow = state.time * BEAM_FLOW;
+				collector.submitCustomGeometry(pose, BEAM, (at, buffer) -> {
+					beam(at, buffer, x, length * CORE_LENGTH, flow, CORE_WIDTH, CORE_COLOR);
+					beam(at, buffer, x, length, flow, 1, BEAM_COLOR);
+				});
+			}
+			pose.popPose();
+		}
 		if (!state.screen) {
 			return;
 		}
@@ -117,5 +162,26 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 		pose.translate((GLASS_LEFT - HALF_FACE) * PIXEL, (top - GLASS_TOP) * PIXEL, 0);
 		TerminalFace.submit(state.face, GLASS_WIDTH * PIXEL, GLASS_HEIGHT * PIXEL, font, pose, collector);
 		pose.popPose();
+	}
+
+	/** A beam: four tapering sides, from its socket (at its feet's height) down {@code length}, {@code width} times a beam's wide, its shimmer flowing down it. */
+	private static void beam(PoseStack.Pose pose, VertexConsumer buffer, float x, float length, float flow, float width, int color) {
+		float root = BEAM_ROOT * width;
+		float tip = BEAM_TIP * width;
+		float[][] corners = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+		for (int side = 0; side < corners.length; side++) {
+			float[] a = corners[side];
+			float[] b = corners[(side + 1) % corners.length];
+			float u0 = side / 4f;
+			float u1 = (side + 1) / 4f;
+			beamVertex(pose, buffer, x + a[0] * root, 0, a[1] * root, u0, flow, color);
+			beamVertex(pose, buffer, x + a[0] * tip, -length, a[1] * tip, u0, flow + 1, color);
+			beamVertex(pose, buffer, x + b[0] * tip, -length, b[1] * tip, u1, flow + 1, color);
+			beamVertex(pose, buffer, x + b[0] * root, 0, b[1] * root, u1, flow, color);
+		}
+	}
+
+	private static void beamVertex(PoseStack.Pose pose, VertexConsumer buffer, float x, float y, float z, float u, float v, int color) {
+		buffer.addVertex(pose, x, y, z).setColor(color).setUv(u, v).setOverlay(OverlayTexture.NO_OVERLAY).setLight(FULL_BRIGHT).setNormal(pose, 0, 1, 0);
 	}
 }

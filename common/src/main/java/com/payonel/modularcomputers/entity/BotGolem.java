@@ -84,14 +84,33 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private static final EntityDataAccessor<Boolean> POWERED = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
 	private static final EntityDataAccessor<Boolean> HALTED = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
 	private static final EntityDataAccessor<Boolean> SCREEN = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
-	/** It stands on its legs (else it's its torso alone: detached, flying in its field, or fallen). */
+	/** It stands on its legs (else it's its torso alone: flying on its thrusters, held in a field, or fallen). */
 	private static final EntityDataAccessor<Boolean> LEGS = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
+	/** Its thrusters fire (flying, hovering or landing): beams from its leg sockets, a roar. */
+	private static final EntityDataAccessor<Boolean> THRUSTING = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
+	/** How fast its thrusters fly it, in blocks a tick: 25 a second (clearly faster than its field's 10; a player sprints 5.6). */
+	public static final double THRUST_SPEED = 1.25;
+	/** How fast it comes down onto its legs, in blocks a tick. */
+	private static final double LANDING_SPEED = 0.25;
+	/** How near a flight's point counts as there, in blocks. */
+	private static final double FLOWN = 0.05;
+	/** A tick's flight that makes less than this share of its step is blocked (something in the way). */
+	private static final double BLOCKED_SHARE = 0.1;
+	/** How much of a shove's speed it keeps each tick, hovering: it drifts, and stops. */
+	private static final double HOVER_DRAG = 0.6;
+	/** A drift slower than this, in blocks a tick, is still. */
+	private static final double DRIFT = 0.005;
+	/** Its leg sockets, each this far to its side of its middle, in blocks: where its beams come from. */
+	private static final double SOCKET_SIDE = 0.2;
+	/** Its beams: red, as its sockets' redstone (scripts/art/bot_golem_textures.py's clamps), and how many motes a socket a tick. */
+	private static final int BEAM_COLOR = 0xE8281E;
+	private static final float BEAM_SIZE = 0.9f;
+	private static final int BEAM_MOTES = 3;
+	private static final String HOVERING_SAVED = "hovering";
 	/** Its legs' height, in blocks: three pixels (its model's); without them it's that much shorter. */
 	public static final float LEG_HEIGHT = 3 / 16f;
 	/** How far from its legs it can attach them, in blocks (their middles). */
 	public static final double LEGS_REACH = 3;
-	/** How fast it goes onto its legs, in blocks a tick. */
-	private static final double ATTACH_SPEED = 0.15;
 	/** How near its legs counts as on them, in blocks. */
 	private static final double ON_LEGS = 0.05;
 	private static final String LEGS_SAVED = "legs";
@@ -110,8 +129,17 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private boolean pathed;
 	/** Its board has been set up in its world (at its first tick there: the plain game has no hook for an entity's arrival). */
 	private boolean placed;
-	/** The legs it's going onto (null: none). */
-	private GolemLegs attaching;
+	/** The legs it's landing on (null: none). */
+	private GolemLegs landing;
+	/** Where a flight is going (null: none). */
+	private Vec3 flyTo;
+	/** Its thrusters hold it up (flying, or still: hovering), until it lands or they're let go. */
+	private boolean hovering;
+	/** Something held it up last tick (its thrusters, a field): when nothing does, legless, it falls and powers off. */
+	private boolean airborne;
+	/** Its thrusters' roar, in a client's world (the client's hook: client.sound.ThrusterRoar). */
+	public static java.util.function.Consumer<BotGolem> clientRoar = golem -> {
+	};
 
 	public BotGolem(EntityType<? extends PathfinderMob> type, Level level) {
 		super(type, level);
@@ -132,7 +160,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	@Override
 	protected void defineSynchedData(SynchedEntityData.Builder builder) {
 		super.defineSynchedData(builder);
-		builder.define(READY, false).define(POWERED, false).define(HALTED, false).define(SCREEN, false).define(LEGS, true);
+		builder.define(READY, false).define(POWERED, false).define(HALTED, false).define(SCREEN, false).define(LEGS, true).define(THRUSTING, false);
 	}
 
 	/** What the board needs from the golem: where it is, which way it faces, and its entity data. */
@@ -241,14 +269,10 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			if (EnergyField.held(BotGolem.this)) {
 				return "held in a field: its field moves it";
 			}
-			float yaw = getYRot() * Mth.DEG_TO_RAD;
-			// Minecraft's heading: 0 faces south (+Z), 90 west; to its right is a quarter turn more.
-			double x = -Mth.sin(yaw) * forward - Mth.cos(yaw) * right;
-			double z = Mth.cos(yaw) * forward - Mth.sin(yaw) * right;
 			turnTo = Float.NaN;
 			getNavigation().stop();
 			hands.stopBreaking();
-			target = position().add(x, up, z);
+			target = position().add(inFrame(forward, right, up));
 			walkedFrom = position();
 			pathed = false; // (its tick finds the way, once it stands: the game plans no path for a mob in the air)
 			return null;
@@ -269,6 +293,62 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			hands.stopBreaking();
 			target = null;
 			turnTo = Float.NaN;
+			flyTo = null; // (flying or landing: it hovers there)
+			landing = null;
+		}
+
+		@Override
+		public String fly(double forward, double right, double up) {
+			if (EnergyField.held(BotGolem.this)) {
+				return "held in a field: its field moves it";
+			}
+			takeOff();
+			flyTo = position().add(inFrame(forward, right, up));
+			return null;
+		}
+
+		@Override
+		public String hover() {
+			if (EnergyField.held(BotGolem.this)) {
+				return "held in a field: its field moves it";
+			}
+			takeOff();
+			flyTo = null;
+			return null;
+		}
+
+		@Override
+		public String land() {
+			if (legs()) {
+				return "already on its legs";
+			}
+			// Its legs below it: within reach to its side, at its height or under it.
+			GolemLegs below = level().getEntitiesOfClass(GolemLegs.class, getBoundingBox().inflate(LEGS_REACH, RoboticsDevice.MAX_FLIGHT, LEGS_REACH), GolemLegs::isAlive)
+				.stream().filter(legs -> legs.getY() <= getY() + ON_LEGS && legs.position().subtract(position()).horizontalDistance() <= LEGS_REACH)
+				.min(java.util.Comparator.comparingDouble(legs -> legs.position().distanceTo(position()))).orElse(null);
+			if (below == null) {
+				return "no legs there to land on";
+			}
+			EnergyField field = EnergyField.fieldOf(BotGolem.this);
+			if (field != null) {
+				field.lose("landing on its legs"); // (it goes onto them itself)
+			}
+			flyTo = null;
+			hovering = true; // (its thrusters bring it down)
+			landing = below;
+			return null;
+		}
+
+		@Override
+		public void release() {
+			flyTo = null;
+			landing = null;
+			hovering = false;
+		}
+
+		@Override
+		public boolean hovering() {
+			return hovering;
 		}
 
 		@Override
@@ -279,41 +359,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		@Override
 		public boolean legs() {
 			return BotGolem.this.legs();
-		}
-
-		@Override
-		public Result detachLegs() {
-			if (!(level() instanceof ServerLevel server)) {
-				return Result.fail("not in a world");
-			}
-			GolemLegs legs = ModEntities.GOLEM_LEGS.create(server, net.minecraft.world.entity.EntitySpawnReason.TRIGGERED);
-			legs.snapTo(getX(), getY(), getZ(), getYRot(), 0);
-			BotGolem.this.legs(false);
-			if (EnergyField.held(BotGolem.this)) {
-				setPos(getX(), getY() + LEG_HEIGHT, getZ()); // (its torso where it was, its legs below it)
-				EnergyField.fieldOf(BotGolem.this).shift(new Vec3(0, LEG_HEIGHT, 0)); // (held there)
-			} else if (machine().isPowered()) {
-				machine().pressPower(); // nothing holding it up: it falls over, and powers off
-			}
-			server.addFreshEntity(legs);
-			return Result.ok(true);
-		}
-
-		@Override
-		public Result attachLegs() {
-			GolemLegs near = level().getEntitiesOfClass(GolemLegs.class, getBoundingBox().inflate(LEGS_REACH), GolemLegs::isAlive).stream()
-				.filter(legs -> legs.position().distanceTo(position()) <= LEGS_REACH)
-				.min(java.util.Comparator.comparingDouble(legs -> legs.position().distanceTo(position()))).orElse(null);
-			if (near == null) {
-				return Result.fail("no legs within " + (int) LEGS_REACH + " blocks");
-			}
-			EnergyField field = EnergyField.fieldOf(BotGolem.this);
-			if (field != null) {
-				field.lose("landing on its legs"); // (it goes onto them itself)
-			}
-			attaching = near;
-			setNoGravity(true);
-			return Result.ok(true);
 		}
 
 		@Override
@@ -465,42 +510,157 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				board.placed();
 			}
 			move();
-			attach();
+			thrust();
 			hands.tick();
 			board.tick();
 		}
 	}
 
-	/** Going onto its legs, a tick of it: straight to them, and on, its legs gone into it. */
-	private void attach() {
-		if (attaching == null) {
+	/** A point {@code forward}, {@code right} and {@code up} blocks from it, in its own frame, as a step from where it is. */
+	private Vec3 inFrame(double forward, double right, double up) {
+		float yaw = getYRot() * Mth.DEG_TO_RAD;
+		// Minecraft's heading: 0 faces south (+Z), 90 west; to its right is a quarter turn more.
+		return new Vec3(-Mth.sin(yaw) * forward - Mth.cos(yaw) * right, up, Mth.cos(yaw) * forward - Mth.sin(yaw) * right);
+	}
+
+	/** Its thrusters take over: its legs, if it stands on them, left standing where it is, its torso where it was. */
+	private void takeOff() {
+		getNavigation().stop();
+		hands.stopBreaking();
+		target = null;
+		turnTo = Float.NaN;
+		landing = null;
+		if (legs() && level() instanceof ServerLevel server) {
+			GolemLegs legs = ModEntities.GOLEM_LEGS.create(server, net.minecraft.world.entity.EntitySpawnReason.TRIGGERED);
+			legs.snapTo(getX(), getY(), getZ(), getYRot(), 0);
+			legs(false);
+			setPos(getX(), getY() + LEG_HEIGHT, getZ()); // (its torso where it was, its legs below it)
+			server.addFreshEntity(legs);
+		}
+		hovering = true;
+		thrusters(true);
+	}
+
+	/**
+	 * Its thrusters, a tick of them: firing while it flies, hovers or lands (their cost, their beams),
+	 * a flight's step (straight, never through blocks), a landing's, or a hover's drift (a shove dies
+	 * away). Legless, with nothing holding it up (its thrusters let go, a field's gone), it falls over,
+	 * and powers off.
+	 */
+	private void thrust() {
+		boolean firing = hovering;
+		thrusters(firing);
+		if (firing) {
+			robotics.thrusted();
+			beams();
+			if (landing != null) {
+				landStep();
+			} else if (flyTo != null) {
+				flyStep();
+			} else {
+				Vec3 drift = getDeltaMovement(); // (a shove's: the game doesn't move a mob held up so)
+				if (drift.lengthSqr() > DRIFT * DRIFT) {
+					move(net.minecraft.world.entity.MoverType.SELF, drift);
+				}
+				setDeltaMovement(drift.lengthSqr() > DRIFT * DRIFT ? drift.scale(HOVER_DRAG) : Vec3.ZERO);
+			}
+		}
+		boolean up = entityData.get(THRUSTING) || EnergyField.held(this);
+		if (airborne && !up && !legs() && machine().isPowered()) {
+			machine().pressPower(); // nothing holding it up: it falls over, and powers off
+		}
+		airborne = up;
+	}
+
+	/** Its thrusters on or off: its synced flag (its beams, its roar), gravity, and their ignition's sound. */
+	private void thrusters(boolean firing) {
+		if (firing == entityData.get(THRUSTING)) {
 			return;
 		}
-		if (!attaching.isAlive()) {
-			attaching = null;
-			setNoGravity(false);
-			robotics.failed("its legs are gone");
+		entityData.set(THRUSTING, firing);
+		setNoGravity(firing);
+		if (firing) {
+			level().playSound(null, getX(), getY(), getZ(), com.payonel.modularcomputers.sound.ModSounds.THRUSTER_ON, net.minecraft.sounds.SoundSource.NEUTRAL, 1, 1);
+		}
+	}
+
+	/** A tick's flight toward its point: there, it hovers (arrived); held back, it hovers (blocked). */
+	private void flyStep() {
+		Vec3 left = flyTo.subtract(position());
+		if (left.length() <= FLOWN) {
+			flyTo = null;
+			robotics.arrived();
+			robotics.hovering();
 			return;
 		}
-		Vec3 to = attaching.position();
-		Vec3 left = to.subtract(position());
+		Vec3 step = left.length() > THRUST_SPEED ? left.normalize().scale(THRUST_SPEED) : left;
+		Vec3 from = position();
+		move(net.minecraft.world.entity.MoverType.SELF, step);
+		setDeltaMovement(Vec3.ZERO);
+		if (position().distanceTo(from) < step.length() * BLOCKED_SHARE) {
+			flyTo = null;
+			robotics.blocked("something in the way");
+			robotics.hovering();
+		}
+	}
+
+	/** A tick's landing: down to its legs (straight onto them once close: they'd stop a collision), and on, its legs gone into it. */
+	private void landStep() {
+		if (!landing.isAlive()) {
+			landing = null;
+			robotics.blocked("its legs are gone");
+			robotics.hovering();
+			return;
+		}
+		Vec3 left = landing.position().subtract(position());
 		if (left.length() > ON_LEGS) {
-			Vec3 step = left.scale(Math.min(1, ATTACH_SPEED / left.length()));
-			setPos(position().add(step));
+			Vec3 step = left.scale(Math.min(1, LANDING_SPEED / left.length()));
+			if (left.length() > LEGS_REACH) {
+				Vec3 from = position();
+				move(net.minecraft.world.entity.MoverType.SELF, step);
+				if (position().distanceTo(from) < step.length() * BLOCKED_SHARE) {
+					landing = null;
+					robotics.blocked("something in the way");
+					robotics.hovering();
+				}
+			} else {
+				setPos(position().add(step));
+			}
 			setDeltaMovement(Vec3.ZERO);
 			return;
 		}
-		setPos(to); // (facing as it was: a program's frame stays where it was)
-		attaching.discard();
-		attaching = null;
-		setNoGravity(false);
+		setPos(landing.position()); // (facing as it was: a program's frame stays where it was)
+		landing.discard();
+		landing = null;
+		hovering = false;
+		thrusters(false);
+		airborne = false;
 		legs(true);
-		robotics.attached();
+		robotics.landed();
 	}
 
-	/** Whether it's flying: its legs off and off the ground (held in its field). Chickens and cows fear it then. */
+	/** Its beams, a tick of them: red motes streaming down from both leg sockets. */
+	private void beams() {
+		if (!(level() instanceof ServerLevel server)) {
+			return;
+		}
+		float yaw = getYRot() * Mth.DEG_TO_RAD;
+		double sideX = -Mth.cos(yaw) * SOCKET_SIDE;
+		double sideZ = -Mth.sin(yaw) * SOCKET_SIDE;
+		var mote = new net.minecraft.core.particles.DustParticleOptions(BEAM_COLOR, BEAM_SIZE);
+		for (int side = -1; side <= 1; side += 2) {
+			server.sendParticles(mote, getX() + side * sideX, getY(), getZ() + side * sideZ, BEAM_MOTES, 0.03, 0.15, 0.03, 0);
+		}
+	}
+
+	/** Whether its thrusters fire. */
+	public boolean thrusting() {
+		return entityData.get(THRUSTING);
+	}
+
+	/** Whether it's flying: on its thrusters (a field holding it isn't flying). Chickens and cows fear it then. */
 	public boolean flying() {
-		return !legs() && !onGround();
+		return thrusting();
 	}
 
 	/** Whether it stands on its legs. */
@@ -526,6 +686,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		super.onSyncedDataUpdated(accessor);
 		if (LEGS.equals(accessor)) {
 			refreshDimensions();
+		}
+		if (THRUSTING.equals(accessor) && level().isClientSide() && thrusting()) {
+			clientRoar.accept(this); // (its roar, for as long as they fire)
 		}
 	}
 
@@ -783,6 +946,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	protected void addAdditionalSaveData(ValueOutput output) {
 		super.addAdditionalSaveData(output);
 		output.putBoolean(LEGS_SAVED, legs());
+		output.putBoolean(HOVERING_SAVED, hovering); // (a save isn't a power cut: it hovers on)
 		board.save(output, false);
 	}
 
@@ -790,6 +954,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	protected void readAdditionalSaveData(ValueInput input) {
 		super.readAdditionalSaveData(input);
 		legs(input.getBooleanOr(LEGS_SAVED, true));
+		hovering = input.getBooleanOr(HOVERING_SAVED, false);
 		board.load(input);
 	}
 }
