@@ -114,7 +114,7 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
    still runs, crafts and acts, but uses no tools (buttons and doors yes) and presses no pressure
    plates. Power out or off in flight: the torso falls, an object in the world (hit: picked up;
    right-click: its GUI); torso over legs in a 2x2 grid makes the golem again.
-5. **Mobs:** spiders (and skeletons riding them) fear golems; a flying golem scares chickens and
+5. **Mobs** (built): spiders (and skeletons riding them) fear golems; a flying golem scares chickens and
    cows (sheep don't care).
 
 ## Getting started in the world

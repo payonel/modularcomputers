@@ -499,6 +499,11 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		robotics.attached();
 	}
 
+	/** Whether it's flying: its legs off and off the ground (held in its field). Chickens and cows fear it then. */
+	public boolean flying() {
+		return !legs() && !onGround();
+	}
+
 	/** Whether it stands on its legs. */
 	public boolean legs() {
 		return entityData.get(LEGS);

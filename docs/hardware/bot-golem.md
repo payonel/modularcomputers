@@ -76,6 +76,12 @@ It runs on its battery, as a case does: swap the battery, or walk it onto a
 program tells its robotics device to act. See [Robotics device](/devices/robotics/) for
 what a program can do with it, and its examples.
 
+## Mobs
+
+Spiders keep away from golems, as they keep away from armadillos, and a skeleton riding one is
+carried off with it. A flying golem scares chickens and cows (mooshrooms too) off as it comes near.
+Sheep don't care.
+
 ## Notes
 
 - A golem and its parts are each one thing, by their ids: placing one you picked up moves it

@@ -302,6 +302,9 @@ in the world, and the `broke` event says whether it kept it all.
   ignoring block triggers (pressure plates). `attachLegs` within 3 blocks goes onto them (a field
   holding it lets go). Picked up legless it's a torso item; torso over legs is a golem again
   (`GolemAssemblyRecipe`, the torso's components kept).
+- **Mobs fear it** (the user's): spiders (a skeleton riding one with them) avoid any golem, chickens
+  and cows a flying one (legs off, off the ground), sheep none: an `AvoidEntityGoal` added as each
+  registers its goals (`GolemFear`; mixins `SpiderFear`, `ChickenFear`, `CowFear`).
 - **One answer says it all** (the user's): a program never checks twice. `store` answers `true, 0`
   when nothing it was asked to move is left, else `false` and how many are (never `false, 0`);
   no container is a failure (nil and why). `drop` fills a container there first and answers how
@@ -666,6 +669,8 @@ Lessons from mistakes, each with its test:
   (`sys.read(file.fd, n)`: what's there now, as `read(2)`), as `cat` does.
 - Lua inside a Java text block is unescaped twice (Java's, then Lua's): use long strings
   (`[[\d]]`) for patterns, and capture a test program's stderr (`2> /err`) to see why it failed.
+- A class in the mixin package can't be loaded as an ordinary class (Mixin reserves the package):
+  helpers the mixins call live elsewhere (`entity/GolemFear`), and each mixin is its own file.
 - Mouse buttons are SDL-numbered (left 1, right 3): use the constants. SDL sends typed characters
   only while text input is on: a screen that takes typing turns it on.
 - `.gitignore` patterns without a leading `/` match at any depth: anchor root-only rules.

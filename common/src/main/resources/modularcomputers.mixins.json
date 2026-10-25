@@ -4,11 +4,15 @@
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
 		"AttackStrength",
+		"ChickenFear",
+		"CowFear",
+		"SpiderFear",
 		"HeldCreeper",
 		"HeldGameMode",
 		"HeldMob",
 		"HeldPlayer",
 		"MinecraftServerSaves",
+		"MobGoals",
 		"ServerLevelSounds"
 	],
 	"injectors": {
