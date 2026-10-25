@@ -1,6 +1,6 @@
 -- efibootmgr [options]: shows and changes the EEPROM's boot variables (its NVRAM: boot entries, a
 -- disk by its id and a file on it; BootOrder, the order they're tried in; BootNext, the one tried
--- once, next), as Linux's efibootmgr does UEFI's, through /dev/eeprom's ioctls (the EEPROM's own
+-- once, next; BootCurrent, the one that booted), as Linux's efibootmgr does UEFI's, through /dev/eeprom's ioctls (the EEPROM's own
 -- methods: it checks every change). The variables are readable in /sys/firmware/efi/efivars too.
 --   -c, --create        a new entry (number -b's, else the first free one), first in BootOrder:
 --   -d, --disk DISK       its disk: a /dev name (storage1, /dev/storage1) or an id (id:<uuid>)
@@ -158,6 +158,9 @@ for _, device in ipairs(sys.devices()) do
 end
 local function hex(n)
   return string.format("%04X", n)
+end
+if boot.current then
+  print("BootCurrent: " .. hex(boot.current))
 end
 if boot.next then
   print("BootNext: " .. hex(boot.next))

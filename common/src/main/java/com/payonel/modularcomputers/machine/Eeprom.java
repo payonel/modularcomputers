@@ -84,6 +84,12 @@ public final class Eeprom implements Device {
 
 	private final Storage storage;
 	private Program attached;
+	/**
+	 * UEFI's BootCurrent: the boot entry the bootloader booted ({@link BootVariables#NONE}: none, it
+	 * booted by its fallback, or nothing has said). Volatile, as UEFI's: the device's, not the chip's
+	 * NVRAM, gone when the power goes, kept through a save.
+	 */
+	private int bootCurrent = BootVariables.NONE;
 
 	/** An EEPROM whose contents are in {@code storage}. */
 	public Eeprom(Storage storage) {
@@ -153,7 +159,47 @@ public final class Eeprom implements Device {
 		if (vars.next() != BootVariables.NONE) {
 			boot.put("next", (long) vars.next());
 		}
+		if (bootCurrent != BootVariables.NONE) {
+			boot.put("current", (long) bootCurrent);
+		}
 		return Result.ok(boot);
+	}
+
+	@Method(doc = "setBootCurrent([number]): the bootloader's: the boot entry it's booting, or none when it boots by its fallback; kept until the power goes")
+	public Result setBootCurrent(Arguments args) {
+		if (args.get(0) == null) {
+			bootCurrent = BootVariables.NONE;
+			return Result.ok();
+		}
+		long number = args.checkInteger(0);
+		if (!storage.nvram().entries().containsKey((int) number) || number < 0 || number >= BootVariables.ENTRIES) {
+			return Result.fail("no Boot" + BootVariables.name((int) Math.max(0, Math.min(number, 0xFFFF))));
+		}
+		bootCurrent = (int) number;
+		return Result.ok();
+	}
+
+	/** The entry it booted, or {@link BootVariables#NONE}. */
+	public int bootCurrent() {
+		return bootCurrent;
+	}
+
+	@Override
+	public void powerOff() {
+		bootCurrent = BootVariables.NONE; // (volatile)
+	}
+
+	/** What a save keeps of it: BootCurrent (a save isn't a power cut). */
+	private static final String BOOT_CURRENT = "bootCurrent";
+
+	@Override
+	public Map<String, Object> saved() {
+		return bootCurrent == BootVariables.NONE ? Map.of() : Map.of(BOOT_CURRENT, (long) bootCurrent);
+	}
+
+	@Override
+	public void restore(Map<String, Object> saved) {
+		bootCurrent = saved.get(BOOT_CURRENT) instanceof Number number ? number.intValue() : BootVariables.NONE;
 	}
 
 	@Method(doc = "setBootEntry(number, disk[, path[, label]]): makes boot entry number (0 to 7) or replaces it: a disk by its id (id:<uuid>, there or not), the file it boots (/init.lua if none), and a label")

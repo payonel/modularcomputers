@@ -2,7 +2,8 @@
 -- entries (the EEPROM's getBoot: a disk by its id and a file on it): BootNext's once (cleared
 -- before it boots, as UEFI does), then BootOrder's in turn, skipping a disk that isn't on the bus;
 -- then, UEFI's fallback, each disk in bus order holding /init.lua. It runs the file found, handing
--- it the disk's address. A file that doesn't compile is said and skipped; with none left, it says
+-- it the disk's address, and tells the EEPROM which entry that was (BootCurrent: none for the
+-- fallback). A file that doesn't compile is said and skipped; with none left, it says
 -- so and halts.
 local function say(text)
   board.invoke("console", "write", text)
@@ -63,10 +64,12 @@ if ok and vars then
     local disk = entry and disks[entry.disk]
     local init = disk and find(disk, entry.path)
     if init then
+      board.invoke("eeprom", "setBootCurrent", number)
       return init(disk)
     end
   end
 end
+board.invoke("eeprom", "setBootCurrent")
 for _, disk in ipairs(order) do
   local init = find(disk, "/init.lua")
   if init then

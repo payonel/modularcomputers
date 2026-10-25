@@ -16,7 +16,7 @@ hidden: true
 
 ## Description
 
-The EEPROM keeps boot variables in its NVRAM, as a UEFI board does: boot entries (<strong>Boot0000</strong> to <strong>Boot0007</strong>), each a disk by its id and a file on it; <strong>BootOrder</strong>, the order the entries are tried in; and <strong>BootNext</strong>, an entry tried once, at the next boot only. At power-on the EEPROM's bootloader tries <strong>BootNext</strong> (and clears it), then each entry of <strong>BootOrder</strong> whose disk is on the bus, then every disk in bus order holding <strong>/init.lua</strong>.
+The EEPROM keeps boot variables in its NVRAM, as a UEFI board does: boot entries (<strong>Boot0000</strong> to <strong>Boot0007</strong>), each a disk by its id and a file on it; <strong>BootOrder</strong>, the order the entries are tried in; <strong>BootNext</strong>, an entry tried once, at the next boot only; and <strong>BootCurrent</strong>, the entry that booted the computer this time (none when it booted by the fallback), kept until it's off. At power-on the EEPROM's bootloader tries <strong>BootNext</strong> (and clears it), then each entry of <strong>BootOrder</strong> whose disk is on the bus, then every disk in bus order holding <strong>/init.lua</strong>.
 
 With no options, <strong>efibootmgr</strong> shows the variables. After a change it shows them as they are now, unless <strong>-q</strong>. Entry numbers are hexadecimal, as in <strong>Boot0001</strong>.
 
@@ -82,7 +82,7 @@ efibootmgr -b 1 -B
 
 ## Notes
 
-Linux's efibootmgr writes UEFI's variables, which name a partition by its GUID and a file on it; mcos's name a disk by its id. There is no <strong>BootCurrent</strong> and no active flag (<strong>-a</strong>, <strong>-A</strong>): every entry is active. The EEPROM checks every change, so a variable is always one its bootloader can read.
+Linux's efibootmgr writes UEFI's variables, which name a partition by its GUID and a file on it; mcos's name a disk by its id. The EEPROM checks every change, so a variable is always one its bootloader can read.
 
 ## See also
 

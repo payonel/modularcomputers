@@ -12,6 +12,7 @@
 --   /sys/firmware/efi/efivars/Boot0001      id:<uuid> /init.lua label (and "not present", off the bus)
 --   /sys/firmware/efi/efivars/BootOrder     an entry's number a line, in order
 --   /sys/firmware/efi/efivars/BootNext      (while it's set)
+--   /sys/firmware/efi/efivars/BootCurrent   the entry booted (when one was: not by the fallback)
 -- Programs list and read it as any files.
 local k, vfs = ...
 
@@ -81,6 +82,9 @@ local function efivars()
         vars.BootOrder = table.concat(order)
         if boot.next then
           vars.BootNext = string.format("%04X\n", boot.next)
+        end
+        if boot.current then
+          vars.BootCurrent = string.format("%04X\n", boot.current)
         end
       end
       break

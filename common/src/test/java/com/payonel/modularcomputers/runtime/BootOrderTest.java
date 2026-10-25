@@ -31,6 +31,8 @@ class BootOrderTest extends McosHarness {
 		board.invoke(file, "close")
 		board.poweroff()
 		""";
+	/** One that halts instead: the power stays on (BootCurrent with it). */
+	private static final String HALTS = MARKS.replace("board.poweroff()", "board.halt()");
 	private static final UUID FIRST = UUID.fromString("0f4c2a10-7b3e-4d9a-9e1f-2c5b8a6d3e71");
 	private static final UUID SECOND = UUID.fromString("5a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d");
 	private static final String ABSENT = "id:9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b";
@@ -58,6 +60,14 @@ class BootOrderTest extends McosHarness {
 		bus.plug(Motherboard.sata(1), new Disk(DiskTier.TIER_1, second), SECOND);
 	}
 
+	/** Powers on, until the OS it booted (one that halts) has said so and halted, the power on. */
+	private void bootToHalt(Path disk) throws Exception {
+		Files.writeString(disk.resolve("init.lua"), HALTS);
+		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
+		settle(() -> booted(disk) && machine.runner().isEmpty());
+		assertThat(machine.isPowered()).as("halted, the power on").isTrue();
+	}
+
 	/** Powers on, until the OS it booted turns the computer off. */
 	private void bootOnce() {
 		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
@@ -76,6 +86,25 @@ class BootOrderTest extends McosHarness {
 		bootOnce();
 		assertThat(booted(second)).as("the entry's disk").isTrue();
 		assertThat(booted(first)).isFalse();
+	}
+
+	@Test
+	void bootCurrentIsTheEntryBootedNoneForTheFallbackAndGoesWithThePower() throws Exception {
+		twoDisks();
+		eeprom.setBootEntry(args(3L, Motherboard.id(SECOND)));
+		eeprom.setBootNext(args(3L));
+		bootToHalt(second);
+		assertThat(eeprom.bootCurrent()).as("BootNext's entry").isEqualTo(3);
+		Map<String, Object> saved = eeprom.saved();
+		eeprom.restore(Map.of());
+		eeprom.restore(saved);
+		assertThat(eeprom.bootCurrent()).as("kept through a save").isEqualTo(3);
+		machine.pressPower(); // (off)
+		settle(() -> !machine.isPowered());
+		assertThat(eeprom.bootCurrent()).as("volatile: gone with the power").isEqualTo(BootVariables.NONE);
+		bootToHalt(first); // (no BootNext now, no order: the fallback, the first disk)
+		assertThat(eeprom.bootCurrent()).as("the fallback: none").isEqualTo(BootVariables.NONE);
+		assertThat(eeprom.setBootCurrent(args(5L)).failed()).as("an entry that isn't there").isTrue();
 	}
 
 	@Test
@@ -136,6 +165,16 @@ class BootOrderTest extends McosHarness {
 		assertThat(eeprom().nvram().entries()).containsOnlyKeys(0);
 		assertThat(eeprom().nvram().order()).containsExactly(0);
 		assertThat(eeprom().nvram().next()).isEqualTo(BootVariables.NONE);
+		assertThat(eeprom().bootCurrent()).as("booted by the fallback").isEqualTo(BootVariables.NONE);
+		// Booted by an entry: BootCurrent says which, in /sys and efibootmgr.
+		untilIdle();
+		type("efibootmgr -q -c -d storage0 -L mcos; efibootmgr -q -n 1; reboot\r");
+		settle(() -> eeprom().bootCurrent() == 1);
+		untilIdle();
+		type("cat /sys/firmware/efi/efivars/BootCurrent > /current; efibootmgr > /shown\r");
+		untilFile(root().resolve("current"), "0001\n");
+		settle(() -> Files.exists(root().resolve("shown")) && read(root().resolve("shown")).contains("Boot0001"));
+		assertThat(read(root().resolve("shown"))).startsWith("BootCurrent: 0001\n");
 	}
 
 	private Eeprom eeprom() {

@@ -29,9 +29,12 @@ to
 .BR Boot0007 ),
 each a disk by its id and a file on it;
 .BR BootOrder ,
-the order the entries are tried in; and
+the order the entries are tried in;
 .BR BootNext ,
-an entry tried once, at the next boot only.
+an entry tried once, at the next boot only; and
+.BR BootCurrent ,
+the entry that booted the computer this time (none when it booted by the
+fallback), kept until it's off.
 At power-on the EEPROM's bootloader tries
 .B BootNext
 (and clears it), then each entry of
@@ -131,12 +134,8 @@ efibootmgr -b 1 -B
 .fi
 .SH NOTES
 Linux's efibootmgr writes UEFI's variables, which name a partition by its
-GUID and a file on it; mcos's name a disk by its id. There is no
-.B BootCurrent
-and no active flag
-.RB ( \-a ", " \-A ):
-every entry is active. The EEPROM checks every change, so a variable is
-always one its bootloader can read.
+GUID and a file on it; mcos's name a disk by its id. The EEPROM checks
+every change, so a variable is always one its bootloader can read.
 .SH SEE ALSO
 .BR label (1),
 .BR lsdev (1)

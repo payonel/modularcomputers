@@ -49,6 +49,7 @@ image keeps them), as a UEFI board keeps `Boot####`, `BootOrder` and `BootNext`:
 | `Boot0000` to `Boot0007` | A boot entry: a disk by its id (`id:<uuid>`), the file on it to boot (`/init.lua` if none), and a label |
 | `BootOrder` | The entries' numbers, in the order they're tried |
 | `BootNext` | An entry to try first, next time only: the bootloader clears it as it boots |
+| `BootCurrent` | The entry that booted the computer this time; none when it booted by the fallback. Not kept in NVRAM: it's gone when the power goes, as UEFI's |
 
 They're a closed set of typed values, never free text: every change is checked by the chip, and a
 change that isn't valid is refused with why (an id that isn't one, a path that doesn't start at `/`
@@ -85,7 +86,9 @@ The NVRAM's variables are files to read, as Linux's efivarfs shows a UEFI board'
 
 ```sh
 $ ls /sys/firmware/efi/efivars
-Boot0000  Boot0001  BootNext  BootOrder
+Boot0000  Boot0001  BootCurrent  BootOrder
+$ cat /sys/firmware/efi/efivars/BootCurrent
+0001
 $ cat /sys/firmware/efi/efivars/Boot0001
 id:9a02c3e1-5b7d-4f0e-8c21-3d6e7f1a2b4c /init.lua tiny OS
 $ cat /sys/firmware/efi/efivars/BootOrder
@@ -121,8 +124,9 @@ Replaces the chip's contents with `data`. It takes effect at the next power-on.
 
 ### getBoot() → table
 
-The NVRAM's boot variables: `entries`, a list of `{number, disk, path, label}` by number; `order`, a
-list of numbers; and `next`, a number, or nil when there's no BootNext.
+The boot variables: `entries`, a list of `{number, disk, path, label}` by number; `order`, a list of
+numbers; `next`, a number, or nil when there's no BootNext; and `current`, the entry that booted, or
+nil.
 
 ### setBootEntry(number, disk[, path[, label]]) → nothing
 
@@ -138,6 +142,11 @@ Removes an entry, from `BootOrder` and as `BootNext` too. Fails for an entry tha
 
 Sets the order entries are tried in: a list of entries' numbers, each one there, none twice. An
 empty list clears it.
+
+### setBootCurrent([number]) → nothing
+
+The bootloader's: the entry it's booting, or none when it boots by its fallback. It's kept until the
+computer's off. Fails for an entry that isn't there.
 
 ### setBootNext([number]) → nothing
 
