@@ -227,6 +227,17 @@ public class CableClientGameTest implements FabricClientGameTest {
 			});
 			context.waitTicks(2);
 			context.takeScreenshot("screen-view-utf8");
+			// The shapes it draws itself: blocks and shades, quadrants, braille, double lines, dashes, diagonals, arcs.
+			String shapes = "\u001B[2J\u001B[H\u2580\u2584\u2588\u258C\u2590 \u2591\u2592\u2593 \u2596\u2597\u2598\u259D \u28FF\u283F\u2847\u2880\r\n"
+				+ "\u2554\u2550\u2566\u2550\u2557 \u250C\u2504\u2510 \u2571\u2572\u2573 \u256D\u2500\u256E\r\n"
+				+ "\u2560\u2550\u256C\u2550\u2563 \u2506 \u2506 \u2588\u2588\u2588 \u2502 \u2502\r\n"
+				+ "\u255A\u2550\u2569\u2550\u255D \u2514\u2504\u2518     \u2570\u2500\u256F\r\n";
+			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
+				.virtualBus().console().write(com.payonel.modularcomputers.device.Terminal.utf8(shapes)));
+			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof com.payonel.modularcomputers.block.ScreenBlockEntity shown
+				&& shown.terminal().buffer().get(0, 1) == 0x2554);
+			context.waitTicks(2);
+			context.takeScreenshot("screen-view-shapes");
 			pressPower(singleplayer, computer);
 			context.waitFor(client -> !machinePowered(client, computer) && !showsHello(client, screen));
 			pressPower(singleplayer, computer);

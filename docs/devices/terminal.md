@@ -127,6 +127,17 @@ the screen agree. Keys typed and pasted reach programs as UTF-8. The DEC charact
 `ESC ( 0` puts DEC's line drawing in G0 (`ESC ( B` back to ASCII, `ESC ( A` the UK set), `ESC ) 0`
 in G1, and SO (`\14`) and SI (`\15`) shift between them; `lqqk` in line drawing is `┌──┐`.
 
+![A tier 3 screen's view: box drawing, Chinese and Japanese, an emoji, café spelled two ways, DEC line drawing](/assets/img/terminal-utf8.png)
+*UTF-8 on a tier 3 screen: wide characters in two cells, an accent combined, DEC's line drawing.*
+
+Box drawing (U+2500 to U+257F), block elements (U+2580 to U+259F) and braille (U+2800 to U+28FF)
+aren't drawn from the font: the terminal draws them itself, filling their cells, as terminal
+emulators do, so lines join from cell to cell (light, heavy, double, dashed, rounded and diagonal),
+blocks and shades meet, and braille's dots sit on their grid, for drawings and charts made of text.
+
+![Blocks, shades, quadrants and braille; double lines, dashed lines, diagonals and a rounded box](/assets/img/terminal-shapes.png)
+*Characters the terminal draws itself.*
+
 Some sequences a program uses most (`ESC` is `"\27"` in Lua):
 
 | Sequence | Does |

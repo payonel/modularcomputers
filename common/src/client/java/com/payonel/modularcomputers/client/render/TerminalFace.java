@@ -18,6 +18,8 @@ import net.minecraft.util.LightCoordsUtil;
 public final class TerminalFace {
 	/** How far its pictures float in front of the cells' backgrounds, in blocks (under the text). */
 	private static final float PIXEL_OFFSET = 0.0005f;
+	/** How many pixels across a cell its drawn shapes have (box drawing, blocks, braille) on a block's face. */
+	private static final int SHAPE_PIXELS = 8;
 
 	/** What a frame draws of a terminal. */
 	public static final class State {
@@ -145,10 +147,27 @@ public final class TerminalFace {
 			});
 			pose.popPose();
 		}
+		// Box drawing, blocks and braille: the cells' own shapes, in SHAPE_PIXELS a cell across (they join cell to cell).
+		float unit = cellWidth / SHAPE_PIXELS;
+		int shapeHeight = Math.max(1, Math.round(cellHeight / unit));
 		for (int row = 0; row < state.cells.length; row++) {
 			for (int column = 0; column < state.cells[row].length; column++) {
 				int c = state.cells[row][column];
-				if (c != ' ' && c != com.payonel.modularcomputers.display.TextBuffer.WIDE) {
+				if (com.payonel.modularcomputers.display.CellGlyphs.draws(c)) {
+					float cellLeft = column * cellWidth;
+					float cellTop = row * cellHeight;
+					float down = cellHeight / shapeHeight;
+					int color = state.foregrounds[row * columns + column] & 0xFFFFFF;
+					com.payonel.modularcomputers.display.CellGlyphs.draw(c, SHAPE_PIXELS, shapeHeight, (x0, y0, x1, y1, alpha) ->
+						collector.submitTextBackground(pose, cellLeft + x0 * unit, cellTop + y0 * down, cellLeft + x1 * unit, cellTop + y1 * down,
+							alpha << 24 | color, Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT));
+				}
+			}
+		}
+		for (int row = 0; row < state.cells.length; row++) {
+			for (int column = 0; column < state.cells[row].length; column++) {
+				int c = state.cells[row][column];
+				if (c != ' ' && c != com.payonel.modularcomputers.display.TextBuffer.WIDE && !com.payonel.modularcomputers.display.CellGlyphs.draws(c)) {
 					Style style = state.style.withBold(state.bold[row * columns + column]);
 					float x = grid.x(column, c, font, style);
 					int color = 0xFF000000 | state.foregrounds[row * columns + column];

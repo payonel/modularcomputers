@@ -299,6 +299,27 @@ public final class DisplayScreen extends Screen {
 			graphics.blit(pixels, area.x(), area.y(), area.x() + Math.round(resolution.columns() * grid.cellWidth()),
 				area.y() + Math.round(resolution.rows() * grid.cellHeight()), 0, 1, 0, 1);
 		}
+		// Box drawing, blocks and braille: the cells' own shapes (they join cell to cell), in whole
+		// screen pixels, so a line is one thickness everywhere.
+		double scale = minecraft.getWindow().getGuiScale();
+		var shapes = graphics.pose();
+		shapes.pushMatrix();
+		shapes.scale((float) (1 / scale), (float) (1 / scale));
+		for (int row = 0; row < resolution.rows(); row++) {
+			for (int column = 0; column < resolution.columns(); column++) {
+				int c = buffer.get(column, row);
+				if (com.payonel.modularcomputers.display.CellGlyphs.draws(c)) {
+					int left = (int) Math.round((area.x() + column * grid.cellWidth()) * scale);
+					int right = (int) Math.round((area.x() + (column + 1) * grid.cellWidth()) * scale);
+					int top = (int) Math.round((area.y() + row * grid.cellHeight()) * scale);
+					int bottom = (int) Math.round((area.y() + (row + 1) * grid.cellHeight()) * scale);
+					int color = foreground.apply(column, row) & 0xFFFFFF;
+					com.payonel.modularcomputers.display.CellGlyphs.draw(c, right - left, bottom - top,
+						(x0, y0, x1, y1, alpha) -> graphics.fill(left + x0, top + y0, left + x1, top + y1, alpha << 24 | color));
+				}
+			}
+		}
+		shapes.popMatrix();
 		var pose = graphics.pose();
 		pose.pushMatrix();
 		pose.translate(area.x(), area.y());
@@ -306,7 +327,7 @@ public final class DisplayScreen extends Screen {
 		for (int row = 0; row < resolution.rows(); row++) {
 			for (int column = 0; column < resolution.columns(); column++) {
 				int c = buffer.get(column, row);
-				if (c != ' ' && c != TextBuffer.WIDE) {
+				if (c != ' ' && c != TextBuffer.WIDE && !com.payonel.modularcomputers.display.CellGlyphs.draws(c)) {
 					Style style = tierStyle.withBold(TextBuffer.bold(buffer.foreground(column, row)));
 					int x = (int) grid.x(column, c, font, style);
 					graphics.text(font, FormattedCharSequence.codepoint(c, style), x, (int) grid.y(row), 0xFF000000 | foreground.apply(column, row), false);
