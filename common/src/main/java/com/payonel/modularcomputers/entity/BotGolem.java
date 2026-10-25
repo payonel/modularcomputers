@@ -204,6 +204,11 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 
 		@Override
+		public BotGolem robot() {
+			return BotGolem.this;
+		}
+
+		@Override
 		public String describe() {
 			return "bot golem " + board.boardId() + " at " + blockPosition().toShortString() + " in " + level().dimension().identifier();
 		}
@@ -253,8 +258,13 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 
 		@Override
-		public Result held() {
-			return hands.held();
+		public Result held(boolean off) {
+			return hands.held(off);
+		}
+
+		@Override
+		public Result swap() {
+			return hands.swap();
 		}
 
 		@Override
@@ -276,8 +286,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 
 		@Override
-		public Result store(String face, int count) {
-			return hands.store(face, count);
+		public Result store(String face, int count, int to) {
+			return hands.store(face, count, to);
 		}
 
 		@Override
@@ -286,27 +296,59 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 	}
 
-	/** Puts what it was given (by its hand: a filled bucket) where it goes: its hand if it's the same, its storage, else the world at its feet. */
-	void keep(ItemStack stack) {
-		ItemStack hand = getMainHandItem();
-		if (hand.isEmpty()) {
-			setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, stack);
-			return;
-		}
-		if (ItemStack.isSameItemSameComponents(hand, stack)) {
-			int moving = Math.min(stack.getCount(), hand.getMaxStackSize() - hand.getCount());
-			hand.grow(moving);
-			stack.shrink(moving);
-		}
+	/**
+	 * Takes what it came by (a broken block's drops, what its hand was given: a filled bucket):
+	 * into its storage first (a crafting card's), else its off hand catches it (in the background:
+	 * empty, or holding the same), else it stays in the world: what didn't go (in the world).
+	 */
+	ItemStack catchItem(ItemStack stack) {
 		ItemStack left = store(stack);
+		if (left.isEmpty()) {
+			return left;
+		}
+		ItemStack off = getOffhandItem();
+		if (off.isEmpty()) {
+			setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, left.split(Math.min(left.getCount(), left.getMaxStackSize())));
+		} else if (ItemStack.isSameItemSameComponents(off, left)) {
+			int moving = Math.min(left.getCount(), off.getMaxStackSize() - off.getCount());
+			off.grow(moving);
+			left.shrink(moving);
+		}
+		return left;
+	}
+
+	/** Takes what its hand was given, as {@link #catchItem}; what it can't hold is dropped at its feet. */
+	void keep(ItemStack stack) {
+		ItemStack left = catchItem(stack);
 		if (!left.isEmpty() && level() instanceof ServerLevel server) {
 			spawnAtLocation(server, left);
 		}
 	}
 
-	/** Puts items into its storage (a crafting card's): what didn't fit. */
+	/** Puts items into its storage (its crafting cards', in their order): what didn't fit. */
 	ItemStack store(ItemStack stack) {
+		for (com.payonel.modularcomputers.device.Card card : board.cards()) {
+			if (!stack.isEmpty() && card instanceof com.payonel.modularcomputers.device.CraftingCard crafting
+				&& crafting.bench() instanceof CraftingBench bench) {
+				stack = bench.storeAway(stack);
+			}
+		}
 		return stack;
+	}
+
+	/** Whether a crafting card is in it (its parts as the server sent them, on a client): a chest on its back. */
+	public boolean hasCraftingCard() {
+		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+			if (ModItems.cardKind(board.parts().getItem(CaseMenu.EXP_SLOTS + lane)).orElse(null) == com.payonel.modularcomputers.device.CardKind.CRAFTING) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Its senses and hand. */
+	GolemHands hands() {
+		return hands;
 	}
 
 	/** It does nothing on its own: no goals. */
@@ -468,45 +510,50 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			board.parts()::stillValid, GolemLayout.BOT_GOLEM, new HandSlot());
 	}
 
-	/** Its hand as a container of one slot, for its parts view: its main hand, read and written there. */
+	/** Its hands as a container of two slots, for its parts view: its main hand and its off hand, read and written there. */
 	private final class HandSlot implements net.minecraft.world.Container {
+		private static final net.minecraft.world.entity.EquipmentSlot[] HANDS = {net.minecraft.world.entity.EquipmentSlot.MAINHAND,
+			net.minecraft.world.entity.EquipmentSlot.OFFHAND};
+
 		@Override
 		public int getContainerSize() {
-			return 1;
+			return HANDS.length;
 		}
 
 		@Override
 		public boolean isEmpty() {
-			return getMainHandItem().isEmpty();
+			return getMainHandItem().isEmpty() && getOffhandItem().isEmpty();
 		}
 
 		@Override
 		public ItemStack getItem(int slot) {
-			return getMainHandItem();
+			return getItemBySlot(HANDS[slot]);
 		}
 
 		@Override
 		public ItemStack removeItem(int slot, int count) {
-			ItemStack taken = getMainHandItem().split(count);
+			ItemStack taken = getItem(slot).split(count);
 			setChanged();
 			return taken;
 		}
 
 		@Override
 		public ItemStack removeItemNoUpdate(int slot) {
-			ItemStack taken = getMainHandItem();
-			setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+			ItemStack taken = getItem(slot);
+			setItemSlot(HANDS[slot], ItemStack.EMPTY);
 			return taken;
 		}
 
 		@Override
 		public void setItem(int slot, ItemStack stack) {
-			setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, stack);
+			setItemSlot(HANDS[slot], stack);
 		}
 
 		@Override
 		public void setChanged() {
-			setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, getMainHandItem()); // (an emptied stack goes)
+			for (var hand : HANDS) {
+				setItemSlot(hand, getItemBySlot(hand)); // (an emptied stack goes)
+			}
 		}
 
 		@Override
@@ -517,6 +564,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		@Override
 		public void clearContent() {
 			setItem(0, ItemStack.EMPTY);
+			setItem(1, ItemStack.EMPTY);
 		}
 	}
 
@@ -566,6 +614,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		if (!getMainHandItem().isEmpty()) {
 			item.set(ModComponents.HELD, getMainHandItem().copy());
 		}
+		if (!getOffhandItem().isEmpty()) {
+			item.set(ModComponents.OFF_HELD, getOffhandItem().copy());
+		}
 		if (hasCustomName()) {
 			item.set(DataComponents.CUSTOM_NAME, getCustomName());
 		}
@@ -582,6 +633,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		item.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(parts);
 		board.restoreParts(parts);
 		setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, item.getOrDefault(ModComponents.HELD, ItemStack.EMPTY).copy());
+		setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, item.getOrDefault(ModComponents.OFF_HELD, ItemStack.EMPTY).copy());
 		if (item.has(DataComponents.CUSTOM_NAME)) {
 			setCustomName(item.get(DataComponents.CUSTOM_NAME));
 		}

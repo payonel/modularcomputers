@@ -72,6 +72,8 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 	public static final class State extends net.minecraft.client.renderer.entity.state.ArmedEntityRenderState {
 		/** A screen is in its gold slot. */
 		boolean screen;
+		/** A crafting card is in: its storage, a chest on its back. */
+		boolean chest;
 		final TerminalFace.State face = new TerminalFace.State();
 	}
 
@@ -85,6 +87,7 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 		super.extractRenderState(golem, state, partialTick);
 		net.minecraft.client.renderer.entity.state.ArmedEntityRenderState.extractArmedEntityRenderState(golem, state, itemModelResolver, partialTick);
 		state.screen = golem.showsScreen();
+		state.chest = golem.hasCraftingCard();
 		TerminalFace.extract(golem.terminal(), state.screen, state.face);
 	}
 

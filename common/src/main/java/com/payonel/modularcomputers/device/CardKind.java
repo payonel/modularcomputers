@@ -20,7 +20,9 @@ public enum CardKind {
 	OPERATOR(DeviceType.OPERATOR),
 	MOTION_SENSOR(DeviceType.MOTION),
 	AUDIO_SENSOR(DeviceType.HEARING),
-	WEATHER_SENSOR(DeviceType.WEATHER);
+	WEATHER_SENSOR(DeviceType.WEATHER),
+	/** Storage and a 3x3 crafting grid; programs work it through a robot's robotics. */
+	CRAFTING(DeviceType.CRAFTING);
 
 	private final DeviceType type;
 

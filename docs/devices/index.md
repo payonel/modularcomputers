@@ -40,6 +40,7 @@ Every device also has a **type**, which the bus reports as a lower case word:
 | `actuator` | [Robotic piston](/devices/robotic-piston/) |
 | `robotics` | [Robotics device](/devices/robotics/) |
 | `charger` | [Charging pad](/devices/charger/) |
+| `crafting` | [Crafting card](/devices/crafting-card/) |
 
 Besides its type, a device says a little about itself (`board.info`, below): its label, and what its
 kind adds, such as a disk's tier and capacity. Each page lists these.
@@ -144,5 +145,6 @@ printable characters. A device with no item to keep it on cannot have one.
 | [Audio sensor](/devices/audio-sensor/) | Reports sounds a player there would hear |
 | [Weather sensor](/devices/weather-sensor/) | Reports the weather and its changes |
 | [Robotic piston](/devices/robotic-piston/) | Pushes and retracts on any side |
-| [Robotics device](/devices/robotics/) | A bot golem's motors: walks it, turns it |
+| [Robotics device](/devices/robotics/) | A bot golem's motors and hands: walks it, senses round it, uses what it holds |
 | [Charging pad](/devices/charger/) | Charges a robot standing on it |
+| [Crafting card](/devices/crafting-card/) | Storage and a crafting grid; a robot's programs craft with it |

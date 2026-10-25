@@ -53,4 +53,9 @@ public interface BoardHost {
 
 	/** How a log names it: which board, where. */
 	String describe();
+
+	/** The robot it is, when it's one (its robotics work its crafting cards), else null. */
+	default com.payonel.modularcomputers.entity.BotGolem robot() {
+		return null;
+	}
 }

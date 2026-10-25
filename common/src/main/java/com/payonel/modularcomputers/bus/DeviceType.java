@@ -37,4 +37,6 @@ public enum DeviceType {
 	ROBOTICS,
 	/** A charging pad: charges a robot standing on it. */
 	CHARGER,
+	/** A crafting card: storage and a crafting grid, a robot's to work. */
+	CRAFTING,
 }

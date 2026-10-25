@@ -32,7 +32,11 @@ BOXES = {
 	"left_arm": ((40, 0), (2, 8, 3)),
 	"right_leg": ((28, 12), (3, 3, 3)),
 	"left_leg": ((42, 12), (3, 3, 3)),
+	"chest": ((0, 24), (5, 4, 3)),  # on its back, with a crafting card: sunk into its frame
 }
+CHEST_WOOD = [(150, 104, 52), (142, 98, 48), (156, 108, 56)]
+CHEST_DARK = (92, 62, 30)
+LATCH = (200, 200, 206)
 
 def faces(box):
 	"""A box's faces on the texture, as (x0, y0, x1, y1), the way Minecraft lays a cube out."""
@@ -105,6 +109,16 @@ def golem(screen):
 		for side in ("right", "front", "left", "back"):
 			x0, y0, x1, y1 = faces(leg)[side]
 			fill(im, x0, y1 - 1, x1, y1, IRON_DARK)
+	# the tiny chest on its back (drawn only with a crafting card in): planks, a dark lid seam, its latch
+	for side, (x0, y0, x1, y1) in faces("chest").items():
+		for y in range(y0, y1):
+			for x in range(x0, x1):
+				put(im, x, y, rnd.choice(CHEST_WOOD))
+		fill(im, x0, y1 - 1, x1, y1, CHEST_DARK)
+		if side in ("right", "left", "back", "front"):
+			fill(im, x0, y0 + 1, x1, y0 + 2, CHEST_DARK)  # the lid's seam
+	bx0, by0, bx1, by1 = faces("chest")["back"]
+	put(im, (bx0 + bx1) // 2, by0 + 2, LATCH)
 	# vines, as on an iron golem: over a shoulder, down the body's side, round a leg
 	vr = random.Random(37)
 	def vine(points):

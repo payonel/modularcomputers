@@ -21,6 +21,7 @@ import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import com.payonel.modularcomputers.device.CraftingCard;
 
 /**
  * The case view: the motherboard's part slots above the player's inventory. Slot positions
@@ -51,6 +52,30 @@ public final class CaseMenu extends AbstractContainerMenu {
 	public static final int HAND_SLOT = PART_SLOTS + INVENTORY_SLOTS;
 	public static final int HAND_X = 182;
 	public static final int HAND_Y = 54;
+	/** Its off hand's slot, under its hand's: where it catches what it breaks with nowhere else to put it. */
+	public static final int OFF_HAND_SLOT = HAND_SLOT + 1;
+	public static final int OFF_HAND_Y = HAND_Y + 18;
+	/**
+	 * Each expansion lane's crafting card's slots (its grid, its storage) and the grid's result,
+	 * after the hand's: all lanes', always there, each shown while its card is in and its tab open.
+	 */
+	public static final int CRAFT_SLOTS = OFF_HAND_SLOT + 1;
+	public static final int CRAFT_LANE_SLOTS = CraftingCard.SLOTS + 1;
+	/** A lane's result slot, after its card's. */
+	public static final int CRAFT_RESULT = CraftingCard.SLOTS;
+	/** Where a crafting card's panel is: right of the buttons' column; its grid, result and storage in it. */
+	public static final int CRAFT_X = 204;
+	public static final int CRAFT_W = 116;
+	public static final int CRAFT_H = 168;
+	public static final int CRAFT_GRID_X = CRAFT_X + 12;
+	public static final int CRAFT_GRID_Y = 22;
+	public static final int CRAFT_RESULT_X = CRAFT_X + 90;
+	public static final int CRAFT_RESULT_Y = 40;
+	public static final int CRAFT_STORAGE_X = CRAFT_X + 22;
+	public static final int CRAFT_STORAGE_Y = 88;
+	private static final int CRAFT_COLUMNS = 3;
+	private static final int STORAGE_COLUMNS = 4;
+	private static final int SLOT_STEP = 18;
 
 	/** Slot positions in the panel, in GUI units (the item's top-left), by slot index. */
 	public static final int[][] SLOT_POSITIONS = {
@@ -98,6 +123,8 @@ public final class CaseMenu extends AbstractContainerMenu {
 	public CaseMenu(net.minecraft.world.inventory.MenuType<CaseMenu> type, int id, Inventory inventory, Container parts, ContainerData power, BlockPos pos,
 		com.payonel.modularcomputers.network.HostRef host, java.util.function.Predicate<Player> valid, BoardLayout tier, Container hand) {
 		super(type, id);
+		this.hasHand = hand != null;
+		this.player = inventory.player;
 		this.tier = tier;
 		checkContainerSize(parts, PART_SLOTS);
 		this.parts = parts;
@@ -110,14 +137,118 @@ public final class CaseMenu extends AbstractContainerMenu {
 			addSlot(new PartSlot(parts, slot, SLOT_POSITIONS[slot][0], SLOT_POSITIONS[slot][1], tier));
 		}
 		addStandardInventorySlots(inventory, 8, INVENTORY_Y);
-		if (hand != null) {
-			addSlot(new Slot(hand, 0, HAND_X, HAND_Y));
+		Container hands = hand != null ? hand : new SimpleContainer(2);
+		for (int which = 0; which < 2; which++) {
+			addSlot(new Slot(hands, which, HAND_X, which == 0 ? HAND_Y : OFF_HAND_Y) {
+				@Override
+				public boolean isActive() {
+					return hasHand;
+				}
+
+				@Override
+				public boolean mayPlace(ItemStack stack) {
+					return hasHand;
+				}
+			});
+		}
+		Runnable changed = parts instanceof com.payonel.modularcomputers.board.BoardAssembly.PartContents contents ? contents::partContentsChanged : () -> {
+		};
+		for (int lane = 0; lane < LANES; lane++) {
+			int partSlot = EXP_SLOTS + lane;
+			CraftingStorage storage = new CraftingStorage(() -> parts.getItem(partSlot), changed);
+			craftStorage[lane] = storage;
+			results[lane] = new net.minecraft.world.inventory.ResultContainer();
+			int which = lane;
+			for (int slot = 0; slot < CraftingCard.SLOTS; slot++) {
+				int x = slot < CraftingCard.GRID ? CRAFT_GRID_X + slot % CRAFT_COLUMNS * SLOT_STEP
+					: CRAFT_STORAGE_X + (slot - CraftingCard.GRID) % STORAGE_COLUMNS * SLOT_STEP;
+				int y = slot < CraftingCard.GRID ? CRAFT_GRID_Y + slot / CRAFT_COLUMNS * SLOT_STEP
+					: CRAFT_STORAGE_Y + (slot - CraftingCard.GRID) / STORAGE_COLUMNS * SLOT_STEP;
+				addSlot(new Slot(storage, slot, x, y) {
+					@Override
+					public boolean isActive() {
+						return showing(which);
+					}
+
+					@Override
+					public boolean mayPlace(ItemStack stack) {
+						return storage.present();
+					}
+
+					@Override
+					public boolean mayPickup(Player player) {
+						return storage.present();
+					}
+				});
+			}
+			addSlot(new net.minecraft.world.inventory.ResultSlot(player, storage.grid(), results[lane], 0, CRAFT_RESULT_X, CRAFT_RESULT_Y) {
+				@Override
+				public boolean isActive() {
+					return showing(which);
+				}
+			});
+			storage.listen(() -> slotsChanged(storage));
+			slotsChanged(storage); // (what its grid makes as it opens)
 		}
 	}
 
+	private final boolean hasHand;
+	private final Player player;
+	/** Each lane's crafting card's slots (on the card: none while it holds no crafting card), and its grid's result. */
+	private final CraftingStorage[] craftStorage = new CraftingStorage[LANES];
+	private final net.minecraft.world.inventory.ResultContainer[] results = new net.minecraft.world.inventory.ResultContainer[LANES];
+	/** The lane whose crafting card's tab is open (-1: none): the client's to choose. */
+	private int openTab = -1;
+
 	/** Whether this is a robot's, with a hand slot. */
 	public boolean hasHand() {
-		return slots.size() > HAND_SLOT;
+		return hasHand;
+	}
+
+	/** Whether lane {@code lane} holds a crafting card. */
+	public boolean craftingCard(int lane) {
+		return craftStorage[lane].present();
+	}
+
+	/** The lane whose crafting card's tab is open, or -1. */
+	public int openTab() {
+		return openTab;
+	}
+
+	/** Opens a lane's crafting card's tab (-1: none). */
+	public void openTab(int lane) {
+		openTab = lane;
+	}
+
+	/** Whether a lane's crafting slots are shown: its card is in and its tab is open. */
+	private boolean showing(int lane) {
+		return openTab == lane && craftingCard(lane);
+	}
+
+	/** A crafting card's grid changed: what it makes, worked out on the server (the client is sent it). */
+	@Override
+	public void slotsChanged(Container container) {
+		super.slotsChanged(container);
+		if (!(player.level() instanceof net.minecraft.server.level.ServerLevel level)) {
+			return;
+		}
+		for (int lane = 0; lane < LANES; lane++) {
+			if (craftStorage[lane] == container) {
+				ItemStack result = ItemStack.EMPTY;
+				if (container instanceof CraftingStorage storage && storage.present()) {
+					var input = storage.grid().asCraftInput();
+					var recipe = level.recipeAccess().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+					if (recipe.isPresent()) {
+						ItemStack made = recipe.get().value().assemble(input);
+						if (made.isItemEnabled(level.enabledFeatures())) {
+							result = made;
+							results[lane].setRecipeUsed(recipe.get());
+						}
+					}
+				}
+				results[lane].setItem(0, result);
+			}
+		}
 	}
 
 	public BoardLayout tier() {
@@ -205,19 +336,46 @@ public final class CaseMenu extends AbstractContainerMenu {
 		ItemStack stack = slot.getItem();
 		ItemStack original = stack.copy();
 		int inventoryEnd = PART_SLOTS + INVENTORY_SLOTS;
-		boolean moved = index < PART_SLOTS || index >= inventoryEnd
-			? moveItemStackTo(stack, PART_SLOTS, inventoryEnd, true)
-			: moveItemStackTo(stack, 0, PART_SLOTS, false) // part slots only take their own item
-				|| hasHand() && moveItemStackTo(stack, HAND_SLOT, HAND_SLOT + 1, false);
+		boolean moved;
+		if (index < PART_SLOTS || index >= inventoryEnd) {
+			if (index >= CRAFT_SLOTS && (index - CRAFT_SLOTS) % CRAFT_LANE_SLOTS == CRAFT_RESULT) {
+				stack.getItem().onCraftedBy(stack, player); // (a craft taken by shift-click: as a crafting table's)
+			}
+			moved = moveItemStackTo(stack, PART_SLOTS, inventoryEnd, true);
+			if (moved && index >= CRAFT_SLOTS && (index - CRAFT_SLOTS) % CRAFT_LANE_SLOTS == CRAFT_RESULT) {
+				slot.onQuickCraft(stack, original);
+			}
+		} else {
+			// part slots only take their own item; then a robot's hand, then an open crafting card's storage
+			moved = moveItemStackTo(stack, 0, PART_SLOTS, false) || hasHand() && moveItemStackTo(stack, HAND_SLOT, HAND_SLOT + 1, false);
+			if (!moved && openTab >= 0 && craftingCard(openTab)) {
+				int lane = CRAFT_SLOTS + openTab * CRAFT_LANE_SLOTS;
+				moved = moveItemStackTo(stack, lane + CraftingCard.GRID, lane + CraftingCard.SLOTS, false);
+			}
+		}
 		if (!moved) {
 			return ItemStack.EMPTY;
 		}
+		boolean result = index >= CRAFT_SLOTS && (index - CRAFT_SLOTS) % CRAFT_LANE_SLOTS == CRAFT_RESULT;
 		if (stack.isEmpty()) {
 			slot.setByPlayer(ItemStack.EMPTY);
 		} else {
 			slot.setChanged();
 		}
+		if (result) {
+			// The craft is made (its grid used), as a crafting table's: what didn't fit is dropped.
+			slot.onTake(player, stack);
+			if (!stack.isEmpty()) {
+				player.drop(stack, false, net.minecraft.util.Prediction.PREDICTED);
+			}
+		}
 		return original;
+	}
+
+	/** A double click gathering a stack never takes from a crafting grid's result (as a crafting table's). */
+	@Override
+	public boolean canTakeItemForPickAll(ItemStack carried, Slot target) {
+		return !(target instanceof net.minecraft.world.inventory.ResultSlot) && super.canTakeItemForPickAll(carried, target);
 	}
 
 	@Override

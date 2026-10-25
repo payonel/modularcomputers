@@ -454,3 +454,86 @@ rnd.setstate(state)
 golem_board(bare=True).save(f"{OUT}/golem_board_bare.png")
 rnd.setstate(after)
 golem_panel().save(f"{OUT}/golem_panel.png")
+
+# A crafting card's panel (user design, 2026-10-24), right of a computer's view: the card itself,
+# big: its green board with gold fingers down its edge, a crafting table's oak top round its 3x3
+# grid, an arrow to the result's socket, and its storage, a chest's dark wood with iron corners.
+# Slot sockets sit where CaseMenu's CRAFT_* put the slots (panel-relative: grid at 12,22, result at
+# 90,40, storage at 22,88; 18 apart). The title and the card's lane are drawn by the game.
+CRAFT_W, CRAFT_H = 116, 168
+CRAFT_GRID = (12, 22)
+CRAFT_RESULT = (90, 40)
+CRAFT_STORAGE = (22, 88)
+OAK = [(160, 118, 68), (152, 112, 64), (166, 122, 72)]
+OAK_DARK = (110, 78, 42)
+CHEST = [(116, 78, 38), (110, 74, 36), (120, 82, 40)]
+CHEST_DARK = (66, 44, 22)
+IRON_CORNER = (176, 176, 182)
+SLOT_RIM_DARK = (55, 55, 55)
+SLOT_RIM_LIGHT = (255, 255, 255)
+SLOT_FACE = (139, 139, 139)
+
+def slot_socket(p, x, y):
+	"""A slot's socket, as the game's inventory draws one: its item at (x, y), 16 by 16."""
+	p.fill(x - 1, y - 1, x + 17, y + 17, SLOT_RIM_LIGHT)
+	p.fill(x - 1, y - 1, x + 16, y + 16, SLOT_RIM_DARK)
+	p.fill(x, y, x + 16, y + 16, SLOT_FACE)
+
+def crafting_panel():
+	cr = random.Random(29)
+	p = Pic(CRAFT_W, CRAFT_H)
+	for y in range(CRAFT_H):
+		for x in range(CRAFT_W):
+			p.px(x, y, cr.choice(GREEN))
+	p.fill(0, 0, CRAFT_W, 1, TRACE_DARK); p.fill(0, CRAFT_H - 1, CRAFT_W, CRAFT_H, TRACE_DARK)
+	p.fill(0, 0, 1, CRAFT_H, TRACE_DARK); p.fill(CRAFT_W - 1, 0, CRAFT_W, CRAFT_H, TRACE_DARK)
+	for y in range(8, CRAFT_H - 8, 6):
+		p.fill(2, y, 5, y + 4, GOLD)  # its gold fingers, down the edge it plugs in by
+	for hx, hy in [(CRAFT_W - 8, 3), (CRAFT_W - 8, CRAFT_H - 8)]:
+		hole(p, hx, hy)
+	# the crafting table's top, round the grid
+	gx, gy = CRAFT_GRID
+	for y in range(gy - 5, gy + 3 * 18 + 4):
+		for x in range(gx - 5, gx + 3 * 18 + 4):
+			p.px(x, y, OAK[(y // 3) % 3] if cr.random() < 0.85 else OAK_DARK)
+	p.fill(gx - 5, gy - 5, gx + 3 * 18 + 4, gy - 4, OAK_DARK); p.fill(gx - 5, gy + 3 * 18 + 3, gx + 3 * 18 + 4, gy + 3 * 18 + 4, OAK_DARK)
+	for row in range(3):
+		for col in range(3):
+			slot_socket(p, gx + col * 18, gy + row * 18)
+	# the arrow to the result
+	rx, ry = CRAFT_RESULT
+	ax, ay = gx + 3 * 18 + 6, ry + 4
+	p.fill(ax, ay + 3, rx - 10, ay + 6, SILK)
+	for i in range(5):
+		p.fill(rx - 10 + i, ay + i - 1, rx - 9 + i, ay + 10 - i, SILK)
+	p.fill(rx - 5, ry - 5, rx + 21, ry + 21, GOLD)  # the result's socket, gold-rimmed
+	p.fill(rx - 4, ry - 4, rx + 20, ry + 20, TRACE_DARK)
+	slot_socket(p, rx, ry)
+	# its storage: a chest's inside
+	sx, sy = CRAFT_STORAGE
+	for y in range(sy - 5, sy + 4 * 18 + 4):
+		for x in range(sx - 5, sx + 4 * 18 + 4):
+			p.px(x, y, CHEST[(x // 4) % 3] if cr.random() < 0.85 else CHEST_DARK)
+	for cx, cy in [(sx - 5, sy - 5), (sx + 4 * 18 + 1, sy - 5), (sx - 5, sy + 4 * 18 + 1), (sx + 4 * 18 + 1, sy + 4 * 18 + 1)]:
+		p.fill(cx, cy, cx + 3, cy + 3, IRON_CORNER)
+	for row in range(4):
+		for col in range(4):
+			slot_socket(p, sx + col * 18, sy + row * 18)
+	return p.im
+
+def crafting_tabs():
+	"""A crafting card's tab button, closed and open side by side (20 by 20 each): a little crafting grid on the card's green."""
+	p = Pic(40, 20)
+	for state in range(2):
+		x0 = state * 20
+		p.fill(x0, 0, x0 + 20, 20, (0, 0, 0))
+		p.fill(x0 + 1, 1, x0 + 19, 19, GOLD if state else TRACE_DARK)
+		p.fill(x0 + 2, 2, x0 + 18, 18, (52, 128, 72) if state else (42, 108, 60))
+		p.fill(x0 + 4, 4, x0 + 16, 16, OAK_DARK)
+		for row in range(3):
+			for col in range(3):
+				p.fill(x0 + 5 + col * 4, 5 + row * 4, x0 + 8 + col * 4, 8 + row * 4, OAK[1])
+	return p.im
+
+crafting_panel().save(f"{OUT}/crafting_panel.png")
+crafting_tabs().save(f"{OUT}/crafting_tabs.png")

@@ -32,7 +32,7 @@ public final class ModMenus {
 	public static final MenuType<CaseMenu> GOLEM = Registry.register(BuiltInRegistries.MENU, id("golem"),
 		Platform.INSTANCE.hostMenuType((id, inventory, host) -> new CaseMenu(ModMenus.GOLEM, id, inventory,
 			new net.minecraft.world.SimpleContainer(CaseMenu.PART_SLOTS), new net.minecraft.world.inventory.SimpleContainerData(CaseMenu.POWER_DATA),
-			BlockPos.ZERO, host, player -> true, com.payonel.modularcomputers.machine.GolemLayout.BOT_GOLEM, new net.minecraft.world.SimpleContainer(1))));
+			BlockPos.ZERO, host, player -> true, com.payonel.modularcomputers.machine.GolemLayout.BOT_GOLEM, new net.minecraft.world.SimpleContainer(2))));
 
 	public static final MenuType<ChargingPadMenu> CHARGING_PAD = Registry.register(BuiltInRegistries.MENU, id("charging_pad"),
 		Platform.INSTANCE.menuType(ChargingPadMenu::new));

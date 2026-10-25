@@ -82,6 +82,7 @@ public final class CardWorld {
 				}
 			}
 			case com.payonel.modularcomputers.device.InternetCard internet -> internet.tick();
+			case com.payonel.modularcomputers.device.CraftingCard crafting -> crafting.tick();
 			case SoundCard sound -> {
 				boolean was = sound.playing();
 				byte[] played = sound.play(now);

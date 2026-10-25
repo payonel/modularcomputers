@@ -38,6 +38,8 @@ public final class RoboticsDevice implements Device {
 	public static final int ACTION_COST = PowerUnits.CPU;
 	/** The spaces round it, in its own frame: its left and right its own, as it turns and walks. */
 	public static final java.util.List<String> FACES = java.util.List.of("front", "back", "left", "right", "up", "down");
+	/** Where a container is when no face is given: in front of it. */
+	public static final String CONTAINER_FACE = "front";
 
 	/** What does the moving: a robot's body in the world. */
 	public interface Body {
@@ -58,8 +60,13 @@ public final class RoboticsDevice implements Device {
 			return Result.fail("no body");
 		}
 
-		/** What its hand holds (an item's table), or nil. */
-		default Result held() {
+		/** What its hand holds (an item's table; {@code off}: its off hand), or nil. */
+		default Result held(boolean off) {
+			return Result.fail("no body");
+		}
+
+		/** Swaps what its hands hold. */
+		default Result swap() {
 			return Result.fail("no body");
 		}
 
@@ -78,8 +85,11 @@ public final class RoboticsDevice implements Device {
 			return Result.fail("no body");
 		}
 
-		/** Puts up to {@code count} of what it holds into the container at {@code face}: how many went. */
-		default Result store(String face, int count) {
+		/**
+		 * Puts up to {@code count} of what it holds into the container at {@code face} (its slot
+		 * {@code to}, from 1; 0: where it fits): true and 0 when none is left, else false and how many are.
+		 */
+		default Result store(String face, int count, int to) {
 			return Result.fail("no body");
 		}
 
@@ -181,9 +191,18 @@ public final class RoboticsDevice implements Device {
 		return body.scan(face);
 	}
 
-	@Method(doc = "held(): what its hand holds, {name, count, damage, maxDamage, label}, or nil")
+	@Method(doc = "held([hand]): what its hand holds (\"off\": its off hand, where it catches what it breaks with nowhere else to put it), {name, count, damage, maxDamage, label}, or nil")
 	public Result held(Arguments args) {
-		return body.held();
+		Object hand = args.count() > 0 ? args.get(0) : null;
+		if (hand != null && !"off".equals(hand) && !"main".equals(hand)) {
+			throw new Arguments.ArgumentError("a hand expected (main or off), got " + hand);
+		}
+		return body.held("off".equals(hand));
+	}
+
+	@Method(doc = "swap(): swaps what its hands hold (its main hand works; its off hand catches), as a player's swap key")
+	public Result swap(Arguments args) {
+		return body.swap();
 	}
 
 	@Method(doc = "use(face): uses what it holds on the space at a face, as a player's right click: places a block, opens a door, presses a button, uses a tool or a bucket; what it did (\"placed\", \"used\"), or false and why")
@@ -194,7 +213,7 @@ public final class RoboticsDevice implements Device {
 		return result;
 	}
 
-	@Method(doc = "swing(face): swings what it holds at a face, as a player's left click: a mob there is hit (\"attacked\", as hard as a player's swing: full strength once the weapon has recovered); else the block there starts breaking, in a player's time (a pickaxe for stone, an axe for wood): \"breaking\" (its event: broke, with the block's name, or failed and why); or false and why")
+	@Method(doc = "swing(face): swings what it holds at a face, as a player's left click: a mob there is hit (\"attacked\", as hard as a player's swing: full strength once the weapon has recovered); else the block there starts breaking, in a player's time (a pickaxe for stone, an axe for wood): \"breaking\" (its event: broke, with the block's name and whether it kept all it dropped, its storage first, else its off hand, kept; or failed and why); or false and why")
 	public Result swing(Arguments args) {
 		String face = face(args, 0);
 		Result result = body.swing(face);
@@ -207,24 +226,27 @@ public final class RoboticsDevice implements Device {
 		return result;
 	}
 
-	@Method(doc = "contents(face): what the container at a face holds: a list of its slots with something in, each {slot, name, count, ...}")
+	@Method(doc = "contents([face]): what the container at a face (in front when none is given) holds: a list of its slots with something in, each {slot, name, count, ...}")
 	public Result contents(Arguments args) {
-		return body.contents(face(args, 0));
+		return body.contents(args.count() > 0 && args.get(0) != null ? face(args, 0) : CONTAINER_FACE);
 	}
 
-	@Method(doc = "store(face[, count]): puts what it holds (or count of it) into the container at a face: how many went (0: no room), or false and why")
+	@Method(doc = "store([face][, count[, to]]): puts what it holds (or count of it) into the container at a face (in front when none is given), into its slot to or where it fits: true, 0 when none of it is left in its hand; false and how many are, when the container's full; or false and why (no container there)")
 	public Result store(Arguments args) {
-		String face = face(args, 0);
-		int count = args.count() > 1 ? count(args, 1) : Integer.MAX_VALUE;
+		int at = args.count() > 0 && args.get(0) instanceof String ? 1 : 0;
+		String face = at == 1 ? face(args, 0) : CONTAINER_FACE;
+		int count = args.count() > at && args.get(at) != null ? count(args, at) : Integer.MAX_VALUE;
+		int to = args.count() > at + 1 && args.get(at + 1) != null ? count(args, at + 1) : 0;
 		power.charge(ACTION_COST);
-		return body.store(face, count);
+		return body.store(face, count, to);
 	}
 
-	@Method(doc = "take(face[, slot[, count]]): takes items from the container at a face into its hand (from a slot, or the first it can; all it can hold, or count): how many came (0: none it could), or false and why")
+	@Method(doc = "take([face][, slot[, count]]): takes items from the container at a face (in front when none is given) into its hand (from a slot, or the first it can; all it can hold, or count): how many came (0: none it could), or false and why")
 	public Result take(Arguments args) {
-		String face = face(args, 0);
-		int slot = args.count() > 1 && args.get(1) != null ? count(args, 1) : 0;
-		int count = args.count() > 2 ? count(args, 2) : Integer.MAX_VALUE;
+		int at = args.count() > 0 && args.get(0) instanceof String ? 1 : 0;
+		String face = at == 1 ? face(args, 0) : CONTAINER_FACE;
+		int slot = args.count() > at && args.get(at) != null ? count(args, at) : 0;
+		int count = args.count() > at + 1 && args.get(at + 1) != null ? count(args, at + 1) : Integer.MAX_VALUE;
 		power.charge(ACTION_COST);
 		return body.take(face, slot, count);
 	}
@@ -285,7 +307,7 @@ public final class RoboticsDevice implements Device {
 		return value == null ? 0L : value;
 	}
 
-	@Method(doc = "pull(): its oldest event, {event} (arrived, turned, stopped), {event = \"broke\", block}, {event = \"blocked\" or \"failed\", why}, or nil")
+	@Method(doc = "pull(): its oldest event, {event} (arrived, turned, stopped), {event = \"broke\", block, kept, dropped}, {event = \"blocked\" or \"failed\", why}, or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -310,11 +332,18 @@ public final class RoboticsDevice implements Device {
 		event("turned", null);
 	}
 
-	/** The body broke the block it was breaking ({@code block}: its name). */
-	public void broke(String block) {
+	/**
+	 * The body broke the block it was breaking ({@code block}: its name); {@code dropped}: how many of
+	 * what it dropped stayed in the world (no room in its storage, nor its off hand).
+	 */
+	public void broke(String block, int dropped) {
 		Map<String, Object> event = new LinkedHashMap<>();
 		event.put("event", "broke");
 		event.put("block", block);
+		event.put("kept", dropped == 0);
+		if (dropped > 0) {
+			event.put("dropped", dropped);
+		}
 		state(IDLE);
 		events.add(event);
 	}

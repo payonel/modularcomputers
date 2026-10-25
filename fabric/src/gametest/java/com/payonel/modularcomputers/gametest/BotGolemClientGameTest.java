@@ -21,11 +21,27 @@ import net.minecraft.world.item.ItemStack;
  * Bot golems as players see them: one with a tier 1 screen in its gold slot, running a program,
  * its face showing the screen's text (green, tier 1's phosphor); one without, its face an empty
  * bezel; the first holding a pickaxe, in its right hand; and its screen view and its parts view,
- * in the golem's own art, its hand's slot holding the pickaxe.
+ * in the golem's own art, its hand's slot holding the pickaxe, and its crafting card's tab open:
+ * its grid, its result and its storage. The other, its back to the player, has a crafting card in:
+ * a tiny chest on its back.
  */
 public class BotGolemClientGameTest implements FabricClientGameTest {
-	/** Facing south (toward the player, who faces north). */
+	/** Facing south (toward the player, who faces north), and north (its back to the player). */
 	private static final float SOUTH = 0;
+	private static final float NORTH = 180;
+	/** The lane its crafting card is in. */
+	private static final int CRAFTING_LANE = 1;
+
+	/** A crafting card with two planks in its grid, one over the other (sticks), and some logs in its storage. */
+	private static ItemStack craftingCard() {
+		ItemStack card = new ItemStack(ModItems.CRAFTING_CARD);
+		var items = net.minecraft.core.NonNullList.withSize(com.payonel.modularcomputers.device.CraftingCard.SLOTS, ItemStack.EMPTY);
+		items.set(0, new ItemStack(net.minecraft.world.item.Items.OAK_PLANKS));
+		items.set(3, new ItemStack(net.minecraft.world.item.Items.OAK_PLANKS));
+		items.set(com.payonel.modularcomputers.device.CraftingCard.GRID, new ItemStack(net.minecraft.world.item.Items.OAK_LOG, 12));
+		card.set(net.minecraft.core.component.DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.fromItems(items));
+		return card;
+	}
 	/** Lit phosphor: a tier 1 screen's text, at least this green, and red well under it. */
 	private static final int LIT = 120;
 	/** How many lit pixels its face shows at least, at this distance. */
@@ -47,12 +63,16 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 				golem.board().machine().board().eeprom().orElseThrow().flash(TestPrograms.HELLO);
 				golem.board().pressPower();
 				golem.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(net.minecraft.world.item.Items.IRON_PICKAXE));
+				golem.board().parts().setItem(CaseMenu.EXP_SLOTS + CRAFTING_LANE, craftingCard());
 				// The other on a charging pad, charging (its particles), its battery run down first.
 				server.overworld().setBlock(without, com.payonel.modularcomputers.block.ModBlocks.CHARGING_PAD.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
 				((com.payonel.modularcomputers.block.ChargingPadBlockEntity) server.overworld().getBlockEntity(without)).cards()
 					.setItem(com.payonel.modularcomputers.block.ChargingPadBlockEntity.BATTERY, ModItems.TIER1_BATTERY.charged());
 				BotGolem charging = golem(server.overworld(), without);
-				charging.snapTo(charging.getX(), charging.getY() + com.payonel.modularcomputers.block.ChargingPadBlock.HEIGHT / 16.0, charging.getZ(), SOUTH, 0);
+				charging.snapTo(charging.getX(), charging.getY() + com.payonel.modularcomputers.block.ChargingPadBlock.HEIGHT / 16.0, charging.getZ(), NORTH, 0);
+				charging.setYBodyRot(NORTH);
+				charging.setYHeadRot(NORTH);
+				charging.board().parts().setItem(CaseMenu.EXP_SLOTS + CRAFTING_LANE, new ItemStack(ModItems.CRAFTING_CARD)); // (its back to us: its chest)
 				ItemStack flat = new ItemStack(ModItems.TIER1_BATTERY);
 				flat.set(com.payonel.modularcomputers.item.ModComponents.CHARGE, com.payonel.modularcomputers.power.BatteryCharge.EMPTY);
 				charging.board().parts().setItem(CaseMenu.UPS_SLOT, flat);
@@ -115,6 +135,21 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			context.getInput().setCursorPos(0, 0); // (off the board: no part's tooltip in the picture)
 			context.waitTicks(2);
 			context.takeScreenshot("bot-golem-parts");
+			// Its crafting card's tab: its panel, right of the buttons.
+			AllInOneClientGameTest.clickOnScreen(context, com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT,
+				screen -> ((com.payonel.modularcomputers.client.screen.CaseScreen) screen).craftTab(CRAFTING_LANE));
+			String grid = context.computeOnClient(c -> {
+				CaseMenu menu = (CaseMenu) c.player.containerMenu;
+				int lane = CaseMenu.CRAFT_SLOTS + CRAFTING_LANE * CaseMenu.CRAFT_LANE_SLOTS;
+				var planks = menu.slots.get(lane);
+				var result = menu.slots.get(lane + CaseMenu.CRAFT_RESULT);
+				return planks.isActive() + " " + planks.getItem() + " " + result.isActive() + " " + result.getItem();
+			});
+			check(grid.startsWith("true") && grid.contains("oak_planks") && grid.contains("true 4 minecraft:stick"),
+				"its crafting tab shows its grid and what it makes: " + grid);
+			context.getInput().setCursorPos(0, 0);
+			context.waitTicks(2);
+			context.takeScreenshot("bot-golem-crafting");
 		}
 	}
 

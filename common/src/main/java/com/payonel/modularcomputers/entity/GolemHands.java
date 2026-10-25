@@ -191,9 +191,17 @@ final class GolemHands {
 		return item;
 	}
 
-	Result held() {
-		ItemStack hand = golem.getMainHandItem();
+	Result held(boolean off) {
+		ItemStack hand = off ? golem.getOffhandItem() : golem.getMainHandItem();
 		return Result.ok(hand.isEmpty() ? null : describe(hand));
+	}
+
+	/** Swaps what its hands hold, as a player's swap key does. */
+	Result swap() {
+		ItemStack main = golem.getMainHandItem();
+		golem.setItemSlot(EquipmentSlot.MAINHAND, golem.getOffhandItem());
+		golem.setItemSlot(EquipmentSlot.OFFHAND, main);
+		return Result.ok(true);
 	}
 
 	// ---- the hand ----------------------------------------------------------------------------
@@ -217,7 +225,7 @@ final class GolemHands {
 		return player;
 	}
 
-	/** Takes back what the hand holds now, and anything else it was given (a filled bucket from a stack), to storage. */
+	/** Takes back what the hand holds now, and anything else it was given (a filled bucket from a stack), as it catches what it breaks. */
 	private void done(ServerPlayer player) {
 		golem.setItemSlot(EquipmentSlot.MAINHAND, player.getMainHandItem());
 		player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
@@ -369,15 +377,17 @@ final class GolemHands {
 				return;
 			}
 			level().levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, pos, net.minecraft.world.level.block.Block.getId(state));
+			int dropped = 0;
 			for (ItemEntity drop : level().getEntitiesOfClass(ItemEntity.class, around, entity -> !before.contains(entity.getId()))) {
-				ItemStack left = golem.store(drop.getItem().copy());
+				ItemStack left = golem.catchItem(drop.getItem().copy());
 				if (left.isEmpty()) {
 					drop.discard();
 				} else {
 					drop.setItem(left);
+					dropped += left.getCount();
 				}
 			}
-			golem.robotics().broke(name);
+			golem.robotics().broke(name, dropped);
 		} finally {
 			done(player);
 		}
@@ -398,7 +408,8 @@ final class GolemHands {
 
 	// ---- containers ----------------------------------------------------------------------------
 
-	private Container container(String face) {
+	/** The container at a face (a block's, or a chest minecart's there), or null. */
+	Container container(String face) {
 		return HopperBlockEntity.getContainerAt(level(), at(face));
 	}
 
@@ -420,21 +431,54 @@ final class GolemHands {
 		return Result.ok(slots);
 	}
 
-	Result store(String face, int count) {
+	/**
+	 * Puts a stack into a container from {@code side}: into its slot {@code to} (from 1) when given, as
+	 * far as that slot takes it (what it allows there, from that side), else where it fits, as a
+	 * hopper does: what didn't go.
+	 */
+	static ItemStack put(Container container, int to, ItemStack stack, Direction side) {
+		if (to == 0) {
+			return HopperBlockEntity.addItem(null, container, stack, side);
+		}
+		int slot = to - 1;
+		if (slot >= container.getContainerSize() || !container.canPlaceItem(slot, stack) || container instanceof WorldlyContainer worldly
+			&& (!worldly.canPlaceItemThroughFace(slot, stack, side) || java.util.Arrays.stream(worldly.getSlotsForFace(side)).noneMatch(each -> each == slot))) {
+			return stack;
+		}
+		ItemStack here = container.getItem(slot);
+		int most = Math.min(container.getMaxStackSize(stack), stack.getMaxStackSize());
+		if (here.isEmpty()) {
+			int moving = Math.min(most, stack.getCount());
+			container.setItem(slot, stack.split(moving));
+		} else if (ItemStack.isSameItemSameComponents(here, stack)) {
+			int moving = Math.min(most - here.getCount(), stack.getCount());
+			if (moving > 0) {
+				here.grow(moving);
+				stack.shrink(moving);
+			}
+		}
+		return stack;
+	}
+
+	Result store(String face, int count, int to) {
 		Container container = container(face);
 		if (container == null) {
 			return Result.fail("no container there");
 		}
 		ItemStack hand = golem.getMainHandItem();
 		if (hand.isEmpty()) {
-			return Result.fail("nothing in hand");
+			return Result.ok(true, 0); // (nothing left to store)
 		}
 		int moving = Math.min(count, hand.getCount());
-		ItemStack left = HopperBlockEntity.addItem(null, container, hand.split(moving), direction(face).getOpposite());
+		if (to > container.getContainerSize()) {
+			return Result.fail("no slot " + to + " (it has " + container.getContainerSize() + ")");
+		}
+		ItemStack left = put(container, to, hand.split(moving), direction(face).getOpposite());
 		hand.grow(left.getCount());
 		golem.setItemSlot(EquipmentSlot.MAINHAND, hand);
 		container.setChanged();
-		return Result.ok(moving - left.getCount());
+		// (one answer says it all: true when none of it is left, else false and how many are)
+		return left.isEmpty() ? Result.ok(true, 0) : Result.ok(false, left.getCount());
 	}
 
 	Result take(String face, int slot, int count) {
@@ -476,7 +520,7 @@ final class GolemHands {
 	}
 
 	/** Whether the hand can take from a slot: something there, the same as it holds (or it holds nothing), and the container lets it out that side. */
-	private static boolean takeable(Container container, int slot, Direction side, ItemStack hand) {
+	static boolean takeable(Container container, int slot, Direction side, ItemStack hand) {
 		ItemStack stack = container.getItem(slot);
 		if (stack.isEmpty() || !hand.isEmpty() && (!ItemStack.isSameItemSameComponents(stack, hand) || hand.getCount() >= hand.getMaxStackSize())) {
 			return false;

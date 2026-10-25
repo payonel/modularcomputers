@@ -82,6 +82,15 @@ class DeviceInterruptsTest {
 			peer.send(new com.payonel.modularcomputers.runtime.Arguments(List.of(card.address(), "frame")));
 		}),
 		Map.entry(Terminal.class, device -> ((Terminal) device).press("a")),
+		Map.entry(com.payonel.modularcomputers.device.CraftingCard.class, device -> {
+			// A craft, in a robot, done: its event.
+			var card = (com.payonel.modularcomputers.device.CraftingCard) device;
+			card.benchIn(new CraftedOnce());
+			card.craft(new com.payonel.modularcomputers.runtime.Arguments(List.of()));
+			for (int tick = 0; tick < com.payonel.modularcomputers.device.CraftingCard.CRAFT_TICKS; tick++) {
+				card.tick();
+			}
+		}),
 		Map.entry(com.payonel.modularcomputers.device.RoboticsDevice.class, device -> ((com.payonel.modularcomputers.device.RoboticsDevice) device).arrived()),
 		Map.entry(com.payonel.modularcomputers.device.ChargingPad.class, device -> ((com.payonel.modularcomputers.device.ChargingPad) device).docked("a robot")),
 		Map.entry(Disk.class, device -> ((Disk) device).mkdir(new com.payonel.modularcomputers.runtime.Arguments(List.of("/made")))));
@@ -192,6 +201,54 @@ class DeviceInterruptsTest {
 			} catch (InterruptedException e) {
 				throw new IllegalStateException(e);
 			}
+		}
+	}
+
+	/** A robot's crafting card's bench that makes a stick each craft (and does nothing else). */
+	private static final class CraftedOnce implements com.payonel.modularcomputers.device.CraftingCard.Bench {
+		@Override
+		public boolean robotics() {
+			return true;
+		}
+
+		@Override
+		public com.payonel.modularcomputers.runtime.Result craft() {
+			return com.payonel.modularcomputers.runtime.Result.ok(Map.of("name", "minecraft:stick", "count", 4));
+		}
+
+		@Override
+		public com.payonel.modularcomputers.runtime.Result list() {
+			return com.payonel.modularcomputers.runtime.Result.ok(List.of());
+		}
+
+		@Override
+		public com.payonel.modularcomputers.runtime.Result move(int from, int to, int count) {
+			return com.payonel.modularcomputers.runtime.Result.ok(0);
+		}
+
+		@Override
+		public com.payonel.modularcomputers.runtime.Result equip(int slot) {
+			return com.payonel.modularcomputers.runtime.Result.ok(true);
+		}
+
+		@Override
+		public com.payonel.modularcomputers.runtime.Result pickup() {
+			return com.payonel.modularcomputers.runtime.Result.ok(0);
+		}
+
+		@Override
+		public com.payonel.modularcomputers.runtime.Result drop(String face, int slot, int count) {
+			return com.payonel.modularcomputers.runtime.Result.ok(0);
+		}
+
+		@Override
+		public com.payonel.modularcomputers.runtime.Result store(String face, int slot, int count, int to) {
+			return com.payonel.modularcomputers.runtime.Result.ok(true, 0);
+		}
+
+		@Override
+		public com.payonel.modularcomputers.runtime.Result take(String face, int slot, int count, int to) {
+			return com.payonel.modularcomputers.runtime.Result.ok(0);
 		}
 	}
 }

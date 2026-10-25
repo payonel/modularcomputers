@@ -53,16 +53,19 @@ Its scan, its hand and containers are ioctls: `sys.ioctl(fd, "scan")`, `sys.ioct
 
 ## Its hand
 
-The golem holds one item, in the hand slot of [its view](/hardware/bot-golem/) (right of its board,
-under its buttons). What it does with it is what a player does: the game's own interactions,
+The golem holds one item in its hand, in the hand slot of [its view](/hardware/bot-golem/) (right
+of its board, under its buttons), and has an off hand under it. What it does with it is what a player does: the game's own interactions,
 through a player standing where it is and looking at the space. A block placed, a door opened, a
 bucket filled, a lever flipped, wool sheared from a sheep: each as a player's right click. Breaking
 a block takes a player's time with what it holds (a pickaxe on stone, an axe on wood; the wrong tool
 is slow and may drop nothing), and the tool wears. A hit on a mob does the weapon's damage, as
-strong as a player's swing at that pace: full strength once the weapon has recovered. What a broken
-block drops goes into the robot's storage when it has some (a crafting card's), else stays in the
-world. Anything the hand is given besides (a filled bucket from a stack of empty ones) goes there
-too.
+strong as a player's swing at that pace: full strength once the weapon has recovered.
+
+What a broken block drops is caught: into the robot's storage (a [crafting card](/devices/crafting-card/)'s)
+first, else its off hand catches it, in the background (when it's empty, or holds the same). What it
+can't catch stays in the world, and the `broke` event says so (`kept`, `dropped`), so a program knows
+from the one event. Anything the hand is given besides (a filled bucket from a stack of empty ones)
+is caught the same way. `swap` puts what the off hand caught in its hand, to store or use.
 
 On its legs it presses pressure plates and trips tripwires, as anything walking does.
 
@@ -95,10 +98,14 @@ What's in the space at a face, or with none, in all six at once, by face. Each s
 | `fluid` | `name` (`minecraft:water`), `amount` (1 to 8), `source` |
 | `entity` | `name` (the first's: `minecraft:pig`; an item's, its item's), `entities` (every one's name), `block` (the block there) |
 
-### held() → item or nil
+### held([hand]) → item or nil
 
-What its hand holds: `{name, count, damage, maxDamage, label}` (`damage` and `maxDamage` for what
-wears; `label` when it's named), or nil.
+What its hand holds (`"off"`: its off hand): `{name, count, damage, maxDamage, label}` (`damage`
+and `maxDamage` for what wears; `label` when it's named), or nil.
+
+### swap() → true
+
+Swaps what its hands hold, as a player's swap key: its main hand works, its off hand catches.
 
 ### use(face) → what, or nil and why
 
@@ -113,24 +120,28 @@ place against` or `nothing there`.
 
 Swings what it holds at a face, as a player's left click. A mob there is hit: `"attacked"`. Else
 the block there starts breaking: `"breaking"`, and its event says how it went: `broke` (with the
-block's name), or `failed` and why (`the block changed`, `what it held changed`). A walk or turn
+block's name, and `kept`: true when it caught all the block dropped, else false and how many it
+`dropped` into the world), or `failed` and why (`the block changed`, `what it held changed`). A walk or turn
 under way is given up. It fails with `nothing there` or `unbreakable`.
 
-### contents(face) → list, or nil and why
+### contents([face]) → list, or nil and why
 
-What the container at a face holds (a chest, a barrel, a furnace, a chest minecart): a list of its
+What the container at a face (in front, when none is given) holds (a chest, a barrel, a furnace, a chest minecart): a list of its
 slots with something in, each `{slot, name, count, ...}` (slots from 1). It fails with
 `no container there`.
 
-### store(face[, count]) → number, or nil and why
+### store([face][, count[, to]]) → true, 0 or false, remaining; or nil and why
 
-Puts what it holds (or `count` of it) into the container at a face, where it fits, as a hopper
-would (a furnace takes fuel from its side, what it smelts from above): how many went, 0 when
-there's no room. It fails with `no container there` or `nothing in hand`.
+Puts what it holds (or `count` of it) into the container at a face (in front, when none is
+given), into its slot `to` or where it fits, as a hopper
+would (a furnace takes fuel from its side, what it smelts from above). One answer says it all: `true,
+0` when none of it is left in its hand (an empty hand too), else `false` and how many are left (the
+container is full), so a program never has to look again to know. It fails (nil and why) with `no
+container there`.
 
-### take(face[, slot[, count]]) → number, or nil and why
+### take([face][, slot[, count]]) → number, or nil and why
 
-Takes items from the container at a face into its hand: from `slot`, or the first it can take (the
+Takes items from the container at a face (in front, when none is given) into its hand: from `slot`, or the first it can take (the
 same as it holds, when it holds something); all its hand can hold, or `count`. How many came: 0
 when there were none it could take. It fails with `no container there` or `no slot`.
 
@@ -156,7 +167,7 @@ Its oldest event, or nil.
 | `blocked` | `why` | a walk can't go on: `no way there`; `interrupted` when its world was saved during it |
 | `turned` | | a turn is done |
 | `stopped` | | `stop` ended a walk, turn or swing |
-| `broke` | `block` | a swing broke the block (its name) |
+| `broke` | `block`, `kept`, `dropped` | a swing broke the block (its name); whether it caught all it dropped, and how many it didn't |
 | `failed` | `why` | a swing couldn't go on |
 
 Its interrupt is raised when an event comes, and stays raised while one waits. With no program

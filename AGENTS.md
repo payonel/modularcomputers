@@ -292,11 +292,28 @@ it is (`Platform.fakePlayer`, `GolemHands`): the game's own interactions (placin
 buckets), breaking in a player's time with its tool (on its legs: a player off the ground digs at a
 fifth), a hit with its weapon's damage (its modifiers put on the fake player, which never ticks, and
 its swing's strength from the time since its last), a container's items in and out as a hopper
-moves them. What a broken block drops goes to its storage when it has some. A player's hit picks it up as its item, parts kept; nothing else harms
+moves them. What a broken block drops (or its hand is given) is caught: its storage first, else its
+off hand (a background catch, the user's: atypical, so storage is always preferred), else it stays
+in the world, and the `broke` event says whether it kept it all.
+- **One answer says it all** (the user's): a program never checks twice. `store` answers `true, 0`
+  when nothing it was asked to move is left, else `false` and how many are (never `false, 0`);
+  no container is a failure (nil and why). `drop` fills a container there first and answers how
+  many went into the world. A face left out is the front for containers, below for drops. A player's hit picks it up as its item, parts kept; nothing else harms
 it; it's solid, as a boat is (players walk into it, not through it), and on its legs nothing
 shoves it (players, mobs, knockback; in the air it's pushed). Creative
 only until the Advanced Robotics Assembly. Its board's state reaches players by
 `BoardStatePayload` (an entity has no block update), its screen's rows as a block's do.
+
+### The crafting card
+
+Storage and a 3x3 grid on a card (user design, 2026-10-24): its slots live on its item (the
+vanilla contents component, read and written by `CraftingStorage`, its one home), so they go where
+the card goes. Any computer takes it, and its view gets a tab a card (right of the buttons) where a
+player crafts by hand, as at a crafting table (the game's result slot). Its methods need robotics:
+in a case they fail (`no robotics available`, the user's words), in a robot `CraftingBench` works
+them (the game's recipes; what's made into storage, all or nothing: no room, no craft). A craft
+takes time and each card crafts on its own, so cards add throughput. Its `/dev` file reads as its
+items (`name count` a line) and a line written dumps its storage (below, or at the face named).
 
 ### The charging pad
 

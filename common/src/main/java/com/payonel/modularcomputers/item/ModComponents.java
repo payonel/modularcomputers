@@ -21,6 +21,10 @@ public final class ModComponents {
 	public static final DataComponentType<ItemStack> HELD = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("held"),
 		DataComponentType.<ItemStack>builder().persistent(ItemStack.CODEC).networkSynchronized(ItemStack.STREAM_CODEC).build());
 
+	/** What a robot held in its off hand (what it caught with nowhere else to put it), kept on its item as {@link #HELD}. */
+	public static final DataComponentType<ItemStack> OFF_HELD = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("off_held"),
+		DataComponentType.<ItemStack>builder().persistent(ItemStack.CODEC).networkSynchronized(ItemStack.STREAM_CODEC).build());
+
 	/** A battery's charge: ticks of running a CPU, and when it was last worked out. */
 	public static final DataComponentType<BatteryCharge> CHARGE = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("battery_charge"),
 		DataComponentType.<BatteryCharge>builder()

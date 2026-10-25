@@ -1,0 +1,19 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"G": "minecraft:gold_nugget",
+		"Q": "modularcomputers:chip",
+		"c": "minecraft:copper_nugget",
+		"t": "minecraft:crafting_table",
+		"h": "minecraft:chest"
+	},
+	"pattern": [
+		"tQh",
+		"ccc",
+		"GGG"
+	],
+	"result": {
+		"id": "modularcomputers:crafting_card"
+	}
+}

@@ -94,6 +94,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int IRON_RIVET = 0xFF706A60;
 	/** How far a hand's plate reaches round its slot. */
 	private static final int HAND_MARGIN = 3;
+	/** Crafting cards' panel and tab buttons (scripts/art/case_gui_textures.py), and where the tabs start without a hand. */
+	private static final Identifier CRAFT_PANEL = ModularComputers.id("textures/gui/crafting_panel.png");
+	private static final Identifier CRAFT_TABS = ModularComputers.id("textures/gui/crafting_tabs.png");
+	private static final int CRAFT_TABS_Y = 48;
 	/**
 	 * Outlines a part slot and its bus order row together while either is hovered, and the
 	 * slots an item would fit while it's carried or hovered in the inventory.
@@ -145,12 +149,44 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	@Override
 	protected void init() {
 		super.init();
-		// Bus panel | case | buttons, centered together. On a window too narrow for all of
-		// it, the bus panel is left out.
+		layout();
+	}
+
+	/**
+	 * Bus panel | case | buttons | an open crafting card's panel, centered together. On a window
+	 * too narrow for all of it, the bus panel is left out.
+	 */
+	private void layout() {
 		int buttons = ComputerButtons.GAP + ComputerButtons.SIZE;
-		showBus = width >= BUS_W + BUS_GAP + imageWidth + buttons;
-		int total = (showBus ? BUS_W + BUS_GAP : 0) + imageWidth + buttons;
+		int crafting = openCraftTab() >= 0 ? ComputerButtons.GAP + CaseMenu.CRAFT_W : 0;
+		showBus = width >= BUS_W + BUS_GAP + imageWidth + buttons + crafting;
+		int total = (showBus ? BUS_W + BUS_GAP : 0) + imageWidth + buttons + crafting;
 		leftPos = (width - total) / 2 + (showBus ? BUS_W + BUS_GAP : 0);
+	}
+
+	/** The open crafting tab's lane, while its card is still in (-1: none). */
+	private int openCraftTab() {
+		int lane = menu.openTab();
+		return lane >= 0 && menu.craftingCard(lane) ? lane : -1;
+	}
+
+	/** The crafting cards' tab buttons, under the buttons (and a robot's hand): one a lane holding one, by lane (others empty). */
+	public Viewport craftTab(int lane) {
+		if (!menu.craftingCard(lane)) {
+			return new Viewport(0, 0, 0, 0);
+		}
+		int shown = 0;
+		for (int before = 0; before < lane; before++) {
+			shown += menu.craftingCard(before) ? 1 : 0;
+		}
+		int top = menu.hasHand() ? handPlate().bottom() - topPos + ComputerButtons.GAP : CRAFT_TABS_Y;
+		return new Viewport(leftPos + imageWidth + ComputerButtons.GAP, topPos + top + shown * (ComputerButtons.SIZE + ComputerButtons.GAP),
+			ComputerButtons.SIZE, ComputerButtons.SIZE);
+	}
+
+	/** An open crafting card's panel. */
+	public Viewport craftPanel() {
+		return new Viewport(leftPos + CaseMenu.CRAFT_X, topPos, CaseMenu.CRAFT_W, CaseMenu.CRAFT_H);
 	}
 
 	public Viewport powerButton() {
@@ -386,6 +422,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		if (menu.hasHand()) {
 			extractHand(graphics);
 		}
+		extractCrafting(graphics);
 		if (showBus) {
 			extractBusPanel(graphics);
 		}
@@ -533,9 +570,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	}
 
 	/** A vanilla-style slot for the player's inventory: 18x18, shadowed top-left, lit bottom-right. */
-	/** A robot's hand: its slot in an iron plate, as its arm's gripper, under the buttons. */
+	/** A robot's hands: their slots (its hand, its off hand under it) in an iron plate, as its arm's gripper, under the buttons. */
 	public Viewport handPlate() {
-		return new Viewport(leftPos + CaseMenu.HAND_X - HAND_MARGIN, topPos + CaseMenu.HAND_Y - HAND_MARGIN, 16 + 2 * HAND_MARGIN, 16 + 2 * HAND_MARGIN);
+		return new Viewport(leftPos + CaseMenu.HAND_X - HAND_MARGIN, topPos + CaseMenu.HAND_Y - HAND_MARGIN, 16 + 2 * HAND_MARGIN,
+			CaseMenu.OFF_HAND_Y - CaseMenu.HAND_Y + 16 + 2 * HAND_MARGIN);
 	}
 
 	private void extractHand(GuiGraphicsExtractor graphics) {
@@ -547,6 +585,24 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			graphics.fill(plate.x() + rivet[0], plate.y() + rivet[1], plate.x() + rivet[0] + 2, plate.y() + rivet[1] + 2, IRON_RIVET);
 		}
 		extractInventorySlot(graphics, leftPos + CaseMenu.HAND_X, topPos + CaseMenu.HAND_Y);
+		extractInventorySlot(graphics, leftPos + CaseMenu.HAND_X, topPos + CaseMenu.OFF_HAND_Y);
+	}
+
+	/** Its crafting cards' tabs, and the open one's panel: the card, its lane on it. */
+	private void extractCrafting(GuiGraphicsExtractor graphics) {
+		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+			Viewport tab = craftTab(lane);
+			if (tab.width() > 0) {
+				int state = lane == openCraftTab() ? 1 : 0;
+				graphics.blit(RenderPipelines.GUI_TEXTURED, CRAFT_TABS, tab.x(), tab.y(), state * ComputerButtons.SIZE, 0, tab.width(), tab.height(),
+					2 * ComputerButtons.SIZE, ComputerButtons.SIZE);
+			}
+		}
+		if (openCraftTab() >= 0) {
+			Viewport panel = craftPanel();
+			graphics.blit(RenderPipelines.GUI_TEXTURED, CRAFT_PANEL, panel.x(), panel.y(), 0, 0, panel.width(), panel.height(), panel.width(), panel.height());
+			graphics.text(font, Component.translatable("gui.modularcomputers.crafting.title", openCraftTab() + 1), panel.x() + 10, panel.y() + 6, SILK, false);
+		}
 	}
 
 	private static void extractInventorySlot(GuiGraphicsExtractor graphics, int itemX, int itemY) {
@@ -759,6 +815,13 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		if (hit != ComputerButtons.Hit.NONE) {
 			return true;
 		}
+		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+			if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && craftTab(lane).contains(event.x(), event.y())) {
+				menu.openTab(lane == openCraftTab() ? -1 : lane); // (its slots show while it's open: the menu's on this side)
+				layout();
+				return true;
+			}
+		}
 		boolean leftOrRight = event.button() == InputConstants.MOUSE_BUTTON_LEFT || event.button() == InputConstants.MOUSE_BUTTON_RIGHT;
 		if (showBus && event.button() == InputConstants.MOUSE_BUTTON_LEFT && busWindow(busEntries().size()).scrolls()
 			&& busScrollbar().contains(event.x(), event.y())) {
@@ -835,7 +898,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		// the carried item.
 		boolean onBus = showBus && busPanel().contains(mouseX, mouseY);
 		boolean onButtons = powerButton().contains(mouseX, mouseY) || viewToggle().contains(mouseX, mouseY)
-			|| menu.hasHand() && handPlate().contains(mouseX, mouseY);
+			|| menu.hasHand() && handPlate().contains(mouseX, mouseY) || openCraftTab() >= 0 && craftPanel().contains(mouseX, mouseY);
+		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+			onButtons |= craftTab(lane).contains(mouseX, mouseY);
+		}
 		return super.hasClickedOutside(mouseX, mouseY, left, top) && !onBus && !onButtons;
 	}
 }

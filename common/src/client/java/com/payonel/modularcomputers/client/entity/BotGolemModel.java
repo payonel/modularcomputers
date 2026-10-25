@@ -12,7 +12,7 @@ import net.minecraft.util.Mth;
 /**
  * The bot golem's model: an iron golem's shape, a block high (15 pixels): a head whose front is its
  * screen, a broad body, long arms hanging to its knees, short legs. Its arms and legs swing as it
- * walks, as an iron golem's. Its texture's layout is scripts/art/bot_golem_textures.py's.
+ * walks, as an iron golem's. With a crafting card in, a tiny chest on its back, sunk in its frame. Its texture's layout is scripts/art/bot_golem_textures.py's.
  */
 public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 	/** The texture's size, in texels. */
@@ -30,6 +30,8 @@ public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 	private final ModelPart leftArm;
 	private final ModelPart rightLeg;
 	private final ModelPart leftLeg;
+	/** The tiny chest on its back, shown while it has a crafting card. */
+	private final ModelPart chest;
 
 	public BotGolemModel(ModelPart root) {
 		super(root);
@@ -37,6 +39,7 @@ public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 		leftArm = root.getChild("left_arm");
 		rightLeg = root.getChild("right_leg");
 		leftLeg = root.getChild("left_leg");
+		chest = root.getChild("chest");
 	}
 
 	/** Its parts, in model pixels (y down, the ground at 24), and where each takes its texture. */
@@ -49,6 +52,8 @@ public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 		root.addOrReplaceChild("left_arm", CubeListBuilder.create().texOffs(40, 0).mirror().addBox(0, -0.5f, -1.5f, 2, 8, 3), PartPose.offset(4, 15.5f, 0));
 		root.addOrReplaceChild("right_leg", CubeListBuilder.create().texOffs(28, 12).addBox(-1.5f, 0, -1.5f, 3, 3, 3), PartPose.offset(-2, 21, 0));
 		root.addOrReplaceChild("left_leg", CubeListBuilder.create().texOffs(42, 12).mirror().addBox(-1.5f, 0, -1.5f, 3, 3, 3), PartPose.offset(2, 21, 0));
+		// Its back is +Z: the chest sticks a pixel and a half out of it, the rest sunk in its frame.
+		root.addOrReplaceChild("chest", CubeListBuilder.create().texOffs(0, 24).addBox(-2.5f, 1, 1, 5, 4, 3), PartPose.offset(0, 15, 0));
 		return LayerDefinition.create(mesh, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 	}
 
@@ -61,6 +66,7 @@ public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 	@Override
 	public void setupAnim(BotGolemRenderer.State state) {
 		super.setupAnim(state);
+		chest.visible = state.chest;
 		float swing = Mth.triangleWave(state.walkAnimationPos, STRIDE) * state.walkAnimationSpeed * SWING;
 		rightArm.xRot = swing;
 		leftArm.xRot = -swing;

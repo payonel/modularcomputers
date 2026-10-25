@@ -35,7 +35,8 @@ public class RecipeGameTest {
 		Map.entry('n', "netherite_ingot"), Map.entry('s', "nether_star"), Map.entry('y', "ender_eye"), Map.entry('O', "ender_pearl"),
 		Map.entry('m', "emerald"), Map.entry('l', "lapis_lazuli"), Map.entry('j', "jukebox"), Map.entry('o', "observer"),
 		Map.entry('u', "sculk_sensor"), Map.entry('t', "daylight_detector"), Map.entry('T', "redstone_torch"), Map.entry('V', "cobweb"), Map.entry('Y', "ender_eye"), Map.entry('v', "lightning_rod"),
-		Map.entry('W', "modularcomputers:cable"), Map.entry('F', "iron_block"), Map.entry('h', "modularcomputers:tier1_hard_disk"));
+		Map.entry('W', "modularcomputers:cable"), Map.entry('F', "iron_block"), Map.entry('h', "modularcomputers:tier1_hard_disk"),
+		Map.entry('a', "crafting_table"), Map.entry('q', "chest"));
 
 	private record Craft(String result, int count, String lower, String... rows) {
 	}
@@ -80,6 +81,7 @@ public class RecipeGameTest {
 		make("motion_sensor_card", "oQ ", "ccc", "GGG"),
 		make("audio_sensor_card", "uQ ", "ccc", "GGG"),
 		make("weather_sensor_card", "tQv", "ccc", "GGG"),
+		make("crafting_card", "aQq", "ccc", "GGG"),
 		upgrade("tier2_battery", "tier1_battery", "ggg", "I#I", "SzS"),
 		upgrade("tier3_battery", "tier2_battery", "DsD", "n#n", "nyn"));
 

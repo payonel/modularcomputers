@@ -26,7 +26,8 @@ import net.minecraft.world.phys.AABB;
 /**
  * A golem's senses and hand, without cards: it scans the six spaces round it at once, in its own
  * frame; uses what it holds on a space (places a block, flips a lever); breaks a block with a tool
- * in a player's time; hits a mob with a weapon; takes from a chest and puts back; and on its legs
+ * in a player's time, catching what it drops (its off hand, with no storage; what it can't, its
+ * event says); hits a mob with a weapon; takes from a chest and puts back; and on its legs
  * it presses a pressure plate.
  */
 public class GolemHandsGameTest {
@@ -128,19 +129,37 @@ public class GolemHandsGameTest {
 	}
 
 	@GameTest(maxTicks = 200)
-	public void itBreaksALogWithAnAxeInAPlayersTimeAndSaysSo(GameTestHelper helper) {
+	public void itBreaksALogWithAnAxeAndCatchesItInItsOffHandWithNoStorage(GameTestHelper helper) {
 		helper.setBlock(FRONT, Blocks.OAK_LOG);
 		List<Object> answers = new ArrayList<>();
 		BotGolem golem = start(helper, answers, call("swing", "front"));
 		golem.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_AXE));
 		helper.succeedWhen(() -> {
 			List<Object> got = copy(answers);
-			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "broke", "block", "minecraft:oak_log"), "its event: " + got);
+			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "broke", "block", "minecraft:oak_log", "kept", true), "its event: " + got);
 			helper.assertBlockPresent(Blocks.AIR, FRONT);
 			helper.assertTrue(golem.getMainHandItem().getDamageValue() == 1, "the axe wore");
-			// No storage: what it dropped stays in the world.
+			// No storage: its off hand caught the log, in the background.
+			helper.assertTrue(golem.getOffhandItem().is(Items.OAK_LOG), "the log in its off hand: " + golem.getOffhandItem());
+			helper.assertTrue(helper.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(helper.absolutePos(FRONT)).inflate(1)).isEmpty(),
+				"nothing left in the world");
+		});
+	}
+
+	@GameTest(maxTicks = 200)
+	public void whatItCantKeepStaysInTheWorldAndItsEventSaysSo(GameTestHelper helper) {
+		helper.setBlock(FRONT, Blocks.OAK_LOG);
+		List<Object> answers = new ArrayList<>();
+		BotGolem golem = start(helper, answers, call("swing", "front"));
+		golem.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_AXE));
+		golem.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.APPLE));
+		helper.succeedWhen(() -> {
+			List<Object> got = copy(answers);
+			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "broke", "block", "minecraft:oak_log", "kept", false, "dropped", 1L),
+				"its event: " + got);
+			helper.assertTrue(golem.getOffhandItem().is(Items.APPLE), "its off hand kept its apple");
 			helper.assertTrue(!helper.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(helper.absolutePos(FRONT)).inflate(1),
-				item -> item.getItem().is(Items.OAK_LOG)).isEmpty(), "the log dropped");
+				item -> item.getItem().is(Items.OAK_LOG)).isEmpty(), "the log stayed in the world");
 		});
 	}
 
@@ -191,7 +210,7 @@ public class GolemHandsGameTest {
 			List<?> contents = (List<?>) got.get(0);
 			same(helper, ((Number) ((Map<?, ?>) contents.getFirst()).get("slot")).intValue(), 5, "the apples' slot, from 1");
 			same(helper, ((Number) got.get(1)).intValue(), 5, "took all 5");
-			same(helper, ((Number) got.get(2)).intValue(), 2, "put 2 back");
+			same(helper, got.get(2), true, "put 2 back, none of them left");
 			helper.assertTrue(golem.getMainHandItem().is(Items.APPLE) && golem.getMainHandItem().getCount() == 3, "3 in hand");
 			int inChest = 0;
 			for (int slot = 0; slot < chest.getContainerSize(); slot++) {

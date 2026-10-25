@@ -886,6 +886,11 @@ public final class BoardAssembly {
 					});
 					bluetooth.boardFrom(this::boardId);
 				}
+				if (cards[lane] instanceof com.payonel.modularcomputers.device.CraftingCard crafting && level instanceof ServerLevel world) {
+					// Its slots live on the card itself; a robot's robotics work them (none in a case).
+					crafting.benchIn(new com.payonel.modularcomputers.entity.CraftingBench(
+						new com.payonel.modularcomputers.menu.CraftingStorage(() -> parts.getItem(slot), host::markChanged), host::robot, () -> world));
+				}
 			}
 			board.plug(connector, cards[lane], serial(CaseMenu.EXP_SLOTS + lane));
 		}
@@ -1098,10 +1103,21 @@ public final class BoardAssembly {
 		}).filter(bytes -> machine.isPowered()).orElse(null);
 	}
 
+	/** A board's part slots, whose parts hold slots of their own (a crafting card's, on the card). */
+	public interface PartContents {
+		/** What a part holds changed (not which parts are in): its holder is saved with it. */
+		void partContentsChanged();
+	}
+
 	/** The part slots. Changes install the parts and update the power button. */
-	private final class Parts extends SimpleContainer {
+	private final class Parts extends SimpleContainer implements PartContents {
 		Parts() {
 			super(CaseMenu.PART_SLOTS);
+		}
+
+		@Override
+		public void partContentsChanged() {
+			host.markChanged();
 		}
 
 		@Override
