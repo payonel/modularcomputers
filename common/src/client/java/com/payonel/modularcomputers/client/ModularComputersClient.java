@@ -77,6 +77,9 @@ public final class ModularComputersClient {
 		renderers.entity(com.payonel.modularcomputers.entity.ModEntities.BOT_GOLEM, com.payonel.modularcomputers.client.entity.BotGolemRenderer::new);
 		renderers.entity(com.payonel.modularcomputers.entity.ModEntities.ENERGY_FIELD, com.payonel.modularcomputers.client.entity.EnergyFieldRenderer::new);
 		renderers.entity(com.payonel.modularcomputers.entity.ModEntities.GOLEM_LEGS, com.payonel.modularcomputers.client.entity.GolemLegsRenderer::new);
+		// The cards that bring a tab (and a panel) to their computer's views.
+		com.payonel.modularcomputers.client.screen.SideTabs.register(com.payonel.modularcomputers.device.CardKind.CRAFTING,
+			com.payonel.modularcomputers.client.screen.SideTabs::crafting);
 		com.payonel.modularcomputers.entity.EnergyField.clientHum = com.payonel.modularcomputers.client.sound.FieldHum::start;
 	}
 

@@ -521,19 +521,29 @@ def crafting_panel():
 			slot_socket(p, sx + col * 18, sy + row * 18)
 	return p.im
 
-def crafting_tabs():
-	"""A crafting card's tab button, closed and open side by side (20 by 20 each): a little crafting grid on the card's green."""
-	p = Pic(40, 20)
-	for state in range(2):
-		x0 = state * 20
-		p.fill(x0, 0, x0 + 20, 20, (0, 0, 0))
-		p.fill(x0 + 1, 1, x0 + 19, 19, GOLD if state else TRACE_DARK)
-		p.fill(x0 + 2, 2, x0 + 18, 18, (52, 128, 72) if state else (42, 108, 60))
-		p.fill(x0 + 4, 4, x0 + 16, 16, OAK_DARK)
-		for row in range(3):
-			for col in range(3):
-				p.fill(x0 + 5 + col * 4, 5 + row * 4, x0 + 8 + col * 4, 8 + row * 4, OAK[1])
+def side_tabs():
+	"""The side tabs' buttons (SideTabs), a row each, closed and open side by side (20 by 20 each), on
+	the board's green, a gold rim when open: the bus order's (its rows: a socket and a display each),
+	then a crafting card's (a little crafting grid)."""
+	p = Pic(40, 40)
+	for row, kind in enumerate(("bus", "crafting")):
+		for state in range(2):
+			x0, y0 = state * 20, row * 20
+			p.fill(x0, y0, x0 + 20, y0 + 20, (0, 0, 0))
+			p.fill(x0 + 1, y0 + 1, x0 + 19, y0 + 19, GOLD if state else TRACE_DARK)
+			p.fill(x0 + 2, y0 + 2, x0 + 18, y0 + 18, (52, 128, 72) if state else (42, 108, 60))
+			if kind == "bus":
+				for line in range(3):
+					y = y0 + 4 + line * 4
+					p.fill(x0 + 4, y, x0 + 7, y + 3, SOCKET_IN)  # its device's socket
+					p.fill(x0 + 8, y, x0 + 16, y + 3, BLACK)  # its display
+					p.fill(x0 + 9, y + 1, x0 + 13, y + 2, SILK)
+			else:
+				p.fill(x0 + 4, y0 + 4, x0 + 16, y0 + 16, OAK_DARK)
+				for r in range(3):
+					for c in range(3):
+						p.fill(x0 + 5 + c * 4, y0 + 5 + r * 4, x0 + 8 + c * 4, y0 + 8 + r * 4, OAK[1])
 	return p.im
 
 crafting_panel().save(f"{OUT}/crafting_panel.png")
-crafting_tabs().save(f"{OUT}/crafting_tabs.png")
+side_tabs().save(f"{OUT}/side_tabs.png")

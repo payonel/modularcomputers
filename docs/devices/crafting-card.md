@@ -29,9 +29,9 @@ computer or robot. Several cards craft at once: two crafting side by side make t
 
 ## In its computer's view
 
-Each crafting card in a computer gets a tab under the view's buttons (under a golem's hands), in
-its screen view too. Click it to open the card, left of the board in the bus order panel's place
-(the buttons stay right; click the tab again for the bus panel): its grid, what the grid makes, and
+Each crafting card in a computer gets a tab under the view's buttons (under a golem's hands), after
+the bus order's tab, and in its screen view too. Click it to open the card, left of the board in the
+bus order panel's place (the buttons stay right; the bus order's tab brings the bus panel back): its grid, what the grid makes, and
 its storage, as a crafting table's. Take what it makes as from a crafting table (Shift-click makes
 as many as it can). A tab in the screen view opens the parts view with that card open.
 

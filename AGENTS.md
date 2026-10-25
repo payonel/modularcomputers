@@ -321,6 +321,9 @@ in a case they fail (`no robotics available`, the user's words), in a robot `Cra
 them (the game's recipes; what's made into storage, all or nothing: no room, no craft). A craft
 takes time and each card crafts on its own, so cards add throughput. Its `/dev` file reads as its
 items (`name count` a line) and a line written dumps its storage (below, or at the face named).
+A view's tabs are one mechanism (`SideTabs`, the user's): the bus order's first, then a tab for
+each card whose kind registered one, each opening its panel left of the board, the same list in the
+screen view; a new card's tab is a registration, nothing else.
 
 ### The energy field card
 

@@ -77,24 +77,6 @@ final class ComputerButtons {
 		return Hit.NONE;
 	}
 
-	/** Crafting cards' tab buttons (scripts/art/case_gui_textures.py): closed and open, side by side. */
-	private static final Identifier CRAFT_TABS = ModularComputers.id("textures/gui/crafting_tabs.png");
-
-	/** A crafting card's tab button, open or not. */
-	static void extractCraftTab(GuiGraphicsExtractor graphics, Viewport tab, boolean open) {
-		graphics.blit(RenderPipelines.GUI_TEXTURED, CRAFT_TABS, tab.x(), tab.y(), open ? SIZE : 0, 0, tab.width(), tab.height(), 2 * SIZE, SIZE);
-	}
-
-	/** Which expansion lanes of a board's parts hold a crafting card (each gets a tab). */
-	static boolean[] craftingLanes(net.minecraft.world.Container parts) {
-		boolean[] lanes = new boolean[com.payonel.modularcomputers.menu.CaseMenu.LANES];
-		for (int lane = 0; lane < lanes.length; lane++) {
-			lanes[lane] = com.payonel.modularcomputers.item.ModItems.cardKind(parts.getItem(com.payonel.modularcomputers.menu.CaseMenu.EXP_SLOTS + lane))
-				.orElse(null) == com.payonel.modularcomputers.device.CardKind.CRAFTING;
-		}
-		return lanes;
-	}
-
 	private static void extractPower(GuiGraphicsExtractor graphics, Viewport button, com.payonel.modularcomputers.block.PowerLight state, boolean held) {
 		// Ready (a CPU and a charged battery): lit red or green. Otherwise the machine can't be
 		// on: faded red, or faded green while the button is held down and for the moment a

@@ -132,11 +132,16 @@ public final class DisplayScreen extends Screen {
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		var hit = ComputerButtons.click(event, powerButton(), viewToggle(), ComputerButtons.Target.CASE, pos);
 		powerHeld = hit == ComputerButtons.Hit.POWER;
+		if (hit == ComputerButtons.Hit.NONE && event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT
+			&& handPlate().contains(event.x(), event.y())) {
+			com.payonel.modularcomputers.client.ModNetworkClient.send(new com.payonel.modularcomputers.network.SwitchViewPayload(pos, true)); // (its hands are the parts view's)
+			return true;
+		}
 		if (hit == ComputerButtons.Hit.NONE && event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT) {
-			for (int lane = 0; lane < com.payonel.modularcomputers.menu.CaseMenu.LANES; lane++) {
-				if (craftTab(lane).contains(event.x(), event.y())) {
-					// Its card's crafting is in the parts view: that, its tab open.
-					CaseScreen.tabToOpen = lane;
+			for (SideTabs.Tab tab : tabs()) {
+				if (tab(tab.lane()).contains(event.x(), event.y())) {
+					// A card's panel is in the parts view: that, its tab open.
+					CaseScreen.tabToOpen = tab.lane();
 					com.payonel.modularcomputers.client.ModNetworkClient.send(new com.payonel.modularcomputers.network.SwitchViewPayload(pos, true));
 					return true;
 				}
@@ -145,23 +150,38 @@ public final class DisplayScreen extends Screen {
 		return hit != ComputerButtons.Hit.NONE || super.mouseClicked(event, doubleClick);
 	}
 
-	/** Its computer's crafting cards' tabs, under its buttons, as the parts view has them: a lane holding one, by lane (others empty). */
-	public Viewport craftTab(int lane) {
+	/** Its computer's cards' tabs ({@link SideTabs}: the parts view's, but the bus order's), or none without a parts view. */
+	private java.util.List<SideTabs.Tab> tabs() {
 		var machine = computer.flatMap(ref -> ref.find(minecraft.level, com.payonel.modularcomputers.block.BoardHolder.class));
 		if (!caseView || machine.isEmpty()) {
-			return NONE;
+			return java.util.List.of();
 		}
-		boolean[] lanes = ComputerButtons.craftingLanes(machine.get().board().parts());
-		if (!lanes[lane]) {
-			return NONE;
+		var parts = machine.get().board().parts();
+		return SideTabs.of(lane -> parts.getItem(com.payonel.modularcomputers.menu.CaseMenu.EXP_SLOTS + lane), false);
+	}
+
+	/** A card's tab's button, by its lane, under the buttons (and a robot's hands) as the parts view has them; empty when it has none. */
+	public Viewport tab(int lane) {
+		java.util.List<SideTabs.Tab> tabs = tabs();
+		Viewport hands = handPlate();
+		int top = hands.width() > 0 ? hands.bottom() + ComputerButtons.GAP : viewToggle().bottom() + ComputerButtons.GAP;
+		for (int index = 0; index < tabs.size(); index++) {
+			if (tabs.get(index).lane() == lane) {
+				return SideTabs.button(viewToggle().x(), top, index);
+			}
 		}
-		int shown = 0;
-		for (int before = 0; before < lane; before++) {
-			shown += lanes[before] ? 1 : 0;
-		}
-		Viewport toggle = viewToggle();
-		return new Viewport(toggle.x(), toggle.bottom() + ComputerButtons.GAP + shown * (ComputerButtons.SIZE + ComputerButtons.GAP), ComputerButtons.SIZE,
-			ComputerButtons.SIZE);
+		return NONE;
+	}
+
+	/** The robot it's the face of, if it's one (its hands show under the buttons). */
+	private java.util.Optional<com.payonel.modularcomputers.entity.BotGolem> robot() {
+		return computer.flatMap(ref -> ref.find(minecraft.level, com.payonel.modularcomputers.block.BoardHolder.class))
+			.filter(com.payonel.modularcomputers.entity.BotGolem.class::isInstance).map(com.payonel.modularcomputers.entity.BotGolem.class::cast);
+	}
+
+	/** A robot's hands, as its parts view shows them (what it holds); empty when it's no robot's. A click opens the parts view. */
+	public Viewport handPlate() {
+		return caseView && robot().isPresent() ? HandPlate.under(viewToggle()) : NONE;
 	}
 
 	/**
@@ -270,11 +290,12 @@ public final class DisplayScreen extends Screen {
 		var machine = computer.flatMap(ref -> ref.find(minecraft.level, com.payonel.modularcomputers.block.BoardHolder.class));
 		if (machine.isPresent()) {
 			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.CASE, machine.get().powerLight(), powerHeld);
-			for (int lane = 0; lane < com.payonel.modularcomputers.menu.CaseMenu.LANES; lane++) {
-				Viewport tab = craftTab(lane);
-				if (tab.width() > 0) {
-					ComputerButtons.extractCraftTab(graphics, tab, false);
-				}
+			robot().ifPresent(golem -> {
+				HandPlate.extract(graphics, handPlate());
+				HandPlate.extractItems(graphics, handPlate(), golem.getMainHandItem(), golem.getOffhandItem(), font);
+			});
+			for (SideTabs.Tab tab : tabs()) {
+				tab.extractButton(graphics, tab(tab.lane()), false);
 			}
 		} else {
 			ComputerButtons.extract(graphics, NONE, viewToggle(), ComputerButtons.Target.CASE, null, false);
