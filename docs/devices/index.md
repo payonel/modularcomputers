@@ -89,6 +89,11 @@ kernel itself, can use a global `board`. It is the motherboard's API:
 The **address** is any of the device's names: its slot path, its `id:<uuid>`, or `console`, a virtual
 device that writes to and reads from every terminal.
 
+**A call never waits**: a method answers at once with what the device has now (a terminal's `read`
+with no keys gives `nil`), and a slow action answers when it has started, its outcome coming later
+as an event. To wait for a device, use `board.waitForInterrupt`, then call it. See
+[Interrupts](/concepts/interrupts/#device-calls-never-wait).
+
 A call never stops the machine. If a device is gone, or an argument is wrong, `board.invoke`
 returns `false` and a message such as `bad argument #1 (string expected, got nil)`. This manual
 writes a method's results as the values after the leading `true`, and its failures as the message.

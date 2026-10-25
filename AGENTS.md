@@ -258,6 +258,10 @@ device data), and user code, as a real CPU runs firmware under an OS.
   its own. The kernel's drivers turn events into what programs see (poll, `/dev` lines, inotify), so
   no kernel has to watch for changes. A disk's are `changes()`, not `pull()`: its `/dev` file is its
   data.
+- **Device methods never block** (a real device's registers don't): a method answers at once with
+  what the device has (a terminal's `read` with no keys: nil), and a slow action answers once it's
+  started, its outcome an event later. `board.waitForInterrupt` is the only wait; mcos's blocking
+  reads are the kernel waiting for a process.
 - **Device failures are soft:** no device can stop the machine; only the program's own error or the
   board's supervision (CPU gone, power gone) ends a run. External devices are hot-plugged: one
   that isn't there isn't on the bus, and calls to it fail at once.

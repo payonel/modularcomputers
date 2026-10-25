@@ -46,6 +46,23 @@ as long as there is room. This means a key needs no call to arrive, so the laten
 round trip. When a device has more data than the ring holds, the device keeps the rest: a full
 ring is a pause, never a silent drop.
 
+## Device calls never wait
+
+Calling a device's method never waits for the device: it answers at once with what the device has
+now. A terminal's `read` with no keys typed gives `nil`; a sensor's `pull` with nothing sensed gives
+`nil`; an internet card's body not arrived yet says so. A method that starts something slow (a robot
+walking, a craft, a download) answers as soon as it has started, and the device says how it went
+later, with an event, raising its interrupt. Waiting is one call only: `board.waitForInterrupt`.
+
+So a program that wants the next key waits for the device's interrupt, then reads, as real hardware
+is used: reading a serial port's data register gives what's there, and the CPU sleeps on the port's
+interrupt until there's more. Reading in a loop without waiting would spin, calling the device
+thousands of times for nothing, at the CPU's running power.
+
+In [mcos](/mcos/) a read does block: `io.read()` returns when there's a line. That's the kernel's
+work, the same wait and read done for you: it puts your process to sleep until the device's
+interrupt, and gives you what the device had.
+
 ## Why it matters
 
 A waiting computer draws the CPU's waiting rate, much less than its running rate: see

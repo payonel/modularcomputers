@@ -65,7 +65,15 @@ local ok, keys = board.invoke("console", "read")
 
 Every call to a device answers first with whether it worked. Then `read` gives what was typed since
 the last read, as one string of bytes (several keys, if you typed fast), or `nil` when there's
-nothing. The loop handles each byte:
+nothing.
+
+That's why the OS waits first and reads second: **a device's methods never wait**. `read` answers at
+once with what the terminal has, nothing if no key's been pressed; only `board.waitForInterrupt`
+waits. Reading in a loop without the wait would work, but it would spin, calling the terminal
+thousands of times a second at the CPU's running power. (A key can still be taken by another
+reader between the wait and the read, so the loop checks for `nil` and goes round again.) In mcos,
+`io.read()` waits because the kernel does these same two calls for you; your OS has no kernel
+underneath, so it does them itself. See [Interrupts](/concepts/interrupts/#device-calls-never-wait). The loop handles each byte:
 
 | You press | The byte(s) | The OS |
 |---|---|---|
