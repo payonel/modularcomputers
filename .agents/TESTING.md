@@ -10,6 +10,7 @@ Gradle and exits with a pass/fail code.
 | Client game tests (dev) | `fabric/src/gametest/java`, `FabricClientGameTest` | `scripts/headless.sh ./gradlew :fabric:runClientGameTest` | Xvfb | ~30s |
 | Client game tests (release jar) | same | `./gradlew :fabric:runProductionClientGameTest` | Xvfb | ~20s |
 | Everything | | `./gradlew testAll` | Xvfb | ~2 min |
+| Without a display (what GitHub Actions runs) | | `./gradlew testServer` | nothing | ~1 min |
 
 `./gradlew build` (compile, jars, unit tests) is the fast inner loop and never starts
 Minecraft. Loom adds the server game tests to `check`, and `fabric/build.gradle` takes them back out.

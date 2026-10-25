@@ -15,10 +15,9 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
       - uses: gradle/actions/setup-gradle@v6
-      - name: install virtual display
-        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
-      - name: unit tests, server game tests, headless client game tests
-        run: ./gradlew testAll
+      # The client game tests stay local (testAll): the runners' Xvfb has no OpenGL for the game.
+      - name: unit tests and server game tests
+        run: ./gradlew testServer
         env:
           # build.gradle reads GITHUB_ACTOR and GITHUB_TOKEN to download LungoLua and StyxLua;
           # Actions doesn't put the token in the environment by itself.
@@ -29,11 +28,12 @@ jobs:
         with:
           name: test-output
           path: |
-            build/reports/
-            build/test-results/
-            build/run/*/screenshots/
-            build/run/*/logs/
+            */build/reports/
+            */build/test-results/
+            */build/run/*/logs/
       - uses: actions/upload-artifact@v7
         with:
           name: jars
-          path: build/libs/
+          path: |
+            fabric/build/libs/
+            neoforge/build/libs/

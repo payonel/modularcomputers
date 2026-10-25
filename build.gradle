@@ -68,3 +68,12 @@ tasks.register("testAll") {
 	dependsOn ":common:build", ":fabric:build", ":neoforge:build",
 		":fabric:runGameTest", ":neoforge:runGameTestServer", ":fabric:runProductionClientGameTest"
 }
+
+// What GitHub Actions runs: testAll but the client tests, which need a display with OpenGL that its
+// runners don't give (Xvfb there finds no GLX visual); they stay testAll's, run before every commit.
+tasks.register("testServer") {
+	group = "verification"
+	description = "Runs unit tests and the server game tests on Fabric and NeoForge (testAll without the client tests)."
+	dependsOn ":common:build", ":fabric:build", ":neoforge:build",
+		":fabric:runGameTest", ":neoforge:runGameTestServer"
+}
