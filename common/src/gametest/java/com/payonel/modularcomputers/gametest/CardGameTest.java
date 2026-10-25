@@ -256,7 +256,10 @@ public class CardGameTest {
 			.thenWaitUntil(() -> {
 				Object event;
 				while ((event = card.pull(args()).first()) != null) {
-					heard.add((Map<?, ?>) event);
+					// (only what this test played, north of it: tests run side by side, and it hears its neighbours' too)
+					if (((Map<?, ?>) event).get("x") instanceof Number x && x.doubleValue() == 0) {
+						heard.add((Map<?, ?>) event);
+					}
 				}
 				helper.assertValueEqual(heard.size(), 2, "the two near sounds: " + heard);
 			})

@@ -367,7 +367,9 @@ final class GolemHands {
 			return;
 		}
 		BlockState state = level().getBlockState(breaking);
-		if (state != breakingState) {
+		// Another block there ends it; the same block with its state changed doesn't (leaves losing
+		// their log, a crop growing), as a player's breaking goes on.
+		if (!state.is(breakingState.getBlock())) {
 			fail("the block changed");
 			return;
 		}

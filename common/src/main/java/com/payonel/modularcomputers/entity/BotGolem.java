@@ -490,8 +490,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			setDeltaMovement(Vec3.ZERO);
 			return;
 		}
-		face(attaching.getYRot());
-		setPos(to);
+		setPos(to); // (facing as it was: a program's frame stays where it was)
 		attaching.discard();
 		attaching = null;
 		setNoGravity(false);

@@ -671,6 +671,12 @@ Lessons from mistakes, each with its test:
   (`[[\d]]`) for patterns, and capture a test program's stderr (`2> /err`) to see why it failed.
 - A class in the mixin package can't be loaded as an ordinary class (Mixin reserves the package):
   helpers the mixins call live elsewhere (`entity/GolemFear`), and each mixin is its own file.
+- **A block's state isn't the block:** leaves change state as their log goes, crops as they grow;
+  what's tied to a block (a golem's breaking) compares the block, not its state.
+  (`aBlockWhoseStateChangesWhileItsBrokenStillBreaks`)
+- **Game tests run side by side:** a sensor in one hears and sees its neighbours' (a part put in a
+  golem 13 blocks off is a sound): a sensor's test counts only what it made, by where it was.
+  (`anAudioSensorHears...`)
 - Mouse buttons are SDL-numbered (left 1, right 3): use the constants. SDL sends typed characters
   only while text input is on: a screen that takes typing turns it on.
 - `.gitignore` patterns without a leading `/` match at any depth: anchor root-only rules.

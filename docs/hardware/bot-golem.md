@@ -76,6 +76,28 @@ It runs on its battery, as a case does: swap the battery, or walk it onto a
 program tells its robotics device to act. See [Robotics device](/devices/robotics/) for
 what a program can do with it, and its examples.
 
+## A whole job: a tree on a ledge
+
+This program uses all of it: the robotics device, a [crafting card](/devices/crafting-card/) for
+storage, and an [energy field card](/devices/energy-field-card/) to fly. Set it up:
+
+1. A golem with a CPU, RAM, an EEPROM, a battery, a disk with mcos, a crafting card and an energy
+   field card (a screen in its gold slot to watch it).
+2. A chest right in front of it, with an axe in it.
+3. A tree on a ledge: its trunk 5 blocks ahead of the golem, its lowest log 10 blocks up (the
+   ledge under it, and under the spot beside it), the way up and over clear.
+
+Save the program as `/home/golem-tree.lua` and run `lua /home/golem-tree.lua` (or `lua
+/home/golem-tree.lua 6 3` for a tree 6 up and 3 ahead). The golem takes the axe, holds itself in
+its field and picks up its legs, flies up beside the trunk, stands on its legs there, cuts the
+logs (its field lifting it, legs and all, to reach the ones above), flies home, stands on its legs
+at the chest, and puts the wood and the axe away. It says each step as it goes, and why it stopped
+if something's in its way.
+
+```lua
+{% include golem-tree.lua %}
+```
+
 ## Mobs
 
 Spiders keep away from golems, as they keep away from armadillos, and a skeleton riding one is

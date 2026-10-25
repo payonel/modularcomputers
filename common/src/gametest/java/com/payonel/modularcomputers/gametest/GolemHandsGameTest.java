@@ -184,6 +184,28 @@ public class GolemHandsGameTest {
 	}
 
 	@GameTest(maxTicks = 200)
+	public void aBlockWhoseStateChangesWhileItsBrokenStillBreaks(GameTestHelper helper) {
+		// Leaves by a log: the log goes as it starts, so the leaves' distance changes under it (a tree cut).
+		helper.setBlock(FRONT, Blocks.OAK_LEAVES);
+		helper.setBlock(FRONT.east(), Blocks.OAK_LOG);
+		List<Object> answers = new ArrayList<>();
+		BotGolem golem = start(helper, answers, call("swing", "front"));
+		golem.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.WOODEN_SWORD));
+		boolean[] cut = {false};
+		helper.onEachTick(() -> {
+			if (!cut[0] && golem.robotics().state().equals("breaking")) {
+				cut[0] = true;
+				helper.setBlock(FRONT.east(), Blocks.AIR);
+			}
+		});
+		helper.succeedWhen(() -> {
+			List<Object> got = copy(answers);
+			helper.assertTrue(got.size() > 1 && got.get(1) instanceof Map<?, ?> event && "broke".equals(event.get("event")), "it broke them: " + got);
+			helper.assertBlockPresent(Blocks.AIR, FRONT);
+		});
+	}
+
+	@GameTest(maxTicks = 200)
 	public void itHitsAMobWithAWeapon(GameTestHelper helper) {
 		Pig pig = helper.spawn(EntityTypes.PIG, FRONT);
 		pig.setNoAi(true);
