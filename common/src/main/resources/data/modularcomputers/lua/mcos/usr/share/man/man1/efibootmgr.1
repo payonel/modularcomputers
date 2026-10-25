@@ -5,7 +5,7 @@ efibootmgr \- show and change the EEPROM's boot entries and boot order
 .B efibootmgr
 .RB [ \-v ]
 .RB [ \-q ]
-.RB [ \-c
+.RB [ \-c " | " \-C
 .B \-d
 .I disk
 .RB [ \-l
@@ -46,8 +46,12 @@ With no options,
 .B efibootmgr
 shows the variables. After a change it shows them as they are now, unless
 .BR \-q .
-Entry numbers are hexadecimal, as in
-.BR Boot0001 .
+An entry's number is the one in its name, in hexadecimal:
+.B 1
+is
+.BR Boot0001 ,
+whatever disk it names and wherever it is in
+.BR BootOrder .
 .SH OPTIONS
 .TP
 .BR \-c ", " \-\-create
@@ -55,6 +59,15 @@ Makes a new entry, numbered
 .BR \-b 's
 or the first free one, and puts it first in
 .BR BootOrder .
+.TP
+.BR \-C ", " \-\-create\-only
+Makes a new entry as
+.B \-c
+does, but leaves it out of
+.BR BootOrder :
+to boot it once with
+.BR \-n ,
+or order it later.
 .TP
 .BR \-d ", " \-\-disk " \fIdisk\fR"
 The new entry's disk: its name in
@@ -76,7 +89,9 @@ The new entry's label.
 .BR \-b ", " \-\-bootnum " \fIXXXX\fR"
 The entry
 .B \-c
-makes or
+or
+.B \-C
+makes, or
 .B \-B
 deletes.
 .TP
@@ -128,6 +143,7 @@ The variables, a file each, to read.
 .nf
 efibootmgr -v
 efibootmgr -c -d storage1 -L "tiny OS"
+efibootmgr -C -d storage1 -L test
 efibootmgr -n 1
 efibootmgr -o 1,0
 efibootmgr -b 1 -B

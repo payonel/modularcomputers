@@ -2,7 +2,8 @@
 -- disk by its id and a file on it; BootOrder, the order they're tried in; BootNext, the one tried
 -- once, next; BootCurrent, the one that booted), as Linux's efibootmgr does UEFI's, through /dev/eeprom's ioctls (the EEPROM's own
 -- methods: it checks every change). The variables are readable in /sys/firmware/efi/efivars too.
---   -c, --create        a new entry (number -b's, else the first free one), first in BootOrder:
+--   -c, --create        a new entry (number -b's, else the first free one), first in BootOrder;
+--   -C, --create-only   the same, left out of BootOrder (to boot it with -n, or order it later):
 --   -d, --disk DISK       its disk: a /dev name (storage1, /dev/storage1) or an id (id:<uuid>)
 --   -l, --loader PATH     the file it boots (/init.lua when not given)
 --   -L, --label LABEL     its label
@@ -16,10 +17,10 @@
 -- Exit status: 0 done, 1 refused (the EEPROM's why on stderr), 2 bad usage.
 local sys = require("sys")
 
-local USAGE = "usage: efibootmgr [-v] [-q] [-c -d disk [-l path] [-L label]] [-b XXXX [-B]]\n"
+local USAGE = "usage: efibootmgr [-v] [-q] [-c | -C -d disk [-l path] [-L label]] [-b XXXX [-B]]\n"
   .. "                  [-o X,Y | -O] [-n X | -N]\n"
 local EEPROM = "/dev/eeprom"
-local LONG = {create = "c", disk = "d", loader = "l", label = "L", bootnum = "b", ["delete-bootnum"] = "B",
+local LONG = {create = "c", ["create-only"] = "C", disk = "d", loader = "l", label = "L", bootnum = "b", ["delete-bootnum"] = "B",
   bootorder = "o", ["delete-bootorder"] = "O", bootnext = "n", ["delete-bootnext"] = "N", verbose = "v", quiet = "q"}
 local TAKES = {d = true, l = true, L = true, b = true, o = true, n = true} -- options with a value
 
@@ -49,7 +50,7 @@ while i <= #arg do
       value = arg[i] or usage()
     end
     options[letter] = value
-  elseif TAKES[letter] == nil and not ("cBONvq"):find(letter, 1, true) then
+  elseif TAKES[letter] == nil and not ("cCBONvq"):find(letter, 1, true) then
     usage()
   else
     options[letter] = true
@@ -96,7 +97,7 @@ local function disk(name)
 end
 
 local changed = false
-if options.c then
+if options.c or options.C then
   local boot = call("getBoot")
   local at = options.b and number(options.b)
   if not at then
@@ -115,13 +116,15 @@ if options.c then
     return 1
   end
   call("setBootEntry", at, id, options.l, options.L)
-  local order = {at}
-  for _, n in ipairs(boot.order) do
-    if n ~= at then
-      order[#order + 1] = n
+  if options.c then
+    local order = {at}
+    for _, n in ipairs(boot.order) do
+      if n ~= at then
+        order[#order + 1] = n
+      end
     end
+    call("setBootOrder", order) -- (first: as efibootmgr -c puts it)
   end
-  call("setBootOrder", order) -- (first: as efibootmgr -c puts it)
   changed = true
 elseif options.B then
   call("removeBootEntry", number(options.b or usage()))

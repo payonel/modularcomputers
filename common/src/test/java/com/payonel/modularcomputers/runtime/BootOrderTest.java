@@ -175,6 +175,12 @@ class BootOrderTest extends McosHarness {
 		untilFile(root().resolve("current"), "0001\n");
 		settle(() -> Files.exists(root().resolve("shown")) && read(root().resolve("shown")).contains("Boot0001"));
 		assertThat(read(root().resolve("shown"))).startsWith("BootCurrent: 0001\n");
+		// -C: an entry left out of the order.
+		var order = eeprom().nvram().order();
+		type("efibootmgr -q -C -d storage1 -L only; touch /only\r");
+		untilFile(root().resolve("only"), "");
+		assertThat(eeprom().nvram().entries().get(2)).isEqualTo(new BootVariables.Entry(eeprom().nvram().entries().get(0).disk(), "/init.lua", "only"));
+		assertThat(eeprom().nvram().order()).as("left as it was").isEqualTo(order);
 	}
 
 	private Eeprom eeprom() {

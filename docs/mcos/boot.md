@@ -24,8 +24,9 @@ one that has `/init.lua`. To boot another, make it an entry with
 [`efibootmgr`](/programs/efibootmgr/):
 
 ```sh
-efibootmgr -c -d storage1 -L backup   # an entry for the second disk, first in BootOrder
-efibootmgr -n 0                       # or: boot entry 0 next time only
+efibootmgr -c -d storage1 -L backup   # entry Boot0000: the second disk, first in BootOrder
+efibootmgr -C -d storage1 -L test     # or: an entry left out of BootOrder (Boot0001)...
+efibootmgr -n 1                       # ...booted next time only (1: the entry, not the disk)
 efibootmgr -v                         # what's set, and which disks are on the bus
 ```
 

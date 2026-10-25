@@ -29,8 +29,8 @@ The steps:
 2. Put it in the computer's second SATA socket, and power on. mcos boots from the first disk and
    shows the new one at `/mnt/sata/1`.
 3. Write the file: `edit /mnt/sata/1/init.lua`, type the program in, Ctrl+O to save, Ctrl+X to leave.
-4. Tell the EEPROM to boot your disk, next time only, and reboot:
-   `efibootmgr -c -d storage1 -L "my OS"`, `efibootmgr -O`, `efibootmgr -n 0`, `reboot`.
+4. Make your disk a boot entry, boot it next time only, and reboot:
+   `efibootmgr -C -d storage1 -L "my OS"`, `efibootmgr -n 0`, `reboot`.
 5. You see `Hello from my own OS, booted from sata:1`, and five seconds later the computer turns
    off. Power it on again and mcos starts, as before.
 
@@ -63,13 +63,19 @@ Check it's there: `cat /mnt/sata/1/init.lua`.
 Both disks stay where they are. A real PC picks its boot disk from its firmware's boot entries, not
 by which port a disk is on, and so does the EEPROM: it keeps boot entries in its NVRAM, each a disk
 by its id, and boots `BootNext`'s once, then `BootOrder`'s, then (with none) the first disk with
-`/init.lua`, mcos's. [`efibootmgr`](/programs/efibootmgr/) sets them, as on Linux. In mcos:
+`/init.lua`, mcos's. [`efibootmgr`](/programs/efibootmgr/) sets them, as on Linux.
+
+Two different things have numbers here, so keep them apart:
+
+- **Disks** are `storage0`, `storage1`: their names in `/dev`, by socket. Yours is `storage1`.
+- **Boot entries** are `Boot0000`, `Boot0001`: each says "boot this disk's file". An entry's number
+  is its own, the one in its name, whatever disk it names. `BootOrder` and `BootNext` hold entry
+  numbers, never disk numbers.
+
+In mcos:
 
 ```
-$ efibootmgr -c -d storage1 -L "my OS"
-BootOrder: 0000
-Boot0000  my OS
-$ efibootmgr -O
+$ efibootmgr -C -d storage1 -L "my OS"
 BootOrder:
 Boot0000  my OS
 $ efibootmgr -n 0
@@ -79,11 +85,11 @@ Boot0000  my OS
 $ reboot
 ```
 
-- **`-c -d storage1 -L "my OS"`** makes boot entry `Boot0000` for your disk (`storage1`, the second
-  disk), labeled `my OS`. A new entry goes first in `BootOrder`, which would make it the default.
-- **`-O`** clears `BootOrder`, so mcos stays the default: with no order, the EEPROM falls back to the
-  first disk with `/init.lua`.
-- **`-n 0`** sets `BootNext`: entry 0, next time only.
+- **`-C -d storage1 -L "my OS"`** creates an entry for your disk, `storage1`, labeled `my OS`. It's
+  the first entry, so it's `Boot0000`: that's the 0 you use next. `-C` leaves it out of
+  `BootOrder`, so mcos stays the default (with no order, the EEPROM falls back to the first disk
+  with `/init.lua`). `-c` would put it first in `BootOrder`, making it the default.
+- **`-n 0`** sets `BootNext` to entry `Boot0000` (your disk), next time only.
 
 The computer restarts, and the EEPROM boots your disk:
 
@@ -95,7 +101,7 @@ Five seconds later, the computer turns off. `BootNext` was used up, so power it 
 Each time you change your OS: `efibootmgr -n 0`, then `reboot`. The computer's parts view marks the
 disk the EEPROM will boot (`SATA 2, boots`).
 
-To make your OS the default: `efibootmgr -o 0`. Then every power-on boots it; to go back, have your
+To make your OS the default, put its entry in `BootOrder`: `efibootmgr -o 0`. Then every power-on boots it; to go back, have your
 OS clear the order (the next pages' shell can: `call eeprom setBootOrder {}`), or take the disk out
 (an entry whose disk isn't there is skipped).
 

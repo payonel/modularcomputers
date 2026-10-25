@@ -11,19 +11,22 @@ hidden: true
 
 ## Synopsis
 
-<strong>efibootmgr</strong> \[<strong>-v</strong>\] \[<strong>-q</strong>\] \[<strong>-c</strong>\
+<strong>efibootmgr</strong> \[<strong>-v</strong>\] \[<strong>-q</strong>\] \[<strong>-c</strong> \| <strong>-C</strong>\
 <strong>-d</strong> <em>disk</em> \[<strong>-l</strong> <em>path</em>\] \[<strong>-L</strong> <em>label</em>\]\] \[<strong>-b</strong> <em>XXXX</em> \[<strong>-B</strong>\]\] \[<strong>-o</strong> <em>X,Y</em> \| <strong>-O</strong>\] \[<strong>-n</strong> <em>X</em> \| <strong>-N</strong>\]
 
 ## Description
 
 The EEPROM keeps boot variables in its NVRAM, as a UEFI board does: boot entries (<strong>Boot0000</strong> to <strong>Boot0007</strong>), each a disk by its id and a file on it; <strong>BootOrder</strong>, the order the entries are tried in; <strong>BootNext</strong>, an entry tried once, at the next boot only; and <strong>BootCurrent</strong>, the entry that booted the computer this time (none when it booted by the fallback), kept until it's off. At power-on the EEPROM's bootloader tries <strong>BootNext</strong> (and clears it), then each entry of <strong>BootOrder</strong> whose disk is on the bus, then every disk in bus order holding <strong>/init.lua</strong>.
 
-With no options, <strong>efibootmgr</strong> shows the variables. After a change it shows them as they are now, unless <strong>-q</strong>. Entry numbers are hexadecimal, as in <strong>Boot0001</strong>.
+With no options, <strong>efibootmgr</strong> shows the variables. After a change it shows them as they are now, unless <strong>-q</strong>. An entry's number is the one in its name, in hexadecimal: <strong>1</strong> is <strong>Boot0001</strong>, whatever disk it names and wherever it is in <strong>BootOrder</strong>.
 
 ## Options
 
 <strong>-c</strong>, <strong>--create</strong>
 : Makes a new entry, numbered <strong>-b</strong>'s or the first free one, and puts it first in <strong>BootOrder</strong>.
+
+<strong>-C</strong>, <strong>--create-only</strong>
+: Makes a new entry as <strong>-c</strong> does, but leaves it out of <strong>BootOrder</strong>: to boot it once with <strong>-n</strong>, or order it later.
 
 <strong>-d</strong>, <strong>--disk</strong> \\fIdisk\\fR
 : The new entry's disk: its name in <strong>/dev</strong> (<strong>storage1</strong>, <strong>/dev/storage1</strong>), or its id (<strong>id:\\fIuuid\\fR</strong>), which may name a disk that isn't on the bus yet.
@@ -35,7 +38,7 @@ With no options, <strong>efibootmgr</strong> shows the variables. After a change
 : The new entry's label.
 
 <strong>-b</strong>, <strong>--bootnum</strong> \\fIXXXX\\fR
-: The entry <strong>-c</strong> makes or <strong>-B</strong> deletes.
+: The entry <strong>-c</strong> or <strong>-C</strong> makes, or <strong>-B</strong> deletes.
 
 <strong>-B</strong>, <strong>--delete-bootnum</strong>
 : Deletes entry <strong>-b</strong>'s, from <strong>BootOrder</strong> and <strong>BootNext</strong> too.
@@ -75,6 +78,7 @@ With no options, <strong>efibootmgr</strong> shows the variables. After a change
 ```text
 efibootmgr -v
 efibootmgr -c -d storage1 -L "tiny OS"
+efibootmgr -C -d storage1 -L test
 efibootmgr -n 1
 efibootmgr -o 1,0
 efibootmgr -b 1 -B
