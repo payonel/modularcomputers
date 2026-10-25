@@ -127,6 +127,44 @@ public final class ModComponents {
 	}
 
 	/** The card's serial number, stamping a new one on if it has none yet. Server side only. */
+	/** The ids an item carries: its own (a board's, a part's) and its parts' (a case's, a golem's, a hub's), each a thing in the world. */
+	public static java.util.Set<UUID> identities(ItemStack stack) {
+		java.util.Set<UUID> ids = new java.util.HashSet<>();
+		UUID own = stack.get(SERIAL);
+		if (own != null) {
+			ids.add(own);
+		}
+		stack.getOrDefault(net.minecraft.core.component.DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.EMPTY)
+			.nonEmptyItemCopyStream().forEach(part -> ids.addAll(identities(part)));
+		return ids;
+	}
+
+	/**
+	 * Whether placing {@code stack} would put a second of something into the world: one of its ids
+	 * is in it already (a creative copy: {@link com.payonel.modularcomputers.board.PartHolds}).
+	 */
+	public static boolean copyOfOneInTheWorld(ItemStack stack, net.minecraft.world.level.Level level) {
+		return level instanceof net.minecraft.server.level.ServerLevel server
+			&& identities(stack).stream().anyMatch(id -> com.payonel.modularcomputers.board.PartHolds.held(id, server.getServer()));
+	}
+
+	/**
+	 * An item placed (a block, a golem) is used up, in creative too, when it carries ids: it moved
+	 * into the world, so no copy stays in the hand (the user's: a creative player's placing made
+	 * copies writing the same disks). Creative puts a placed stack's count back, so it's taken out
+	 * of the hand instead (the count goes back on a stack nobody holds).
+	 */
+	public static void placed(ItemStack stack, net.minecraft.world.entity.player.Player player, net.minecraft.world.InteractionHand hand) {
+		if (player == null || !player.hasInfiniteMaterials() || identities(stack).isEmpty()) {
+			return;
+		}
+		if (player.getItemInHand(hand) == stack) {
+			player.setItemInHand(hand, ItemStack.EMPTY);
+		} else {
+			stack.shrink(1);
+		}
+	}
+
 	public static UUID serial(ItemStack card) {
 		UUID serial = card.get(SERIAL);
 		if (serial == null) {

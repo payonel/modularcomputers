@@ -49,6 +49,10 @@ what a program can do with it, and its examples.
 
 ## Notes
 
+- A golem and its parts are each one thing, by their ids: placing one you picked up moves it
+  into the world, in creative too (it leaves your hand). A copy of one that's in the world (creative's
+  Ctrl and pick block makes them) can't be placed, and a copied part, a disk say, in another computer
+  stays off its bus until the one in the world is gone. Nothing is given a new id.
 - It knows nothing of where it is: a walk is given relative to itself (forward, right, up). A GPS
   card is planned.
 - A walk under way when its world is saved doesn't go on after a load: it ends then, blocked

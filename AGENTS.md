@@ -197,6 +197,12 @@ blank, and its files leave the world save when the player takes it.
   the station, as a dock's drives): `Cabled.host` names the host, and `BusOrder` keeps the device
   off, shown offline, whenever its host is disconnected, missing or another board's, and off when
   the bus has no room for its host. One rule in the bus order, for every host to come.
+- **A part is one thing in one place, by its id** (`PartHolds`; the user's): creative can copy an
+  item with all it holds (Ctrl and pick block, the creative inventory), and a copy is the same part:
+  placing an item that carries ids moves it into the world (used up in creative too), a copy of one
+  in the world can't be placed, and a copied part in another computer waits off its bus until the
+  one in the world goes. Never a new id for a copy (the user's: OpenComputers did, and lost which
+  was which).
 - **A device is on one bus at a time** (`BusHolds`): whichever board has it first holds it; holds
   are worked out afresh as boards load, never saved (long cables and unloaded chunks would desync
   them).
@@ -566,6 +572,10 @@ Lessons from mistakes, each with its test:
 - **Edit by matching text, never by line numbers:** an earlier edit moves the lines.
 - **A bitmap font magnified by a fraction is blocky:** snap its scale to whole pixels a texel, and
   test at a player's window (1080p), not only the test window's 854x480. (`CableClientGameTest`)
+- **Creative puts a placed stack's count back** (`ServerPlayerGameMode.useItemOn`): an item that
+  must be used up is taken out of the hand; and placement is tested through the server's game mode,
+  not the item's `useOn` (a mock player isn't creative unless its abilities say so).
+  (`placingAPickedUpComputerInCreative...`)
 - **A buffer fills on demand, not only on its cadence:** a pad whose battery filled its buffer once
   a second charged nothing for up to a second. (`aBatteryPutInChargesAtOnce`)
 - **A loader's event may come on the network's thread** (Fabric's disconnect does): work for the

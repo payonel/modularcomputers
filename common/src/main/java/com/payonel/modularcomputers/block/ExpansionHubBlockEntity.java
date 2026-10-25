@@ -46,8 +46,18 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 
 	@Override
 	protected void cardsChanged() {
+		Object server = level instanceof net.minecraft.server.level.ServerLevel world ? world.getServer() : null;
+		java.util.Set<java.util.UUID> kept = new java.util.HashSet<>();
 		for (int slot = 0; slot < SLOTS; slot++) {
 			CardKind kind = ModItems.cardKind(cards().getItem(slot)).orElse(null);
+			java.util.UUID serial = cards().getItem(slot).get(ModComponents.SERIAL);
+			if (kind != null && server != null && serial != null) {
+				if (!com.payonel.modularcomputers.board.PartHolds.claim(serial, this, server)) {
+					kind = null; // (a copy of a card in another place: it waits, as no card: PartHolds)
+				} else {
+					kept.add(serial);
+				}
+			}
 			devices[slot] = kind == null ? null : devices[slot] != null && devices[slot].kind() == kind ? devices[slot] : cardHere(kind);
 			if (devices[slot] != null) {
 				int at = slot;
@@ -55,6 +65,21 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 				devices[slot].idFrom(() -> cards().getItem(at).get(ModComponents.SERIAL));
 			}
 		}
+		if (server != null) {
+			com.payonel.modularcomputers.board.PartHolds.keep(this, kept);
+		}
+	}
+
+	@Override
+	public void setLevel(net.minecraft.world.level.Level level) {
+		super.setLevel(level);
+		cardsChanged(); // (loaded before it had a world: its cards claimed now)
+	}
+
+	@Override
+	public void setRemoved() {
+		super.setRemoved();
+		com.payonel.modularcomputers.board.PartHolds.releaseAll(this);
 	}
 
 	@Override

@@ -76,6 +76,10 @@ Breaking a case drops it with its parts inside.
 
 ## Notes
 
+- A computer and its parts are each one thing, by their ids: placing one you picked up moves it
+  into the world, in creative too (it leaves your hand). A copy of one that's in the world (creative's
+  Ctrl and pick block makes them) can't be placed, and a copied part, a disk say, in another computer
+  stays off its bus until the one in the world is gone. Nothing is given a new id.
 - The CPU's tier, not the case's, sets how many devices the bus holds. A tier 1 CPU's 4 are used up
   quickly by the case's own parts.
 - Parts that have been in a machine carry an id, and are told apart by it. See

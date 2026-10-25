@@ -164,6 +164,7 @@ public final class DiskStationBlockEntity extends CardHolderBlockEntity {
 		for (int slot = 0; slot < disks.length; slot++) {
 			retire(slot);
 		}
+		com.payonel.modularcomputers.board.PartHolds.releaseAll(this);
 	}
 
 	/** Server: a disk device for each disk in it, its data in the world save by its id; the source read only. */
@@ -171,8 +172,18 @@ public final class DiskStationBlockEntity extends CardHolderBlockEntity {
 		if (!(level instanceof ServerLevel server)) {
 			return;
 		}
+		java.util.Set<UUID> kept = new java.util.HashSet<>();
 		for (int slot = 0; slot < disks.length; slot++) {
 			ItemStack stack = cards().getItem(slot);
+			UUID claimed = stack.getItem() instanceof DiskItem ? ModComponents.serial(stack) : null;
+			if (claimed != null && !com.payonel.modularcomputers.board.PartHolds.claim(claimed, this, server.getServer())) {
+				retire(slot); // (a copy of a disk in another place: it waits, as no disk: PartHolds)
+				serials[slot] = null;
+				continue;
+			}
+			if (claimed != null) {
+				kept.add(claimed);
+			}
 			if (!(stack.getItem() instanceof DiskItem item)) {
 				retire(slot);
 				serials[slot] = null;
@@ -194,6 +205,7 @@ public final class DiskStationBlockEntity extends CardHolderBlockEntity {
 			}
 			serials[slot] = serial;
 		}
+		com.payonel.modularcomputers.board.PartHolds.keep(this, kept);
 	}
 
 	private void retire(int slot) {

@@ -493,11 +493,13 @@ public final class BoardAssembly {
 	/** Destroyed (a block broken, a golem killed): a power cut. */
 	public void removed() {
 		machine.removed();
+		PartHolds.releaseAll(this);
 	}
 
 	/** Unloaded (or destroyed): its program was saved, so it stops here, and goes on after a load. */
 	public void unloaded() {
 		machine.unload();
+		PartHolds.releaseAll(this); // (its parts are where it is, unloaded: a copy may have them now; it waits for them when it's back)
 		for (int lane = 0; lane < disks.length; lane++) {
 			retireDisk(lane);
 		}
@@ -533,6 +535,9 @@ public final class BoardAssembly {
 	public void tick() {
 		ServerLevel level = (ServerLevel) host.level();
 		ticks++;
+		if (waiting && seenPartHolds != PartHolds.version()) {
+			installParts(); // (a part one of its slots waited for was let go)
+		}
 		if (ticks % BATTERY_TICKS == 0) {
 			updateBattery();
 		}
@@ -766,9 +771,34 @@ public final class BoardAssembly {
 			.resolve("modularcomputers").resolve("disks").resolve(id.toString());
 	}
 
+	/**
+	 * Takes the part {@code id} (server side; a client takes nothing): whether it's this board's, not
+	 * one in another place ({@link PartHolds}: a creative copy waits, as a part that isn't there).
+	 */
+	private boolean mine(UUID id, Object server, Set<UUID> kept) {
+		if (server == null || id == null) {
+			return true;
+		}
+		if (PartHolds.claim(id, this, server)) {
+			kept.add(id);
+			return true;
+		}
+		waiting = true;
+		return false;
+	}
+
+	/** A part in its slots is another's ({@link PartHolds}): it's looked at again when one is let go. */
+	private boolean waiting;
+	private long seenPartHolds = -1;
+
 	/** Puts the parts in the slots onto the motherboard, and drives and cards onto the bus. */
 	private void installParts() {
 		Level level = host.level();
+		Object server = level instanceof ServerLevel serverLevel ? serverLevel.getServer() : null;
+		Set<UUID> kept = new java.util.HashSet<>();
+		waiting = false;
+		seenPartHolds = PartHolds.version();
+		mine(boardId, server, kept); // (its board: what a copy of it would be placed as)
 		Motherboard board = machine.board();
 		CpuItem cpuItem = parts.getItem(CaseMenu.CPU_SLOT).getItem() instanceof CpuItem cpu ? cpu : null;
 		if (cpuItem == null) {
@@ -778,8 +808,8 @@ public final class BoardAssembly {
 		}
 		// The EEPROM reads and writes the item in its slot directly (EepromSlot): no copy of its text.
 		ItemStack stack = parts.getItem(CaseMenu.EEPROM_SLOT);
-		boolean hasEeprom = ModItems.isEeprom(stack);
-		UUID serial = hasEeprom ? stack.get(ModComponents.SERIAL) : null;
+		UUID serial = ModItems.isEeprom(stack) ? stack.get(ModComponents.SERIAL) : null;
+		boolean hasEeprom = ModItems.isEeprom(stack) && mine(serial, server, kept);
 		if (!hasEeprom) {
 			eeprom = null;
 		} else if (eeprom == null || !java.util.Objects.equals(eepromSerial, serial)) {
@@ -790,15 +820,15 @@ public final class BoardAssembly {
 		// Each part answers to its serial number too: a card is found by it here or in a hub.
 		board.plug(Motherboard.EEPROM, eeprom, serial(CaseMenu.EEPROM_SLOT));
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
-			DiskTier diskTier = parts.getItem(CaseMenu.SATA_SLOTS + lane).getItem() instanceof DiskItem disk ? disk.tier() : null;
 			UUID diskSerial = serial(CaseMenu.SATA_SLOTS + lane);
+			DiskTier diskTier = parts.getItem(CaseMenu.SATA_SLOTS + lane).getItem() instanceof DiskItem disk && mine(diskSerial, server, kept) ? disk.tier() : null;
 			ItemStack diskStack = parts.getItem(CaseMenu.SATA_SLOTS + lane);
 			if (diskTier == null) {
 				retireDisk(lane);
 			} else if (disks[lane] == null || disks[lane].tier() != diskTier || !java.util.Objects.equals(diskSerials[lane], diskSerial)) {
 				// Another disk: its own data, in the world save by its id (none on a client).
 				retireDisk(lane);
-				java.nio.file.Path folder = level instanceof ServerLevel server && diskSerial != null ? diskFolder(server.getServer(), diskSerial) : null;
+				java.nio.file.Path folder = level instanceof ServerLevel world && diskSerial != null ? diskFolder(world.getServer(), diskSerial) : null;
 				if (folder != null && imageDisk(diskStack, folder, level.getGameTime())) {
 					host.markChanged(); // (from a load too, as its chunk loads: never setChanged, which waits for the chunk)
 				}
@@ -820,6 +850,12 @@ public final class BoardAssembly {
 				continue;
 			}
 			ItemStack card = parts.getItem(CaseMenu.EXP_SLOTS + lane);
+			boolean ours = mine(serial(CaseMenu.EXP_SLOTS + lane), server, kept);
+			if (!ours) {
+				cards[lane] = null;
+				board.plug(connector, null, null);
+				continue;
+			}
 			if (lane == 0 && screenInSlot()) {
 				// A screen in the gold slot: its terminal, on the bus there.
 				TerminalTier screenTier = ((ScreenItem) card.getItem()).screen().tier();
@@ -852,6 +888,9 @@ public final class BoardAssembly {
 				}
 			}
 			board.plug(connector, cards[lane], serial(CaseMenu.EXP_SLOTS + lane));
+		}
+		if (server != null) {
+			PartHolds.keep(this, kept);
 		}
 		rebuildBus();
 	}

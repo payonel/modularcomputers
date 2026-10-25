@@ -121,6 +121,7 @@
 	"hint.modularcomputers.details.charging_pad": "A robot standing on it charges: from a running computer's power by cable, else from its own battery",
 	"gui.modularcomputers.charging_pad.charging": "Charging",
 	"gui.modularcomputers.charging_pad.buffer": "Buffer",
+	"message.modularcomputers.already_placed": "That one is in the world already: a copy can't be placed",
 	"item.modularcomputers.bot_golem": "Bot Golem",
 	"gui.modularcomputers.bus.robotics": "Robotics Device",
 	"gui.modularcomputers.bus.soldered": "EXP %s, soldered",

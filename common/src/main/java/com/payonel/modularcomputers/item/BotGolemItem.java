@@ -25,6 +25,12 @@ public final class BotGolemItem extends HintedItem {
 			return InteractionResult.SUCCESS;
 		}
 		ItemStack stack = context.getItemInHand();
+		if (ModComponents.copyOfOneInTheWorld(stack, level)) {
+			if (context.getPlayer() != null) {
+				context.getPlayer().sendOverlayMessage(net.minecraft.network.chat.Component.translatable("message.modularcomputers.already_placed"));
+			}
+			return InteractionResult.FAIL;
+		}
 		BotGolem golem = ModEntities.BOT_GOLEM.create(level, EntitySpawnReason.SPAWN_ITEM_USE);
 		if (golem == null) {
 			return InteractionResult.FAIL;
@@ -39,7 +45,11 @@ public final class BotGolemItem extends HintedItem {
 		}
 		golem.fromItem(stack);
 		level.addFreshEntity(golem);
+		int before = stack.getCount();
 		stack.consume(1, context.getPlayer());
+		if (stack.getCount() == before) {
+			ModComponents.placed(stack, context.getPlayer(), context.getHand()); // (creative left it: it moved all the same)
+		}
 		return InteractionResult.SUCCESS;
 	}
 }
