@@ -33,6 +33,10 @@ public final class ModSounds {
 	public static final SoundEvent BATTERY_REMOVE = register("battery_remove");
 	/** A terminal's bell: a BEL (\a) rings it (see scripts/art/bell.py). */
 	public static final SoundEvent BELL = register("bell");
+	/** An energy field: its start (a hum rising), its end (a hum sagging out), and its soft hum while on, a loop (scripts/art/field_sounds.py). */
+	public static final SoundEvent FIELD_ON = register("field_on");
+	public static final SoundEvent FIELD_OFF = register("field_off");
+	public static final SoundEvent FIELD_HUM = register("field_hum");
 	/** A Sound Card's speaker: what it plays comes from its stream, not a file (its file only stands in). */
 	public static final SoundEvent SOUND_CARD = register("sound_card");
 

@@ -17,17 +17,30 @@ def rect(im, x0, y0, x1, y1, c):
 			im.putpixel((x, y), c)
 
 def silicon():
-	"""A polished silicon ingot: blue-gray, with a mirror sheen, as refined silicon looks."""
+	"""A silicon wafer (the user's): a round, mirror-polished disc, seen a little from above, its
+	flat edge cut at the bottom (how a wafer shows its crystal's orientation), a faint grid of the
+	dies to be printed on it, and the rainbow sheen polished silicon throws."""
 	im = Image.new("RGBA", (16, 16), CLEAR)
-	body = [(98, 108, 128, 255), (110, 121, 142, 255), (90, 99, 118, 255)]
-	rnd = random.Random(3)
-	for y in range(5, 12):
-		for x in range(2 + (11 - y) // 2, 14 - (y - 5) // 2):
-			im.putpixel((x, y), rnd.choice(body))
-	rect(im, 5, 5, 12, 5, (170, 182, 204, 255))      # top edge, lit
-	for x in range(6, 10):
-		im.putpixel((x, 7), (205, 215, 232, 255))    # sheen
-	rect(im, 3, 11, 12, 11, (60, 66, 80, 255))      # shadowed base
+	cx, cy, r = 7.5, 7.5, 7.0
+	sheen = [(150, 120, 200), (110, 150, 210), (110, 190, 190), (170, 190, 140)]  # thin-film colours, top left to bottom right
+	for y in range(16):
+		for x in range(16):
+			dx, dy = x - cx, y - cy
+			if dx * dx + dy * dy > r * r or y >= 14:  # (its flat: the bottom cut off)
+				continue
+			base = 120 + int(40 * (1 - (dx + dy + 2 * r) / (4 * r)))  # lit from the top left
+			c = (base - 6, base, base + 14)
+			band = sheen[min(len(sheen) - 1, int((dx + dy + 2 * r) / (4 * r) * len(sheen)))]
+			c = tuple((a * 3 + b) // 4 for a, b in zip(c, band))  # its sheen, across it
+			if (x - 1) % 4 == 0 or (y - 1) % 4 == 0:
+				c = tuple(max(0, v - 9) for v in c)  # the dies' grid, faint
+			im.putpixel((x, y), c + (255,))
+	for x in range(16):  # its rim: dark at the bottom, its flat's edge
+		for y in range(15, -1, -1):
+			if im.getpixel((x, y))[3]:
+				im.putpixel((x, y), (70, 74, 86, 255))
+				break
+	im.putpixel((5, 4), (235, 240, 250, 255)); im.putpixel((6, 4), (220, 228, 244, 255)); im.putpixel((5, 5), (220, 228, 244, 255))  # the glint
 	return im
 
 def chip():

@@ -7,7 +7,8 @@ order: 158
 An energy field card suspends a creature or an item in a sphere of translucent blue energy. What it
 holds falls in place and can't act: it doesn't move, attack or react (a creeper doesn't blow, a
 player can't hit or use anything). The field moves, and what it holds with it: lift a friend to a
-higher floor, or hold a mob out of the way. It never moves blocks. In a [Bot Golem](/hardware/bot-golem/)
+higher floor, or hold a mob out of the way. It never moves blocks. It hums up as it takes hold,
+hums softly round what it holds, and powers down as it lets go. In a [Bot Golem](/hardware/bot-golem/)
 holding itself, it's how the golem flies.
 
 <div class="infobox" markdown="1">

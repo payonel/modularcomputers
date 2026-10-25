@@ -309,10 +309,10 @@ def internet_card_item():
 	return im
 
 def operator_card_item():
-	"""A command block's look on the bracket (orange, its arrow), and a gold chip: it runs the server's commands."""
+	"""A command block's look on the bracket (purple, a repeating command block's, the user's; its arrow), and a gold chip: it runs the server's commands."""
 	im = card_base()
 	rect(im, 4, 7, 7, 9, (214, 170, 40, 255))  # a gold chip
-	rect(im, 13, 4, 15, 8, (186, 112, 58, 255))  # the command block
+	rect(im, 13, 4, 15, 8, (128, 74, 186, 255))  # the command block
 	im.putpixel((14, 5), (240, 220, 190, 255))
 	im.putpixel((14, 6), (240, 220, 190, 255))
 	im.putpixel((15, 6), (240, 220, 190, 255))

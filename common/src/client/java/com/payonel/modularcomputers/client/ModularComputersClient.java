@@ -76,6 +76,7 @@ public final class ModularComputersClient {
 		renderers.register(ModBlocks.PHOTOMASK_ENTITY, context -> new PhotomaskRenderer());
 		renderers.entity(com.payonel.modularcomputers.entity.ModEntities.BOT_GOLEM, com.payonel.modularcomputers.client.entity.BotGolemRenderer::new);
 		renderers.entity(com.payonel.modularcomputers.entity.ModEntities.ENERGY_FIELD, com.payonel.modularcomputers.client.entity.EnergyFieldRenderer::new);
+		com.payonel.modularcomputers.entity.EnergyField.clientHum = com.payonel.modularcomputers.client.sound.FieldHum::start;
 	}
 
 	public static void screens(Screens screens) {

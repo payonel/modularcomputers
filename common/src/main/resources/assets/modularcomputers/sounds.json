@@ -1,4 +1,25 @@
 {
+	"field_on": {
+		"sounds": [
+			"modularcomputers:field_on"
+		],
+		"subtitle": "subtitles.modularcomputers.field_on"
+	},
+	"field_off": {
+		"sounds": [
+			"modularcomputers:field_off"
+		],
+		"subtitle": "subtitles.modularcomputers.field_off"
+	},
+	"field_hum": {
+		"sounds": [
+			{
+				"name": "modularcomputers:field_hum",
+				"attenuation_distance": 12
+			}
+		],
+		"subtitle": "subtitles.modularcomputers.field_hum"
+	},
 	"sound_card": {
 		"sounds": [
 			{

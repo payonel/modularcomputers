@@ -57,6 +57,11 @@ public final class EnergyField extends Entity {
 		void lost(String why);
 	}
 
+	/** What a client does as a field comes into view: its hum, while it's there (the client's, set at its start). */
+	public static java.util.function.Consumer<EnergyField> clientHum = field -> {
+	};
+	private boolean humming;
+
 	private Entity held;
 	/** Where what it holds is held (its feet), and where a move is taking it (null: none). */
 	private Vec3 anchor;
@@ -86,6 +91,8 @@ public final class EnergyField extends Entity {
 		double height = entity.getBbHeight();
 		entityData.set(RADIUS, (float) (Math.sqrt(2 * width * width + height * height) / 2 + MARGIN)); // (its box's half diagonal)
 		follow();
+		level().playSound(null, entity.getX(), entity.getY(), entity.getZ(), com.payonel.modularcomputers.sound.ModSounds.FIELD_ON,
+			net.minecraft.sounds.SoundSource.NEUTRAL, 1, 1);
 		return true;
 	}
 
@@ -112,6 +119,8 @@ public final class EnergyField extends Entity {
 	/** Lets what it holds go (it falls), and goes. */
 	public void release() {
 		if (held != null) {
+			Vec3 at = held.getBoundingBox().getCenter();
+			level().playSound(null, at.x, at.y, at.z, com.payonel.modularcomputers.sound.ModSounds.FIELD_OFF, net.minecraft.sounds.SoundSource.NEUTRAL, 1, 1);
 			HOLDING.remove(held, this);
 			held.resetFallDistance(); // (it falls from here: what it fell held in place doesn't count)
 			if (held instanceof ItemEntity item) {
@@ -127,6 +136,10 @@ public final class EnergyField extends Entity {
 	public void tick() {
 		super.tick();
 		if (!(level() instanceof ServerLevel)) {
+			if (!humming) {
+				humming = true;
+				clientHum.accept(this); // (its hum, round it, for as long as it's there)
+			}
 			return;
 		}
 		if (held == null) {
