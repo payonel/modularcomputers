@@ -12,9 +12,9 @@ Devices: `devices/index.md`, `terminal.md`, `disk.md`, `disk-station.md`, `eepro
   `operator-card.md`, `motion-sensor.md`, `audio-sensor.md`, `weather-sensor.md`, `robotic-piston.md`,
   `robotics.md`, `charger.md`, `crafting-card.md`, `energy-field-card.md`
 mcos: `mcos/index.md`, `boot.md`, `filesystem.md`, `shell.md`, `dev.md`, `networking.md`,
-  `services.md`, `programs.md` (writing programs), `sys-api.md`, `remote-shell.md`
+  `services.md`, `programs.md` (writing programs), `sys-api.md`, `devices-library.md`, `remote-shell.md`
 Programs: `programs/index.md` and `programs/<name>.md` per man page (generated)
 Tutorials: `tutorials/index.md`, `first-computer.md`, `first-program.md`, `redstone.md`,
-  `two-computers.md`, `disk-station.md`
+  `two-computers.md`, `disk-station.md`, `service.md`, `from-opencomputers.md`
 
 Links are root-relative with a trailing slash: `/hardware/case/`, `/programs/ls/`.

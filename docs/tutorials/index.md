@@ -22,6 +22,10 @@ wrong.
    commands and copy files between them with [rsh](/programs/rsh/) and [rcp](/programs/rcp/).
 5. [The Disk Station](/tutorials/disk-station/). For anyone with more than one disk. Format, clone
    and install mcos onto disks with the [Disk Station](/hardware/disk-station/).
+6. [Your own service](/tutorials/service/). For anyone with a program that should keep running.
+   Make it a service that runs in the background and starts at boot, with [rc](/programs/rc/).
+7. [Coming from OpenComputers](/tutorials/from-opencomputers/). For OpenComputers players. What you
+   did with components, signals, the GPU and robots, done the mcos way.
 
 If you want to know why something works the way it does, the [concepts](/concepts/) pages explain
 the ideas ([the bus](/concepts/bus/), [power](/concepts/power/), [names](/concepts/names/)), and the

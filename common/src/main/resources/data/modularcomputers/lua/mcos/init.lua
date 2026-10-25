@@ -187,6 +187,20 @@ function k.refreshdevices()
       k.log(entry.name, entry.id, "detached")
     end
   end
+  -- /dev's names changed: inotify's notices (as udev's /dev nodes come and go), a name given to
+  -- another device being both (storage1 becomes storage0 as storage0 goes).
+  if k.changed then
+    for name, entry in pairs(devices.byname) do
+      if not byname[name] or byname[name].id ~= entry.id then
+        k.changed("/dev/" .. name, "remove")
+      end
+    end
+    for name, entry in pairs(byname) do
+      if not devices.byname[name] or devices.byname[name].id ~= entry.id then
+        k.changed("/dev/" .. name, "create")
+      end
+    end
+  end
   devices.list, devices.byname, devices.byid = list, byname, byid
   return list
 end

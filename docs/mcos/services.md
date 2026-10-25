@@ -68,7 +68,7 @@ again at the next boot.
 
 ## Writing your own
 
-Put a Lua script in `/etc/rc.d` named after the service, with a `command`:
+The tutorial [Your own service](/tutorials/service/) walks through one. In short: put a Lua script in `/etc/rc.d` named after the service, with a `command`:
 
 ```lua
 description = "my sensor logger"

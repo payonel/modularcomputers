@@ -334,24 +334,74 @@ class McosTest extends McosHarness {
 	}
 
 	@Test
-	void sysHasADirectoryADeviceAndAReadOnlyFileForEachOfItsMethods() {
+	void sysClassHasADirectoryAKindAndADeviceWithItsAttributesAndAFileAMethod() {
 		file("api.lua", """
 			local fs = require("fs")
 			local out = assert(io.open("/api", "w"))
-			for _, entry in ipairs(assert(fs.list("/sys/eeprom"))) do
-			  local f = assert(io.open("/sys/eeprom/" .. entry.name))
+			for _, entry in ipairs(assert(fs.list("/sys/class/eeprom/eeprom/methods"))) do
+			  local f = assert(io.open("/sys/class/eeprom/eeprom/methods/" .. entry.name))
 			  out:write(entry.name, "=", (f:read("l")), "\\n")
 			  f:close()
 			end
 			out:close()
 			""");
 		boot();
-		type("ls /sys > /ls; ls /sys/eeprom > /m; cat /sys/eeprom/get > /e; lua /api.lua; echo x 2> /dev/null > /sys/eeprom/get; echo $? > /status\r");
+		type("ls /sys/class > /k; ls /sys/class/eeprom/eeprom > /a; cat /sys/class/eeprom/eeprom/type /sys/class/eeprom/eeprom/path > /t; "
+			+ "cat /sys/class/eeprom/eeprom/methods/get > /e; lua /api.lua; echo x 2> /dev/null > /sys/class/eeprom/eeprom/type; echo $? > /status\r");
 		untilFile(root().resolve("status"), "1\n"); // (read only: the write is refused)
-		assertThat(read(root().resolve("ls"))).as("a directory a device, by its /dev name").contains("eeprom\n", "terminal0\n");
-		assertThat(read(root().resolve("m"))).as("a file a method").contains("get\n", "set\n");
+		assertThat(read(root().resolve("k"))).as("a directory a kind of device").contains("eeprom\n", "terminal\n", "storage\n");
+		assertThat(read(root().resolve("a"))).as("its attributes, a file each, and its methods").isEqualTo("id\nlabel\nmethods\npath\ntype\n"); // (ls sorts)
+		assertThat(read(root().resolve("t"))).isEqualTo("eeprom\neeprom\n");
 		assertThat(read(root().resolve("e"))).as("its signature, then what it does, indented").containsPattern("^get\\(\\)\n    \\S");
 		assertThat(read(root().resolve("api"))).as("a program lists and reads them as files").contains("get=get()\n", "set=set(");
+	}
+
+	@Test
+	void theDevicesLibraryOpensADeviceAsATableOfItsMethods() {
+		file("open.lua", """
+			local devices = require("devices")
+			local out = assert(io.open("/o", "w"))
+			for _, device in ipairs(devices.list("eeprom")) do out:write("listed ", device.name, " ", device.type, "\\n") end
+			local eeprom = assert(devices.open("eeprom"))
+			local names = {}
+			for name, method in pairs(eeprom) do names[#names + 1] = name end
+			table.sort(names)
+			out:write("methods ", table.concat(names, " "), "\\n")
+			out:write("doc ", tostring(eeprom.get):match("^[^\\n]*"), "\\n")
+			out:write("called ", #eeprom.get(), "\\n")
+			out:write("info ", devices.info(eeprom).type, "\\n")
+			devices.close(eeprom)
+			out:write("missing ", tostring(select(2, devices.open("nosuch0"))), "\\n")
+			out:close()
+			""");
+		boot();
+		String image = machine.board().eeprom().orElseThrow().image();
+		type("lua /open.lua; echo $? > /status\r");
+		untilFile(root().resolve("status"), "0\n");
+		assertThat(read(root().resolve("o"))).contains("listed eeprom eeprom\n", "doc get()\n", "called " + image.length() + "\n", "info eeprom\n",
+			"missing no such device: nosuch0\n").containsPattern("methods .*\\bget\\b.*\\bset\\b");
+	}
+
+	@Test
+	void aProgramWaitingOnDevHearsADeviceComeOntoTheBus() {
+		file("wait.lua", """
+			local devices = require("devices")
+			local sys = require("sys")
+			local watch = sys.inotify()
+			sys.watch(watch, "/dev")
+			io.open("/ready", "w"):close()
+			local name = devices.wait("motion")
+			local f = io.open("/came", "w"); f:write(name, "\\n", (sys.read(watch, 4096))); f:close()
+			""");
+		boot();
+		type("lua /wait.lua 2> /err\r");
+		settle(() -> Files.exists(root().resolve("ready")));
+		devices.put(Motherboard.exp(0), new com.payonel.modularcomputers.device.MotionSensorCard());
+		TestBus.of(machine, devices); // plugged in: the bus's interrupt
+		settle(() -> Files.exists(root().resolve("came")) && Files.exists(root().resolve("err")));
+		untilIdle();
+		assertThat(read(root().resolve("err"))).isEmpty();
+		assertThat(read(root().resolve("came"))).as("devices.wait's name, and inotify's notice of /dev").isEqualTo("motion0\nCREATE /dev/motion0\n");
 	}
 
 	@Test

@@ -37,18 +37,22 @@ sys.close(card)
 A device's file is ready for `sys.poll`'s `PRI` while the device has news: its interrupt came
 since the file was last read. The methods each device has are on its page.
 
-## /sys: what a device can do
+## /sys: what a device is and can do
 
-So a device can be learned in the game, without this manual, `/sys` has a directory for each
-device, by the same name as its `/dev` file, and in it a read-only file for each of its methods (its
-file's ioctls): the method's arguments and what it does, from the device's own descriptions, as
-Linux's sysfs has a directory a device and a file an attribute.
+So a device can be learned in the game, without this manual, `/sys/class` has a directory for each
+kind of device on the bus, and in it a directory for each device, by its `/dev` name, as Linux's
+`/sys/class` has (`/sys/class/net/eth0`). In a device's directory, its attributes are small
+read-only files (`type`, `id`, `path`: its slot, or `-` when it's cabled; `label`), and `methods`
+has a file for each of its methods (its file's ioctls): the method's arguments and what it does,
+from the device's own descriptions. Linux has a `/sys/devices` tree too, by where each device is
+attached; mcos's bus is flat, so there's only the class tree.
 
 ```sh
-ls /sys
-ls /sys/robotics0
-cat /sys/robotics0/walk
-cat /sys/robotics0/* | less
+ls /sys/class
+ls /sys/class/robotics
+cat /sys/class/robotics/robotics0/id
+ls /sys/class/robotics/robotics0/methods
+cat /sys/class/robotics/robotics0/methods/walk
 ```
 
 ```
@@ -57,21 +61,15 @@ walk(forward[, right[, up]])
     way it faces, right to its right, up), by the way it finds; ...
 ```
 
-A program reads them as any files, to make its own table of a device's API:
+Programs read them as any files; the [devices library](/mcos/devices-library/) does it for you.
 
-```lua
-local fs = require("fs")
+## Devices coming and going
 
-local api = {}
-for _, entry in ipairs(assert(fs.list("/sys/robotics0"))) do
-  local file = assert(io.open("/sys/robotics0/" .. entry.name))
-  api[entry.name] = file:read("a")
-  file:close()
-end
-for name, text in pairs(api) do
-  print(name, (text:match("^[^\n]*")))
-end
-```
+A device joining the bus makes its file appear in `/dev`, and one leaving takes it away, so
+inotify reports them as any directory's changes: `CREATE /dev/charger0`, `DELETE /dev/charger0`
+(a name passing to another device, as `storage1` becomes `storage0` when `storage0` goes, is both).
+A program waits for a device with a watch on `/dev`, or with `devices.wait`: see
+[the devices library](/mcos/devices-library/).
 
 ## How a file behaves
 

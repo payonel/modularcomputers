@@ -23,6 +23,7 @@ operating system works, because the parts are small enough to read.
 - [Services](/mcos/services/): `/etc/rc`, `/etc/rc.d` and `rc.conf`.
 - [Remote shell](/mcos/remote-shell/): `rsh`, `rshd` and `rcp`.
 - [The sys library](/mcos/sys-api/): the system calls a Lua program uses.
+- [The devices library](/mcos/devices-library/): the bus's devices as tables of their methods, and waiting for one to come.
 - [Programs](/programs/): every command, one page each.
 
 ## How it is built

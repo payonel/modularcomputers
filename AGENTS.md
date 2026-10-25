@@ -481,7 +481,7 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   (`lib/modules/drivers/<type>.lua`, found by its type) making it text: a redstone card's file is a
   line a face (`north 7 7`), a line written takes effect at once (a sysfs attribute's write); a
   device without one (the EEPROM) takes everything written at close, all or nothing.
-- **Every device has a `/dev` file, and it's the device's API** (the user's call: no `device.*`
+- **Every device has a `/dev` file, and it's the device's API** (the user's call: no kernel device
   library): `/dev` is flat, `console`, `tty`, `null`, `zero` and a node for each
   device by the kernel's name, and its ioctls are the device's methods by name
   (`sys.ioctl(fd, "setStrength", 4)`, in any open mode, with the arguments given and no more: a stream
@@ -503,10 +503,15 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   older ones dropped), so a reader sees what's current and nothing grows: a NIC's file reads its
   frames, one a line (direction, remote address, distance, bytes, outcome); its data is read
   through sockets.
-- **`/sys` makes devices learnable in the game** (the user's): a directory a device, by its `/dev`
-  name, and a read-only file a method (`/sys/robotics0/walk`), its arguments and what it does, from
-  its `@Method` doc (so a method's doc begins with its signature: `walk(forward[, right]): ...`), as
-  Linux's sysfs has a file an attribute (`sysfs.lua`). Programs read them as files: no API of its own.
+- **`/sys` makes devices learnable in the game** (the user's): Linux's `/sys/class` tree, a
+  directory a kind, a device by its `/dev` name, its attributes a read-only file each (type, id,
+  path, label) and `methods/` a file a method, its arguments and what it does, from its `@Method`
+  doc (so a doc begins with its signature: `walk(forward[, right]): ...`). No `/sys/devices` tree:
+  the bus is flat (`sysfs.lua`). `/dev`'s names coming and going are inotify notices
+  (`CREATE /dev/charger0`, udev's way), so a program waits for a device as for a file.
+- **`lib/devices.lua` is user space's convenience over `/dev`, `/sys` and inotify** (the user's;
+  `sys` stays the kernel's calls): a device opened as a table of its methods (ioctls; `tostring` a
+  method's doc, as OpenComputers' proxies), the bus listed, `devices.wait` for one to come.
 - **`sys.poll(fds, seconds)`** is poll(2) (`IN`, `PRI`, `OUT`; `HUP`, `ERR` unasked), in `sys` (mcos's
   POSIX layer), since Lua's `io` is C's stdio; `sys.fileno` gives an io file's descriptor. A
   redstone file is always readable and reports a change as `PRI` (a sysfs GPIO's way).

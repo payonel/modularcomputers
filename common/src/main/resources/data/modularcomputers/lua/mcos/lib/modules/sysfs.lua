@@ -1,15 +1,21 @@
--- sysfs: /sys, what each device on the bus can do, so a player can learn a device without the
--- manual (the user's). A directory a device, by the kernel's name for it (as /dev's: robotics0,
--- crafting0), and in it a file a method (its /dev file's ioctls), read only: its arguments and what
--- it does, from the device's own descriptions (cat /sys/robotics0/walk; ls /sys/robotics0), as
--- Linux's sysfs has a directory a device and a file an attribute. A program lists and reads them as
--- any files.
+-- sysfs: /sys, what each device on the bus is and can do, so a player can learn a device without
+-- the manual (the user's). As Linux's /sys/class: a directory a kind of device (its type), in it a
+-- directory a device, by the kernel's name for it (as /dev's), and in that its attributes, a small
+-- read-only file each, and its methods (its /dev file's ioctls), a file each, saying its arguments
+-- and what it does, from the device's own descriptions:
+--   /sys/class/robotics/robotics0/type, id, path, label     (path: its slot, or - when it's cabled)
+--   /sys/class/robotics/robotics0/methods/walk
+-- Linux has a /sys/devices tree too, by where each device is; mcos's bus is flat, so there's only
+-- the class tree. Programs list and read it as any files.
 local k, vfs = ...
 
 local fail = vfs.fail
 
 local fs = {type = "sysfs"}
 
+local CLASS = "class"
+local METHODS = "methods"
+local ATTRIBUTES = {"type", "id", "path", "label"} -- a device's, from the kernel's view of the bus
 local WIDTH = 78 -- a description's lines, at most, indented
 local INDENT = "    "
 
@@ -36,28 +42,93 @@ local function about(device, name)
   return (signature or doc) .. "\n" .. (signature and wrap(says) .. "\n" or "")
 end
 
--- What a path names: a device (its directory), and one of its methods (a file), or nothing.
+local function methods(device)
+  local list = board.methods(device.id) or {}
+  table.sort(list)
+  return list
+end
+
+local function kind(device)
+  return tostring(device.type or "device")
+end
+
+-- What a path names: {dir = entries()} or {file = text()}, or nil.
 local function find(path)
-  local name, method = path:match("^/([^/]+)/?([^/]*)$")
-  local device = k.devices.byname[name or ""]
-  if not device or method == "" then
-    return device
+  local parts = {}
+  for part in path:gmatch("[^/]+") do
+    parts[#parts + 1] = part
   end
-  for _, each in ipairs(board.methods(device.id) or {}) do
-    if each == method then
-      return device, method
+  if #parts == 0 then
+    return {dir = function() return {{name = CLASS, type = "directory"}} end}
+  elseif parts[1] ~= CLASS then
+    return nil
+  elseif #parts == 1 then
+    return {dir = function()
+      local seen, entries = {}, {}
+      for _, device in ipairs(k.devices.list) do
+        if not seen[kind(device)] then
+          seen[kind(device)] = true
+          entries[#entries + 1] = {name = kind(device), type = "directory"}
+        end
+      end
+      return entries
+    end}
+  end
+  if #parts == 2 then
+    local entries = {}
+    for _, device in ipairs(k.devices.list) do
+      if kind(device) == parts[2] then
+        entries[#entries + 1] = {name = device.name, type = "directory"}
+      end
+    end
+    return #entries > 0 and {dir = function() return entries end} or nil
+  end
+  local device = k.devices.byname[parts[3]]
+  if not device or kind(device) ~= parts[2] then
+    return nil
+  elseif #parts == 3 then
+    return {dir = function()
+      local entries = {}
+      for i, attribute in ipairs(ATTRIBUTES) do
+        entries[i] = {name = attribute, type = "file"}
+      end
+      entries[#entries + 1] = {name = METHODS, type = "directory"}
+      return entries
+    end}
+  elseif #parts == 4 and parts[4] == METHODS then
+    return {dir = function()
+      local entries = {}
+      for i, name in ipairs(methods(device)) do
+        entries[i] = {name = name, type = "file"}
+      end
+      return entries
+    end}
+  elseif #parts == 4 then
+    for _, attribute in ipairs(ATTRIBUTES) do
+      if attribute == parts[4] then
+        return {file = function() return tostring(device[attribute] or "-") .. "\n" end}
+      end
+    end
+  elseif #parts == 5 and parts[4] == METHODS then
+    for _, name in ipairs(methods(device)) do
+      if name == parts[5] then
+        return {file = function() return about(device, name) end}
+      end
     end
   end
+  return nil
 end
 
 function fs:open(path, mode)
-  local device, method = find(path)
-  if not method then
-    return fail(device and "EISDIR" or "ENOENT")
+  local node = find(path)
+  if not node then
+    return fail("ENOENT")
+  elseif node.dir then
+    return fail("EISDIR")
   elseif mode:find("[wa+]") then
     return fail("EACCES") -- (read only)
   end
-  local text, at = about(device, method), 0
+  local text, at = node.file(), 0
   return {
     type = "file",
     events = function(self)
@@ -79,37 +150,23 @@ function fs:open(path, mode)
 end
 
 function fs:stat(path)
-  if path == "/" then
+  local node = find(path)
+  if not node then
+    return fail("ENOENT")
+  elseif node.dir then
     return {type = "directory", size = 0, modified = 0}
   end
-  local device, method = find(path)
-  if method then
-    return {type = "file", size = #about(device, method), modified = 0}
-  elseif device then
-    return {type = "directory", size = 0, modified = 0}
-  end
-  return fail("ENOENT")
+  return {type = "file", size = #node.file(), modified = 0}
 end
 
--- / lists the devices (directories), a device its methods (files), in name order.
 function fs:list(path)
-  local entries = {}
-  if path == "/" or path == "" then
-    for i, device in ipairs(k.devices.list) do
-      entries[i] = {name = device.name, type = "directory"}
-    end
-    return entries
+  local node = find(path)
+  if not node then
+    return fail("ENOENT")
+  elseif not node.dir then
+    return fail("ENOTDIR")
   end
-  local device, method = find(path)
-  if not device or method then
-    return fail(method and "ENOTDIR" or "ENOENT")
-  end
-  local methods = board.methods(device.id) or {}
-  table.sort(methods)
-  for i, name in ipairs(methods) do
-    entries[i] = {name = name, type = "file"}
-  end
-  return entries
+  return node.dir()
 end
 
 function fs:mkdir()
