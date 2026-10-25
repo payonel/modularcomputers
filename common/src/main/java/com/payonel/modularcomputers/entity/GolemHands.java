@@ -241,6 +241,12 @@ final class GolemHands {
 		BlockPos pos = at(face);
 		Direction toward = direction(face);
 		ServerPlayer player = hand(face);
+		// Without legs it has no footing to work a tool: one in hand is used as an empty hand (a
+		// button, a door, a lever, its legs popped up), and goes back in its hand after.
+		ItemStack tool = !golem.legs() && player.getMainHandItem().isDamageableItem() ? player.getMainHandItem() : null;
+		if (tool != null) {
+			player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+		}
 		try {
 			// A mob or an item there: used on it, as a player's click on it (shears on a sheep, legs popped up).
 			for (Entity entity : entitiesAt(pos)) {
@@ -282,6 +288,13 @@ final class GolemHands {
 			}
 			return Result.fail("nothing there");
 		} finally {
+			if (tool != null) {
+				ItemStack given = player.getMainHandItem();
+				player.setItemInHand(InteractionHand.MAIN_HAND, tool);
+				if (!given.isEmpty()) {
+					player.getInventory().add(given); // (what its empty hand was given: kept as the rest)
+				}
+			}
 			done(player);
 		}
 	}
@@ -306,6 +319,9 @@ final class GolemHands {
 	}
 
 	Result swing(String face) {
+		if (!golem.legs()) {
+			return Result.fail("no legs: it can't swing without its footing");
+		}
 		BlockPos pos = at(face);
 		List<Entity> there = entitiesAt(pos).stream().filter(entity -> entity instanceof LivingEntity).toList();
 		if (!there.isEmpty()) {

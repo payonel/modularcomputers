@@ -92,23 +92,23 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 
 ### The golem's hands, crafting, fields and flight (user design, 2026-10-24), building in stages
 
-1. **Robotics, no cards:** a scan of the six spaces round it at once (air, block, fluid, entity,
+1. **Robotics, no cards** (built): a scan of the six spaces round it at once (air, block, fluid, entity,
    detailed: a block's state, a fluid's level, a container's size), relative to itself; one item in
    hand (placed in its GUI): place blocks, use tools (an axe, a pickaxe: breaking takes a player's
    time), interact (buttons, doors, levers); a container in front: put the hand's items in, take
    them out. On its legs it presses pressure plates.
-2. **The crafting card,** in any computer: storage (a 3x3 crafting grid, the rest storage), its
+2. **The crafting card** (built), in any computer: storage (a 3x3 crafting grid, the rest storage), its
    own tab on the right of the computer's GUI (a tab button each card), where a player crafts by
    hand; its API needs robotics (a case's calls fail, "no robotics available": its Shift details
    say so), and crafting programmatically takes time and
    cards craft at once (more cards, more throughput); the output goes to storage, no room: the craft
    fails; it picks items up from the world and drops them, moves them to and from the hand and
    containers. With one in, a tiny chest on its back, partly sunk in its frame.
-3. **The energy field card** (any computer): suspends a creature or an item in a translucent blue
+3. **The energy field card** (built) (any computer): suspends a creature or an item in a translucent blue
    sphere; held, it falls in place and can't act, move, attack or react (a creeper doesn't blow);
    the field moves, and what it holds with it (lift a player to a higher floor). Never blocks (one
    day, maybe buttons).
-4. **Legs:** robotics' `detachLegs`: without a field the golem falls over and powers off; inside its
+4. **Legs** (built): robotics' `detachLegs`: without a field the golem falls over and powers off; inside its
    own field it flies, the field moved by its program, much faster than it walks, its legs left
    behind; `attachLegs` within a small distance of them: it goes to them and lands. In flight it
    still runs, crafts and acts, but uses no tools (buttons and doors yes) and presses no pressure

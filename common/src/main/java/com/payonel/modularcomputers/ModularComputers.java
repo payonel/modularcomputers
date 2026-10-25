@@ -58,7 +58,7 @@ public final class ModularComputers {
 	 */
 	public static List<RecipeSerializer<?>> clientRecipeSerializers() {
 		return List.of(ShapedRecipe.SERIALIZER, BatteryUpgradeRecipe.SERIALIZER, com.payonel.modularcomputers.item.DiskUsingRecipe.SERIALIZER,
-			BlastingRecipe.SERIALIZER);
+			com.payonel.modularcomputers.item.GolemAssemblyRecipe.SERIALIZER, BlastingRecipe.SERIALIZER);
 	}
 
 	/** The types of {@link #clientRecipeSerializers}' recipes. */
@@ -76,6 +76,7 @@ public final class ModularComputers {
 		BatteryChargingRecipe.init();
 		ClearIdRecipe.init();
 		BatteryUpgradeRecipe.init();
+		com.payonel.modularcomputers.item.GolemAssemblyRecipe.init();
 		com.payonel.modularcomputers.item.DiskUsingRecipe.init();
 		ModBlocks.init();
 		com.payonel.modularcomputers.entity.ModEntities.init();

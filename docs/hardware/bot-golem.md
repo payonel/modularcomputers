@@ -53,6 +53,24 @@ A [crafting card](/devices/crafting-card/) gives it storage (a tiny chest appear
 crafting grid its programs craft with; what it breaks goes there first. Each card has a tab under
 its hands.
 
+## Its legs, and flight
+
+A program can detach the golem's legs (`detachLegs`). With an [energy field card](/devices/energy-field-card/)
+holding the golem itself first, it flies on, much faster than it walks, its program moving the field,
+its legs left standing below; in flight it still runs, crafts and works buttons and doors, but uses
+no tools (it has no footing) and presses no pressure plates. With nothing holding it up, it falls
+over and powers off. Its legs, emerald and redstone clamps on top, plug into sockets under its
+torso: `attachLegs`, within three blocks of them, takes it to them and onto them.
+
+![A golem's torso on the ground beside its legs](/assets/img/bot-golem-legs.png)
+*A golem's torso, beside its legs.*
+
+A right click on legs pops them up into your inventory (the golem's `use` pops them into its own),
+and their item, used on a block, stands them there. If its power runs out or it's turned off in
+flight, its field lets go and its torso falls: hit it to pick it up as a Bot Golem Torso (its parts
+in it), or right-click it for its view. A torso crafted over its legs, in any crafting grid (2x2 is
+enough), is the golem again, with all it kept.
+
 It runs on its battery, as a case does: swap the battery, or walk it onto a
 [charging pad](/hardware/charging-pad/). It does nothing until a
 program tells its robotics device to act. See [Robotics device](/devices/robotics/) for

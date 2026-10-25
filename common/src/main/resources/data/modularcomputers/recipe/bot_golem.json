@@ -1,0 +1,15 @@
+{
+	"type": "modularcomputers:golem_assembly",
+	"category": "misc",
+	"key": {
+		"T": "modularcomputers:bot_golem_torso",
+		"L": "modularcomputers:bot_golem_legs"
+	},
+	"pattern": [
+		"T",
+		"L"
+	],
+	"result": {
+		"id": "modularcomputers:bot_golem"
+	}
+}

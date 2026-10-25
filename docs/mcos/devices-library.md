@@ -40,10 +40,20 @@ function, `device.method(args...)`, and answers as the method does (nil and why 
 methods, and nothing else is in it. Its file stays open until `devices.close`. Fails with `no such
 device`.
 
-### devices.info(device) → {name, type, id, fd}
+### devices.info(device) → {name, type, id, path, label, methods, fd}, or nil and why
 
-What an opened device is: its name, type, id (`id:...`, the same wherever it's connected) and its
-file's descriptor (for `sys.poll`).
+What a device is: one opened, or one by its name (`devices.info("operator0")`, or
+`"/dev/operator0"`): its name, type, id (`id:...`, the same wherever it's connected), path (its
+slot, `exp:1`; nil when it's cabled), label (nil when it has none), and its methods' names, a list.
+An opened one's adds its file's descriptor, `fd` (for `sys.poll`).
+
+```lua
+local devices = require("devices")
+for _, device in ipairs(devices.list()) do
+  local info = devices.info(device.name)
+  print(info.name, info.type, info.path or "cabled", table.concat(info.methods, " "))
+end
+```
 
 ### devices.close(device) → true
 

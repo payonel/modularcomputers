@@ -458,7 +458,8 @@ public class CaseGameTest {
 		for (var item : ModCommands.modItems()) {
 			boolean holdsData = ModItems.EEPROMS.contains(item) || ModItems.HARD_DISKS.contains(item)
 				|| item == ModItems.BOT_GOLEM // (its parts and its board's id)
-				|| item == ModItems.CRAFTING_CARD; // (its slots' items)
+				|| item == ModItems.CRAFTING_CARD // (its slots' items)
+				|| item == ModItems.BOT_GOLEM_TORSO; // (a golem's parts, as the golem's)
 			helper.assertValueEqual(new ItemStack(item).getMaxStackSize(), holdsData ? 1 : 64, "how many " + item + " stack");
 		}
 		helper.assertTrue(ItemStack.isSameItemSameComponents(ModItems.TIER1_BATTERY.charged(), ModItems.TIER1_BATTERY.charged()),

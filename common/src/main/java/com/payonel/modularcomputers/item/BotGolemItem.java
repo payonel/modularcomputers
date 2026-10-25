@@ -12,11 +12,19 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * A bot golem, picked up: used on a block, it stands there, facing the player, with the parts and
- * board id it kept.
+ * board id it kept. Its torso alone (its legs detached) is one too, and is placed without legs.
  */
 public final class BotGolemItem extends HintedItem {
+	/** Whether it's a whole golem (or its torso alone). */
+	private final boolean legs;
+
 	public BotGolemItem(Properties properties) {
+		this(properties, true);
+	}
+
+	public BotGolemItem(Properties properties, boolean legs) {
 		super(properties);
+		this.legs = legs;
 	}
 
 	@Override
@@ -37,6 +45,7 @@ public final class BotGolemItem extends HintedItem {
 		}
 		Vec3 at = Vec3.atBottomCenterOf(context.getClickedPos().relative(context.getClickedFace()));
 		float facing = context.getPlayer() != null ? context.getPlayer().getYRot() + 180 : 0; // (toward the player)
+		golem.legs(legs); // (its size, for the room it needs)
 		golem.snapTo(at.x, at.y, at.z, facing, 0);
 		golem.setYBodyRot(facing);
 		golem.setYHeadRot(facing);
@@ -44,6 +53,7 @@ public final class BotGolemItem extends HintedItem {
 			return InteractionResult.FAIL; // no room
 		}
 		golem.fromItem(stack);
+		golem.legs(legs);
 		level.addFreshEntity(golem);
 		int before = stack.getCount();
 		stack.consume(1, context.getPlayer());

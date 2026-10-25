@@ -24,6 +24,7 @@ import net.minecraft.world.item.ItemStack;
  * in the golem's own art, its hand's slot holding the pickaxe, and its crafting card's tab open:
  * its grid, its result and its storage. The other, its back to the player, has a crafting card in:
  * a tiny chest on its back. And a pig held up in an energy field: a translucent blue sphere round it.
+ * And a golem's torso beside its legs, detached.
  */
 public class BotGolemClientGameTest implements FabricClientGameTest {
 	/** Facing south (toward the player, who faces north), and north (its back to the player). */
@@ -112,6 +113,20 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			context.getInput().lookAt(without);
 			context.waitTicks(10);
 			context.takeScreenshot("bot-golem-charging");
+			// A golem's torso, beside its legs, detached.
+			BlockPos torsoAt = feet.north(2).west(2);
+			int torsoId = singleplayer.getServer().computeOnServer(server -> {
+				BotGolem torso = golem(server.overworld(), torsoAt);
+				torso.legs(false);
+				var legs = com.payonel.modularcomputers.entity.ModEntities.GOLEM_LEGS.create(server.overworld(), EntitySpawnReason.COMMAND);
+				legs.snapTo(torsoAt.getX() - 0.5, torsoAt.getY(), torsoAt.getZ() + 0.5, SOUTH, 0);
+				server.overworld().addFreshEntity(legs);
+				return torso.getId();
+			});
+			context.waitFor(client -> client.level.getEntity(torsoId) instanceof BotGolem shown && !shown.legs());
+			context.getInput().lookAt(torsoAt);
+			context.waitTicks(10);
+			context.takeScreenshot("bot-golem-legs");
 			// A pig held up in an energy field, in front of the player.
 			BlockPos pigAt = feet.north(3).west(2).above(2);
 			int pigId = singleplayer.getServer().computeOnServer(server -> {

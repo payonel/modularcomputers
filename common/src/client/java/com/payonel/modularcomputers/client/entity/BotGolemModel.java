@@ -22,6 +22,8 @@ public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 	public static final float HEAD_FRONT = -3;
 	/** The head's top, in pixels above the ground. */
 	public static final float HEAD_TOP = 15;
+	/** Its legs' height, in model pixels: without them, the rest sits that much lower. */
+	public static final float LEG_PIXELS = 3;
 	/** How far a stride swings an arm or a leg, in radians, and its period in walk steps (an iron golem's). */
 	private static final float SWING = 1.0f;
 	private static final float STRIDE = 13;
@@ -40,6 +42,15 @@ public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 		rightLeg = root.getChild("right_leg");
 		leftLeg = root.getChild("left_leg");
 		chest = root.getChild("chest");
+	}
+
+	/** Its legs alone, as they stand when detached: its leg boxes, the same texture. */
+	public static LayerDefinition createLegsLayer() {
+		MeshDefinition mesh = new MeshDefinition();
+		PartDefinition root = mesh.getRoot();
+		root.addOrReplaceChild("right_leg", CubeListBuilder.create().texOffs(28, 12).addBox(-1.5f, 0, -1.5f, 3, 3, 3), PartPose.offset(-2, 21, 0));
+		root.addOrReplaceChild("left_leg", CubeListBuilder.create().texOffs(42, 12).mirror().addBox(-1.5f, 0, -1.5f, 3, 3, 3), PartPose.offset(2, 21, 0));
+		return LayerDefinition.create(mesh, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 	}
 
 	/** Its parts, in model pixels (y down, the ground at 24), and where each takes its texture. */
@@ -67,6 +78,9 @@ public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 	public void setupAnim(BotGolemRenderer.State state) {
 		super.setupAnim(state);
 		chest.visible = state.chest;
+		rightLeg.visible = state.legs;
+		leftLeg.visible = state.legs;
+		root().y = state.legs ? 0 : LEG_PIXELS; // (its torso on the ground; model y is down)
 		float swing = Mth.triangleWave(state.walkAnimationPos, STRIDE) * state.walkAnimationSpeed * SWING;
 		rightArm.xRot = swing;
 		leftArm.xRot = -swing;

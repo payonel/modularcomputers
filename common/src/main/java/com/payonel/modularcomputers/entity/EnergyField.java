@@ -78,6 +78,11 @@ public final class EnergyField extends Entity {
 		return HOLDING.containsKey(entity);
 	}
 
+	/** The field holding {@code entity}, or null. */
+	public static EnergyField fieldOf(Entity entity) {
+		return HOLDING.get(entity);
+	}
+
 	/** Holds {@code entity}, telling {@code listener} how it goes; false when a field holds it already. */
 	public boolean hold(Entity entity, Listener listener) {
 		if (HOLDING.putIfAbsent(entity, this) != null) {
@@ -109,6 +114,14 @@ public final class EnergyField extends Entity {
 	/** Starts moving what it holds by {@code by}, its middle to there: its listener hears when it arrives, or is blocked. */
 	public void moveBy(Vec3 by) {
 		target = anchor.add(by);
+	}
+
+	/** Moves where it holds what it holds by {@code by} at once, a move under way too (what it holds changed its shape: a golem's legs off). */
+	public void shift(Vec3 by) {
+		anchor = anchor.add(by);
+		if (target != null) {
+			target = target.add(by);
+		}
 	}
 
 	/** Stops a move under way, holding what it holds where it is. */

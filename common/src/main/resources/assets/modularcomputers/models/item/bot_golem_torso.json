@@ -1,0 +1,6 @@
+{
+	"parent": "minecraft:item/generated",
+	"textures": {
+		"layer0": "modularcomputers:item/bot_golem_torso"
+	}
+}

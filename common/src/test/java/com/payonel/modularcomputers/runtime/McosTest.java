@@ -369,7 +369,9 @@ class McosTest extends McosHarness {
 			out:write("methods ", table.concat(names, " "), "\\n")
 			out:write("doc ", tostring(eeprom.get):match("^[^\\n]*"), "\\n")
 			out:write("called ", #eeprom.get(), "\\n")
-			out:write("info ", devices.info(eeprom).type, "\\n")
+			out:write("info ", devices.info(eeprom).type, " ", tostring(devices.info(eeprom).fd ~= nil), "\\n")
+			local named = devices.info("/dev/eeprom")
+			out:write("named ", named.name, " ", named.type, " ", named.path, " ", tostring(named.fd), " ", tostring(#named.methods > 0), "\\n")
 			devices.close(eeprom)
 			out:write("missing ", tostring(select(2, devices.open("nosuch0"))), "\\n")
 			out:close()
@@ -378,7 +380,7 @@ class McosTest extends McosHarness {
 		String image = machine.board().eeprom().orElseThrow().image();
 		type("lua /open.lua; echo $? > /status\r");
 		untilFile(root().resolve("status"), "0\n");
-		assertThat(read(root().resolve("o"))).contains("listed eeprom eeprom\n", "doc get()\n", "called " + image.length() + "\n", "info eeprom\n",
+		assertThat(read(root().resolve("o"))).contains("listed eeprom eeprom\n", "doc get()\n", "called " + image.length() + "\n", "info eeprom true\n", "named eeprom eeprom eeprom nil true\n",
 			"missing no such device: nosuch0\n").containsPattern("methods .*\\bget\\b.*\\bset\\b");
 	}
 

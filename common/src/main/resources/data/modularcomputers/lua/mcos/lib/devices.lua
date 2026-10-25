@@ -93,9 +93,27 @@ function devices.open(name)
   return device
 end
 
--- devices.info(device): what an opened device is, {name, type, id, fd}.
+-- devices.info(device): what a device is: an opened one, or one by its name (operator0, or
+-- /dev/operator0): {name, type, id, path, label, methods} (path: its slot, nil when it's cabled;
+-- methods: their names), and an opened one's fd. Nil and why when there's no such device.
 function devices.info(device)
-  return about[device]
+  local opened = type(device) == "table" and about[device]
+  local name = opened and opened.name or type(device) == "string" and (device:match("([^/]+)$") or device)
+  local kind = name and typeof(name)
+  if not kind then
+    return nil, "no such device: " .. tostring(name or device)
+  end
+  local base = CLASS .. "/" .. kind .. "/" .. name
+  local function attribute(key)
+    local value = (slurp(base .. "/" .. key) or "-"):gsub("\n$", "")
+    return value ~= "-" and value or nil
+  end
+  local info = {name = name, type = kind, id = attribute("id"), path = attribute("path"), label = attribute("label"), methods = {},
+    fd = opened and opened.fd or nil}
+  for i, method in ipairs(fs.list(base .. "/methods") or {}) do
+    info.methods[i] = method.name
+  end
+  return info
 end
 
 -- devices.close(device): closes its file.

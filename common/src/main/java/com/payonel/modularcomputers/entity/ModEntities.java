@@ -30,6 +30,13 @@ public final class ModEntities {
 		EntityType.Builder.<EnergyField>of(EnergyField::new, MobCategory.MISC).sized(FIELD_SIZE, FIELD_SIZE).noSave().clientTrackingRange(FIELD_TRACKING)
 			.updateInterval(1));
 
+	/** A golem's legs: as wide as they stand, three pixels high. */
+	private static final float LEGS_WIDTH = 0.6f;
+	private static final float LEGS_HEIGHT = BotGolem.LEG_HEIGHT;
+
+	public static final EntityType<GolemLegs> GOLEM_LEGS = register("golem_legs",
+		EntityType.Builder.<GolemLegs>of(GolemLegs::new, MobCategory.MISC).sized(LEGS_WIDTH, LEGS_HEIGHT).clientTrackingRange(GOLEM_TRACKING));
+
 	private ModEntities() {
 	}
 

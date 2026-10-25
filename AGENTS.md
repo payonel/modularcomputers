@@ -295,6 +295,13 @@ its swing's strength from the time since its last), a container's items in and o
 moves them. What a broken block drops (or its hand is given) is caught: its storage first, else its
 off hand (a background catch, the user's: atypical, so storage is always preferred), else it stays
 in the world, and the `broke` event says whether it kept it all.
+- **Its legs come off** (`detachLegs`; the user's design): its legs an entity of their own
+  (`GolemLegs`, a boat's kind of object), the golem its torso alone (`LEGS`, saved; shorter). In
+  its own field it flies; with nothing holding it, it powers off. Legless: no walking, no tools
+  (swing refused; a tool in hand used as an empty hand: buttons, doors, its legs popped up),
+  ignoring block triggers (pressure plates). `attachLegs` within 3 blocks goes onto them (a field
+  holding it lets go). Picked up legless it's a torso item; torso over legs is a golem again
+  (`GolemAssemblyRecipe`, the torso's components kept).
 - **One answer says it all** (the user's): a program never checks twice. `store` answers `true, 0`
   when nothing it was asked to move is left, else `false` and how many are (never `false, 0`);
   no container is a failure (nil and why). `drop` fills a container there first and answers how

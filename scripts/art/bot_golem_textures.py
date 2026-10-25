@@ -23,6 +23,13 @@ LEAF = (88, 148, 56)
 BEZEL = (58, 56, 54)
 GLASS = (10, 12, 14)  # a tier 1 screen's glass, off
 PIN = (204, 166, 74)
+# Where its legs clamp onto its torso (the user's): emerald and redstone, the legs' clamps on top
+# (the male side), the torso's sockets underneath (the female side), the same colours.
+EMERALD = (40, 200, 110)
+EMERALD_DARK = (20, 120, 64)
+REDSTONE = (210, 36, 30)
+REDSTONE_DARK = (120, 16, 12)
+SOCKET = (26, 24, 24)
 
 # Each box: its name, texOffs (u, v), and size (w, h, d), as BotGolemModel's.
 BOXES = {
@@ -119,6 +126,15 @@ def golem(screen):
 			fill(im, x0, y0 + 1, x1, y0 + 2, CHEST_DARK)  # the lid's seam
 	bx0, by0, bx1, by1 = faces("chest")["back"]
 	put(im, (bx0 + bx1) // 2, by0 + 2, LATCH)
+	# the legs' clamps on their tops, an emerald one and a redstone one each; the torso's sockets under it
+	for leg, colors in (("right_leg", (EMERALD, REDSTONE)), ("left_leg", (REDSTONE, EMERALD))):
+		x0, y0, x1, y1 = faces(leg)["top"]
+		put(im, x0, y0 + 1, colors[0]); put(im, x0 + 2, y0 + 1, colors[1])
+		put(im, x0 + 1, y0 + 1, IRON_DARK)
+	ux0, uy0, ux1, uy1 = faces("body")["bottom"]
+	for i, c in enumerate((EMERALD_DARK, REDSTONE_DARK, REDSTONE_DARK, EMERALD_DARK)):
+		x = ux0 + 1 + i * 2
+		put(im, x, uy0 + 2, SOCKET); put(im, x, uy0 + 1, c)
 	# vines, as on an iron golem: over a shoulder, down the body's side, round a leg
 	vr = random.Random(37)
 	def vine(points):
@@ -153,10 +169,36 @@ def icon():
 	put(im, 4, 8, VINE); put(im, 4, 9, VINE_DARK); put(im, 5, 10, LEAF); put(im, 3, 9, VINE)
 	return im
 
+def torso_icon():
+	"""Its torso alone: the golem's icon without its legs, set a little lower, the sockets its legs
+	clamp into showing under it (emerald and redstone rims, dark holes)."""
+	whole = icon()
+	im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+	im.alpha_composite(whole.crop((0, 0, 16, 12)), (0, 2))
+	for x, rim in ((4, EMERALD), (6, REDSTONE), (9, REDSTONE), (11, EMERALD)):
+		put(im, x, 13, rim); put(im, x, 14, SOCKET)
+	return im
+
+def legs_icon():
+	"""Its legs alone: two stubby iron legs under a hip plate, vines round one."""
+	rnd = random.Random(47)
+	im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+	iron(im, (3, 6, 13, 8), rnd)   # the hip plate
+	fill(im, 3, 7, 13, 8, IRON_SHADE)
+	iron(im, (4, 8, 7, 13), rnd)   # legs
+	iron(im, (9, 8, 12, 13), rnd)
+	fill(im, 4, 12, 7, 13, IRON_DARK); fill(im, 9, 12, 12, 13, IRON_DARK)
+	for x, clamp, dark in ((4, EMERALD, EMERALD_DARK), (6, REDSTONE, REDSTONE_DARK), (9, REDSTONE, REDSTONE_DARK), (11, EMERALD, EMERALD_DARK)):
+		put(im, x, 4, clamp); put(im, x, 5, dark)  # its clamps, up into its torso's sockets
+	put(im, 4, 9, VINE); put(im, 5, 10, VINE_DARK); put(im, 4, 11, LEAF)
+	return im
+
 images = {"bot_golem": golem(True), "bot_golem_blank": golem(False)}
 for name, im in images.items():
 	im.save(f"{ASSETS}/textures/entity/{name}.png")
 icon().save(f"{ASSETS}/textures/item/bot_golem.png")
+torso_icon().save(f"{ASSETS}/textures/item/bot_golem_torso.png")
+legs_icon().save(f"{ASSETS}/textures/item/bot_golem_legs.png")
 
 def write(path, data):
 	with open(f"{ASSETS}/{path}", "w") as f:
@@ -165,6 +207,9 @@ def write(path, data):
 
 write("models/item/bot_golem.json", {"parent": "minecraft:item/generated", "textures": {"layer0": "modularcomputers:item/bot_golem"}})
 write("items/bot_golem.json", {"model": {"type": "minecraft:model", "model": "modularcomputers:item/bot_golem"}})
+for part in ("bot_golem_torso", "bot_golem_legs"):
+	write(f"models/item/{part}.json", {"parent": "minecraft:item/generated", "textures": {"layer0": f"modularcomputers:item/{part}"}})
+	write(f"items/{part}.json", {"model": {"type": "minecraft:model", "model": f"modularcomputers:item/{part}"}})
 
 if PREVIEW:
 	sheet = Image.new("RGBA", (W * 2 + 24 + 16, H), (40, 40, 40, 255))

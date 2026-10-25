@@ -64,8 +64,11 @@ public final class ModItems {
 	public static final Item OPERATOR_CARD = register("operator_card");
 	/** A bot golem, picked up (its parts in it): creative only until the Advanced Robotics Assembly makes them. */
 	public static final Item BOT_GOLEM = register("bot_golem", BotGolemItem::new, ModItems::holdsData);
+	/** A bot golem's torso, its legs detached (its parts in it), and its legs: crafted together, one over the other, they're a golem again. */
+	public static final Item BOT_GOLEM_TORSO = register("bot_golem_torso", properties -> new BotGolemItem(properties, false), ModItems::holdsData);
+	public static final Item BOT_GOLEM_LEGS = register("bot_golem_legs", GolemLegsItem::new, UnaryOperator.identity());
 	/** Items with no recipe on purpose: the creative tab's (and giveall's). */
-	public static final List<Item> CREATIVE_ONLY = List.of(OPERATOR_CARD, BOT_GOLEM);
+	public static final List<Item> CREATIVE_ONLY = List.of(OPERATOR_CARD, BOT_GOLEM, BOT_GOLEM_TORSO, BOT_GOLEM_LEGS);
 	public static final Item MOTION_SENSOR_CARD = register("motion_sensor_card");
 	public static final Item AUDIO_SENSOR_CARD = register("audio_sensor_card");
 	public static final Item WEATHER_SENSOR_CARD = register("weather_sensor_card");

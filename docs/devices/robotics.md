@@ -145,9 +145,26 @@ Takes items from the container at a face (in front, when none is given) into its
 same as it holds, when it holds something); all its hand can hold, or `count`. How many came: 0
 when there were none it could take. It fails with `no container there` or `no slot`.
 
-### get() → {state}
+### detachLegs() → true, or nil and why
 
-What it's doing now: `idle`, `walking`, `turning` or `breaking`.
+Detaches its legs, leaving them standing where it is. Held in its own
+[energy field](/devices/energy-field-card/) (`capture("self")` first), it flies on, the field
+moving it; with nothing holding it up, it falls over and powers off. Without its legs it walks
+nowhere (`no legs`), swings nothing (no tools: `no legs: it can't swing without its footing`), and
+presses no pressure plates; it still uses what's round it (buttons, doors, levers: a tool in its
+hand works as an empty hand), places what it holds, and its other cards work. A right click pops
+legs up into an inventory, its own `use` too. Fails with `no legs to detach`.
+
+### attachLegs() → true, or nil and why
+
+Goes to its legs, standing within three blocks of it, and onto them; a field holding it lets go
+as it lands (its event there: `lost`, `landing on its legs`). Its event: `attached`, or `failed`
+and why (`its legs are gone`). Fails with `no legs within 3 blocks` or `already on its legs`.
+
+### get() → {state, legs}
+
+What it's doing now (`idle`, `walking`, `turning`, `breaking` or `attaching`), and whether it stands
+on its legs.
 
 ### set(action) → true
 
@@ -168,7 +185,8 @@ Its oldest event, or nil.
 | `turned` | | a turn is done |
 | `stopped` | | `stop` ended a walk, turn or swing |
 | `broke` | `block`, `kept`, `dropped` | a swing broke the block (its name); whether it caught all it dropped, and how many it didn't |
-| `failed` | `why` | a swing couldn't go on |
+| `failed` | `why` | a swing couldn't go on, or it couldn't get onto its legs |
+| `attached` | | it's on its legs again |
 
 Its interrupt is raised when an event comes, and stays raised while one waits. With no program
 running on its board it takes no data: its events go, and it stops.

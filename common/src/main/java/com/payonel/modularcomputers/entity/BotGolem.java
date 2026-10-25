@@ -84,6 +84,17 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private static final EntityDataAccessor<Boolean> POWERED = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
 	private static final EntityDataAccessor<Boolean> HALTED = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
 	private static final EntityDataAccessor<Boolean> SCREEN = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
+	/** It stands on its legs (else it's its torso alone: detached, flying in its field, or fallen). */
+	private static final EntityDataAccessor<Boolean> LEGS = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
+	/** Its legs' height, in blocks: three pixels (its model's); without them it's that much shorter. */
+	public static final float LEG_HEIGHT = 3 / 16f;
+	/** How far from its legs it can attach them, in blocks (their middles). */
+	public static final double LEGS_REACH = 3;
+	/** How fast it goes onto its legs, in blocks a tick. */
+	private static final double ATTACH_SPEED = 0.15;
+	/** How near its legs counts as on them, in blocks. */
+	private static final double ON_LEGS = 0.05;
+	private static final String LEGS_SAVED = "legs";
 
 	private final BoardAssembly board;
 	private final RoboticsDevice robotics = new RoboticsDevice();
@@ -99,6 +110,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private boolean pathed;
 	/** Its board has been set up in its world (at its first tick there: the plain game has no hook for an entity's arrival). */
 	private boolean placed;
+	/** The legs it's going onto (null: none). */
+	private GolemLegs attaching;
 
 	public BotGolem(EntityType<? extends PathfinderMob> type, Level level) {
 		super(type, level);
@@ -119,7 +132,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	@Override
 	protected void defineSynchedData(SynchedEntityData.Builder builder) {
 		super.defineSynchedData(builder);
-		builder.define(READY, false).define(POWERED, false).define(HALTED, false).define(SCREEN, false);
+		builder.define(READY, false).define(POWERED, false).define(HALTED, false).define(SCREEN, false).define(LEGS, true);
 	}
 
 	/** What the board needs from the golem: where it is, which way it faces, and its entity data. */
@@ -222,6 +235,12 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private final class Legs implements RoboticsDevice.Body {
 		@Override
 		public String walk(double forward, double right, double up) {
+			if (!legs()) {
+				return "no legs";
+			}
+			if (EnergyField.held(BotGolem.this)) {
+				return "held in a field: its field moves it";
+			}
 			float yaw = getYRot() * Mth.DEG_TO_RAD;
 			// Minecraft's heading: 0 faces south (+Z), 90 west; to its right is a quarter turn more.
 			double x = -Mth.sin(yaw) * forward - Mth.cos(yaw) * right;
@@ -255,6 +274,46 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		@Override
 		public Result scan(String face) {
 			return hands.scan(face);
+		}
+
+		@Override
+		public boolean legs() {
+			return BotGolem.this.legs();
+		}
+
+		@Override
+		public Result detachLegs() {
+			if (!(level() instanceof ServerLevel server)) {
+				return Result.fail("not in a world");
+			}
+			GolemLegs legs = ModEntities.GOLEM_LEGS.create(server, net.minecraft.world.entity.EntitySpawnReason.TRIGGERED);
+			legs.snapTo(getX(), getY(), getZ(), getYRot(), 0);
+			BotGolem.this.legs(false);
+			if (EnergyField.held(BotGolem.this)) {
+				setPos(getX(), getY() + LEG_HEIGHT, getZ()); // (its torso where it was, its legs below it)
+				EnergyField.fieldOf(BotGolem.this).shift(new Vec3(0, LEG_HEIGHT, 0)); // (held there)
+			} else if (machine().isPowered()) {
+				machine().pressPower(); // nothing holding it up: it falls over, and powers off
+			}
+			server.addFreshEntity(legs);
+			return Result.ok(true);
+		}
+
+		@Override
+		public Result attachLegs() {
+			GolemLegs near = level().getEntitiesOfClass(GolemLegs.class, getBoundingBox().inflate(LEGS_REACH), GolemLegs::isAlive).stream()
+				.filter(legs -> legs.position().distanceTo(position()) <= LEGS_REACH)
+				.min(java.util.Comparator.comparingDouble(legs -> legs.position().distanceTo(position()))).orElse(null);
+			if (near == null) {
+				return Result.fail("no legs within " + (int) LEGS_REACH + " blocks");
+			}
+			EnergyField field = EnergyField.fieldOf(BotGolem.this);
+			if (field != null) {
+				field.lose("landing on its legs"); // (it goes onto them itself)
+			}
+			attaching = near;
+			setNoGravity(true);
+			return Result.ok(true);
 		}
 
 		@Override
@@ -406,9 +465,70 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				board.placed();
 			}
 			move();
+			attach();
 			hands.tick();
 			board.tick();
 		}
+	}
+
+	/** Going onto its legs, a tick of it: straight to them, and on, its legs gone into it. */
+	private void attach() {
+		if (attaching == null) {
+			return;
+		}
+		if (!attaching.isAlive()) {
+			attaching = null;
+			setNoGravity(false);
+			robotics.failed("its legs are gone");
+			return;
+		}
+		Vec3 to = attaching.position();
+		Vec3 left = to.subtract(position());
+		if (left.length() > ON_LEGS) {
+			Vec3 step = left.scale(Math.min(1, ATTACH_SPEED / left.length()));
+			setPos(position().add(step));
+			setDeltaMovement(Vec3.ZERO);
+			return;
+		}
+		face(attaching.getYRot());
+		setPos(to);
+		attaching.discard();
+		attaching = null;
+		setNoGravity(false);
+		legs(true);
+		robotics.attached();
+	}
+
+	/** Whether it stands on its legs. */
+	public boolean legs() {
+		return entityData.get(LEGS);
+	}
+
+	/** Puts its legs on, or takes them off (it's its torso alone then: shorter). */
+	public void legs(boolean on) {
+		entityData.set(LEGS, on);
+		refreshDimensions();
+	}
+
+	/** Without legs it's shorter by them. */
+	@Override
+	protected net.minecraft.world.entity.EntityDimensions getDefaultDimensions(net.minecraft.world.entity.Pose pose) {
+		var size = super.getDefaultDimensions(pose);
+		return entityData.get(LEGS) ? size : size.scale(1, (size.height() - LEG_HEIGHT) / size.height());
+	}
+
+	@Override
+	public void onSyncedDataUpdated(EntityDataAccessor<?> accessor) {
+		super.onSyncedDataUpdated(accessor);
+		if (LEGS.equals(accessor)) {
+			refreshDimensions();
+		}
+	}
+
+	/** Without legs it presses no pressure plates and trips no tripwires (nothing stands on them). */
+	@Override
+	public boolean isIgnoringBlockTriggers() {
+		return !legs();
 	}
 
 	/** Its walk or turn under way, a tick of it: what it walked paid, and how it ended told. */
@@ -602,7 +722,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	/** It as its item: its parts and its board's id with it, as a case keeps them when broken. */
 	public ItemStack asItem() {
-		ItemStack item = new ItemStack(ModItems.BOT_GOLEM);
+		ItemStack item = new ItemStack(legs() ? ModItems.BOT_GOLEM : ModItems.BOT_GOLEM_TORSO);
 		List<ItemStack> parts = new ArrayList<>();
 		for (int slot = 0; slot < board.parts().getContainerSize(); slot++) {
 			parts.add(board.parts().getItem(slot).copy());
@@ -659,12 +779,14 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	@Override
 	protected void addAdditionalSaveData(ValueOutput output) {
 		super.addAdditionalSaveData(output);
+		output.putBoolean(LEGS_SAVED, legs());
 		board.save(output, false);
 	}
 
 	@Override
 	protected void readAdditionalSaveData(ValueInput input) {
 		super.readAdditionalSaveData(input);
+		legs(input.getBooleanOr(LEGS_SAVED, true));
 		board.load(input);
 	}
 }

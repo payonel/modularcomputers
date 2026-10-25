@@ -77,6 +77,8 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 		boolean screen;
 		/** A crafting card is in: its storage, a chest on its back. */
 		boolean chest;
+		/** It stands on its legs (else its torso sits on the ground, lower). */
+		boolean legs = true;
 		final TerminalFace.State face = new TerminalFace.State();
 	}
 
@@ -91,6 +93,7 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 		net.minecraft.client.renderer.entity.state.ArmedEntityRenderState.extractArmedEntityRenderState(golem, state, itemModelResolver, partialTick);
 		state.screen = golem.showsScreen();
 		state.chest = golem.hasCraftingCard();
+		state.legs = golem.legs();
 		TerminalFace.extract(golem.terminal(), state.screen, state.face);
 	}
 
@@ -110,7 +113,8 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 		pose.rotateDegrees(Axis.YP, 180 - state.bodyRot);
 		pose.translate(0, 0, BotGolemModel.HEAD_FRONT * PIXEL - TEXT_OFFSET);
 		pose.rotateDegrees(Axis.YP, 180);
-		pose.translate((GLASS_LEFT - HALF_FACE) * PIXEL, (BotGolemModel.HEAD_TOP - GLASS_TOP) * PIXEL, 0);
+		float top = BotGolemModel.HEAD_TOP - (state.legs ? 0 : BotGolemModel.LEG_PIXELS);
+		pose.translate((GLASS_LEFT - HALF_FACE) * PIXEL, (top - GLASS_TOP) * PIXEL, 0);
 		TerminalFace.submit(state.face, GLASS_WIDTH * PIXEL, GLASS_HEIGHT * PIXEL, font, pose, collector);
 		pose.popPose();
 	}

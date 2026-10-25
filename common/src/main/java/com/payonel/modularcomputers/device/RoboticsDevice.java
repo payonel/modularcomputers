@@ -34,6 +34,7 @@ public final class RoboticsDevice implements Device {
 	public static final String WALKING = "walking";
 	public static final String TURNING = "turning";
 	public static final String BREAKING = "breaking";
+	public static final String ATTACHING = "attaching";
 	/** What an action with its hand costs (a use, a swing, a move to or from a container): a running CPU's tick. */
 	public static final int ACTION_COST = PowerUnits.CPU;
 	/** The spaces round it, in its own frame: its left and right its own, as it turns and walks. */
@@ -63,6 +64,24 @@ public final class RoboticsDevice implements Device {
 		/** What its hand holds (an item's table; {@code off}: its off hand), or nil. */
 		default Result held(boolean off) {
 			return Result.fail("no body");
+		}
+
+		/**
+		 * Detaches its legs, leaving them standing where it is: true; in a field of its own it flies on,
+		 * else it falls over and powers off.
+		 */
+		default Result detachLegs() {
+			return Result.fail("no body");
+		}
+
+		/** Starts going to its legs, close by, and onto them (its event: attached, or failed): true, or false and why. */
+		default Result attachLegs() {
+			return Result.fail("no body");
+		}
+
+		/** Whether it stands on its legs. */
+		default boolean legs() {
+			return true;
 		}
 
 		/** Swaps what its hands hold. */
@@ -269,10 +288,38 @@ public final class RoboticsDevice implements Device {
 		return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
 	}
 
-	@Method(doc = "get(): {state}: what it's doing now (idle, walking, turning or breaking)")
+	@Method(doc = "detachLegs(): detaches its legs, leaving them standing where it is (a right click pops them up, its own too); held in its own energy field it flies on, else it falls over and powers off. Without legs it walks nowhere, uses no tools (buttons and doors yes) and presses no pressure plates")
+	public Result detachLegs(Arguments args) {
+		if (!body.legs()) {
+			return Result.fail("no legs to detach");
+		}
+		body.stop();
+		state(IDLE);
+		return body.detachLegs();
+	}
+
+	@Method(doc = "attachLegs(): goes to its legs, standing within three blocks of it, and onto them; a field holding it lets go as it lands; true at once (its event: attached, or failed and why), or false and why (no legs near)")
+	public Result attachLegs(Arguments args) {
+		if (body.legs()) {
+			return Result.fail("already on its legs");
+		}
+		Result started = body.attachLegs();
+		if (!started.failed()) {
+			state(ATTACHING);
+		}
+		return started;
+	}
+
+	/** The body got onto its legs. */
+	public void attached() {
+		event("attached", null);
+	}
+
+	@Method(doc = "get(): {state, legs}: what it's doing now (idle, walking, turning, breaking or attaching), and whether it stands on its legs")
 	public Result get(Arguments args) {
 		Map<String, Object> now = new LinkedHashMap<>();
 		now.put("state", state);
+		now.put("legs", body.legs());
 		return Result.ok(now);
 	}
 
@@ -307,7 +354,7 @@ public final class RoboticsDevice implements Device {
 		return value == null ? 0L : value;
 	}
 
-	@Method(doc = "pull(): its oldest event, {event} (arrived, turned, stopped), {event = \"broke\", block, kept, dropped}, {event = \"blocked\" or \"failed\", why}, or nil")
+	@Method(doc = "pull(): its oldest event, {event} (arrived, turned, stopped, attached), {event = \"broke\", block, kept, dropped}, {event = \"blocked\" or \"failed\", why}, or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
