@@ -29,7 +29,8 @@ The steps:
 2. Put it in the computer's second SATA socket, and power on. mcos boots from the first disk and
    shows the new one at `/mnt/sata/1`.
 3. Write the file: `edit /mnt/sata/1/init.lua`, type the program in, Ctrl+O to save, Ctrl+X to leave.
-4. Turn the computer off, take the mcos disk out, and put your disk in the first SATA socket.
+4. Turn the computer off, and swap the two disks' sockets: yours to the first SATA socket, mcos to
+   the second. Both stay in the case.
 5. Power on. You see `Hello from my own OS, booted from sata:0`, and five seconds later the computer
    turns off.
 
@@ -59,8 +60,13 @@ Check it's there: `cat /mnt/sata/1/init.lua`.
 
 ### 3. Boot it
 
-Turn the computer off. Take the mcos disk out, and move your disk to the first SATA socket. Power
-on.
+Turn the computer off. Swap the two disks: take each out of its socket and put your disk in the
+first SATA socket and the mcos disk in the second. Both stay in the case. Power on.
+
+Why swap sockets, and not the bus order? A case's own sockets are fixed connectors, like the SATA
+ports on a real motherboard: SATA 1 always comes before SATA 2, and the bus order's arrows move only
+devices on cables. The bootloader boots the first disk, in that order, holding `/init.lua`, so
+the socket decides.
 
 The EEPROM's bootloader looks at the disks in bus order, finds `/init.lua` on yours, and runs it.
 You see:
@@ -71,9 +77,14 @@ Hello from my own OS, booted from sata:0
 
 Five seconds later, the computer turns off.
 
-To go back to mcos, put the mcos disk back in the first socket. To keep both, leave mcos first and
-your disk second while you work on your OS: the bootloader boots the first disk that has
-`/init.lua`, so the order of the sockets decides which OS starts.
+To go back to mcos, turn the computer off and swap the disks again. Your OS sees the mcos disk
+while it runs (at `sata:1`), so the two can stay together for as long as you work on your OS.
+
+To choose without swapping, do what a PC's boot menu does: flash the EEPROM with a bootloader that
+boots one disk by its id, wherever it sits. [EEPROM](/devices/eeprom/) has one,
+`eeprom-pin-boot.lua`: run it from mcos with your disk's name (`lua eeprom-pin-boot.lua storage1`),
+and that disk boots from then on, wherever it sits. It boots only that disk, so mcos won't start
+again from that EEPROM: to go back, put in a new EEPROM, which comes with the usual bootloader.
 
 ## What each line does
 
@@ -94,10 +105,11 @@ your disk second while you work on your OS: the bootloader boots the first disk 
 - **`boot: no bootable disk`:** no disk on the bus has `/init.lua`. Check the name (lower case,
   at the top of the disk, not in a folder) and that the disk is in the case.
 - **`boot: sata:0: init.lua:7: ...`:** your file isn't valid Lua; the message says the line and why. Fix it
-  from mcos (swap the disks back) and try again.
+  from mcos (swap the disks back, the computer off) and try again.
 - **The screen goes gray with `ABRT:` and a message:** your OS crashed while running (an error), or
   it ended. An OS must never return: when `init.lua` runs out of code, the CPU has nothing left to
   run, and aborts. This one ends with `board.poweroff()`, which never returns.
-- **mcos boots instead:** the mcos disk is still before yours in the bus order.
+- **mcos boots instead:** the mcos disk is still in the first SATA socket. Swap them, the computer
+  off.
 
 Next: [Reading the keyboard](/os/keyboard/).

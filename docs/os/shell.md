@@ -12,7 +12,8 @@ added.
 
 ## What you need
 
-- [ ] Your OS disk, first in the bus order, and the mcos disk to write files with.
+- [ ] Your OS disk in the first SATA socket, and the mcos disk in the second (swap them, the computer
+  off, to write files from mcos).
 
 ## The whole thing
 

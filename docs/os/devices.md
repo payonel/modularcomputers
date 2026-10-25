@@ -11,7 +11,7 @@ running a program you write for your OS. The same steps work for any device: its
 
 ## What you need
 
-- [ ] Your OS disk with the shell's `/init.lua`, first in the bus order.
+- [ ] Your OS disk with the shell's `/init.lua`, in the first SATA socket.
 - [ ] A [redstone card](/devices/redstone-card/) in the computer, and a redstone lamp against the
   case's north side (or any side: change `north` below to it).
 

@@ -10,7 +10,8 @@ device, and calls one.
 
 ## What you need
 
-- [ ] Your OS disk from [Booting your own code](/os/boot/), and the mcos disk to write files with.
+- [ ] Your OS disk from [Booting your own code](/os/boot/) in the first SATA socket, and the mcos disk
+  in the second (swap them, the computer off, to write files from mcos).
 - [ ] A [screen](/hardware/screen/) on the computer. Right-click its glass to open it: what you type
   then goes to the computer.
 
