@@ -12,14 +12,22 @@ A [CPU](/hardware/cpu/) only runs what the [EEPROM](/hardware/eeprom/) holds. Th
 slot of the board, like the reset vector of a real chip. If the EEPROM has nothing the CPU can run,
 the CPU aborts, which is a panic.
 
-A new EEPROM comes with a small boot program, like a BIOS. It looks through the
-[bus](/concepts/bus/) in order for the first storage device that has a file `/init.lua`. It
-reads the file, and runs it, giving it the disk's address. With no such disk it writes
-`boot: no bootable disk` to the console and halts. If the file doesn't compile, it writes why and
-halts.
+A new EEPROM comes with a boot manager, as a UEFI board has. It tries the boot entries the chip
+keeps in its NVRAM, each a disk by its id and a file on it: `BootNext`'s once, then `BootOrder`'s in
+turn, skipping a disk that isn't on the bus. Then, UEFI's fallback, it looks through the
+[bus](/concepts/bus/) in order for the first disk that has `/init.lua`. It reads the file it found
+and runs it, giving it the disk's address. A file that doesn't compile is reported and skipped; with
+nothing left it writes `boot: no bootable disk` to the console and halts.
 
-So the order of the bus decides which disk starts the computer. A computer with several disks
-boots the first one that has `/init.lua`.
+So with no boot entries, the order of the bus decides: a computer with several disks boots the first
+one that has `/init.lua`. To boot another, make it an entry with
+[`efibootmgr`](/programs/efibootmgr/):
+
+```sh
+efibootmgr -c -d storage1 -L backup   # an entry for the second disk, first in BootOrder
+efibootmgr -n 0                       # or: boot entry 0 next time only
+efibootmgr -v                         # what's set, and which disks are on the bus
+```
 
 ## 2. The kernel starts
 

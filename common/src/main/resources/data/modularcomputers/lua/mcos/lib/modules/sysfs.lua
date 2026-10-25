@@ -6,7 +6,13 @@
 --   /sys/class/robotics/robotics0/type, id, path, label     (path: its slot, or - when it's cabled)
 --   /sys/class/robotics/robotics0/methods/walk
 -- Linux has a /sys/devices tree too, by where each device is; mcos's bus is flat, so there's only
--- the class tree. Programs list and read it as any files.
+-- the class tree. And the firmware's: the EEPROM's NVRAM, its boot variables, a file each, as
+-- Linux's efivarfs, as text (Linux's are binary), and without UEFI's vendor GUID in the names (a
+-- closed set, no vendors); efibootmgr changes them, through /dev/eeprom's ioctls:
+--   /sys/firmware/efi/efivars/Boot0001      id:<uuid> /init.lua label (and "not present", off the bus)
+--   /sys/firmware/efi/efivars/BootOrder     an entry's number a line, in order
+--   /sys/firmware/efi/efivars/BootNext      (while it's set)
+-- Programs list and read it as any files.
 local k, vfs = ...
 
 local fail = vfs.fail
@@ -14,6 +20,7 @@ local fail = vfs.fail
 local fs = {type = "sysfs"}
 
 local CLASS = "class"
+local FIRMWARE = {"firmware", "efi", "efivars"} -- the boot variables' directory, a level each
 local METHODS = "methods"
 local ATTRIBUTES = {"type", "id", "path", "label"} -- a device's, from the kernel's view of the bus
 local WIDTH = 78 -- a description's lines, at most, indented
@@ -52,6 +59,65 @@ local function kind(device)
   return tostring(device.type or "device")
 end
 
+-- The EEPROM's boot variables, by file name ("Boot0001", "BootOrder", "BootNext"), each its text.
+local function efivars()
+  local vars = {}
+  for _, device in ipairs(k.devices.list) do
+    if device.type == "eeprom" then
+      local ok, boot = board.invoke(device.id, "getBoot")
+      if ok and boot then
+        local present = {}
+        for _, other in ipairs(k.devices.list) do
+          present[other.id] = true
+        end
+        local order = {}
+        for _, entry in ipairs(boot.entries) do
+          vars[string.format("Boot%04X", entry.number)] = entry.disk .. " " .. entry.path .. (entry.label ~= "" and " " .. entry.label or "")
+            .. "\n" .. (present[entry.disk] and "" or "not present\n")
+        end
+        for i, number in ipairs(boot.order) do
+          order[i] = string.format("%04X\n", number)
+        end
+        vars.BootOrder = table.concat(order)
+        if boot.next then
+          vars.BootNext = string.format("%04X\n", boot.next)
+        end
+      end
+      break
+    end
+  end
+  return vars
+end
+
+-- What a path in the firmware's tree names (parts[1] is "firmware"), or nil.
+local function firmware(parts)
+  for depth = 1, math.min(#parts, #FIRMWARE) do
+    if parts[depth] ~= FIRMWARE[depth] then
+      return nil
+    end
+  end
+  if #parts < #FIRMWARE then
+    local below = FIRMWARE[#parts + 1]
+    return {dir = function() return {{name = below, type = "directory"}} end}
+  elseif #parts == #FIRMWARE then
+    return {dir = function()
+      local names = {}
+      for name in pairs(efivars()) do
+        names[#names + 1] = name
+      end
+      table.sort(names)
+      for i, name in ipairs(names) do
+        names[i] = {name = name, type = "file"}
+      end
+      return names
+    end}
+  elseif #parts == #FIRMWARE + 1 then
+    local text = efivars()[parts[#parts]]
+    return text and {file = function() return text end} or nil
+  end
+  return nil
+end
+
 -- What a path names: {dir = entries()} or {file = text()}, or nil.
 local function find(path)
   local parts = {}
@@ -59,7 +125,9 @@ local function find(path)
     parts[#parts + 1] = part
   end
   if #parts == 0 then
-    return {dir = function() return {{name = CLASS, type = "directory"}} end}
+    return {dir = function() return {{name = CLASS, type = "directory"}, {name = FIRMWARE[1], type = "directory"}} end}
+  elseif parts[1] == FIRMWARE[1] then
+    return firmware(parts)
   elseif parts[1] ~= CLASS then
     return nil
   elseif #parts == 1 then

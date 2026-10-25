@@ -10,8 +10,8 @@ device, and calls one.
 
 ## What you need
 
-- [ ] Your OS disk from [Booting your own code](/os/boot/) in the first SATA socket, and the mcos disk
-  in the second (swap them, the computer off, to write files from mcos).
+- [ ] Your OS disk from [Booting your own code](/os/boot/) in the second SATA socket, its boot entry
+  made (`Boot0000`), and mcos's disk in the first, to write files with.
 - [ ] A [screen](/hardware/screen/) on the computer. Right-click its glass to open it: what you type
   then goes to the computer.
 
@@ -25,7 +25,7 @@ Replace `/init.lua` on your OS disk with this:
 
 [Download os-echo.lua](/examples/os-echo.lua)
 
-Boot it (your disk first in the bus order) and type:
+Boot it (`efibootmgr -n 0`, then `reboot`) and type:
 
 ```
 Type something. Type off to turn the computer off.

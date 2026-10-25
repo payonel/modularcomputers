@@ -57,6 +57,7 @@
 	"hint.modularcomputers.slot.ups": "UPS %s",
 	"hint.modularcomputers.slot.card": "Slot %s",
 	"gui.modularcomputers.bus.title": "BUS ORDER",
+	"gui.modularcomputers.bus.boot": "%s, boots",
 	"gui.modularcomputers.bus.held": "in your hand: no bus till it's set down",
 	"gui.modularcomputers.bus.sata": "SATA %s",
 	"gui.modularcomputers.bus.expansion": "EXP %s",

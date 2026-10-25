@@ -251,6 +251,34 @@ public class CaseClientGameTest implements FabricClientGameTest {
 			checkBoardPixel(context, full, 90, 115, 0xB0B4BC, "expansion slot 2 engaged");
 			checkBoardPixel(context, full, 114, 115, 0x1A1A1E, "expansion slot 3 empty");
 			checkBoardPixel(context, full, 42, 121, 0x5AE66E, "full case power: sixth bar green");
+			// The boot disk's mark (the user's): the EEPROM's, from its NVRAM, so it goes with the EEPROM.
+			java.util.function.Consumer<Boolean> eepromIn = withEntry -> singleplayer.getServer().runOnServer(server -> {
+				var parts = ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).parts();
+				ItemStack eeprom = parts.getItem(CaseMenu.EEPROM_SLOT).isEmpty() ? heldEeprom[0] : parts.getItem(CaseMenu.EEPROM_SLOT).copy();
+				heldEeprom[0] = eeprom;
+				if (withEntry) {
+					String disk = "id:" + parts.getItem(CaseMenu.SATA_SLOTS + 2).get(com.payonel.modularcomputers.item.ModComponents.SERIAL);
+					try {
+						eeprom.set(com.payonel.modularcomputers.item.ModComponents.NVRAM, com.payonel.modularcomputers.machine.BootVariables.EMPTY
+							.withEntry(0, disk, null, null).withOrder(List.of(0L)));
+					} catch (com.payonel.modularcomputers.machine.BootVariables.Invalid e) {
+						throw new IllegalStateException(e);
+					}
+				} else {
+					eeprom.remove(com.payonel.modularcomputers.item.ModComponents.NVRAM);
+				}
+				parts.setItem(CaseMenu.EEPROM_SLOT, eeprom.copy());
+			});
+			eepromIn.accept(true);
+			context.waitFor(client -> ((CaseScreen) client.gui.screen()).bootDisk().equals(java.util.Optional.of("sata:2")));
+			context.takeScreenshot("case-boot-mark");
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).parts()
+				.setItem(CaseMenu.EEPROM_SLOT, ItemStack.EMPTY));
+			context.waitFor(client -> ((CaseScreen) client.gui.screen()).bootDisk().isEmpty()); // (its EEPROM out: no mark)
+			eepromIn.accept(true);
+			context.waitFor(client -> ((CaseScreen) client.gui.screen()).bootDisk().equals(java.util.Optional.of("sata:2"))); // (back, with it)
+			eepromIn.accept(false); // (as it was: the rest boots as before)
+			context.waitFor(client -> ((CaseScreen) client.gui.screen()).bootDisk().isEmpty());
 			// Hovering the meter tells the case's power and the batteries', and the runtime at the recent draw.
 			moveCursorTo(context, screen -> ((CaseScreen) screen).chargeMeter());
 			context.waitTicks(2);
@@ -606,6 +634,9 @@ public class CaseClientGameTest implements FabricClientGameTest {
 	}
 
 	/** The screenshot pixel in the middle of an area of the open screen. */
+	/** The EEPROM taken out of the case while its mark's checked, to put back. */
+	private static final ItemStack[] heldEeprom = {ItemStack.EMPTY};
+
 	/** Whether a button has the open view's ring: its left edge's middle, just outside it, in the ring's yellow. */
 	static boolean ringed(ClientGameTestContext context, BufferedImage image, Function<Screen, Viewport> button) {
 		int rgb = pixelAt(context, image, screen -> {

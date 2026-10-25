@@ -19,6 +19,7 @@ The programs in mcos's `/bin`. Each page is the program's man page: the same tex
 | [du](/programs/du/) | estimate file space usage |
 | [echo](/programs/echo/) | display a line of text |
 | [edit](/programs/edit/) | a simple text editor, after nano |
+| [efibootmgr](/programs/efibootmgr/) | show and change the EEPROM's boot entries and boot order |
 | [false](/programs/false/) | do nothing, unsuccessfully |
 | [find](/programs/find/) | search for files in a directory tree |
 | [free](/programs/free/) | display the amount of memory in use and free |

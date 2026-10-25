@@ -49,13 +49,14 @@ public final class ClearIdRecipe extends CustomRecipe {
 		}
 		if (ModItems.isEeprom(found)) {
 			// An EEPROM alone is wiped (user, 2026-10-12): no id, nothing on it.
-			if (!found.has(ModComponents.SERIAL) && found.getOrDefault(ModComponents.EEPROM_IMAGE, "").isEmpty()) {
+			if (!found.has(ModComponents.SERIAL) && found.getOrDefault(ModComponents.EEPROM_IMAGE, "").isEmpty() && !found.has(ModComponents.NVRAM)) {
 				return ItemStack.EMPTY;
 			}
 			ItemStack wiped = found.copyWithCount(1);
 			wiped.remove(ModComponents.SERIAL);
 			wiped.remove(ModComponents.LABEL); // (a new device: no label either)
 			wiped.set(ModComponents.EEPROM_IMAGE, "");
+			wiped.remove(ModComponents.NVRAM); // (its boot entries too: a blank chip)
 			return wiped;
 		}
 		if (found.getItem() instanceof DiskItem) {

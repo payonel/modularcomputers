@@ -12,8 +12,8 @@ added.
 
 ## What you need
 
-- [ ] Your OS disk in the first SATA socket, and the mcos disk in the second (swap them, the computer
-  off, to write files from mcos).
+- [ ] Your OS disk in the second SATA socket, its boot entry made (`Boot0000`), and mcos's disk in the
+  first, to write files with.
 
 ## The whole thing
 
@@ -27,19 +27,20 @@ with `wget`, or copy it into the disk's folder; see [Booting your own code](/os/
 Boot it and try each command:
 
 ```
-tiny OS, booted from sata:0. Type help.
+tiny OS, booted from sata:1. Type help.
 # help
 devices                    the devices on the bus
 ...
 # devices
 eeprom eeprom id:6f1c...
 sata:0 storage id:9a02...
+sata:1 storage id:5c71...
 id:41be... terminal id:41be...
 # methods storage
 changes(): the oldest change on it not yet taken, ...
 getCapacity(): how many bytes it holds
 ...
-# call sata:0 getCapacity
+# call sata:1 getCapacity
 1048576
 # save /hello.txt Hello, disk!
 # cat /hello.txt
@@ -91,9 +92,9 @@ program: numbers, `"strings"` in quotes, `true`, and tables like `{north = {powe
 answers are shown the same way, tables as `{key = value}`.
 
 ```
-# call sata:0 stat "/init.lua"
+# call sata:1 stat "/init.lua"
 {directory = false, modified = 1200850, size = 8431}
-# call sata:0 nope
+# call sata:1 nope
 failed: no such method: nope
 ```
 

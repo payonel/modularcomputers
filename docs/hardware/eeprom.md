@@ -35,5 +35,8 @@ Craft an EEPROM alone in the crafting grid to wipe it: it comes out blank, with 
 
 ## Notes
 
+- Besides its program, the EEPROM keeps the computer's boot entries and boot order (its NVRAM), so
+  they go wherever the chip goes. Crafting it alone wipes them too. See
+  [EEPROM](/devices/eeprom/#nvram-the-boot-entries).
 - The CPU runs what the EEPROM holds as Lua: text that isn't Lua stops it with Lua's own error
   message, and a blank EEPROM stops it too.

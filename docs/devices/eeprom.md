@@ -29,12 +29,36 @@ A CPU that cannot (the chip is empty or its code does not load) panics. The EEPR
 plain text, one character a byte, and for the Lua CPU they are Lua code. The mod has no size limit
 for it yet.
 
-The chip a computer comes with boots the first disk, in bus order, that holds `/init.lua`, handing
-it the disk's address, and says `boot: no bootable disk` and halts when none does. The code on the
-chip runs before any OS, so it calls the board directly (`board.invoke`, `board.list`).
+The chip a computer comes with is a boot manager, as a UEFI board's. It tries the boot entries in
+the chip's NVRAM (below): `BootNext`'s once, then `BootOrder`'s in turn, skipping a disk that isn't
+on the bus. Then, as UEFI's fallback, it boots the first disk in bus order that holds `/init.lua`.
+It hands the file it runs the disk's address. A file that doesn't compile is reported and skipped;
+with nothing left, it says `boot: no bootable disk` and halts. The code on the chip runs before any
+OS, so it calls the board directly (`board.invoke`, `board.list`).
 
 The chip keeps its contents on its item: reads and writes go straight there. A write takes effect at
 the next power-on.
+
+## NVRAM: the boot entries
+
+Besides its image, the chip has NVRAM, a small store of boot variables apart from the image (a new
+image keeps them), as a UEFI board keeps `Boot####`, `BootOrder` and `BootNext`:
+
+| Variable | What it is |
+|---|---|
+| `Boot0000` to `Boot0007` | A boot entry: a disk by its id (`id:<uuid>`), the file on it to boot (`/init.lua` if none), and a label |
+| `BootOrder` | The entries' numbers, in the order they're tried |
+| `BootNext` | An entry to try first, next time only: the bootloader clears it as it boots |
+
+They're a closed set of typed values, never free text: every change is checked by the chip, and a
+change that isn't valid is refused with why (an id that isn't one, a path that doesn't start at `/`
+or has spaces, an entry that doesn't exist). An entry is checked for its form, not for its disk
+being on the bus, so you can make one for a disk you haven't put in yet, as a UEFI board keeps a USB
+stick's entry while it's unplugged. At boot, an entry whose disk isn't there is skipped.
+
+The NVRAM is on the chip's item, so it goes where the chip goes: take the EEPROM out and its boot
+entries go with it. A computer's parts view marks the disk the chip boots (`SATA 3, boots`): the
+first disk on the bus that its entries name. Crafting the chip alone wipes its NVRAM too.
 
 ## In mcos
 
@@ -54,6 +78,25 @@ cp /dev/eeprom /home/eeprom.bak   # back it up
 cp /home/new.lua /dev/eeprom      # flash a new image
 reboot                            # run it
 ```
+
+### Its boot variables: /sys/firmware/efi/efivars
+
+The NVRAM's variables are files to read, as Linux's efivarfs shows a UEFI board's, a line each:
+
+```sh
+$ ls /sys/firmware/efi/efivars
+Boot0000  Boot0001  BootNext  BootOrder
+$ cat /sys/firmware/efi/efivars/Boot0001
+id:9a02c3e1-5b7d-4f0e-8c21-3d6e7f1a2b4c /init.lua tiny OS
+$ cat /sys/firmware/efi/efivars/BootOrder
+0001
+0000
+```
+
+An entry whose disk isn't on the bus says `not present` on a second line. Linux's files are binary
+and named with UEFI's vendor GUID (`BootOrder-8be4df61-...`); mcos's are text, with plain names (a
+closed set: no vendors). To change them, use [`efibootmgr`](/programs/efibootmgr/), or the methods
+below.
 
 ### Its ioctls are its methods
 
@@ -75,6 +118,31 @@ The chip's contents.
 ### set(data) → nothing
 
 Replaces the chip's contents with `data`. It takes effect at the next power-on.
+
+### getBoot() → table
+
+The NVRAM's boot variables: `entries`, a list of `{number, disk, path, label}` by number; `order`, a
+list of numbers; and `next`, a number, or nil when there's no BootNext.
+
+### setBootEntry(number, disk[, path[, label]]) → nothing
+
+Makes boot entry `number` (0 to 7), or replaces it: `disk` its id (`id:<uuid>`, on the bus or not),
+`path` the file it boots (`/init.lua` if none: starting at `/`, printable, no spaces, at most 128
+characters), and `label` (at most 32 printable characters). Fails, with why, for anything else.
+
+### removeBootEntry(number) → nothing
+
+Removes an entry, from `BootOrder` and as `BootNext` too. Fails for an entry that isn't there.
+
+### setBootOrder(numbers) → nothing
+
+Sets the order entries are tried in: a list of entries' numbers, each one there, none twice. An
+empty list clears it.
+
+### setBootNext([number]) → nothing
+
+Sets the entry to boot next time only, or clears it with none. The bootloader clears it as it boots
+it.
 
 ## Events
 
@@ -104,14 +172,17 @@ lua eeprom-flash.lua /home/boot.lua
 reboot
 ```
 
-### Boot one disk only
+### Boot another disk once
 
-Writes a new boot image that boots one disk, by its id, wherever it sits on the bus. The image it
-writes is firmware-level code: a whole EEPROM program, calling the board directly.
+Boots another disk next time only, then this one again: it makes the disk a boot entry (if it hasn't
+one) and sets `BootNext`, through the file's ioctls, then reboots. `efibootmgr -c` and `-n` do the
+same as commands.
 
 ```lua
-{% include eeprom-pin-boot.lua %}
+{% include eeprom-boot-once.lua %}
 ```
-[Download eeprom-pin-boot.lua](/examples/eeprom-pin-boot.lua)
+[Download eeprom-boot-once.lua](/examples/eeprom-boot-once.lua)
 
-To undo it, flash the old image back: `lua eeprom-flash.lua /home/eeprom.old`.
+```sh
+lua eeprom-boot-once.lua storage1
+```

@@ -63,6 +63,10 @@ walk(forward[, right[, up]])
 
 Programs read them as any files; the [devices library](/mcos/devices-library/) does it for you.
 
+`/sys/firmware/efi/efivars` has the EEPROM's boot variables, a file each (`Boot0001`, `BootOrder`,
+`BootNext`), as Linux's efivarfs; see [EEPROM](/devices/eeprom/) and
+[`efibootmgr`](/programs/efibootmgr/).
+
 ## Devices coming and going
 
 A device joining the bus makes its file appear in `/dev`, and one leaving takes it away, so

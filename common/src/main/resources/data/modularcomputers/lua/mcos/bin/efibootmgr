@@ -1,0 +1,177 @@
+-- efibootmgr [options]: shows and changes the EEPROM's boot variables (its NVRAM: boot entries, a
+-- disk by its id and a file on it; BootOrder, the order they're tried in; BootNext, the one tried
+-- once, next), as Linux's efibootmgr does UEFI's, through /dev/eeprom's ioctls (the EEPROM's own
+-- methods: it checks every change). The variables are readable in /sys/firmware/efi/efivars too.
+--   -c, --create        a new entry (number -b's, else the first free one), first in BootOrder:
+--   -d, --disk DISK       its disk: a /dev name (storage1, /dev/storage1) or an id (id:<uuid>)
+--   -l, --loader PATH     the file it boots (/init.lua when not given)
+--   -L, --label LABEL     its label
+--   -b, --bootnum XXXX  the entry (hex, as Boot0001's) -B, -c act on
+--   -B, --delete-bootnum  deletes entry -b's (from BootOrder and BootNext too)
+--   -o, --bootorder X,Y   sets BootOrder; -O, --delete-bootorder clears it
+--   -n, --bootnext X      boots entry X next time only; -N, --delete-bootnext clears it
+--   -v, --verbose         shows each entry's disk and file, and whether its disk is on the bus
+--   -q, --quiet           shows nothing after a change
+-- With no change it shows the variables; after one, it shows them as they are now (unless -q).
+-- Exit status: 0 done, 1 refused (the EEPROM's why on stderr), 2 bad usage.
+local sys = require("sys")
+
+local USAGE = "usage: efibootmgr [-v] [-q] [-c -d disk [-l path] [-L label]] [-b XXXX [-B]]\n"
+  .. "                  [-o X,Y | -O] [-n X | -N]\n"
+local EEPROM = "/dev/eeprom"
+local LONG = {create = "c", disk = "d", loader = "l", label = "L", bootnum = "b", ["delete-bootnum"] = "B",
+  bootorder = "o", ["delete-bootorder"] = "O", bootnext = "n", ["delete-bootnext"] = "N", verbose = "v", quiet = "q"}
+local TAKES = {d = true, l = true, L = true, b = true, o = true, n = true} -- options with a value
+
+local function usage()
+  io.stderr:write(USAGE)
+  os.exit(2)
+end
+
+-- The options, by their short letter (true, or the value given).
+local options = {}
+local i = 1
+while i <= #arg do
+  local word = arg[i]
+  local letter, value
+  local long, given = word:match("^%-%-([%w-]+)=?(.*)$")
+  if long then
+    letter = LONG[long] or usage()
+    value = given ~= "" and given or nil
+  elseif word:match("^%-%a$") then
+    letter = word:sub(2)
+  else
+    usage()
+  end
+  if TAKES[letter] then
+    if not value then
+      i = i + 1
+      value = arg[i] or usage()
+    end
+    options[letter] = value
+  elseif TAKES[letter] == nil and not ("cBONvq"):find(letter, 1, true) then
+    usage()
+  else
+    options[letter] = true
+  end
+  i = i + 1
+end
+
+-- An entry's number from its hex (0001, 1).
+local function number(text)
+  local n = text and text:match("^%x+$") and tonumber(text, 16)
+  if not n then
+    io.stderr:write("efibootmgr: not an entry's number: ", tostring(text), "\n")
+    os.exit(2)
+  end
+  return n
+end
+
+local fd, why = sys.open(EEPROM)
+if not fd then
+  io.stderr:write("efibootmgr: ", EEPROM, ": ", tostring(why), "\n")
+  return 1
+end
+
+-- Calls one of the EEPROM's methods (an ioctl answers with what the method does, or nil and why); a
+-- refusal ends it, with the EEPROM's why.
+local function call(method, ...)
+  local result, why = sys.ioctl(fd, method, ...)
+  if result == nil then
+    io.stderr:write("efibootmgr: ", tostring(why), "\n")
+    os.exit(1)
+  end
+  return result
+end
+
+-- A disk's id, from its /dev name or its id.
+local function disk(name)
+  name = name:gsub("^/dev/", "")
+  for _, device in ipairs(sys.devices()) do
+    if device.name == name or device.id == name then
+      return device.id
+    end
+  end
+  return name:find("^id:") and name or nil -- (a disk not on the bus yet: by its id)
+end
+
+local changed = false
+if options.c then
+  local boot = call("getBoot")
+  local at = options.b and number(options.b)
+  if not at then
+    local used = {}
+    for _, entry in ipairs(boot.entries) do
+      used[entry.number] = true
+    end
+    at = 0
+    while used[at] do
+      at = at + 1
+    end
+  end
+  local id = options.d and disk(options.d)
+  if not id then
+    io.stderr:write("efibootmgr: ", options.d and options.d .. ": No such device" or "a new entry needs its disk: -d", "\n")
+    return 1
+  end
+  call("setBootEntry", at, id, options.l, options.L)
+  local order = {at}
+  for _, n in ipairs(boot.order) do
+    if n ~= at then
+      order[#order + 1] = n
+    end
+  end
+  call("setBootOrder", order) -- (first: as efibootmgr -c puts it)
+  changed = true
+elseif options.B then
+  call("removeBootEntry", number(options.b or usage()))
+  changed = true
+end
+if options.o then
+  local order = {}
+  for text in options.o:gmatch("[^,]+") do
+    order[#order + 1] = number(text)
+  end
+  call("setBootOrder", order)
+  changed = true
+elseif options.O then
+  call("setBootOrder", {})
+  changed = true
+end
+if options.n then
+  call("setBootNext", number(options.n))
+  changed = true
+elseif options.N then
+  call("setBootNext")
+  changed = true
+end
+
+if changed and options.q then
+  sys.close(fd)
+  return 0
+end
+local boot = call("getBoot")
+sys.close(fd)
+local present = {}
+for _, device in ipairs(sys.devices()) do
+  present[device.id] = true
+end
+local function hex(n)
+  return string.format("%04X", n)
+end
+if boot.next then
+  print("BootNext: " .. hex(boot.next))
+end
+local order = {}
+for i, n in ipairs(boot.order) do
+  order[i] = hex(n)
+end
+print("BootOrder: " .. table.concat(order, ","))
+for _, entry in ipairs(boot.entries) do
+  local line = "Boot" .. hex(entry.number) .. "  " .. entry.label
+  if options.v then
+    line = line .. "\t" .. entry.disk .. " " .. entry.path .. (present[entry.disk] and "" or " (not present)")
+  end
+  print(line)
+end
+return 0

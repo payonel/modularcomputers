@@ -177,18 +177,24 @@ class StorageExamplesTest extends McosHarness {
 	}
 
 	@Test
-	void aPinnedBootImageBootsTheDiskItNames() {
-		dataDisk(); // (another disk on the bus, never booted)
+	void theBootOnceProgramBootsAnotherDiskNextTimeOnlyThenThisOneAgain() throws IOException {
+		Path data = dataDisk();
+		Files.createDirectories(data);
+		Files.writeString(data.resolve("init.lua"), """
+			local disk = ...
+			local ok, file = board.invoke(disk, "open", "/booted", "w")
+			board.invoke(file, "close")
+			board.poweroff()
+			"""); // (an OS that says it booted, and turns the computer off)
 		boot();
-		String old = eeprom();
-		file("pin.lua", example("eeprom-pin-boot"));
-		assertThat(status("lua /pin.lua")).isEqualTo("0");
-		assertThat(eeprom()).startsWith("-- pinned boot").contains("local DISK = \"id:");
-		assertThat(read(root().resolve("home/eeprom.old"))).isEqualTo(old);
-		Runner first = machine.runner().orElseThrow();
-		type("reboot\r");
-		settle(() -> machine.runner().isPresent() && machine.runner().get() != first);
-		untilIdle(); // booted again, from the pinned image
+		file("once.lua", example("eeprom-boot-once"));
+		type("lua /once.lua storage1\r");
+		settle(() -> Files.exists(data.resolve("booted")) && !machine.isPowered());
+		var nvram = machine.board().eeprom().orElseThrow().nvram();
+		assertThat(nvram.entries()).hasSize(1);
+		assertThat(nvram.next()).as("BootNext: once only").isEqualTo(com.payonel.modularcomputers.machine.BootVariables.NONE);
+		assertThat(machine.pressPower()).isEqualTo(com.payonel.modularcomputers.machine.Machine.PowerPress.ON);
+		untilIdle(); // (mcos again: the fallback)
 		type("touch /after\r");
 		untilFile(root().resolve("after"), "");
 	}

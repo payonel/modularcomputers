@@ -143,6 +143,21 @@ public final class BoardAssembly {
 		}
 
 		@Override
+		public com.payonel.modularcomputers.machine.BootVariables nvram() {
+			return parts.getItem(CaseMenu.EEPROM_SLOT).getOrDefault(ModComponents.NVRAM, com.payonel.modularcomputers.machine.BootVariables.EMPTY);
+		}
+
+		@Override
+		public void nvram(com.payonel.modularcomputers.machine.BootVariables vars) {
+			if (vars.equals(com.payonel.modularcomputers.machine.BootVariables.EMPTY)) {
+				parts.getItem(CaseMenu.EEPROM_SLOT).remove(ModComponents.NVRAM); // (an empty chip stacks with a new one)
+			} else {
+				parts.getItem(CaseMenu.EEPROM_SLOT).set(ModComponents.NVRAM, vars);
+			}
+			host.setChanged();
+		}
+
+		@Override
 		public String label() {
 			return ModComponents.label(parts.getItem(CaseMenu.EEPROM_SLOT));
 		}

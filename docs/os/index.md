@@ -31,9 +31,11 @@ There are three layers, as on a real PC:
 
 - **The CPU's firmware** builds a safe place for Lua to run (a sandbox), and runs whatever the
   [EEPROM](/hardware/eeprom/) holds in it. You can't change this layer, and you don't need to.
-- **The EEPROM's bootloader** is what a new EEPROM comes with, like a PC's BIOS. It looks through
-  the [bus](/concepts/bus/), in order, for the first [disk](/hardware/disk/) holding a file named
-  `/init.lua`, reads it, and runs it, passing it the disk's address.
+- **The EEPROM's bootloader** is what a new EEPROM comes with, like a UEFI board's boot manager. It
+  boots the disk its boot entries name (a disk by its id, set with
+  [`efibootmgr`](/programs/efibootmgr/)), or with none, the first [disk](/hardware/disk/) on the
+  [bus](/concepts/bus/) holding a file named `/init.lua`. It reads that file and runs it, passing it
+  the disk's address.
 - **Your OS** is that `/init.lua`. From the moment it starts, the computer is yours: nothing runs
   but your code.
 
@@ -55,7 +57,8 @@ Every device page in [Devices](/devices/) lists its methods: those are what `boa
 
 - A working computer: follow [Your first computer](/tutorials/first-computer/) if you don't have one.
   It boots mcos, which you'll use to write your OS's files.
-- A second [hard disk](/hardware/disk/), for your OS.
+- A second [hard disk](/hardware/disk/), for your OS. Both disks stay in the computer: the EEPROM's
+  boot entries ([`efibootmgr`](/programs/efibootmgr/)) say which one boots.
 
 No Lua experience beyond [Your first program](/tutorials/first-program/) is needed: every program is
 complete on its page, and explained line by line.

@@ -95,6 +95,46 @@ public final class ModComponents {
 		DataComponentType.<String>builder().persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.stringUtf8(Integer.MAX_VALUE)).build());
 
 	/**
+	 * An EEPROM's NVRAM: its boot variables (UEFI's Boot####, BootOrder, BootNext), kept on the chip
+	 * with its image (a flash keeps them: they're apart from it), checked at every write
+	 * ({@link com.payonel.modularcomputers.machine.BootVariables}). None: no entries.
+	 */
+	public static final DataComponentType<com.payonel.modularcomputers.machine.BootVariables> NVRAM = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE,
+		id("nvram"), DataComponentType.<com.payonel.modularcomputers.machine.BootVariables>builder().persistent(Nvram.CODEC)
+			.networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.fromCodec(Nvram.CODEC)).build());
+
+	/** The NVRAM's codec: its entries as a list (a map's keys must be strings), each with its number. */
+	private static final class Nvram {
+		private record Numbered(int number, String disk, String path, String label) {
+		}
+
+		private static final Codec<Numbered> ENTRY = RecordCodecBuilder.create(entry -> entry.group(
+			Codec.INT.fieldOf("number").forGetter(Numbered::number),
+			Codec.STRING.fieldOf("disk").forGetter(Numbered::disk),
+			Codec.STRING.fieldOf("path").forGetter(Numbered::path),
+			Codec.STRING.optionalFieldOf("label", "").forGetter(Numbered::label)
+		).apply(entry, Numbered::new));
+
+		static final Codec<com.payonel.modularcomputers.machine.BootVariables> CODEC = RecordCodecBuilder.create(vars -> vars.group(
+			ENTRY.listOf().fieldOf("entries").forGetter(Nvram::numbered),
+			Codec.INT.listOf().fieldOf("order").forGetter(com.payonel.modularcomputers.machine.BootVariables::order),
+			Codec.INT.optionalFieldOf("next", com.payonel.modularcomputers.machine.BootVariables.NONE).forGetter(com.payonel.modularcomputers.machine.BootVariables::next)
+		).apply(vars, Nvram::of));
+
+		private static java.util.List<Numbered> numbered(com.payonel.modularcomputers.machine.BootVariables vars) {
+			return vars.entries().entrySet().stream().map(e -> new Numbered(e.getKey(), e.getValue().disk(), e.getValue().path(), e.getValue().label())).toList();
+		}
+
+		private static com.payonel.modularcomputers.machine.BootVariables of(java.util.List<Numbered> entries, java.util.List<Integer> order, int next) {
+			java.util.Map<Integer, com.payonel.modularcomputers.machine.BootVariables.Entry> map = new java.util.TreeMap<>();
+			for (Numbered entry : entries) {
+				map.put(entry.number(), new com.payonel.modularcomputers.machine.BootVariables.Entry(entry.disk(), entry.path(), entry.label()));
+			}
+			return new com.payonel.modularcomputers.machine.BootVariables(map, order, next);
+		}
+	}
+
+	/**
 	 * A computer's bus order (external devices by id, and the ones unplugged), kept on its item
 	 * when it's broken, as a board's NVRAM keeps its boot order.
 	 */

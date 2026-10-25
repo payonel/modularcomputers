@@ -681,6 +681,38 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	}
 
 	/** The bus order's panel (its tab's: {@link SideTabs}). */
+	/**
+	 * The disk its EEPROM boots, by its bus entry's key, if it names one on the bus: BootNext's,
+	 * else BootOrder's first there (BootVariables.toTry), as the bootloader tries them. The EEPROM's,
+	 * read from its item in the slot: no EEPROM, no mark; none named, none (the bootloader's
+	 * fallback, the first disk holding /init.lua, is the disks' business, not the chip's).
+	 */
+	public Optional<String> bootDisk() {
+		ItemStack eeprom = menu.slots.get(CaseMenu.EEPROM_SLOT).getItem();
+		var vars = eeprom.get(com.payonel.modularcomputers.item.ModComponents.NVRAM);
+		if (vars == null) {
+			return Optional.empty();
+		}
+		List<com.payonel.modularcomputers.board.BoardAssembly.BusEntry> entries = busEntries();
+		for (var entry : vars.toTry()) {
+			for (var bus : entries) {
+				if (entry.disk().equals(idOf(bus)) && (!bus.cabled() || bus.online())) {
+					return Optional.of(bus.key());
+				}
+			}
+		}
+		return Optional.empty();
+	}
+
+	/** A bus entry's device's id: a cabled one's key, a part's its item's serial. */
+	private static String idOf(com.payonel.modularcomputers.board.BoardAssembly.BusEntry entry) {
+		if (entry.key().startsWith("id:")) {
+			return entry.key();
+		}
+		java.util.UUID serial = entry.item().get(com.payonel.modularcomputers.item.ModComponents.SERIAL);
+		return serial == null ? "" : "id:" + serial;
+	}
+
 	void extractBusPanel(GuiGraphicsExtractor graphics) {
 		Viewport panel = busPanel();
 		graphics.blit(RenderPipelines.GUI_TEXTURED, BUS_PANEL, panel.x(), panel.y(), 0, 0, BUS_W, BUS_H, BUS_W, BUS_H);
@@ -700,6 +732,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		pose.popMatrix();
 		extractLed(graphics, busOverflowLed(), status.overflow());
 		List<com.payonel.modularcomputers.board.BoardAssembly.BusEntry> entries = busEntries();
+		String bootKey = bootDisk().orElse(null);
 		int firstExternal = firstExternal(entries);
 		ScrollWindow window = busWindow(entries.size());
 		busScroll = window.clamp(busScroll);
@@ -724,7 +757,9 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 				graphics.fill(panel.x() + BUS_ROW_X + 19, ry + 1, panel.x() + BUS_ROW_X + BUS_ROW_W, ry + 18, OFFLINE_DISPLAY);
 			}
 			graphics.text(font, entry.name(), panel.x() + 41, ry + 1, offline ? OFFLINE_NAME : entry.connected() ? LIGHT : SILK_DIM, false);
-			graphics.text(font, entry.location(), panel.x() + 41, ry + 10, offline ? OFFLINE_LOCATION : SILK_DIM, false);
+			boolean boots = entry.key().equals(bootKey);
+			Component location = boots ? Component.translatable("gui.modularcomputers.bus.boot", entry.location()) : entry.location();
+			graphics.text(font, location, panel.x() + 41, ry + 10, offline ? OFFLINE_LOCATION : boots ? GOLD : SILK_DIM, false);
 			if (entry.cabled()) {
 				extractBulb(graphics, busBulb(row), Identify.isOn(entry.device().get()));
 				if (entry.online()) {

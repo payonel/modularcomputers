@@ -1,0 +1,142 @@
+.TH EFIBOOTMGR 1 "" "" "mcos Manual"
+.SH NAME
+efibootmgr \- show and change the EEPROM's boot entries and boot order
+.SH SYNOPSIS
+.B efibootmgr
+.RB [ \-v ]
+.RB [ \-q ]
+.RB [ \-c
+.B \-d
+.I disk
+.RB [ \-l
+.IR path ]
+.RB [ \-L
+.IR label ]]
+.RB [ \-b
+.I XXXX
+.RB [ \-B ]]
+.RB [ \-o
+.I X,Y
+.RB | " \-O" ]
+.RB [ \-n
+.I X
+.RB | " \-N" ]
+.SH DESCRIPTION
+The EEPROM keeps boot variables in its NVRAM, as a UEFI board does:
+boot entries
+.RB ( Boot0000
+to
+.BR Boot0007 ),
+each a disk by its id and a file on it;
+.BR BootOrder ,
+the order the entries are tried in; and
+.BR BootNext ,
+an entry tried once, at the next boot only.
+At power-on the EEPROM's bootloader tries
+.B BootNext
+(and clears it), then each entry of
+.B BootOrder
+whose disk is on the bus, then every disk in bus order holding
+.BR /init.lua .
+.PP
+With no options,
+.B efibootmgr
+shows the variables. After a change it shows them as they are now, unless
+.BR \-q .
+Entry numbers are hexadecimal, as in
+.BR Boot0001 .
+.SH OPTIONS
+.TP
+.BR \-c ", " \-\-create
+Makes a new entry, numbered
+.BR \-b 's
+or the first free one, and puts it first in
+.BR BootOrder .
+.TP
+.BR \-d ", " \-\-disk " \fIdisk\fR"
+The new entry's disk: its name in
+.B /dev
+.RB ( storage1 ,
+.BR /dev/storage1 ),
+or its id
+.RB ( id:\fIuuid\fR ),
+which may name a disk that isn't on the bus yet.
+.TP
+.BR \-l ", " \-\-loader " \fIpath\fR"
+The file the new entry boots;
+.B /init.lua
+when not given.
+.TP
+.BR \-L ", " \-\-label " \fIlabel\fR"
+The new entry's label.
+.TP
+.BR \-b ", " \-\-bootnum " \fIXXXX\fR"
+The entry
+.B \-c
+makes or
+.B \-B
+deletes.
+.TP
+.BR \-B ", " \-\-delete\-bootnum
+Deletes entry
+.BR \-b 's,
+from
+.B BootOrder
+and
+.B BootNext
+too.
+.TP
+.BR \-o ", " \-\-bootorder " \fIX,Y\fR"
+Sets
+.BR BootOrder .
+.TP
+.BR \-O ", " \-\-delete\-bootorder
+Clears
+.BR BootOrder .
+.TP
+.BR \-n ", " \-\-bootnext " \fIX\fR"
+Boots entry
+.I X
+next time only.
+.TP
+.BR \-N ", " \-\-delete\-bootnext
+Clears
+.BR BootNext .
+.TP
+.BR \-v ", " \-\-verbose
+Shows each entry's disk and file, and
+.B (not present)
+for a disk that isn't on the bus.
+.TP
+.BR \-q ", " \-\-quiet
+Shows nothing after a change.
+.SH EXIT STATUS
+0 when done; 1 when the EEPROM refuses a change (why is on standard error:
+an id that isn't one, a path that isn't absolute, an entry that doesn't
+exist), or there's no EEPROM; 2 for bad usage.
+.SH FILES
+.TP
+.B /dev/eeprom
+The EEPROM, whose ioctls change the variables.
+.TP
+.B /sys/firmware/efi/efivars
+The variables, a file each, to read.
+.SH EXAMPLES
+.nf
+efibootmgr -v
+efibootmgr -c -d storage1 -L "tiny OS"
+efibootmgr -n 1
+efibootmgr -o 1,0
+efibootmgr -b 1 -B
+.fi
+.SH NOTES
+Linux's efibootmgr writes UEFI's variables, which name a partition by its
+GUID and a file on it; mcos's name a disk by its id. There is no
+.B BootCurrent
+and no active flag
+.RB ( \-a ", " \-A ):
+every entry is active. The EEPROM checks every change, so a variable is
+always one its bootloader can read.
+.SH SEE ALSO
+.BR label (1),
+.BR lsdev (1)

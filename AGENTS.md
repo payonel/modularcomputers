@@ -183,6 +183,16 @@ blank, and its files leave the world save when the player takes it.
   (`CaseTier`'s). One board, so a fix to it is a fix for every holder.
 - A CPU only runs what the EEPROM holds (a fixed slot, like a reset vector) and aborts (ABRT, a
   panic) when it can't. The motherboard owns the bus (cases change; the board's firmware doesn't).
+- **Boot order is the EEPROM's NVRAM, not the bus's** (user design, 2026-10-25): a case's sockets are
+  fixed connectors, as a motherboard's ports, and the EEPROM keeps UEFI's boot variables on its item
+  (`ModComponents.NVRAM`, `BootVariables`): entries (a disk by its id, a file, a label), BootOrder,
+  BootNext. A closed set of typed values, checked by the chip at every write, never a free store
+  (UEFI's let bad writes brick laptops); an entry is checked for its form, not for its disk being
+  there (UEFI keeps an unplugged stick's). The factory bootloader is a boot manager: BootNext once
+  (cleared first), BootOrder, skipping absent disks, then the bus-order scan (UEFI's fallback). The
+  parts view marks the disk it boots, read from the EEPROM item in the slot, so the mark is the
+  chip's. In mcos: `efibootmgr` writes them (the chip's methods, through `/dev/eeprom`), and
+  `/sys/firmware/efi/efivars` reads them, text a file each, plain names (no vendor GUIDs).
 - **Devices have several names**, as on a real system: a slot path (`sata:0`, `exp:1`), an id
   (`id:<uuid>`, however connected), and virtual names (`console`, UEFI's ConSplitter). The bus keys
   a device by its address (a part's slot path, a cabled device's id); its other names are aliases.
