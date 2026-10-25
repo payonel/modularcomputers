@@ -37,6 +37,29 @@ sys.close(card)
 A device's file is ready for `sys.poll`'s `PRI` while the device has news: its interrupt came
 since the file was last read. The methods each device has are on its page.
 
+## /sys: what a device can do
+
+So a device can be learned in the game, without this manual, `/sys` has a read-only file for each
+device, by the same name as its `/dev` file: each of its methods (its file's ioctls), its arguments,
+and what it does, from the device's own descriptions.
+
+```sh
+ls /sys
+cat /sys/robotics0 | less
+```
+
+```
+robotics0: robotics
+
+contents([face])
+    what the container at a face (in front when none is given) holds: a list
+    of its slots with something in, each {slot, name, count, ...}
+...
+```
+
+Linux's sysfs is a tree of a device's attributes, a file each; this one is flat, a file a device,
+its methods' text.
+
 ## How a file behaves
 
 Reading gives what the device's `get` returns, taken at the first read. What you write goes to the

@@ -88,6 +88,7 @@ local fail = vfs.fail
 local tty = module("tty")
 local hfs = module("hfs", k, vfs)
 local devfs = module("devfs", k, vfs)
+local sysfs = module("sysfs", k, vfs)
 local newpipe = module("pipe", k, vfs)
 local tmpfs = module("tmpfs", k, vfs)
 
@@ -812,7 +813,7 @@ function syscalls.getcwd(p)
 end
 
 -- mount(source, target[, type]): a disk (its bus address: an hfs disk) or a kernel filesystem
--- ("devfs") on a path.
+-- ("devfs", "sysfs", "tmpfs") on a path.
 function syscalls.mount(p, request, source, target, fstype)
   local at = path(p, target)
   if type(source) ~= "string" or not at then
@@ -821,6 +822,8 @@ function syscalls.mount(p, request, source, target, fstype)
   local fs
   if fstype == "devfs" or source == "devfs" then
     fs = devfs
+  elseif fstype == "sysfs" or source == "sysfs" then
+    fs = sysfs
   elseif fstype == "tmpfs" or source == "tmpfs" then
     fs = tmpfs()
   else
@@ -1204,6 +1207,7 @@ kernel.tty = console
 
 vfs.mount("/", hfs(root), root)
 vfs.mount("/dev", devfs, "devfs")
+vfs.mount("/sys", sysfs, "sysfs")
 vfs.mount("/tmp", tmpfs(), "tmpfs")
 
 -- Disks on the bus, mounted as the kernel finds them (as udisks does: sata:1 at /mnt/sata/1, id:x at

@@ -13,6 +13,7 @@ different places in it.
 |---|---|---|
 | `/` | The boot disk | On the disk |
 | `/dev` | The devices as files: see [/dev](/mcos/dev/) | The kernel's |
+| `/sys` | What each device can do, a file each, read only: see [/sys](/mcos/dev/#sys-what-a-device-can-do) | The kernel's |
 | `/tmp` | A filesystem in the computer's memory | Until the computer is turned off |
 | `/run` | Another one, for services' pids; made by `/etc/rc` | Until the computer is turned off |
 | `/mnt/...` | Every other disk on the bus | On the disk |

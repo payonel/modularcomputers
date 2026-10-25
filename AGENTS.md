@@ -470,7 +470,7 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   line a face (`north 7 7`), a line written takes effect at once (a sysfs attribute's write); a
   device without one (the EEPROM) takes everything written at close, all or nothing.
 - **Every device has a `/dev` file, and it's the device's API** (the user's call: no `device.*`
-  library, no `/sys` yet): `/dev` is flat, `console`, `tty`, `null`, `zero` and a node for each
+  library): `/dev` is flat, `console`, `tty`, `null`, `zero` and a node for each
   device by the kernel's name, and its ioctls are the device's methods by name
   (`sys.ioctl(fd, "setStrength", 4)`, in any open mode, with the arguments given and no more: a stream
   method called with none takes what's come; a method answering nothing gives `true`, so one whose
@@ -491,6 +491,10 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   older ones dropped), so a reader sees what's current and nothing grows: a NIC's file reads its
   frames, one a line (direction, remote address, distance, bytes, outcome); its data is read
   through sockets.
+- **`/sys` makes devices learnable in the game** (the user's): a read-only file a device, by its
+  `/dev` name, listing its methods, arguments and what each does, from their `@Method` docs (so a
+  method's doc begins with its signature: `walk(forward[, right]): ...`). Flat, not Linux's tree of
+  attributes (`sysfs.lua`).
 - **`sys.poll(fds, seconds)`** is poll(2) (`IN`, `PRI`, `OUT`; `HUP`, `ERR` unasked), in `sys` (mcos's
   POSIX layer), since Lua's `io` is C's stdio; `sys.fileno` gives an io file's descriptor. A
   redstone file is always readable and reports a change as `PRI` (a sysfs GPIO's way).

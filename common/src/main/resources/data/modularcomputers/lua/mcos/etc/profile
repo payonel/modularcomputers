@@ -5,4 +5,4 @@ export HOME=/home
 export ENV=$HOME/.shrc
 alias ll='ls -alF'
 alias la='ls -a'
-alias l='ls -CF'
+alias l='ls -lh --color=auto'

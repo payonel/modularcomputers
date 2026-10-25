@@ -3,7 +3,8 @@
 ls \- list directory contents
 .SH SYNOPSIS
 .B ls
-.RB [ \-1aClFS ]
+.RB [ \-1aChlFS ]
+.RB [ \-\-color [ =\fIwhen\fP ]]
 .RI [ path ...]
 .SH DESCRIPTION
 .B ls
@@ -23,7 +24,9 @@ is given.
 When standard output is a terminal, names are laid out in columns, filled
 down then across, as many as fit the terminal's width; directories show in
 bold blue and symbolic links in bold cyan. Into a pipe or a file, names
-go one a line, without colors.
+go one a line, without colors (unless
+.B \-\-color=always
+says otherwise).
 .SH OPTIONS
 Options may be combined
 .RB ( \-la )
@@ -54,6 +57,32 @@ file), the size in bytes, and the name; a link's target follows
 A link named on the command line is shown as itself, not as what it
 points to.
 .TP
+.B \-h
+With
+.BR \-l ,
+sizes for people to read: bytes under 1024, else in K, M, G or T (each
+1024 of the last), with a tenth under 10 of a unit
+.RB ( 1.5K ),
+whole above
+.RB ( 12K ),
+rounded up, as GNU ls shows them.
+.TP
+.BI \-\-color [ =when ]
+When to color names:
+.B auto
+(on a terminal only, as with no
+.BR \-\-color ),
+.B always
+(also given by
+.B \-\-color
+alone), or
+.BR never .
+GNU's other words for each
+.RB ( tty ,
+.BR yes ,
+.BR none ...)
+are taken too.
+.TP
 .B \-F
 Append
 .B /
@@ -64,8 +93,14 @@ to symbolic links.
 .B \-S
 Sort by size, largest first (names in order where sizes are the same).
 .SH EXIT STATUS
-0 on success; 2 on a bad option, or if any path could not be read.
+0 on success; 2 on a bad option or
+.B \-\-color
+argument, or if any path could not be read.
 .SH NOTES
+Colors are on by default on a terminal, as if
+.B \-\-color=auto
+were given (GNU ls colors only when asked; distributions' shell aliases
+ask).
 There are no owners, permissions or times to show, so
 .B \-l
 gives only the type, the size and the name. A symbolic link to nothing

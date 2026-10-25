@@ -14,7 +14,7 @@ reference is the [sh](/programs/sh/) page; this one is the tour.
 An interactive shell shows `PS1`, by default `\w \$ `: the working directory (with `~` for `HOME`
 unless `HOME` is `/`) and a `$`. The console's shell is a login shell (`sh -l`), which runs
 `/etc/profile` and then `/home/.shrc`. The profile sets `PATH`, `HOME`, `ENV` and three aliases:
-`ll` (`ls -alF`), `la` (`ls -a`) and `l` (`ls -CF`). Put your own aliases and variables in
+`ll` (`ls -alF`), `la` (`ls -a`) and `l` (`ls -lh --color=auto`). Put your own aliases and variables in
 `/home/.shrc`.
 
 ## Commands

@@ -11,7 +11,7 @@ hidden: true
 
 ## Synopsis
 
-<strong>ls</strong> \[<strong>-1aClFS</strong>\] \[<em>path</em>...\]
+<strong>ls</strong> \[<strong>-1aChlFS</strong>\] \[<strong>--color</strong>\[<strong>=\\fIwhen\\fP</strong>\]\] \[<em>path</em>...\]
 
 ## Description
 
@@ -19,7 +19,7 @@ hidden: true
 
 Names starting with a dot are left out unless <strong>-a</strong> is given.
 
-When standard output is a terminal, names are laid out in columns, filled down then across, as many as fit the terminal's width; directories show in bold blue and symbolic links in bold cyan. Into a pipe or a file, names go one a line, without colors.
+When standard output is a terminal, names are laid out in columns, filled down then across, as many as fit the terminal's width; directories show in bold blue and symbolic links in bold cyan. Into a pipe or a file, names go one a line, without colors (unless <strong>--color=always</strong> says otherwise).
 
 ## Options
 
@@ -37,6 +37,12 @@ Options may be combined (<strong>-la</strong>) and may come anywhere among the p
 <strong>-l</strong>
 : Long format: a type letter (<strong>d</strong> directory, <strong>l</strong> symbolic link, <strong>c</strong> device, <strong>p</strong> pipe, <strong>-</strong> file), the size in bytes, and the name; a link's target follows <strong>-\></strong>. A link named on the command line is shown as itself, not as what it points to.
 
+<strong>-h</strong>
+: With <strong>-l</strong>, sizes for people to read: bytes under 1024, else in K, M, G or T (each 1024 of the last), with a tenth under 10 of a unit (<strong>1.5K</strong>), whole above (<strong>12K</strong>), rounded up, as GNU ls shows them.
+
+<strong>--color</strong><em>\[</em><strong>=when</strong><em>\]</em>
+: When to color names: <strong>auto</strong> (on a terminal only, as with no <strong>--color</strong>), <strong>always</strong> (also given by <strong>--color</strong> alone), or <strong>never</strong>. GNU's other words for each (<strong>tty</strong>, <strong>yes</strong>, <strong>none</strong>...) are taken too.
+
 <strong>-F</strong>
 : Append <strong>/</strong> to directories and <strong>@</strong> to symbolic links.
 
@@ -45,11 +51,11 @@ Options may be combined (<strong>-la</strong>) and may come anywhere among the p
 
 ## Exit status
 
-0 on success; 2 on a bad option, or if any path could not be read.
+0 on success; 2 on a bad option or <strong>--color</strong> argument, or if any path could not be read.
 
 ## Notes
 
-There are no owners, permissions or times to show, so <strong>-l</strong> gives only the type, the size and the name. A symbolic link to nothing is listed as the link.
+Colors are on by default on a terminal, as if <strong>--color=auto</strong> were given (GNU ls colors only when asked; distributions' shell aliases ask). There are no owners, permissions or times to show, so <strong>-l</strong> gives only the type, the size and the name. A symbolic link to nothing is listed as the link.
 
 ## See also
 

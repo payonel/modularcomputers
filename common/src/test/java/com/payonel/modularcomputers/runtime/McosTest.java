@@ -334,6 +334,33 @@ class McosTest extends McosHarness {
 	}
 
 	@Test
+	void sysHasAReadOnlyFileADeviceSayingWhatEachOfItsMethodsDoes() {
+		boot();
+		type("ls /sys > /ls; cat /sys/eeprom > /e; echo x 2> /dev/null > /sys/eeprom; echo $? > /status\r");
+		untilFile(root().resolve("status"), "1\n"); // (read only: the write is refused)
+		assertThat(read(root().resolve("ls"))).as("a file a device, by its /dev name").contains("eeprom\n", "terminal0\n");
+		String about = read(root().resolve("e"));
+		assertThat(about).startsWith("eeprom: eeprom\n\n");
+		assertThat(about).as("each method's signature, then what it does, indented").containsPattern("(?m)^get\\(\\)\n    \\S");
+	}
+
+	@Test
+	void lsDashLhShowsSizesForPeopleAndColorSaysWhen() {
+		file("s/a", "a");
+		file("s/b", "x".repeat(1536));
+		file("s/c", "x".repeat(12 * 1024 + 5));
+		file("s/d/inside", "");
+		boot();
+		type("ls -lh /s > /o; ls --color=always /s > /c; ls --color=never /s > /n; ls --color=bogus /s 2> /bad; echo $? > /status\r");
+		untilFile(root().resolve("status"), "2\n");
+		assertThat(read(root().resolve("o"))).as("bytes under 1K, a tenth under 10 of a unit, whole above, rounded up (GNU's)")
+			.isEqualTo("-        1 a\n-     1.5K b\n-      13K c\nd        0 d\n");
+		assertThat(read(root().resolve("c"))).as("colored into a file when always").contains("\u001B[1;34md\u001B[0m");
+		assertThat(read(root().resolve("n"))).doesNotContain("\u001B");
+		assertThat(read(root().resolve("bad"))).isNotEmpty();
+	}
+
+	@Test
 	void lsDashSSortsBySizeLargestFirst() {
 		file("s/small", "a");
 		file("s/big", "abcdef");

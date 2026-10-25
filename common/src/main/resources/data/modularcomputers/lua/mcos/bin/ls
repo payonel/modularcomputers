@@ -1,8 +1,10 @@
--- ls [-1aClFS] [path...]: what's in directories (a file lists itself). On a terminal, names go in
--- columns down then across, as wide as the terminal (as GNU ls), directories in blue; into a pipe or
--- a file, one a line. -1 one a line, -C columns anyway, -l long (type, size, name; a link's target
--- after ->), -a names starting with a dot too, -F a / after directories, an @ after links, -S by
--- size, largest first (ties by name), as GNU ls's.
+-- ls [-1aChlFS] [--color[=WHEN]] [path...]: what's in directories (a file lists itself). On a
+-- terminal, names go in columns down then across, as wide as the terminal (as GNU ls), directories
+-- in blue; into a pipe or a file, one a line. -1 one a line, -C columns anyway, -l long (type, size,
+-- name; a link's target after ->), -h sizes as 1.5K, 12M (GNU's, powers of 1024), -a names starting
+-- with a dot too, -F a / after directories, an @ after links, -S by size, largest first (ties by
+-- name), as GNU ls's. --color=auto colors on a terminal only (as with no --color), always or
+-- --color alone always, never not at all.
 local sys = require("sys")
 local fs = require("fs")
 
@@ -11,13 +13,29 @@ local DEFAULT_WIDTH = 80 -- columns, when the terminal doesn't say
 local DIRECTORY_COLOR = "\27[1;34m" -- (dircolors' default for directories)
 local LINK_COLOR = "\27[1;36m" -- (and for links)
 local RESET = "\27[0m"
+local UNITS = {"K", "M", "G", "T"} -- -h's, each 1024 of the last
+local KIBI = 1024
+local ONE_DECIMAL = 10 -- -h shows a tenth below this many of a unit (1.5K), whole ones from it (12K)
+local COLOR_WHEN = {auto = "auto", tty = "auto", ["if-tty"] = "auto", always = "always", yes = "always", force = "always",
+  never = "never", no = "never", none = "never"} -- (GNU's words for each)
 
 local flags = {}
 local paths = {}
+local color = "auto"
 for _, word in ipairs(arg) do
-  if string.sub(word, 1, 1) == "-" and #word > 1 then
+  if word:sub(1, 7) == "--color" then
+    local when = word:match("^%-%-color=(.+)$")
+    if word ~= "--color" and not COLOR_WHEN[when or ""] then
+      io.stderr:write("ls: invalid argument '" .. tostring(when or word:sub(8)) .. "' for '--color'\n")
+      return 2
+    end
+    color = when and COLOR_WHEN[when] or "always"
+  elseif word:sub(1, 2) == "--" then
+    io.stderr:write("ls: unrecognized option '" .. word .. "'\n")
+    return 2
+  elseif string.sub(word, 1, 1) == "-" and #word > 1 then
     for c in string.gmatch(string.sub(word, 2), ".") do
-      if not string.find("1aClFS", c, 1, true) then
+      if not string.find("1aChlFS", c, 1, true) then
         io.stderr:write("ls: invalid option -- '" .. c .. "'\n")
         return 2
       end
@@ -32,6 +50,7 @@ if #paths == 0 then
 end
 
 local tty = sys.isatty(1)
+local colored = color == "always" or color == "auto" and tty
 local columns = flags.C or (tty and not flags["1"] and not flags.l)
 local width = tty and sys.ioctl(1, "TIOCGWINSZ") or DEFAULT_WIDTH
 
@@ -39,9 +58,9 @@ local width = tty and sys.ioctl(1, "TIOCGWINSZ") or DEFAULT_WIDTH
 local function shown(entry)
   local mark = flags.F and (entry.type == "directory" and "/" or entry.type == "link" and "@") or ""
   local text = entry.name .. mark
-  local color = entry.type == "directory" and DIRECTORY_COLOR or entry.type == "link" and LINK_COLOR
-  if tty and color then
-    return color .. text .. RESET, utf8.len(text) or #text
+  local paint = entry.type == "directory" and DIRECTORY_COLOR or entry.type == "link" and LINK_COLOR
+  if colored and paint then
+    return paint .. text .. RESET, utf8.len(text) or #text
   end
   return text, utf8.len(text) or #text
 end
@@ -90,6 +109,25 @@ local function grid(entries)
   end
 end
 
+-- A size as -h shows it (GNU's): bytes under 1K, else a tenth of a unit under 10 of it, rounded up.
+local function human(bytes)
+  if bytes < KIBI then
+    return tostring(bytes)
+  end
+  local value, unit = bytes, 0
+  while value >= KIBI and unit < #UNITS do
+    value, unit = value / KIBI, unit + 1
+  end
+  if value < ONE_DECIMAL then
+    local tenths = math.ceil(value * 10)
+    if tenths < ONE_DECIMAL * 10 then
+      return string.format("%d.%d%s", tenths // 10, tenths % 10, UNITS[unit])
+    end
+    value = ONE_DECIMAL
+  end
+  return string.format("%d%s", math.ceil(value), UNITS[unit])
+end
+
 -- An entry's size (a link's own, as -l shows it).
 local function size(entry, dir)
   if entry.size then
@@ -123,7 +161,8 @@ local function show(entries, dir)
       local kind = ({directory = "d", device = "c", fifo = "p", link = "l"})[st and st.type or entry.type] or "-"
       local text = shown(entry)
       local target = st and st.target and " -> " .. st.target or ""
-      io.write(string.format("%s %8d %s%s\n", kind, st and st.size or 0, text, target))
+      local bytes = st and st.size or 0
+      io.write(string.format("%s %8s %s%s\n", kind, flags.h and human(bytes) or tostring(bytes), text, target))
     end
   elseif columns then
     grid(visible)
