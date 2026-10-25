@@ -68,7 +68,7 @@ computers really work.
 ## Working rules
 
 - **Commits:** on `master` (`git add -A`), autonomously, when an addition is done and `testAll`
-  passes, gated on its exit status (never on grepping its log). Never branch, never push. No model
+  passes, gated on its exit status (never on grepping its log). Never branch. No model
   identifiers in commits or code. End messages with the co-author line.
 - **The manual (`docs/`) moves with the mod:** a commit that changes the mod's behavior or
   features (a block, item, device, recipe, mcos program or API) includes the matching update to its
