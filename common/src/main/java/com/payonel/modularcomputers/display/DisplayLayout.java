@@ -4,7 +4,7 @@ package com.payonel.modularcomputers.display;
  * Where the screen view puts the display, its bezel and its buttons. The bezel (the display
  * plus a {@code border} frame) fills {@code fill} of the area, centered, leaving room on both
  * sides so the button column fits to the right of the bezel without covering it: the power
- * button level with the bezel's top edge, and the view toggle below it.
+ * button level with the bezel's top edge, and the column's next row below it (the view buttons': ComputerButtons).
  */
 public record DisplayLayout(Viewport bezel, Viewport display, Viewport powerButton, Viewport viewToggle) {
 	public static DisplayLayout of(int areaWidth, int areaHeight, double aspectRatio, double fill, int border, int buttonSize, int gap) {

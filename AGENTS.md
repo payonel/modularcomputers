@@ -159,7 +159,10 @@ traces, sockets and latches, silkscreen labels in the game's font), its controls
 hardware's parts (switches, LEDs, meters), and every texture comes from the scripts in
 `scripts/art/` with their shared palette. Every item has a hint (`Hinted`): a summary in its
 tooltip, and with Shift held, details above the crafting grid of how it works and what crafting
-it does (a disk used in a recipe loses its files).
+it does (a disk used in a recipe loses its files). Every view of a computer, a screen or a card
+holder has one button column (`ComputerButtons`, the user's: the same buttons in the same places in
+every view, an icon a view that never changes, the open one ringed in yellow): power, the screen
+view, the parts view, a robot's hands, the cards' tabs; a view a block lacks is dimmed, not removed.
 
 ### Items
 
@@ -325,9 +328,9 @@ in a case they fail (`no robotics available`, the user's words), in a robot `Cra
 them (the game's recipes; what's made into storage, all or nothing: no room, no craft). A craft
 takes time and each card crafts on its own, so cards add throughput. Its `/dev` file reads as its
 items (`name count` a line) and a line written dumps its storage (below, or at the face named).
-A view's tabs are one mechanism (`SideTabs`, the user's): the bus order's first, then a tab for
-each card whose kind registered one, each opening its panel left of the board, the same list in the
-screen view; a new card's tab is a registration, nothing else.
+A view's tabs are one mechanism (`SideTabs`, the user's): a tab for each card whose kind
+registered one, each opening its panel left of the board (the bus order is the parts view's own
+panel), the same list in the screen view; a new card's tab is a registration, nothing else.
 
 ### The energy field card
 
@@ -665,6 +668,9 @@ Lessons from mistakes, each with its test:
   render thread (textures, sounds) goes to the client's thread (`Minecraft.execute`). Timing-bound,
   so no test catches it reliably: the client test's log showed it.
 
+- **Compare a view's tabs by lane, not identity:** `SideTabs` makes its tabs afresh at each call,
+  so `tab == open` is never true (the open tab's mark never showed). (`BotGolemClientGameTest`: the
+  crafting tab ringed)
 - An hfs file shows its writes only at close: watch a file a program keeps open on `/tmp` (tmpfs).
 - Typing more than 256 keys at once in a test drops the rest (a terminal's key queue): split lines.
 - Lua 5.5 for-loop variables are constants (a compile error when the script loads: `LuaScriptsTest`

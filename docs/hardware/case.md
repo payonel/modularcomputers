@@ -63,6 +63,19 @@ faces such as `front` and `left` are named from the case's front. See [Faces](/c
 A [Bluetooth card](/devices/bluetooth-card/) in your hand, right-clicked on a case that has one,
 links the two.
 
+## The buttons
+
+Right of every view of a computer is the same column of buttons, in the same order:
+
+1. **Power**, the same button as on the case's back.
+2. **The screen view** (a little screen): the terminal. Dimmed when the computer has no screen in
+   its slot.
+3. **The parts view** (a motherboard): the board, its sockets and the bus order.
+4. A golem's **hands**, on a golem.
+5. A **tab for each card** that has a panel, such as a [crafting card](/devices/crafting-card/).
+
+The view that's open is ringed in yellow.
+
 ## Crafting
 
 - **Tier 1:** a row of three iron ingots, then copper ingot, note block, copper ingot, then iron

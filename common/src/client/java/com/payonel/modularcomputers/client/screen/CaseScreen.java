@@ -37,8 +37,8 @@ import net.minecraft.world.item.ItemStack;
  * Left of it, the bus order panel lists every device on the bus in discovery order, one row
  * each; its arrows move a device up or down, and it scrolls when the devices don't all fit.
  * Cabled devices also get a bulb (outline the device in the world for a while) and a plug
- * (connect or disconnect it). Right of it, the power button and the toggle back to the screen
- * view, as in the screen view.
+ * (connect or disconnect it). Right of it, the button column every view has ({@link ComputerButtons}):
+ * power, the screen view, this view (ringed while the bus order shows), a robot's hands, the cards' tabs.
  * <p>
  * The board, the bus panel's backing and the icons are textures (scripts/art/case_gui_textures.py);
  * labels, numbers and everything that reacts to the parts (seated RAM, plugged drives, the
@@ -87,8 +87,6 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int LIT_CORE = 0xFFC8FFD2;
 	private static final int SILVER = 0xFFB0B4BC;
 	private static final int GOLD = 0xFFCCA64A;
-	/** Where its tabs start, under its buttons, when it has no hands. */
-	private static final int CRAFT_TABS_Y = 48;
 	/**
 	 * Outlines a part slot and its bus order row together while either is hovered, and the
 	 * slots an item would fit while it's carried or hovered in the inventory.
@@ -171,26 +169,25 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		return showBus;
 	}
 
-	/** Its tabs: the bus order's, then each card's that has one ({@link SideTabs}), by what's in its slots now. */
+	/** Its cards' tabs ({@link SideTabs}), by what's in its slots now. */
 	private java.util.List<SideTabs.Tab> tabs() {
-		return SideTabs.of(lane -> menu.slots.get(CaseMenu.EXP_SLOTS + lane).getItem(), true);
+		return SideTabs.of(lane -> menu.slots.get(CaseMenu.EXP_SLOTS + lane).getItem());
 	}
 
-	/** The open tab: the menu's (which card's slots show), while that card is still in; else the bus order's. */
+	/** The open panel: the menu's tab (which card's slots show), while that card is still in; else the bus order's. */
 	private SideTabs.Tab openTab() {
-		java.util.List<SideTabs.Tab> tabs = tabs();
-		for (SideTabs.Tab tab : tabs) {
+		for (SideTabs.Tab tab : tabs()) {
 			if (tab.lane() == menu.openTab()) {
 				return tab;
 			}
 		}
-		return tabs.getFirst();
+		return SideTabs.bus();
 	}
 
-	/** A tab's button, by its lane ({@link SideTabs#BUS}, or a card's), under the buttons (and a robot's hands); empty when it has none. */
+	/** A card's tab's button, by its lane, under the view buttons (and a robot's hands); empty when it has none. */
 	public Viewport tab(int lane) {
 		java.util.List<SideTabs.Tab> tabs = tabs();
-		int top = topPos + (menu.hasHand() ? handPlate().bottom() - topPos + ComputerButtons.GAP : CRAFT_TABS_Y);
+		int top = menu.hasHand() ? handPlate().bottom() + ComputerButtons.GAP : ComputerButtons.below(partsButton());
 		for (int index = 0; index < tabs.size(); index++) {
 			if (tabs.get(index).lane() == lane) {
 				return SideTabs.button(leftPos + imageWidth + ComputerButtons.GAP, top, index);
@@ -205,16 +202,28 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		return showPanel ? new Viewport(leftPos - BUS_GAP - open.width(), topPos, open.width(), imageHeight) : new Viewport(0, 0, 0, 0);
 	}
 
-	public Viewport powerButton() {
-		return new Viewport(leftPos + imageWidth + ComputerButtons.GAP, topPos, ComputerButtons.SIZE, ComputerButtons.SIZE);
+	/** The button column's row {@code index}, right of the panel ({@link ComputerButtons}). */
+	private Viewport row(int index) {
+		return ComputerButtons.row(leftPos + imageWidth + ComputerButtons.GAP, topPos, index);
 	}
 
-	public Viewport viewToggle() {
-		if (!(minecraft != null && computer().map(BoardHolder::showsScreen).orElse(false))) {
-			return new Viewport(0, 0, 0, 0); // no screen in the slot: no screen view to switch to
-		}
-		Viewport power = powerButton();
-		return new Viewport(power.x(), power.bottom() + ComputerButtons.GAP, ComputerButtons.SIZE, ComputerButtons.SIZE);
+	public Viewport powerButton() {
+		return row(0);
+	}
+
+	/** The screen view's button: always there, dimmed (and doing nothing) with no screen in its slot. */
+	public Viewport screenButton() {
+		return row(1);
+	}
+
+	/** Whether it has a screen view to go to (a screen in its slot). */
+	public boolean hasScreenView() {
+		return minecraft != null && computer().map(BoardHolder::showsScreen).orElse(false);
+	}
+
+	/** The parts view's button (this view's): it opens the bus order's panel. */
+	public Viewport partsButton() {
+		return row(2);
 	}
 
 	/** A slot's 16x16 item area on screen. */
@@ -445,8 +454,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		extractLinkedHighlight(graphics, mouseX, mouseY);
 		SlotHints.extract(graphics, menu, hoveredSlot, CaseMenu.PART_SLOTS, this::slotArea);
 		if (computer().isPresent()) {
-			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.SCREEN, computer().get().powerLight(), powerHeld);
+			ComputerButtons.extractPower(graphics, powerButton(), computer().get().powerLight(), powerHeld);
 		}
+		ComputerButtons.extractView(graphics, screenButton(), ComputerButtons.View.SCREEN, hasScreenView(), false);
+		ComputerButtons.extractView(graphics, partsButton(), ComputerButtons.View.PARTS, true, openTab().lane() == SideTabs.BUS);
 	}
 
 	@Override
@@ -599,7 +610,10 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private void extractTabs(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
 		SideTabs.Tab open = openTab();
 		for (SideTabs.Tab tab : tabs()) {
-			tab.extractButton(graphics, tab(tab.lane()), tab == open);
+			tab.extractButton(graphics, tab(tab.lane()));
+			if (tab.lane() == open.lane()) { // (by lane: each call makes its tabs afresh)
+				ComputerButtons.ring(graphics, tab(tab.lane()));
+			}
 		}
 		if (showPanel) {
 			open.extractPanel(this, graphics, panel(), mouseX, mouseY);
@@ -812,9 +826,21 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		var hit = ComputerButtons.click(event, powerButton(), viewToggle(), ComputerButtons.Target.SCREEN, menu.host());
-		powerHeld = hit == ComputerButtons.Hit.POWER;
-		if (hit != ComputerButtons.Hit.NONE) {
+		boolean leftOrRightButton = event.button() == InputConstants.MOUSE_BUTTON_LEFT || event.button() == InputConstants.MOUSE_BUTTON_RIGHT;
+		powerHeld = leftOrRightButton && powerButton().contains(event.x(), event.y());
+		if (powerHeld) {
+			ComputerButtons.pressPower(menu.host());
+			return true;
+		}
+		if (leftOrRightButton && screenButton().contains(event.x(), event.y())) {
+			if (hasScreenView()) {
+				ComputerButtons.open(menu.host(), ComputerButtons.View.SCREEN);
+			}
+			return true; // (dimmed: nothing)
+		}
+		if (leftOrRightButton && partsButton().contains(event.x(), event.y())) {
+			menu.openTab(SideTabs.BUS); // (this view: its own panel)
+			layout();
 			return true;
 		}
 		for (SideTabs.Tab tab : tabs()) {
@@ -899,7 +925,7 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		// The bus panel and the buttons are part of this screen: clicking them must not drop
 		// the carried item.
 		boolean onBus = showBus && busPanel().contains(mouseX, mouseY);
-		boolean onButtons = powerButton().contains(mouseX, mouseY) || viewToggle().contains(mouseX, mouseY)
+		boolean onButtons = powerButton().contains(mouseX, mouseY) || screenButton().contains(mouseX, mouseY) || partsButton().contains(mouseX, mouseY)
 			|| menu.hasHand() && handPlate().contains(mouseX, mouseY) || panel().contains(mouseX, mouseY);
 		for (SideTabs.Tab tab : tabs()) {
 			onButtons |= tab(tab.lane()).contains(mouseX, mouseY);

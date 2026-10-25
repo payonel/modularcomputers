@@ -26,7 +26,7 @@ final class HandPlate {
 	static final int WIDTH = 16 + 2 * MARGIN;
 	static final int HEIGHT = OFF_HAND_DOWN + 16 + 2 * MARGIN;
 	/** How far below the view's buttons it starts (as the parts view's slots are placed). */
-	static final int BELOW_BUTTONS = CaseMenu.HAND_Y - MARGIN - (2 * ComputerButtons.SIZE + ComputerButtons.GAP);
+	static final int BELOW_BUTTONS = CaseMenu.HAND_Y - MARGIN - ((ComputerButtons.VIEW_ROWS + 1) * ComputerButtons.SIZE + ComputerButtons.VIEW_ROWS * ComputerButtons.GAP);
 
 	private HandPlate() {
 	}
@@ -36,9 +36,9 @@ final class HandPlate {
 		return new Viewport(itemX - MARGIN, itemY - MARGIN, WIDTH, HEIGHT);
 	}
 
-	/** The plate under buttons whose toggle is {@code toggle} (the screen view's). */
-	static Viewport under(Viewport toggle) {
-		return new Viewport(toggle.x() + (toggle.width() - WIDTH) / 2, toggle.bottom() + BELOW_BUTTONS, WIDTH, HEIGHT);
+	/** The plate under the view buttons, {@code parts} the last of them (the screen view's). */
+	static Viewport under(Viewport parts) {
+		return new Viewport(parts.x() + (parts.width() - WIDTH) / 2, parts.bottom() + BELOW_BUTTONS, WIDTH, HEIGHT);
 	}
 
 	/** The plate and its slots' sockets. */

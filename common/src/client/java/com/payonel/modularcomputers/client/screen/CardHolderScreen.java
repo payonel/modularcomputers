@@ -47,25 +47,34 @@ public final class CardHolderScreen extends AbstractContainerScreen<CardHolderMe
 		return menu.getType() == ModMenus.SCREEN;
 	}
 
-	/** The toggle back to the screen view, or an empty area for blocks without one. */
-	public Viewport viewToggle() {
-		return hasScreenView() ? new Viewport(leftPos + imageWidth + ComputerButtons.GAP, topPos, ComputerButtons.SIZE, ComputerButtons.SIZE)
-			: new Viewport(0, 0, 0, 0);
+	/** The screen view's button (the column every view has: {@link ComputerButtons}), or an empty area for blocks without one. */
+	public Viewport screenButton() {
+		return hasScreenView() ? ComputerButtons.row(leftPos + imageWidth + ComputerButtons.GAP, topPos, 0) : new Viewport(0, 0, 0, 0);
+	}
+
+	/** This view's button (ringed), under the screen view's; an empty area for blocks with only this view. */
+	public Viewport partsButton() {
+		return hasScreenView() ? ComputerButtons.row(leftPos + imageWidth + ComputerButtons.GAP, topPos, 1) : new Viewport(0, 0, 0, 0);
 	}
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		var none = new Viewport(0, 0, 0, 0);
-		if (ComputerButtons.click(event, none, viewToggle(), ComputerButtons.Target.SCREEN, com.payonel.modularcomputers.network.HostRef.of(menu.pos())) != ComputerButtons.Hit.NONE) {
+		boolean leftOrRightButton = event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT
+			|| event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_RIGHT;
+		if (leftOrRightButton && screenButton().contains(event.x(), event.y())) {
+			ComputerButtons.open(com.payonel.modularcomputers.network.HostRef.of(menu.pos()), ComputerButtons.View.SCREEN);
 			return true;
+		}
+		if (leftOrRightButton && partsButton().contains(event.x(), event.y())) {
+			return true; // (this view)
 		}
 		return super.mouseClicked(event, doubleClick);
 	}
 
 	@Override
 	protected boolean hasClickedOutside(double mouseX, double mouseY, int left, int top) {
-		// The toggle is part of this screen: clicking it must not drop the carried item.
-		return super.hasClickedOutside(mouseX, mouseY, left, top) && !viewToggle().contains(mouseX, mouseY);
+		// The buttons are part of this screen: clicking them must not drop the carried item.
+		return super.hasClickedOutside(mouseX, mouseY, left, top) && !screenButton().contains(mouseX, mouseY) && !partsButton().contains(mouseX, mouseY);
 	}
 
 	/** A card slot's 16x16 item area on screen. */
@@ -99,7 +108,10 @@ public final class CardHolderScreen extends AbstractContainerScreen<CardHolderMe
 				graphics.blit(RenderPipelines.GUI_TEXTURED, ICONS, area.x(), area.y(), ICON_CARD * 16, 0, 16, 16, 128, 16);
 			}
 		}
-		ComputerButtons.extract(graphics, new Viewport(0, 0, 0, 0), viewToggle(), ComputerButtons.Target.SCREEN, null, false);
+		if (hasScreenView()) {
+			ComputerButtons.extractView(graphics, screenButton(), ComputerButtons.View.SCREEN, true, false);
+			ComputerButtons.extractView(graphics, partsButton(), ComputerButtons.View.PARTS, true, true);
+		}
 		for (int slot = menu.cardSlots(); slot < menu.slots.size(); slot++) {
 			int sx = x + menu.slots.get(slot).x - 1;
 			int sy = y + menu.slots.get(slot).y - 1;

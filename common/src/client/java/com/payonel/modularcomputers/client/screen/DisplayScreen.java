@@ -29,9 +29,10 @@ import net.minecraft.util.FormattedCharSequence;
  * the window. It shows the same text as the block's face; an off computer shows black.
  * <p>
  * The display sits in a bezel like the screen surround on the computer's front. Right of the
- * bezel, from its top edge down: the power button, which looks like the one on the computer's
- * back, and the toggle to the case view (see {@link ComputerButtons}). A screen block has no
- * power button (that belongs to the computer's case); its toggle opens its radio slot.
+ * bezel, from its top edge down, the button column every view has ({@link ComputerButtons}): the
+ * power button (looking like the one on the computer's back), this view's (ringed), the parts
+ * view's, a robot's hands, the cards' tabs. A screen block alone has no power button (that belongs
+ * to the computer's case); its parts view is its radio slot.
  */
 public final class DisplayScreen extends Screen {
 	/** Share of the window, in each direction, that the display may fill. */
@@ -95,17 +96,25 @@ public final class DisplayScreen extends Screen {
 		return layout.bezel();
 	}
 
-	/** The power button, or an empty area when there's no computer to power. */
-	public Viewport powerButton() {
-		return computer.isPresent() ? layout.powerButton() : NONE;
+	/** The button column's row {@code index}: from the bezel's top edge, a power button's row first when it has one. */
+	private Viewport row(int index) {
+		Viewport top = layout.powerButton();
+		return ComputerButtons.row(top.x(), top.y(), computer.isPresent() ? index : index - 1);
 	}
 
-	/** The toggle to the case view (at the top when there's no power button), or an empty area when there's no case. */
-	public Viewport viewToggle() {
-		if (!caseView) {
-			return NONE;
-		}
-		return computer.isPresent() ? layout.viewToggle() : layout.powerButton();
+	/** The power button, or an empty area when there's no computer to power. */
+	public Viewport powerButton() {
+		return computer.isPresent() ? row(0) : NONE;
+	}
+
+	/** This view's button (ringed: it's open). */
+	public Viewport screenButton() {
+		return row(1);
+	}
+
+	/** The parts view's button (a computer's board and bus order, a screen's radio slot), or an empty area with none. */
+	public Viewport partsButton() {
+		return caseView ? row(2) : NONE;
 	}
 
 	@Override
@@ -128,9 +137,22 @@ public final class DisplayScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-		var hit = ComputerButtons.click(event, powerButton(), viewToggle(), ComputerButtons.Target.CASE, pos);
-		powerHeld = hit == ComputerButtons.Hit.POWER;
-		int[] cell = hit == ComputerButtons.Hit.NONE ? cellAt(event.x(), event.y()) : null;
+		boolean leftOrRightButton = event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT
+			|| event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_RIGHT;
+		powerHeld = leftOrRightButton && powerButton().contains(event.x(), event.y());
+		if (powerHeld) {
+			ComputerButtons.pressPower(pos);
+			return true;
+		}
+		if (leftOrRightButton && screenButton().contains(event.x(), event.y())) {
+			return true; // (this view)
+		}
+		if (leftOrRightButton && partsButton().contains(event.x(), event.y())) {
+			CaseScreen.tabToOpen = SideTabs.BUS;
+			ComputerButtons.open(pos, ComputerButtons.View.PARTS);
+			return true;
+		}
+		int[] cell = cellAt(event.x(), event.y());
 		if (cell != null && xtermButton(event.button()) >= 0) {
 			// On the glass: the terminal's (a program tracking the mouse gets it).
 			mouseDown = true;
@@ -138,42 +160,42 @@ public final class DisplayScreen extends Screen {
 			mouse(com.payonel.modularcomputers.device.Terminal.MouseAction.PRESS, xtermButton(event.button()), cell, xtermModifiers(event));
 			return true;
 		}
-		if (hit == ComputerButtons.Hit.NONE && event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT
-			&& handPlate().contains(event.x(), event.y())) {
-			com.payonel.modularcomputers.client.ModNetworkClient.send(new com.payonel.modularcomputers.network.SwitchViewPayload(pos, true)); // (its hands are the parts view's)
+		if (event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT && handPlate().contains(event.x(), event.y())) {
+			CaseScreen.tabToOpen = SideTabs.BUS;
+			ComputerButtons.open(pos, ComputerButtons.View.PARTS); // (its hands are the parts view's)
 			return true;
 		}
-		if (hit == ComputerButtons.Hit.NONE && event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT) {
+		if (event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT) {
 			for (SideTabs.Tab tab : tabs()) {
 				if (tab(tab.lane()).contains(event.x(), event.y())) {
 					// A card's panel is in the parts view: that, its tab open.
 					CaseScreen.tabToOpen = tab.lane();
-					com.payonel.modularcomputers.client.ModNetworkClient.send(new com.payonel.modularcomputers.network.SwitchViewPayload(pos, true));
+					ComputerButtons.open(pos, ComputerButtons.View.PARTS);
 					return true;
 				}
 			}
 		}
-		return hit != ComputerButtons.Hit.NONE || super.mouseClicked(event, doubleClick);
+		return super.mouseClicked(event, doubleClick);
 	}
 
-	/** Its computer's cards' tabs ({@link SideTabs}: the parts view's, but the bus order's), or none without a parts view. */
+	/** Its computer's cards' tabs ({@link SideTabs}: the parts view's), or none without a parts view. */
 	private java.util.List<SideTabs.Tab> tabs() {
 		var machine = computer.flatMap(ref -> ref.find(minecraft.level, com.payonel.modularcomputers.block.BoardHolder.class));
 		if (!caseView || machine.isEmpty()) {
 			return java.util.List.of();
 		}
 		var parts = machine.get().board().parts();
-		return SideTabs.of(lane -> parts.getItem(com.payonel.modularcomputers.menu.CaseMenu.EXP_SLOTS + lane), false);
+		return SideTabs.of(lane -> parts.getItem(com.payonel.modularcomputers.menu.CaseMenu.EXP_SLOTS + lane));
 	}
 
 	/** A card's tab's button, by its lane, under the buttons (and a robot's hands) as the parts view has them; empty when it has none. */
 	public Viewport tab(int lane) {
 		java.util.List<SideTabs.Tab> tabs = tabs();
 		Viewport hands = handPlate();
-		int top = hands.width() > 0 ? hands.bottom() + ComputerButtons.GAP : viewToggle().bottom() + ComputerButtons.GAP;
+		int top = hands.width() > 0 ? hands.bottom() + ComputerButtons.GAP : ComputerButtons.below(partsButton());
 		for (int index = 0; index < tabs.size(); index++) {
 			if (tabs.get(index).lane() == lane) {
-				return SideTabs.button(viewToggle().x(), top, index);
+				return SideTabs.button(partsButton().x(), top, index);
 			}
 		}
 		return NONE;
@@ -187,7 +209,7 @@ public final class DisplayScreen extends Screen {
 
 	/** A robot's hands, as its parts view shows them (what it holds); empty when it's no robot's. A click opens the parts view. */
 	public Viewport handPlate() {
-		return caseView && robot().isPresent() ? HandPlate.under(viewToggle()) : NONE;
+		return caseView && robot().isPresent() ? HandPlate.under(partsButton()) : NONE;
 	}
 
 	/**
@@ -352,16 +374,20 @@ public final class DisplayScreen extends Screen {
 		}
 		var machine = computer.flatMap(ref -> ref.find(minecraft.level, com.payonel.modularcomputers.block.BoardHolder.class));
 		if (machine.isPresent()) {
-			ComputerButtons.extract(graphics, powerButton(), viewToggle(), ComputerButtons.Target.CASE, machine.get().powerLight(), powerHeld);
+			ComputerButtons.extractPower(graphics, powerButton(), machine.get().powerLight(), powerHeld);
+		}
+		ComputerButtons.extractView(graphics, screenButton(), ComputerButtons.View.SCREEN, true, true);
+		if (partsButton().width() > 0) {
+			ComputerButtons.extractView(graphics, partsButton(), ComputerButtons.View.PARTS, true, false);
+		}
+		if (machine.isPresent()) {
 			robot().ifPresent(golem -> {
 				HandPlate.extract(graphics, handPlate());
 				HandPlate.extractItems(graphics, handPlate(), golem.getMainHandItem(), golem.getOffhandItem(), font);
 			});
 			for (SideTabs.Tab tab : tabs()) {
-				tab.extractButton(graphics, tab(tab.lane()), false);
+				tab.extractButton(graphics, tab(tab.lane()));
 			}
-		} else {
-			ComputerButtons.extract(graphics, NONE, viewToggle(), ComputerButtons.Target.CASE, null, false);
 		}
 		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 	}

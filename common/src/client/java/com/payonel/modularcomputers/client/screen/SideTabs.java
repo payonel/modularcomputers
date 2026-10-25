@@ -18,23 +18,22 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * The tabs down a computer's views' right side, under their buttons (the user's: one mechanism, not
- * a case for each): each opens a panel left of its board, in the parts view. The bus order's tab is
- * always first; then a tab for each card in its expansion slots whose kind registered one
- * ({@link #register}: the crafting card's grid and storage), in slot order. The screen view lists the
- * cards' tabs, each opening the parts view with its panel. A card brings its tab by registering,
- * with nothing else to change.
+ * The panels left of a computer's board in its parts view, and the cards' tabs that open them, down
+ * its views' button column under the view buttons ({@link ComputerButtons}; the user's: one
+ * mechanism, not a case for each). The bus order is the parts view's own panel (its button opens it);
+ * each card in an expansion slot whose kind registered a tab ({@link #register}: the crafting card's
+ * grid and storage) has one, in slot order, the same in the screen view (each opening the parts view
+ * with its panel). A card brings its tab by registering, with nothing else to change.
  */
 public final class SideTabs {
-	/** The bus order's tab's lane: not a card's. */
+	/** The bus order panel's lane: not a card's. */
 	public static final int BUS = -1;
-	/** The tabs' buttons (scripts/art/case_gui_textures.py): a row each, closed and open side by side. */
+	/** The tabs' buttons (scripts/art/case_gui_textures.py): one a kind, a row each. */
 	private static final Identifier TEXTURE = ModularComputers.id("textures/gui/side_tabs.png");
-	private static final int BUS_ROW = 0;
-	private static final int CRAFTING_ROW = 1;
-	private static final int ROWS = 2;
+	private static final int CRAFTING_ROW = 0;
+	private static final int ROWS = 1;
 
-	/** A tab: its button, and the panel it opens left of the board. */
+	/** A panel left of the board, and (a card's) the tab opening it. */
 	public interface Tab {
 		/** Its card's expansion lane, or {@link #BUS}. */
 		int lane();
@@ -47,8 +46,8 @@ public final class SideTabs {
 			return false;
 		}
 
-		/** Its button, open or not. */
-		void extractButton(GuiGraphicsExtractor graphics, Viewport at, boolean open);
+		/** Its button (the open one's ring is the column's). */
+		void extractButton(GuiGraphicsExtractor graphics, Viewport at);
 
 		/** Its panel, at {@code at} (left of the board). */
 		void extractPanel(CaseScreen screen, GuiGraphicsExtractor graphics, Viewport at, int mouseX, int mouseY);
@@ -69,12 +68,14 @@ public final class SideTabs {
 		CARDS.put(kind, tab);
 	}
 
-	/** The tabs a computer's parts give ({@code card}: what's in an expansion lane), in order: the bus order's when {@code bus}, then its cards'. */
-	public static List<Tab> of(IntFunction<ItemStack> card, boolean bus) {
+	/** The bus order's panel: the parts view's own. */
+	public static Tab bus() {
+		return BUS_TAB;
+	}
+
+	/** The cards' tabs a computer's parts give ({@code card}: what's in an expansion lane), in slot order. */
+	public static List<Tab> of(IntFunction<ItemStack> card) {
 		List<Tab> tabs = new ArrayList<>();
-		if (bus) {
-			tabs.add(BUS_TAB);
-		}
 		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
 			CardTab maker = ModItems.cardKind(card.apply(lane)).map(CARDS::get).orElse(null);
 			if (maker != null) {
@@ -86,15 +87,15 @@ public final class SideTabs {
 
 	/** Where a computer's tabs go: down from {@code top}, right of its view at {@code x}, a button each. */
 	public static Viewport button(int x, int top, int index) {
-		return new Viewport(x, top + index * (ComputerButtons.SIZE + ComputerButtons.GAP), ComputerButtons.SIZE, ComputerButtons.SIZE);
+		return ComputerButtons.row(x, top, index);
 	}
 
-	private static void extractButton(GuiGraphicsExtractor graphics, Viewport at, int row, boolean open) {
+	private static void extractButton(GuiGraphicsExtractor graphics, Viewport at, int row) {
 		int size = ComputerButtons.SIZE;
-		graphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, at.x(), at.y(), open ? size : 0, row * size, at.width(), at.height(), 2 * size, ROWS * size);
+		graphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, at.x(), at.y(), 0, row * size, at.width(), at.height(), size, ROWS * size);
 	}
 
-	/** The bus order's: every device on the bus, in order (the view's first panel; left out when there's no room). */
+	/** The bus order's: every device on the bus, in order (the parts view's own panel; left out when there's no room). */
 	private static final Tab BUS_TAB = new Tab() {
 		@Override
 		public int lane() {
@@ -112,8 +113,8 @@ public final class SideTabs {
 		}
 
 		@Override
-		public void extractButton(GuiGraphicsExtractor graphics, Viewport at, boolean open) {
-			SideTabs.extractButton(graphics, at, BUS_ROW, open);
+		public void extractButton(GuiGraphicsExtractor graphics, Viewport at) {
+			// (no button of its own: the parts view's opens it)
 		}
 
 		@Override
@@ -142,8 +143,8 @@ public final class SideTabs {
 			}
 
 			@Override
-			public void extractButton(GuiGraphicsExtractor graphics, Viewport at, boolean open) {
-				SideTabs.extractButton(graphics, at, CRAFTING_ROW, open);
+			public void extractButton(GuiGraphicsExtractor graphics, Viewport at) {
+				SideTabs.extractButton(graphics, at, CRAFTING_ROW);
 			}
 
 			@Override

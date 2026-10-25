@@ -184,7 +184,7 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 				var view = (com.payonel.modularcomputers.client.screen.DisplayScreen) c.gui.screen();
 				var hands = view.handPlate();
 				var tab = view.tab(CRAFTING_LANE);
-				return hands.width() > 0 && hands.y() >= view.viewToggle().bottom() && tab.y() >= hands.bottom() ? "ok" : hands + " " + tab;
+				return hands.width() > 0 && hands.y() >= view.partsButton().bottom() && tab.y() >= hands.bottom() ? "ok" : hands + " " + tab;
 			});
 			check(column.equals("ok"), "its hands under the screen view's buttons, its crafting tab under them: " + column);
 			// Its crafting card's tab, under the screen view's buttons: it opens the parts view, that card open,
@@ -206,12 +206,15 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 				"its crafting tab shows its grid and what it makes, left of the board in the bus panel's place, the tabs right: " + grid);
 			context.getInput().setCursorPos(0, 0);
 			context.waitTicks(2);
-			context.takeScreenshot("bot-golem-crafting");
-			// The bus order's tab, first under the hands: the bus panel's back (the user's report: no way back to it).
+			var crafting = CaseClientGameTest.read(context.takeScreenshot("bot-golem-crafting"));
+			check(CaseClientGameTest.ringed(context, crafting, screen -> ((com.payonel.modularcomputers.client.screen.CaseScreen) screen).tab(CRAFTING_LANE))
+				&& !CaseClientGameTest.ringed(context, crafting, screen -> ((com.payonel.modularcomputers.client.screen.CaseScreen) screen).partsButton()),
+				"its crafting tab ringed (open), the parts view's button not");
+			// The parts view's button: the bus panel back (the user's report: no way back to it from a card's).
 			CaseClientGameTest.clickOnScreen(context, com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT,
-				screen -> ((com.payonel.modularcomputers.client.screen.CaseScreen) screen).tab(com.payonel.modularcomputers.client.screen.SideTabs.BUS));
+				screen -> ((com.payonel.modularcomputers.client.screen.CaseScreen) screen).partsButton());
 			check(context.computeOnClient(c -> ((com.payonel.modularcomputers.client.screen.CaseScreen) c.gui.screen()).showsBus()),
-				"the bus order's tab shows the bus panel again");
+				"the parts view's button shows the bus panel again");
 			// What its bus panel lists: the client's copy of its board, as the server's.
 			var server = singleplayer.getServer().computeOnServer(s -> keys((BotGolem) s.overworld().getEntity(id)));
 			var client = context.computeOnClient(c -> keys((BotGolem) c.level.getEntity(id)));

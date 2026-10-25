@@ -48,10 +48,14 @@ public final class CaseMenu extends AbstractContainerMenu {
 	public static final int INVENTORY_Y = 150;
 	/** The player's inventory's slots: its main rows and its hotbar. */
 	public static final int INVENTORY_SLOTS = 36;
-	/** A robot's hand slot (its main hand), after the player's inventory: in the column right of the panel, under its buttons. */
+	/**
+	 * A robot's hand slot (its main hand), after the player's inventory: in the column right of the
+	 * panel, under its buttons (the power button, the screen view's and the parts view's: three rows
+	 * of 20, 4 apart, ending at 68), its plate's rim 3 round it.
+	 */
 	public static final int HAND_SLOT = PART_SLOTS + INVENTORY_SLOTS;
 	public static final int HAND_X = 182;
-	public static final int HAND_Y = 54;
+	public static final int HAND_Y = 78;
 	/** Its off hand's slot, under its hand's: where it catches what it breaks with nowhere else to put it. */
 	public static final int OFF_HAND_SLOT = HAND_SLOT + 1;
 	public static final int OFF_HAND_Y = HAND_Y + 18;

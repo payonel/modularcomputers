@@ -158,15 +158,15 @@ public class CableClientGameTest implements FabricClientGameTest {
 			context.waitFor(client -> casePercent(client, computer) == 51);
 			context.waitFor(client -> casePercent(client, computer) == 50);
 
-			// Its screen view: the display and the toggle to its slot. The power button is the
-			// computer case's.
+			// Its screen view: the display, and the column's view buttons (this view's, its slot view's).
+			// The power button is the computer case's.
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(DisplayScreen.class);
 			context.waitTicks(2);
 			context.runOnClient(client -> {
 				DisplayScreen view = (DisplayScreen) client.gui.screen();
 				check(view.powerButton().width() == 0, "a screen block has no power button");
-				check(view.viewToggle().width() > 0, "a screen block has a toggle to its slot");
+				check(view.screenButton().width() > 0 && view.partsButton().y() > view.screenButton().y(), "a screen block has its view's button, its slot view's under it");
 			});
 			BufferedImage view = read(context.takeScreenshot("screen-view"));
 			int viewMagenta = count(view, 0, 0, view.getWidth(), view.getHeight(), rgb -> CaseClientGameTest.red(rgb) > 200
@@ -243,14 +243,14 @@ public class CableClientGameTest implements FabricClientGameTest {
 			pressPower(singleplayer, computer);
 			context.waitFor(client -> machinePowered(client, computer) && showsHello(client, screen));
 
-			// The toggle opens the screen's radio slot, and back, straight from view to view.
+			// Its parts view's button opens the screen's radio slot, and the screen view's back, straight from view to view.
 			int grabs = context.computeOnClient(client -> MouseGrabs.count);
-			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, s -> ((DisplayScreen) s).viewToggle());
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, s -> ((DisplayScreen) s).partsButton());
 			context.waitForScreen(CardHolderScreen.class);
 			context.waitTicks(2);
 			check(context.computeOnClient(client -> ((CardHolderScreen) client.gui.screen()).getMenu().cardSlots()) == 1, "the screen's one slot");
 			context.takeScreenshot("screen-slot");
-			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, s -> ((CardHolderScreen) s).viewToggle());
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, s -> ((CardHolderScreen) s).screenButton());
 			context.waitForScreen(DisplayScreen.class);
 			context.waitTicks(2);
 			context.runOnClient(client -> {

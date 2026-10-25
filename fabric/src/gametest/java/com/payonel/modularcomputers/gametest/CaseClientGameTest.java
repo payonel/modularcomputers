@@ -148,10 +148,23 @@ public class CaseClientGameTest implements FabricClientGameTest {
 			int cpuHotbar = hotbarSlotOf(context, ModItems.TIER3_CPU);
 			int eepromHotbar = hotbarSlotOf(context, ModItems.EEPROM);
 
-			// The view toggle opens the case view; the parts go in with real mouse clicks.
-			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((DisplayScreen) screen).viewToggle());
+			// The screen view's column (the user's: the same buttons in every view, the open one ringed):
+			// power, this view (ringed), the parts view.
+			BufferedImage screenColumn = read(context.takeScreenshot("case-screen-column"));
+			check(ringed(context, screenColumn, screen -> ((DisplayScreen) screen).screenButton())
+				&& !ringed(context, screenColumn, screen -> ((DisplayScreen) screen).partsButton()), "the screen view's button ringed, the parts view's not");
+			var screenRows = context.computeOnClient(client -> rows(((DisplayScreen) client.gui.screen()).powerButton(),
+				((DisplayScreen) client.gui.screen()).screenButton(), ((DisplayScreen) client.gui.screen()).partsButton()));
+			// The parts view's button opens the case view; the parts go in with real mouse clicks.
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((DisplayScreen) screen).partsButton());
 			context.waitForScreen(CaseScreen.class);
-			context.takeScreenshot("case-empty");
+			BufferedImage caseShot0 = read(context.takeScreenshot("case-empty"));
+			// The same column here: power, the screen view, this view (ringed), each in its place.
+			check(ringed(context, caseShot0, screen -> ((CaseScreen) screen).partsButton())
+				&& !ringed(context, caseShot0, screen -> ((CaseScreen) screen).screenButton()), "the parts view's button ringed, the screen view's not");
+			var caseRows = context.computeOnClient(client -> rows(((CaseScreen) client.gui.screen()).powerButton(),
+				((CaseScreen) client.gui.screen()).screenButton(), ((CaseScreen) client.gui.screen()).partsButton()));
+			check(caseRows.equals(screenRows), "the same column in both views: " + caseRows + " and " + screenRows);
 			int hotbar = CaseMenu.PART_SLOTS + 27; // the case menu's first hotbar slot
 
 			// Hovering an item in the inventory outlines the slots it fits.
@@ -310,7 +323,7 @@ public class CaseClientGameTest implements FabricClientGameTest {
 			// Straight from one view to the other: never through "no screen", which grabs the
 			// mouse and so recenters the cursor.
 			int grabs = context.computeOnClient(client -> MouseGrabs.count);
-			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).viewToggle());
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((CaseScreen) screen).screenButton());
 			context.waitForScreen(DisplayScreen.class);
 			context.waitTicks(2);
 			context.runOnClient(client -> {
@@ -555,7 +568,7 @@ public class CaseClientGameTest implements FabricClientGameTest {
 			check(display.x() > bezel.x() && display.right() < bezel.right() && display.y() > bezel.y() && display.bottom() < bezel.bottom(),
 				"the bezel should frame the display: " + bezel + " around " + display);
 			check(button.x() >= bezel.right() && button.y() == bezel.y(), "power button should be right of the bezel at its top: " + button);
-			check(screen.viewToggle().bottom() <= screen.height, "view toggle should be inside the window: " + screen.viewToggle());
+			check(screen.partsButton().bottom() <= screen.height, "the view buttons should be inside the window: " + screen.partsButton());
 		});
 	}
 
@@ -593,6 +606,27 @@ public class CaseClientGameTest implements FabricClientGameTest {
 	}
 
 	/** The screenshot pixel in the middle of an area of the open screen. */
+	/** Whether a button has the open view's ring: its left edge's middle, just outside it, in the ring's yellow. */
+	static boolean ringed(ClientGameTestContext context, BufferedImage image, Function<Screen, Viewport> button) {
+		int rgb = pixelAt(context, image, screen -> {
+			Viewport b = button.apply(screen);
+			return new Viewport(b.x() - 2, b.y() + b.height() / 2, 2, 1);
+		});
+		return near(rgb, RING_YELLOW, 40);
+	}
+
+	/** The open view's ring's yellow (ComputerButtons.OPEN). */
+	private static final int RING_YELLOW = 0xFFD23C;
+
+	/** A column's rows, as offsets from its first: where each button sits under the one above. */
+	private static java.util.List<Integer> rows(Viewport... buttons) {
+		java.util.List<Integer> rows = new java.util.ArrayList<>();
+		for (Viewport button : buttons) {
+			rows.add(button.y() - buttons[0].y());
+		}
+		return rows;
+	}
+
 	private static int pixelAt(ClientGameTestContext context, BufferedImage image, Function<Screen, Viewport> area) {
 		return context.computeOnClient(client -> {
 			Screen screen = client.gui.screen();
