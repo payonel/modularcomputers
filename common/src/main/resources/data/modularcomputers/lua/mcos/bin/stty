@@ -1,13 +1,17 @@
 -- stty [setting...]: the terminal's line settings (termios), as Linux's stty. With none, they're
--- listed. A setting turns a flag on (echo) or off (-echo); "raw" turns line editing, echo, signals
--- and CR to NL off (-raw or "cooked" back on); "sane" puts Linux's defaults back; "size" prints the
--- rows and columns. The flags: icanon (line editing), echo, echoe (erase on the screen), echoctl
--- (^X for control characters), isig (^C signals), icrnl (Enter as a new line), onlcr (a new line
--- out as CR LF), iutf8 (erase a UTF-8 character at a time).
+-- listed: the flags, then min and time. A setting turns a flag on (echo) or off (-echo); "min N"
+-- and "time N" set a raw read's wait (VMIN: the bytes it waits for; VTIME: tenths of a second);
+-- "raw" turns line editing, echo, signals and CR to NL off, min 1 time 0 (-raw or "cooked" back on);
+-- "sane" puts Linux's defaults back; "size" prints the rows and columns; "-g" prints every setting
+-- as one word stty takes back (stty "$saved"). The flags: icanon (line editing), echo, echoe (erase
+-- on the screen), echoctl (^X for control characters), isig (^C signals), icrnl (Enter as a new
+-- line), onlcr (a new line out as CR LF), iutf8 (erase a UTF-8 character at a time).
 local sys = require("sys")
 
 local SANE = {icanon = true, echo = true, echoe = true, echoctl = true, isig = true, icrnl = true, onlcr = true, iutf8 = true}
 local RAW = {"icanon", "echo", "isig", "icrnl"}
+local CC = {"min", "time"} -- termios's c_cc values stty sets: VMIN and VTIME
+local CC_MAX = 255 -- a c_cc value is a byte
 
 local flags, why = sys.ioctl(0, "TCGETS")
 if not flags then
@@ -15,29 +19,81 @@ if not flags then
   return 1
 end
 
-if #arg == 0 then
-  local names = {}
-  for name in pairs(flags) do
-    names[#names + 1] = name
+-- The flags' names, in order (not min and time: they're numbers).
+local function names()
+  local list = {}
+  for name, value in pairs(flags) do
+    if type(value) == "boolean" then
+      list[#list + 1] = name
+    end
   end
-  table.sort(names)
+  table.sort(list)
+  return list
+end
+
+local function invalid(word)
+  io.stderr:write("stty: invalid argument '" .. word .. "'\n")
+  os.exit(1)
+end
+
+-- A c_cc value given: an integer, 0 to 255.
+local function cc(name, word)
+  local value = math.tointeger(tonumber(word or ""))
+  if not value or value < 0 or value > CC_MAX then
+    invalid(word or name)
+  end
+  flags["v" .. name] = value
+end
+
+if #arg == 0 then
   local shown = {}
-  for i, name in ipairs(names) do
+  for i, name in ipairs(names()) do
     shown[i] = (flags[name] and "" or "-") .. name
   end
-  io.write(table.concat(shown, " "), "\n")
+  io.write(table.concat(shown, " "), "\n", ("min = %d; time = %d;"):format(flags.vmin, flags.vtime), "\n")
   return 0
 end
 
-for _, word in ipairs(arg) do
+if arg[1] == "-g" and #arg == 1 then
+  local saved = {}
+  for i, name in ipairs(names()) do
+    saved[i] = (flags[name] and "" or "-") .. name
+  end
+  for _, name in ipairs(CC) do
+    saved[#saved + 1] = name .. "=" .. flags["v" .. name]
+  end
+  io.write(table.concat(saved, ":"), "\n")
+  return 0
+end
+
+local i = 1
+while i <= #arg do
+  local word = arg[i]
   local off, name = string.match(word, "^(%-?)(%w+)$")
-  if word == "size" then
+  if word:find(":", 1, true) then
+    -- what -g printed: every setting, put back
+    for field in word:gmatch("[^:]+") do
+      local key, value = field:match("^(%a+)=(%d+)$")
+      local fieldoff, fieldname = field:match("^(%-?)(%w+)$")
+      if key and (key == "min" or key == "time") then
+        cc(key, value)
+      elseif fieldname and type(flags[fieldname]) == "boolean" then
+        flags[fieldname] = fieldoff == ""
+      else
+        invalid(word)
+      end
+    end
+  elseif word == "size" then
     local columns, rows = sys.ioctl(0, "TIOCGWINSZ")
     io.write(tostring(rows), " ", tostring(columns), "\n")
+  elseif word == "min" or word == "time" then
+    i = i + 1
+    cc(word, arg[i])
   elseif word == "raw" or word == "-cooked" then
     for _, flag in ipairs(RAW) do
       flags[flag] = false
     end
+    flags.vmin, flags.vtime = 1, 0
   elseif word == "-raw" or word == "cooked" then
     for _, flag in ipairs(RAW) do
       flags[flag] = true
@@ -46,12 +102,12 @@ for _, word in ipairs(arg) do
     for flag, on in pairs(SANE) do
       flags[flag] = on
     end
-  elseif name and flags[name] ~= nil then
+  elseif name and type(flags[name]) == "boolean" then
     flags[name] = off == ""
   else
-    io.stderr:write("stty: invalid argument '" .. word .. "'\n")
-    return 1
+    invalid(word)
   end
+  i = i + 1
 end
 local ok, err = sys.ioctl(0, "TCSETS", flags)
 if not ok then

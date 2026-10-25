@@ -30,8 +30,10 @@ function tty.new(device, signal, out)
     out = out,
     input = device and board.ring(device, RING_SIZE), -- what the device sends, as it sends it
     signal = signal,
-    -- termios's flags, Linux's defaults for a terminal
-    flags = {icanon = true, echo = true, echoe = true, echoctl = true, isig = true, icrnl = true, onlcr = true, iutf8 = true},
+    -- termios's flags, Linux's defaults for a terminal; and its c_cc's VMIN and VTIME (a raw read:
+    -- the bytes it waits for, and tenths of a second it waits)
+    flags = {icanon = true, echo = true, echoe = true, echoctl = true, isig = true, icrnl = true, onlcr = true, iutf8 = true,
+      vmin = 1, vtime = 0},
     line = {}, -- the line being typed (canonical mode), a byte each
     ready = {}, -- what processes can read: whole lines and EOF marks (canonical), or bytes as typed
     -- foreground: the process group its signals go to (tcsetpgrp), set by the kernel
@@ -170,13 +172,29 @@ function tty:read(n)
   return bytes
 end
 
--- termios (tcsetattr): set from a table of flags (unknown names are ignored); tcgetattr is the
--- kernel's copy of tty.flags.
+-- The bytes a raw read would take now.
+function tty:pending()
+  local n = 0
+  for _, chunk in ipairs(self.ready) do
+    n = n + #chunk
+  end
+  return n
+end
+
+local CC_MAX = 255 -- a c_cc value is a byte
+
+-- termios (tcsetattr): set from a table of flags (unknown names are ignored), and vmin and vtime
+-- (integers, 0 to 255); tcgetattr is the kernel's copy of tty.flags.
 function tty:setattr(flags)
   local wascanonical = self.flags.icanon
-  for name in pairs(self.flags) do
-    if flags[name] ~= nil then
-      self.flags[name] = flags[name] and true or false
+  for name, was in pairs(self.flags) do
+    local value = flags[name]
+    if value ~= nil and type(was) == "number" then
+      if math.type(value) == "integer" and value >= 0 and value <= CC_MAX then
+        self.flags[name] = value
+      end
+    elseif value ~= nil then
+      self.flags[name] = value and true or false
     end
   end
   if wascanonical and not self.flags.icanon then

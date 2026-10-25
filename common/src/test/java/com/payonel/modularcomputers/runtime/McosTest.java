@@ -794,6 +794,111 @@ class McosTest extends McosHarness {
 	}
 
 	@Test
+	void osExecuteRunsACommandThroughShAndGivesHowItEnded() {
+		boot();
+		file("killed.lua", """
+			local sys = require("sys")
+			sys.kill(sys.getpid(), "SIGTERM")
+			sys.sleep(10)
+			""");
+		file("x.lua", """
+			local out = io.open("/got", "w")
+			local function show(...) local t = table.pack(...) for i = 1, t.n do t[i] = tostring(t[i]) end out:write(table.concat(t, " "), "\\n") end
+			show(os.execute())
+			show(os.execute("touch /made"))
+			show(os.execute("false"))
+			show(os.execute("lua /killed.lua"))
+			out:close()
+			""");
+		type("lua /x.lua 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("err"))).isEmpty();
+		assertThat(Files.exists(root().resolve("made"))).as("the command ran").isTrue();
+		assertThat(read(root().resolve("got"))).isEqualTo("true\ntrue exit 0\nnil exit 1\nnil exit 143\n");
+	}
+
+	@Test
+	void controlCDuringOsExecuteIsTheCommandsNotTheCallers() {
+		boot();
+		file("x.lua", """
+			local ok, how, status = os.execute("sleep 100")
+			local out = io.open("/got", "w")
+			out:write(tostring(ok), " ", tostring(how), " ", tostring(status), "\\n")
+			out:close()
+			""");
+		type("lua /x.lua\r");
+		untilIdle();
+		type("\u0003"); // ^C: the sleeping command's (and its shell's), not the caller's
+		untilFile(root().resolve("got"), "nil signal SIGINT\n");
+	}
+
+	@Test
+	void rawReadsWaitAsVminAndVtimeSay() {
+		boot();
+		file("r.lua", """
+			local sys = require("sys")
+			local out = io.open("/got", "w")
+			local saved = sys.ioctl(0, "TCGETS")
+			local function mode(min, time)
+			  sys.ioctl(0, "TCSETS", {icanon = false, echo = false, vmin = min, vtime = time})
+			end
+			mode(0, 0)
+			local start = sys.uptime()
+			out:write("now ", tostring(sys.read(0, 10)), " ", tostring(sys.uptime() - start < 0.2), "\\n")
+			mode(0, 5)
+			start = sys.uptime()
+			local got = sys.read(0, 10)
+			out:write("timed ", tostring(got), " ", tostring(sys.uptime() - start >= 0.45), "\\n")
+			mode(3, 0)
+			io.open("/ready3", "w"):close() -- (the test types once the read waits)
+			out:write("three ", tostring(sys.read(0, 10)), "\\n")
+			mode(5, 2)
+			io.open("/ready5", "w"):close()
+			out:write("gap ", tostring(sys.read(0, 10)), "\\n")
+			sys.ioctl(0, "TCSETS", saved)
+			out:close()
+			""");
+		type("lua /r.lua 2> /err; touch /done\r");
+		settle(() -> Files.isRegularFile(root().resolve("ready3")));
+		untilIdle();
+		// (it waits for three bytes: two, then the third)
+		type("ab");
+		untilIdle();
+		type("c");
+		settle(() -> Files.isRegularFile(root().resolve("ready5")));
+		untilIdle();
+		type("xy"); // (five wanted: two come, and a fifth of a second passes)
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("err"))).isEmpty();
+		assertThat(read(root().resolve("got"))).isEqualTo("now  true\ntimed  true\nthree abc\ngap xy\n");
+	}
+
+	@Test
+	void sttyGSettingsComeBackAsTheyWere() {
+		boot();
+		file("g.lua", """
+			local sys = require("sys")
+			local before = sys.ioctl(0, "TCGETS")
+			local saved = io.popen("stty -g"):read("l")
+			os.execute("stty raw -echo min 0 time 7")
+			local changed = sys.ioctl(0, "TCGETS")
+			os.execute("stty " .. saved)
+			local after = sys.ioctl(0, "TCGETS")
+			local same = true
+			for name, value in pairs(before) do
+			  same = same and after[name] == value
+			end
+			local out = io.open("/got", "w")
+			out:write(tostring(changed.vtime), " ", tostring(changed.icanon), " ", tostring(same), "\\n")
+			out:close()
+			""");
+		type("lua /g.lua 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("err"))).isEmpty();
+		assertThat(read(root().resolve("got"))).isEqualTo("7 false true\n");
+	}
+
+	@Test
 	void inotifyTellsOfChangesOnADiskAndInTmp() {
 		boot();
 		file("n.lua", """

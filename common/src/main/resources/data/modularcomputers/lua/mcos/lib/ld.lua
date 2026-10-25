@@ -36,7 +36,8 @@ if not ioload then
 end
 -- The environment: getenv's, setenv's, and what io.popen's children get.
 local environ = sys.environ()
-io = ioload(sys, environ)
+local reap
+io, reap = ioload(sys, environ)
 -- (not a syscall, as C's fileno isn't: an io file's descriptor, for sys.poll. A drift from Lua's io,
 -- which hides it; what the file has read ahead into its buffer, poll doesn't see, as with C's stdio)
 function sys.fileno(file)
@@ -55,6 +56,29 @@ end
 function os.exit(code, close)
   io.flushall()
   sys.exit((code == nil or code == true) and 0 or code == false and 1 or code)
+end
+-- os.execute(command): runs a command with sh -c and waits for it, as C's system does (^C is the
+-- command's meanwhile: the caller ignores SIGINT, and its child starts with it as the caller had it,
+-- default unless the caller ignored it: an ignored signal stays ignored across exec);
+-- true (or nil), "exit" and its status, or nil, "signal" and the signal that ended it. With no
+-- command: whether there's a shell.
+function os.execute(command)
+  if command == nil then
+    return sys.stat("/bin/sh") ~= nil
+  end
+  local interrupt = sys.signal("SIGINT", "ignore")
+  local pid, why, errno = sys.spawn("/bin/sh", {"-c", command}, {env = environ, default = interrupt ~= "ignore" and {"SIGINT"} or nil})
+  local how, status
+  if pid then
+    how, status, errno = reap(pid)
+  end
+  sys.signal("SIGINT", interrupt)
+  if not pid or how == nil then
+    return nil, pid and status or why, errno
+  elseif how == "exited" then
+    return status == 0 or nil, "exit", status
+  end
+  return nil, "signal", status
 end
 -- (C's remove: a file, a link itself (never what it points to), or an empty directory)
 function os.remove(path)

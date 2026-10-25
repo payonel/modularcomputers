@@ -12,11 +12,12 @@ hidden: true
 ## Synopsis
 
 <strong>stty</strong>\
-<strong>stty</strong> <em>setting</em>...
+<strong>stty</strong> <em>setting</em>...\
+<strong>stty -g</strong>
 
 ## Description
 
-<strong>stty</strong> reads and changes the line settings (termios flags) of the tty on its standard input, as Linux's stty does. With no arguments it lists every flag on one line, sorted, a flag that is off with a <strong>-</strong> before it.
+<strong>stty</strong> reads and changes the line settings (termios flags) of the tty on its standard input, as Linux's stty does. With no arguments it lists every flag on one line, sorted, a flag that is off with a <strong>-</strong> before it, then <strong>min</strong> and <strong>time</strong>.
 
 Each <em>setting</em> is applied in order; the flags are written back to the tty once all have been read. An invalid setting stops it before anything is changed.
 
@@ -28,8 +29,14 @@ Each <em>setting</em> is applied in order; the flags are written back to the tty
 <strong>-</strong><em>flag</em>
 : Turns <em>flag</em> off.
 
+<strong>min</strong> <em>n</em>
+: A read in raw mode (with <strong>-icanon</strong> ) waits for <em>n</em> bytes (0 to 255; VMIN).
+
+<strong>time</strong> <em>n</em>
+: A read in raw mode waits up to <em>n</em> tenths of a second (0 to 255; VTIME): for the first byte with <strong>min 0</strong> (it reads nothing when the time passes); with <strong>min</strong> over 0, from each byte to the next. With <strong>min 0 time 0</strong> a read takes what's there now, nothing if nothing is.
+
 <strong>raw</strong> or <strong>-cooked</strong>
-: Turns off <strong>icanon</strong>, <strong>echo</strong>, <strong>isig</strong> and <strong>icrnl</strong>.
+: Turns off <strong>icanon</strong>, <strong>echo</strong>, <strong>isig</strong> and <strong>icrnl</strong>, and sets <strong>min 1 time 0.</strong>
 
 <strong>-raw</strong> or <strong>cooked</strong>
 : Turns those four back on.
@@ -39,6 +46,9 @@ Each <em>setting</em> is applied in order; the flags are written back to the tty
 
 <strong>size</strong>
 : Prints the terminal's rows and columns, as two numbers on a line.
+
+<strong>-g</strong>
+: Prints every setting as one word that <strong>stty</strong> takes back as a setting: save it, change the settings, and put them back with <strong>stty "$saved"</strong>.
 
 ## Flags
 
@@ -74,6 +84,7 @@ Each <em>setting</em> is applied in order; the flags are written back to the tty
 
 ```text
 stty -echo
+stty -icanon min 0 time 5
 stty raw
 stty sane
 stty size
@@ -81,7 +92,7 @@ stty size
 
 ## Notes
 
-These are the tty's settings, kept by the kernel. A terminal's own modes (cursor keys, the alternate screen) are set with escape sequences, not with <strong>stty</strong>. There are no special-character settings (such as <strong>intr ^C</strong>) and no speeds.
+These are the tty's settings, kept by the kernel. A terminal's own modes (cursor keys, the alternate screen) are set with escape sequences, not with <strong>stty</strong>. The only special-character settings are <strong>min</strong> and <strong>time</strong> (no <strong>intr ^C</strong>), and there are no speeds. What <strong>-g</strong> prints is mcos's own (the flags and min and time, joined by colons), as GNU's is its own.
 
 ## See also
 

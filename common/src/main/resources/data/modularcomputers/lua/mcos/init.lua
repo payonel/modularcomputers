@@ -512,6 +512,9 @@ local function spawn(parent, path, argv, opts)
   for _, signal in ipairs(opts.ignore or {}) do
     p.handlers[signal] = "ignore"
   end
+  for _, signal in ipairs(opts.default or {}) do
+    p.handlers[signal] = nil -- (posix_spawn's SETSIGDEF: as system(3) gives its child back its ^C)
+  end
   local map = opts.fds or {}
   for fd = 0, 2 do
     if map[fd] == nil and parent.fds[fd] then
@@ -615,7 +618,7 @@ syscalls.read = withfd(function(p, request, d, fd, n)
   if not d.read then
     return fail(d.type == "directory" and "EISDIR" or "EBADF")
   end
-  return d:read(math.type(n) == "integer" and n > 0 and n or READ_SIZE)
+  return d:read(math.type(n) == "integer" and n > 0 and n or READ_SIZE, p, request) -- (a tty's raw read times itself)
 end)
 
 -- Writes all of 'data', waiting for room as long as it takes (a pipe's reader); the count written.

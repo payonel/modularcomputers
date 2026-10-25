@@ -259,6 +259,19 @@ function FILE:seek(whence, offset)
   return at
 end
 
+-- Waits for a child to end, through signals (a handler run during the wait returns EINTR: it's
+-- waited for again, as libc's pclose and system do); how it ended and its status, or nil and why.
+local function reap(pid)
+  while true do
+    local got, how, value = sys.waitpid(pid)
+    if got then
+      return how, value
+    elseif value ~= "EINTR" then
+      return nil, how, value
+    end
+  end
+end
+
 function FILE:close()
   checkopen(self)
   local ok, why, errno = self:flush()
@@ -267,8 +280,10 @@ function FILE:close()
   local closed, err, code = sys.close(self.fd)
   if self.process then
     -- io.popen's: its command's status
-    local _, how, status = sys.waitpid(self.process)
-    if how == "exited" then
+    local how, status, errno = reap(self.process)
+    if how == nil then
+      return nil, status, errno
+    elseif how == "exited" then
       return status == 0 or nil, "exit", status
     end
     return nil, "signal", status
@@ -390,4 +405,4 @@ function io.flushall()
   end
 end
 
-return io
+return io, reap

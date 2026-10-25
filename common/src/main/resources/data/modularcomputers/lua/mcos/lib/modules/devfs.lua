@@ -17,8 +17,35 @@ local fail = vfs.fail
 
 local fs = {type = "devfs"}
 
--- A tty as a file: reads block until a line (or what's typed, in raw mode) is ready.
--- (A hung-up tty, a pty whose master closed, reads as its end and fails writes, as Linux's.)
+local TENTH = 2 -- a tenth of a second, in ticks (VTIME's unit; 20 ticks a second)
+
+-- A raw read's wait, POSIX's MIN and TIME: VMIN 0 and VTIME 0, what's there now; VMIN 0, the first
+-- byte, or VTIME tenths of a second pass ("": none); VTIME 0, VMIN bytes (or all of n); else the
+-- first byte, then VMIN bytes, or VTIME after the last came. Its answer, or k.BLOCK ('request'
+-- keeps its timer; the process wakes at its deadline).
+local function rawread(t, n, p, request)
+  local min, time = t.flags.vmin, t.flags.vtime
+  local have = t:pending()
+  local want = math.min(min, n)
+  if have > 0 and have >= want or min == 0 and time == 0 then
+    return t:read(n) or ""
+  elseif time == 0 or have == 0 and min > 0 then
+    return k.BLOCK
+  end
+  local now = k.now()
+  if min > 0 and have ~= request.seen then
+    request.seen, request.deadline = have, now + time * TENTH -- (the timer starts again at each byte)
+  end
+  request.deadline = request.deadline or now + time * TENTH
+  if now >= request.deadline then
+    return t:read(n) or ""
+  end
+  p.wakeat = request.deadline
+  return k.BLOCK
+end
+
+-- A tty as a file: reads block until a line (or what's typed, in raw mode, as VMIN and VTIME say)
+-- is ready. (A hung-up tty, a pty whose master closed, reads as its end and fails writes, as Linux's.)
 function k.ttyfile(t)
   if t.opened then
     t:opened() -- (a pty counts its terminal end's open files)
@@ -29,9 +56,11 @@ function k.ttyfile(t)
     events = function(self)
       return {IN = #t.ready > 0 or t.hungup, OUT = not t.hungup, HUP = t.hungup}
     end,
-    read = function(self, n)
+    read = function(self, n, p, request)
       if t.hungup then
         return ""
+      elseif not t.flags.icanon and p then
+        return rawread(t, n, p, request)
       end
       local data = t:read(n)
       if data == nil then

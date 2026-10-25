@@ -141,6 +141,7 @@ of strings), as the caller's child. `opts` may hold:
 | `fds` | The child's descriptors: `{[0] = a parent fd, ...}`. 0, 1 and 2 are inherited when not given; others aren't (close-on-exec). A value of `false` starts it closed. |
 | `env` | The child's environment, a table; the caller's if not given. |
 | `ignore` | A list of signals it starts ignoring, like `{"SIGINT"}`. |
+| `default` | A list of signals it starts with their default action, though the caller ignores them (an ignored signal stays ignored otherwise, as across exec): `posix_spawn`'s `SETSIGDEF`. |
 | `pgid` | `0`: a process group of its own. |
 | `setsid` | A session of its own, a group of its own. Its controlling terminal is its standard input's, if that is a terminal with no session; else it has none, so no terminal's signals reach it (a daemon). |
 
@@ -218,8 +219,8 @@ A terminal's ioctls, by Linux's names:
 
 | op | Does |
 |---|---|
-| `TCGETS` | The termios flags, a table of booleans. |
-| `TCSETS` | Sets them from a table (`icanon`, `echo`, `echoe`, `echoctl`, `isig`, `icrnl`, `onlcr`, `iutf8`). |
+| `TCGETS` | The termios settings: its flags (booleans) and `vmin` and `vtime` (integers). |
+| `TCSETS` | Sets them from a table: the flags `icanon`, `echo`, `echoe`, `echoctl`, `isig`, `icrnl`, `onlcr`, `iutf8`, and `vmin` and `vtime` (0 to 255), a raw read's wait, as POSIX's MIN and TIME: with `vmin 0 vtime 0` a read takes what's there now; with `vmin 0`, the first byte, or `vtime` tenths of a second (nothing then); with `vtime 0`, `vmin` bytes; else the first byte, then `vmin` bytes or `vtime` after the last. |
 | `TIOCGWINSZ` | Returns columns, rows. |
 | `TIOCSWINSZ` | A pty's size, `{columns, rows}`; sends `SIGWINCH` to the program in front. |
 | `TIOCSTI` | Puts bytes into the input as if typed. |
@@ -312,7 +313,11 @@ raw while a line is typed. `lua` and `sh` both use it.
 
 - `io` is C's stdio: a file buffers (a terminal's output by line), and `file:read(n)` waits until it has all
   `n` bytes or the end. A program that passes a stream on reads the descriptor instead.
-- `io.popen(command, mode)` runs the command through `sh`.
+- `io.popen(command, mode)` runs the command through `sh`; closing the file waits for it and gives its
+  status, as `os.execute`'s.
+- `os.execute(command)` runs the command through `sh` and waits for it, as C's `system`: `true` (or
+  `nil`), `"exit"` and its status, or `nil`, `"signal"` and the signal that ended it. ^C is the
+  command's while it runs (the caller ignores `SIGINT` meanwhile). With no command, whether there's a shell.
 - `os.time` and `os.date` use the world's calendar: days from 1, each day twenty-four game hours (1200
   real seconds), the epoch at the first day's sunrise, 06:00. `os.date`'s fields are `day`, `hour`,
   `min`, `sec` and `yday`; its formats are `%d %H %M %S %T %R %s %c %n %t %%`.

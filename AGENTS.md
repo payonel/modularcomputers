@@ -577,6 +577,11 @@ Lessons from mistakes, each with its test:
   must be used up is taken out of the hand; and placement is tested through the server's game mode,
   not the item's `useOn` (a mock player isn't creative unless its abilities say so).
   (`placingAPickedUpComputerInCreative...`)
+- **An ignored signal stays ignored across spawn** (as across exec): a caller ignoring ^C while it
+  waits (`os.execute`, as `system(3)`) gives its child SIGINT back (`sys.spawn`'s `default`), or the
+  command can't be stopped. (`controlCDuringOsExecute...`)
+- **A test types only once the program waits for it:** keys typed during an earlier read are that
+  read's (a program says it's ready with a file). (`rawReadsWaitAsVminAndVtimeSay`)
 - **A buffer fills on demand, not only on its cadence:** a pad whose battery filled its buffer once
   a second charged nothing for up to a second. (`aBatteryPutInChargesAtOnce`)
 - **A loader's event may come on the network's thread** (Fabric's disconnect does): work for the

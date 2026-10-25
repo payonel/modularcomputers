@@ -6,13 +6,18 @@ stty \- show or change the terminal's line settings
 .br
 .B stty
 .IR setting ...
+.br
+.B stty \-g
 .SH DESCRIPTION
 .B stty
 reads and changes the line settings (termios flags) of the tty on its
 standard input, as Linux's stty does. With no arguments it lists every
 flag on one line, sorted, a flag that is off with a
 .B \-
-before it.
+before it, then
+.B min
+and
+.BR time .
 .PP
 Each
 .I setting
@@ -30,13 +35,33 @@ Turns
 .I flag
 off.
 .TP
+.BI "min " n
+A read in raw mode (with
+.B \-icanon
+) waits for
+.I n
+bytes (0 to 255; VMIN).
+.TP
+.BI "time " n
+A read in raw mode waits up to
+.I n
+tenths of a second (0 to 255; VTIME): for the first byte with
+.B min 0
+(it reads nothing when the time passes); with
+.B min
+over 0, from each byte to the next. With
+.B min 0 time 0
+a read takes what's there now, nothing if nothing is.
+.TP
 .BR raw " or " \-cooked
 Turns off
 .BR icanon ,
 .BR echo ,
 .B isig
 and
-.BR icrnl .
+.BR icrnl ,
+and sets
+.B min 1 time 0.
 .TP
 .BR \-raw " or " cooked
 Turns those four back on.
@@ -46,6 +71,13 @@ Puts every flag below back on (Linux's defaults).
 .TP
 .B size
 Prints the terminal's rows and columns, as two numbers on a line.
+.TP
+.B \-g
+Prints every setting as one word that
+.B stty
+takes back as a setting: save it, change the settings, and put them back
+with
+.BR "stty \(dq$saved\(dq" .
 .SH FLAGS
 .TP
 .B icanon
@@ -78,6 +110,7 @@ the settings can't be set.
 .SH EXAMPLES
 .nf
 stty \-echo
+stty \-icanon min 0 time 5
 stty raw
 stty sane
 stty size
@@ -87,9 +120,16 @@ These are the tty's settings, kept by the kernel. A terminal's own modes
 (cursor keys, the alternate screen) are set with escape sequences, not
 with
 .BR stty .
-There are no special-character settings (such as
-.BR "intr ^C" )
-and no speeds.
+The only special-character settings are
+.B min
+and
+.B time
+(no
+.BR "intr ^C" ),
+and there are no speeds. What
+.B \-g
+prints is mcos's own (the flags and min and time, joined by colons), as
+GNU's is its own.
 .SH SEE ALSO
 .BR sh (1),
 .BR clear (1)
