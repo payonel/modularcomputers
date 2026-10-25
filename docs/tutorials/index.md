@@ -27,6 +27,9 @@ wrong.
 7. [Coming from OpenComputers](/tutorials/from-opencomputers/). For OpenComputers players. What you
    did with components, signals, the GPU and robots, done the mcos way.
 
+Want to skip mcos altogether? [Your own OS](/os/) is a section of its own: write an operating
+system from nothing, boot it, and build a command shell that talks to the board and its devices.
+
 If you want to know why something works the way it does, the [concepts](/concepts/) pages explain
 the ideas ([the bus](/concepts/bus/), [power](/concepts/power/), [names](/concepts/names/)), and the
 [mcos](/mcos/) pages explain the operating system.

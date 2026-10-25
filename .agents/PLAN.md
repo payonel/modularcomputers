@@ -127,6 +127,14 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 
 ## The Lua CPU and the server
 
+- **A wait on every source reports the console and its terminal raised with nothing to read**
+  (seen 2026-10-24, writing the own-OS shell: `board.waitForInterrupt(0.1)` with no sources, right
+  after `board.invoke("console", "read")` took a line, answers `{"console", "id:screen"}`, and a read
+  of either then gives nil; again on the next wait). Interrupts are level-triggered, so it looks
+  like a stale report: the published status, or the host's `take` filling the inbox for the
+  terminal behind the console. Find it with a unit test on `LuaRunner` (a console over one
+  terminal; read a line; wait on all), then fix. The tutorial's `wait` leaves terminals out, which
+  it should anyway.
 - **RAM sizes:** settle the tiers' sizes (and their ring sizes) once the VM and mcos are finished,
   with OC's values as a reference.
 - **mcos's memory** (measured 2026-10-20; tier 1 is 1 MiB now, the user's call): it reaches its prompt

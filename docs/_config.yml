@@ -23,6 +23,7 @@ wiki_sections:
   - mcos
   - Programs
   - Tutorials
+  - Your own OS
 
 defaults:
   - scope: { path: "" }
