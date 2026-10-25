@@ -22,7 +22,9 @@ public enum CardKind {
 	AUDIO_SENSOR(DeviceType.HEARING),
 	WEATHER_SENSOR(DeviceType.WEATHER),
 	/** Storage and a 3x3 crafting grid; programs work it through a robot's robotics. */
-	CRAFTING(DeviceType.CRAFTING);
+	CRAFTING(DeviceType.CRAFTING),
+	/** Suspends a creature or an item in a field of energy, and moves it. */
+	ENERGY_FIELD(DeviceType.FIELD);
 
 	private final DeviceType type;
 

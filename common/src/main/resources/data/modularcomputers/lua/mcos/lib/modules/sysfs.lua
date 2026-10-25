@@ -1,8 +1,9 @@
 -- sysfs: /sys, what each device on the bus can do, so a player can learn a device without the
--- manual (the user's). A file a device, by the kernel's name for it (as /dev's: robotics0,
--- crafting0), read only: each of its methods (its /dev file's ioctls), its arguments and what it
--- does, from the device's own descriptions. Linux's sysfs is a tree of attributes; this is flat, a
--- file a device, its methods' text.
+-- manual (the user's). A directory a device, by the kernel's name for it (as /dev's: robotics0,
+-- crafting0), and in it a file a method (its /dev file's ioctls), read only: its arguments and what
+-- it does, from the device's own descriptions (cat /sys/robotics0/walk; ls /sys/robotics0), as
+-- Linux's sysfs has a directory a device and a file an attribute. A program lists and reads them as
+-- any files.
 local k, vfs = ...
 
 local fail = vfs.fail
@@ -27,32 +28,36 @@ local function wrap(text)
   return table.concat(lines, "\n")
 end
 
--- A device's methods as text: each its signature (how a doc begins: "walk(forward[, right]): ..."),
--- then what it does, a blank line between, in name order.
-local function about(device)
-  local methods = board.methods(device.id) or {}
-  table.sort(methods)
-  local text = {}
-  for i, name in ipairs(methods) do
-    local doc = board.doc(device.id, name) or (name .. "()")
-    local signature, says = doc:match("^([%w_]+%b())[^:]*:%s*(.*)$")
-    text[i] = (signature or doc) .. "\n" .. (signature and wrap(says) .. "\n" or "")
-  end
-  return device.name .. ": " .. tostring(device.type) .. "\n\n" .. table.concat(text, "\n")
+-- A method's text: its signature (how a doc begins: "walk(forward[, right]): ..."), then what it
+-- does, wrapped and indented.
+local function about(device, name)
+  local doc = board.doc(device.id, name) or (name .. "()")
+  local signature, says = doc:match("^([%w_]+%b())[^:]*:%s*(.*)$")
+  return (signature or doc) .. "\n" .. (signature and wrap(says) .. "\n" or "")
 end
 
+-- What a path names: a device (its directory), and one of its methods (a file), or nothing.
 local function find(path)
-  return k.devices.byname[path:match("^/([^/]+)$") or ""]
+  local name, method = path:match("^/([^/]+)/?([^/]*)$")
+  local device = k.devices.byname[name or ""]
+  if not device or method == "" then
+    return device
+  end
+  for _, each in ipairs(board.methods(device.id) or {}) do
+    if each == method then
+      return device, method
+    end
+  end
 end
 
 function fs:open(path, mode)
-  local device = find(path)
-  if not device then
-    return fail("ENOENT")
+  local device, method = find(path)
+  if not method then
+    return fail(device and "EISDIR" or "ENOENT")
   elseif mode:find("[wa+]") then
     return fail("EACCES") -- (read only)
   end
-  local text, at = about(device), 0
+  local text, at = about(device, method), 0
   return {
     type = "file",
     events = function(self)
@@ -76,17 +81,33 @@ end
 function fs:stat(path)
   if path == "/" then
     return {type = "directory", size = 0, modified = 0}
-  elseif find(path) then
-    return {type = "file", size = 0, modified = 0}
+  end
+  local device, method = find(path)
+  if method then
+    return {type = "file", size = #about(device, method), modified = 0}
+  elseif device then
+    return {type = "directory", size = 0, modified = 0}
   end
   return fail("ENOENT")
 end
 
--- (only / is a directory here, so it's the only one listed)
-function fs:list()
+-- / lists the devices (directories), a device its methods (files), in name order.
+function fs:list(path)
   local entries = {}
-  for i, device in ipairs(k.devices.list) do
-    entries[i] = {name = device.name, type = "file"}
+  if path == "/" or path == "" then
+    for i, device in ipairs(k.devices.list) do
+      entries[i] = {name = device.name, type = "directory"}
+    end
+    return entries
+  end
+  local device, method = find(path)
+  if not device or method then
+    return fail(method and "ENOTDIR" or "ENOENT")
+  end
+  local methods = board.methods(device.id) or {}
+  table.sort(methods)
+  for i, name in ipairs(methods) do
+    entries[i] = {name = name, type = "file"}
   end
   return entries
 end

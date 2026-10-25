@@ -82,6 +82,13 @@ class DeviceInterruptsTest {
 			peer.send(new com.payonel.modularcomputers.runtime.Arguments(List.of(card.address(), "frame")));
 		}),
 		Map.entry(Terminal.class, device -> ((Terminal) device).press("a")),
+		Map.entry(com.payonel.modularcomputers.device.FieldCard.class, device -> {
+			// What it held is gone: its event.
+			var card = (com.payonel.modularcomputers.device.FieldCard) device;
+			card.projectorIn(new HeldAPig());
+			card.capture(new com.payonel.modularcomputers.runtime.Arguments(List.of("a")));
+			card.lost("gone");
+		}),
 		Map.entry(com.payonel.modularcomputers.device.CraftingCard.class, device -> {
 			// A craft, in a robot, done: its event.
 			var card = (com.payonel.modularcomputers.device.CraftingCard) device;
@@ -249,6 +256,38 @@ class DeviceInterruptsTest {
 		@Override
 		public com.payonel.modularcomputers.runtime.Result take(String face, int slot, int count, int to) {
 			return com.payonel.modularcomputers.runtime.Result.ok(0);
+		}
+	}
+
+	/** An energy field card's projector that holds a pig, and does nothing else. */
+	private static final class HeldAPig implements com.payonel.modularcomputers.device.FieldCard.Projector {
+		@Override
+		public com.payonel.modularcomputers.runtime.Result scan(double range) {
+			return com.payonel.modularcomputers.runtime.Result.ok(List.of());
+		}
+
+		@Override
+		public com.payonel.modularcomputers.runtime.Result capture(String id, double[] at) {
+			return com.payonel.modularcomputers.runtime.Result.ok("minecraft:pig");
+		}
+
+		@Override
+		public com.payonel.modularcomputers.runtime.Result move(double forward, double right, double up) {
+			return com.payonel.modularcomputers.runtime.Result.ok(true);
+		}
+
+		@Override
+		public void release() {
+		}
+
+		@Override
+		public Map<String, Object> where() {
+			return null;
+		}
+
+		@Override
+		public String check() {
+			return null;
 		}
 	}
 }

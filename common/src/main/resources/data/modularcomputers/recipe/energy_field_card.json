@@ -1,0 +1,19 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "redstone",
+	"key": {
+		"G": "minecraft:gold_nugget",
+		"Q": "modularcomputers:chip",
+		"c": "minecraft:copper_nugget",
+		"O": "minecraft:ender_pearl",
+		"A": "minecraft:amethyst_shard"
+	},
+	"pattern": [
+		"OQA",
+		"ccc",
+		"GGG"
+	],
+	"result": {
+		"id": "modularcomputers:energy_field_card"
+	}
+}

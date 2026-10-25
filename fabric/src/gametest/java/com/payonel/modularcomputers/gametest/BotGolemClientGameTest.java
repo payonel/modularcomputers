@@ -23,12 +23,15 @@ import net.minecraft.world.item.ItemStack;
  * bezel; the first holding a pickaxe, in its right hand; and its screen view and its parts view,
  * in the golem's own art, its hand's slot holding the pickaxe, and its crafting card's tab open:
  * its grid, its result and its storage. The other, its back to the player, has a crafting card in:
- * a tiny chest on its back.
+ * a tiny chest on its back. And a pig held up in an energy field: a translucent blue sphere round it.
  */
 public class BotGolemClientGameTest implements FabricClientGameTest {
 	/** Facing south (toward the player, who faces north), and north (its back to the player). */
 	private static final float SOUTH = 0;
 	private static final float NORTH = 180;
+	/** How much bluer (than red) a pixel the field covers turns, and how many turn at least. */
+	private static final int FIELD_BLUE = 20;
+	private static final int FIELD_PIXELS = 500;
 	/** The lane its crafting card is in. */
 	private static final int CRAFTING_LANE = 1;
 
@@ -109,6 +112,51 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			context.getInput().lookAt(without);
 			context.waitTicks(10);
 			context.takeScreenshot("bot-golem-charging");
+			// A pig held up in an energy field, in front of the player.
+			BlockPos pigAt = feet.north(3).west(2).above(2);
+			int pigId = singleplayer.getServer().computeOnServer(server -> {
+				var pig = net.minecraft.world.entity.EntityTypes.PIG.create(server.overworld(), EntitySpawnReason.COMMAND);
+				pig.snapTo(pigAt.getX() + 0.5, pigAt.getY(), pigAt.getZ() + 0.5, 0, 0);
+				pig.setNoGravity(true); // (up there, before the field: to see what the field adds)
+				pig.setNoAi(true);
+				server.overworld().addFreshEntity(pig);
+				return pig.getId();
+			});
+			context.getInput().lookAt(pigAt);
+			context.waitTicks(10);
+			BufferedImage bare = read(context.takeScreenshot("energy-field-before"));
+			singleplayer.getServer().runOnServer(server -> {
+				var pig = server.overworld().getEntity(pigId);
+				var field = com.payonel.modularcomputers.entity.ModEntities.ENERGY_FIELD.create(server.overworld(), EntitySpawnReason.TRIGGERED);
+				field.hold(pig, new com.payonel.modularcomputers.entity.EnergyField.Listener() {
+					@Override
+					public void arrived() {
+					}
+
+					@Override
+					public void blocked(String why) {
+					}
+
+					@Override
+					public void lost(String why) {
+					}
+				});
+				server.overworld().addFreshEntity(field);
+			});
+			context.waitTicks(10);
+			BufferedImage held = read(context.takeScreenshot("energy-field"));
+			// The pixels the field turned bluer (over the sky, the grass and the pig alike).
+			int blue = 0;
+			for (int y = 0; y < held.getHeight(); y++) {
+				for (int x = 0; x < held.getWidth(); x++) {
+					int was = bare.getRGB(x, y);
+					int now = held.getRGB(x, y);
+					if (AllInOneClientGameTest.blue(now) - AllInOneClientGameTest.red(now) > AllInOneClientGameTest.blue(was) - AllInOneClientGameTest.red(was) + FIELD_BLUE) {
+						blue++;
+					}
+				}
+			}
+			check(blue > FIELD_PIXELS, "the field's blue sphere round the pig: " + blue + " pixels turned bluer");
 			context.getInput().lookAt(withScreen);
 			context.waitTicks(2);
 			// Its screen view: right-click it.

@@ -385,6 +385,16 @@ def crafting_card_item():
 	im.putpixel((14, 7), (200, 200, 206, 255))  # its latch
 	return im
 
+def energy_field_card_item():
+	"""A blue field emitter on the board, glowing, and its lens on the bracket."""
+	im = card_base()
+	rect(im, 4, 6, 8, 10, (30, 40, 70, 255))  # the emitter
+	rect(im, 5, 7, 7, 9, (90, 170, 255, 255))
+	im.putpixel((6, 8), (210, 240, 255, 255))
+	rect(im, 14, 6, 15, 9, (60, 130, 230, 255))  # the lens
+	im.putpixel((14, 7), (190, 230, 255, 255))
+	return im
+
 def bluetooth_card_item():
 	"""A blue radio chip and a short antenna stub."""
 	im = card_base()
@@ -432,7 +442,7 @@ for name, fn in [("tier1_cpu", tier1_cpu_item), ("tier2_cpu", tier2_cpu_item), (
 		("tier1_hard_disk", lambda: hard_disk_item(1)), ("tier2_hard_disk", lambda: hard_disk_item(2)), ("tier3_hard_disk", lambda: hard_disk_item(3)),
 		("tier1_wlan_card", lambda: wlan_card_item(1)), ("tier2_wlan_card", lambda: wlan_card_item(2)), ("network_card", network_card_item), ("tier1_battery", tier1_battery_item), ("tier2_battery", tier2_battery_item), ("tier3_battery", tier3_battery_item), ("redstone_card", redstone_card_item),
 		("sound_card", sound_card_item), ("internet_card", internet_card_item), ("operator_card", operator_card_item), ("motion_sensor_card", motion_sensor_card_item), ("audio_sensor_card", audio_sensor_card_item),
-		("weather_sensor_card", weather_sensor_card_item), ("bluetooth_card", bluetooth_card_item), ("crafting_card", crafting_card_item)]:
+		("weather_sensor_card", weather_sensor_card_item), ("bluetooth_card", bluetooth_card_item), ("crafting_card", crafting_card_item), ("energy_field_card", energy_field_card_item)]:
 	fn().save(f"{OUT}/../item/{name}.png")
 
 # Preview sheet, scaled up, for review.

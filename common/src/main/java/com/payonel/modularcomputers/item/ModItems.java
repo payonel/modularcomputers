@@ -77,6 +77,8 @@ public final class ModItems {
 	public static final Item WEATHER_SENSOR_CARD = register("weather_sensor_card");
 	/** Storage and a crafting grid: a player crafts with it in its computer's view; a robot's programs too. */
 	public static final Item CRAFTING_CARD = register("crafting_card", ModItems::holdsData);
+	/** Suspends creatures and items in a field of energy, and moves them. */
+	public static final Item ENERGY_FIELD_CARD = register("energy_field_card");
 	/** Each card item and the kind of card it is. */
 	public static final Map<Item, CardKind> CARDS = cards();
 	/** Batteries for the UPS slot: a computer runs on one. */
@@ -102,6 +104,7 @@ public final class ModItems {
 		cards.put(AUDIO_SENSOR_CARD, CardKind.AUDIO_SENSOR);
 		cards.put(WEATHER_SENSOR_CARD, CardKind.WEATHER_SENSOR);
 		cards.put(CRAFTING_CARD, CardKind.CRAFTING);
+		cards.put(ENERGY_FIELD_CARD, CardKind.ENERGY_FIELD);
 		return Collections.unmodifiableMap(cards);
 	}
 

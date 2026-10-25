@@ -711,6 +711,13 @@ public final class BoardAssembly {
 		}
 		card.onChange(host::markChanged);
 		card.frontFrom(() -> com.payonel.modularcomputers.device.Face.of(host.front().getName()));
+		if (card instanceof com.payonel.modularcomputers.device.FieldCard field) {
+			// Its frame is its computer's: a robot's own, else its block's.
+			field.projectorIn(new com.payonel.modularcomputers.entity.FieldProjector(field, () -> (ServerLevel) host.level(),
+				() -> host.robot() != null ? com.payonel.modularcomputers.entity.FieldProjector.Frame.of(host.robot())
+					: com.payonel.modularcomputers.entity.FieldProjector.Frame.of(net.minecraft.world.phys.Vec3.atCenterOf(host.pos()), host.front()),
+				host::robot));
+		}
 		if (card instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
 			redstone.block(side -> CardWorld.redstone(cards(), side));
 			redstone.onOutput(() -> {

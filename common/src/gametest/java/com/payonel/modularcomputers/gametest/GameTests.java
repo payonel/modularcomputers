@@ -32,7 +32,7 @@ public final class GameTests {
 		CardHolderGameTest.class, BluetoothGameTest.class, BatteryGameTest.class, CaseTierGameTest.class, DiskGameTest.class,
 		RoboticPistonGameTest.class, CardGameTest.class, NetworkGameTest.class, RecipeGameTest.class, KeepPartsGameTest.class, PhotomaskGameTest.class,
 		AncientLabGameTest.class, DiskStationGameTest.class, BotGolemGameTest.class, ChargingPadGameTest.class, PartHoldsGameTest.class,
-		GolemHandsGameTest.class, CraftingCardGameTest.class);
+		GolemHandsGameTest.class, CraftingCardGameTest.class, FieldCardGameTest.class);
 
 	/** Ticks a test may take unless it says otherwise (the game's usual). */
 	public static final int MAX_TICKS = 20;

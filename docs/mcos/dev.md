@@ -39,26 +39,39 @@ since the file was last read. The methods each device has are on its page.
 
 ## /sys: what a device can do
 
-So a device can be learned in the game, without this manual, `/sys` has a read-only file for each
-device, by the same name as its `/dev` file: each of its methods (its file's ioctls), its arguments,
-and what it does, from the device's own descriptions.
+So a device can be learned in the game, without this manual, `/sys` has a directory for each
+device, by the same name as its `/dev` file, and in it a read-only file for each of its methods (its
+file's ioctls): the method's arguments and what it does, from the device's own descriptions, as
+Linux's sysfs has a directory a device and a file an attribute.
 
 ```sh
 ls /sys
-cat /sys/robotics0 | less
+ls /sys/robotics0
+cat /sys/robotics0/walk
+cat /sys/robotics0/* | less
 ```
 
 ```
-robotics0: robotics
-
-contents([face])
-    what the container at a face (in front when none is given) holds: a list
-    of its slots with something in, each {slot, name, count, ...}
-...
+walk(forward[, right[, up]])
+    walks to the point that many blocks from it, in its own frame (forward the
+    way it faces, right to its right, up), by the way it finds; ...
 ```
 
-Linux's sysfs is a tree of a device's attributes, a file each; this one is flat, a file a device,
-its methods' text.
+A program reads them as any files, to make its own table of a device's API:
+
+```lua
+local fs = require("fs")
+
+local api = {}
+for _, entry in ipairs(assert(fs.list("/sys/robotics0"))) do
+  local file = assert(io.open("/sys/robotics0/" .. entry.name))
+  api[entry.name] = file:read("a")
+  file:close()
+end
+for name, text in pairs(api) do
+  print(name, (text:match("^[^\n]*")))
+end
+```
 
 ## How a file behaves
 

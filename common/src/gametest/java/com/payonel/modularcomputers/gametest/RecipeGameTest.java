@@ -82,6 +82,7 @@ public class RecipeGameTest {
 		make("audio_sensor_card", "uQ ", "ccc", "GGG"),
 		make("weather_sensor_card", "tQv", "ccc", "GGG"),
 		make("crafting_card", "aQq", "ccc", "GGG"),
+		make("energy_field_card", "OQA", "ccc", "GGG"),
 		upgrade("tier2_battery", "tier1_battery", "ggg", "I#I", "SzS"),
 		upgrade("tier3_battery", "tier2_battery", "DsD", "n#n", "nyn"));
 

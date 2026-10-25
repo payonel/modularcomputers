@@ -66,6 +66,9 @@ public final class CardWorld {
 		if (card instanceof NetworkCard network) {
 			network(network, level, pos, now); // (on or off: one listening for a wake hears while its computer's off)
 		}
+		if (card instanceof com.payonel.modularcomputers.device.FieldCard field) {
+			field.tick(card.power() != null && card.power().powered()); // (powered or not: without power it lets go)
+		}
 		if (card.power() == null || !card.power().powered()) {
 			return;
 		}

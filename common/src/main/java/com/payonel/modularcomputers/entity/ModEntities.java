@@ -21,6 +21,15 @@ public final class ModEntities {
 	public static final EntityType<BotGolem> BOT_GOLEM = register("bot_golem",
 		EntityType.Builder.<BotGolem>of(BotGolem::new, MobCategory.MISC).sized(GOLEM_WIDTH, GOLEM_HEIGHT).clientTrackingRange(GOLEM_TRACKING));
 
+	/** A field's own box: small (it's drawn round what it holds, whatever its size), never in the way. */
+	private static final float FIELD_SIZE = 0.25f;
+	/** How far away players see a field, in chunks: as far as what it may hold. */
+	private static final int FIELD_TRACKING = 10;
+
+	public static final EntityType<EnergyField> ENERGY_FIELD = register("energy_field",
+		EntityType.Builder.<EnergyField>of(EnergyField::new, MobCategory.MISC).sized(FIELD_SIZE, FIELD_SIZE).noSave().clientTrackingRange(FIELD_TRACKING)
+			.updateInterval(1));
+
 	private ModEntities() {
 	}
 

@@ -42,12 +42,14 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 		addLayer(new HeldItem(this));
 	}
 
-	/** What it holds, at the end of its right arm, held as a player holds it (the game's third person pose). */
+	/** What it holds, at the end of its right arm, held as a player holds it (the game's third person pose), at half size. */
 	private static final class HeldItem extends net.minecraft.client.renderer.entity.layers.RenderLayer<State, BotGolemModel> {
 		/** Where its hand is down its arm, and the game's offsets for a held item from there (ItemInHandLayer's), in pixels. */
 		private static final float HAND_DOWN = 7;
 		private static final float OFFSET_X = 1;
 		private static final float OFFSET_Y = 2;
+		/** What it holds is drawn at its scale (the user's): it's half a player's height, so its tools are half a player's. */
+		private static final float HELD_SCALE = 0.5f;
 
 		HeldItem(net.minecraft.client.renderer.entity.RenderLayerParent<State, BotGolemModel> parent) {
 			super(parent);
@@ -62,7 +64,8 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 			getParentModel().translateToRightArm(pose);
 			pose.rotateDegrees(Axis.XP, -90);
 			pose.rotateDegrees(Axis.YP, 180);
-			pose.translate(OFFSET_X * PIXEL, OFFSET_Y * PIXEL, -HAND_DOWN * PIXEL);
+			pose.translate(OFFSET_X * PIXEL * HELD_SCALE, OFFSET_Y * PIXEL * HELD_SCALE, -HAND_DOWN * PIXEL);
+			pose.scale(HELD_SCALE, HELD_SCALE, HELD_SCALE);
 			state.rightHandItemState.submit(pose, collector, light, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, state.outlineColor);
 			pose.popPose();
 		}

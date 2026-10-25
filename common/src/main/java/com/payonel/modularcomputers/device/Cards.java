@@ -16,6 +16,7 @@ public final class Cards {
 			case INTERNET -> new InternetCard();
 			case OPERATOR -> new OperatorCard();
 			case CRAFTING -> new CraftingCard();
+			case ENERGY_FIELD -> new FieldCard();
 			case NETWORK, TIER1_WLAN, TIER2_WLAN -> new NetworkCard(kind);
 			default -> new Card(kind);
 		};

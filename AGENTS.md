@@ -315,6 +315,18 @@ them (the game's recipes; what's made into storage, all or nothing: no room, no 
 takes time and each card crafts on its own, so cards add throughput. Its `/dev` file reads as its
 items (`name count` a line) and a line written dumps its storage (below, or at the face named).
 
+### The energy field card
+
+It suspends one creature or item in a field (user design, 2026-10-24): an `EnergyField` entity, not
+saved (the card's while it runs), holding what it holds in place each tick and moving it with the
+game's collisions (never through blocks, never moving blocks), drawn as a sphere round it. What a
+field holds can't act, enforced by mixins asking `EnergyField.held`: a mob's AI doesn't run, a
+creeper's fuse dies and it can't blow, a player can't attack, use or break (their client's position
+is overridden by teleports). Positions are in its computer's frame (`FieldProjector.Frame`: a
+block's front and right as `Face` names them; a robot's heading and its own right), and it reaches
+16 blocks from its computer, except a robot holding itself, which carries the card. It lets go
+without power or a running program (it's ticked powered or not, so it knows).
+
 ### The charging pad
 
 A plate a robot stands on to charge (user design, 2026-10-24): green particles round it while it
@@ -491,10 +503,10 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   older ones dropped), so a reader sees what's current and nothing grows: a NIC's file reads its
   frames, one a line (direction, remote address, distance, bytes, outcome); its data is read
   through sockets.
-- **`/sys` makes devices learnable in the game** (the user's): a read-only file a device, by its
-  `/dev` name, listing its methods, arguments and what each does, from their `@Method` docs (so a
-  method's doc begins with its signature: `walk(forward[, right]): ...`). Flat, not Linux's tree of
-  attributes (`sysfs.lua`).
+- **`/sys` makes devices learnable in the game** (the user's): a directory a device, by its `/dev`
+  name, and a read-only file a method (`/sys/robotics0/walk`), its arguments and what it does, from
+  its `@Method` doc (so a method's doc begins with its signature: `walk(forward[, right]): ...`), as
+  Linux's sysfs has a file an attribute (`sysfs.lua`). Programs read them as files: no API of its own.
 - **`sys.poll(fds, seconds)`** is poll(2) (`IN`, `PRI`, `OUT`; `HUP`, `ERR` unasked), in `sys` (mcos's
   POSIX layer), since Lua's `io` is C's stdio; `sys.fileno` gives an io file's descriptor. A
   redstone file is always readable and reports a change as `PRI` (a sysfs GPIO's way).

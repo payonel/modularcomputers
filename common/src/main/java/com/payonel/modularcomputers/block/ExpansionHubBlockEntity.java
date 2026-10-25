@@ -98,6 +98,11 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 		// Minecraft writes only chunks marked changed: its cards' events and settings change as they're used.
 		card.onChange(() -> ChunkMarks.changed(level, worldPosition));
 		card.frontFrom(() -> com.payonel.modularcomputers.device.Face.of(getBlockState().getValue(ExpansionHubBlock.FACING).getName()));
+		if (card instanceof com.payonel.modularcomputers.device.FieldCard field) {
+			field.projectorIn(new com.payonel.modularcomputers.entity.FieldProjector(field, () -> (net.minecraft.server.level.ServerLevel) level,
+				() -> com.payonel.modularcomputers.entity.FieldProjector.Frame.of(net.minecraft.world.phys.Vec3.atCenterOf(worldPosition),
+					getBlockState().getValue(ExpansionHubBlock.FACING)), () -> null));
+		}
 		if (card instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
 			redstone.block(side -> CardWorld.redstone(java.util.Arrays.stream(devices).filter(java.util.Objects::nonNull).toList(), side));
 			redstone.onOutput(() -> {

@@ -334,14 +334,24 @@ class McosTest extends McosHarness {
 	}
 
 	@Test
-	void sysHasAReadOnlyFileADeviceSayingWhatEachOfItsMethodsDoes() {
+	void sysHasADirectoryADeviceAndAReadOnlyFileForEachOfItsMethods() {
+		file("api.lua", """
+			local fs = require("fs")
+			local out = assert(io.open("/api", "w"))
+			for _, entry in ipairs(assert(fs.list("/sys/eeprom"))) do
+			  local f = assert(io.open("/sys/eeprom/" .. entry.name))
+			  out:write(entry.name, "=", (f:read("l")), "\\n")
+			  f:close()
+			end
+			out:close()
+			""");
 		boot();
-		type("ls /sys > /ls; cat /sys/eeprom > /e; echo x 2> /dev/null > /sys/eeprom; echo $? > /status\r");
+		type("ls /sys > /ls; ls /sys/eeprom > /m; cat /sys/eeprom/get > /e; lua /api.lua; echo x 2> /dev/null > /sys/eeprom/get; echo $? > /status\r");
 		untilFile(root().resolve("status"), "1\n"); // (read only: the write is refused)
-		assertThat(read(root().resolve("ls"))).as("a file a device, by its /dev name").contains("eeprom\n", "terminal0\n");
-		String about = read(root().resolve("e"));
-		assertThat(about).startsWith("eeprom: eeprom\n\n");
-		assertThat(about).as("each method's signature, then what it does, indented").containsPattern("(?m)^get\\(\\)\n    \\S");
+		assertThat(read(root().resolve("ls"))).as("a directory a device, by its /dev name").contains("eeprom\n", "terminal0\n");
+		assertThat(read(root().resolve("m"))).as("a file a method").contains("get\n", "set\n");
+		assertThat(read(root().resolve("e"))).as("its signature, then what it does, indented").containsPattern("^get\\(\\)\n    \\S");
+		assertThat(read(root().resolve("api"))).as("a program lists and reads them as files").contains("get=get()\n", "set=set(");
 	}
 
 	@Test

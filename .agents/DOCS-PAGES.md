@@ -10,7 +10,7 @@ Hardware: `hardware/index.md`, `case.md` (tiers 1-3), `all-in-one.md`, `broken-c
 Devices: `devices/index.md`, `terminal.md`, `disk.md`, `disk-station.md`, `eeprom.md`, `redstone-card.md`,
   `network-card.md`, `wlan-card.md`, `bluetooth-card.md`, `sound-card.md`, `internet-card.md`,
   `operator-card.md`, `motion-sensor.md`, `audio-sensor.md`, `weather-sensor.md`, `robotic-piston.md`,
-  `robotics.md`, `charger.md`, `crafting-card.md`
+  `robotics.md`, `charger.md`, `crafting-card.md`, `energy-field-card.md`
 mcos: `mcos/index.md`, `boot.md`, `filesystem.md`, `shell.md`, `dev.md`, `networking.md`,
   `services.md`, `programs.md` (writing programs), `sys-api.md`, `remote-shell.md`
 Programs: `programs/index.md` and `programs/<name>.md` per man page (generated)

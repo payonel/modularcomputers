@@ -39,4 +39,6 @@ public enum DeviceType {
 	CHARGER,
 	/** A crafting card: storage and a crafting grid, a robot's to work. */
 	CRAFTING,
+	/** An energy field card: suspends creatures and items, and moves them. */
+	FIELD,
 }
