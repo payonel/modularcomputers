@@ -899,6 +899,43 @@ class McosTest extends McosHarness {
 	}
 
 	@Test
+	void lineEditingOverWideCharactersKeepsTheCursorWhereTheScreenHasIt() {
+		boot();
+		untilIdle();
+		type("echo ");
+		screen.type("中文"); // (as a player types them: UTF-8, two cells each)
+		untilIdle();
+		int start = "~ $ echo ".length();
+		assertThat(screen.cursor().column()).as("after 中文: four cells on").isEqualTo(start + 4);
+		type("\u001B[D"); // left: over 文, two cells back
+		untilIdle();
+		assertThat(screen.cursor().column()).isEqualTo(start + 2);
+		type("x");
+		untilIdle();
+		assertThat(screen.cursor().column()).isEqualTo(start + 3);
+		assertThat(screen.buffer().get(start, screen.cursor().row())).isEqualTo(0x4E2D);
+		assertThat(screen.buffer().get(start + 2, screen.cursor().row())).isEqualTo('x');
+		assertThat(screen.buffer().get(start + 3, screen.cursor().row())).isEqualTo(0x6587);
+		type("\u0005 > /o\r"); // ^E, to the end: the line's as it shows
+		untilFile(root().resolve("o"), "中x文\n");
+	}
+
+	@Test
+	void aCombiningMarkTypedJoinsItsLetterForTheCursor() {
+		boot();
+		untilIdle();
+		type("echo e");
+		screen.type("\u0301"); // a combining acute: on the e
+		type("x");
+		untilIdle();
+		int start = "~ $ echo ".length();
+		assertThat(screen.cursor().column()).as("é is one cell").isEqualTo(start + 2);
+		type("\u001B[D\u001B[D\u007F"); // left twice (over x, over é), then nothing to erase before: still all there
+		type("\u0005\u007F\u007F > /o\r"); // to the end, erase x and é (with its mark, as one)
+		untilFile(root().resolve("o"), "\n");
+	}
+
+	@Test
 	void inotifyTellsOfChangesOnADiskAndInTmp() {
 		boot();
 		file("n.lua", """

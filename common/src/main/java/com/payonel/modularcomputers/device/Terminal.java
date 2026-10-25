@@ -264,7 +264,7 @@ public final class Terminal implements Device {
 	}
 
 	private static String fitted(String text, int columns) {
-		return text.length() >= columns ? text.substring(0, columns) : text + " ".repeat(columns - text.length());
+		return TextBuffer.fit(text, columns); // (by cells: a wide character or a mark isn't a char)
 	}
 
 	private static int[] fitted(int[] colors, int columns, int blank) {
@@ -334,11 +334,16 @@ public final class Terminal implements Device {
 		}
 	}
 
-	/** Text typed at it (as the keyboard's layout makes it): sent, unless every key is reported as an escape code. */
+	/** Text typed at it (as the keyboard's layout makes it): sent as UTF-8, unless every key is reported as an escape code. */
 	public void type(String text) {
 		if (TerminalKeyboard.sendsText(decoder.keyboardFlags())) {
-			press(text);
+			press(utf8(text));
 		}
+	}
+
+	/** Text as the bytes a program reads (UTF-8, a char a byte: what the line carries). */
+	public static String utf8(String text) {
+		return new String(text.getBytes(java.nio.charset.StandardCharsets.UTF_8), java.nio.charset.StandardCharsets.ISO_8859_1);
 	}
 
 	/** The most a paste takes, in characters (the rest is dropped, as a terminal's paste buffer has a size). */
@@ -358,7 +363,7 @@ public final class Terminal implements Device {
 		String lines = text.replace("\r\n", "\r").replace('\n', '\r');
 		for (int i = 0; i < lines.length() && clean.length() < MAX_PASTE; i++) {
 			char c = lines.charAt(i);
-			if (c >= ' ' && c != 0x7F || c == '\t' || c == '\r') {
+			if (c >= ' ' && c != 0x7F && !(c >= 0x80 && c < 0xA0) || c == '\t' || c == '\r') { // (no C0 or C1 controls)
 				clean.append(c);
 			}
 		}
@@ -369,8 +374,9 @@ public final class Terminal implements Device {
 		if (bracketed) {
 			press("\u001B[200~");
 		}
-		for (int i = 0; i < clean.length(); i += PASTE_PIECE) {
-			press(clean.substring(i, Math.min(clean.length(), i + PASTE_PIECE)));
+		String bytes = utf8(clean.toString());
+		for (int i = 0; i < bytes.length(); i += PASTE_PIECE) {
+			press(bytes.substring(i, Math.min(bytes.length(), i + PASTE_PIECE)));
 		}
 		if (bracketed) {
 			press("\u001B[201~");

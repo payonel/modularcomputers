@@ -26,6 +26,11 @@ import java.util.function.Consumer;
  * largest ({@code 19t}: {@code CSI 9;rows;cols t});</li>
  * <li>full reset (ESC c).</li>
  * </ul>
+ * <li>UTF-8 (every tier, as every terminal emulator today): its bytes decoded into characters, a
+ * bad byte shown as U+FFFD; a wide character ({@link CharWidth}) takes two cells, a combining
+ * mark joins the cell before, each character its own width (wcwidth's, as xterm's);</li>
+ * <li>character sets: G0 and G1 designated ({@code ESC ( 0}, {@code ESC ) B}...), SO and SI
+ * shifting between them; DEC's special graphics (the line-drawing set) and the UK set;</li>
  * Anything else is parsed and ignored, as real terminals do with sequences they don't know.
  * Erasing fills with the current background (xterm's "background color erase").
  */
@@ -36,6 +41,18 @@ public final class VtDecoder {
 		0x7F7F7F, 0xFF0000, 0x00FF00, 0xFFFF00, 0x5C5CFF, 0xFF00FF, 0x00FFFF, 0xFFFFFF,
 	};
 	private static final int TAB = 8;
+	/** The character sets G0 and G1 can hold. */
+	private static final int ASCII = 0;
+	private static final int DEC_GRAPHICS = 1;
+	private static final int UK = 2;
+	/** DEC's special graphics, for 0x5F to 0x7E (the VT100's line-drawing set, as Unicode). */
+	private static final int[] SPECIAL_GRAPHICS = {
+		0x00A0, 0x25C6, 0x2592, 0x2409, 0x240C, 0x240D, 0x240A, 0x00B0, 0x00B1, 0x2424, 0x240B, 0x2518, 0x2510, 0x250C, 0x2514, 0x253C,
+		0x23BA, 0x23BB, 0x2500, 0x23BC, 0x23BD, 0x251C, 0x2524, 0x2534, 0x252C, 0x2502, 0x2264, 0x2265, 0x03C0, 0x2260, 0x00A3, 0x00B7,
+	};
+	private static final int SPECIAL_FIRST = 0x5F;
+	private static final int POUND = 0x00A3;
+	private static final int REPLACEMENT = 0xFFFD;
 
 	private enum Parse { GROUND, ESCAPE, CHARSET, CSI, STRING, DCS, SIXEL }
 
@@ -62,6 +79,15 @@ public final class VtDecoder {
 	private boolean sixelDisplayMode;
 	/** xterm's bracketed paste ({@code CSI ?2004 h}): a paste comes wrapped in {@code ESC[200~} and {@code ESC[201~}. */
 	private boolean bracketedPaste;
+
+	/** G0 and G1 (ASCII, DEC_GRAPHICS, UK), which SO and SI shift between, and the one being designated. */
+	private final int[] charsets = {ASCII, ASCII};
+	private boolean shiftOut;
+	private int designating;
+	/** A UTF-8 character being decoded: its bytes still to come, its length, and its bits so far. */
+	private int utf8Left;
+	private int utf8Length;
+	private int utf8Code;
 
 	private int x;
 	private int y;
@@ -214,7 +240,7 @@ public final class VtDecoder {
 		int columns = Math.min(from.columns(), to.columns());
 		for (int row = 0; row < to.rows(); row++) {
 			String text = row < screen.rows().size() ? screen.rows().get(row) : "";
-			text = text.length() >= to.columns() ? text.substring(0, to.columns()) : text + " ".repeat(to.columns() - text.length());
+			text = TextBuffer.fit(text, to.columns());
 			rows.add(text);
 			if (row < from.rows() && (row + 1) * from.columns() <= screen.foregrounds().length && (row + 1) * from.columns() <= screen.backgrounds().length) {
 				System.arraycopy(screen.foregrounds(), row * from.columns(), foregrounds, row * to.columns(), columns);
@@ -253,10 +279,65 @@ public final class VtDecoder {
 		return newLineMode;
 	}
 
-	/** Decodes text onto the buffer. */
+	/**
+	 * Decodes text onto the buffer: bytes (as chars 0 to 255, a program's output), UTF-8; a char
+	 * past 255 (a Java string's own) is taken as the character it is.
+	 */
 	public void write(String text) {
 		for (int i = 0; i < text.length(); i++) {
-			accept(text.charAt(i));
+			char c = text.charAt(i);
+			if (c > 0xFF) {
+				int cp = text.codePointAt(i);
+				i += Character.charCount(cp) - 1;
+				flushUtf8();
+				accept(cp);
+			} else {
+				decode(c);
+			}
+		}
+	}
+
+	/** The smallest character each UTF-8 length may hold (shorter is overlong: refused). */
+	private static final int[] UTF8_MINIMUM = {0, 0, 0x80, 0x800, 0x10000};
+
+	/** A byte of UTF-8. */
+	private void decode(int b) {
+		if (utf8Left > 0) {
+			if ((b & 0xC0) == 0x80) {
+				utf8Code = utf8Code << 6 | b & 0x3F;
+				if (--utf8Left == 0) {
+					int cp = utf8Code;
+					boolean bad = cp < UTF8_MINIMUM[utf8Length] || cp > Character.MAX_CODE_POINT || cp >= 0xD800 && cp <= 0xDFFF;
+					accept(bad ? REPLACEMENT : cp);
+				}
+				return;
+			}
+			flushUtf8(); // (cut short: what came is one bad character, and this byte starts afresh)
+		}
+		if (b < 0x80) {
+			accept(b);
+		} else if (b >= 0xC2 && b <= 0xDF) {
+			start(2, b & 0x1F);
+		} else if (b >= 0xE0 && b <= 0xEF) {
+			start(3, b & 0x0F);
+		} else if (b >= 0xF0 && b <= 0xF4) {
+			start(4, b & 0x07);
+		} else {
+			accept(REPLACEMENT); // (a continuation alone, or a byte UTF-8 never has)
+		}
+	}
+
+	private void start(int length, int bits) {
+		utf8Length = length;
+		utf8Left = length - 1;
+		utf8Code = bits;
+	}
+
+	/** A character left half decoded: shown as U+FFFD. */
+	private void flushUtf8() {
+		if (utf8Left > 0) {
+			utf8Left = 0;
+			accept(REPLACEMENT);
 		}
 	}
 
@@ -279,16 +360,33 @@ public final class VtDecoder {
 		keyboardStack.clear();
 		saved = null;
 		mainScreen = null;
+		charsets[0] = ASCII;
+		charsets[1] = ASCII;
+		shiftOut = false;
+		utf8Left = 0;
 		buffer.clear();
 	}
 
 	// ---- parsing --------------------------------------------------------------------------
 
-	private void accept(char c) {
+	/** A character, decoded: printed, or part of a control or an escape sequence. */
+	private void accept(int cp) {
+		if (cp > 0x7F && parse != Parse.GROUND) {
+			// not ASCII in an escape sequence: it ends it (xterm's); inside a string (OSC, DCS), it's the string's
+			if (parse == Parse.ESCAPE || parse == Parse.CSI || parse == Parse.CHARSET) {
+				parse = Parse.GROUND;
+			}
+			return;
+		}
+		if (parse == Parse.GROUND) {
+			ground(cp);
+			return;
+		}
+		char c = (char) cp;
 		switch (parse) {
 			case GROUND -> ground(c);
 			case ESCAPE -> escape(c);
-			case CHARSET -> parse = Parse.GROUND; // ESC ( B and the like: character sets, ignored
+			case CHARSET -> designate(c);
 			case CSI -> csi(c);
 			case STRING -> string(c);
 			case DCS -> dcs(c);
@@ -390,9 +488,19 @@ public final class VtDecoder {
 		}
 	}
 
-	private void ground(char c) {
+	/** ESC ( x and the like: G0 (or G1) is now the set {@code c} names (DEC graphics, the UK's, else ASCII). */
+	private void designate(char c) {
+		parse = Parse.GROUND;
+		if (designating < charsets.length) {
+			charsets[designating] = c == '0' ? DEC_GRAPHICS : c == 'A' ? UK : ASCII;
+		}
+	}
+
+	private void ground(int c) {
 		switch (c) {
 			case '\u001B' -> parse = Parse.ESCAPE;
+			case '\u000E' -> shiftOut = true; // SO: G1
+			case '\u000F' -> shiftOut = false; // SI: G0
 			case '\r' -> carriageReturn();
 			case '\n', '\u000B', '\u000C' -> {
 				index();
@@ -410,7 +518,7 @@ public final class VtDecoder {
 			}
 			case '\u0007' -> bell.run();
 			default -> {
-				if (c >= ' ') {
+				if (c >= ' ' && c != 0x7F && !(c >= 0x80 && c <= 0x9F)) { // (DEL and C1 controls show nothing)
 					print(c);
 				}
 			}
@@ -432,7 +540,10 @@ public final class VtDecoder {
 				stringEscape = false;
 				parse = Parse.STRING; // OSC and the like: read to the end, ignored
 			}
-			case '(', ')', '*', '+' -> parse = Parse.CHARSET;
+			case '(', ')', '*', '+' -> {
+				designating = c == '(' ? 0 : c == ')' ? 1 : charsets.length; // (G2 and G3: read, unused)
+				parse = Parse.CHARSET;
+			}
 			case '7' -> saveCursor();
 			case '8' -> restoreCursor();
 			case 'D' -> index();
@@ -610,17 +721,54 @@ public final class VtDecoder {
 
 	// ---- the screen -----------------------------------------------------------------------
 
-	private void print(char c) {
-		if (pendingWrap) {
+	/**
+	 * Prints a character at the cursor, in the shifted-in set (a DEC graphics character as its
+	 * line-drawing one). A combining mark joins the cell before; a wide character takes two cells,
+	 * wrapping first when only one is left (or, with autowrap off, put in the last two).
+	 */
+	private void print(int c) {
+		int set = charsets[shiftOut ? 1 : 0];
+		if (set == DEC_GRAPHICS && c >= SPECIAL_FIRST && c < SPECIAL_FIRST + SPECIAL_GRAPHICS.length) {
+			c = SPECIAL_GRAPHICS[c - SPECIAL_FIRST];
+		} else if (set == UK && c == '#') {
+			c = POUND;
+		}
+		int width = CharWidth.of(c);
+		if (width == 0) {
+			int under = pendingWrap ? x : x - 1; // (the character just printed)
+			if (under >= 0) {
+				if (buffer.get(under, y) == TextBuffer.WIDE && under > 0) {
+					under--;
+				}
+				buffer.addMark(under, y, c);
+			}
+			return;
+		}
+		if (width == 2 && columns < 2) {
+			c = REPLACEMENT; // (nowhere two cells wide)
+			width = 1;
+		}
+		if (pendingWrap || width == 2 && x == columns - 1 && autowrap) {
 			pendingWrap = false;
 			carriageReturn();
 			index();
 		}
+		if (width == 2 && x == columns - 1) {
+			x = columns - 2; // (no autowrap: the last two cells)
+		}
 		buffer.set(x, y, c, foreground(), background());
-		if (x < columns - 1) {
-			x++;
-		} else if (autowrap) {
-			pendingWrap = true; // the next character wraps, as on a real VT100
+		if (width == 2) {
+			buffer.set(x + 1, y, TextBuffer.WIDE, foreground(), background());
+		}
+		buffer.mend(x, y);
+		buffer.mend(x + width - 1, y);
+		if (x + width <= columns - 1) {
+			x += width;
+		} else {
+			x = columns - 1;
+			if (autowrap) {
+				pendingWrap = true; // the next character wraps, as on a real VT100
+			}
 		}
 	}
 
@@ -655,7 +803,18 @@ public final class VtDecoder {
 	}
 
 	private void saveCursor() {
-		saved = new int[] {x, y, fgIndex, fgRgb, bgIndex, bgRgb, bold ? 1 : 0, reverse ? 1 : 0};
+		saved = new int[] {x, y, fgIndex, fgRgb, bgIndex, bgRgb, bold ? 1 : 0, reverse ? 1 : 0, packedCharsets()}; // (DECSC saves the sets too)
+	}
+
+	/** G0, G1 and the shift, in an int (saves). */
+	private int packedCharsets() {
+		return charsets[0] | charsets[1] << 2 | (shiftOut ? 1 << 4 : 0);
+	}
+
+	private void unpackCharsets(int packed) {
+		charsets[0] = Math.min(packed & 3, UK);
+		charsets[1] = Math.min(packed >> 2 & 3, UK);
+		shiftOut = (packed & 1 << 4) != 0;
 	}
 
 	private void restoreCursor() {
@@ -671,6 +830,7 @@ public final class VtDecoder {
 		bgRgb = saved[5];
 		bold = saved[6] != 0;
 		reverse = saved[7] != 0;
+		unpackCharsets(saved[8]);
 	}
 
 	private void alternateScreen(boolean on, boolean saveCursor) {
@@ -746,6 +906,7 @@ public final class VtDecoder {
 			copyCell(column - n, column);
 		}
 		erase(x, y, Math.min(n, columns - x));
+		buffer.mendRow(y); // (a wide character the move split)
 	}
 
 	private void deleteChars(int n) {
@@ -754,6 +915,7 @@ public final class VtDecoder {
 			copyCell(column + n, column);
 		}
 		erase(Math.max(x, columns - n), y, Math.min(n, columns - x));
+		buffer.mendRow(y);
 	}
 
 	private void copyCell(int from, int to) {
@@ -943,7 +1105,10 @@ public final class VtDecoder {
 	}
 
 	/** The size of {@link #state()}. */
-	private static final int STATE = 19;
+	private static final int STATE = 23;
+	/** Where the saved cursor starts in {@link #state()}, and how long it is. */
+	private static final int SAVED_AT = 14;
+	private static final int SAVED_SIZE = 9;
 
 	/**
 	 * Everything about it but the cells and {@link #pendingParams}, for saving and for a copy
@@ -959,7 +1124,9 @@ public final class VtDecoder {
 		int[] state = new int[STATE];
 		// (a picture half decoded isn't kept: the rest of it is read and ignored)
 		Parse saving = parse == Parse.DCS || parse == Parse.SIXEL ? Parse.STRING : parse;
-		int[] registers = {x, y, fgIndex, fgRgb, bgIndex, bgRgb, flags, top, bottom, saving.ordinal(), saved != null ? 1 : 0};
+		int utf8 = utf8Left << 28 | utf8Length << 24 | utf8Code;
+		int[] registers = {x, y, fgIndex, fgRgb, bgIndex, bgRgb, flags, top, bottom, saving.ordinal(), saved != null ? 1 : 0,
+			packedCharsets(), designating, utf8};
 		System.arraycopy(registers, 0, state, 0, registers.length);
 		if (saved != null) {
 			System.arraycopy(saved, 0, state, registers.length, saved.length);
@@ -1005,7 +1172,12 @@ public final class VtDecoder {
 			bottom = state[8];
 		}
 		parse = state[9] >= 0 && state[9] < Parse.values().length ? Parse.values()[state[9]] : Parse.GROUND;
-		saved = state[10] != 0 ? java.util.Arrays.copyOfRange(state, 11, 19) : null;
+		unpackCharsets(state[11]);
+		designating = Math.clamp(state[12], 0, charsets.length);
+		utf8Left = state[13] >>> 28 & 7;
+		utf8Length = Math.clamp(state[13] >>> 24 & 0xF, 0, UTF8_MINIMUM.length - 1);
+		utf8Code = state[13] & 0xFFFFFF;
+		saved = state[10] != 0 ? java.util.Arrays.copyOfRange(state, SAVED_AT, SAVED_AT + SAVED_SIZE) : null;
 		params.setLength(0);
 		params.append(pendingParams);
 		mainScreen = main;
@@ -1036,7 +1208,11 @@ public final class VtDecoder {
 					lastFg = fg;
 					lastBg = bg;
 				}
-				out.append(buffer.get(column, row));
+				int c = buffer.get(column, row);
+				if (c != TextBuffer.WIDE) {
+					String glyph = Character.toString(c) + buffer.marks(column, row);
+					out.append(new String(glyph.getBytes(java.nio.charset.StandardCharsets.UTF_8), java.nio.charset.StandardCharsets.ISO_8859_1));
+				}
 			}
 		}
 		// Its pictures, a cell's tile a sixel each, drawn where they are (DECSDM: no scrolling, the cursor stays).

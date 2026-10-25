@@ -38,7 +38,7 @@ public final class ScreenSave {
 	}
 
 	private static void save(ValueOutput output, String name, VtDecoder.Screen screen, VtDecoder decoder) {
-		int columns = screen.rows().isEmpty() ? 0 : screen.rows().getFirst().length();
+		int columns = screen.rows().isEmpty() ? 0 : com.payonel.modularcomputers.display.TextBuffer.cells(screen.rows().getFirst()).count();
 		output.putIntArray(name + "_size", new int[] {columns, screen.rows().size()});
 		output.store(name, Codec.STRING.listOf(), screen.rows());
 		output.putIntArray(name + "_foreground", screen.foregrounds());

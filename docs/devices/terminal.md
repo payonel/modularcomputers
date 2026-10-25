@@ -113,6 +113,20 @@ It understands the common xterm subset: cursor movement, erasing and editing, sc
 and cursor position reports, and the kitty keyboard protocol (flags 1, 2 and 8). Anything else is
 parsed and ignored. A BEL (`\a`) rings the terminal's bell at its block.
 
+Every tier reads text as UTF-8, as terminal emulators do today: a program writes UTF-8 bytes, and
+the terminal shows the characters (a byte that isn't UTF-8 shows as `�`). Each character takes the
+cells its width says, as glibc's `wcwidth` gives it (each code point its own width, as xterm's):
+
+- most characters, accented letters, box drawing: one cell;
+- CJK and most emoji: two cells;
+- combining marks (an accent written after its letter) and format characters (a zero-width joiner):
+  none, they go on the character before.
+
+The table is mcos's `/usr/share/wcwidth`, so a program that measures text (mcos's line editing) and
+the screen agree. Keys typed and pasted reach programs as UTF-8. The DEC character sets work too:
+`ESC ( 0` puts DEC's line drawing in G0 (`ESC ( B` back to ASCII, `ESC ( A` the UK set), `ESC ) 0`
+in G1, and SO (`\14`) and SI (`\15`) shift between them; `lqqk` in line drawing is `┌──┐`.
+
 Some sequences a program uses most (`ESC` is `"\27"` in Lua):
 
 | Sequence | Does |

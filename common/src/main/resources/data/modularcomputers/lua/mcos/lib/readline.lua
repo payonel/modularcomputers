@@ -22,6 +22,7 @@
 --   local line, why = editor:read("prompt> ")   -- nil, "EINTR" for ^C; nil at the end of input
 local sys = require("sys")
 local fs = require("fs")
+local wcwidth = require("wcwidth")
 
 local readline = {}
 
@@ -38,17 +39,28 @@ local NEWLINE_SHOWN = "\226\134\181" -- a new line in the line, as it's drawn: U
 local DEFAULT_BREAKS = "[ \t\n\"'`<>;|&()=]" -- what ends a word, for completion (as rl_completer_word_break_characters)
 local SPECIAL = "[ \t\n\"'`<>;|&()$\\*?%[%]#~=!{}]" -- characters a file name has quoted when it's put in
 
--- How many columns text takes on the screen (escape sequences take none).
+-- How many columns text takes on the screen (escape sequences take none; each character its
+-- width, as the terminal lays it out: wcwidth).
 local function columns(text)
-  text = text:gsub("\27%[[%d;?]*[ -/]*[@-~]", "")
-  return utf8.len(text) or #text
+  return wcwidth.string((text:gsub("\27%[[%d;?]*[ -/]*[@-~]", "")))
 end
 
--- A string's characters (UTF-8), one a slot.
+-- A character's width in cells (a slot: its combining marks go with it).
+local function cells(c)
+  local ok, code = pcall(utf8.codepoint, c)
+  return ok and wcwidth.of(code) or 1
+end
+
+-- A string's characters (UTF-8), one a slot; a combining mark (no width) in its character's slot,
+-- so the cursor moves over the two, and erases them, as one.
 local function characters(text)
   local list = {}
   for c in text:gmatch("[\0-\127\194-\244][\128-\191]*") do
-    list[#list + 1] = c
+    if #list > 0 and #c > 1 and cells(c) == 0 then
+      list[#list] = list[#list] .. c
+    else
+      list[#list + 1] = c
+    end
   end
   return list
 end
@@ -206,6 +218,20 @@ function editor:read(shown)
     end
   end
   prompt()
+  -- The cell after the line's first n characters (counting from the row the prompt's last line
+  -- is on): each its width, and a wide one that won't fit in a row's last cell starting the next
+  -- row, as the terminal wraps it.
+  local function pos(n)
+    local p = start
+    for i = 1, n do
+      local w = cells(buffer[i])
+      if w == 2 and p % width == width - 1 then
+        p = p + 1
+      end
+      p = p + w
+    end
+    return p
+  end
   local function moveto(target)
     local from, to = at // width, target // width
     if to < from then
@@ -218,15 +244,15 @@ function editor:read(shown)
   end
   -- Draws the line from character 'from' on, clears what's after it, and puts the cursor back.
   local function redraw(from)
-    moveto(start + from)
+    moveto(pos(from))
     local tail = table.concat(buffer, "", from + 1):gsub("\n", NEWLINE_SHOWN)
     out[#out + 1] = tail
-    at = start + #buffer
+    at = pos(#buffer)
     if #tail > 0 and at % width == 0 then
       out[#out + 1] = " \r" -- (it ended in the last column: on to the next row, as the model has it)
     end
     out[#out + 1] = CSI .. "J"
-    moveto(start + cursor)
+    moveto(pos(cursor))
   end
   local function set(text)
     buffer = characters(text)
@@ -235,7 +261,7 @@ function editor:read(shown)
   end
   local function finish(line, why)
     self.typeahead = why == "EINTR" and "" or pending -- (^C flushes what was typed, as the tty does)
-    moveto(start + #buffer)
+    moveto(pos(#buffer))
     out[#out + 1] = (why == "EINTR" and "^C\r\n" or "\r\n") .. CSI .. "?2004l" -- (bracketed paste off: the program's again)
     io.stdout:write(table.concat(out))
     io.stdout:flush()
@@ -257,7 +283,7 @@ function editor:read(shown)
   end
   local function go(at)
     cursor = at
-    moveto(start + at)
+    moveto(pos(at))
   end
   -- Tab: the word before the cursor completed, or (a second Tab with nothing to add) the words it
   -- could be, listed.
@@ -291,7 +317,7 @@ function editor:read(shown)
       for k, w in ipairs(words) do
         shownwords[k] = readline.unescape(w:match("([^/]*/?)$")) -- (a file's name, not its directory)
       end
-      moveto(start + #buffer)
+      moveto(pos(#buffer))
       out[#out + 1] = "\r\n" .. grid(shownwords, width) .. "\r\n"
       prompt()
       redraw(0)
@@ -438,9 +464,14 @@ function editor:read(shown)
     elseif #key > 1 and key:sub(1, 1) == "\27" then
       -- (a key it has no use for)
     elseif key:byte() >= 32 and key ~= "\127" then
-      table.insert(buffer, cursor + 1, key)
-      cursor = cursor + 1
-      redraw(cursor - 1)
+      if cursor > 0 and #key > 1 and cells(key) == 0 then
+        buffer[cursor] = buffer[cursor] .. key -- (a combining mark: on the character before)
+        redraw(cursor - 1)
+      else
+        table.insert(buffer, cursor + 1, key)
+        cursor = cursor + 1
+        redraw(cursor - 1)
+      end
     end
     listing = tabbed
     ::continue::

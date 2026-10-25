@@ -30,14 +30,15 @@ public record TextGrid(float cellWidth, float cellHeight, float fontScale) {
 	 * {@link #fontScale}). Minecraft's font is proportional; centering keeps narrow glyphs
 	 * like {@code l} from leaving gaps.
 	 */
-	public float x(int column, char c, Font font) {
+	public float x(int column, int c, Font font) {
 		return x(column, c, font, net.minecraft.network.chat.Style.EMPTY);
 	}
 
-	/** {@link #x(int, char, Font)} for a glyph drawn in {@code style}'s font. */
-	public float x(int column, char c, Font font, net.minecraft.network.chat.Style style) {
+	/** {@link #x(int, int, Font)} for a glyph drawn in {@code style}'s font: a wide one centered across its two cells. */
+	public float x(int column, int c, Font font, net.minecraft.network.chat.Style style) {
 		float glyphWidth = font.width(net.minecraft.util.FormattedCharSequence.codepoint(c, style)) - 1; // width includes 1 unit of spacing
-		return column * cellWidth / fontScale + (cellWidth / fontScale - glyphWidth) / 2;
+		int cells = com.payonel.modularcomputers.display.CharWidth.of(c) == 2 ? 2 : 1;
+		return column * cellWidth / fontScale + (cells * cellWidth / fontScale - glyphWidth) / 2;
 	}
 
 	/** Top edge of a cell, in font units. */

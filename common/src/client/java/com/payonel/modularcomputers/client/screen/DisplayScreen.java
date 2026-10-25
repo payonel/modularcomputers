@@ -305,11 +305,17 @@ public final class DisplayScreen extends Screen {
 		pose.scale(grid.fontScale(), grid.fontScale());
 		for (int row = 0; row < resolution.rows(); row++) {
 			for (int column = 0; column < resolution.columns(); column++) {
-				char c = buffer.get(column, row);
-				if (c != ' ') {
+				int c = buffer.get(column, row);
+				if (c != ' ' && c != TextBuffer.WIDE) {
 					Style style = tierStyle.withBold(TextBuffer.bold(buffer.foreground(column, row)));
-					graphics.text(font, FormattedCharSequence.codepoint(c, style), (int) grid.x(column, c, font, style), (int) grid.y(row),
-						0xFF000000 | foreground.apply(column, row), false);
+					int x = (int) grid.x(column, c, font, style);
+					graphics.text(font, FormattedCharSequence.codepoint(c, style), x, (int) grid.y(row), 0xFF000000 | foreground.apply(column, row), false);
+					String marks = buffer.marks(column, row);
+					for (int i = 0; i < marks.length(); i = marks.offsetByCodePoints(i, 1)) {
+						// a combining mark over its character, where it is
+						graphics.text(font, FormattedCharSequence.codepoint(marks.codePointAt(i), style), x, (int) grid.y(row),
+							0xFF000000 | foreground.apply(column, row), false);
+					}
 				}
 			}
 		}

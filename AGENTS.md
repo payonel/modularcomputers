@@ -384,6 +384,13 @@ the farther it reaches (OC's wirelessCostPerRange); any tier hears any other.
   new lines as Enter, but no control characters or ESC (a paste can't fake its end or send
   sequences); with bracketed paste on (mode 2004) it comes wrapped, and readline turns that on while
   it reads a line (as bash does), so a multi-line paste goes into the line and runs only at Enter.
+- **UTF-8, every tier** (the user's): the terminal decodes the bytes programs write (bad ones
+  U+FFFD); a cell holds a code point, a wide character's right half `TextBuffer.WIDE`, combining
+  marks on their cell; widths are wcwidth's, each code point its own (xterm's, not grapheme
+  clusters), from `/usr/share/wcwidth` (scripts/data/wcwidth.py), the one table the terminal
+  (`CharWidth`) and mcos (`lib/wcwidth.lua`, readline's cursor) read, so they agree. A row as text
+  is its cells, a character and its marks each: saves and players' copies carry it. Typed text and
+  pastes go as UTF-8. DEC's character sets (G0/G1, SO/SI, the line drawing, the UK set).
 - **The server's decoder is the only one:** only changed rows go to players (the user rejected a
   client-side decoder: a client-only bug could show what the server never decoded).
 

@@ -28,7 +28,7 @@ class TerminalKeyboardTest {
 		terminal.key(F1, 0, PRESS);
 		terminal.key(TAB, SHIFT, PRESS);
 		terminal.type("é");
-		assertThat(sent()).isEqualTo("\u001B[A\r\u0003\u001B[1;5D\u001B[3~\u001BOP\u001B[Zé");
+		assertThat(sent()).as("typed text goes as UTF-8").isEqualTo("\u001B[A\r\u0003\u001B[1;5D\u001B[3~\u001BOP\u001B[Z\u00C3\u00A9");
 	}
 
 	@Test

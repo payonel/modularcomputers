@@ -210,6 +210,23 @@ public class CableClientGameTest implements FabricClientGameTest {
 				.virtualBus().console().write("\u001B[8;16;50t\u001B[2J\u001B[Hhello world\r\n")); // (back as the test had it)
 			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof com.payonel.modularcomputers.block.ScreenBlockEntity shown
 				&& shown.terminal().buffer().resolution().columns() == 50);
+			// UTF-8 as a program writes it (bytes): box drawing, CJK and emoji two cells wide, an accent
+			// combined, DEC's line drawing.
+			String unicode = "\u001B[2J\u001B[H\u250F\u2501\u2501\u2501\u2513 \u4E2D\u6587 \uD83D\uDE00 caf\u00E9 cafe\u0301\r\n"
+				+ "\u2503ok \u2503 \u65E5\u672C\u8A9E \u2500\u2502\u253C \u03C0\u2248\u221E\r\n\u2517\u2501\u2501\u2501\u251B "
+				+ "\u001B(0lqqk\u001B(B\r\n";
+			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
+				.virtualBus().console().write(com.payonel.modularcomputers.device.Terminal.utf8(unicode)));
+			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof com.payonel.modularcomputers.block.ScreenBlockEntity shown
+				&& shown.terminal().buffer().get(6, 0) == 0x4E2D);
+			context.runOnClient(client -> {
+				var cells = ((com.payonel.modularcomputers.block.ScreenBlockEntity) client.level.getBlockEntity(screen)).terminal().buffer();
+				check(cells.get(7, 0) == com.payonel.modularcomputers.display.TextBuffer.WIDE && cells.get(8, 0) == 0x6587,
+					"the client's copy: 中 two cells, then 文");
+				check(cells.get(0, 2) == 0x2517 && cells.get(6, 2) == 0x250C, "box drawing, and DEC's line drawing as box drawing");
+			});
+			context.waitTicks(2);
+			context.takeScreenshot("screen-view-utf8");
 			pressPower(singleplayer, computer);
 			context.waitFor(client -> !machinePowered(client, computer) && !showsHello(client, screen));
 			pressPower(singleplayer, computer);

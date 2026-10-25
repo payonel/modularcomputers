@@ -24,6 +24,9 @@ public final class TerminalFace {
 		Resolution resolution = Resolution.DEFAULT;
 		/** Rows of the display, or null when there's nothing to draw. */
 		String[] rows;
+		/** Its cells' characters and combining marks ("" for none), by row and column. */
+		int[][] cells;
+		String[][] marks;
 		int[] foregrounds;
 		int[] backgrounds;
 		/** The tier's font ({@link TerminalFonts}). */
@@ -54,6 +57,15 @@ public final class TerminalFace {
 			return;
 		}
 		state.rows = display.rows().toArray(String[]::new);
+		int columnsNow = display.resolution().columns();
+		state.cells = new int[state.rows.length][columnsNow];
+		state.marks = new String[state.rows.length][columnsNow];
+		for (int row = 0; row < state.rows.length; row++) {
+			for (int column = 0; column < columnsNow; column++) {
+				state.cells[row][column] = display.get(column, row);
+				state.marks[row][column] = display.marks(column, row);
+			}
+		}
 		state.pixels = PixelLayers.of(display);
 		// A monochrome terminal's phosphor has one color: the glass glows green (ColorDepth.glow).
 		var depth = terminal.tier().depth();
@@ -133,14 +145,21 @@ public final class TerminalFace {
 			});
 			pose.popPose();
 		}
-		for (int row = 0; row < state.rows.length; row++) {
-			String text = state.rows[row];
-			for (int column = 0; column < text.length(); column++) {
-				char c = text.charAt(column);
-				if (c != ' ') {
+		for (int row = 0; row < state.cells.length; row++) {
+			for (int column = 0; column < state.cells[row].length; column++) {
+				int c = state.cells[row][column];
+				if (c != ' ' && c != com.payonel.modularcomputers.display.TextBuffer.WIDE) {
 					Style style = state.style.withBold(state.bold[row * columns + column]);
-					collector.submitText(pose, grid.x(column, c, font, style), grid.y(row), FormattedCharSequence.codepoint(c, style), false,
-						Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT, 0xFF000000 | state.foregrounds[row * columns + column], 0, 0);
+					float x = grid.x(column, c, font, style);
+					int color = 0xFF000000 | state.foregrounds[row * columns + column];
+					collector.submitText(pose, x, grid.y(row), FormattedCharSequence.codepoint(c, style), false,
+						Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT, color, 0, 0);
+					String marks = state.marks[row][column];
+					for (int i = 0; i < marks.length(); i = marks.offsetByCodePoints(i, 1)) {
+						// a combining mark over its character, where it is
+						collector.submitText(pose, x, grid.y(row), FormattedCharSequence.codepoint(marks.codePointAt(i), style), false,
+							Font.DisplayMode.POLYGON_OFFSET, LightCoordsUtil.FULL_BRIGHT, color, 0, 0);
+					}
 				}
 			}
 		}
