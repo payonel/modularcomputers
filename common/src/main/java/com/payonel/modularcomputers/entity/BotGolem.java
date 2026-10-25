@@ -256,6 +256,12 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	 * On its legs it holds its ground (the user's): nothing shoves it, not a player walking into it,
 	 * a mob, a blast's knockback; in the air it's pushed as anything is.
 	 */
+	/** It's solid, as a boat is: a player walks into it, not through it (the user's), and can stand on it. */
+	@Override
+	public boolean canBeCollidedWith(net.minecraft.world.entity.Entity other) {
+		return isAlive();
+	}
+
 	@Override
 	public boolean isPushable() {
 		return !onGround() && super.isPushable();

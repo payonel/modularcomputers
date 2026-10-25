@@ -284,7 +284,8 @@ robotics device soldered onto the last lane (`/dev/robotics0`), the only way it 
 on its own (no goals). The device walks it to a point relative to itself (it knows nothing of where
 it is: a GPS card later), at a player's walking pace, by the game's pathfinding, turns it, and stops
 it; each ends in an event. A player's hit picks it up as its item, parts kept; nothing else harms
-it, and on its legs nothing shoves it (players, mobs, knockback; in the air it's pushed). Creative
+it; it's solid, as a boat is (players walk into it, not through it), and on its legs nothing
+shoves it (players, mobs, knockback; in the air it's pushed). Creative
 only until the Advanced Robotics Assembly. Its board's state reaches players by
 `BoardStatePayload` (an entity has no block update), its screen's rows as a block's do.
 

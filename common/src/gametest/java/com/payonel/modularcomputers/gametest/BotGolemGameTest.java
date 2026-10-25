@@ -189,6 +189,21 @@ public class BotGolemGameTest {
 			.thenSucceed();
 	}
 
+	@GameTest(maxTicks = 40)
+	public void itsSolidNothingWalksThroughIt(GameTestHelper helper) {
+		BotGolem golem = golem(helper, board -> board.halt());
+		var pig = helper.spawn(net.minecraft.world.entity.EntityTypes.PIG, START.west().west().east()); // (a block west of it: START is at x 1)
+		pig.snapTo(golem.getX() - 1.5, golem.getY(), golem.getZ(), 0, 0);
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(golem.onGround() && pig.onGround(), "both standing"))
+			.thenExecute(() -> {
+				pig.move(net.minecraft.world.entity.MoverType.SELF, new Vec3(3, 0, 0)); // (straight into it, and past)
+				helper.assertTrue(pig.getBoundingBox().maxX <= golem.getBoundingBox().minX + 1e-3,
+					"stopped at it: the pig's edge " + pig.getBoundingBox().maxX + ", the golem's " + golem.getBoundingBox().minX);
+			})
+			.thenSucceed();
+	}
+
 	@GameTest
 	public void aPlayersHitPicksItUpWithItsParts(GameTestHelper helper) {
 		BotGolem golem = golem(helper, board -> board.halt());
