@@ -19,6 +19,18 @@ class RoboticsExamplesTest extends McosHarness {
 	private final RoboticsDevice robotics = new RoboticsDevice();
 	/** What the body was asked, in order. */
 	private final List<String> asked = new ArrayList<>();
+	/** How many blocks it breaks before one won't break (-1: all do). */
+	private int bedrockAfter = -1;
+
+	/** What the stand-in sees round it: stone ahead, a chest to its right, the floor below, air elsewhere. */
+	private static java.util.Map<String, Object> space(String face) {
+		return switch (face) {
+			case "front", "down" -> java.util.Map.of("kind", "block", "name", "minecraft:stone");
+			case "right" -> java.util.Map.of("kind", "block", "name", "minecraft:chest", "container", 27);
+			default -> java.util.Map.of("kind", "air");
+		};
+	}
+
 	/** How many walks it makes before one is blocked (-1: none is). */
 	private int wallAfter = -1;
 
@@ -42,6 +54,29 @@ class RoboticsExamplesTest extends McosHarness {
 
 			@Override
 			public void stop() {
+			}
+
+			@Override
+			public Result scan(String face) {
+				java.util.Map<String, Object> around = new java.util.LinkedHashMap<>();
+				for (String each : RoboticsDevice.FACES) {
+					around.put(each, space(each));
+				}
+				return Result.ok(face == null ? around : around.get(face));
+			}
+
+			@Override
+			public Result held() {
+				return Result.ok(java.util.Map.of("name", "minecraft:iron_pickaxe", "count", 1));
+			}
+
+			@Override
+			public Result swing(String face) {
+				asked.add("swing " + face);
+				boolean stuck = bedrockAfter == 0;
+				bedrockAfter--;
+				server.add(stuck ? () -> robotics.failed("unbreakable") : () -> robotics.broke("minecraft:stone"));
+				return Result.ok(RoboticsDevice.BREAKING);
 			}
 		});
 		devices.put(Motherboard.exp(GolemLayout.ROBOTICS_LANE), robotics); // (soldered, a golem's)
@@ -87,5 +122,35 @@ class RoboticsExamplesTest extends McosHarness {
 		assertThat(asked).hasSize(5).last().isEqualTo("walk 4 0 0");
 		assertThat(Files.exists(root().resolve("out"))).isTrue();
 		assertThat(read(root().resolve("out"))).isEqualTo("side 3: blocked (no way there)\n");
+	}
+
+	@Test
+	void theLookProgramSaysWhatsRoundItFromOneScan() {
+		boot();
+		file("look.lua", example("robotics-look"));
+		type("lua /look.lua > /out; echo $? > /status\r");
+		untilFile(root().resolve("status"), "0\n");
+		assertThat(read(root().resolve("out"))).isEqualTo("front: block minecraft:stone\nback: air\nleft: air\n"
+			+ "right: block minecraft:chest (27 slots)\nup: air\ndown: block minecraft:stone\n");
+	}
+
+	@Test
+	void theDigProgramBreaksAndWalksInAgainAndAgain() {
+		boot();
+		file("dig.lua", example("robotics-dig"));
+		type("lua /dig.lua 3 > /out; echo $? > /status\r");
+		untilFile(root().resolve("status"), "0\n");
+		assertThat(asked).containsExactly("swing front", "walk 1 0 0", "swing front", "walk 1 0 0", "swing front", "walk 1 0 0");
+		assertThat(read(root().resolve("out"))).isEqualTo("digging with minecraft:iron_pickaxe\ndug 3\n");
+	}
+
+	@Test
+	void theDigProgramStopsAtWhatWontBreak() {
+		bedrockAfter = 1;
+		boot();
+		file("dig.lua", example("robotics-dig"));
+		type("lua /dig.lua > /out; echo $? > /status\r");
+		untilFile(root().resolve("status"), "1\n");
+		assertThat(read(root().resolve("out"))).isEqualTo("digging with minecraft:iron_pickaxe\nstopped after 1: unbreakable\n");
 	}
 }

@@ -83,4 +83,9 @@ public final class TestPlatform implements Platform {
 	public void entityAttributes(net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.LivingEntity> type,
 		java.util.function.Supplier<net.minecraft.world.entity.ai.attributes.AttributeSupplier> attributes) {
 	}
+
+	@Override
+	public net.minecraft.server.level.ServerPlayer fakePlayer(net.minecraft.server.level.ServerLevel level, com.mojang.authlib.GameProfile profile) {
+		throw new UnsupportedOperationException("no world in unit tests");
+	}
 }

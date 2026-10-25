@@ -87,6 +87,13 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	private static final int LIT_CORE = 0xFFC8FFD2;
 	private static final int SILVER = 0xFFB0B4BC;
 	private static final int GOLD = 0xFFCCA64A;
+	/** A golem's iron (scripts/art/case_gui_textures.py's), for its hand's plate. */
+	private static final int IRON = 0xFFC9C2B5;
+	private static final int IRON_SHADE = 0xFF8A8377;
+	private static final int IRON_LIGHT = 0xFFE4DED2;
+	private static final int IRON_RIVET = 0xFF706A60;
+	/** How far a hand's plate reaches round its slot. */
+	private static final int HAND_MARGIN = 3;
 	/**
 	 * Outlines a part slot and its bus order row together while either is hovered, and the
 	 * slots an item would fit while it's carried or hovered in the inventory.
@@ -373,8 +380,11 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 				extractIcon(graphics, ghostIcon(slot), area.x(), area.y());
 			}
 		}
-		for (int slot = CaseMenu.PART_SLOTS; slot < menu.slots.size(); slot++) {
+		for (int slot = CaseMenu.PART_SLOTS; slot < CaseMenu.PART_SLOTS + CaseMenu.INVENTORY_SLOTS; slot++) {
 			extractInventorySlot(graphics, x + menu.slots.get(slot).x, y + menu.slots.get(slot).y);
+		}
+		if (menu.hasHand()) {
+			extractHand(graphics);
 		}
 		if (showBus) {
 			extractBusPanel(graphics);
@@ -523,6 +533,22 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 	}
 
 	/** A vanilla-style slot for the player's inventory: 18x18, shadowed top-left, lit bottom-right. */
+	/** A robot's hand: its slot in an iron plate, as its arm's gripper, under the buttons. */
+	public Viewport handPlate() {
+		return new Viewport(leftPos + CaseMenu.HAND_X - HAND_MARGIN, topPos + CaseMenu.HAND_Y - HAND_MARGIN, 16 + 2 * HAND_MARGIN, 16 + 2 * HAND_MARGIN);
+	}
+
+	private void extractHand(GuiGraphicsExtractor graphics) {
+		Viewport plate = handPlate();
+		graphics.fill(plate.x(), plate.y(), plate.right(), plate.bottom(), IRON_SHADE);
+		graphics.fill(plate.x(), plate.y(), plate.right() - 1, plate.bottom() - 1, IRON_LIGHT);
+		graphics.fill(plate.x() + 1, plate.y() + 1, plate.right() - 1, plate.bottom() - 1, IRON);
+		for (int[] rivet : new int[][] {{1, 1}, {plate.width() - 3, 1}, {1, plate.height() - 3}, {plate.width() - 3, plate.height() - 3}}) {
+			graphics.fill(plate.x() + rivet[0], plate.y() + rivet[1], plate.x() + rivet[0] + 2, plate.y() + rivet[1] + 2, IRON_RIVET);
+		}
+		extractInventorySlot(graphics, leftPos + CaseMenu.HAND_X, topPos + CaseMenu.HAND_Y);
+	}
+
 	private static void extractInventorySlot(GuiGraphicsExtractor graphics, int itemX, int itemY) {
 		int x = itemX - 1;
 		int y = itemY - 1;
@@ -808,7 +834,8 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 		// The bus panel and the buttons are part of this screen: clicking them must not drop
 		// the carried item.
 		boolean onBus = showBus && busPanel().contains(mouseX, mouseY);
-		boolean onButtons = powerButton().contains(mouseX, mouseY) || viewToggle().contains(mouseX, mouseY);
+		boolean onButtons = powerButton().contains(mouseX, mouseY) || viewToggle().contains(mouseX, mouseY)
+			|| menu.hasHand() && handPlate().contains(mouseX, mouseY);
 		return super.hasClickedOutside(mouseX, mouseY, left, top) && !onBus && !onButtons;
 	}
 }

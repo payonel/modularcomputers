@@ -30,14 +30,14 @@ public class BotGolemGameTest {
 	/** Where it stands: the test space's corner row, on the floor the test lays. */
 	private static final BlockPos START = new BlockPos(1, 1, 1);
 	/** Facing east (+X), along the row: Minecraft's heading for east. */
-	private static final float EAST = -90;
+	static final float EAST = -90;
 	/** How far the test's walks go, in blocks. */
 	private static final long WALK = 5;
 	/** A player's walking speed, in blocks a second (the game's), and the margin its pace is held to. */
 	private static final double PLAYER_PACE = 4.317;
 	private static final double PACE_MARGIN = 0.25;
 	private static final double TICKS_A_SECOND = 20;
-	private static final String ROBOTICS = Motherboard.exp(GolemLayout.ROBOTICS_LANE);
+	static final String ROBOTICS = Motherboard.exp(GolemLayout.ROBOTICS_LANE);
 	/** How long its program waits for its robotics device at a time, in seconds. */
 	private static final double WAIT = 1000;
 
@@ -51,7 +51,7 @@ public class BotGolemGameTest {
 	}
 
 	/** A golem at the start, facing east, with a board: running {@code program} once pressed on. */
-	private static BotGolem golem(GameTestHelper helper, Program program) {
+	static BotGolem golem(GameTestHelper helper, Program program) {
 		floor(helper);
 		BotGolem golem = ModEntities.BOT_GOLEM.create(helper.getLevel(), EntitySpawnReason.COMMAND);
 		Vec3 at = helper.absoluteVec(Vec3.atBottomCenterOf(START));

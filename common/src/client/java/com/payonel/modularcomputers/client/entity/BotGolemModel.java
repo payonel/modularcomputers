@@ -52,6 +52,12 @@ public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 		return LayerDefinition.create(mesh, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 	}
 
+	/** Moves to its right hand's pivot, as its arm swings (where what it holds is drawn from). */
+	public void translateToRightArm(com.mojang.blaze3d.vertex.PoseStack pose) {
+		root().translateAndRotate(pose);
+		rightArm.translateAndRotate(pose);
+	}
+
 	@Override
 	public void setupAnim(BotGolemRenderer.State state) {
 		super.setupAnim(state);

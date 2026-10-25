@@ -280,10 +280,19 @@ files.
 A robot a block high, an iron golem's look (user design, 2026-10-24): an entity holding a
 `BoardAssembly` (as a case does) in `GolemLayout`'s slots: a battery, 2 RAM, a disk, a gold slot
 taking only a tier 1 screen (its face, drawn by `TerminalFace` as a case's front), 2 cards, and its
-robotics device soldered onto the last lane (`/dev/robotics0`), the only way it moves: it never acts
-on its own (no goals). The device walks it to a point relative to itself (it knows nothing of where
-it is: a GPS card later), at a player's walking pace, by the game's pathfinding, turns it, and stops
-it; each ends in an event. A player's hit picks it up as its item, parts kept; nothing else harms
+robotics device soldered onto the last lane (`/dev/robotics0`), the only way it moves and acts: it
+never acts on its own (no goals). The device walks it to a point relative to itself (it knows nothing
+of where it is: a GPS card later), at a player's walking pace, by the game's pathfinding, turns it,
+and stops it; each ends in an event. It names faces in its own frame only (`front`, `back`, `left`,
+`right`, `up`, `down`; its left its own, as it turns and walks: not `Face`'s, where left is a
+viewer's), since it knows no compass; a block's direction it reads is turned into that frame. It
+scans all six spaces at once, and works with its hand (its main hand, one item: a slot in its view,
+kept on its item when picked up) as a player does, through the loader's fake player standing where
+it is (`Platform.fakePlayer`, `GolemHands`): the game's own interactions (placing, doors, buttons,
+buckets), breaking in a player's time with its tool (on its legs: a player off the ground digs at a
+fifth), a hit with its weapon's damage (its modifiers put on the fake player, which never ticks, and
+its swing's strength from the time since its last), a container's items in and out as a hopper
+moves them. What a broken block drops goes to its storage when it has some. A player's hit picks it up as its item, parts kept; nothing else harms
 it; it's solid, as a boat is (players walk into it, not through it), and on its legs nothing
 shoves it (players, mobs, knockback; in the air it's pushed). Creative
 only until the Advanced Robotics Assembly. Its board's state reaches players by
@@ -609,5 +618,7 @@ Lessons from mistakes, each with its test:
 - Mouse buttons are SDL-numbered (left 1, right 3): use the constants. SDL sends typed characters
   only while text input is on: a screen that takes typing turns it on.
 - `.gitignore` patterns without a leading `/` match at any depth: anchor root-only rules.
+- `GameTestHelper.assertValueEqual` throws on a null value (it calls `value.equals`), crashing the
+  test server instead of failing the test: compare with `Objects.equals` in an `assertTrue`.
 - An empty dedicated server stops ticking after a minute unless `pause-when-empty-seconds=-1`
   (`scripts/devserver.sh` sets it).

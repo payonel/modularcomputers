@@ -20,7 +20,8 @@ import net.minecraft.world.item.ItemStack;
 /**
  * Bot golems as players see them: one with a tier 1 screen in its gold slot, running a program,
  * its face showing the screen's text (green, tier 1's phosphor); one without, its face an empty
- * bezel; and its screen view and its parts view, in the golem's own art.
+ * bezel; the first holding a pickaxe, in its right hand; and its screen view and its parts view,
+ * in the golem's own art, its hand's slot holding the pickaxe.
  */
 public class BotGolemClientGameTest implements FabricClientGameTest {
 	/** Facing south (toward the player, who faces north). */
@@ -45,6 +46,7 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 				golem.board().parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(com.payonel.modularcomputers.block.ModBlocks.TIER1_SCREEN));
 				golem.board().machine().board().eeprom().orElseThrow().flash(TestPrograms.HELLO);
 				golem.board().pressPower();
+				golem.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(net.minecraft.world.item.Items.IRON_PICKAXE));
 				// The other on a charging pad, charging (its particles), its battery run down first.
 				server.overworld().setBlock(without, com.payonel.modularcomputers.block.ModBlocks.CHARGING_PAD.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
 				((com.payonel.modularcomputers.block.ChargingPadBlockEntity) server.overworld().getBlockEntity(without)).cards()
@@ -107,6 +109,9 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			var client = context.computeOnClient(c -> keys((BotGolem) c.level.getEntity(id)));
 			check(client.equals(server) && client.contains("exp:0") && client.contains("exp:3"),
 				"its bus panel lists its screen and its robotics device, as the server's board: client " + client + ", server " + server);
+			String hand = context.computeOnClient(c -> c.player.containerMenu instanceof CaseMenu menu && menu.hasHand()
+				? menu.slots.get(CaseMenu.HAND_SLOT).getItem().toString() : "no hand slot");
+			check(hand.contains("iron_pickaxe"), "its hand's slot holds its pickaxe: " + hand);
 			context.getInput().setCursorPos(0, 0); // (off the board: no part's tooltip in the picture)
 			context.waitTicks(2);
 			context.takeScreenshot("bot-golem-parts");

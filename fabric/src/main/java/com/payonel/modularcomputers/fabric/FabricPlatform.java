@@ -99,6 +99,11 @@ public final class FabricPlatform implements Platform {
 	}
 
 	@Override
+	public net.minecraft.server.level.ServerPlayer fakePlayer(net.minecraft.server.level.ServerLevel level, com.mojang.authlib.GameProfile profile) {
+		return net.fabricmc.fabric.api.entity.FakePlayer.get(level, profile);
+	}
+
+	@Override
 	public void openMenu(Player player, MenuProvider provider, BlockPos pos) {
 		player.openMenu(new ExtendedMenuProvider<BlockPos>() {
 			@Override

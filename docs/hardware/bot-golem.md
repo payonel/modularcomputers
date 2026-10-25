@@ -17,7 +17,7 @@ board is the only way it moves. It never acts on its own: a program drives it.
 | Stack | 1 (it keeps its parts) |
 | Size | A block high, through a one-block gap |
 | Speed | A player's walking pace |
-| Slots | CPU, EEPROM, a battery, 2 RAM, 1 disk, a tier 1 screen (its face), 2 cards |
+| Slots | CPU, EEPROM, a battery, 2 RAM, 1 disk, a tier 1 screen (its face), 2 cards, its hand |
 | Soldered | Its robotics device, on its last expansion lane |
 | Getting one | Creative only, for now |
 
@@ -42,9 +42,15 @@ own to change: none is soldered but the robotics device.
 ![The golem's parts view: the board through its iron chest, its robotics chip soldered at the bottom right](/assets/img/bot-golem-parts.png)
 *Its parts view: the bus order panel lists its robotics device, soldered on EXP 4.*
 
+Right of its board, under its buttons, is its hand: one item it holds (a tool, blocks to place, a
+bucket), shown in its hand in the world. A program uses it as a player would: places blocks, opens
+doors and presses buttons, breaks blocks with a tool in a player's time, hits mobs with a weapon,
+and moves items to and from a chest in front of it. When you pick the golem up, what it holds goes
+with it. On its legs it presses pressure plates, as anything walking does.
+
 It runs on its battery, as a case does: swap the battery, or walk it onto a
 [charging pad](/hardware/charging-pad/). It does nothing until a
-program tells its robotics device to walk or turn. See [Robotics device](/devices/robotics/) for
+program tells its robotics device to act. See [Robotics device](/devices/robotics/) for
 what a program can do with it, and its examples.
 
 ## Notes

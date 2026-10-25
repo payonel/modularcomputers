@@ -1,11 +1,13 @@
 -- The robotics device's driver, for its /dev file (as a sysfs attribute: text, a write taking
--- effect at once). A read gives what it's doing now, a word: idle, walking or turning. A line
--- written is an action:
+-- effect at once). A read gives what it's doing now, a word: idle, walking, turning or breaking.
+-- A line written is an action:
 --   walk forward [right [up]]   (blocks from where it is, in its own frame)
 --   turn left|right|around|degrees
+--   use FACE                    (front, back, left, right, up or down: its own)
+--   swing FACE
 --   stop
 -- How an action went comes as an event (poll's PRI; the pull ioctl: arrived, blocked, turned,
--- stopped).
+-- stopped, broke, failed). Its scan, its hand and containers are ioctls (scan, held, take...).
 local function number(word)
   return word and tonumber(word)
 end
@@ -28,6 +30,8 @@ return {
       return {action = "walk", forward = number(words[2]), right = right or 0, up = up or 0}
     elseif action == "turn" and #words == 2 then
       return {action = "turn", way = number(words[2]) or words[2]}
+    elseif (action == "use" or action == "swing") and #words == 2 then
+      return {action = action, face = words[2]}
     elseif action == "stop" and #words == 1 then
       return {action = "stop"}
     end

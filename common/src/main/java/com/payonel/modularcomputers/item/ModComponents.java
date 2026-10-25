@@ -17,6 +17,10 @@ import net.minecraft.world.item.ItemStack;
 
 /** Item data components. */
 public final class ModComponents {
+	/** What a robot held in its hand, kept on its item while it's one (its main hand's home in the world is the robot). */
+	public static final DataComponentType<ItemStack> HELD = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("held"),
+		DataComponentType.<ItemStack>builder().persistent(ItemStack.CODEC).networkSynchronized(ItemStack.STREAM_CODEC).build());
+
 	/** A battery's charge: ticks of running a CPU, and when it was last worked out. */
 	public static final DataComponentType<BatteryCharge> CHARGE = Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, id("battery_charge"),
 		DataComponentType.<BatteryCharge>builder()

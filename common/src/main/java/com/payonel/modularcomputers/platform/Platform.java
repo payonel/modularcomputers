@@ -75,4 +75,13 @@ public interface Platform {
 	 */
 	void entityAttributes(net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.LivingEntity> type,
 		Supplier<net.minecraft.world.entity.ai.attributes.AttributeSupplier> attributes);
+
+	/** Who a robot's hand acts as (a fake player's profile: a player the game knows nothing of). */
+	com.mojang.authlib.GameProfile ROBOT = new com.mojang.authlib.GameProfile(java.util.UUID.fromString("6d6f6463-6f6d-7072-6f62-6f7400000001"), "[Robot]");
+
+	/**
+	 * The loader's fake player for {@code profile} in {@code level}: a player no one plays, through
+	 * which a robot uses items and blocks as a player would (the game's interactions take a player).
+	 */
+	net.minecraft.server.level.ServerPlayer fakePlayer(net.minecraft.server.level.ServerLevel level, com.mojang.authlib.GameProfile profile);
 }

@@ -45,6 +45,12 @@ public final class CaseMenu extends AbstractContainerMenu {
 	public static final int BOARD_X = 4;
 	public static final int BOARD_Y = 4;
 	public static final int INVENTORY_Y = 150;
+	/** The player's inventory's slots: its main rows and its hotbar. */
+	public static final int INVENTORY_SLOTS = 36;
+	/** A robot's hand slot (its main hand), after the player's inventory: in the column right of the panel, under its buttons. */
+	public static final int HAND_SLOT = PART_SLOTS + INVENTORY_SLOTS;
+	public static final int HAND_X = 182;
+	public static final int HAND_Y = 54;
 
 	/** Slot positions in the panel, in GUI units (the item's top-left), by slot index. */
 	public static final int[][] SLOT_POSITIONS = {
@@ -85,6 +91,12 @@ public final class CaseMenu extends AbstractContainerMenu {
 	/** A computer's parts view of any kind ({@code type}: whose art it's drawn in), on a board with {@code layout}'s slots. */
 	public CaseMenu(net.minecraft.world.inventory.MenuType<CaseMenu> type, int id, Inventory inventory, Container parts, ContainerData power, BlockPos pos,
 		com.payonel.modularcomputers.network.HostRef host, java.util.function.Predicate<Player> valid, BoardLayout tier) {
+		this(type, id, inventory, parts, power, pos, host, valid, tier, null);
+	}
+
+	/** ...and a robot's: its hand ({@code hand}, one slot; null: it has none), after the player's inventory. */
+	public CaseMenu(net.minecraft.world.inventory.MenuType<CaseMenu> type, int id, Inventory inventory, Container parts, ContainerData power, BlockPos pos,
+		com.payonel.modularcomputers.network.HostRef host, java.util.function.Predicate<Player> valid, BoardLayout tier, Container hand) {
 		super(type, id);
 		this.tier = tier;
 		checkContainerSize(parts, PART_SLOTS);
@@ -98,6 +110,14 @@ public final class CaseMenu extends AbstractContainerMenu {
 			addSlot(new PartSlot(parts, slot, SLOT_POSITIONS[slot][0], SLOT_POSITIONS[slot][1], tier));
 		}
 		addStandardInventorySlots(inventory, 8, INVENTORY_Y);
+		if (hand != null) {
+			addSlot(new Slot(hand, 0, HAND_X, HAND_Y));
+		}
+	}
+
+	/** Whether this is a robot's, with a hand slot. */
+	public boolean hasHand() {
+		return slots.size() > HAND_SLOT;
 	}
 
 	public BoardLayout tier() {
@@ -184,9 +204,11 @@ public final class CaseMenu extends AbstractContainerMenu {
 		}
 		ItemStack stack = slot.getItem();
 		ItemStack original = stack.copy();
-		boolean moved = index < PART_SLOTS
-			? moveItemStackTo(stack, PART_SLOTS, slots.size(), true)
-			: moveItemStackTo(stack, 0, PART_SLOTS, false); // part slots only take their own item
+		int inventoryEnd = PART_SLOTS + INVENTORY_SLOTS;
+		boolean moved = index < PART_SLOTS || index >= inventoryEnd
+			? moveItemStackTo(stack, PART_SLOTS, inventoryEnd, true)
+			: moveItemStackTo(stack, 0, PART_SLOTS, false) // part slots only take their own item
+				|| hasHand() && moveItemStackTo(stack, HAND_SLOT, HAND_SLOT + 1, false);
 		if (!moved) {
 			return ItemStack.EMPTY;
 		}

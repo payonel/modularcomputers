@@ -16,9 +16,12 @@ import java.util.Map;
  * the only way it moves (a robot never acts on its own). It walks to a point given relative to
  * itself, in its own frame (forward, right, up: it knows nothing of where it is, as a robot
  * without a GPS), turns in place, and stops; each ends in an event (its interrupt): {@code
- * arrived}, {@code blocked} and why, {@code turned}, {@code stopped}. Its state is what it's doing
- * now. A body ({@link Body}: a golem) does the moving, and tells it how it went. Every block walked
- * costs power.
+ * arrived}, {@code blocked} and why, {@code turned}, {@code stopped}. It senses the six spaces round
+ * it, named in its own frame ({@link #FACES}: it knows no compass), and works with what's in its
+ * hand: uses it on a space (places a block, opens a door, presses a button), breaks a block with it
+ * (in a player's time: {@code broke}, or {@code failed} and why), and moves it in and out of a
+ * container. Its state is what it's doing now. A body ({@link Body}: a golem) does the work, and
+ * tells it how it went. Every block walked, and every action, costs power.
  */
 public final class RoboticsDevice implements Device {
 	/** What walking a block costs: a running CPU's tick. */
@@ -30,6 +33,11 @@ public final class RoboticsDevice implements Device {
 	public static final String IDLE = "idle";
 	public static final String WALKING = "walking";
 	public static final String TURNING = "turning";
+	public static final String BREAKING = "breaking";
+	/** What an action with its hand costs (a use, a swing, a move to or from a container): a running CPU's tick. */
+	public static final int ACTION_COST = PowerUnits.CPU;
+	/** The spaces round it, in its own frame: its left and right its own, as it turns and walks. */
+	public static final java.util.List<String> FACES = java.util.List.of("front", "back", "left", "right", "up", "down");
 
 	/** What does the moving: a robot's body in the world. */
 	public interface Body {
@@ -42,8 +50,43 @@ public final class RoboticsDevice implements Device {
 		/** Starts turning {@code degrees} (to its right; negative: its left); null, or why not. */
 		String turn(double degrees);
 
-		/** Stops at once, where it is. */
+		/** Stops at once, where it is (a block it was breaking left as it is). */
 		void stop();
+
+		/** What's in the space at {@code face} (one of {@link #FACES}), or in all six by face (null). */
+		default Result scan(String face) {
+			return Result.fail("no body");
+		}
+
+		/** What its hand holds (an item's table), or nil. */
+		default Result held() {
+			return Result.fail("no body");
+		}
+
+		/** Uses what it holds on the space at {@code face}, as a player's right click: what it did, or false and why. */
+		default Result use(String face) {
+			return Result.fail("no body");
+		}
+
+		/** Swings what it holds at {@code face}: "attacked" (a mob there), "breaking" (the block there: its event, broke or failed), or false and why. */
+		default Result swing(String face) {
+			return Result.fail("no body");
+		}
+
+		/** What the container at {@code face} holds: its slots with items in, each an item's table and its slot. */
+		default Result contents(String face) {
+			return Result.fail("no body");
+		}
+
+		/** Puts up to {@code count} of what it holds into the container at {@code face}: how many went. */
+		default Result store(String face, int count) {
+			return Result.fail("no body");
+		}
+
+		/** Takes up to {@code count} from the container at {@code face} (its slot {@code slot}, from 1; 0: the first it can) into its hand: how many came. */
+		default Result take(String face, int slot, int count) {
+			return Result.fail("no body");
+		}
 	}
 
 	private final InterruptLine line = new InterruptLine();
@@ -132,14 +175,86 @@ public final class RoboticsDevice implements Device {
 		return Result.ok();
 	}
 
-	@Method(doc = "get(): {state}: what it's doing now (idle, walking or turning)")
+	@Method(doc = "scan([face]): what's in the space at a face (front, back, left, right, up or down: its own), or with none, in all six by face: {kind = \"air\"}, {kind = \"block\", name, state, hardness, solid, container}, {kind = \"fluid\", name, amount, source}, or {kind = \"entity\", name, entities, block}")
+	public Result scan(Arguments args) {
+		String face = args.count() > 0 && args.get(0) != null ? face(args, 0) : null;
+		return body.scan(face);
+	}
+
+	@Method(doc = "held(): what its hand holds, {name, count, damage, maxDamage, label}, or nil")
+	public Result held(Arguments args) {
+		return body.held();
+	}
+
+	@Method(doc = "use(face): uses what it holds on the space at a face, as a player's right click: places a block, opens a door, presses a button, uses a tool or a bucket; what it did (\"placed\", \"used\"), or false and why")
+	public Result use(Arguments args) {
+		String face = face(args, 0);
+		Result result = body.use(face);
+		power.charge(ACTION_COST);
+		return result;
+	}
+
+	@Method(doc = "swing(face): swings what it holds at a face, as a player's left click: a mob there is hit (\"attacked\", as hard as a player's swing: full strength once the weapon has recovered); else the block there starts breaking, in a player's time (a pickaxe for stone, an axe for wood): \"breaking\" (its event: broke, with the block's name, or failed and why); or false and why")
+	public Result swing(Arguments args) {
+		String face = face(args, 0);
+		Result result = body.swing(face);
+		if (!result.failed()) {
+			power.charge(ACTION_COST);
+			if (BREAKING.equals(result.first())) {
+				state(BREAKING);
+			}
+		}
+		return result;
+	}
+
+	@Method(doc = "contents(face): what the container at a face holds: a list of its slots with something in, each {slot, name, count, ...}")
+	public Result contents(Arguments args) {
+		return body.contents(face(args, 0));
+	}
+
+	@Method(doc = "store(face[, count]): puts what it holds (or count of it) into the container at a face: how many went (0: no room), or false and why")
+	public Result store(Arguments args) {
+		String face = face(args, 0);
+		int count = args.count() > 1 ? count(args, 1) : Integer.MAX_VALUE;
+		power.charge(ACTION_COST);
+		return body.store(face, count);
+	}
+
+	@Method(doc = "take(face[, slot[, count]]): takes items from the container at a face into its hand (from a slot, or the first it can; all it can hold, or count): how many came (0: none it could), or false and why")
+	public Result take(Arguments args) {
+		String face = face(args, 0);
+		int slot = args.count() > 1 && args.get(1) != null ? count(args, 1) : 0;
+		int count = args.count() > 2 ? count(args, 2) : Integer.MAX_VALUE;
+		power.charge(ACTION_COST);
+		return body.take(face, slot, count);
+	}
+
+	/** The face named by argument {@code n}: one of {@link #FACES}. */
+	private static String face(Arguments args, int n) {
+		Object name = args.get(n);
+		if (!(name instanceof String face) || !FACES.contains(face)) {
+			throw new Arguments.ArgumentError("a face expected (front, back, left, right, up or down), got " + name);
+		}
+		return face;
+	}
+
+	/** A positive whole number, argument {@code n}. */
+	private static int count(Arguments args, int n) {
+		double value = args.checkNumber(n);
+		if (value < 1 || value != Math.floor(value)) {
+			throw new Arguments.ArgumentError("a count of 1 or more expected, got " + args.get(n));
+		}
+		return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
+	}
+
+	@Method(doc = "get(): {state}: what it's doing now (idle, walking, turning or breaking)")
 	public Result get(Arguments args) {
 		Map<String, Object> now = new LinkedHashMap<>();
 		now.put("state", state);
 		return Result.ok(now);
 	}
 
-	@Method(doc = "set(action): does an action, as a table: {action = \"walk\", forward, right, up}, {action = \"turn\", way}, or {action = \"stop\"}")
+	@Method(doc = "set(action): does an action, as a table: {action = \"walk\", forward, right, up}, {action = \"turn\", way}, {action = \"use\", face}, {action = \"swing\", face}, or {action = \"stop\"}")
 	public Result set(Arguments args) {
 		Object value = args.get(0);
 		if (!(value instanceof Map<?, ?> action)) {
@@ -157,8 +272,12 @@ public final class RoboticsDevice implements Device {
 				rest.add(action.get("way"));
 				yield turn(new Arguments(rest));
 			}
+			case "use", "swing" -> {
+				rest.add(action.get("face"));
+				yield action.get("action").equals("use") ? use(new Arguments(rest)) : swing(new Arguments(rest));
+			}
 			case "stop" -> stop(new Arguments(rest));
-			default -> Result.fail("not an action: " + action.get("action") + " (walk, turn or stop)");
+			default -> Result.fail("not an action: " + action.get("action") + " (walk, turn, use, swing or stop)");
 		};
 	}
 
@@ -166,7 +285,7 @@ public final class RoboticsDevice implements Device {
 		return value == null ? 0L : value;
 	}
 
-	@Method(doc = "pull(): its oldest event, {event} (arrived, turned, stopped) or {event = \"blocked\", why}, or nil")
+	@Method(doc = "pull(): its oldest event, {event} (arrived, turned, stopped), {event = \"broke\", block}, {event = \"blocked\" or \"failed\", why}, or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -189,6 +308,20 @@ public final class RoboticsDevice implements Device {
 	/** The body finished turning. */
 	public void turned() {
 		event("turned", null);
+	}
+
+	/** The body broke the block it was breaking ({@code block}: its name). */
+	public void broke(String block) {
+		Map<String, Object> event = new LinkedHashMap<>();
+		event.put("event", "broke");
+		event.put("block", block);
+		state(IDLE);
+		events.add(event);
+	}
+
+	/** The body couldn't go on breaking ({@code why}: the block changed, the tool went). */
+	public void failed(String why) {
+		event("failed", why);
 	}
 
 	/** What it's doing now. */

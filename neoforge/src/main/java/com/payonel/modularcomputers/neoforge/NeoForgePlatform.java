@@ -84,4 +84,9 @@ public final class NeoForgePlatform implements Platform {
 		java.util.function.Supplier<net.minecraft.world.entity.ai.attributes.AttributeSupplier> attributes) {
 		ATTRIBUTES.put(type, attributes);
 	}
+
+	@Override
+	public net.minecraft.server.level.ServerPlayer fakePlayer(net.minecraft.server.level.ServerLevel level, com.mojang.authlib.GameProfile profile) {
+		return net.neoforged.neoforge.common.util.FakePlayerFactory.get(level, profile);
+	}
 }

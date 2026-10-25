@@ -19,6 +19,7 @@ import com.payonel.modularcomputers.network.ModNetwork;
 import com.payonel.modularcomputers.network.OpenDisplayPayload;
 import com.payonel.modularcomputers.network.ScreenRowsPayload;
 import com.payonel.modularcomputers.platform.Platform;
+import com.payonel.modularcomputers.runtime.Result;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -86,6 +87,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	private final BoardAssembly board;
 	private final RoboticsDevice robotics = new RoboticsDevice();
+	/** Its senses and its hand, in the world. */
+	private final GolemHands hands = new GolemHands(this);
 	/** Where a walk is going (null: none). */
 	private Vec3 target;
 	/** The heading a turn is going to, in degrees (NaN: none). */
@@ -220,6 +223,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			double z = Mth.cos(yaw) * forward - Mth.sin(yaw) * right;
 			turnTo = Float.NaN;
 			getNavigation().stop();
+			hands.stopBreaking();
 			target = position().add(x, up, z);
 			walkedFrom = position();
 			pathed = false; // (its tick finds the way, once it stands: the game plans no path for a mob in the air)
@@ -229,6 +233,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		@Override
 		public String turn(double degrees) {
 			getNavigation().stop();
+			hands.stopBreaking();
 			target = null;
 			turnTo = Mth.wrapDegrees(getYRot() + (float) degrees);
 			return null;
@@ -237,9 +242,71 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		@Override
 		public void stop() {
 			getNavigation().stop();
+			hands.stopBreaking();
 			target = null;
 			turnTo = Float.NaN;
 		}
+
+		@Override
+		public Result scan(String face) {
+			return hands.scan(face);
+		}
+
+		@Override
+		public Result held() {
+			return hands.held();
+		}
+
+		@Override
+		public Result use(String face) {
+			return hands.use(face);
+		}
+
+		@Override
+		public Result swing(String face) {
+			getNavigation().stop();
+			target = null;
+			turnTo = Float.NaN;
+			return hands.swing(face);
+		}
+
+		@Override
+		public Result contents(String face) {
+			return hands.contents(face);
+		}
+
+		@Override
+		public Result store(String face, int count) {
+			return hands.store(face, count);
+		}
+
+		@Override
+		public Result take(String face, int slot, int count) {
+			return hands.take(face, slot, count);
+		}
+	}
+
+	/** Puts what it was given (by its hand: a filled bucket) where it goes: its hand if it's the same, its storage, else the world at its feet. */
+	void keep(ItemStack stack) {
+		ItemStack hand = getMainHandItem();
+		if (hand.isEmpty()) {
+			setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, stack);
+			return;
+		}
+		if (ItemStack.isSameItemSameComponents(hand, stack)) {
+			int moving = Math.min(stack.getCount(), hand.getMaxStackSize() - hand.getCount());
+			hand.grow(moving);
+			stack.shrink(moving);
+		}
+		ItemStack left = store(stack);
+		if (!left.isEmpty() && level() instanceof ServerLevel server) {
+			spawnAtLocation(server, left);
+		}
+	}
+
+	/** Puts items into its storage (a crafting card's): what didn't fit. */
+	ItemStack store(ItemStack stack) {
+		return stack;
 	}
 
 	/** It does nothing on its own: no goals. */
@@ -297,6 +364,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				board.placed();
 			}
 			move();
+			hands.tick();
 			board.tick();
 		}
 	}
@@ -397,7 +465,59 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	@Override
 	public AbstractContainerMenu createMenu(int id, Inventory inventory, Player player) {
 		return new CaseMenu(ModMenus.GOLEM, id, inventory, board.parts(), board.powerData(), blockPosition(), HostRef.of(this),
-			board.parts()::stillValid, GolemLayout.BOT_GOLEM);
+			board.parts()::stillValid, GolemLayout.BOT_GOLEM, new HandSlot());
+	}
+
+	/** Its hand as a container of one slot, for its parts view: its main hand, read and written there. */
+	private final class HandSlot implements net.minecraft.world.Container {
+		@Override
+		public int getContainerSize() {
+			return 1;
+		}
+
+		@Override
+		public boolean isEmpty() {
+			return getMainHandItem().isEmpty();
+		}
+
+		@Override
+		public ItemStack getItem(int slot) {
+			return getMainHandItem();
+		}
+
+		@Override
+		public ItemStack removeItem(int slot, int count) {
+			ItemStack taken = getMainHandItem().split(count);
+			setChanged();
+			return taken;
+		}
+
+		@Override
+		public ItemStack removeItemNoUpdate(int slot) {
+			ItemStack taken = getMainHandItem();
+			setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+			return taken;
+		}
+
+		@Override
+		public void setItem(int slot, ItemStack stack) {
+			setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, stack);
+		}
+
+		@Override
+		public void setChanged() {
+			setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, getMainHandItem()); // (an emptied stack goes)
+		}
+
+		@Override
+		public boolean stillValid(Player player) {
+			return board.parts().stillValid(player);
+		}
+
+		@Override
+		public void clearContent() {
+			setItem(0, ItemStack.EMPTY);
+		}
 	}
 
 	@Override
@@ -443,6 +563,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			item.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(parts));
 		}
 		item.set(ModComponents.SERIAL, board.boardId());
+		if (!getMainHandItem().isEmpty()) {
+			item.set(ModComponents.HELD, getMainHandItem().copy());
+		}
 		if (hasCustomName()) {
 			item.set(DataComponents.CUSTOM_NAME, getCustomName());
 		}
@@ -458,6 +581,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		NonNullList<ItemStack> parts = NonNullList.withSize(CaseMenu.PART_SLOTS, ItemStack.EMPTY);
 		item.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).copyInto(parts);
 		board.restoreParts(parts);
+		setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, item.getOrDefault(ModComponents.HELD, ItemStack.EMPTY).copy());
 		if (item.has(DataComponents.CUSTOM_NAME)) {
 			setCustomName(item.get(DataComponents.CUSTOM_NAME));
 		}

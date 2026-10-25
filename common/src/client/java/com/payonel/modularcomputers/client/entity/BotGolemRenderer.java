@@ -9,13 +9,13 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
-import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.resources.Identifier;
 
 /**
  * Draws a bot golem: its model, and on its head's front its screen's glass (the tier 1 screen in
- * its gold slot), as a case's front shows its terminal; with no screen in, an empty bezel.
+ * its gold slot), as a case's front shows its terminal; with no screen in, an empty bezel; and what
+ * it holds, in its right hand.
  */
 public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRenderer.State, BotGolemModel> {
 	private static final Identifier TEXTURE = ModularComputers.id("textures/entity/bot_golem.png");
@@ -39,10 +39,37 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 	public BotGolemRenderer(EntityRendererProvider.Context context) {
 		super(context, new BotGolemModel(BotGolemModel.createBodyLayer().bakeRoot()), SHADOW);
 		font = context.getFont();
+		addLayer(new HeldItem(this));
+	}
+
+	/** What it holds, at the end of its right arm, held as a player holds it (the game's third person pose). */
+	private static final class HeldItem extends net.minecraft.client.renderer.entity.layers.RenderLayer<State, BotGolemModel> {
+		/** Where its hand is down its arm, and the game's offsets for a held item from there (ItemInHandLayer's), in pixels. */
+		private static final float HAND_DOWN = 7;
+		private static final float OFFSET_X = 1;
+		private static final float OFFSET_Y = 2;
+
+		HeldItem(net.minecraft.client.renderer.entity.RenderLayerParent<State, BotGolemModel> parent) {
+			super(parent);
+		}
+
+		@Override
+		public void submit(PoseStack pose, SubmitNodeCollector collector, int light, State state, float yRot, float xRot) {
+			if (state.rightHandItemState.isEmpty()) {
+				return;
+			}
+			pose.pushPose();
+			getParentModel().translateToRightArm(pose);
+			pose.rotateDegrees(Axis.XP, -90);
+			pose.rotateDegrees(Axis.YP, 180);
+			pose.translate(OFFSET_X * PIXEL, OFFSET_Y * PIXEL, -HAND_DOWN * PIXEL);
+			state.rightHandItemState.submit(pose, collector, light, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, state.outlineColor);
+			pose.popPose();
+		}
 	}
 
 	/** What a frame draws of it. */
-	public static final class State extends LivingEntityRenderState {
+	public static final class State extends net.minecraft.client.renderer.entity.state.ArmedEntityRenderState {
 		/** A screen is in its gold slot. */
 		boolean screen;
 		final TerminalFace.State face = new TerminalFace.State();
@@ -56,6 +83,7 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 	@Override
 	public void extractRenderState(BotGolem golem, State state, float partialTick) {
 		super.extractRenderState(golem, state, partialTick);
+		net.minecraft.client.renderer.entity.state.ArmedEntityRenderState.extractArmedEntityRenderState(golem, state, itemModelResolver, partialTick);
 		state.screen = golem.showsScreen();
 		TerminalFace.extract(golem.terminal(), state.screen, state.face);
 	}
