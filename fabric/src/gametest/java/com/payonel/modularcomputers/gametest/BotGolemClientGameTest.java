@@ -45,7 +45,15 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 				golem.board().parts().setItem(CaseMenu.EXP_SLOTS, new ItemStack(com.payonel.modularcomputers.block.ModBlocks.TIER1_SCREEN));
 				golem.board().machine().board().eeprom().orElseThrow().flash(TestPrograms.HELLO);
 				golem.board().pressPower();
-				golem(server.overworld(), without);
+				// The other on a charging pad, charging (its particles), its battery run down first.
+				server.overworld().setBlock(without, com.payonel.modularcomputers.block.ModBlocks.CHARGING_PAD.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+				((com.payonel.modularcomputers.block.ChargingPadBlockEntity) server.overworld().getBlockEntity(without)).cards()
+					.setItem(com.payonel.modularcomputers.block.ChargingPadBlockEntity.BATTERY, ModItems.TIER1_BATTERY.charged());
+				BotGolem charging = golem(server.overworld(), without);
+				charging.snapTo(charging.getX(), charging.getY() + com.payonel.modularcomputers.block.ChargingPadBlock.HEIGHT / 16.0, charging.getZ(), SOUTH, 0);
+				ItemStack flat = new ItemStack(ModItems.TIER1_BATTERY);
+				flat.set(com.payonel.modularcomputers.item.ModComponents.CHARGE, com.payonel.modularcomputers.power.BatteryCharge.EMPTY);
+				charging.board().parts().setItem(CaseMenu.UPS_SLOT, flat);
 				return golem.getId();
 			});
 			teleport(singleplayer, feet, 180);
@@ -67,6 +75,20 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			int lit = count(shot, 0, 0, shot.getWidth(), shot.getHeight(),
 				rgb -> AllInOneClientGameTest.green(rgb) > LIT && AllInOneClientGameTest.red(rgb) < AllInOneClientGameTest.green(rgb) / 2);
 			check(lit > LIT_PIXELS, "its face shows its screen's text, found " + lit + " lit pixels");
+			// The other, charging on its pad: its green particles round it.
+			String padState = singleplayer.getServer().computeOnServer(server -> {
+				var pad = (com.payonel.modularcomputers.block.ChargingPadBlockEntity) server.overworld().getBlockEntity(without);
+				var golems = server.overworld().getEntitiesOfClass(BotGolem.class, new net.minecraft.world.phys.AABB(without).inflate(2));
+				return pad.charging() + " buffer " + pad.buffer().level() + " battery " + pad.cards().getItem(0) + " golems " + golems.stream().map(g -> g.position() + " " + g.blockPosition()).toList()
+					+ " pad at " + without;
+			});
+			check(padState.startsWith("true"), "the pad charging the golem on it: " + padState);
+			context.runOnClient(client -> client.options.particles().set(net.minecraft.server.level.ParticleStatus.ALL)); // (the test's settings may cut them)
+			context.getInput().lookAt(without);
+			context.waitTicks(10);
+			context.takeScreenshot("bot-golem-charging");
+			context.getInput().lookAt(withScreen);
+			context.waitTicks(2);
 			// Its screen view: right-click it.
 			context.getInput().pressKey(options -> options.keyUse);
 			context.waitForScreen(com.payonel.modularcomputers.client.screen.DisplayScreen.class);

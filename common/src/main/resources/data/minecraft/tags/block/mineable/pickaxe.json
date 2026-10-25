@@ -11,6 +11,7 @@
 		"modularcomputers:robotic_piston",
 		"modularcomputers:photomask",
 		"modularcomputers:disk_station",
+		"modularcomputers:charging_pad",
 		"modularcomputers:broken_case"
 	]
 }

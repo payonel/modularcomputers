@@ -122,18 +122,20 @@ def golem(screen):
 	return im
 
 def icon():
-	"""Its item: a little golem, from the front, its face lit."""
+	"""Its item: a little golem, from the front, as blocky as its model (its head near its body's
+	size), its face lit."""
 	rnd = random.Random(41)
 	im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
-	iron(im, (4, 1, 12, 7), rnd)       # head
-	fill(im, 5, 2, 11, 6, BEZEL)
-	fill(im, 6, 3, 10, 5, (60, 220, 90))  # its glass, lit: a tier 1 screen's green
-	iron(im, (3, 7, 13, 12), rnd)      # body
-	iron(im, (1, 7, 3, 13), rnd)       # arms
+	iron(im, (4, 0, 12, 7), rnd)        # head: 8 by 7, as the model's 7 by 6 to its body's 8 by 6
+	fill(im, 5, 1, 11, 6, BEZEL)
+	fill(im, 6, 2, 10, 5, (60, 220, 90))  # its glass, lit: a tier 1 screen's green
+	fill(im, 4, 6, 12, 7, IRON_SHADE)   # its chin
+	iron(im, (3, 7, 13, 12), rnd)       # body
+	iron(im, (1, 7, 3, 13), rnd)        # arms, long, to its knees
 	iron(im, (13, 7, 15, 13), rnd)
-	iron(im, (4, 12, 7, 15), rnd)      # legs
-	iron(im, (9, 12, 12, 15), rnd)
 	fill(im, 1, 12, 3, 13, IRON_SHADE); fill(im, 13, 12, 15, 13, IRON_SHADE)
+	iron(im, (4, 12, 7, 16), rnd)       # legs
+	iron(im, (9, 12, 12, 16), rnd)
 	put(im, 4, 8, VINE); put(im, 4, 9, VINE_DARK); put(im, 5, 10, LEAF); put(im, 3, 9, VINE)
 	return im
 

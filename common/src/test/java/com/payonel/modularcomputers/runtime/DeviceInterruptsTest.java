@@ -49,20 +49,20 @@ class DeviceInterruptsTest {
 	private static final Object WORLD = new Object();
 
 	/** Gives a device of each type something for its program, as the world would. */
-	private static final Map<Class<?>, Consumer<Device>> STIMULI = Map.of(
-		RedstoneCard.class, device -> ((RedstoneCard) device).sense(0, 7),
-		WeatherCard.class, device -> {
+	private static final Map<Class<?>, Consumer<Device>> STIMULI = Map.ofEntries(
+		Map.entry(RedstoneCard.class, device -> ((RedstoneCard) device).sense(0, 7)),
+		Map.entry(WeatherCard.class, device -> {
 			((WeatherCard) device).sense("clear");
 			((WeatherCard) device).sense("rain"); // (a change is an event, not the first look)
-		},
-		MotionSensorCard.class, device -> ((MotionSensorCard) device).sense(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", 0.0)),
-		com.payonel.modularcomputers.device.SoundCard.class, device -> {
+		}),
+		Map.entry(MotionSensorCard.class, device -> ((MotionSensorCard) device).sense(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", 0.0))),
+		Map.entry(com.payonel.modularcomputers.device.SoundCard.class, device -> {
 			var card = (com.payonel.modularcomputers.device.SoundCard) device;
 			card.write(new com.payonel.modularcomputers.runtime.Arguments(List.of("x".repeat(20_000)))); // more than fits: refused
 			card.play(0);
 			card.play(20); // a second played: room for the writer
-		},
-		com.payonel.modularcomputers.device.InternetCard.class, device -> {
+		}),
+		Map.entry(com.payonel.modularcomputers.device.InternetCard.class, device -> {
 			var card = (com.payonel.modularcomputers.device.InternetCard) device;
 			card.request(new com.payonel.modularcomputers.runtime.Arguments(List.of("http://127.0.0.1/"))); // (refused, on its thread: an event)
 			long until = System.nanoTime() + 5_000_000_000L;
@@ -70,20 +70,21 @@ class DeviceInterruptsTest {
 				Thread.onSpinWait();
 			}
 			card.tick(); // (its block's tick: its interrupt)
-		},
-		com.payonel.modularcomputers.device.AudioSensorCard.class, device -> ((com.payonel.modularcomputers.device.AudioSensorCard) device)
-			.hear(Map.of("sound", "minecraft:entity.pig.ambient", "x", 1.0, "y", 0.0, "z", 0.0)),
-		NetworkCard.class, device -> {
+		}),
+		Map.entry(com.payonel.modularcomputers.device.AudioSensorCard.class, device -> ((com.payonel.modularcomputers.device.AudioSensorCard) device)
+			.hear(Map.of("sound", "minecraft:entity.pig.ambient", "x", 1.0, "y", 0.0, "z", 0.0))),
+		Map.entry(NetworkCard.class, device -> {
 			NetworkCard card = (NetworkCard) device;
 			card.place(WORLD, net.minecraft.core.BlockPos.ZERO, 0);
 			NetworkCard peer = new NetworkCard(card.kind());
 			peer.idFrom(java.util.UUID::randomUUID);
 			peer.place(WORLD, net.minecraft.core.BlockPos.ZERO, 0);
 			peer.send(new com.payonel.modularcomputers.runtime.Arguments(List.of(card.address(), "frame")));
-		},
-		Terminal.class, device -> ((Terminal) device).press("a"),
-		com.payonel.modularcomputers.device.RoboticsDevice.class, device -> ((com.payonel.modularcomputers.device.RoboticsDevice) device).arrived(),
-		Disk.class, device -> ((Disk) device).mkdir(new com.payonel.modularcomputers.runtime.Arguments(List.of("/made"))));
+		}),
+		Map.entry(Terminal.class, device -> ((Terminal) device).press("a")),
+		Map.entry(com.payonel.modularcomputers.device.RoboticsDevice.class, device -> ((com.payonel.modularcomputers.device.RoboticsDevice) device).arrived()),
+		Map.entry(com.payonel.modularcomputers.device.ChargingPad.class, device -> ((com.payonel.modularcomputers.device.ChargingPad) device).docked("a robot")),
+		Map.entry(Disk.class, device -> ((Disk) device).mkdir(new com.payonel.modularcomputers.runtime.Arguments(List.of("/made")))));
 
 	private static final String BY_ID = "by its id";
 	private static final String BY_SLOT = "by its slot";
@@ -101,6 +102,12 @@ class DeviceInterruptsTest {
 		devices.add(Map.entry(Motherboard.exp(0), () -> new Terminal(Resolution.DEFAULT)));
 		devices.add(Map.entry(Motherboard.sata(0), () -> new Disk(DiskTier.TIER_1, folder())));
 		devices.add(Map.entry(Motherboard.exp(3), com.payonel.modularcomputers.device.RoboticsDevice::new)); // (a golem's, soldered)
+		devices.add(Map.entry(Motherboard.exp(0), () -> new com.payonel.modularcomputers.device.ChargingPad(new com.payonel.modularcomputers.device.ChargingPad.Pad() {
+			public String robot() { return null; }
+			public boolean charging() { return false; }
+			public int buffer() { return 0; }
+			public int capacity() { return 0; }
+		}))); // (a block's: cabled, in a test at a slot)
 		return devices;
 	}
 

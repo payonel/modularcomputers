@@ -39,6 +39,7 @@ Every device also has a **type**, which the bus reports as a lower case word:
 | `weather` | [Weather sensor](/devices/weather-sensor/) |
 | `actuator` | [Robotic piston](/devices/robotic-piston/) |
 | `robotics` | [Robotics device](/devices/robotics/) |
+| `charger` | [Charging pad](/devices/charger/) |
 
 Besides its type, a device says a little about itself (`board.info`, below): its label, and what its
 kind adds, such as a disk's tier and capacity. Each page lists these.
@@ -144,3 +145,4 @@ printable characters. A device with no item to keep it on cannot have one.
 | [Weather sensor](/devices/weather-sensor/) | Reports the weather and its changes |
 | [Robotic piston](/devices/robotic-piston/) | Pushes and retracts on any side |
 | [Robotics device](/devices/robotics/) | A bot golem's motors: walks it, turns it |
+| [Charging pad](/devices/charger/) | Charges a robot standing on it |

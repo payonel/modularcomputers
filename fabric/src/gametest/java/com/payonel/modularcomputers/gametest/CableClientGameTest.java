@@ -180,6 +180,36 @@ public class CableClientGameTest implements FabricClientGameTest {
 					(int) ((area.y() + area.height() / 16.0) * scale), AllInOneClientGameTest::isWhite);
 			});
 			check(viewText > 50, "the screen view shows hello world, found " + viewText);
+			// At tier 3's own size (160x50, as it powers on), its view's text: Unifont, crisp, where the
+			// cells are drawn big (the user's report: the default font, magnified, was blocky).
+			String page = "\u001B[8;50;160t\u001B[2J\u001B[H" + ("The quick brown fox jumps over the lazy dog. 0123456789 ~!@#$%^&*()_+ "
+				+ "Modular Computers, tier 3: 160 by 50.   ").repeat(2).substring(0, 158).concat("\r\n").repeat(12);
+			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
+				.virtualBus().console().write(page));
+			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof com.payonel.modularcomputers.block.ScreenBlockEntity shown
+				&& shown.terminal().buffer().resolution().columns() == 160 && shown.terminal().buffer().row(0).startsWith("The quick"));
+			context.waitTicks(2);
+			context.takeScreenshot("screen-view-160x50");
+			// And on a 1080p window, as players' are: the cells drawn big enough for Unifont, whole pixels a texel.
+			context.runOnClient(client -> client.getWindow().setWindowed(1920, 1080));
+			context.waitTicks(5);
+			context.takeScreenshot("screen-view-160x50-1080p");
+			context.runOnClient(client -> {
+				DisplayScreen shown = (DisplayScreen) client.gui.screen();
+				var area = shown.viewport();
+				double scale = client.getWindow().getGuiScale();
+				var text = com.payonel.modularcomputers.client.render.TerminalFonts.forView(com.payonel.modularcomputers.device.TerminalTier.TIER_3,
+					area.width(), area.height(), new com.payonel.modularcomputers.display.Resolution(160, 50), client.font, scale);
+				double pixels = text.grid().fontScale() * 0.5 * scale; // (Unifont's texel: half a font unit)
+				check(!text.style().equals(net.minecraft.network.chat.Style.EMPTY), "160x50 on a 1080p window: Unifont, its detail on screen");
+				check(Math.abs(pixels - Math.rint(pixels)) < 1e-6 && pixels >= 1, "whole pixels a texel (crisp), was " + pixels);
+			});
+			context.runOnClient(client -> client.getWindow().setWindowed(854, 480));
+			context.waitTicks(5);
+			singleplayer.getServer().runOnServer(server -> ((AllInOneBlockEntity) server.overworld().getBlockEntity(computer)).machine().board()
+				.virtualBus().console().write("\u001B[8;16;50t\u001B[2J\u001B[Hhello world\r\n")); // (back as the test had it)
+			context.waitFor(client -> client.level.getBlockEntity(screen) instanceof com.payonel.modularcomputers.block.ScreenBlockEntity shown
+				&& shown.terminal().buffer().resolution().columns() == 50);
 			pressPower(singleplayer, computer);
 			context.waitFor(client -> !machinePowered(client, computer) && !showsHello(client, screen));
 			pressPower(singleplayer, computer);

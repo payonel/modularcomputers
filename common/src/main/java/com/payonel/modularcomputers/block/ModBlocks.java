@@ -85,6 +85,14 @@ public final class ModBlocks {
 		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("disk_station"),
 		new BlockEntityType<>(DiskStationBlockEntity::new, Set.of(DISK_STATION)));
 
+	/** A charging pad: charges a robot standing on it. */
+	public static final Block CHARGING_PAD = registerWithItem("charging_pad", ChargingPadBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.5f).sound(SoundType.METAL).noOcclusion());
+
+	public static final BlockEntityType<ChargingPadBlockEntity> CHARGING_PAD_ENTITY = Registry.register(
+		BuiltInRegistries.BLOCK_ENTITY_TYPE, id("charging_pad"),
+		new BlockEntityType<>(ChargingPadBlockEntity::new, Set.of(CHARGING_PAD)));
+
 	/** A broken computer from the ancient sites: decoration, nothing works; broken, it's gone (no drops). */
 	public static final Block BROKEN_CASE = registerWithItem("broken_case", BrokenCaseBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(1.5f).sound(SoundType.METAL).noOcclusion().noLootTable());

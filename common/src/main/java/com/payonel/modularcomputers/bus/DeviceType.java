@@ -35,4 +35,6 @@ public enum DeviceType {
 	DISK_STATION,
 	/** A robot's robotics device: its body's motors (a golem's legs), soldered onto its board. */
 	ROBOTICS,
+	/** A charging pad: charges a robot standing on it. */
+	CHARGER,
 }

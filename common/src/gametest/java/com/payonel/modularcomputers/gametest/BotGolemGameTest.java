@@ -171,6 +171,24 @@ public class BotGolemGameTest {
 		});
 	}
 
+	@GameTest(maxTicks = 60)
+	public void onItsLegsNothingShovesIt(GameTestHelper helper) {
+		BotGolem golem = golem(helper, board -> board.halt());
+		// A pig walking into it, a push, a knockback: once it stands, none moves it.
+		var pig = helper.spawn(net.minecraft.world.entity.EntityTypes.PIG, START);
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(golem.onGround(), "standing"))
+			.thenExecute(() -> {
+				golem.push(1, 0, 1);
+				golem.knockback(2, 1, 0, helper.getLevel().damageSources().generic(), 1, true);
+				golem.push(pig);
+				helper.assertTrue(!golem.isPushable(), "not pushable on its legs");
+			})
+			.thenIdle(20)
+			.thenExecute(() -> helper.assertValueEqual(at(helper, golem), START, "where it stood"))
+			.thenSucceed();
+	}
+
 	@GameTest
 	public void aPlayersHitPicksItUpWithItsParts(GameTestHelper helper) {
 		BotGolem golem = golem(helper, board -> board.halt());

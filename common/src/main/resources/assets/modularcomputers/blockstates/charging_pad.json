@@ -1,0 +1,19 @@
+{
+	"variants": {
+		"facing=north": {
+			"model": "modularcomputers:block/charging_pad"
+		},
+		"facing=east": {
+			"model": "modularcomputers:block/charging_pad",
+			"y": 90
+		},
+		"facing=south": {
+			"model": "modularcomputers:block/charging_pad",
+			"y": 180
+		},
+		"facing=west": {
+			"model": "modularcomputers:block/charging_pad",
+			"y": 270
+		}
+	}
+}

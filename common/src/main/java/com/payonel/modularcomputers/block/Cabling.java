@@ -56,6 +56,9 @@ public final class Cabling {
 		if (block instanceof RoboticPistonBlock) {
 			return side == state.getValue(DirectionalBlock.FACING);
 		}
+		if (block instanceof ChargingPadBlock) {
+			return side != state.getValue(HorizontalDirectionalBlock.FACING); // not its front (its battery hatch)
+		}
 		if (block instanceof DiskStationBlock) {
 			return side != state.getValue(HorizontalDirectionalBlock.FACING); // not its front
 		}
@@ -82,7 +85,8 @@ public final class Cabling {
 					return CableWalk.Kind.RELAY;
 				}
 				return block instanceof AllInOneBlock || block instanceof RoboticPistonBlock
-					|| block instanceof PhotomaskBlock || block instanceof DiskStationBlock ? CableWalk.Kind.DEVICE : CableWalk.Kind.NONE;
+					|| block instanceof PhotomaskBlock || block instanceof DiskStationBlock || block instanceof ChargingPadBlock
+					? CableWalk.Kind.DEVICE : CableWalk.Kind.NONE;
 			}
 
 			@Override

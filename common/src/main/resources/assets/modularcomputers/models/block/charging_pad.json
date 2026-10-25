@@ -1,0 +1,85 @@
+{
+	"parent": "minecraft:block/block",
+	"textures": {
+		"particle": "modularcomputers:block/charging_pad_side",
+		"top": "modularcomputers:block/charging_pad_top",
+		"side": "modularcomputers:block/charging_pad_side",
+		"front": "modularcomputers:block/charging_pad_front",
+		"bottom": "modularcomputers:block/charging_pad_bottom"
+	},
+	"elements": [
+		{
+			"from": [
+				0,
+				0,
+				0
+			],
+			"to": [
+				16,
+				3,
+				16
+			],
+			"faces": {
+				"up": {
+					"uv": [
+						0,
+						0,
+						16,
+						16
+					],
+					"texture": "#top"
+				},
+				"down": {
+					"uv": [
+						0,
+						0,
+						16,
+						16
+					],
+					"texture": "#bottom",
+					"cullface": "down"
+				},
+				"north": {
+					"uv": [
+						0,
+						13,
+						16,
+						16
+					],
+					"texture": "#front",
+					"cullface": "north"
+				},
+				"south": {
+					"uv": [
+						0,
+						13,
+						16,
+						16
+					],
+					"texture": "#side",
+					"cullface": "south"
+				},
+				"east": {
+					"uv": [
+						0,
+						13,
+						16,
+						16
+					],
+					"texture": "#side",
+					"cullface": "east"
+				},
+				"west": {
+					"uv": [
+						0,
+						13,
+						16,
+						16
+					],
+					"texture": "#side",
+					"cullface": "west"
+				}
+			}
+		}
+	]
+}

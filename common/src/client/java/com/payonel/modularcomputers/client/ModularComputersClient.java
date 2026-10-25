@@ -80,6 +80,7 @@ public final class ModularComputersClient {
 	public static void screens(Screens screens) {
 		screens.register(ModMenus.CASE, CaseScreen::new);
 		screens.register(ModMenus.GOLEM, CaseScreen::new); // (its art by its board: a golem's)
+		screens.register(ModMenus.CHARGING_PAD, com.payonel.modularcomputers.client.screen.ChargingPadScreen::new);
 		screens.register(ModMenus.EXPANSION_HUB, CardHolderScreen::new);
 		screens.register(ModMenus.ROBOTIC_PISTON, CardHolderScreen::new);
 		screens.register(ModMenus.SCREEN, CardHolderScreen::new);
@@ -92,8 +93,17 @@ public final class ModularComputersClient {
 		return data instanceof HintTooltip hint ? new HintComponent(hint.stack()) : null;
 	}
 
-	/** Left a world or server. */
+	/**
+	 * Left a world or server: what was this visit's goes, on the client's thread (a loader may tell
+	 * of the disconnect on the network's: Fabric's does, and textures and sounds are the render
+	 * thread's).
+	 */
 	public static void disconnected() {
+		var client = net.minecraft.client.Minecraft.getInstance();
+		if (!client.isSameThread()) {
+			client.execute(ModularComputersClient::disconnected);
+			return;
+		}
 		Identify.clear(); // the bulb's outlines belong to this visit to a world
 		ClientRecipes.clear();
 		com.payonel.modularcomputers.client.sound.SoundCardSpeakers.clear(); // (its sounds were this world's)

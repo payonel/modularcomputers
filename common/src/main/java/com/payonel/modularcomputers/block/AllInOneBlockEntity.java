@@ -378,6 +378,8 @@ public final class AllInOneBlockEntity extends BlockEntity implements MenuProvid
 							station.cards().getItem(slot).getItem(), -1, host), station.disk(slot));
 					}
 				}
+			} else if (block instanceof ChargingPadBlockEntity pad) {
+				addCabled(found, devices, new BoardAssembly.Cabled(Motherboard.id(pad.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.CHARGING_PAD.asItem(), -1), pad.device());
 			} else if (block instanceof PhotomaskBlockEntity mask) {
 				addCabled(found, devices, new BoardAssembly.Cabled(Motherboard.id(mask.id()), at.pos(), at.meters(), at.wireless(), paired, ModBlocks.PHOTOMASK.asItem(), -1), mask.device());
 			}

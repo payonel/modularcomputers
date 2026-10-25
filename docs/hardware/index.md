@@ -40,6 +40,7 @@ or by Bluetooth.
 - [Photomask](/hardware/photomask/): prints chips from silicon.
 - [Robotic Piston](/hardware/robotic-piston/): a piston a computer can push with.
 - [Bot Golem](/hardware/bot-golem/): a robot a block high, a computer that walks.
+- [Charging Pad](/hardware/charging-pad/): charges a robot standing on it.
 
 ## Cards
 

@@ -34,6 +34,9 @@ public final class ModMenus {
 			new net.minecraft.world.SimpleContainer(CaseMenu.PART_SLOTS), new net.minecraft.world.inventory.SimpleContainerData(CaseMenu.POWER_DATA),
 			BlockPos.ZERO, host, player -> true, com.payonel.modularcomputers.machine.GolemLayout.BOT_GOLEM)));
 
+	public static final MenuType<ChargingPadMenu> CHARGING_PAD = Registry.register(BuiltInRegistries.MENU, id("charging_pad"),
+		Platform.INSTANCE.menuType(ChargingPadMenu::new));
+
 	public static final MenuType<DiskStationMenu> DISK_STATION = Registry.register(BuiltInRegistries.MENU, id("disk_station"),
 		Platform.INSTANCE.menuType(DiskStationMenu::new));
 

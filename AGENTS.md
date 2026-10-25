@@ -278,8 +278,17 @@ robotics device soldered onto the last lane (`/dev/robotics0`), the only way it 
 on its own (no goals). The device walks it to a point relative to itself (it knows nothing of where
 it is: a GPS card later), at a player's walking pace, by the game's pathfinding, turns it, and stops
 it; each ends in an event. A player's hit picks it up as its item, parts kept; nothing else harms
-it. Creative only until the Advanced Robotics Assembly. Its board's state reaches players by
+it, and on its legs nothing shoves it (players, mobs, knockback; in the air it's pushed). Creative
+only until the Advanced Robotics Assembly. Its board's state reaches players by
 `BoardStatePayload` (an entity has no block update), its screen's rows as a block's do.
+
+### The charging pad
+
+A plate a robot stands on to charge (user design, 2026-10-24): green particles round it while it
+does. Its power is a device's, as the Disk Station's: the bus's while a running computer has it,
+else its own buffer, which its battery fills. It charges the robot's battery (its board's buffer
+without one), ten running CPUs' worth a tick. Its device (`charger0`) says what it's doing and
+reports a robot docking and leaving.
 
 ### The operator card
 
@@ -343,8 +352,10 @@ the farther it reaches (OC's wirelessCostPerRange); any tier hears any other.
   show (UEFI's ConSplitter's common mode). Tests that look at pixels size the console 50×16 first
   (`TestPrograms.READABLE`): sub-pixel text is flaky to count.
 - **Each tier's font** (`TerminalFonts`): tiers 1 and 2, whose cells are big, draw in Unifont
-  (Minecraft's `uniform`, finer magnified); tier 3, small cells, in the default font. The grid is
-  sized from the tier's own font (`TextGrid`).
+  (Minecraft's `uniform`, finer magnified); tier 3 on a block's face, small cells, in the default
+  font. In a screen's view text is crisp: drawn at a whole number of screen pixels a texel (a
+  bitmap font magnified by a fraction is uneven blocks), in Unifont whenever its texels can be a
+  pixel or more, tier 3's too (`TerminalFonts.forView`). The grid is sized from the font (`TextGrid`).
 - **Each tier's glass and white** (`ColorDepth.glass`, `white`): a real screen is never pure black
   or white; the defaults (pure black and white, as a theme recolors them) show as the tier's (tier
   2 a CRT's cool near black and white, tier 3 a charcoal and a paper white), every other color as
@@ -553,6 +564,13 @@ Lessons from mistakes, each with its test:
 - **Never drain and refill a bounded queue another thread fills:** keep what's left of an item
   beside the queue. (`readsSmallerThanAPiece...`)
 - **Edit by matching text, never by line numbers:** an earlier edit moves the lines.
+- **A bitmap font magnified by a fraction is blocky:** snap its scale to whole pixels a texel, and
+  test at a player's window (1080p), not only the test window's 854x480. (`CableClientGameTest`)
+- **A buffer fills on demand, not only on its cadence:** a pad whose battery filled its buffer once
+  a second charged nothing for up to a second. (`aBatteryPutInChargesAtOnce`)
+- **A loader's event may come on the network's thread** (Fabric's disconnect does): work for the
+  render thread (textures, sounds) goes to the client's thread (`Minecraft.execute`). Timing-bound,
+  so no test catches it reliably: the client test's log showed it.
 
 - An hfs file shows its writes only at close: watch a file a program keeps open on `/tmp` (tmpfs).
 - Typing more than 256 keys at once in a test drops the rest (a terminal's key queue): split lines.
