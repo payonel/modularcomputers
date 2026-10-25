@@ -18,6 +18,27 @@ In this tutorial you join two computers with [network cards](/devices/network-ca
   this tutorial and need no cable, within their range.
 - [ ] Some [cable](/hardware/cable/) (a craft gives eight)
 
+## The whole thing
+
+Once both computers have a network card and a cable between them, this is every command, in order
+(each step below explains its part):
+
+```sh
+# on the second computer
+hostname beta
+rc rshd start              # rc rshd enable: at every boot too
+
+# on the first computer
+hostname alpha
+rsh beta hostname          # prints beta: it ran there
+rsh beta 'ls /nothing'; echo $?    # beta's error, and its exit status, 1
+echo "sent from alpha" > note.txt
+rcp note.txt beta:/home/note.txt
+rsh beta cat /home/note.txt        # sent from alpha
+rcp beta:/home/note.txt ./back.txt
+rsh beta                   # a shell on beta; exit (or ~.) to come back
+```
+
 ## Steps
 
 ### 1. Fit a card in each

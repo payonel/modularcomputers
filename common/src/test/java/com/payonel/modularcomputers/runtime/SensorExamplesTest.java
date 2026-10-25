@@ -109,6 +109,25 @@ class SensorExamplesTest extends McosHarness {
 	}
 
 	@Test
+	void theVisitorsServiceWrittenOutInFullStartsCountsAndStops() {
+		MotionSensorCard motion = new MotionSensorCard();
+		devices.put(Motherboard.exp(0), motion);
+		boot();
+		file("home/visitors.lua", example("service-visitors"));
+		file("etc/rc.d/visitors", example("service-visitors-full-rc"));
+		type("rc visitors start; rc visitors status > /running; echo $? > /up\r");
+		untilFile(root().resolve("up"), "0\n");
+		untilIdle();
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
+		settle(() -> Files.exists(root().resolve("home/visitors.log")) && read(root().resolve("home/visitors.log")).contains("minecraft:pig"));
+		type("rc visitors count > /count; rc visitors restart; rc visitors stop; rc visitors status > /stopped; echo $? > /status\r");
+		untilFile(root().resolve("status"), "3\n");
+		assertThat(read(root().resolve("count"))).isEqualTo("1 visitors\n");
+		assertThat(read(root().resolve("running"))).startsWith("visitors is running (pid ");
+		assertThat(read(root().resolve("stopped"))).isEqualTo("visitors is stopped\n");
+	}
+
+	@Test
 	void theNearLightGrowsBrighterAsSomethingComesCloseAndGoesDark() {
 		MotionSensorCard motion = new MotionSensorCard();
 		devices.put(Motherboard.exp(0), motion);

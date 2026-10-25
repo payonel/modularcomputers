@@ -62,8 +62,12 @@ order: 10                   # place within the section (lower first)
   through its methods, real uses, each included from `docs/examples/` and run by a test).
 - **Program:** from its man page and its header comment: synopsis, options, exit statuses, an
   example, and where it differs from GNU. The man page is the source; keep the two in agreement.
-- **Tutorial:** a prerequisites list, numbered steps each saying what to do and what you will see,
-  what goes wrong and how to fix it, and a link to the next tutorial.
+- **Tutorial:** a prerequisites list, then **the whole thing first** (the user's: show the code,
+  and a reader pulls what they need from it): every file complete (programs, definitions,
+  settings) and every command in order, as tested examples (`docs/examples/`, included); then
+  numbered steps each saying what to do and what you will see, what goes wrong and how to fix it,
+  and a link to the next tutorial. Where a mechanism has defaults (a service's actions), show them
+  written out in full too, named, so a reader can copy and change one.
 - **Concept:** what it is, why the mod works that way, what a player or program sees.
 
 ## Lua in pages
