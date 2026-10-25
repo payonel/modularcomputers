@@ -79,6 +79,21 @@ public final class VtDecoder {
 	private boolean sixelDisplayMode;
 	/** xterm's bracketed paste ({@code CSI ?2004 h}): a paste comes wrapped in {@code ESC[200~} and {@code ESC[201~}. */
 	private boolean bracketedPaste;
+	/**
+	 * xterm's mouse tracking, what a program asked for ({@code CSI ?n h}): none (0), presses only
+	 * (X10's, 9), presses and releases (1000), and drags (1002), and every motion (1003); and whether
+	 * reports come in SGR's encoding (1006), not X10's bytes.
+	 */
+	private int mouseTracking;
+	private boolean mouseSgr;
+	public static final int MOUSE_OFF = 0;
+	public static final int MOUSE_X10 = 9;
+	public static final int MOUSE_NORMAL = 1000;
+	public static final int MOUSE_BUTTON_EVENT = 1002;
+	public static final int MOUSE_ANY_EVENT = 1003;
+	private static final int MOUSE_SGR = 1006;
+	/** The tracking modes, in the order {@link #state()} numbers them. */
+	private static final int[] MOUSE_MODES = {MOUSE_OFF, MOUSE_X10, MOUSE_NORMAL, MOUSE_BUTTON_EVENT, MOUSE_ANY_EVENT};
 
 	/** G0 and G1 (ASCII, DEC_GRAPHICS, UK), which SO and SI shift between, and the one being designated. */
 	private final int[] charsets = {ASCII, ASCII};
@@ -358,6 +373,8 @@ public final class VtDecoder {
 		cursorKeysApplication = false;
 		keyboardFlags = 0;
 		keyboardStack.clear();
+		mouseTracking = MOUSE_OFF;
+		mouseSgr = false;
 		saved = null;
 		mainScreen = null;
 		charsets[0] = ASCII;
@@ -711,6 +728,14 @@ public final class VtDecoder {
 				case 25 -> cursorVisible = on;
 				case 80 -> sixelDisplayMode = on;
 				case 2004 -> bracketedPaste = on;
+				case MOUSE_X10, MOUSE_NORMAL, MOUSE_BUTTON_EVENT, MOUSE_ANY_EVENT -> {
+					if (on) {
+						mouseTracking = mode;
+					} else if (mouseTracking == mode) {
+						mouseTracking = MOUSE_OFF; // (as xterm: resetting another mode leaves this one)
+					}
+				}
+				case MOUSE_SGR -> mouseSgr = on;
 				case 47, 1047, 1049 -> alternateScreen(on, mode == 1049);
 				default -> {
 					// not supported: ignored
@@ -1099,6 +1124,21 @@ public final class VtDecoder {
 	/** And bracketed paste. */
 	private static final int BRACKETED_PASTE_BIT = 21;
 
+	/** And the mouse's tracking mode (3 bits: its place in MOUSE_MODES) and SGR encoding. */
+	private static final int MOUSE_MODE_BIT = 22;
+	private static final int MOUSE_MODE_MASK = 7;
+	private static final int MOUSE_SGR_BIT = 25;
+
+	/** The mouse tracking a program asked for: {@link #MOUSE_OFF}, {@link #MOUSE_X10}, {@link #MOUSE_NORMAL}, {@link #MOUSE_BUTTON_EVENT} or {@link #MOUSE_ANY_EVENT}. */
+	public int mouseTracking() {
+		return mouseTracking;
+	}
+
+	/** Whether mouse reports come in SGR's encoding (mode 1006). */
+	public boolean mouseSgr() {
+		return mouseSgr;
+	}
+
 	/** Whether a paste comes wrapped (bracketed paste, xterm's mode 2004). */
 	public boolean bracketedPaste() {
 		return bracketedPaste;
@@ -1120,7 +1160,7 @@ public final class VtDecoder {
 		int flags = (bold ? 1 : 0) | (reverse ? 2 : 0) | (newLineMode ? 4 : 0) | (autowrap ? 8 : 0)
 			| (cursorVisible ? 16 : 0) | (pendingWrap ? 32 : 0) | (stringEscape ? 64 : 0) | (cursorStyle << 8)
 			| (cursorKeysApplication ? 1 << 11 : 0) | (keyboardFlags << 12) | (sixelDisplayMode ? 1 << SIXEL_DISPLAY_BIT : 0)
-			| (bracketedPaste ? 1 << BRACKETED_PASTE_BIT : 0);
+			| (bracketedPaste ? 1 << BRACKETED_PASTE_BIT : 0) | mouseModeIndex() << MOUSE_MODE_BIT | (mouseSgr ? 1 << MOUSE_SGR_BIT : 0);
 		int[] state = new int[STATE];
 		// (a picture half decoded isn't kept: the rest of it is read and ignored)
 		Parse saving = parse == Parse.DCS || parse == Parse.SIXEL ? Parse.STRING : parse;
@@ -1132,6 +1172,15 @@ public final class VtDecoder {
 			System.arraycopy(saved, 0, state, registers.length, saved.length);
 		}
 		return state;
+	}
+
+	private int mouseModeIndex() {
+		for (int i = 0; i < MOUSE_MODES.length; i++) {
+			if (MOUSE_MODES[i] == mouseTracking) {
+				return i;
+			}
+		}
+		return 0;
 	}
 
 	/** The parameters of an escape sequence it's in the middle of, for saving with {@link #state()}. */
@@ -1167,6 +1216,9 @@ public final class VtDecoder {
 		keyboardFlags = (flags >> 12) & KEYBOARD_FLAGS;
 		sixelDisplayMode = (flags & 1 << SIXEL_DISPLAY_BIT) != 0;
 		bracketedPaste = (flags & 1 << BRACKETED_PASTE_BIT) != 0;
+		int mouse = flags >> MOUSE_MODE_BIT & MOUSE_MODE_MASK;
+		mouseTracking = mouse < MOUSE_MODES.length ? MOUSE_MODES[mouse] : MOUSE_OFF;
+		mouseSgr = (flags & 1 << MOUSE_SGR_BIT) != 0;
 		if (state[7] >= 0 && state[7] < state[8] && state[8] < rows) {
 			top = state[7];
 			bottom = state[8];

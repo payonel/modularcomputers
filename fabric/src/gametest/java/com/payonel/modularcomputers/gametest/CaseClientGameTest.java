@@ -334,6 +334,21 @@ public class CaseClientGameTest implements FabricClientGameTest {
 			context.getInput().typeChars("ok");
 			context.waitFor(client -> client.level.getBlockEntity(computer) instanceof CaseBlockEntity be
 				&& be.terminal().buffer().row(1).startsWith("hi") && be.terminal().buffer().row(2).startsWith("ok"));
+			// The mouse, once its program asks (xterm's 1000: presses and releases): a click on the glass
+			// is reported as its cell. The program echoes it: in X10's bytes ESC [ M (a line deleted)
+			// and three bytes, printed: the release's ends "#", then the column's and row's, 33 past them.
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).terminal().write("\u001B[?1000h"));
+			context.waitTicks(2);
+			int[] clicked = context.computeOnClient(client -> {
+				DisplayScreen view = (DisplayScreen) client.gui.screen();
+				Viewport glass = view.viewport();
+				return view.cellAt(glass.x() + glass.width() / 2.0, glass.y() + glass.height() / 2.0);
+			});
+			clickOnScreen(context, InputConstants.MOUSE_BUTTON_LEFT, screen -> ((DisplayScreen) screen).viewport());
+			String report = "#" + (char) (33 + clicked[0]) + (char) (33 + clicked[1]);
+			context.waitFor(client -> client.level.getBlockEntity(computer) instanceof CaseBlockEntity be
+				&& be.terminal().buffer().row(2).contains(report));
+			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer)).terminal().write("\u001B[?1000l"));
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitFor(client -> client.gui.screen() == null);
 			check(!context.computeOnClient(CaseClientGameTest::textInputOn), "and off again when it closes");

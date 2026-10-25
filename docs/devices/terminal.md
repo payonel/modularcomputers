@@ -156,6 +156,31 @@ Some sequences a program uses most (`ESC` is `"\27"` in Lua):
 
 `/usr/bin/vtdemo.lua` shows every tier's colors and a picture.
 
+### The mouse
+
+In a screen's view the mouse works as on xterm: nothing reaches a program until it asks, with the
+same modes, and then each click, release, wheel notch or move (as it asked) comes as typed input,
+at the cell it was over (columns and rows from 1).
+
+| Sequence | Reports |
+|---|---|
+| `ESC[?9h` | presses only (X10's), no modifiers |
+| `ESC[?1000h` | presses, releases and the wheel |
+| `ESC[?1002h` | those, and moves while a button is held (drags) |
+| `ESC[?1003h` | those, and every move |
+| `ESC[?1006h` | reports in SGR's encoding: `ESC[<b;x;yM`, `m` for a release |
+| `ESC[?…l` | turns one off; `ESC c` (a reset) turns them all off |
+
+Without `1006`, a report is X10's: `ESC[M` and three bytes, the button, the column and the row,
+each 32 past its number (so a position past 223 can't be reported). The button: 0 left, 1 middle,
+2 right (3: a release, in X10's encoding), 64 and 65 the wheel up and down, plus 32 for a move;
+Shift adds 4, Alt 8, Control 16. While no program tracks the mouse, the wheel scrolls the screen
+view back over what scrolled off.
+
+```lua
+{% include terminal-mouse.lua %}
+```
+
 Lines that scroll off the top of the main screen are kept, 200 of them, and the screen view scrolls
 back over them. They are lost when the block unloads.
 

@@ -444,6 +444,10 @@ the farther it reaches (OC's wirelessCostPerRange); any tier hears any other.
   pastes go as UTF-8. DEC's character sets (G0/G1, SO/SI, the line drawing, the UK set).
   Box drawing, block elements and braille are drawn by the terminal itself (`CellGlyphs`, shapes
   read from the characters' Unicode names), in whole pixels filling their cells, so they join.
+- **The mouse is xterm's** (the user's: as a real terminal, switched on by a program's DECSET):
+  9, 1000, 1002, 1003 and SGR's 1006, the decoder's modes (saved with it); the screen view sends
+  what the mouse does over the glass, by cell (`TerminalMousePayload`), and the terminal reports it
+  as asked, or with none tracking, the wheel scrolls back.
 - **The server's decoder is the only one:** only changed rows go to players (the user rejected a
   client-side decoder: a client-only bug could show what the server never decoded).
 

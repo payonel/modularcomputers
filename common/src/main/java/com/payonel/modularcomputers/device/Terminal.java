@@ -383,6 +383,82 @@ public final class Terminal implements Device {
 		}
 	}
 
+	/** What a mouse did over the terminal's glass. */
+	public enum MouseAction {
+		PRESS, RELEASE, MOVE, WHEEL
+	}
+
+	/** Mouse buttons, as xterm numbers them in its reports: left, middle, right; the wheel up and down. */
+	public static final int MOUSE_LEFT = 0;
+	public static final int MOUSE_MIDDLE = 1;
+	public static final int MOUSE_RIGHT = 2;
+	public static final int WHEEL_UP = 0;
+	public static final int WHEEL_DOWN = 1;
+	/** Modifiers held, as xterm adds them to a report's button: Shift, Meta (Alt), Control. */
+	public static final int MOUSE_SHIFT = 4;
+	public static final int MOUSE_META = 8;
+	public static final int MOUSE_CONTROL = 16;
+	/** What a report's button gains for motion, for the wheel, and its code for a release (X10's encoding: which button isn't said). */
+	private static final int MOTION = 32;
+	private static final int WHEEL = 64;
+	private static final int RELEASED = 3;
+	/** X10's encoding: each number a byte, 32 past it; a position past 223 can't be said. */
+	private static final int X10_OFFSET = 32;
+	private static final int X10_LARGEST = 255 - X10_OFFSET;
+	/** Lines a notch of the wheel scrolls the glass back, when no program tracks the mouse. */
+	public static final int WHEEL_LINES = 3;
+	/** The button held down (for drags' reports), or -1. */
+	private int mouseHeld = -1;
+
+	/**
+	 * The mouse over its glass, at a cell ({@code column}, {@code row}, from 0), with {@code
+	 * modifiers} (MOUSE_SHIFT...): reported to the program as xterm does when it asked (DECSET 9:
+	 * presses; 1000: presses and releases, the wheel; 1002: and drags; 1003: and every motion; 1006:
+	 * SGR's encoding, {@code ESC[<b;x;yM}, or {@code m} for a release; else X10's, {@code ESC[M} and a
+	 * byte each). With no program tracking it, the wheel scrolls the glass back (as xterm's).
+	 */
+	public void mouse(MouseAction action, int button, int column, int row, int modifiers) {
+		int tracking = decoder.mouseTracking();
+		if (action == MouseAction.PRESS) {
+			mouseHeld = button;
+		} else if (action == MouseAction.RELEASE) {
+			mouseHeld = -1;
+		}
+		if (tracking == VtDecoder.MOUSE_OFF) {
+			if (action == MouseAction.WHEEL) {
+				scrollView(button == WHEEL_UP ? WHEEL_LINES : -WHEEL_LINES);
+			}
+			return;
+		}
+		boolean reported = switch (action) {
+			case PRESS, WHEEL -> true;
+			case RELEASE -> tracking != VtDecoder.MOUSE_X10;
+			case MOVE -> tracking == VtDecoder.MOUSE_ANY_EVENT || tracking == VtDecoder.MOUSE_BUTTON_EVENT && mouseHeld >= 0;
+		};
+		if (!reported) {
+			return;
+		}
+		int code = switch (action) {
+			case PRESS, RELEASE -> button;
+			case WHEEL -> WHEEL + button;
+			case MOVE -> MOTION + (mouseHeld >= 0 ? mouseHeld : RELEASED);
+		};
+		if (tracking != VtDecoder.MOUSE_X10) {
+			code |= modifiers & (MOUSE_SHIFT | MOUSE_META | MOUSE_CONTROL); // (X10's reports carry none)
+		}
+		if (decoder.mouseSgr()) {
+			press("\u001B[<" + code + ";" + (column + 1) + ";" + (row + 1) + (action == MouseAction.RELEASE ? "m" : "M"));
+			return;
+		}
+		if (action == MouseAction.RELEASE) {
+			code = RELEASED | code & ~3;
+		}
+		if (column + 1 > X10_LARGEST || row + 1 > X10_LARGEST) {
+			return; // (too far for its bytes: xterm sends nothing either)
+		}
+		press("\u001B[M" + (char) (X10_OFFSET + code) + (char) (X10_OFFSET + column + 1) + (char) (X10_OFFSET + row + 1));
+	}
+
 	/** Bytes from its keyboard: they wait in the queue, and the interrupt line wakes its computers. */
 	public void press(String key) {
 		scrollToBottom();

@@ -170,6 +170,34 @@ class DeviceExamplesTest extends McosHarness {
 		assertThat(screen.buffer().row(7)).isEqualTo(" ".repeat(17) + "|  Back soon  |" + " ".repeat(18));
 	}
 
+	@Test
+	void theMouseProgramReportsEachClickWhereItWasUntilQ() {
+		boot();
+		file("mouse.lua", example("terminal-mouse"));
+		type("lua /mouse.lua 2> /err; touch /done\r");
+		settle(() -> screen.decoder().mouseTracking() == com.payonel.modularcomputers.display.VtDecoder.MOUSE_NORMAL && screen.decoder().mouseSgr());
+		untilIdle(); // (reading: the program waits for the mouse)
+		server.add(() -> {
+			screen.mouse(com.payonel.modularcomputers.device.Terminal.MouseAction.PRESS, com.payonel.modularcomputers.device.Terminal.MOUSE_LEFT, 4, 2, 0);
+			screen.mouse(com.payonel.modularcomputers.device.Terminal.MouseAction.RELEASE, com.payonel.modularcomputers.device.Terminal.MOUSE_LEFT, 4, 2, 0);
+		});
+		settle(() -> screenText().contains("left released at column 5, row 3"));
+		assertThat(screenText()).contains("left at column 5, row 3");
+		type("q");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("err"))).isEmpty();
+		assertThat(screen.decoder().mouseTracking()).as("its mouse given back").isEqualTo(com.payonel.modularcomputers.display.VtDecoder.MOUSE_OFF);
+	}
+
+	/** What the terminal shows, a line a row. */
+	private String screenText() {
+		StringBuilder text = new StringBuilder();
+		for (int row = 0; row < screen.buffer().resolution().rows(); row++) {
+			text.append(screen.buffer().row(row).stripTrailing()).append('\n');
+		}
+		return text.toString();
+	}
+
 	// ---- the operator card ---------------------------------------------------------------------
 
 	/** An operator card whose block runs only time and weather commands, keeping each one run. */

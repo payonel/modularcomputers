@@ -58,8 +58,6 @@ public final class DisplayScreen extends Screen {
 
 	/** The keys held down in this view (a press seen, no release yet): a press while held is a repeat. */
 	private final java.util.Set<Integer> held = new java.util.HashSet<>();
-	/** Lines a notch of the mouse wheel scrolls the terminal's glass. */
-	private static final int WHEEL_LINES = 3;
 	/** Whose terminal it shows: a block or an entity (a golem). */
 	private final HostRef pos;
 	/** The terminal's size as the layout was made for it: a program may change it while it shows. */
@@ -132,6 +130,14 @@ public final class DisplayScreen extends Screen {
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		var hit = ComputerButtons.click(event, powerButton(), viewToggle(), ComputerButtons.Target.CASE, pos);
 		powerHeld = hit == ComputerButtons.Hit.POWER;
+		int[] cell = hit == ComputerButtons.Hit.NONE ? cellAt(event.x(), event.y()) : null;
+		if (cell != null && xtermButton(event.button()) >= 0) {
+			// On the glass: the terminal's (a program tracking the mouse gets it).
+			mouseDown = true;
+			mouseCell = cell;
+			mouse(com.payonel.modularcomputers.device.Terminal.MouseAction.PRESS, xtermButton(event.button()), cell, xtermModifiers(event));
+			return true;
+		}
 		if (hit == ComputerButtons.Hit.NONE && event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT
 			&& handPlate().contains(event.x(), event.y())) {
 			com.payonel.modularcomputers.client.ModNetworkClient.send(new com.payonel.modularcomputers.network.SwitchViewPayload(pos, true)); // (its hands are the parts view's)
@@ -244,11 +250,60 @@ public final class DisplayScreen extends Screen {
 	/** The wheel scrolls the terminal's glass over its scrollback, as in a terminal emulator. */
 	@Override
 	public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
-		int lines = (int) Math.signum(scrollY) * WHEEL_LINES;
-		if (lines != 0) {
-			ModNetworkClient.send(new ScrollTerminalPayload(pos, lines));
+		if (scrollY != 0) {
+			// The terminal's to decide: a program tracking the mouse gets it, else its glass scrolls back.
+			int[] cell = cellAt(x, y);
+			mouse(com.payonel.modularcomputers.device.Terminal.MouseAction.WHEEL,
+				scrollY > 0 ? com.payonel.modularcomputers.device.Terminal.WHEEL_UP : com.payonel.modularcomputers.device.Terminal.WHEEL_DOWN,
+				cell != null ? cell : new int[] {0, 0}, 0);
 		}
 		return true;
+	}
+
+	/** The cell of the glass at a point (column, row, from 0), or null off the glass. */
+	public int[] cellAt(double x, double y) {
+		Viewport glass = layout.display();
+		if (!glass.contains(x, y) || glass.width() <= 0 || glass.height() <= 0) {
+			return null;
+		}
+		int column = (int) ((x - glass.x()) * resolution.columns() / glass.width());
+		int row = (int) ((y - glass.y()) * resolution.rows() / glass.height());
+		return new int[] {Math.min(column, resolution.columns() - 1), Math.min(row, resolution.rows() - 1)};
+	}
+
+	/** The cell the mouse was last over (so a move is sent only to another cell), and whether a button's held down on the glass. */
+	private int[] mouseCell;
+	private boolean mouseDown;
+
+	private void mouse(com.payonel.modularcomputers.device.Terminal.MouseAction action, int button, int[] cell, int modifiers) {
+		ModNetworkClient.send(new com.payonel.modularcomputers.network.TerminalMousePayload(pos, action.ordinal(), button, cell[0], cell[1], modifiers));
+	}
+
+	/** A mouse button as xterm numbers it (left 0, middle 1, right 2), or -1. */
+	private static int xtermButton(int button) {
+		return switch (button) {
+			case InputConstants.MOUSE_BUTTON_LEFT -> com.payonel.modularcomputers.device.Terminal.MOUSE_LEFT;
+			case InputConstants.MOUSE_BUTTON_MIDDLE -> com.payonel.modularcomputers.device.Terminal.MOUSE_MIDDLE;
+			case InputConstants.MOUSE_BUTTON_RIGHT -> com.payonel.modularcomputers.device.Terminal.MOUSE_RIGHT;
+			default -> -1;
+		};
+	}
+
+	/** The modifiers held, as xterm adds them to a report. */
+	private static int xtermModifiers(MouseButtonEvent event) {
+		return (event.hasShiftDown() ? com.payonel.modularcomputers.device.Terminal.MOUSE_SHIFT : 0)
+			| (event.hasAltDown() ? com.payonel.modularcomputers.device.Terminal.MOUSE_META : 0)
+			| (event.hasControlDown() ? com.payonel.modularcomputers.device.Terminal.MOUSE_CONTROL : 0);
+	}
+
+	@Override
+	public void mouseMoved(double x, double y) {
+		int[] cell = cellAt(x, y);
+		if (cell != null && (mouseCell == null || cell[0] != mouseCell[0] || cell[1] != mouseCell[1])) {
+			mouseCell = cell;
+			mouse(com.payonel.modularcomputers.device.Terminal.MouseAction.MOVE, 0, cell, 0);
+		}
+		super.mouseMoved(x, y);
 	}
 
 	private void send(String keys) {
@@ -258,6 +313,14 @@ public final class DisplayScreen extends Screen {
 	@Override
 	public boolean mouseReleased(MouseButtonEvent event) {
 		powerHeld = false;
+		int button = xtermButton(event.button());
+		if (mouseDown && button >= 0) {
+			mouseDown = false;
+			int[] cell = cellAt(event.x(), event.y());
+			mouse(com.payonel.modularcomputers.device.Terminal.MouseAction.RELEASE, button, cell != null ? cell : mouseCell != null ? mouseCell : new int[] {0, 0},
+				xtermModifiers(event));
+			return true;
+		}
 		return super.mouseReleased(event);
 	}
 

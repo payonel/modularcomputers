@@ -28,6 +28,7 @@ public final class ModNetwork {
 	public static final List<ToServer<?>> TO_SERVER = List.of(
 		new ToServer<>(PressPowerPayload.TYPE, PressPowerPayload.CODEC, PressPowerPayload::handle),
 		new ToServer<>(TerminalInputPayload.TYPE, TerminalInputPayload.CODEC, TerminalInputPayload::handle),
+		new ToServer<>(TerminalMousePayload.TYPE, TerminalMousePayload.CODEC, TerminalMousePayload::handle),
 		new ToServer<>(PasteTerminalPayload.TYPE, PasteTerminalPayload.CODEC, PasteTerminalPayload::handle),
 		new ToServer<>(ScrollTerminalPayload.TYPE, ScrollTerminalPayload.CODEC, ScrollTerminalPayload::handle),
 		new ToServer<>(TerminalKeyPayload.TYPE, TerminalKeyPayload.CODEC, TerminalKeyPayload::handle),
