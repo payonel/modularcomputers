@@ -1,5 +1,6 @@
--- Two threads count the creatures two motion sensors see, into one shared tally, written to a file
--- after each sighting. Each update is several steps: read the count, do something slow with it (here
+-- Visitors at two doors, counted in one tally: a motion sensor card in an expansion hub at each of a
+-- house's two doors, both hubs cabled back to this computer (motion0 and motion1 in /dev), a thread
+-- watching each, the tally written to a file after each sighting. Each update is several steps: read the count, do something slow with it (here
 -- a moment's sleep stands for it: asking another computer, moving a robot), write the count back. The
 -- other thread goes on running meanwhile, so without the mutex it would do its own update between
 -- this one's read and write: both read 4, both write 5, and a sighting is lost. With the mutex, it
@@ -34,9 +35,9 @@ local function watch(sensor)
   end
 end
 
-local first = thread.create(watch, "motion0")
-local second = thread.create(watch, "motion1")
-print("tallying what " .. "motion0 and motion1 see in " .. FILE)
+local front = thread.create(watch, "motion0") -- (the front door's hub)
+local back = thread.create(watch, "motion1") -- (the back door's)
+print("tallying both doors' visitors in " .. FILE)
 io.stdout:flush()
-first:join()
-second:join()
+front:join()
+back:join()
