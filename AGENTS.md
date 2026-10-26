@@ -565,6 +565,16 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   method's doc, as OpenComputers' proxies), the bus listed, `devices.wait` for one to come,
   `devices.event` for its next event (the poll and the pull). The manual teaches the three layers
   side by side (the board, `sys`, `devices`: concepts/device-layers, tutorials/device-layers).
+- **Threads are the kernel's tasks** (user design, 2026-10-25; Linux's, not OpenOS's): a process is
+  one or more, each its own coroutine and syscall under way (one blocked leaves the others running),
+  all preempted by the firmware's timer as processes are, sharing the process's globals, files,
+  directory, environment and handlers (a thread's table holds its own task's fields and reaches the
+  rest through to its process). Nothing is copied between them: devices are files, a device's events
+  taken by whichever thread reads them (OpenOS copied every signal to every thread, and its threads
+  had to yield). The main thread ending ends the process and its threads; a thread's error ends it
+  alone (said on stderr, its join's). `sys.thread`, `join`, `cancel`, `gettid`, `threads`, `mutex`,
+  `lock`, `unlock`; `lib/thread.lua` over them. A syscall's task is the one it's given, never "the
+  one resumed last" (a blocked one is served without being resumed).
 - **`sys.poll(fds, seconds)`** is poll(2) (`IN`, `PRI`, `OUT`; `HUP`, `ERR` unasked), in `sys` (mcos's
   POSIX layer), since Lua's `io` is C's stdio; `sys.fileno` gives an io file's descriptor. A
   redstone file is always readable and reports a change as `PRI` (a sysfs GPIO's way).

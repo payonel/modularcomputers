@@ -45,6 +45,8 @@ local ERRNO = {
   ENOEXEC = "Exec format error",
   ELOOP = "Too many levels of symbolic links",
   ENAMETOOLONG = "File name too long",
+  EDEADLK = "Resource deadlock avoided",
+  ETIMEDOUT = "Connection timed out",
 }
 
 function vfs.fail(name)

@@ -14,6 +14,15 @@
 -- its slice is spent (the timer), so processes are preempted: a busy one never keeps the others
 -- (or the kernel) from running. Since a process is only ever stopped in its own code, the kernel
 -- can end it at any time by dropping it (SIGKILL), and closes what it held.
+--
+-- Threads (user design, 2026-10-25) are tasks, as Linux's: a process is one or more of them, each a
+-- coroutine of its own with its own syscall under way (so one blocked in a read leaves the others
+-- running), all sharing the process's files, directory, environment, signal handlers and globals.
+-- They're preempted as processes are (the firmware's timer stops whichever runs), so no thread
+-- yields for another, and nothing is copied between them: a device's events are its file's, taken
+-- by whichever thread reads them. The process's table is its main thread; another thread's table
+-- holds only its own task's fields and reaches the process's through it (TASK). Ending the main
+-- thread ends the process, and every thread with it, as POSIX's return from main does.
 local root, cmdline = ...
 
 local VERSION = "0.2"
@@ -227,6 +236,8 @@ end
 -- (a syscall it trapped with), reply, blocked, zombie, status}.
 local processes = {}
 local order = {} -- pids in the order they run (round robin)
+-- The task the kernel resumed last: whose syscall a trap is (a process's main thread, or a thread).
+local running
 local nextpid = 1
 local kernel = {pid = 0, cwd = "/", fds = {}, environ = {PATH = "/bin", HOME = "/"}, handlers = {}}
 
@@ -269,6 +280,54 @@ end
 
 local respawn
 
+-- ---- threads -----------------------------------------------------------------------------------
+
+-- A thread's own fields; the rest of a thread's table is its process's, read and written through.
+local OWN = {co = true, request = true, reply = true, blocked = true, wakeat = true, tid = true, proc = true,
+  results = true, ended = true}
+
+-- A thread of process 'p': its own task's fields here, everything else the process's.
+local function task(p, tid, co)
+  return setmetatable({tid = tid, proc = p, co = co}, {
+    __index = p,
+    __newindex = function(t, key, value)
+      if OWN[key] then
+        rawset(t, key, value)
+      else
+        p[key] = value
+      end
+    end,
+  })
+end
+
+-- A process's tasks, in the order they run: its main thread (the process), then its threads.
+local function tasks(p)
+  local list = {p}
+  for _, t in ipairs(p.threads or {}) do
+    list[#list + 1] = t
+  end
+  return list
+end
+
+-- A thread ends (returned, failed, or cancelled): its coroutine dropped, its mutexes let go, its
+-- results kept for the thread that joins it.
+local function endthread(t, results)
+  if t.co then
+    board.removestop(t.co)
+    if not isfrozen(t.co) and coroutine.status(t.co) == "suspended" then
+      coroutine.close(t.co)
+    end
+    t.co = nil
+  end
+  t.ended, t.results = true, results
+  t.request, t.reply, t.blocked = nil, nil, false
+  for _, mutex in pairs(t.proc.mutexes or {}) do
+    if mutex.owner == t then
+      mutex.owner = nil
+    end
+  end
+end
+
 -- A zombie reaped: gone from the table and the run order.
 local function reap(p)
   processes[p.pid] = nil
@@ -286,6 +345,14 @@ local function exit(p, how, value)
   if p.zombie then
     return
   end
+  p = rawget(p, "proc") or p -- (a thread's exit is its process's)
+  if p.zombie then
+    return
+  end
+  for _, t in ipairs(p.threads or {}) do
+    endthread(t, table.pack(false, "killed")) -- (its threads end with it)
+  end
+  p.threads = {}
   if p.co then
     board.removestop(p.co)
     if not isfrozen(p.co) and coroutine.status(p.co) == "suspended" then
@@ -358,14 +425,15 @@ local function systable(p)
       return nil
     end
     local function call(...)
-      p.request = table.pack(name, ...)
+      local me = running -- (the task that's calling: the process's main thread, or one of its threads)
+      me.request = table.pack(name, ...)
       trap()
-      local reply = p.reply
-      p.reply = nil
+      local reply = me.reply
+      me.reply = nil
       if reply == nil then
         error("sys." .. name .. ": not called from its process", 2)
       end
-      while p.caught[1] do
+      while p.caught[1] do -- (a signal's handler runs in whichever of its threads comes back first)
         local signal = table.remove(p.caught, 1)
         local handler = p.handlers[signal]
         if type(handler) == "function" then
@@ -513,7 +581,7 @@ local function spawn(parent, path, argv, opts)
   local p = {
     pid = nextpid, ppid = parent.pid, pgid = parent.pgid, path = path, argv = argv or {},
     fds = {}, cwd = parent.cwd, environ = copy(opts.env or parent.environ), tty = parent.tty,
-    handlers = {}, caught = {},
+    handlers = {}, caught = {}, threads = {}, mutexes = {},
   }
   local env = environment(p)
   if opts.pgid == 0 or opts.setsid then
@@ -963,7 +1031,144 @@ function syscalls.environ(p)
   return copy(p.environ)
 end
 
--- The processes (Linux's /proc): {pid, ppid, pgid, path, argv, state} each.
+-- ---- threads' syscalls --------------------------------------------------------------------------
+
+-- thread(f, ...): a new thread of the process, running f(...): its id (a tid, from the pids' numbers).
+function syscalls.thread(p, request, f, ...)
+  if type(f) ~= "function" then
+    return fail("EINVAL")
+  end
+  local proc = rawget(p, "proc") or p
+  local args = table.pack(...)
+  local co = coroutine.create(function()
+    return f(table.unpack(args, 1, args.n))
+  end)
+  local t = task(proc, nextpid, co)
+  nextpid = nextpid + 1
+  board.addstop(co)
+  proc.threads[#proc.threads + 1] = t
+  return t.tid
+end
+
+-- A thread of the process, by its id, or nil.
+local function threadof(p, tid)
+  local proc = rawget(p, "proc") or p
+  for _, t in ipairs(proc.threads) do
+    if t.tid == tid then
+      return t, proc
+    end
+  end
+end
+
+-- join(tid[, seconds]): waits for a thread to end, and gives what it did: true and what it returned,
+-- or false and its error ("killed": cancelled); nil and ETIMEDOUT after seconds. Its record is gone
+-- then (as pthread_join's). EDEADLK joining itself.
+function syscalls.join(p, request, tid, seconds)
+  if math.type(tid) ~= "integer" or seconds ~= nil and (type(seconds) ~= "number" or seconds < 0) then
+    return fail("EINVAL")
+  end
+  if tid == (rawget(p, "tid") or p.pid) then
+    return fail("EDEADLK")
+  end
+  local t, proc = threadof(p, tid)
+  if not t then
+    return fail("ESRCH")
+  end
+  if t.ended then
+    for i, other in ipairs(proc.threads) do
+      if other == t then
+        table.remove(proc.threads, i)
+        break
+      end
+    end
+    return table.unpack(t.results, 1, t.results.n)
+  end
+  if seconds then
+    now = now or board.uptime()
+    request.deadline = request.deadline or now + math.ceil(seconds * TICKS_PER_SECOND)
+    if now >= request.deadline then
+      return fail("ETIMEDOUT")
+    end
+    p.wakeat = request.deadline
+  end
+  return k.BLOCK
+end
+
+-- cancel(tid): ends a thread where it is (pthread_cancel, at once: its mutexes let go); its join
+-- gives false, "killed". The main thread isn't one: the process ends by exit.
+function syscalls.cancel(p, request, tid)
+  local t = threadof(p, tid)
+  if not t then
+    return fail("ESRCH")
+  end
+  if not t.ended then
+    endthread(t, table.pack(false, "killed"))
+  end
+  return true
+end
+
+-- gettid(): the calling thread's id (the main thread's is the process's pid).
+function syscalls.gettid(p)
+  return rawget(p, "tid") or p.pid
+end
+
+-- threads(): the process's threads, {tid, state} each (running, sleeping, or ended: not yet joined).
+function syscalls.threads(p)
+  local proc = rawget(p, "proc") or p
+  local list = {{tid = proc.pid, state = proc.blocked and "sleeping" or "running"}}
+  for _, t in ipairs(proc.threads) do
+    list[#list + 1] = {tid = t.tid, state = t.ended and "ended" or t.blocked and "sleeping" or "running"}
+  end
+  return list
+end
+
+-- mutex(): a new mutex of the process, its id; lock(id[, seconds]) waits until no other thread holds
+-- it and takes it (EDEADLK if this thread holds it: not recursive; nil and ETIMEDOUT after seconds);
+-- unlock(id) lets it go (EPERM unless this thread holds it). A thread that ends lets its go.
+function syscalls.mutex(p)
+  local proc = rawget(p, "proc") or p
+  local id = #proc.mutexes + 1
+  proc.mutexes[id] = {}
+  return id
+end
+
+function syscalls.lock(p, request, id, seconds)
+  local proc = rawget(p, "proc") or p
+  local mutex = proc.mutexes[id]
+  if not mutex or seconds ~= nil and (type(seconds) ~= "number" or seconds < 0) then
+    return fail("EINVAL")
+  end
+  local me = p -- (the task that asked: its process's table for the main thread, or the thread's)
+  if mutex.owner == me then
+    return fail("EDEADLK")
+  elseif mutex.owner == nil then
+    mutex.owner = me
+    return true
+  end
+  if seconds then
+    now = now or board.uptime()
+    request.deadline = request.deadline or now + math.ceil(seconds * TICKS_PER_SECOND)
+    if now >= request.deadline then
+      return fail("ETIMEDOUT")
+    end
+    p.wakeat = request.deadline
+  end
+  return k.BLOCK
+end
+
+function syscalls.unlock(p, request, id)
+  local proc = rawget(p, "proc") or p
+  local mutex = proc.mutexes[id]
+  if not mutex then
+    return fail("EINVAL")
+  elseif mutex.owner ~= p then
+    return fail("EPERM")
+  end
+  mutex.owner = nil
+  return true
+end
+
+-- The processes (Linux's /proc): {pid, ppid, pgid, path, argv, state, threads} each.
 function syscalls.processes()
   local list = {}
   for _, pid in ipairs(order) do
@@ -971,6 +1176,7 @@ function syscalls.processes()
     list[#list + 1] = {
       pid = q.pid, ppid = q.ppid, pgid = q.pgid, path = q.path, argv = copy(q.argv),
       state = q.zombie and "zombie" or q.blocked and "sleeping" or "running",
+      threads = 1 + #(q.threads or {}),
     }
   end
   return list
@@ -1282,16 +1488,29 @@ kernel.fds[0], kernel.fds[1], kernel.fds[2] = hold(consolefile), hold(consolefil
 local function run(p)
   local co = p.co
   local ok, result
+  running = p
+  local packed
   if isfrozen(co) then
-    ok, result = thaw(co)
+    packed = table.pack(thaw(co))
   else
-    ok, result = coroutine.resume(co)
+    packed = table.pack(coroutine.resume(co))
   end
-  if p.zombie then
-    return -- (it ended itself: exit)
+  ok, result = packed[1], packed[2]
+  if p.zombie or rawget(p, "ended") then
+    return -- (it ended itself: exit, or a cancel)
   end
   if isfrozen(co) then
     serve(p) -- (if it trapped; else it was stopped for input or by the timer: the handlers run first)
+  elseif rawget(p, "proc") and coroutine.status(co) == "dead" then
+    -- A thread's end: what it returned, or its error (said on the process's stderr, as an
+    -- uncaught exception in a thread is), kept for its join.
+    if not ok then
+      local stderr = p.fds[2]
+      if stderr and stderr.write then
+        stderr:write(p.path .. ": thread " .. p.tid .. ": " .. tostring(result) .. "\n")
+      end
+    end
+    endthread(p, ok and table.pack(true, table.unpack(packed, 2, packed.n)) or table.pack(false, result))
   elseif coroutine.status(co) == "dead" then
     if ok then
       exit(p, "exited", math.type(result) == "integer" and result or 0)
@@ -1349,9 +1568,10 @@ end
 local function idle()
   local wake
   for _, pid in ipairs(order) do
-    local p = processes[pid]
-    if p.blocked and p.wakeat and (not wake or p.wakeat < wake) then
-      wake = p.wakeat
+    for _, t in ipairs(tasks(processes[pid])) do
+      if t.blocked and t.wakeat and (not wake or t.wakeat < wake) then
+        wake = t.wakeat
+      end
     end
   end
   if retryat and (not wake or retryat < wake) then
@@ -1410,14 +1630,16 @@ while true do
   for _, pid in ipairs(copy(order)) do
     local p = processes[pid]
     if p and not p.zombie then
-      if not p.killed then
-        if p.blocked then
-          serve(p) -- what it waits for may have come
-        end
-        if not p.blocked then
-          run(p)
-          interrupt()
-          progressed = true
+      for _, t in ipairs(tasks(p)) do
+        if not p.killed and not p.zombie and t.co and not rawget(t, "ended") then
+          if t.blocked then
+            serve(t) -- what it waits for may have come
+          end
+          if not t.blocked and t.co then
+            run(t)
+            interrupt()
+            progressed = true
+          end
         end
       end
       if p.killed then

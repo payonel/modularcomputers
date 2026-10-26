@@ -172,10 +172,35 @@ one. `SIGKILL` can't be caught. By default a signal ends the process, except `SI
 The environment the process started with, a copy.
 
 ### sys.processes() → list
-Like `/proc`: `{pid, ppid, pgid, path, argv, state}` each, `state` being `"running"`, `"sleeping"` or `"zombie"`.
+Like `/proc`: `{pid, ppid, pgid, path, argv, state, threads}` each, `state` being `"running"`, `"sleeping"` or `"zombie"`, `threads` how many it has (its main thread too).
 
 ### sys.sleep(seconds) → true
 Waits, in game time.
+
+## Threads
+
+A process's threads are the kernel's tasks: see [Threads](/mcos/threads/), and the `thread` library over
+these calls.
+
+### sys.thread(f, ...) → tid
+A new thread of the process, running `f(...)`: its id (from the pids' numbers).
+
+### sys.join(tid[, seconds]) → true, results... | false, error
+Waits for a thread to end: `true` and what it returned, or `false` and its error (`killed`: cancelled).
+`ETIMEDOUT` after `seconds`, `EDEADLK` joining itself, `ESRCH` for no such thread. Once joined, it's gone.
+
+### sys.cancel(tid) → true
+Ends a thread where it is; its mutexes are let go.
+
+### sys.gettid() → tid
+The calling thread's id; the main thread's is the process's pid.
+
+### sys.threads() → list
+The process's threads, `{tid, state}` each: `running`, `sleeping`, or `ended` (not yet joined).
+
+### sys.mutex() → id, sys.lock(id[, seconds]) → true, sys.unlock(id) → true
+A mutex of the process. `lock` waits until no other thread holds it (`EDEADLK` if the caller does,
+`ETIMEDOUT` after `seconds`); `unlock` lets it go (`EPERM` unless the caller holds it).
 
 ## Waiting for several things
 
@@ -289,6 +314,10 @@ path)`, `fs.exists(path)`, `fs.isdir(path)`, `fs.list(path)` (entries `{name, ty
 `fs.command(name[, path])` (where a command is, as `execvp` looks it up), `fs.mkdir(path[, parents])`,
 `fs.remove(path[, recursive])`, `fs.copy(from, to[, recursive])`, `fs.move(from, to)` (across
 filesystems by copying), `fs.pattern(glob)` and `fs.glob(glob)` (the paths a shell pattern matches).
+
+### thread
+Threads of a process: `thread.create`, `t:join`, `t:kill`, `t:status`, `thread.current`, `thread.mutex`.
+See [Threads](/mcos/threads/).
 
 ### serialization
 Lua values as text, and back. `serialization.serialize(value[, pretty])` gives Lua source for nil,

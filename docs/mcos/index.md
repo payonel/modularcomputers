@@ -24,6 +24,7 @@ operating system works, because the parts are small enough to read.
 - [Remote shell](/mcos/remote-shell/): `rsh`, `rshd` and `rcp`.
 - [The sys library](/mcos/sys-api/): the system calls a Lua program uses.
 - [The devices library](/mcos/devices-library/): the bus's devices as tables of their methods, and waiting for one to come.
+- [Threads](/mcos/threads/): doing several things at once in one program, each thread preempted and blocking only itself.
 - [Programs](/programs/): every command, one page each.
 
 ## How it is built
