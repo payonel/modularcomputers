@@ -703,16 +703,50 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			}
 		}
 		if (index < 0) {
+			// A soldered device's chip under the mouse: its row, by its connector.
+			for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+				if (soldered(lane).contains(mouseX, mouseY)) {
+					for (int i = 0; i < entries.size(); i++) {
+						if (entries.get(i).key().equals(com.payonel.modularcomputers.machine.Motherboard.exp(lane))) {
+							index = i;
+						}
+					}
+				}
+			}
+		}
+		if (index < 0) {
 			return;
 		}
 		int shownRow = index - busScroll;
 		if (showBus && shownRow >= 0 && shownRow < busWindow(entries.size()).rowsShown(busScroll)) {
 			outline(graphics, busRow(shownRow), 1);
 		}
-		int slot = entries.get(index).slot();
-		if (slot >= 0) {
-			outline(graphics, slotArea(slot), 2);
+		var entry = entries.get(index);
+		if (entry.slot() >= 0) {
+			outline(graphics, slotArea(entry.slot()), 2);
+		} else {
+			solderedLane(entry).ifPresent(lane -> outline(graphics, soldered(lane), 1)); // (no slot: its chip on the board)
 		}
+	}
+
+	/** The lane a bus entry's device is soldered onto, if it's a soldered one. */
+	private java.util.Optional<Integer> solderedLane(com.payonel.modularcomputers.board.BoardAssembly.BusEntry entry) {
+		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+			if (menu.tier().soldered(lane) && entry.key().equals(com.payonel.modularcomputers.machine.Motherboard.exp(lane))) {
+				return java.util.Optional.of(lane);
+			}
+		}
+		return java.util.Optional.empty();
+	}
+
+	/** Whether the board's highlight is on a soldered device's chip now (its row, or it, under the mouse): for tests. */
+	public boolean solderedHighlighted(int lane, double mouseX, double mouseY) {
+		List<com.payonel.modularcomputers.board.BoardAssembly.BusEntry> entries = busEntries();
+		int row = busRowAt(mouseX, mouseY, entries.size());
+		if (row >= 0) {
+			return solderedLane(entries.get(busScroll + row)).map(at -> at == lane).orElse(false);
+		}
+		return soldered(lane).contains(mouseX, mouseY);
 	}
 
 	/** A 1-pixel highlight around an area, {@code gap} pixels out. */

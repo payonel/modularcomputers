@@ -658,7 +658,7 @@ public class CaseClientGameTest implements FabricClientGameTest {
 		return rows;
 	}
 
-	private static int pixelAt(ClientGameTestContext context, BufferedImage image, Function<Screen, Viewport> area) {
+	static int pixelAt(ClientGameTestContext context, BufferedImage image, Function<Screen, Viewport> area) {
 		return context.computeOnClient(client -> {
 			Screen screen = client.gui.screen();
 			Viewport target = scaled(area.apply(screen), (double) image.getWidth() / screen.width);

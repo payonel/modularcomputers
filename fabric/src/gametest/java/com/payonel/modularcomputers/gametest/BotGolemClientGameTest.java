@@ -258,6 +258,16 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			});
 			check(soldered.contains("Robotics Device") && soldered.contains("/dev/robotics0"), "its soldered device's tooltip: " + soldered);
 			context.takeScreenshot("bot-golem-soldered");
+			// Its bus order row under the mouse: its chip on the board outlined (the user's), as a part's slot is.
+			int roboticsRow = context.computeOnClient(c -> keys((BotGolem) c.level.getEntity(id)).indexOf("exp:3"));
+			CaseClientGameTest.moveCursorTo(context, screen -> ((com.payonel.modularcomputers.client.screen.CaseScreen) screen).busRow(roboticsRow));
+			context.waitTicks(2);
+			var linked = CaseClientGameTest.read(context.takeScreenshot("bot-golem-soldered-row"));
+			int edge = CaseClientGameTest.pixelAt(context, linked, screen -> {
+				var chip = ((com.payonel.modularcomputers.client.screen.CaseScreen) screen).soldered(com.payonel.modularcomputers.machine.GolemLayout.ROBOTICS_LANE);
+				return new com.payonel.modularcomputers.display.Viewport(chip.x() - 1, chip.y() + chip.height() / 2, 1, 1);
+			});
+			check(CaseClientGameTest.near(edge, 0xF2F2E6, 30), "its chip outlined, its row under the mouse: " + CaseClientGameTest.hex(edge));
 			context.getInput().setCursorPos(0, 0);
 			// A golem in hand: sneaking and using it opens its parts view, on the item (the user's), its hands too.
 			context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE);
