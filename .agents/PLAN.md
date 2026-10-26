@@ -73,6 +73,14 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 - **The bus walk has no gaps** (disconnected and absent devices are left out). Open: whether
   firmware should see them, as PCI addresses skip empty slots.
 
+- **A handheld scanner** (user idea, 2026-10-26, undecided): an item a player carries, with no CPU,
+  a device of a computer's bus out in the field (as a Bluetooth barcode scanner is a host's input
+  device): what the player scans with it (a block, a creature, what a container holds) goes back to
+  the computer as the device's event. Open: how it reaches the bus (a Bluetooth-style link, a
+  range), what it scans and reports (where, relative to what: the computer knows no world
+  position), its power (a battery in it), whether the computer can answer on it (a line on its
+  display, a beep).
+
 ## Robots: the bot golem, then drones
 
 - **Walking, decided and built (2026-10-25):** a pose (odometry from an origin a dimension), whole-
