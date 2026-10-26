@@ -81,8 +81,10 @@ A mutex: one thread holds it at a time.
 - `m:run(f, ...)` runs `f(...)` holding it, and lets it go even if `f` fails.
 
 A mutex matters when threads update the same thing in several steps, and a step can take long
-enough for another thread to run. Here two threads keep one tally of what two motion sensors see:
-each update reads a count, opens a file (a call to the disk: slow), and writes the count back. The
+enough for another thread to run. Here a house has two doors, far apart, each with an
+[expansion hub](/hardware/expansion-hub/) holding a [motion sensor card](/devices/motion-sensor/), both
+hubs cabled back to one computer: `motion0` at the front door, `motion1` at the back. A thread watches
+each door, and both keep one tally of visitors. Each update reads a count, opens a file (a call to the disk: slow), and writes the count back. The
 other thread keeps running meanwhile, so without the mutex it could slip its own update in between,
 both reading `4` and both writing `5`, and a sighting would be lost. With the mutex the other thread
 still runs, but waits at `lock:run` until the first update is done.
