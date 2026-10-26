@@ -733,7 +733,8 @@ Lessons from mistakes, each with its test:
 - **The clock is the firmware's, not a board call:** `board.uptime` was a call to the server thread
   (a tick each), so a loop reading the time (OpenOS's event loop) ran a tick a read and its timers
   came late; it's the firmware's `clock` now, answered at once. A read of something the firmware
-  has never goes to the server. (`OpenOsTest.sleepsAndTimersAreTheEventLibrarys`)
+  has never goes to the server. (`McosTest.readingTheClockCostsNoTicks`,
+  `OpenOsTest.sleepsAndTimersAreTheEventLibrarys`)
 - **A trend needs readings apart:** one look at a file reads it several times (a stat, an open), so a
   store's last reading was always a moment ago and never showed it charging. Compare against one at
   least a second old. (`sysShowsThePowerSupplies`)

@@ -27,33 +27,33 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * The user's big test: a bot golem running mcos, its manual's program (docs/examples/golem-tree.lua)
- * as a service started at boot, takes an axe from the chest in front of it, flies up to a tree on a
- * ledge (holding itself in its energy field, legs and all: it keeps its tools, off the ground at a
- * fifth of their speed), cuts the trunk from the air, flies home, lands on its legs at the chest,
- * and puts the wood and the axe in it. Smaller than the user's (10 up, 5 ahead): a test's space is
- * 8 blocks.
+ * as a service started at boot: it takes an axe from the chest behind it (from whatever slot), holds
+ * itself in its energy field, legs and all, flies forward looking for a tree, climbs the cliff it's
+ * on, cuts the trunk from the air, comes home the way it went, and leaves things ready to run again:
+ * the axe in the chest's first slot, the wood in the chest, its hands and storage empty. When
+ * something's wrong (no axe, a cliff too high) it comes home all the same, tidy, and says why.
  */
 public class TreeJobGameTest {
-	/** Where it starts, facing east (+X), and the chest in front of it. */
+	/** Where it starts, facing east (+X), and the chest behind it. */
 	private static final BlockPos START = new BlockPos(1, 1, 1);
-	private static final BlockPos CHEST = START.east();
-	/** The tree: its lowest log this far up and ahead of the golem; two logs, leaves over them. */
-	private static final int UP = 3;
+	private static final BlockPos CHEST = START.west();
+	/** The axe's slot in the chest: not the first (it finds it wherever it is). */
+	private static final int AXE_SLOT = 4;
+	/** The tree: on a cliff this many blocks ahead, its lowest log this far up; two logs, leaves over them. */
 	private static final int FORWARD = 3;
+	private static final int UP = 2;
 	private static final int LOGS = 2;
-	private static final BlockPos TRUNK = START.above(UP).east(FORWARD);
+	private static final BlockPos TRUNK = START.east(FORWARD).above(UP);
 
-	private static void tree(GameTestHelper helper) {
+	private static void tree(GameTestHelper helper, boolean axe) {
 		for (int x = 0; x < 8; x++) {
 			for (int z = 0; z < 8; z++) {
 				helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
 			}
 		}
-		// The ledge: under the trunk and the golem's spot beside it.
-		for (int x = TRUNK.getX() - 1; x <= TRUNK.getX() + 1; x++) {
-			for (int z = TRUNK.getZ() - 1; z <= TRUNK.getZ() + 1; z++) {
-				helper.setBlock(new BlockPos(x, TRUNK.getY() - 1, z), Blocks.STONE);
-			}
+		// The cliff: stone under the trunk, up to it.
+		for (int y = START.getY(); y < TRUNK.getY(); y++) {
+			helper.setBlock(TRUNK.atY(y), Blocks.STONE);
 		}
 		for (int log = 0; log < LOGS; log++) {
 			helper.setBlock(TRUNK.above(log), Blocks.OAK_LOG);
@@ -65,8 +65,10 @@ public class TreeJobGameTest {
 			}
 		}
 		helper.setBlock(crown.above(), Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
-		helper.setBlock(CHEST, Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.WEST));
-		helper.getBlockEntity(CHEST, ChestBlockEntity.class).setItem(0, new ItemStack(Items.IRON_AXE));
+		helper.setBlock(CHEST, Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.EAST));
+		if (axe) {
+			helper.getBlockEntity(CHEST, ChestBlockEntity.class).setItem(AXE_SLOT, new ItemStack(Items.IRON_AXE));
+		}
 	}
 
 	/** The golem: a board booting mcos off its disk, a screen, its crafting card and its energy field card. */
@@ -107,41 +109,84 @@ public class TreeJobGameTest {
 		return count;
 	}
 
-	@GameTest(maxTicks = 3000) // (mcos boots off the disk first: a board call a read)
-	public void aGolemFliesUpToATreeCutsItAndBringsTheWoodHome(GameTestHelper helper) throws IOException {
-		tree(helper);
-		BotGolem golem = golem(helper);
-		// The program, and a service running it at boot (as the manual's tutorial makes one).
+	/** The job, as a service started at boot with these arguments; its output file. */
+	private static Path job(GameTestHelper helper, BotGolem golem, String args) throws IOException {
 		Path disk = CaseBlockEntity.diskFolder(helper.getLevel().getServer(), golem.board().parts().getItem(CaseMenu.SATA_SLOTS).get(ModComponents.SERIAL));
 		Files.writeString(disk.resolve("home/golem-tree.lua"), example("golem-tree"));
 		Files.writeString(disk.resolve("etc/rc.d/treejob"), """
 			description = "the tree job"
 			command = "/bin/lua"
-			command_args = {"/home/golem-tree.lua", "%d", "%d"}
+			command_args = "/home/golem-tree.lua %s"
 			output_log = "/home/tree.out"
-			""".formatted(UP, FORWARD));
+			""".formatted(args));
 		Files.writeString(disk.resolve("etc/rc.conf"), Files.readString(disk.resolve("etc/rc.conf")) + "treejob_enable=YES\n");
 		helper.runAfterDelay(1, () -> golem.board().pressPower());
+		return disk.resolve("home/tree.out");
+	}
+
+	private static String read(Path out) {
+		try {
+			return Files.exists(out) ? Files.readString(out) : "(nothing yet)";
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+
+	/** Home and tidy: on its legs where it started, its hands and storage empty, the axe in the chest's first slot (when it had one). */
+	private static void homeAndTidy(GameTestHelper helper, BotGolem golem, ChestBlockEntity chest, Path out, boolean axe) {
+		helper.assertTrue(golem.legs(), "on its legs; its output: " + read(out));
+		helper.assertTrue(golem.blockPosition().equals(helper.absolutePos(START)), "home: " + golem.blockPosition() + "; " + read(out));
+		helper.assertTrue(golem.getMainHandItem().isEmpty() && golem.getOffhandItem().isEmpty(), "its hands empty: " + golem.getMainHandItem() + ", " + golem.getOffhandItem());
+		var storage = golem.board().parts().getItem(CaseMenu.EXP_SLOTS + 1).getOrDefault(net.minecraft.core.component.DataComponents.CONTAINER,
+			net.minecraft.world.item.component.ItemContainerContents.EMPTY);
+		helper.assertTrue(storage.nonEmptyItemCopyStream().findAny().isEmpty(), "its storage empty: " + storage);
+		if (axe) {
+			helper.assertTrue(chest.getItem(0).is(Items.IRON_AXE), "the axe in the chest's first slot: " + chest.getItem(0));
+		}
+		helper.assertTrue(helper.getLevel().getEntitiesOfClass(GolemLegs.class, new AABB(helper.absolutePos(BlockPos.ZERO)).inflate(8)).isEmpty(), "no legs left lying about");
+	}
+
+	@GameTest(maxTicks = 3000) // (mcos boots off the disk first: a board call a read)
+	public void aGolemFliesToATreeOnACliffCutsItAndBringsTheWoodHomeReadyToRunAgain(GameTestHelper helper) throws IOException {
+		tree(helper, true);
+		BotGolem golem = golem(helper);
+		Path out = job(helper, golem, "");
 		ChestBlockEntity chest = helper.getBlockEntity(CHEST, ChestBlockEntity.class);
 		helper.succeedWhen(() -> {
-			String out;
-			try {
-				out = Files.exists(disk.resolve("home/tree.out")) ? Files.readString(disk.resolve("home/tree.out")) : "(nothing yet)";
-			} catch (IOException e) {
-				throw new UncheckedIOException(e);
-			}
-			helper.assertTrue(count(chest, Items.OAK_LOG) == LOGS, "the wood in the chest: " + count(chest, Items.OAK_LOG) + "; its program's output: " + out
-				+ "; the golem: holding " + golem.getMainHandItem() + ", legs " + golem.legs() + ", held " + com.payonel.modularcomputers.entity.EnergyField.held(golem)
-				+ ", at " + golem.position().subtract(helper.absoluteVec(Vec3.ZERO)) + ", robotics " + golem.robotics().state() + ", screen: "
-				+ golem.terminal().buffer().row(0).strip() + " / " + golem.terminal().buffer().row(1).strip() + " / " + golem.terminal().buffer().row(2).strip());
-			helper.assertTrue(count(chest, Items.IRON_AXE) == 1, "the axe back in the chest");
+			helper.assertTrue(read(out).contains("brought them home"), "its output: " + read(out) + "; the golem at "
+				+ golem.position().subtract(helper.absoluteVec(Vec3.ZERO)) + ", robotics " + golem.robotics().state());
+			helper.assertTrue(count(chest, Items.OAK_LOG) == LOGS, "the wood in the chest: " + count(chest, Items.OAK_LOG));
 			for (int log = 0; log < LOGS; log++) {
 				helper.assertBlockPresent(Blocks.AIR, TRUNK.above(log));
 			}
-			helper.assertTrue(golem.legs(), "on its legs");
-			helper.assertTrue(golem.blockPosition().equals(helper.absolutePos(START)), "home: " + golem.blockPosition());
-			helper.assertTrue(helper.getLevel().getEntitiesOfClass(GolemLegs.class, new AABB(helper.absolutePos(BlockPos.ZERO)).inflate(8)).isEmpty(),
-				"no legs left lying about");
+			homeAndTidy(helper, golem, chest, out, true);
+		});
+	}
+
+	@GameTest(maxTicks = 2000)
+	public void withNoAxeInTheChestItSaysSoAndStaysHomeTidy(GameTestHelper helper) throws IOException {
+		tree(helper, false);
+		BotGolem golem = golem(helper);
+		golem.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.OAK_PLANKS, 3)); // (something in its way)
+		Path out = job(helper, golem, "");
+		ChestBlockEntity chest = helper.getBlockEntity(CHEST, ChestBlockEntity.class);
+		helper.succeedWhen(() -> {
+			helper.assertTrue(read(out).contains("there's no axe in the chest behind me, so I came home"), "its output: " + read(out));
+			helper.assertTrue(count(chest, Items.OAK_PLANKS) == 3, "what it held, put in the chest");
+			homeAndTidy(helper, golem, chest, out, false);
+		});
+	}
+
+	@GameTest(maxTicks = 3000)
+	public void aCliffTooHighItComesHomeTidyAndSaysWhy(GameTestHelper helper) throws IOException {
+		tree(helper, true);
+		BotGolem golem = golem(helper);
+		Path out = job(helper, golem, "8 1"); // (it climbs one block at most: the cliff is two)
+		ChestBlockEntity chest = helper.getBlockEntity(CHEST, ChestBlockEntity.class);
+		helper.succeedWhen(() -> {
+			helper.assertTrue(read(out).contains("while looking for a tree, I found a cliff") && read(out).contains("so I came home"), "its output: " + read(out));
+			helper.assertBlockPresent(Blocks.OAK_LOG, TRUNK);
+			homeAndTidy(helper, golem, chest, out, true);
 		});
 	}
 }
