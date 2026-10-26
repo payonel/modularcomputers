@@ -1,4 +1,4 @@
--- Walk out, say where it is, and walk home: its pose (where it is from its origin, the way it faced
+-- Walk out, say where it is, and walk home: its position (where it is from its origin, the way it faced
 -- when it started) is exact, so walkTo(0, 0, 0) brings it back onto the very block it started on.
 --   lua robotics-home.lua [forward [right]]     (3 and 2 when not given)
 local devices = require("devices")
@@ -35,8 +35,8 @@ local function go(ok, why)
 end
 
 local function where()
-  local pose = robot.pose()
-  print(string.format("at %s forward, %s right, %s up, facing %s", pose.forward, pose.right, pose.up, pose.heading))
+  local at = robot.position()
+  print(string.format("at %s forward, %s right, %s up, facing %s", at.forward, at.right, at.up, at.heading))
 end
 
 go(robot.walk(FORWARD, RIGHT))

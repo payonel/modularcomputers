@@ -14,7 +14,7 @@ The robot knows nothing of where it is in the world, not even which way is north
 named in its own frame, `front`, `back`, `left`, `right`, `up` and `down`, its left and right its own
 (as it turns and walks), and a block's direction it reads (a door's `facing`) is in that frame too.
 But it always knows exactly how far it is from where it started, as a real robot's odometry does:
-its [pose](#where-it-is-its-pose).
+its [position](#where-it-is-its-position).
 
 <div class="infobox" markdown="1">
 
@@ -31,22 +31,22 @@ its [pose](#where-it-is-its-pose).
 ## In mcos
 
 `/dev/robotics0` reads as what it's doing now, a word (`idle`, `walking`, `turning`, `breaking`,
-`flying`, `hovering` or `landing`), then its pose, a line: `pose forward right up heading`. A line
+`flying`, `hovering` or `landing`), then where it is, a line: `position forward right up heading`. A line
 written is an action, taking effect as it's written:
 
 | Line | Does |
 |---|---|
 | `walk forward [right [up]]` | Walks whole blocks from where it is, in its own frame |
-| `walkto forward [right [up]]` | Walks to whole blocks from its pose's origin, in the origin's frame |
+| `walkto forward [right [up]]` | Walks to whole blocks from its origin, in the origin's frame |
 | `fly forward [right [up]]` | Flies on its thrusters that far from where it is, its legs left standing |
-| `flyto forward [right [up]]` | Flies to a point from its pose's origin |
+| `flyto forward [right [up]]` | Flies to a point from its origin |
 | `hover` | Holds itself where it is on its thrusters |
 | `land` | Comes down onto its legs, below it |
 | `turn left`, `turn right`, `turn around` | Turns a right angle in place (or two) |
 | `use face` | Uses what it holds on the space at a face |
 | `swing face` | Swings what it holds at a face: hits a mob, or breaks the block |
 | `stop` | Stops, on the last block's middle it reached (flying: it hovers there) |
-| `reset` | Makes where it is its pose's origin |
+| `origin [forward [right [up [heading]]]]` | Sets its origin, where it is being that far from it (none: here) |
 | `pathfinding on`, `pathfinding off` | Whether its moves find their way round things |
 
 A line that isn't one fails the write with `EINVAL`. How an action went comes as an event: the
@@ -91,8 +91,8 @@ way is given up. It fails with `whole blocks expected` or `too far: at most 64 b
 
 ### walkTo(forward[, right[, up]]) → true
 
-Walks, as `walk` does, to the block that many whole blocks from its pose's origin, in the origin's
-frame: the numbers `pose` gives. `walkTo(0, 0, 0)` goes home.
+Walks, as `walk` does, to the block that many whole blocks from its origin, in the origin's
+frame: the numbers `position` gives. `walkTo(0, 0, 0)` goes home.
 
 ### turn(way) → true
 
@@ -105,16 +105,21 @@ origin's.
 Stops walking, turning, flying or landing: a walk stops on the middle of the last block it reached,
 facing as it was; a flight hovers where it is. Its event, when it was doing something: `stopped`.
 
-### pose() → {forward, right, up, heading}
+### position() → {forward, right, up, heading}
 
-Where it is from its pose's origin, in the origin's frame: blocks forward, to the right and up, and
-its heading in degrees to the origin's right (0, 90, 180 or 270). Exact: after a walk the numbers
-are whole; a shove (on its thrusters) shows as a fraction. See [its pose](#where-it-is-its-pose).
+Where it is from its origin, in the origin's frame: blocks forward, to the right and up, and its
+heading in degrees to the origin's right (0, 90, 180 or 270). Exact: after a walk the numbers are
+whole; a shove (on its thrusters) shows as a fraction. See [where it is](#where-it-is-its-position).
 
-### resetPose() → true
+### setOrigin([forward[, right[, up[, heading]]]]) → true
 
-Makes where it is its pose's origin, in this dimension: it moves onto its block's middle and turns
-to the nearest right angle, and its pose is all zeros.
+Sets its origin, in this dimension, so that where it is now is that far from it: whole blocks
+forward, right and up in the origin's frame, and facing `heading` degrees to the origin's right (0,
+90, 180 or 270). Each is 0 when not given, so `setOrigin()` makes where it is the origin, and its
+position all zeros. It moves onto its block's middle and turns to the nearest right angle first.
+From a place whose position you know in another frame (a map's, a GPS's), it gives `position` that
+frame: `setOrigin(12, -3, 0, 90)` says "I'm 12 forward, 3 left of its origin, facing its right".
+Fails with `whole blocks expected` or `a right angle expected`.
 
 ### setPathfinding(on) → true
 
@@ -210,10 +215,10 @@ field holding it lets go. Its event: `landed`, or `blocked` and why (`something 
 legs are gone`: it hovers there). Fails with `no legs there to land on` (it goes on hovering) or
 `already on its legs`. A right click pops legs up into an inventory, its own `use` too.
 
-### get() → {state, legs, pathfinding, pose}
+### get() → {state, legs, pathfinding, position}
 
 What it's doing now (`idle`, `walking`, `turning`, `breaking`, `flying`, `hovering` or `landing`),
-whether it stands on its legs, whether it finds its way round things, and its pose.
+whether it stands on its legs, whether it finds its way round things, and where it is.
 
 ### set(action) → true
 
@@ -225,22 +230,22 @@ up}`, `{action = "turn", way}`, `{action = "use", face}`, `{action = "swing", fa
 
 Its oldest event, or nil.
 
-## Where it is: its pose
+## Where it is: its position
 
-A robot always knows exactly how far it is from its pose's origin, and which way it faces from
-the origin's way, as a real robot's odometry does: what moves it (walking, flying, a field
-carrying it, a shove) moves its pose. Not where it is in the world: no compass, no coordinates.
+A robot always knows exactly how far it is from its origin, and which way it faces from the
+origin's way, as a real robot's odometry does: what moves it (walking, flying, a field carrying
+it, a shove) moves its position. Not where it is in the world: no compass, no coordinates.
 
 - **Its origin** is where it stood, on its block's middle, and the way it faced, a right angle. It's
-  set the first time the golem runs (powered on, or set down), by `resetPose`, and in each
+  set the first time the golem runs (powered on, or set down), by `setOrigin`, and in each
   dimension it first comes to: each dimension keeps its own, so back in the overworld it has its old
   origin again.
 - **It lasts**: through reboots, power cuts, shoves and field flight. It's lost only when the golem
-  is picked up (its item keeps no pose): set down again, it has a new origin there.
+  is picked up (its item keeps no position): set down again, it has a new origin there.
 - **Its heading is always a right angle** from the origin's: a move begins by squaring it up, and
   ends by giving it back, so pathfinding's turns never leave it facing a new way.
 
-So a program can always say where to go from home: `walkTo(3, 0, 5)`, or `walk` and check `pose`.
+So a program can always say where to go from home: `walkTo(3, 0, 5)`, or `walk` and check `position`.
 
 ## Walking
 
@@ -301,7 +306,7 @@ Fly up on its thrusters, look round, and land back on its legs:
 {% include robotics-fly.lua %}
 ```
 
-Walk somewhere and back home with `walkTo`, from its pose:
+Walk somewhere and back home with `walkTo`, from its origin:
 
 ```lua
 {% include robotics-home.lua %}

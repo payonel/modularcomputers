@@ -34,8 +34,8 @@ same. It never acts on its own: a program drives it.
 ## Use
 
 Use the golem item on a block: the golem stands there, facing the nearest right angle to you, on its
-block's middle: that's its pose's origin, from which it always knows exactly how far it is (see
-[its pose](/devices/robotics/#where-it-is-its-pose)). Its walks are whole blocks, straight, and end
+block's middle: that's its origin, from which it always knows exactly how far it is (see
+[its position](/devices/robotics/#where-it-is-its-position)). Its walks are whole blocks, straight, and end
 exactly where asked, unless you turn its pathfinding on. Right-click it to see its
 screen (when its face has one), or crouch and right-click for its parts. Hit it to pick it up: it
 drops as its item, its parts and its board's id kept in it, as a broken case keeps them. Holding

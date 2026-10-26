@@ -32,7 +32,7 @@ class RoboticsExamplesTest extends McosHarness {
 	}
 
 	/** Where the stand-in is from its origin: forward, right (its walks move it). */
-	private long[] poseAt = {0, 0};
+	private long[] at = {0, 0};
 
 	/** How many walks it makes before one is blocked (-1: none is). */
 	private int wallAfter = -1;
@@ -42,7 +42,7 @@ class RoboticsExamplesTest extends McosHarness {
 			@Override
 			public String walk(double forward, double right, double up) {
 				asked.add("walk " + (long) forward + " " + (long) right + " " + (long) up);
-				poseAt = new long[] {poseAt[0] + (long) forward, poseAt[1] + (long) right};
+				at = new long[] {at[0] + (long) forward, at[1] + (long) right};
 				boolean wall = wallAfter == 0;
 				wallAfter--;
 				server.add(wall ? () -> robotics.blocked("no way there") : robotics::arrived);
@@ -79,14 +79,14 @@ class RoboticsExamplesTest extends McosHarness {
 			@Override
 			public String walkTo(double forward, double right, double up) {
 				asked.add("walkTo " + (long) forward + " " + (long) right + " " + (long) up);
-				poseAt = new long[] {(long) forward, (long) right};
+				at = new long[] {(long) forward, (long) right};
 				server.add(robotics::arrived);
 				return null;
 			}
 
 			@Override
-			public Result pose() {
-				return Result.ok(java.util.Map.of("forward", poseAt[0], "right", poseAt[1], "up", 0L, "heading", 0L));
+			public Result position() {
+				return Result.ok(java.util.Map.of("forward", at[0], "right", at[1], "up", 0L, "heading", 0L));
 			}
 
 			@Override

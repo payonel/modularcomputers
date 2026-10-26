@@ -153,12 +153,12 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	/** Whether its moves find their way round things (the game's pathfinder) or go straight: off by default, lost when it's picked up. */
 	private boolean pathfinding;
 	/**
-	 * Its pose's origins, a dimension's each (by its id): where it stood and faced when its pose was
-	 * last reset there. Kept through reboots and shoves; lost when it's picked up (an item keeps none).
+	 * Its origins, a dimension's each (by its id): where its position is measured from there, and the
+	 * way its forward is. Kept through reboots and shoves; lost when it's picked up (an item keeps none).
 	 */
 	private final Map<String, Origin> origins = new HashMap<>();
 
-	/** A pose's origin: the middle of the block it stood on, and its heading, a right angle. */
+	/** An origin: a block's middle, and its frame's forward (a yaw, a right angle). */
 	record Origin(Vec3 at, float yaw) {
 	}
 	/** The heading a turn is going to, in degrees (NaN: none). */
@@ -328,7 +328,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			goal = GolemSteps.elevation(getY()) + (int) up;
 			if (pathfinding) {
 				target = start.add(inFrame(forward, right, 0)).add(0, up, 0);
-				walkedFrom = position();
+				walkedFrom = BotGolem.this.position();
 				pathed = false; // (its tick finds the way, once it stands: the game plans no path for a mob in the air)
 				return null;
 			}
@@ -416,7 +416,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				return "held in a field: its field moves it";
 			}
 			Vec3 to = fromOrigin(forward, right, up).add(0, LEG_HEIGHT, 0); // (its torso's height, its feet there)
-			if (to.distanceTo(position()) > RoboticsDevice.MAX_FLIGHT * Math.sqrt(3)) {
+			if (to.distanceTo(BotGolem.this.position()) > RoboticsDevice.MAX_FLIGHT * Math.sqrt(3)) {
 				return "too far: at most " + (int) RoboticsDevice.MAX_FLIGHT + " blocks each way";
 			}
 			begin();
@@ -425,13 +425,14 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 
 		@Override
-		public Result pose() {
-			return Result.ok(BotGolem.this.pose());
+		public Result position() {
+			return Result.ok(BotGolem.this.positionFromOrigin());
 		}
 
 		@Override
-		public void resetPose() {
-			BotGolem.this.resetPose();
+		public String setOrigin(long forward, long right, long up, int heading) {
+			BotGolem.this.setOrigin(forward, right, up, heading);
+			return null;
 		}
 
 		@Override
@@ -467,8 +468,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			}
 			// Its legs below it: within reach to its side, at its height or under it.
 			GolemLegs below = level().getEntitiesOfClass(GolemLegs.class, getBoundingBox().inflate(LEGS_REACH, RoboticsDevice.MAX_FLIGHT, LEGS_REACH), GolemLegs::isAlive)
-				.stream().filter(legs -> legs.getY() <= getY() + ON_LEGS && legs.position().subtract(position()).horizontalDistance() <= LEGS_REACH)
-				.min(java.util.Comparator.comparingDouble(legs -> legs.position().distanceTo(position()))).orElse(null);
+				.stream().filter(legs -> legs.getY() <= getY() + ON_LEGS && legs.position().subtract(BotGolem.this.position()).horizontalDistance() <= LEGS_REACH)
+				.min(java.util.Comparator.comparingDouble(legs -> legs.position().distanceTo(BotGolem.this.position()))).orElse(null);
 			if (below == null) {
 				return "no legs there to land on";
 			}
@@ -652,7 +653,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				placed = true;
 				board.placed();
 			}
-			origin(); // (its first tick here, or a dimension it's new to: its pose's origin, where it is)
+			origin(); // (its first tick here, or a dimension it's new to: its origin, where it is)
 			move();
 			thrust();
 			hands.tick();
@@ -660,7 +661,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 	}
 
-	// ---- its pose and its moves' frame ---------------------------------------------------------
+	// ---- its position and its moves' frame ---------------------------------------------------------
 
 	/** A heading turned to the nearest right angle. */
 	static float rightAngle(float yaw) {
@@ -677,53 +678,60 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		return getY() - (legs() ? 0 : LEG_HEIGHT);
 	}
 
-	/** This dimension's id: each has its own pose. */
+	/** This dimension's id: each has its own origin. */
 	private String dimension() {
 		return level().dimension().identifier().toString();
 	}
 
-	/** Its pose's origin here, made now if it has none (its first power-on, or a dimension it's new to). */
+	/** Its origin here, made now if it has none (its first power-on, or a dimension it's new to): where it stands. */
 	private Origin origin() {
 		Origin origin = origins.get(dimension());
 		if (origin == null) {
-			resetPose();
+			setOrigin(0, 0, 0, 0);
 			origin = origins.get(dimension());
 		}
 		return origin;
 	}
 
-	/** Makes where it is its pose's origin here: onto its block's middle, facing the nearest right angle. */
-	public void resetPose() {
+	/**
+	 * Sets its origin here so that where it is (moved onto its block's middle, turned to the nearest
+	 * right angle) is {@code forward}, {@code right}, {@code up} blocks from it, facing
+	 * {@code heading} degrees to the origin's right (a right angle): all 0, its origin where it is.
+	 */
+	public void setOrigin(long forward, long right, long up, int heading) {
 		Vec3 middle = middle();
 		setPos(middle.x, getY(), middle.z);
 		face(rightAngle(getYRot()));
-		origins.put(dimension(), new Origin(new Vec3(middle.x, feet(), middle.z), getYRot()));
+		float originYaw = Mth.positiveModulo(getYRot() - heading, 360f);
+		float yaw = originYaw * Mth.DEG_TO_RAD;
+		Vec3 offset = new Vec3(-Mth.sin(yaw) * forward - Mth.cos(yaw) * right, up, Mth.cos(yaw) * forward - Mth.sin(yaw) * right);
+		origins.put(dimension(), new Origin(new Vec3(middle.x, feet(), middle.z).subtract(offset), originYaw));
 	}
 
-	/** Where it is from its origin, in the origin's frame: {forward, right, up, heading}. */
-	public Map<String, Object> pose() {
+	/** Where it is from its origin, in the origin's frame: {forward, right, up, heading} (the robotics device's position). */
+	public Map<String, Object> positionFromOrigin() {
 		Origin origin = origin();
 		Vec3 d = new Vec3(getX(), feet(), getZ()).subtract(origin.at());
 		float yaw = origin.yaw() * Mth.DEG_TO_RAD;
-		Map<String, Object> pose = new LinkedHashMap<>();
-		pose.put("forward", tidy(d.dot(new Vec3(-Mth.sin(yaw), 0, Mth.cos(yaw)))));
-		pose.put("right", tidy(d.dot(new Vec3(-Mth.cos(yaw), 0, -Mth.sin(yaw)))));
-		pose.put("up", tidy(d.y));
-		pose.put("heading", tidy(Mth.positiveModulo(getYRot() - origin.yaw(), 360f)));
-		return pose;
+		Map<String, Object> position = new LinkedHashMap<>();
+		position.put("forward", tidy(d.dot(new Vec3(-Mth.sin(yaw), 0, Mth.cos(yaw)))));
+		position.put("right", tidy(d.dot(new Vec3(-Mth.cos(yaw), 0, -Mth.sin(yaw)))));
+		position.put("up", tidy(d.y));
+		position.put("heading", tidy(Mth.positiveModulo(getYRot() - origin.yaw(), 360f)));
+		return position;
 	}
 
-	/** A pose's number: whole when it's within a hair of whole (a sine's rounding isn't a program's business). */
+	/** A position's number: whole when it's within a hair of whole (a sine's rounding isn't a program's business). */
 	private static Object tidy(double value) {
 		double whole = Math.rint(value);
-		if (Math.abs(value - whole) < POSE_HAIR) {
+		if (Math.abs(value - whole) < HAIR) {
 			return (long) whole;
 		}
 		return value;
 	}
 
-	/** How near a whole number a pose's counts as it, in blocks or degrees. */
-	private static final double POSE_HAIR = 1e-6;
+	/** How near a whole number a position's counts as it, in blocks or degrees. */
+	private static final double HAIR = 1e-6;
 
 	/** The point {@code forward}, {@code right} and {@code up} blocks from its origin, in the origin's frame. */
 	private Vec3 fromOrigin(double forward, double right, double up) {
@@ -1091,7 +1099,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		if (Double.isNaN(floor)) {
 			return fits(next.x, here, next.z) ? "too far down" : "a wall";
 		}
-		BlockPos feet = BlockPos.containing(next.x, floor + POSE_HAIR, next.z);
+		BlockPos feet = BlockPos.containing(next.x, floor + HAIR, next.z);
 		var state = level().getBlockState(feet);
 		if (state.getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) {
 			return "lava";
@@ -1127,7 +1135,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				continue;
 			}
 			double surface = y + shape.max(net.minecraft.core.Direction.Axis.Y);
-			if (surface > feet + GolemSteps.MAX_JUMP + POSE_HAIR || surface < feet - GolemSteps.MAX_DROP - POSE_HAIR) {
+			if (surface > feet + GolemSteps.MAX_JUMP + HAIR || surface < feet - GolemSteps.MAX_DROP - HAIR) {
 				continue;
 			}
 			if (fits(x, surface, z)) {

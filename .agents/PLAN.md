@@ -83,10 +83,17 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 
 ## Robots: the bot golem, then drones
 
-- **Walking, decided and built (2026-10-25):** a pose (odometry from an origin a dimension), whole-
+- **A GPS card** (the user's, 2026-10-26: players may work in world coordinates if they choose):
+  a card that gives where it is in the world, data only, never coupled to the robotics device (no
+  method added to it, no talking to it). A program uses its numbers, optionally, with the robotics
+  device's `setOrigin(forward, right, up, heading)` (where it is, from an origin) to put its
+  position in the world's frame. Open: the axes (forward north (-z), right east (+x), up y, so a
+  program passes its fix as `-z, x, y`); its heading (a fix has none, as a real GPS's: move a block
+  and fix again); its precision (whole blocks, a block's middle), range or satellites.
+- **Walking, decided and built (2026-10-25):** a position (odometry from an origin a dimension), whole-
   block walks ending exactly, straight without pathfinding (the default), the game's pathfinder as
-  a mode, walkTo/flyTo from the pose. Still to consider: whether the field card's moves should land
-  on block middles too (they're exact offsets now), and a GPS card for world positions.
+  a mode, walkTo/flyTo from the origin. Still to consider: whether the field card's moves should land
+  on block middles too (they're exact offsets now).
 - **The bot golem** (user design, 2026-10-24), next to build: an entity a block in size, an iron
   golem's look, walking as fast as a player. Its GUI is a case's (CPU, RAM, EEPROM, disk, battery,
   cards: none soldered) in the golem's own art, and it holds only a tier 1 screen. One slot holds a
@@ -143,7 +150,7 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   DiskGameTest.aNewEepromBootsMcosFromATier1Disk, "waiting for a key on tick 402"): it passed on
   Fabric in the same run and twice on NeoForge alone. A tick deadline on mcos's boot is a timing
   bug under load: make the test wait for the state it needs, not a tick count.
-- **A save test failed once under testAll's load** (2026-10-25, LuaRunnerTest.aSaveCarriesOutNoCalls...,
+- **A save test fails now and then under testAll's load** (2026-10-25, and again 2026-10-26, LuaRunnerTest.aSaveCarriesOutNoCalls...,
   "the save made no call": the counter was 1): it passes alone and with its class, every time. The
   test waits for queuedCalls() > 0, then persists; nothing in it serves the server queue, so no call
   should be made. Find what made it (a call answered off the server thread? queuedCalls counting a

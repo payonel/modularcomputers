@@ -306,14 +306,15 @@ robotics device soldered onto the last lane (`/dev/robotics0`), the only way it 
 never acts on its own (no goals). The device walks it to a point relative to itself, at a player's
 walking pace, turns it, and stops it; each ends in an event. **Its moves are deterministic** (the
 user's design, 2026-10-25): it knows no world position (a GPS card later) but always its exact
-**pose**, odometry from an origin a dimension (set at its first tick there or by `resetPose`, on a
+**position** (the user's word: robotics' "pose"), odometry from an origin a dimension (set at its
+first tick there or by `setOrigin`, where it is or so that where it is is a given place: a GPS's, on a
 block's middle at a right angle; kept through reboots, shoves, fields; lost only when it's an item),
 and `walkTo`/`flyTo` go to points from it. A walk is whole blocks and ends on the asked block's
 middle, facing as it began (a move squares its heading up, and gives it back), or `blocked` on the
 last middle reached; turns are right angles. Without pathfinding (the default) it walks straight,
 forward then right, never turning (it strafes and backs up), by `GolemSteps`: free within its
 elevation (the block its feet are in: slabs), a block up at a time only toward `up`, down three at
-most only toward it. With pathfinding (`setPathfinding`, kept like the pose) the game's pathfinder
+most only toward it. With pathfinding (`setPathfinding`, kept like the origin) the game's pathfinder
 walks it, the flying one flies it, ending exactly all the same. It names faces in its own frame only (`front`, `back`, `left`,
 `right`, `up`, `down`; its left its own, as it turns and walks: not `Face`'s, where left is a
 viewer's), since it knows no compass; a block's direction it reads is turned into that frame. It
