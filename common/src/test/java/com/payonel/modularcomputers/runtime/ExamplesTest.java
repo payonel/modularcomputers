@@ -72,4 +72,32 @@ class ExamplesTest extends McosHarness {
 		untilFile(root().resolve("status"), "3\n"); // (LSB's "not running")
 		assertThat(read(log)).as("started, its ticks, then its own last line").containsPattern("started, a line every 2 seconds\n(.* tick \\d+\n)+.* stopped after \\d+ ticks\n$");
 	}
+
+	/**
+	 * The manual's three layers, each the same job (the lever on the west follows to the lamp on the
+	 * east): layer 2 through mcos's sys (a file, its poll and its ioctls), layer 3 through the devices
+	 * library (layer 1, an OS of its own, is OwnOsExamplesTest's).
+	 */
+	@Test
+	void theSysLayersLampFollowsTheLever() {
+		lampFollows("layers-sys");
+	}
+
+	@Test
+	void theDevicesLayersLampFollowsTheLever() {
+		lampFollows("layers-devices");
+	}
+
+	private void lampFollows(String program) {
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		devices.put(Motherboard.exp(0), card);
+		boot();
+		file("lamp.lua", example(program));
+		type("lua /lamp.lua > /dev/null &\r");
+		untilIdle(); // (waiting on the card: a disk file shows its writes only at close, so no output to wait for)
+		server.add(() -> card.sense(3, 15)); // west: the lever on
+		settle(() -> card.output(2) == 15); // east: the lamp lit
+		server.add(() -> card.sense(3, 0));
+		settle(() -> card.output(2) == 0);
+	}
 }

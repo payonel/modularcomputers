@@ -562,7 +562,9 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   (`CREATE /dev/charger0`, udev's way), so a program waits for a device as for a file.
 - **`lib/devices.lua` is user space's convenience over `/dev`, `/sys` and inotify** (the user's;
   `sys` stays the kernel's calls): a device opened as a table of its methods (ioctls; `tostring` a
-  method's doc, as OpenComputers' proxies), the bus listed, `devices.wait` for one to come.
+  method's doc, as OpenComputers' proxies), the bus listed, `devices.wait` for one to come,
+  `devices.event` for its next event (the poll and the pull). The manual teaches the three layers
+  side by side (the board, `sys`, `devices`: concepts/device-layers, tutorials/device-layers).
 - **`sys.poll(fds, seconds)`** is poll(2) (`IN`, `PRI`, `OUT`; `HUP`, `ERR` unasked), in `sys` (mcos's
   POSIX layer), since Lua's `io` is C's stdio; `sys.fileno` gives an io file's descriptor. A
   redstone file is always readable and reports a change as `PRI` (a sysfs GPIO's way).

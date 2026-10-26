@@ -3,7 +3,7 @@
 Section / path (under `docs/`) — owner
 
 Start: `index.md` (front page), `install.md`
-Concepts: `concepts/index.md`, `bus.md`, `faces.md`, `power.md`, `interrupts.md`, `names.md`, `persistence.md`
+Concepts: `concepts/index.md`, `bus.md`, `faces.md`, `power.md`, `interrupts.md`, `device-layers.md`, `names.md`, `persistence.md`
 Hardware: `hardware/index.md`, `case.md` (tiers 1-3), `broken-case.md`, `screen.md`,
   `cpu.md`, `memory.md`, `eeprom.md`, `disk.md`, `battery.md`, `cable.md`, `expansion-hub.md`,
   `disk-station.md`, `photomask.md`, `robotic-piston.md`, `bot-golem.md`, `charging-pad.md`
@@ -15,7 +15,7 @@ mcos: `mcos/index.md`, `boot.md`, `filesystem.md`, `shell.md`, `dev.md`, `networ
   `services.md`, `programs.md` (writing programs), `sys-api.md`, `devices-library.md`, `remote-shell.md`
 Programs: `programs/index.md` and `programs/<name>.md` per man page (generated)
 Tutorials: `tutorials/index.md`, `first-computer.md`, `first-program.md`, `redstone.md`,
-  `two-computers.md`, `disk-station.md`, `service.md`, `from-opencomputers.md`
+  `two-computers.md`, `disk-station.md`, `service.md`, `device-layers.md`, `from-opencomputers.md`
 Your own OS (`os/`): `index.md`, `boot.md`, `keyboard.md`, `shell.md`, `devices.md`
 
 Links are root-relative with a trailing slash: `/hardware/case/`, `/programs/ls/`.

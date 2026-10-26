@@ -1,7 +1,7 @@
 ---
 title: Coming from OpenComputers
 section: Tutorials
-order: 8
+order: 9
 ---
 
 Modular Computers is OpenComputers' idea built again, but its computers run mcos, a Linux-like OS,

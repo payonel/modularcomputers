@@ -105,4 +105,18 @@ class OwnOsExamplesTest extends McosHarness {
 		type("off\r");
 		untilOff();
 	}
+
+	/** The manual's layer 1: an OS of its own working the redstone card straight from the board. */
+	@Test
+	void theBoardLayersLampFollowsTheLever() {
+		RedstoneCard card = new RedstoneCard();
+		devices.put(Motherboard.exp(0), card);
+		bootOwn(example("layers-board"));
+		untilWaiting();
+		server.add(() -> card.sense(3, 15)); // west: the lever on
+		settle(() -> card.output(2) == 15); // east: the lamp lit
+		untilWaiting();
+		server.add(() -> card.sense(3, 0));
+		settle(() -> card.output(2) == 0);
+	}
 }

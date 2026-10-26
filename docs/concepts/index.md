@@ -17,6 +17,8 @@ pages say so; where it takes a shortcut, they say that too.
 - [Power](/concepts/power/): what draws power, what stores it, and how watts are shown.
 - [Interrupts](/concepts/interrupts/): how a computer waits for a key, a frame or a sound without
   checking again and again.
+- [Three ways to reach a device](/concepts/device-layers/): the board, mcos's `sys`, and the
+  `devices` library, each built on the one below, and which to use.
 - [Names](/concepts/names/): why one device answers to a slot path, an id and sometimes a virtual name.
 - [Persistence](/concepts/persistence/): how a running computer survives a save, a restart and an
   unloaded chunk, and what a budget means.

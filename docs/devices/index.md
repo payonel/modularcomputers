@@ -48,7 +48,10 @@ kind adds, such as a disk's tier and capacity. Each page lists these.
 
 ## How a program reaches a device
 
-There are two ways, and which one you use depends on where your code runs.
+There are three layers, each built on the one below: the board (code with no OS under it), mcos's
+files (`sys`), and the `devices` library over them. Which you use depends on where your code runs.
+[Three ways to reach a device](/concepts/device-layers/) compares them, and the tutorial
+[One device, three ways](/tutorials/device-layers/) does one job at each.
 
 ### In mcos: files in /dev
 

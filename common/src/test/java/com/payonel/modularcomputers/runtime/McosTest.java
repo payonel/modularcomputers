@@ -406,6 +406,31 @@ class McosTest extends McosHarness {
 		assertThat(read(root().resolve("came"))).as("devices.wait's name, and inotify's notice of /dev").isEqualTo("motion0\nCREATE /dev/motion0\n");
 	}
 
+	/** devices.event: a device's next event, waited for; with seconds and none coming, nil and "timed out"; a device without events refused. */
+	@Test
+	void devicesEventWaitsForADevicesNextEventOrTimesOut() {
+		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
+		devices.put(Motherboard.exp(0), card);
+		file("event.lua", """
+			local devices = require("devices")
+			local card = assert(devices.open("redstone0"))
+			local none, why = devices.event(card, 0.2)
+			local eeprom = assert(devices.open("eeprom"))
+			local _, refused = devices.event(eeprom)
+			io.open("/ready", "w"):close()
+			local change = devices.event(card)
+			local f = io.open("/got", "w"); f:write(tostring(none), " ", why, "\\n", refused, "\\n", change.side, " ", change.level, "\\n"); f:close()
+			""");
+		boot();
+		type("lua /event.lua 2> /err\r");
+		settle(() -> Files.exists(root().resolve("ready")) || Files.exists(root().resolve("err")) && !read(root().resolve("err")).isEmpty());
+		assertThat(Files.exists(root().resolve("err")) ? read(root().resolve("err")) : "").isEmpty();
+		untilIdle();
+		server.add(() -> card.sense(3, 9)); // west: 9 comes in
+		settle(() -> Files.exists(root().resolve("got")) && read(root().resolve("got")).endsWith("\n") && read(root().resolve("got")).split("\n").length == 3);
+		assertThat(read(root().resolve("got"))).isEqualTo("nil timed out\nnot an opened device with events\nwest 9\n");
+	}
+
 	@Test
 	void lsDashLhShowsSizesForPeopleAndColorSaysWhen() {
 		file("s/a", "a");

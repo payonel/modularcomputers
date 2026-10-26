@@ -10,6 +10,7 @@
 --   robot.walk(3)                                   -- an ioctl: the device's walk
 --   for name, method in pairs(robot) do print(name, method) end   -- each its description
 --   local name = devices.wait("charger", 10)        -- the first charger, waiting up to 10 s for one
+--   local event = devices.event(robot)              -- its next event, waiting for one
 local sys = require("sys")
 local fs = require("fs")
 
@@ -156,6 +157,30 @@ function devices.wait(what, seconds)
   end
   sys.close(watch)
   return name
+end
+
+-- devices.event(device[, seconds]): an opened device's next event (its pull method's), waiting for
+-- one if none waits (poll's PRI on its file); with seconds, nil and "timed out" after that long.
+-- The loop every program waiting on a device writes, once.
+function devices.event(device, seconds)
+  local opened = about[device]
+  if not opened or not device.pull then
+    return nil, "not an opened device with events"
+  end
+  local deadline = seconds and sys.uptime() + seconds
+  while true do
+    local got, why = device.pull()
+    if got then
+      return got
+    elseif why then
+      return nil, why
+    end
+    local left = deadline and deadline - sys.uptime()
+    if left and left <= 0 then
+      return nil, "timed out"
+    end
+    sys.poll({[opened.fd] = {PRI = true}}, left)
+  end
 end
 
 return devices

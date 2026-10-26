@@ -24,7 +24,10 @@ wrong.
    and install mcos onto disks with the [Disk Station](/hardware/disk-station/).
 6. [Your own service](/tutorials/service/). For anyone with a program that should keep running.
    Make it a service that runs in the background and starts at boot, with [rc](/programs/rc/).
-7. [Coming from OpenComputers](/tutorials/from-opencomputers/). For OpenComputers players. What you
+7. [One device, three ways](/tutorials/device-layers/). For programmers. The same job (a lever
+   lights a lamp) straight from the board in an OS of your own, through mcos's `sys`, and with the
+   `devices` library: how each waits for a device's events and takes them.
+8. [Coming from OpenComputers](/tutorials/from-opencomputers/). For OpenComputers players. What you
    did with components, signals, the GPU and robots, done the mcos way.
 
 Want to skip mcos altogether? [Your own OS](/os/) is a section of its own: write an operating

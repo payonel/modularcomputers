@@ -55,6 +55,21 @@ for _, device in ipairs(devices.list()) do
 end
 ```
 
+### devices.event(device[, seconds]) → event, or nil and why
+
+An opened device's next event (its `pull` method's), waiting for one if none is waiting: the poll on
+its file for `PRI` and the pull, the loop every program waiting on a device writes. With `seconds`,
+nil and `timed out` after that long. Fails with `not an opened device with events` for a device
+with no `pull` (an EEPROM).
+
+```lua
+local devices = require("devices")
+local robot = assert(devices.open("robotics0"))
+robot.walk(3)
+local done = devices.event(robot)          -- arrived, or blocked and why
+print(done.event, done.why)
+```
+
 ### devices.close(device) → true
 
 Closes its file.
@@ -75,18 +90,27 @@ print("charging pad here: " .. name)
 
 ## Events
 
-A device's events are its file's: wait with `sys.poll` on its descriptor (`devices.info(device).fd`)
-for `PRI`, and take them with its `pull` method.
+A device's events are its file's: `devices.event` waits for the next and takes it. To wait for
+several things at once (a device, a socket, the keyboard), poll them all yourself, its descriptor
+(`devices.info(device).fd`) for `PRI`, and take its events with its `pull` method:
 
 ```lua
 local sys = require("sys")
 local devices = require("devices")
 
 local robot = assert(devices.open("robotics0"))
-robot.walk(5)
 local fd = devices.info(robot).fd
+robot.walk(5)
+local done
 repeat
-  sys.poll({[fd] = {PRI = true}})
-  local event = robot.pull()
-until event and event.event ~= nil
+  local ready = sys.poll({[fd] = {PRI = true}, [0] = {IN = true}})
+  if ready[0] then
+    io.read() -- (a line typed meanwhile)
+  end
+  done = robot.pull()
+until done
+print(done.event)
 ```
+
+See [Three ways to reach a device](/concepts/device-layers/) for how this builds on `sys` and the
+board.
