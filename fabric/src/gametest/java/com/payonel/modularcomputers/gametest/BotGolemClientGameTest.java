@@ -248,6 +248,17 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			context.getInput().setCursorPos(0, 0); // (off the board: no part's tooltip in the picture)
 			context.waitTicks(2);
 			context.takeScreenshot("bot-golem-parts");
+			// Its soldered robotics device, under the mouse: what it is (the user's: it's no item, so it has no item's tooltip).
+			CaseClientGameTest.moveCursorTo(context, screen -> ((com.payonel.modularcomputers.client.screen.CaseScreen) screen).soldered(com.payonel.modularcomputers.machine.GolemLayout.ROBOTICS_LANE));
+			context.waitTicks(2);
+			String soldered = context.computeOnClient(c -> {
+				var screen = (com.payonel.modularcomputers.client.screen.CaseScreen) c.gui.screen();
+				var at = screen.soldered(com.payonel.modularcomputers.machine.GolemLayout.ROBOTICS_LANE);
+				return screen.solderedTooltip(at.x() + at.width() / 2.0, at.y() + at.height() / 2.0).map(lines -> lines.stream().map(line -> line.getString()).toList().toString()).orElse("none");
+			});
+			check(soldered.contains("Robotics Device") && soldered.contains("/dev/robotics0"), "its soldered device's tooltip: " + soldered);
+			context.takeScreenshot("bot-golem-soldered");
+			context.getInput().setCursorPos(0, 0);
 			// A golem in hand: sneaking and using it opens its parts view, on the item (the user's), its hands too.
 			context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE);
 			context.waitFor(c -> c.gui.screen() == null);

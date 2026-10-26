@@ -48,8 +48,8 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 	private static final float CORE_WIDTH = 0.4f;
 	private static final float CORE_LENGTH = 0.75f;
 	/** Each socket's beam: how far to its side of its middle, how long, how wide at the socket and at the tip (half widths), in blocks. */
-	private static final float SOCKET_SIDE = 0.2f;
-	private static final float BEAM_LENGTH = 0.9f;
+	private static final float SOCKET_SIDE = BotGolem.SOCKET_SIDE;
+	private static final float BEAM_LENGTH = 0.5f;
 	private static final float BEAM_ROOT = 0.07f;
 	private static final float BEAM_TIP = 0.015f;
 	/** How much its length flickers (a share of it), and how fast (a tick's phase). */

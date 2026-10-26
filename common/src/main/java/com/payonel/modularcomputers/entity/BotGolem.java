@@ -100,12 +100,14 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private static final double HOVER_DRAG = 0.6;
 	/** A drift slower than this, in blocks a tick, is still. */
 	private static final double DRIFT = 0.005;
-	/** Its leg sockets, each this far to its side of its middle, in blocks: where its beams come from. */
-	private static final double SOCKET_SIDE = 0.2;
+	/** Its leg sockets, each this far to its side of its middle, in blocks: where its legs' tops are (BotGolemModel's, 2 pixels), and its beams come from. */
+	public static final float SOCKET_SIDE = 2 / 16f;
 	/** Its beams: red, as its sockets' redstone (scripts/art/bot_golem_textures.py's clamps), and how many motes a socket a tick. */
 	private static final int BEAM_COLOR = 0xE8281E;
 	private static final float BEAM_SIZE = 0.9f;
 	private static final int BEAM_MOTES = 3;
+	/** How far under its sockets its sparks start, in blocks (round the beam's middle). */
+	private static final double BEAM_SPARKS_DOWN = 0.15;
 	private static final String HOVERING_SAVED = "hovering";
 	/** Its legs' height, in blocks: three pixels (its model's); without them it's that much shorter. */
 	public static final float LEG_HEIGHT = 3 / 16f;
@@ -649,7 +651,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		double sideZ = -Mth.sin(yaw) * SOCKET_SIDE;
 		var mote = new net.minecraft.core.particles.DustParticleOptions(BEAM_COLOR, BEAM_SIZE);
 		for (int side = -1; side <= 1; side += 2) {
-			server.sendParticles(mote, getX() + side * sideX, getY(), getZ() + side * sideZ, BEAM_MOTES, 0.03, 0.15, 0.03, 0);
+			server.sendParticles(mote, getX() + side * sideX, getY() - BEAM_SPARKS_DOWN, getZ() + side * sideZ, BEAM_MOTES, 0.02, 0.08, 0.02, 0);
 		}
 	}
 

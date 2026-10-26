@@ -30,6 +30,11 @@ public interface BoardLayout {
 		return false;
 	}
 
+	/** What's soldered onto a lane, as its lang keys name it ({@code gui.modularcomputers.soldered.<kind>}), or null. */
+	default String solderedKind(int lane) {
+		return null;
+	}
+
 	/** Whether its screen slot takes a screen of {@code tier}. */
 	default boolean takesScreen(com.payonel.modularcomputers.device.TerminalTier tier) {
 		return true;

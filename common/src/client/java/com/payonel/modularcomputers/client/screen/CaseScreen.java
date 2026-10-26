@@ -303,6 +303,46 @@ public final class CaseScreen extends AbstractContainerScreen<CaseMenu> {
 			graphics.setComponentTooltipForNextFrame(font, powerTooltip(), mouseX, mouseY);
 		}
 		busButtonTip(mouseX, mouseY).ifPresent(tip -> graphics.setTooltipForNextFrame(font, tip, mouseX, mouseY));
+		if (menu.getCarried().isEmpty()) {
+			solderedTooltip(mouseX, mouseY).ifPresent(lines -> {
+				List<net.minecraft.util.FormattedCharSequence> wrapped = new ArrayList<>();
+				for (Component line : lines) {
+					wrapped.addAll(font.split(line, TOOLTIP_WIDTH)); // (wrapped, as an item's hint is)
+				}
+				graphics.setTooltipForNextFrame(font, wrapped, mouseX, mouseY);
+			});
+		}
+	}
+
+	/** Where a soldered device sits on the board (its lane's connector's place), or an empty area for a lane without one. */
+	public Viewport soldered(int lane) {
+		if (!menu.tier().soldered(lane)) {
+			return new Viewport(0, 0, 0, 0);
+		}
+		Viewport at = slotArea(CaseMenu.EXP_SLOTS + lane);
+		return new Viewport(at.x() - SOLDERED_MARGIN, at.y() - SOLDERED_MARGIN, at.width() + 2 * SOLDERED_MARGIN, at.height() + 2 * SOLDERED_MARGIN);
+	}
+
+	/** The widest a soldered device's tooltip's lines get before they wrap, in GUI units. */
+	private static final int TOOLTIP_WIDTH = 200;
+	/** How far round its connector's slot a soldered chip reaches, in GUI units (its art's pins). */
+	private static final int SOLDERED_MARGIN = 2;
+
+	/**
+	 * What the soldered device under the mouse is (the user's: it's no item, so it has no item's
+	 * tooltip): its name, that it's soldered on, and what it does, as an item's hint does.
+	 */
+	public Optional<List<Component>> solderedTooltip(double mouseX, double mouseY) {
+		for (int lane = 0; lane < CaseMenu.LANES; lane++) {
+			String kind = menu.tier().solderedKind(lane);
+			if (kind != null && soldered(lane).contains(mouseX, mouseY)) {
+				String key = "gui.modularcomputers.soldered." + kind;
+				return Optional.of(List.of(Component.translatable(key),
+					Component.translatable("gui.modularcomputers.soldered").withStyle(net.minecraft.ChatFormatting.GRAY),
+					Component.translatable(key + ".about").withStyle(net.minecraft.ChatFormatting.GRAY)));
+			}
+		}
+		return Optional.empty();
 	}
 
 	/** The one-word tip for the bus order panel's button under the mouse: View, Disconnect, Up, ... */

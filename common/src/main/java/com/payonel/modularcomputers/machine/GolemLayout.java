@@ -55,6 +55,11 @@ public enum GolemLayout implements BoardLayout {
 	}
 
 	@Override
+	public String solderedKind(int lane) {
+		return lane == ROBOTICS_LANE ? "robotics" : null;
+	}
+
+	@Override
 	public boolean takesScreen(TerminalTier tier) {
 		return tier == TerminalTier.TIER_1;
 	}
