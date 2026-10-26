@@ -1082,7 +1082,8 @@ syscalls.watch = withfd(function(p, request, d, fd, file)
 end)
 
 -- Sockets, as Linux's: socket([type]) an open file ("dgram", UDP's, or "stream", TCP's), bind(fd,
--- port), sendto(fd, data, address, port), recvfrom(fd) (data, address, port), listen(fd[, backlog]),
+-- port), sendto(fd, data, address, port), recvfrom(fd) (data, address, port), recvmsg(fd) (and where it
+-- came in: {interface, to, distance}), listen(fd[, backlog]),
 -- connect(fd, address, port), accept(fd) (a new one, the peer's address and port), shutdown(fd) (no
 -- more to send), and their ioctls (lib/modules/net.lua, loaded at the first).
 function syscalls.socket(p, request, kind)
@@ -1118,7 +1119,7 @@ function syscalls.accept(p, request, fd)
   return new, address, port
 end
 
-for _, name in ipairs({"bind", "sendto", "recvfrom", "listen", "connect", "shutdown"}) do
+for _, name in ipairs({"bind", "sendto", "recvfrom", "recvmsg", "listen", "connect", "shutdown"}) do
   syscalls[name] = withfd(function(p, request, d, fd, ...)
     if d.type ~= "socket" then
       return nil, "Socket operation on non-socket", "ENOTSOCK"

@@ -85,6 +85,50 @@ class McosTest extends McosHarness {
 		untilFile(root().resolve("ahead"), "ahead\n");
 	}
 
+	/**
+	 * Reading the clock costs no ticks: board.uptime was a call to the server thread, a tick a read,
+	 * so forty reads took two seconds (seen failing); it's the firmware's clock, answered at once.
+	 */
+	@Test
+	void readingTheClockCostsNoTicks() {
+		file("clock.lua", """
+			local sys = require("sys")
+			local first = sys.uptime()
+			for _ = 1, 40 do
+			  sys.uptime()
+			end
+			local out = io.open("/out", "w")
+			out:write(sys.uptime() - first < 0.5 and "fast" or ("slow: " .. (sys.uptime() - first)), "\\n")
+			out:close()
+			""");
+		boot();
+		type("lua /clock.lua\r");
+		untilFile(root().resolve("out"), "fast\n");
+	}
+
+	/** recvmsg says where a datagram came in: the card it came in on, and how far it came. */
+	@Test
+	void recvmsgSaysWhereADatagramCameIn() {
+		devices.put(Motherboard.exp(0), networkCard(new Object(), java.util.UUID.randomUUID()));
+		file("udp.lua", """
+			local sys = require("sys")
+			local card = sys.ioctl(assert(sys.socket()), "SIOCGIFCONF")[1]
+			local s = assert(sys.socket())
+			assert(sys.bind(s, 7000))
+			assert(sys.sendto(s, "hi", card.address, 7000))
+			local data, from, port, where = sys.recvmsg(s)
+			local out = io.open("/out", "w")
+			out:write(data, " ", tostring(from == card.address), " ", port, " ", where.interface, " ", tostring(where.to == card.address), " ",
+			  where.distance, "\\n")
+			out:close()
+			""");
+		boot();
+		type("lua /udp.lua 2> /err\r");
+		settle(() -> Files.exists(root().resolve("out")) && read(root().resolve("out")).endsWith("\n")
+			|| Files.exists(root().resolve("err")) && !read(root().resolve("err")).isEmpty());
+		assertThat(read(root().resolve("out"))).isEqualTo("hi true 7000 wlan0 true 0\n");
+	}
+
 	@Test
 	void haltHalts() {
 		boot();

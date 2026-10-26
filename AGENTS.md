@@ -704,6 +704,10 @@ Lessons from mistakes, each with its test:
   `ItemContainerContents`), never an `ItemStack`: NeoForge refuses one when it's set, so a golem
   picked up holding something crashed there (Fabric doesn't check). Items on an item go in an
   `ItemContainerContents` (`ModComponents.HANDS`). (`aPlayersHitPicksItUpWithItsParts`, on NeoForge)
+- **The clock is the firmware's, not a board call:** `board.uptime` was a call to the server thread
+  (a tick each), so a loop reading the time ran a tick a read and its timeouts came late; it's the
+  firmware's `clock` now, answered at once. A read of something the firmware has never goes to
+  the server. (`McosTest.readingTheClockCostsNoTicks`)
 - **Compare a view's tabs by lane, not identity:** `SideTabs` makes its tabs afresh at each call,
   so `tab == open` is never true (the open tab's mark never showed). (`BotGolemClientGameTest`: the
   crafting tab ringed)

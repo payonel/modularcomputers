@@ -594,7 +594,13 @@ public final class VtDecoder {
 			for (String part : body.split("[;:]", -1)) {
 				args.add(part.isEmpty() ? -1 : (int) Math.min(Integer.MAX_VALUE, Long.parseLong(part.length() > 9 ? "999999999" : part)));
 			}
-			execute(c, privateMode, raw.matches(".*[ -/].*") && !privateMode, args);
+			char intermediate = 0;
+			for (int i = 0; i < raw.length() && !privateMode; i++) {
+				if (raw.charAt(i) >= ' ' && raw.charAt(i) <= '/') {
+					intermediate = raw.charAt(i);
+				}
+			}
+			execute(c, privateMode, intermediate, args);
 		} else if (c == '\u001B') {
 			parse = Parse.ESCAPE; // a broken sequence: start over
 		} else if (params.length() < 64) {
@@ -610,11 +616,18 @@ public final class VtDecoder {
 		return index < args.size() && args.get(index) >= 0 ? args.get(index) : 0;
 	}
 
-	private void execute(char command, boolean privateMode, boolean intermediate, List<Integer> args) {
-		if (intermediate) {
-			if (command == 'q') {
+	private void execute(char command, boolean privateMode, char intermediate, List<Integer> args) {
+		if (intermediate != 0) {
+			if (intermediate == ' ' && command == 'q') {
 				int style = argOrZero(args, 0);
 				cursorStyle = style <= 6 ? style : 0; // DECSCUSR (CSI Ps SP q): the cursor's shape
+			} else if (intermediate == '$' && command == 'v') {
+				// DECCRA (a VT420's): CSI top;left;bottom;right;page;toTop;toLeft;page $v copies a rectangle
+				copyRectangle(arg(args, 0, 1) - 1, arg(args, 1, 1) - 1, arg(args, 2, rows) - 1, arg(args, 3, columns) - 1,
+					arg(args, 5, 1) - 1, arg(args, 6, 1) - 1);
+			} else if (intermediate == '$' && command == 'x') {
+				// DECFRA: CSI char;top;left;bottom;right $x fills a rectangle with a character, in the current colors
+				fillRectangle(argOrZero(args, 0), arg(args, 1, 1) - 1, arg(args, 2, 1) - 1, arg(args, 3, rows) - 1, arg(args, 4, columns) - 1);
 			}
 			return; // (other sequences with intermediates are ignored)
 		}
@@ -950,6 +963,54 @@ public final class VtDecoder {
 	private void copyRow(int from, int to) {
 		for (int column = 0; column < columns; column++) {
 			buffer.copy(column, from, column, to);
+		}
+	}
+
+	/**
+	 * DECCRA: the cells from {@code top,left} to {@code bottom,right} (from 0, inclusive; clipped to
+	 * the screen) copied to {@code toTop,toLeft}, as they were before the copy (overlapping is fine);
+	 * the cursor stays.
+	 */
+	private void copyRectangle(int top, int left, int bottom, int right, int toTop, int toLeft) {
+		bottom = Math.min(bottom, rows - 1);
+		right = Math.min(right, columns - 1);
+		int height = Math.min(bottom - top + 1, rows - toTop);
+		int width = Math.min(right - left + 1, columns - toLeft);
+		if (height <= 0 || width <= 0 || top < 0 || left < 0) {
+			return;
+		}
+		boolean down = toTop > top;
+		boolean rightward = toLeft > left;
+		for (int i = 0; i < height; i++) {
+			int row = down ? height - 1 - i : i;
+			for (int j = 0; j < width; j++) {
+				int column = rightward ? width - 1 - j : j;
+				buffer.copy(left + column, top + row, toLeft + column, toTop + row);
+			}
+			buffer.mend(toLeft, toTop + row);
+			buffer.mend(toLeft + width - 1, toTop + row);
+		}
+	}
+
+	/** DECFRA: the cells from {@code top,left} to {@code bottom,right} filled with {@code c} (a wide one in pairs of cells), in the current colors. */
+	private void fillRectangle(int c, int top, int left, int bottom, int right) {
+		bottom = Math.min(bottom, rows - 1);
+		right = Math.min(right, columns - 1);
+		int width = CharWidth.of(c);
+		if (c < ' ' || c == 0x7F || c >= 0x80 && c < 0xA0 || width == 0 || top < 0 || left < 0) {
+			return; // (DECFRA takes printable characters only)
+		}
+		for (int row = top; row <= bottom; row++) {
+			for (int column = left; column <= right; column++) {
+				if (width == 2 && column < right) {
+					buffer.set(column, row, c, foreground(), background());
+					buffer.set(++column, row, TextBuffer.WIDE, foreground(), background());
+				} else {
+					buffer.set(column, row, width == 2 ? ' ' : c, foreground(), background());
+				}
+			}
+			buffer.mend(left, row);
+			buffer.mend(right, row);
 		}
 	}
 

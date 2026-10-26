@@ -131,6 +131,7 @@ public final class DisplayScreen extends Screen {
 
 	@Override
 	public void removed() {
+		sendTyping();
 		minecraft.onTextInputFocusChange(this, false);
 		super.removed();
 	}
@@ -244,18 +245,40 @@ public final class DisplayScreen extends Screen {
 			// every key goes to the terminal (press, or repeat while it's held); it decides what to send
 			int kind = held.add(event.key()) ? com.payonel.modularcomputers.device.TerminalKeyboard.PRESS
 				: com.payonel.modularcomputers.device.TerminalKeyboard.REPEAT;
-			ModNetworkClient.send(new com.payonel.modularcomputers.network.TerminalKeyPayload(pos, code, TerminalKeys.modifiers(event), kind));
+			sendTyping();
+			typing = new com.payonel.modularcomputers.network.TerminalKeyPayload(pos, code, TerminalKeys.modifiers(event), kind, "");
 		}
 		return true;
 	}
 
+	/**
+	 * A press (or repeat) waiting for the text it types: the game gives a key and its character as
+	 * two events, the character right after its key, so the key goes with its text (kitty's
+	 * associated text) once the character comes, or without at the next key event or tick.
+	 */
+	private com.payonel.modularcomputers.network.TerminalKeyPayload typing;
+
+	/** Sends the press waiting for its text, with what it typed ("" none). */
+	private void sendTyping(String text) {
+		if (typing != null) {
+			ModNetworkClient.send(new com.payonel.modularcomputers.network.TerminalKeyPayload(typing.host(), typing.key(), typing.modifiers(),
+				typing.event(), text));
+			typing = null;
+		}
+	}
+
+	private void sendTyping() {
+		sendTyping("");
+	}
+
 	@Override
 	public boolean keyReleased(KeyEvent event) {
+		sendTyping();
 		if (held.remove(event.key())) {
 			int code = TerminalKeys.code(event);
 			if (code != 0) {
 				ModNetworkClient.send(new com.payonel.modularcomputers.network.TerminalKeyPayload(pos, code, TerminalKeys.modifiers(event),
-					com.payonel.modularcomputers.device.TerminalKeyboard.RELEASE));
+					com.payonel.modularcomputers.device.TerminalKeyboard.RELEASE, ""));
 			}
 		}
 		return true;
@@ -264,6 +287,7 @@ public final class DisplayScreen extends Screen {
 	@Override
 	public boolean charTyped(CharacterEvent event) {
 		if (event.isAllowedChatCharacter()) {
+			sendTyping(event.codepointAsString());
 			send(event.codepointAsString());
 		}
 		return true;
@@ -505,6 +529,7 @@ public final class DisplayScreen extends Screen {
 
 	@Override
 	public void tick() {
+		sendTyping(); // (a key that typed nothing: its character never came)
 		// Close when the screen block is gone or the player walked away.
 		var player = minecraft.player;
 		if (player == null || pos.find(player.level(), DisplayHost.class).isEmpty() || !pos.reachable(player, 1.0)) {

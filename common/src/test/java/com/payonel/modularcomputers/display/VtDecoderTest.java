@@ -27,6 +27,23 @@ class VtDecoderTest {
 	}
 
 	@Test
+	void decCraCopiesARectangleEvenOverItself() {
+		vt.write("abcdef" + ESC + "[2;1Hghijkl" + ESC + "[1;1;2;3;1;2;2;1$v");
+		assertThat(rows()).as("the top-left 2x3 down a row and right a column").containsExactly("abcdef", "gabckl", " ghi  ");
+		assertThat(vt.column()).as("the cursor stays").isEqualTo(5);
+	}
+
+	@Test
+	void decFraFillsARectangleInTheCurrentColors() {
+		vt.write(ESC + "[31m" + ESC + "[42;2;2;3;5$x");
+		assertThat(rows()).containsExactly("      ", " **** ", " **** ");
+		assertThat(TextBuffer.color(buffer.foreground(1, 1))).isEqualTo(0xCD0000);
+		vt.write(ESC + "[0m" + ESC + "[65307;1;1;1;6$x"); // (a wide character: in pairs of cells)
+		assertThat(new int[] {buffer.get(0, 0), buffer.get(1, 0), buffer.get(4, 0), buffer.get(5, 0)})
+			.containsExactly(0xFF1B, TextBuffer.WIDE, 0xFF1B, TextBuffer.WIDE);
+	}
+
+	@Test
 	void textGoesAtTheCursorAndLfOnlyMovesDown() {
 		vt.write("ab\ncd");
 		assertThat(rows()).containsExactly("ab    ", "  cd  ", "      ");
