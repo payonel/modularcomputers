@@ -431,6 +431,43 @@ class McosTest extends McosHarness {
 		assertThat(read(root().resolve("got"))).isEqualTo("nil timed out\nnot an opened device with events\nwest 9\n");
 	}
 
+	/** The computer's power as Linux's power_supply class: its case's store (a UPS) and a battery a bay, in Linux's units. */
+	@Test
+	void sysShowsThePowerSupplies() {
+		long[] stored = {36_000}; // (half a watt-hour of 72000 units in its case)
+		machine.board().setChassis(new com.payonel.modularcomputers.machine.Chassis() {
+			@Override
+			public int tier() {
+				return 3;
+			}
+
+			@Override
+			public Board.PowerInfo power() {
+				return new Board.PowerInfo(new Board.Store(stored[0], 72_000, false),
+					java.util.List.of(new Board.BatteryInfo(0, 1, new Board.Store(1_440_000, 1_440_000, false))), 110);
+			}
+
+			@Override
+			public java.util.List<Board.MemoryInfo> memory() {
+				return com.payonel.modularcomputers.machine.Chassis.BENCH.memory();
+			}
+		});
+		boot();
+		type("ls /sys/class/power_supply > /supplies; ls /sys/class/power_supply/case > /files; cd /sys/class/power_supply/case; cat type status capacity > /case; cd; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("files"))).contains("type\n", "status\n", "capacity\n", "power_now\n");
+		assertThat(read(root().resolve("supplies"))).isEqualTo("BAT0\ncase\n");
+		assertThat(read(root().resolve("case"))).as("half full, drawing 110 W").isEqualTo("UPS\nDischarging\n50\n");
+		untilIdle();
+		type("cd /sys/class/power_supply; cat case/energy_now case/energy_full case/power_now BAT0/type BAT0/status BAT0/capacity BAT0/energy_full > /more; cd; touch /done2\r");
+		untilFile(root().resolve("done2"), "");
+		assertThat(read(root().resolve("more"))).isEqualTo("500000\n1000000\n110000000\nBattery\nFull\n100\n20000000\n");
+		untilIdle();
+		stored[0] = 54_000; // (it charged)
+		type("cat /sys/class/power_supply/case/status > /charging\r");
+		untilFile(root().resolve("charging"), "Charging\n");
+	}
+
 	@Test
 	void lsDashLhShowsSizesForPeopleAndColorSaysWhen() {
 		file("s/a", "a");

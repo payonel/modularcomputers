@@ -63,6 +63,17 @@ walk(forward[, right[, up]])
 
 Programs read them as any files; the [devices library](/mcos/devices-library/) does it for you.
 
+`/sys/class/power_supply` has the computer's power, as Linux's: a directory for each battery in a bay
+(`BAT0`, `BAT1`, type `Battery`) and one for the case's own store, the one it runs on and its batteries
+fill (`case`, type `UPS`), each with `status` (`Full`, `Charging`, `Discharging`, `Not charging`),
+`capacity` (percent), `energy_now` and `energy_full` (µWh), and the case's `power_now` (µW: what the
+computer draws now). A power unit a tick is a watt. An infinite battery has only its `capacity`, 100.
+
+```sh
+cat /sys/class/power_supply/case/capacity
+cat /sys/class/power_supply/BAT0/status
+```
+
 `/sys/firmware/efi/efivars` has the EEPROM's boot variables, a file each (`Boot0001`, `BootOrder`,
 `BootNext`, `BootCurrent`), as Linux's efivarfs; see [EEPROM](/devices/eeprom/) and
 [`efibootmgr`](/programs/efibootmgr/).

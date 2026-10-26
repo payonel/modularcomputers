@@ -138,6 +138,7 @@ in an event, so a program waits for it rather than blocking in the call:
 |---|---|
 | `shell.execute("ls")` | `os.execute("ls")`, or `io.popen("ls")` to read what it prints |
 | `computer.shutdown()`, `computer.shutdown(true)` | `poweroff`, `reboot` |
+| `computer.energy()`, `computer.maxEnergy()` | `/sys/class/power_supply/case/energy_now` and `energy_full` (µWh), `capacity` (percent), and a battery a bay (`BAT0`) |
 | `computer.setBootAddress(address)` | [`efibootmgr`](/programs/efibootmgr/) `-c -d storage1` (an entry, first in the boot order), or `-C` and `-n` for the next boot only |
 | `/autorun.lua`, `/home/.shrc` | a [service](/mcos/services/) in `/etc/rc.d`, or `/home/.shrc` for login shells |
 | `edit file.lua` | `edit file.lua` |

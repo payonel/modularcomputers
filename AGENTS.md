@@ -554,6 +554,9 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   older ones dropped), so a reader sees what's current and nothing grows: a NIC's file reads its
   frames, one a line (direction, remote address, distance, bytes, outcome); its data is read
   through sockets.
+- **The computer's power is Linux's `/sys/class/power_supply`** (sysfs.lua, from `board.power`): a
+  battery a bay (`BAT0`...) and the case's store (`case`, a UPS), Linux's files and units (µWh, µW: a
+  unit a tick is a watt); `status` by the store's trend against a reading at least a second old.
 - **`/sys` makes devices learnable in the game** (the user's): Linux's `/sys/class` tree, a
   directory a kind, a device by its `/dev` name, its attributes a read-only file each (type, id,
   path, label) and `methods/` a file a method, its arguments and what it does, from its `@Method`
@@ -714,6 +717,9 @@ Lessons from mistakes, each with its test:
   `ItemContainerContents`), never an `ItemStack`: NeoForge refuses one when it's set, so a golem
   picked up holding something crashed there (Fabric doesn't check). Items on an item go in an
   `ItemContainerContents` (`ModComponents.HANDS`). (`aPlayersHitPicksItUpWithItsParts`, on NeoForge)
+- **A trend needs readings apart:** one look at a file reads it several times (a stat, an open), so a
+  store's last reading was always a moment ago and never showed it charging. Compare against one at
+  least a second old. (`sysShowsThePowerSupplies`)
 - **Compare a view's tabs by lane, not identity:** `SideTabs` makes its tabs afresh at each call,
   so `tab == open` is never true (the open tab's mark never showed). (`BotGolemClientGameTest`: the
   crafting tab ringed)
