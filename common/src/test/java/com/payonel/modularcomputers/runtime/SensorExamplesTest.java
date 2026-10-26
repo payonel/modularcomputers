@@ -90,6 +90,26 @@ class SensorExamplesTest extends McosHarness {
 		untilFile(root().resolve("home/census.txt"), "minecraft:cow 1\nminecraft:pig 2\n");
 	}
 
+	/** The threads page's tally: two threads, two sensors, one count kept by a mutex, none lost. */
+	@Test
+	void theTallyCountsWhatBothSensorsSeeInOneTallyLosingNone() {
+		MotionSensorCard first = new MotionSensorCard();
+		MotionSensorCard second = new MotionSensorCard();
+		devices.put(Motherboard.exp(0), first);
+		devices.put(Motherboard.exp(1), second);
+		boot();
+		file("tally.lua", example("threads-tally"));
+		type("lua /tally.lua > /dev/null 2> /err &\r");
+		untilIdle();
+		server.add(() -> {
+			for (int i = 0; i < 3; i++) {
+				first.sense(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", 0.0));
+				second.sense(Map.of("mob", "minecraft:pig", "x", 2.0, "y", 0.0, "z", 0.0));
+			}
+		});
+		untilFile(root().resolve("home/tally.txt"), "minecraft:pig 6\n");
+	}
+
 	@Test
 	void theVisitorsServiceStartsWithRcLogsWhatItSeesAndStops() {
 		MotionSensorCard motion = new MotionSensorCard();
