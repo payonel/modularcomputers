@@ -717,6 +717,10 @@ Lessons from mistakes, each with its test:
   `ItemContainerContents`), never an `ItemStack`: NeoForge refuses one when it's set, so a golem
   picked up holding something crashed there (Fabric doesn't check). Items on an item go in an
   `ItemContainerContents` (`ModComponents.HANDS`). (`aPlayersHitPicksItUpWithItsParts`, on NeoForge)
+- **A table that reads through to another must not read through what's its own:** a thread's
+  task fields, unset, read its process's (`__index = p`), so a thread started while its main thread
+  waited took that wait as its own and never ran (and could have taken its pending syscall). Own
+  fields answer nil when unset. (`aThreadStartedWhileItsMainThreadWaitsRunsAndFinishes`)
 - **A trend needs readings apart:** one look at a file reads it several times (a stat, an open), so a
   store's last reading was always a moment ago and never showed it charging. Compare against one at
   least a second old. (`sysShowsThePowerSupplies`)

@@ -286,10 +286,17 @@ local respawn
 local OWN = {co = true, request = true, reply = true, blocked = true, wakeat = true, tid = true, proc = true,
   results = true, ended = true}
 
--- A thread of process 'p': its own task's fields here, everything else the process's.
+-- A thread of process 'p': its own task's fields here, everything else the process's. Its own fields
+-- never read through, even unset: a new thread isn't blocked because its main thread is, nor asking
+-- what its main thread asks.
 local function task(p, tid, co)
-  return setmetatable({tid = tid, proc = p, co = co}, {
-    __index = p,
+  return setmetatable({tid = tid, proc = p, co = co, blocked = false}, {
+    __index = function(t, key)
+      if OWN[key] then
+        return nil
+      end
+      return p[key]
+    end,
     __newindex = function(t, key, value)
       if OWN[key] then
         rawset(t, key, value)
@@ -1112,12 +1119,13 @@ function syscalls.gettid(p)
   return rawget(p, "tid") or p.pid
 end
 
--- threads(): the process's threads, {tid, state} each (running, sleeping, or ended: not yet joined).
+-- threads(): the process's threads, {tid, state} each: running, suspended (waiting in a call), or
+-- dead (ended, not yet joined): Lua's coroutine words, as OpenOS's threads used.
 function syscalls.threads(p)
   local proc = rawget(p, "proc") or p
-  local list = {{tid = proc.pid, state = proc.blocked and "sleeping" or "running"}}
+  local list = {{tid = proc.pid, state = proc.blocked and "suspended" or "running"}}
   for _, t in ipairs(proc.threads) do
-    list[#list + 1] = {tid = t.tid, state = t.ended and "ended" or t.blocked and "sleeping" or "running"}
+    list[#list + 1] = {tid = t.tid, state = t.ended and "dead" or t.blocked and "suspended" or "running"}
   end
   return list
 end
