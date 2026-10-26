@@ -39,6 +39,18 @@ For Minecraft 26.3, on Fabric (Loader 0.19.5 or newer, Fabric API 0.162.0+26.3) 
 
 ## Building and testing
 
+The Lua engine (LungoLua and StyxLua) comes from GitHub Packages, which needs a GitHub login even
+to read a public package. Make a token (GitHub: Settings, Developer settings, Personal access
+tokens, Tokens (classic)) with only the `read:packages` scope, and put it in
+`~/.gradle/gradle.properties`:
+
+```properties
+gpr.user=your-github-user
+gpr.key=ghp_your_token
+```
+
+(Or set `GITHUB_ACTOR` and `GITHUB_TOKEN`, as GitHub Actions does.) Then:
+
 ```sh
 ./gradlew build      # compile and unit tests (seconds; doesn't start Minecraft)
 ./gradlew testAll    # everything: server game tests on both loaders, headless client tests

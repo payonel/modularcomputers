@@ -3,6 +3,20 @@ plugins {
 	id 'net.neoforged.moddev' version "${moddev_version}" apply false
 }
 
+// LungoLua and StyxLua come from GitHub Packages, whose Maven registry wants a login even to read a
+// public package: a GitHub user and a token with read:packages, as gpr.user and gpr.key in
+// ~/.gradle/gradle.properties (or GITHUB_ACTOR and GITHUB_TOKEN, as Actions gives them). Without
+// them the build says so here, not as "Username must not be null!" from deep in a resolve.
+def packagesUser = providers.gradleProperty('gpr.user').orElse(providers.environmentVariable('GITHUB_ACTOR')).getOrNull()
+def packagesKey = providers.gradleProperty('gpr.key').orElse(providers.environmentVariable('GITHUB_TOKEN')).getOrNull()
+if (packagesUser == null || packagesKey == null) {
+	throw new GradleException("""No GitHub Packages login: LungoLua and StyxLua are on GitHub Packages, which needs one even to read.
+Make a GitHub token (Settings, Developer settings, Personal access tokens, classic) with only the read:packages scope, and put
+    gpr.user=<your GitHub user>
+    gpr.key=<the token>
+in ${gradle.gradleUserHomeDir}/gradle.properties (or set GITHUB_ACTOR and GITHUB_TOKEN). See the README's Building.""")
+}
+
 // Published versions carry the Minecraft version as SemVer build metadata: 0.1.0+26.3 (each loader's
 // jar is named for its loader). See .agents/VERSIONING.md.
 subprojects {
@@ -21,8 +35,8 @@ subprojects {
 			name = 'LungoLua'
 			url = 'https://maven.pkg.github.com/payonel/lua'
 			credentials {
-				username = providers.gradleProperty('gpr.user').orElse(providers.environmentVariable('GITHUB_ACTOR')).getOrNull()
-				password = providers.gradleProperty('gpr.key').orElse(providers.environmentVariable('GITHUB_TOKEN')).getOrNull()
+				username = packagesUser
+				password = packagesKey
 			}
 			content {
 				includeModule 'com.payonel', 'lungolua'
@@ -32,8 +46,8 @@ subprojects {
 			name = 'StyxLua'
 			url = 'https://maven.pkg.github.com/payonel/styxlua'
 			credentials {
-				username = providers.gradleProperty('gpr.user').orElse(providers.environmentVariable('GITHUB_ACTOR')).getOrNull()
-				password = providers.gradleProperty('gpr.key').orElse(providers.environmentVariable('GITHUB_TOKEN')).getOrNull()
+				username = packagesUser
+				password = packagesKey
 			}
 			content {
 				includeModule 'com.payonel', 'styxlua'
