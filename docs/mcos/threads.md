@@ -80,20 +80,19 @@ A mutex: one thread holds it at a time.
 - `m:unlock()` lets it go (`EPERM` unless this thread holds it).
 - `m:run(f, ...)` runs `f(...)` holding it, and lets it go even if `f` fails.
 
+A mutex matters when threads update the same thing in several steps, and a step can take long
+enough for another thread to run. Here two threads keep one tally of what two motion sensors see:
+each update reads a count, opens a file (a call to the disk: slow), and writes the count back. The
+other thread keeps running meanwhile, so without the mutex it could slip its own update in between,
+both reading `4` and both writing `5`, and a sighting would be lost. With the mutex the other thread
+still runs, but waits at `lock:run` until the first update is done.
+
 ```lua
-local thread = require("thread")
-local lock = thread.mutex()
-local count = 0
-local function add()
-  for i = 1, 100 do
-    lock:run(function() count = count + 1 end)
-  end
-end
-local a, b = thread.create(add), thread.create(add)
-a:join()
-b:join()
-print(count)                            -- 200
+{% include threads-tally.lua %}
 ```
+
+A single step on shared data with no call in it (`tally[name] = (tally[name] or 0) + 1`) needs no
+mutex in practice; data each thread keeps to itself never does.
 
 ## Underneath
 
