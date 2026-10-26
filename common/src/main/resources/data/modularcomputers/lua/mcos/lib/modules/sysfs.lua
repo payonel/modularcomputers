@@ -13,6 +13,13 @@
 --   /sys/firmware/efi/efivars/BootOrder     an entry's number a line, in order
 --   /sys/firmware/efi/efivars/BootNext      (while it's set)
 --   /sys/firmware/efi/efivars/BootCurrent   the entry booted (when one was: not by the fallback)
+-- And the computer's power, as Linux's power_supply class: a battery a bay (BAT0, BAT1...) and the
+-- case's own store, the one it runs on (case, a UPS: its batteries fill it), a small file each:
+--   /sys/class/power_supply/BAT0/type, status, capacity, energy_now, energy_full
+--   /sys/class/power_supply/case/type, status, capacity, energy_now, energy_full, power_now
+-- in Linux's units (percent, µWh, µW: a power unit a tick is a watt, 72000 stored units a watt-hour);
+-- status Full, Charging, Discharging or Not charging (by its last reading); an infinite battery
+-- has no energy, only its capacity, 100.
 -- Programs list and read it as any files.
 local k, vfs = ...
 
@@ -21,6 +28,11 @@ local fail = vfs.fail
 local fs = {type = "sysfs"}
 
 local CLASS = "class"
+local POWER = "power_supply"
+local MICRO = 1000000
+local UNITS_PER_WATT_HOUR = 20 * 60 * 60 -- stored power units in a watt-hour (a watt a tick, for an hour)
+local SUPPLY_FILES = {"type", "status", "capacity", "energy_now", "energy_full"}
+local TREND_TICKS = 20 -- how far apart readings are that say a store's charging or discharging (a second)
 local FIRMWARE = {"firmware", "efi", "efivars"} -- the boot variables' directory, a level each
 local METHODS = "methods"
 local ATTRIBUTES = {"type", "id", "path", "label"} -- a device's, from the kernel's view of the bus
@@ -122,6 +134,93 @@ local function firmware(parts)
   return nil
 end
 
+-- Each power supply's last reading ({stored, at}), by name: whether it's charging or discharging.
+local readings = {}
+
+-- The computer's power supplies now, by name: {file = text} each, in Linux's units.
+local function supplies()
+  local power = board.power()
+  local found = {}
+  local function supply(name, kind, store, load)
+    local files = {type = kind}
+    local stored, capacity = store.stored, store.capacity
+    if store.infinite then
+      files.capacity, files.status = 100, "Full"
+    elseif capacity > 0 then
+      files.capacity = math.floor(stored * 100 / capacity + 0.5)
+      files.energy_now = math.floor(stored * MICRO / UNITS_PER_WATT_HOUR + 0.5)
+      files.energy_full = math.floor(capacity * MICRO / UNITS_PER_WATT_HOUR + 0.5)
+      -- Its trend: against a reading at least TREND_TICKS old (a look takes several reads: a stat, an
+      -- open), the last trend seen while nothing's changed since.
+      local now = k.now()
+      local last = readings[name]
+      if not last then
+        last = {stored = stored, at = now, trend = 0}
+        readings[name] = last
+      end
+      local trend = stored ~= last.stored and stored - last.stored or last.trend
+      if now - last.at >= TREND_TICKS then
+        readings[name] = {stored = stored, at = now, trend = trend}
+      end
+      if stored >= capacity then
+        files.status = "Full"
+      elseif trend > 0 then
+        files.status = "Charging"
+      elseif trend < 0 or load and load > 0 then
+        files.status = "Discharging"
+      else
+        files.status = "Not charging"
+      end
+    end
+    if load then
+      files.power_now = load * MICRO
+    end
+    found[name] = files
+  end
+  supply("case", "UPS", power.store, power.load)
+  for _, battery in ipairs(power.batteries or {}) do
+    supply("BAT" .. battery.bay, "Battery", battery.charge)
+  end
+  return found
+end
+
+-- What a path in the power supplies names (parts[2] is "power_supply"), or nil.
+local function power(parts)
+  if #parts == 2 then
+    return {dir = function()
+      local names = {}
+      for name in pairs(supplies()) do
+        names[#names + 1] = name
+      end
+      table.sort(names)
+      for i, name in ipairs(names) do
+        names[i] = {name = name, type = "directory"}
+      end
+      return names
+    end}
+  end
+  local files = supplies()[parts[3]]
+  if not files then
+    return nil
+  elseif #parts == 3 then
+    return {dir = function()
+      local entries = {}
+      for _, name in ipairs(SUPPLY_FILES) do
+        if files[name] ~= nil then
+          entries[#entries + 1] = {name = name, type = "file"}
+        end
+      end
+      if files.power_now then
+        entries[#entries + 1] = {name = "power_now", type = "file"}
+      end
+      return entries
+    end}
+  elseif #parts == 4 and files[parts[4]] ~= nil then
+    return {file = function() return tostring(files[parts[4]]) .. "\n" end}
+  end
+  return nil
+end
+
 -- What a path names: {dir = entries()} or {file = text()}, or nil.
 local function find(path)
   local parts = {}
@@ -134,9 +233,11 @@ local function find(path)
     return firmware(parts)
   elseif parts[1] ~= CLASS then
     return nil
+  elseif parts[2] == POWER then
+    return power(parts)
   elseif #parts == 1 then
     return {dir = function()
-      local seen, entries = {}, {}
+      local seen, entries = {[POWER] = true}, {{name = POWER, type = "directory"}}
       for _, device in ipairs(k.devices.list) do
         if not seen[kind(device)] then
           seen[kind(device)] = true
