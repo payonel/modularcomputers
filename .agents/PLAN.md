@@ -220,11 +220,6 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   `useradd`/`userdel`, OpenOS's `transforms` and `event`/`keyboard` libraries.
 - **The internet card, open:** raw TCP connections to the internet (OC's `connect`), if wanted;
   rate limits per card or per player, if servers need them.
-- **Threads, maybe** (user, 2026-10-24: not sure yet): OpenOS's thread library let one program run
-  several tasks as straight-line code. mcos does concurrency with poll and processes; threads would
-  be Linux's pthreads: several threads in a process sharing its memory, each blocking in its own
-  syscalls (a blocking syscall freezes the whole process today), so it's kernel work (threads in
-  the process table, each with its own syscall state), with a library shaped like OpenOS's on top.
 - **Screens' look, ideas only** (user, 2026-10-24: not wanted now; unsure about scanlines): faint
   scanlines on the CRT tiers, a vignette (the glass darker toward its edges, a curved tube), a
   phosphor glow around text (costly on many block faces). The tiers' glass and whites are done.
