@@ -71,7 +71,7 @@ class DiskTest {
 			seen.add(board.invoke("sata:0", "rename", "/to", "/moved").failed());
 			seen.add(board.invoke("sata:0", "remove", "/moved").failed()); // the link, not what it points to
 			seen.add(board.invoke("sata:0", "stat", "/real").first() != null);
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen.get(0)).isEqualTo(false);
 		assertThat(seen.get(1)).isEqualTo("/real");
@@ -90,7 +90,7 @@ class DiskTest {
 	void aLinksFileIsCifssMinshallFrenchSymlink() throws Exception {
 		run(DiskTier.TIER_1, board -> {
 			board.invoke("sata:0", "symlink", "a/b", "/l");
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		byte[] bytes = Files.readAllBytes(storage().resolve("l"));
 		String text = new String(bytes, java.nio.charset.StandardCharsets.ISO_8859_1);
@@ -122,7 +122,7 @@ class DiskTest {
 			seen.add(board.invoke("sata:0", "list", "/").first());
 			seen.add(board.invoke("sata:0", "list", "/notes").first());
 			seen.add(board.invoke("sata:0", "stat", "/notes/hello.txt").first());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen).containsExactly("hfs", false, false, true, "", "closed handle", "hello", 6L, "disk\n", null,
 			List.of("notes/"), List.of("hello.txt"), seen.get(12));
@@ -209,7 +209,7 @@ class DiskTest {
 			Handle file = (Handle) board.invoke("sata:0", "open", "/../../escape.txt", "w").first();
 			board.invoke(file, "write", "x");
 			board.invoke(file, "close");
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(world.resolve("escape.txt")).doesNotExist();
 		assertThat(storage().resolve("escape.txt")).hasContent("x");
@@ -233,7 +233,7 @@ class DiskTest {
 			board.invoke(file, "close");
 			board.invoke("sata:0", "remove", "/big");
 			seen.add(board.invoke("sata:0", "getUsed").first());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen).containsExactly((long) Disk.ENTRY, false, (long) Disk.ENTRY + 4096, Disk.NO_SPACE, 0L);
 	}
@@ -244,7 +244,7 @@ class DiskTest {
 		run(DiskTier.TIER_1, board -> {
 			kept[0] = (Handle) board.invoke("sata:0", "open", "/a", "w").first();
 			board.waitForInterrupt(1000, "nothing");
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(kept[0].isOpen()).isTrue();
 		machine.pressPower(); // off
@@ -252,11 +252,11 @@ class DiskTest {
 	}
 
 	@Test
-	void aProgramThatHaltsLeavesNoFilesOpen() {
+	void aProgramThatPowersOffLeavesNoFilesOpen() {
 		Handle[] kept = new Handle[1];
 		run(DiskTier.TIER_1, board -> {
 			kept[0] = (Handle) board.invoke("sata:0", "open", "/a", "w").first();
-			board.halt();
+			board.poweroff();
 		});
 		assertThat(kept[0].isOpen()).as("its program's gone: what it held goes too").isFalse();
 	}
@@ -278,7 +278,7 @@ class DiskTest {
 			seen.add(board.invoke("sata:0", "read", size + 1, 1).error());
 			seen.add(board.invoke("sata:0", "setMode", "hfs").failed());
 			seen.add(board.invoke("sata:0", "list", "/").first());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen).containsExactly("hfs disk: format it raw to read and write it by offset", false, false, "raw disk: no filesystem",
 			4L, "\0\0boot\0\0", 2L, "ta", null, "no such offset: " + (size + 1) + " (0 to " + size + ")", false, List.of());
@@ -300,7 +300,7 @@ class DiskTest {
 			Handle file = (Handle) board.invoke("sata:0", "open", "../../escape.txt", "w").first();
 			board.invoke(file, "write", "stays in");
 			board.invoke(file, "close");
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen.subList(0, 4)).allMatch(error -> String.valueOf(error).startsWith("no such file"));
 		assertThat(seen.subList(4, 10)).allMatch(error -> String.valueOf(error).startsWith("bad name"));
@@ -316,7 +316,7 @@ class DiskTest {
 		run(DiskTier.TIER_1, board -> {
 			seen.add(board.invoke("sata:0", "open", "/link/secret.txt").error());
 			seen.add(board.invoke("sata:0", "open", "/link/new.txt", "w").error());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen).allMatch(error -> String.valueOf(error).startsWith("outside the disk"));
 		assertThat(Files.exists(world.resolve("new.txt"))).isFalse();
@@ -339,7 +339,7 @@ class DiskTest {
 			}
 			seen.add(got.toString());
 			board.invoke(file, "close");
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen).containsExactly(text.toString());
 	}
@@ -357,7 +357,7 @@ class DiskTest {
 			seen.add(read(storage().resolve("a.txt"))); // the host file: as it was
 			seen.add(board.invoke(file, "close").failed());
 			seen.add(read(storage().resolve("a.txt")));
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen).containsExactly("hello WORLD!", "hello world", false, "hello WORLD!");
 	}
@@ -370,13 +370,13 @@ class DiskTest {
 			Handle file = (Handle) board.invoke("sata:0", "open", "/a.txt", "w").first();
 			board.invoke(file, "write", "x".repeat(10_000));
 			seen.add(board.invoke("sata:0", "getUsed").first());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		machine.pressPower(); // a power cut
 		assertThat(Files.readString(storage().resolve("a.txt"))).isEqualTo("old");
 		run(DiskTier.TIER_1, board -> {
 			seen.add(board.invoke("sata:0", "getUsed").first());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen).containsExactly((long) Disk.ENTRY + 10_000, (long) Disk.ENTRY + 3);
 	}

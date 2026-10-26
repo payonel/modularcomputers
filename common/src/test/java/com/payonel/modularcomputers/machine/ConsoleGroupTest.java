@@ -52,14 +52,14 @@ class ConsoleGroupTest {
 		return machine.board().virtualBus().console();
 	}
 
-	/** Runs a program until it halts. */
+	/** Runs a program until it parks. */
 	private void boot(Program program) {
 		machine.board().setEeprom(new Eeprom(program));
 		machine.pressPower();
-		for (int i = 0; i < 5 && machine.runner().isPresent(); i++) {
+		for (int i = 0; i < 5 && !Parked.parked(machine); i++) {
 			machine.tick();
 		}
-		assertThat(machine.runner()).as("halted").isEmpty();
+		assertThat(Parked.parked(machine)).as("parked").isTrue();
 	}
 
 	/** Greets on the console, then takes every terminal for itself and labels it, then halts. */
@@ -74,7 +74,7 @@ class ConsoleGroupTest {
 				}
 			}
 			seen.add(board.invoke("console", "terminals").first());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 	}
 
@@ -90,7 +90,7 @@ class ConsoleGroupTest {
 	void everyTerminalIsInTheGroupByDefault() {
 		boot(board -> {
 			seen.add(board.invoke("console", "terminals").first());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen).containsExactly(List.of(BUILT_IN, "id:first", "id:second"));
 	}
@@ -166,7 +166,7 @@ class ConsoleGroupTest {
 			keys.add(board.waitForInterrupt(60));
 			keys.add(board.invoke("console", "read").first());
 			keys.add(board.invoke("console", "read").first());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		}));
 		first.press("x"); // typed before power-on: dropped (no program runs to take it)
 		machine.pressPower();
@@ -185,7 +185,7 @@ class ConsoleGroupTest {
 			board.waitForInterrupt(60, "id:first");
 			keys.add(board.invoke("id:first", "read").first()); // the terminal's own read the second
 			keys.add(board.invoke("console", "read").first()); // so the console finds nothing left
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		}));
 		machine.pressPower();
 		first.press("a");
@@ -201,7 +201,7 @@ class ConsoleGroupTest {
 			board.invoke("console", "unbind", "id:second");
 			seen.add(board.waitForInterrupt(60, "console"));
 			seen.add(board.invoke("console", "read").first());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		}));
 		machine.pressPower();
 		second.press("ignored"); // its own interrupt is on, but nobody waits on it
@@ -266,7 +266,7 @@ class ConsoleGroupTest {
 			keys.add(board.waitForInterrupt(60));
 			keys.add(board.invoke("console", "read").first());
 			keys.add(board.invoke("id:second", "read").first());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		}));
 		machine.pressPower();
 		machine.tick();

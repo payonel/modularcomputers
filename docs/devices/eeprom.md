@@ -33,7 +33,8 @@ The chip a computer comes with is a boot manager, as a UEFI board's. It tries th
 the chip's NVRAM (below): `BootNext`'s once, then `BootOrder`'s in turn, skipping a disk that isn't
 on the bus. Then, as UEFI's fallback, it boots the first disk in bus order that holds `/init.lua`.
 It hands the file it runs the disk's address. A file that doesn't compile is reported and skipped;
-with nothing left, it says `boot: no bootable disk` and halts. The code on the chip runs before any
+with nothing left, it says `boot: no bootable disk: press a key to try again`, waits for a key or
+a disk joining the bus, and restarts. The code on the chip runs before any
 OS, so it calls the board directly (`board.invoke`, `board.list`).
 
 The chip keeps its contents on its item: reads and writes go straight there. A write takes effect at
@@ -61,6 +62,14 @@ The NVRAM is on the chip's item, so it goes where the chip goes: take the EEPROM
 entries go with it. A computer's parts view marks the disk the chip boots (`SATA 3, boots`): the
 first disk on the bus that its entries name. Crafting the chip alone wipes its NVRAM too.
 
+### Restore on power loss
+
+The NVRAM also keeps a BIOS setup's "restore on AC power loss" (off at first): with it on, a
+computer that [aborted](/hardware/cpu/#aborts) because its power ran out powers itself back on as
+soon as it has power again, as a server in a rack does after an outage. It's the chip's setting, so
+it goes where the chip goes. Set it with `setRestoreOnPowerLoss(true)`; mcos shows it as
+`/sys/firmware/efi/efivars/RestoreOnPowerLoss` (`on` or `off`).
+
 ## In mcos
 
 ### /dev/eeprom
@@ -86,7 +95,7 @@ The NVRAM's variables are files to read, as Linux's efivarfs shows a UEFI board'
 
 ```sh
 $ ls /sys/firmware/efi/efivars
-Boot0000  Boot0001  BootCurrent  BootOrder
+Boot0000  Boot0001  BootCurrent  BootOrder  RestoreOnPowerLoss
 $ cat /sys/firmware/efi/efivars/BootCurrent
 0001
 $ cat /sys/firmware/efi/efivars/Boot0001
@@ -152,6 +161,14 @@ computer's off. Fails for an entry that isn't there.
 
 Sets the entry to boot next time only, or clears it with none. The bootloader clears it as it boots
 it.
+
+### getRestoreOnPowerLoss() → boolean
+
+Whether the computer powers itself back on when power comes back after it ran out. Off at first.
+
+### setRestoreOnPowerLoss(on) → nothing
+
+Turns [restore on power loss](#restore-on-power-loss) on or off.
 
 ## Events
 

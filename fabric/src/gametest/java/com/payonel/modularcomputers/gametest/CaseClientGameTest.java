@@ -12,7 +12,6 @@ import com.payonel.modularcomputers.client.screen.CaseScreen;
 import com.payonel.modularcomputers.client.screen.DisplayScreen;
 import com.payonel.modularcomputers.display.Viewport;
 import com.payonel.modularcomputers.item.ModItems;
-import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.power.PowerBuffer;
 import java.awt.image.BufferedImage;
@@ -423,33 +422,21 @@ public class CaseClientGameTest implements FabricClientGameTest {
 			check(!context.computeOnClient(client -> machinePowered(client, computer)), "the case window should not toggle power");
 			context.waitTicks(USE_COOLDOWN);
 
-			// Without an EEPROM the CPU shows the abort screen: soft gray with dark text.
+			// Without an EEPROM the CPU aborts: off, its power light blinking amber until it's next powered on.
 			singleplayer.getServer().runOnServer(server -> ((CaseBlockEntity) server.overworld().getBlockEntity(computer))
 				.parts().setItem(CaseMenu.EEPROM_SLOT, ItemStack.EMPTY));
 			aimAtBack(context, computer, 11.5, 11.5);
 			context.getInput().pressKey(options -> options.keyUse);
-			context.waitFor(client -> machinePowered(client, computer));
+			context.waitFor(client -> client.level.getBlockState(computer).getValue(CaseBlock.ABORTED));
+			check(!context.computeOnClient(client -> machinePowered(client, computer)), "an aborted computer is off");
+			context.takeScreenshot("case-aborted-blink"); // its power button, on the back: one frame lit,
+			context.waitTicks(ABORT_BLINK_TICKS);
+			context.takeScreenshot("case-aborted-blink-next"); // the next dark (or the other way round)
 			context.waitTicks(USE_COOLDOWN);
-			aimAtBack(context, computer, 5.5, 10.5); // elsewhere on the back: opens the display
-			context.getInput().pressKey(options -> options.keyUse);
-			context.waitForScreen(DisplayScreen.class);
-			context.waitTicks(2);
-			DisplayShot abort = displayShot(context, "case-display-abort", Cpu.ABORT_BACKGROUND);
-			int abortText = abort.pixels(0, 1, rgb -> (rgb & 0xFFFFFF) == Cpu.ABORT_FOREGROUND);
-			check(abortText >= 30, "the abort message should show in dark text, found " + abortText);
-
-			// The block face shows the abort screen too.
-			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
-			context.waitFor(client -> client.gui.screen() == null);
 			teleport(singleplayer, feet, 180);
 			context.waitFor(client -> client.player.blockPosition().equals(feet));
 			context.getInput().lookAt(computer);
 			context.waitTicks(5);
-			BufferedImage abortFace = read(context.takeScreenshot("case-abort-face"));
-			int cx = abortFace.getWidth() / 2;
-			int cy = abortFace.getHeight() / 2;
-			int gray = count(abortFace, cx - 100, cy - 105, cx + 100, cy, rgb -> near(rgb, Cpu.ABORT_BACKGROUND, 16));
-			check(gray > 5000, "the face should show the gray abort screen, found " + gray + " gray pixels");
 
 			// Breaking the computer closes its display.
 			context.getInput().pressKey(options -> options.keyUse);
@@ -459,6 +446,9 @@ public class CaseClientGameTest implements FabricClientGameTest {
 			context.waitFor(client -> client.gui.screen() == null);
 		}
 	}
+
+	/** An aborted computer's power light's frame, in ticks (case_power_aborted.png.mcmeta's frametime). */
+	private static final int ABORT_BLINK_TICKS = 10;
 
 	/** Stands the player in the middle of {@code feet}, looking toward {@code yaw}. */
 	static void teleport(TestSingleplayerContext singleplayer, BlockPos feet, int yaw) {

@@ -1,6 +1,7 @@
--- halt: ends every process and halts the computer.
+-- halt: ends every process and turns the computer off (as halt -p: this board has no halted
+-- state, a CPU stopped with the power on; power-off and restart are the clean ways out).
 local sys = require("sys")
 io.flushall()
-local ok, why = sys.reboot("halt")
+local ok, why = sys.reboot("poweroff")
 io.stderr:write("halt: " .. tostring(why) .. "\n")
 return 1

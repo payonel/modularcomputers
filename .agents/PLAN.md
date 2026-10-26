@@ -93,6 +93,38 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   position in the world's frame. Open: the axes (forward north (-z), right east (+x), up y, so a
   program passes its fix as `-z, x, y`); its heading (a fix has none, as a real GPS's: move a block
   and fix again); its precision (whole blocks, a block's middle), range or satellites.
+- **Beacon positioning, a primary use case** (the user's, 2026-10-26; the GPS card only makes it
+  simpler): fixed computers with WLAN cards as beacons, each knowing its place in a shared frame,
+  and a golem working out its own from the distances their frames carry (trilateration, as GPS
+  itself does), then `setPosition` with it, so every golem agrees on one frame and a target sent
+  over the network is the same block to all. Distances are already from block to block (a card's
+  place is its block), rounded to 0.1 m: whole-block fixes come out exact for beacons spread well
+  apart, rounding worse far off (a check with numbers, then a test, before it's documented as a
+  tutorial). Needs a settled robot to measure from: `stop()` settles it whenever it's called, moving or
+  not (the user's: after a shove, say): what it was doing stops, then it moves, as a walk does, onto
+  the middle of the block it's in (in the air, at a whole block's height too) and turns to the
+  nearest right angle (its heading squared for good, not given back), each only if it's off; it
+  ends in its `stopped` event always (now only when it was moving), once settled, so a program
+  waits for the settle as for any slow action, by its event, never by polling `state()`. When it
+  can't settle (something on the block's middle), it ends in `blocked` and why instead.
+- **POST debug LEDs** (to propose to the user, 2026-10-26): an aborted computer's why is readable
+  only after a boot that works (or with the scanner), so a computer that can't boot at all (no RAM)
+  shows only its blinking light. Real boards light a CPU/DRAM/VGA/BOOT LED or a two-digit Q-code;
+  the parts view could mark the faulty socket from the board's shutdown record.
+- **A `shoved` event** (the user's, 2026-10-26; the device rule's "every change to its state"): a
+  shove moves the golem without its program, so it reports it, with its `position()` after (maybe
+  off a block's middle: a program settles with `stop()` before it measures).
+- **Command tags and a move queue** (the user's, 2026-10-26: a careful walk, forward 10 and only
+  then right; and a state read is always a race): every action answers with a tag and its ending
+  event carries it (NVMe's and NCQ's command tags), so a program waits for its own answer and older
+  news is plainly older. Actions queue on the device, a motion controller's command buffer (G-code,
+  a 3D printer's planner), bounded (a full queue refuses at once: the handshake), run in order, an
+  event each; a `blocked` one drops the rest, its event saying how many; `stop()` clears the queue,
+  then settles. A new walk then queues behind the last instead of replacing it (change course:
+  `stop()` first, as a motion controller's; `stop()` is the cancel: the queue cleared, settled,
+  start over). Tags go on every device's slow actions, the ones ending in an event (a craft, a
+  request, a Disk Station's job), not on methods answering at once; the manual teaches them on all
+  three layers (the board, `sys`, `devices`).
 - **Walking, decided and built (2026-10-25):** a position (odometry from an origin a dimension), whole-
   block walks ending exactly, straight without pathfinding (the default), the game's pathfinder as
   a mode, walkTo/flyTo from the origin. Still to consider: whether the field card's moves should land

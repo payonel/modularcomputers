@@ -13,7 +13,12 @@ Gradle and exits with a pass/fail code.
 | Without a display (what GitHub Actions runs) | | `./gradlew testServer` | nothing | ~1 min |
 
 `./gradlew build` (compile, jars, unit tests) is the fast inner loop and never starts
-Minecraft. Loom adds the server game tests to `check`, and `fabric/build.gradle` takes them back out.
+Minecraft. One class or test is quicker still (Gradle's own cost is about a second):
+`./gradlew :common:test --tests '*DiskTest'`, or `'*McosTest.haltPowersOff'`. The unit tests run
+in several JVMs side by side (`maxParallelForks` in `common/build.gradle`, a quarter of the cores:
+each JVM its own statics, so no test sees another's), so the suite takes about as long as its
+slowest class (`McosTest`, under a minute). A failing test that waits out its 10 s settle costs 10
+s each: a run with many failures is slow for that reason, not the suite. Loom adds the server game tests to `check`, and `fabric/build.gradle` takes them back out.
 Run `./gradlew testAll` before committing.
 
 **Two loaders, one set of server tests.** The server game tests are loader-neutral: each loader's

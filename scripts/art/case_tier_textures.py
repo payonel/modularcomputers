@@ -110,21 +110,24 @@ for tier in (1, 2, 3):
 				textures["button"] = "modularcomputers:block/case_power_" + ("on" if on else "off") + ("_faded" if faded else "")
 				write(f"{ROOT}/models/block/{name}.json",
 					{"parent": "modularcomputers:block/case_base" + ("_faded" if faded else ""), "textures": textures})
-		# On with its CPU halted: the button lit amber (only a ready machine can be on).
+		# Off after a fault: the button blinking amber (its animated texture), until it's powered on.
 		textures = {face: f"modularcomputers:block/{tex}" for face, tex in faces(tier, screen).items()}
 		textures["particle"] = textures["east"]
-		textures["button"] = "modularcomputers:block/case_power_halted"
-		write(f"{ROOT}/models/block/tier{tier}_case" + ("_screen" if screen else "") + "_halted.json",
+		textures["button"] = "modularcomputers:block/case_power_aborted"
+		write(f"{ROOT}/models/block/tier{tier}_case" + ("_screen" if screen else "") + "_aborted.json",
 			{"parent": "modularcomputers:block/case_base", "textures": textures})
 	variants = {}
 	for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270)):
-		for halted in (False, True):
+		for aborted in (False, True):
 			for powered in (False, True):
 				for ready in (False, True):
 					for screen in (False, True):
-						model = f"modularcomputers:block/tier{tier}_case" + ("_screen" if screen and tier > 1 else "") \
-							+ (("_halted" if halted and ready else "_on") if powered else "") + ("" if ready else "_faded")
-						key = f"facing={facing},halted={str(halted).lower()},powered={str(powered).lower()},ready={str(ready).lower()},screen={str(screen).lower()}"
+						base = f"modularcomputers:block/tier{tier}_case" + ("_screen" if screen and tier > 1 else "")
+						if aborted and not powered:
+							model = base + "_aborted"  # (blinking, ready or not: the board's fault light)
+						else:
+							model = base + ("_on" if powered else "") + ("" if ready else "_faded")
+						key = f"facing={facing},aborted={str(aborted).lower()},powered={str(powered).lower()},ready={str(ready).lower()},screen={str(screen).lower()}"
 						variants[key] = {"model": model} | ({"y": y} if y else {})
 	states = {"variants": variants}
 	write(f"{ROOT}/blockstates/tier{tier}_case.json", states)

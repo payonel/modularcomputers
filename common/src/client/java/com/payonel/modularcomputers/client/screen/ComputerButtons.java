@@ -59,18 +59,27 @@ final class ComputerButtons {
 		return parts.bottom() + GAP;
 	}
 
+	/** The power button's frames (computer_textures.py's GUI_STATES): the aborted light's lit and unlit ones, and how long each shows. */
+	private static final int AMBER_FRAME = 4;
+	private static final int UNLIT_FRAME = 5;
+	private static final int POWER_FRAMES = 6;
+	private static final long BLINK_MILLIS = 500;
+
 	/** @param held the mouse is still down on it */
 	static void extractPower(GuiGraphicsExtractor graphics, Viewport button, com.payonel.modularcomputers.block.PowerLight state, boolean held) {
 		// Ready (a CPU and a charged battery): lit red or green. Otherwise the machine can't be
 		// on: faded red, or faded green while the button is held down and for the moment a
-		// refused press lasts. On with its CPU stopped (halted): amber.
+		// refused press lasts. Off after a fault (aborted): blinking amber, lit and unlit.
 		boolean green = state.powered();
-		int frame = state.ready() ? (green ? (state.halted() ? 4 : 1) : 0) : (held || green ? 3 : 2);
+		int frame = state.ready() ? (green ? 1 : 0) : (held || green ? 3 : 2);
+		if (state.aborted() && !green) {
+			frame = System.currentTimeMillis() / BLINK_MILLIS % 2 == 0 ? AMBER_FRAME : UNLIT_FRAME;
+		}
 		var pose = graphics.pose();
 		pose.pushMatrix();
 		pose.translate(button.x(), button.y());
 		pose.scale(SCALE, SCALE);
-		graphics.blit(RenderPipelines.GUI_TEXTURED, POWER_TEXTURE, 0, 0, frame * TEXELS, 0, TEXELS, TEXELS, 5 * TEXELS, TEXELS);
+		graphics.blit(RenderPipelines.GUI_TEXTURED, POWER_TEXTURE, 0, 0, frame * TEXELS, 0, TEXELS, TEXELS, POWER_FRAMES * TEXELS, TEXELS);
 		pose.popMatrix();
 	}
 

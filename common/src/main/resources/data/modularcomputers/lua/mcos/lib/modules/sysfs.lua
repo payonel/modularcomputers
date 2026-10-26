@@ -13,6 +13,13 @@
 --   /sys/firmware/efi/efivars/BootOrder     an entry's number a line, in order
 --   /sys/firmware/efi/efivars/BootNext      (while it's set)
 --   /sys/firmware/efi/efivars/BootCurrent   the entry booted (when one was: not by the fallback)
+--   /sys/firmware/efi/efivars/RestoreOnPowerLoss  on or off (it powers itself back on when power returns)
+-- And why the computer last stopped, as its board recorded it (a chipset's power-failure flags), a
+-- value a file: an abort's cause and what it said, read after the next boot:
+--   /sys/firmware/last_shutdown/cause       none, clean, button, power lost, cpu changed, ram changed,
+--                                           no program, returned, crashed or unsaved
+--   /sys/firmware/last_shutdown/message     what it said (a crash's error and stack)
+--   /sys/firmware/last_shutdown/time        when, the world's time in seconds (as sys.time's)
 -- And the computer's power, as Linux's power_supply class: a battery a bay (BAT0, BAT1...) and the
 -- case's own store, the one it runs on (case, a UPS: its batteries fill it), a small file each:
 --   /sys/class/power_supply/BAT0/type, status, capacity, energy_now, energy_full
@@ -34,6 +41,9 @@ local UNITS_PER_WATT_HOUR = 20 * 60 * 60 -- stored power units in a watt-hour (a
 local SUPPLY_FILES = {"type", "status", "capacity", "energy_now", "energy_full"}
 local TREND_TICKS = 20 -- how far apart readings are that say a store's charging or discharging (a second)
 local FIRMWARE = {"firmware", "efi", "efivars"} -- the boot variables' directory, a level each
+local LAST_SHUTDOWN = "last_shutdown"
+local SHUTDOWN_FILES = {"cause", "message", "time"}
+local TICKS_PER_SECOND = 20
 local METHODS = "methods"
 local ATTRIBUTES = {"type", "id", "path", "label"} -- a device's, from the kernel's view of the bus
 local WIDTH = 78 -- a description's lines, at most, indented
@@ -98,6 +108,10 @@ local function efivars()
         if boot.current then
           vars.BootCurrent = string.format("%04X\n", boot.current)
         end
+        local got, restore = board.invoke(device.id, "getRestoreOnPowerLoss")
+        if got then
+          vars.RestoreOnPowerLoss = restore and "on\n" or "off\n"
+        end
       end
       break
     end
@@ -105,8 +119,31 @@ local function efivars()
   return vars
 end
 
+-- Why it last stopped: the kernel's copy, read from the board once at boot (k.lastShutdown).
+local function lastShutdown(parts)
+  local last = k.lastShutdown or {cause = "none", message = "", time = 0}
+  if #parts == 2 then
+    return {dir = function()
+      local entries = {}
+      for i, name in ipairs(SHUTDOWN_FILES) do
+        entries[i] = {name = name, type = "file"}
+      end
+      return entries
+    end}
+  elseif #parts == 3 and last[parts[3]] ~= nil then
+    local value = parts[3] == "time" and math.floor(last.time / TICKS_PER_SECOND) or last[parts[3]]
+    return {file = function() return tostring(value) .. "\n" end}
+  end
+  return nil
+end
+
 -- What a path in the firmware's tree names (parts[1] is "firmware"), or nil.
 local function firmware(parts)
+  if #parts == 1 then
+    return {dir = function() return {{name = FIRMWARE[2], type = "directory"}, {name = LAST_SHUTDOWN, type = "directory"}} end}
+  elseif parts[2] == LAST_SHUTDOWN then
+    return lastShutdown(parts)
+  end
   for depth = 1, math.min(#parts, #FIRMWARE) do
     if parts[depth] ~= FIRMWARE[depth] then
       return nil

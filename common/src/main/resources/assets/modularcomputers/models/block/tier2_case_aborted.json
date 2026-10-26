@@ -1,13 +1,13 @@
 {
 	"parent": "modularcomputers:block/case_base",
 	"textures": {
-		"north": "modularcomputers:block/tier2_case_front_screen",
+		"north": "modularcomputers:block/tier2_case_front",
 		"south": "modularcomputers:block/tier2_case_back",
 		"east": "modularcomputers:block/tier2_case_side",
 		"west": "modularcomputers:block/tier2_case_side",
 		"up": "modularcomputers:block/tier2_case_top",
 		"down": "modularcomputers:block/tier2_case_bottom",
 		"particle": "modularcomputers:block/tier2_case_side",
-		"button": "modularcomputers:block/case_power_halted"
+		"button": "modularcomputers:block/case_power_aborted"
 	}
 }

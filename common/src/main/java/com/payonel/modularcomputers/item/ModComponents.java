@@ -118,19 +118,21 @@ public final class ModComponents {
 		static final Codec<com.payonel.modularcomputers.machine.BootVariables> CODEC = RecordCodecBuilder.create(vars -> vars.group(
 			ENTRY.listOf().fieldOf("entries").forGetter(Nvram::numbered),
 			Codec.INT.listOf().fieldOf("order").forGetter(com.payonel.modularcomputers.machine.BootVariables::order),
-			Codec.INT.optionalFieldOf("next", com.payonel.modularcomputers.machine.BootVariables.NONE).forGetter(com.payonel.modularcomputers.machine.BootVariables::next)
+			Codec.INT.optionalFieldOf("next", com.payonel.modularcomputers.machine.BootVariables.NONE).forGetter(com.payonel.modularcomputers.machine.BootVariables::next),
+			Codec.BOOL.optionalFieldOf("restore_on_power_loss", false).forGetter(com.payonel.modularcomputers.machine.BootVariables::restoreOnPowerLoss)
 		).apply(vars, Nvram::of));
 
 		private static java.util.List<Numbered> numbered(com.payonel.modularcomputers.machine.BootVariables vars) {
 			return vars.entries().entrySet().stream().map(e -> new Numbered(e.getKey(), e.getValue().disk(), e.getValue().path(), e.getValue().label())).toList();
 		}
 
-		private static com.payonel.modularcomputers.machine.BootVariables of(java.util.List<Numbered> entries, java.util.List<Integer> order, int next) {
+		private static com.payonel.modularcomputers.machine.BootVariables of(java.util.List<Numbered> entries, java.util.List<Integer> order, int next,
+			boolean restore) {
 			java.util.Map<Integer, com.payonel.modularcomputers.machine.BootVariables.Entry> map = new java.util.TreeMap<>();
 			for (Numbered entry : entries) {
 				map.put(entry.number(), new com.payonel.modularcomputers.machine.BootVariables.Entry(entry.disk(), entry.path(), entry.label()));
 			}
-			return new com.payonel.modularcomputers.machine.BootVariables(map, order, next);
+			return new com.payonel.modularcomputers.machine.BootVariables(map, order, next, restore);
 		}
 	}
 

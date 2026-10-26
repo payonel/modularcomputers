@@ -168,11 +168,11 @@ class StorageExamplesTest extends McosHarness {
 		String old = eeprom();
 		file("flash.lua", example("eeprom-flash"));
 		file("bad.lua", "this is not ( lua");
-		file("new.lua", "-- a new image\nboard.halt()\n");
+		file("new.lua", "-- a new image\nwhile true do board.waitForInterrupt(nil, 'park') end\n");
 		assertThat(status("lua /flash.lua /bad.lua")).isEqualTo("1");
 		assertThat(eeprom()).as("left as it was").isEqualTo(old);
 		assertThat(status("lua /flash.lua /new.lua")).isEqualTo("0");
-		assertThat(eeprom()).isEqualTo("-- a new image\nboard.halt()\n");
+		assertThat(eeprom()).isEqualTo("-- a new image\nwhile true do board.waitForInterrupt(nil, 'park') end\n");
 		assertThat(read(root().resolve("home/eeprom.old"))).isEqualTo(old);
 	}
 

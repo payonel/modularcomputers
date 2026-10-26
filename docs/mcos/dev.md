@@ -75,8 +75,9 @@ cat /sys/class/power_supply/BAT0/status
 ```
 
 `/sys/firmware/efi/efivars` has the EEPROM's boot variables, a file each (`Boot0001`, `BootOrder`,
-`BootNext`, `BootCurrent`), as Linux's efivarfs; see [EEPROM](/devices/eeprom/) and
-[`efibootmgr`](/programs/efibootmgr/).
+`BootNext`, `BootCurrent`, `RestoreOnPowerLoss`), as Linux's efivarfs; see [EEPROM](/devices/eeprom/) and
+[`efibootmgr`](/programs/efibootmgr/). `/sys/firmware/last_shutdown` has why the computer last
+stopped (`cause`, `message`, `time`), as its board recorded it; see [aborts](/hardware/cpu/#aborts).
 
 ## Devices coming and going
 

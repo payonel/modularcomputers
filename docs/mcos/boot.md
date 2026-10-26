@@ -17,7 +17,8 @@ keeps in its NVRAM, each a disk by its id and a file on it: `BootNext`'s once, t
 turn, skipping a disk that isn't on the bus. Then, UEFI's fallback, it looks through the
 [bus](/concepts/bus/) in order for the first disk that has `/init.lua`. It reads the file it found
 and runs it, giving it the disk's address. A file that doesn't compile is reported and skipped; with
-nothing left it writes `boot: no bootable disk` to the console and halts.
+nothing left it writes `boot: no bootable disk: press a key to try again` to the console and waits:
+a key, or a disk joining the bus, and it restarts to look again.
 
 So with no boot entries, the order of the bus decides: a computer with several disks boots the first
 one that has `/init.lua`. To boot another, make it an entry with
@@ -68,9 +69,11 @@ on the console and tries again after five seconds.
 
 ## Stopping
 
-[`halt`](/programs/halt/), [`poweroff`](/programs/poweroff/) and [`reboot`](/programs/reboot/) end
-every process first, closing their files so the disks get what was written, and then halt the CPU,
-turn the computer off, or restart it.
+[`poweroff`](/programs/poweroff/) (and [`halt`](/programs/halt/), the same) and
+[`reboot`](/programs/reboot/) end every process first, closing their files so the disks get what
+was written, and then turn the computer off, or restart it. These are the clean ways out; anything
+else is an [abort](/hardware/cpu/#aborts). At boot, mcos logs why the last run ended when it was
+an abort (`dmesg`), and `/sys/firmware/last_shutdown/` has it (`cause`, `message`, `time`).
 
 ## Watching a boot
 

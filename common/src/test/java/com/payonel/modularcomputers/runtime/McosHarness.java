@@ -138,9 +138,10 @@ abstract class McosHarness {
 		assertThat(machine.runner()).as(() -> "still running; the screen:\n" + screen()).isPresent();
 	}
 
-	void untilHalted() {
-		settle(() -> machine.runner().isEmpty());
-		assertThat(machine.board().virtualBus().console().screen().row(0)).doesNotStartWith("ABRT");
+	/** Until it's off, cleanly (mcos's poweroff, its halt), not by an abort. */
+	void untilOff() {
+		settle(() -> !machine.isPowered());
+		assertThat(machine.isAborted()).as(() -> "clean, not an abort: " + machine.lastShutdown()).isFalse();
 	}
 
 	void type(String keys) {

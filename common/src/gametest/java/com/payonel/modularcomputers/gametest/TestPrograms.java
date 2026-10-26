@@ -14,10 +14,10 @@ public final class TestPrograms {
 	 * where a tier 3 terminal's 160 by 50, the size it powers on at, makes text a few specks.
 	 */
 	public static final String READABLE = "\u001B[8;16;50t";
-	/** Prints the greeting to the console (sized {@link #READABLE}), then halts. */
+	/** Prints the greeting to the console (sized {@link #READABLE}), then parks. */
 	public static final Program HELLO = board -> {
 		board.invoke("console", "write", READABLE + GREETING + "\r\n");
-		board.halt();
+		com.payonel.modularcomputers.machine.Program.park(board);
 	};
 
 	/**
@@ -42,7 +42,7 @@ public final class TestPrograms {
 		}
 	};
 
-	/** Keeps the CPU busy forever (never waits, never halts): it draws a full CPU's power. */
+	/** Keeps the CPU busy forever (never waits): it draws a full CPU's power. */
 	public static final Program BUSY = board -> {
 		while (true) {
 			board.uptime();
@@ -50,6 +50,11 @@ public final class TestPrograms {
 	};
 
 	private TestPrograms() {
+	}
+
+	/** Whether its program has parked (waiting for good on {@link Program#PARK}, as the tests' programs end), the power on. */
+	public static boolean parked(com.payonel.modularcomputers.machine.Machine machine) {
+		return machine.isPowered() && machine.runner().map(runner -> runner.waitingFor().contains(Program.PARK)).orElse(false);
 	}
 
 	/** Puts a tier 3 screen in the computer's gold slot: its terminal, on its front. */

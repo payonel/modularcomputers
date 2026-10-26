@@ -54,7 +54,6 @@ import java.util.function.Supplier;
  * <li>{@code "wait", ticks, sources...}: the thread sleeps until one of the sources (any, when none)
  * has an interrupt pending, or {@code ticks} pass ({@code -1}: no limit); answered with those
  * pending.</li>
- * <li>{@code "halt"}: the CPU halts; the thread ends.</li>
  * <li>{@code "poweroff"}, {@code "reboot"}: the machine turns off (ACPI soft-off), or off and on again; the thread ends.</li>
  * </ul>
  * The firmware coroutine ends with {@code "returned"} (the EEPROM's code returned: a panic), {@code "abort",
@@ -588,7 +587,7 @@ public final class LuaRunner implements Runner {
 	 * stack, then queues it again), so a save never moves data between the program and its devices,
 	 * and every block's saved copy agrees with the program's. Empty when it can't be saved now (it's
 	 * not running, the state holds what can't be persisted, or it took too long); the computer then
-	 * comes back halted.
+	 * comes back aborted ("unsaved").
 	 */
 	@Override
 	public Optional<byte[]> persist(Board board, String who) {
@@ -613,7 +612,7 @@ public final class LuaRunner implements Runner {
 				}
 			}
 		} catch (InterruptedException | ExecutionException e) {
-			com.payonel.modularcomputers.ModularComputers.LOGGER.error("Saving {}: it couldn't be saved; it will come back halted", who, e);
+			com.payonel.modularcomputers.ModularComputers.LOGGER.error("Saving {}: it couldn't be saved; it will come back aborted", who, e);
 			return Optional.empty();
 		} finally {
 			pin.compareAndSet(snapshot, null);
@@ -728,9 +727,15 @@ public final class LuaRunner implements Runner {
 	public State state() {
 		State current = state;
 		if (current != State.RUNNING) {
-			return current; // halted, returned or crashed: the thread is done
+			return current; // powered off, returned or crashed: the thread is done
 		}
 		return wait != null && calls.isEmpty() ? State.WAITING : State.RUNNING;
+	}
+
+	@Override
+	public List<String> waitingFor() {
+		Wait waiting = wait;
+		return waiting == null ? List.of() : waiting.sources();
 	}
 
 	@Override
@@ -917,7 +922,7 @@ public final class LuaRunner implements Runner {
 	public void stop() {
 		stopping = true;
 		if (state == State.RUNNING) {
-			state = State.HALTED;
+			state = State.STOPPED;
 		}
 		if (thread != null) {
 			thread.interrupt(); // out of a wait for an answer; a running slice sees 'stopping' at its next yield
@@ -946,7 +951,7 @@ public final class LuaRunner implements Runner {
 	}
 
 	/**
-	 * The computer's thread: runs the firmware, serving its requests, until it halts or is stopped.
+	 * The computer's thread: runs the firmware, serving its requests, until its program ends or is stopped.
 	 */
 	private void run() {
 		try {
@@ -1009,10 +1014,6 @@ public final class LuaRunner implements Runner {
 						lua_settop(firmwareCo, top - asked);
 						reply = List.of(now);
 					}
-					case "halt" -> {
-						finish(State.HALTED, null);
-						return;
-					}
 					case "poweroff" -> {
 						finish(State.POWERED_OFF, null);
 						return;
@@ -1034,7 +1035,7 @@ public final class LuaRunner implements Runner {
 		} finally {
 			LIVE.remove(this);
 			ended = true;
-			// Ended (halted, crashed, stopped): a save asked for gets "nothing to save" at once.
+			// Ended (powered off, returned, crashed, stopped): a save asked for gets "nothing to save" at once.
 			Snapshot asked = pin.get();
 			if (asked != null) {
 				asked.bytes().complete(null);
@@ -1122,6 +1123,7 @@ public final class LuaRunner implements Runner {
 			case "time" -> Board::time;
 			case "setLabel" -> board -> board.setLabel(arg(args, 0), arg(args, 1));
 			case "power" -> Board::power;
+			case "lastShutdown" -> Board::lastShutdown;
 			case "hardware" -> Board::hardware;
 			case "invoke" -> board -> {
 				Object target = args.isEmpty() ? null : args.getFirst();

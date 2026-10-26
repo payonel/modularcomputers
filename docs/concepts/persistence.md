@@ -57,7 +57,7 @@ There are three limits.
 
 ## Freezing, not yielding
 
-A syscall does not yield. Every board call, wait or halt records its request and cuts the program's
+A syscall does not yield. Every board call, wait or power-off records its request and cuts the program's
 budget to one step; the budget callback then freezes the **whole chain** of the program's
 coroutines, wherever it is: inside coroutines, inside a `table.sort` comparison, inside a `gsub`
 callback. When the host has answered, the program thaws and the call returns the answer.
@@ -99,10 +99,12 @@ After a restore, the computer is simply running.
 - **Power loss.** An unloaded chunk only freezes a computer, but a broken case, or a battery that
   runs dry, is a power cut. A power cut is not a save: the computer is off, and what a program had
   written to a file but not closed is lost. On a disk, a file's writes are committed at close.
-- **A state that can't be saved.** If a computer can't be saved (it isn't running, or its state
-  holds something that cannot be persisted, or it could not be saved at all), it comes back
-  **halted**, and you start it again. The server logs why.
-- **A computer whose saved state fails to load** also comes back halted, with a warning in the log.
+- **A state that can't be saved.** If a running computer can't be saved (its state holds something
+  that cannot be persisted, or it could not be saved at all), it comes back
+  [aborted](/hardware/cpu/#aborts) (`unsaved`): off, its light blinking, and you start it again.
+  The server logs why.
+- **A computer whose saved state fails to load** also comes back aborted (`crashed`), with a warning
+  in the log.
 - **Old saves.** The mod's saved formats change freely between versions, without shims. Do not
   expect a computer saved by one version to resume in another.
 

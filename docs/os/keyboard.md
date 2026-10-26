@@ -95,7 +95,9 @@ moves down a row on `\n` but goes back to the left only on `\r`.
 
 - **Nothing appears when you type:** check that you're typing into the screen (its glass right-clicked open), and
   that the OS reached its prompt (`> `).
-- **`ABRT: init.lua:...`:** an error while it ran: the message says the line. A typo in a name
-  (`board.invok`) shows here, not at boot, because Lua finds it only when that line runs.
+- **The light blinks amber:** an error while it ran (or your code ran out: an OS must never return)
+  aborted it. Why is kept on the board: boot mcos and `cat /sys/firmware/last_shutdown/message`
+  says the line. A typo in a name (`board.invok`) shows only then, not at boot, because Lua finds it
+  only when that line runs.
 
 Next: [A command shell](/os/shell/).

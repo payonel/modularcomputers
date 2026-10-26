@@ -32,7 +32,32 @@ an EEPROM, a battery, a disk and one card or external device.
 | Draw while running | 100 W | 150 W | 200 W |
 | Draw while waiting for an interrupt | 50 W | 20 W | 5 W |
 
-A halted CPU draws nothing. See [Power](/concepts/power/).
+An off CPU draws nothing. See [Power](/concepts/power/).
+
+## Aborts
+
+A CPU runs only what its EEPROM holds, and the only clean ways out are the board's own: a program
+calling `board.poweroff()` or `board.reboot()` (mcos's `poweroff` and `reboot`), or the power
+button. Anything else is an **abort**: the computer turns off, and its power light blinks amber
+until it's next powered on. It aborts when:
+
+| Cause | What happened |
+|---|---|
+| `no program` | No RAM, no EEPROM, a blank one, or code that doesn't compile, at power-on. |
+| `returned` | The program ran out of code: an OS must never return. |
+| `crashed` | The program raised an error out of its EEPROM. |
+| `power lost` | Its power ran out: the case's store empty, no battery to carry it. |
+| `cpu changed` | Its CPU was taken out, or swapped, while it ran. |
+| `ram changed` | RAM was put in, taken out or swapped while it ran. |
+| `unsaved` | It was on when the world was saved, but its program couldn't be saved with it. |
+
+Disks, cards, the EEPROM and batteries can be swapped while it runs without an abort.
+
+The board records why it last stopped, and the next boot can read it: `board.lastShutdown()` gives
+`{cause, message, time}` (`cause` one of the above, or `clean`, `button`, `none`), and mcos shows it
+as `/sys/firmware/last_shutdown/` (`cause`, `message`, `time`) and in its log at boot (`dmesg`). An
+EEPROM can also bring a computer back on by itself when power returns after a power loss: see
+[restore on power loss](/devices/eeprom/#restore-on-power-loss).
 
 ## Crafting
 

@@ -85,7 +85,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	private static final EntityDataAccessor<Boolean> READY = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
 	private static final EntityDataAccessor<Boolean> POWERED = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
-	private static final EntityDataAccessor<Boolean> HALTED = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
+	private static final EntityDataAccessor<Boolean> ABORTED = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
 	private static final EntityDataAccessor<Boolean> SCREEN = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
 	/** It stands on its legs (else it's its torso alone: flying on its thrusters, held in a field, or fallen). */
 	private static final EntityDataAccessor<Boolean> LEGS = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
@@ -214,7 +214,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	@Override
 	protected void defineSynchedData(SynchedEntityData.Builder builder) {
 		super.defineSynchedData(builder);
-		builder.define(READY, false).define(POWERED, false).define(HALTED, false).define(SCREEN, false).define(LEGS, true).define(THRUSTING, false);
+		builder.define(READY, false).define(POWERED, false).define(ABORTED, false).define(SCREEN, false).define(LEGS, true).define(THRUSTING, false);
 	}
 
 	/** What the board needs from the golem: where it is, which way it faces, and its entity data. */
@@ -255,15 +255,15 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 
 		@Override
-		public boolean showPowerState(boolean ready, boolean powered, boolean halted, boolean screen) {
+		public boolean showPowerState(boolean ready, boolean powered, boolean aborted, boolean screen) {
 			if (level().isClientSide()) {
 				return false;
 			}
 			boolean changed = entityData.get(READY) != ready || entityData.get(POWERED) != powered
-				|| entityData.get(HALTED) != halted || entityData.get(SCREEN) != screen;
+				|| entityData.get(ABORTED) != aborted || entityData.get(SCREEN) != screen;
 			entityData.set(READY, ready);
 			entityData.set(POWERED, powered);
-			entityData.set(HALTED, halted);
+			entityData.set(ABORTED, aborted);
 			entityData.set(SCREEN, screen);
 			if (changed) {
 				syncToClients(); // (its board's state with it, as a case's block update carries its block entity)
@@ -1184,7 +1184,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	@Override
 	public PowerLight powerLight() {
-		return new PowerLight(entityData.get(READY), entityData.get(POWERED), entityData.get(HALTED));
+		return new PowerLight(entityData.get(READY), entityData.get(POWERED), entityData.get(ABORTED));
 	}
 
 	@Override

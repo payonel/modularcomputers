@@ -69,7 +69,7 @@ class BoardInfoTest {
 		run(board -> {
 			seen.add(board.power());
 			seen.add(board.hardware());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen.get(0)).isEqualTo(power);
 		assertThat(((Board.PowerInfo) seen.get(0)).store().percent()).isEqualTo(50);
@@ -82,7 +82,7 @@ class BoardInfoTest {
 		run(board -> {
 			seen.add(board.hardware().caseTier());
 			seen.add(board.power().store().infinite());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen).containsExactly(0, true);
 	}
@@ -101,7 +101,7 @@ class BoardInfoTest {
 			seen.add(board.info("id:screen"));
 			seen.add(board.info("console"));
 			seen.add(board.info("sata:3"));
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen.get(0)).isEqualTo(Optional.of(Map.of("address", "sata:0", "id", diskId, "type", "storage", "label", "backups",
 			"tier", 2L, "capacity", (long) DiskTier.TIER_2.bytes(), "mode", "hfs")));
@@ -132,7 +132,7 @@ class BoardInfoTest {
 			seen.add(board.info("eeprom").orElseThrow().get("used"));
 			seen.add(board.invoke("eeprom", "set", "x".repeat(100_000)).failed()); // no size limit for now
 			seen.add(board.info("eeprom").orElseThrow().get("used"));
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		machine.board().setCpu(new Cpu(CpuTier.TIER_2));
 		new TestBus(machine).eeprom(eeprom);

@@ -123,14 +123,14 @@ public final class CaseBlockEntity extends BlockEntity implements MenuProvider, 
 		 * screen in the gold slot; the block state carries them to clients.
 		 */
 		@Override
-		public boolean showPowerState(boolean ready, boolean powered, boolean halted, boolean screen) {
+		public boolean showPowerState(boolean ready, boolean powered, boolean aborted, boolean screen) {
 			if (level == null || level.isClientSide()) {
 				return false;
 			}
 			BlockState state = getBlockState()
 				.setValue(CaseBlock.READY, ready)
 				.setValue(CaseBlock.POWERED, powered)
-				.setValue(CaseBlock.HALTED, halted)
+				.setValue(CaseBlock.ABORTED, aborted)
 				.setValue(CaseBlock.SCREEN, screen);
 			if (state == getBlockState()) {
 				return false;
@@ -187,7 +187,7 @@ public final class CaseBlockEntity extends BlockEntity implements MenuProvider, 
 	@Override
 	public PowerLight powerLight() {
 		BlockState state = getBlockState();
-		return new PowerLight(state.getValue(CaseBlock.READY), state.getValue(CaseBlock.POWERED), state.getValue(CaseBlock.HALTED));
+		return new PowerLight(state.getValue(CaseBlock.READY), state.getValue(CaseBlock.POWERED), state.getValue(CaseBlock.ABORTED));
 	}
 
 	/** The motherboard's bus order. */
@@ -434,9 +434,6 @@ public final class CaseBlockEntity extends BlockEntity implements MenuProvider, 
 			// The block's tick sets the light back.
 			level.setBlock(worldPosition, getBlockState().setValue(CaseBlock.POWERED, true), Block.UPDATE_CLIENTS);
 			level.scheduleTick(worldPosition, getBlockState().getBlock(), CaseBlock.ATTEMPT_TICKS);
-		} else if (result != Machine.PowerPress.NO_POWER) {
-			// Changing the block state also sends this block entity's update to clients.
-			level.setBlock(worldPosition, getBlockState().setValue(CaseBlock.POWERED, result == Machine.PowerPress.ON), Block.UPDATE_CLIENTS);
 		}
 		return result;
 	}

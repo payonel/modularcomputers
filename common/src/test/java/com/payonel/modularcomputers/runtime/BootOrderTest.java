@@ -32,7 +32,7 @@ class BootOrderTest extends McosHarness {
 		board.poweroff()
 		""";
 	/** One that halts instead: the power stays on (BootCurrent with it). */
-	private static final String HALTS = MARKS.replace("board.poweroff()", "board.halt()");
+	private static final String PARKS = MARKS.replace("board.poweroff()", "while true do board.waitForInterrupt(nil, 'park') end");
 	private static final UUID FIRST = UUID.fromString("0f4c2a10-7b3e-4d9a-9e1f-2c5b8a6d3e71");
 	private static final UUID SECOND = UUID.fromString("5a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d");
 	private static final String ABSENT = "id:9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b";
@@ -60,12 +60,12 @@ class BootOrderTest extends McosHarness {
 		bus.plug(Motherboard.sata(1), new Disk(DiskTier.TIER_1, second), SECOND);
 	}
 
-	/** Powers on, until the OS it booted (one that halts) has said so and halted, the power on. */
-	private void bootToHalt(Path disk) throws Exception {
-		Files.writeString(disk.resolve("init.lua"), HALTS);
+	/** Powers on, until the OS it booted (one that parks) has said so and parked, the power on. */
+	private void bootToPark(Path disk) throws Exception {
+		Files.writeString(disk.resolve("init.lua"), PARKS);
 		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
-		settle(() -> booted(disk) && machine.runner().isEmpty());
-		assertThat(machine.isPowered()).as("halted, the power on").isTrue();
+		settle(() -> booted(disk) && com.payonel.modularcomputers.machine.Parked.parked(machine));
+		assertThat(machine.isPowered()).as("parked, the power on").isTrue();
 	}
 
 	/** Powers on, until the OS it booted turns the computer off. */
@@ -93,7 +93,7 @@ class BootOrderTest extends McosHarness {
 		twoDisks();
 		eeprom.setBootEntry(args(3L, Motherboard.id(SECOND)));
 		eeprom.setBootNext(args(3L));
-		bootToHalt(second);
+		bootToPark(second);
 		assertThat(eeprom.bootCurrent()).as("BootNext's entry").isEqualTo(3);
 		Map<String, Object> saved = eeprom.saved();
 		eeprom.restore(Map.of());
@@ -102,7 +102,7 @@ class BootOrderTest extends McosHarness {
 		machine.pressPower(); // (off)
 		settle(() -> !machine.isPowered());
 		assertThat(eeprom.bootCurrent()).as("volatile: gone with the power").isEqualTo(BootVariables.NONE);
-		bootToHalt(first); // (no BootNext now, no order: the fallback, the first disk)
+		bootToPark(first); // (no BootNext now, no order: the fallback, the first disk)
 		assertThat(eeprom.bootCurrent()).as("the fallback: none").isEqualTo(BootVariables.NONE);
 		assertThat(eeprom.setBootCurrent(args(5L)).failed()).as("an entry that isn't there").isTrue();
 	}
@@ -152,7 +152,7 @@ class BootOrderTest extends McosHarness {
 		assertThat(read(root().resolve("b1"))).as("a disk not on the bus: kept, and said").isEqualTo(ABSENT + " /init.lua\nnot present\n");
 		assertThat(read(root().resolve("order"))).as("a new entry goes first").isEqualTo("0001\n0000\n");
 		assertThat(read(root().resolve("next"))).isEqualTo("0000\n");
-		assertThat(read(root().resolve("names"))).isEqualTo("Boot0000\nBoot0001\nBootNext\nBootOrder\n");
+		assertThat(read(root().resolve("names"))).isEqualTo("Boot0000\nBoot0001\nBootNext\nBootOrder\nRestoreOnPowerLoss\n");
 		assertThat(eeprom().nvram().entries().get(0)).isEqualTo(new BootVariables.Entry(id, "/init.lua", "tiny"));
 		untilIdle();
 		// Refused: no such disk, an entry that isn't one, a bad usage; deleting one takes it out of the order too.

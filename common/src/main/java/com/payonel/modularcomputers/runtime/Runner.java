@@ -16,19 +16,24 @@ public interface Runner {
 		RUNNING,
 		/** Waiting for an interrupt. */
 		WAITING,
-		/** The program halted the CPU; power stays on. */
-		HALTED,
+		/** The host stopped it (the machine lost power, aborted or unloaded). */
+		STOPPED,
 		/** The program turned the machine off (ACPI soft-off): the board cuts its power. */
 		POWERED_OFF,
 		/** The program asked for a restart: the board turns off and on again. */
 		REBOOTING,
-		/** The program returned instead of halting: a panic, like Linux's init exiting. */
+		/** The program returned out of its EEPROM: an abort, like Linux's init exiting. */
 		RETURNED,
 		/** The program threw; see {@link #crash()}. */
 		CRASHED,
 	}
 
 	State state();
+
+	/** The interrupt sources it waits on now (any, when empty); nothing while it isn't waiting. */
+	default List<String> waitingFor() {
+		return List.of();
+	}
 
 	/** How many calls the host has answered, all told. */
 	long answered();
@@ -53,7 +58,7 @@ public interface Runner {
 
 	/**
 	 * Server side: the program's state as it runs, to save; empty when it can't be saved (it comes
-	 * back halted). {@code who}: the computer, as a log names it (which board, where).
+	 * back aborted, "unsaved"). {@code who}: the computer, as a log names it (which board, where).
 	 */
 	default java.util.Optional<byte[]> persist(Board board, String who) {
 		return java.util.Optional.empty();

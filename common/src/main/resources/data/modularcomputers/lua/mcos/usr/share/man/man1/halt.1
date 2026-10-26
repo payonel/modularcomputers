@@ -1,27 +1,38 @@
 .TH HALT 1 "" "" "mcos Manual"
 .SH NAME
-halt \- stop the computer
+halt \- stop the computer, turning it off
 .SH SYNOPSIS
 .B halt
 .SH DESCRIPTION
 .B halt
-flushes its output and asks the kernel to halt the system.
+flushes its output and asks the kernel to turn the system off, as
+.BR poweroff (1)
+does.
 Every process ends and its open files are closed, so what was written
-reaches the disks; then the CPU stops.
-The machine's power stays on, and the screens keep what they show.
+reaches the disks; then the machine turns off.
 Arguments are ignored.
 .PP
-To turn the machine off, use
-.BR poweroff (1);
-to start again, use
+To start again, use the power button, or
 .BR reboot (1)
-or the power button.
+instead.
 .SH EXIT STATUS
 On success
 .B halt
 does not return.
 If the kernel refuses, it prints the reason on standard error and
 exits with 1.
+.SH NOTES
+Linux's
+.B halt
+stops the CPUs and leaves the power on. This computer's board has no such
+state: a CPU stops with its power on only after a fault, and a fault turns
+the machine off (its power light blinking amber; why is in
+.I /sys/firmware/last_shutdown
+after the next boot). So
+.B halt
+powers off, as
+.B halt \-p
+does.
 .SH SEE ALSO
 .BR poweroff (1),
 .BR reboot (1),

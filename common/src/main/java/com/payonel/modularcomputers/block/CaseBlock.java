@@ -46,10 +46,10 @@ public final class CaseBlock extends HorizontalDirectionalBlock implements Entit
 	 */
 	public static final BooleanProperty READY = BooleanProperty.create("ready");
 	/**
-	 * On, with its CPU stopped (halted, aborted or crashed; user, 2026-10-13): the power light is
-	 * amber instead of green, so a halted machine shows it.
+	 * Off after a fault (an abort, user design 2026-10-26: power lost, its CPU or RAM changed, its
+	 * program left its EEPROM): the power light blinks amber until it's next powered on.
 	 */
-	public static final BooleanProperty HALTED = BooleanProperty.create("halted");
+	public static final BooleanProperty ABORTED = BooleanProperty.create("aborted");
 	/** A screen is in the case's gold expansion slot: its front shows it. */
 	public static final BooleanProperty SCREEN = BooleanProperty.create("screen");
 
@@ -60,7 +60,7 @@ public final class CaseBlock extends HorizontalDirectionalBlock implements Entit
 		super(properties);
 		this.tier = tier;
 		registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false).setValue(READY, false)
-			.setValue(HALTED, false).setValue(SCREEN, false));
+			.setValue(ABORTED, false).setValue(SCREEN, false));
 	}
 
 	public CaseTier tier() {
@@ -74,7 +74,7 @@ public final class CaseBlock extends HorizontalDirectionalBlock implements Entit
 
 	@Override
 	protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-		builder.add(FACING, POWERED, READY, HALTED, SCREEN);
+		builder.add(FACING, POWERED, READY, ABORTED, SCREEN);
 	}
 
 	@Override

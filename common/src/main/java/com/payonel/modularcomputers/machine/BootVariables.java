@@ -18,8 +18,10 @@ import java.util.UUID;
  * @param entries the entries by number
  * @param order entry numbers, each an entry's, once each
  * @param next an entry's number, or {@link #NONE}
+ * @param restoreOnPowerLoss whether the computer powers itself back on when power comes back after
+ *        it was lost (a BIOS setup's "restore on AC power loss", the user's: off by default)
  */
-public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, int next) {
+public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, int next, boolean restoreOnPowerLoss) {
 	/** How many entries there can be, numbered from 0. */
 	public static final int ENTRIES = 8;
 	/** No BootNext. */
@@ -30,7 +32,16 @@ public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, in
 	public static final String DEFAULT_PATH = "/init.lua";
 	/** A disk's name in an entry: its id, as the bus names it. */
 	private static final String ID_PREFIX = "id:";
-	public static final BootVariables EMPTY = new BootVariables(Map.of(), List.of(), NONE);
+	public static final BootVariables EMPTY = new BootVariables(Map.of(), List.of(), NONE, false);
+
+	public BootVariables(Map<Integer, Entry> entries, List<Integer> order, int next) {
+		this(entries, order, next, false);
+	}
+
+	/** With restore on AC power loss set. */
+	public BootVariables withRestoreOnPowerLoss(boolean on) {
+		return new BootVariables(entries, order, next, on);
+	}
 
 	/** A boot entry: a disk ({@code id:<uuid>}), a file on it, and a label ("" for none). */
 	public record Entry(String disk, String path, String label) {
@@ -68,7 +79,7 @@ public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, in
 		}
 		Map<Integer, Entry> now = new TreeMap<>(entries);
 		now.put(at, new Entry(disk, path == null ? DEFAULT_PATH : path, label == null ? "" : label));
-		return new BootVariables(now, order, next);
+		return new BootVariables(now, order, next, restoreOnPowerLoss);
 	}
 
 	/** Removes entry {@code number}, from the order and as BootNext too (as {@code efibootmgr -B} does). */
@@ -78,7 +89,7 @@ public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, in
 		now.remove(at);
 		List<Integer> left = new ArrayList<>(order);
 		left.remove(Integer.valueOf(at));
-		return new BootVariables(now, left, next == at ? NONE : next);
+		return new BootVariables(now, left, next == at ? NONE : next, restoreOnPowerLoss);
 	}
 
 	/** Sets the order: each number an entry's, none twice. */
@@ -91,12 +102,12 @@ public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, in
 			}
 			now.add(at);
 		}
-		return new BootVariables(entries, now, next);
+		return new BootVariables(entries, now, next, restoreOnPowerLoss);
 	}
 
 	/** Sets BootNext (an entry's number), or clears it ({@link #NONE}). */
 	public BootVariables withNext(long number) throws Invalid {
-		return new BootVariables(entries, order, number == NONE ? NONE : existing(number));
+		return new BootVariables(entries, order, number == NONE ? NONE : existing(number), restoreOnPowerLoss);
 	}
 
 	/** The entries to try, in turn: BootNext's first, then the order's (each once). */

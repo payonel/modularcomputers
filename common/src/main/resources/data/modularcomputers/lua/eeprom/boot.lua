@@ -4,7 +4,7 @@
 -- then, UEFI's fallback, each disk in bus order holding /init.lua. It runs the file found, handing
 -- it the disk's address, and tells the EEPROM which entry that was (BootCurrent: none for the
 -- fallback). A file that doesn't compile is said and skipped; with none left, it says
--- so and halts.
+-- so and waits for a key (or a disk coming), then restarts to try again.
 local function say(text)
   board.invoke("console", "write", text)
 end
@@ -76,5 +76,8 @@ for _, disk in ipairs(order) do
     return init(disk)
   end
 end
-say("boot: no bootable disk\r\n")
-board.halt()
+-- Nothing to boot: as a BIOS, it says so and waits (a machine on, its message showing), then tries
+-- again at a key or a device coming (a disk put in): it never leaves the EEPROM (that's an abort).
+say("boot: no bootable disk: press a key to try again\r\n")
+board.waitForInterrupt(nil, "console", "bus")
+board.reboot()

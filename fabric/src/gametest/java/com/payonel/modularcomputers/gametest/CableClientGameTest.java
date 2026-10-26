@@ -150,13 +150,13 @@ public class CableClientGameTest implements FabricClientGameTest {
 				.setItem(CaseMenu.EXP_SLOTS + 1, ItemStack.EMPTY)); // (what follows counts the bus without it)
 
 			// With the battery out the case's own power runs down, and clients see it drop.
+			check(context.computeOnClient(client -> casePercent(client, computer)) > 50, "full, from its battery");
 			singleplayer.getServer().runOnServer(server -> {
 				CaseBlockEntity be = (CaseBlockEntity) server.overworld().getBlockEntity(computer);
-				be.power().set(PowerBuffer.CAPACITY / 2 + 10); // just over 50%: the next draw crosses it
+				be.power().set(PowerBuffer.CAPACITY / 2 + 10); // just over 50%: the next draw (a settle's, 20 ticks of it) crosses it
 				be.parts().setItem(CaseMenu.UPS_SLOT, ItemStack.EMPTY);
 			});
-			context.waitFor(client -> casePercent(client, computer) == 51);
-			context.waitFor(client -> casePercent(client, computer) == 50);
+			context.waitFor(client -> casePercent(client, computer) <= 50); // (a settle may draw more than a percent: past half, not at it)
 
 			// Its screen view: the display, and the column's view buttons (this view's, its slot view's).
 			// The power button is the computer case's.

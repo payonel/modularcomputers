@@ -1,3 +1,5 @@
--- hello, world: on the console, then halt (power stays on)
+-- hello, world: on the console, then waiting, the machine on (leaving its EEPROM is an abort)
 board.invoke("console", "write", "hello world\r\n")
-board.halt()
+while true do
+  board.waitForInterrupt()
+end

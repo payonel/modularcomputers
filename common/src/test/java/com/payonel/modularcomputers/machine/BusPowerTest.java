@@ -34,9 +34,9 @@ class BusPowerTest {
 		return bus;
 	}
 
-	private static final Program HALT = board -> {
+	private static final Program PARKS = board -> {
 		board.invoke("console", "write", "hi\n");
-		board.halt();
+		com.payonel.modularcomputers.machine.Program.park(board);
 	};
 
 	@Test
@@ -53,11 +53,14 @@ class BusPowerTest {
 	}
 
 	@Test
-	void aHaltedCpuDrawsNothingButItsTerminalsDo() {
-		Machine machine = machine(HALT);
+	void aParkedCpuDrawsNothingButItsTerminalsDo() {
+		Machine machine = machine(PARKS);
 		cabled(machine);
 		machine.pressPower();
-		assertThat(machine.runner()).as("halted").isEmpty();
+		for (int i = 0; i < 5 && !Parked.parked(machine); i++) {
+			machine.tick();
+		}
+		assertThat(Parked.parked(machine)).as("parked").isTrue();
 		machine.powerUse(1000);
 		assertThat(machine.powerUse(1020)).as("a terminal for 20 ticks").isEqualTo(20 * PowerUnits.TERMINAL);
 	}
@@ -100,7 +103,7 @@ class BusPowerTest {
 	@Test
 	void disksDrawLessAtHigherTiers() {
 		for (DiskTier tier : DiskTier.values()) {
-			Machine machine = machine(HALT);
+			Machine machine = machine(PARKS);
 			new TestBus(machine).disk(new Disk(tier));
 			machine.pressPower();
 			machine.powerUse(100);
@@ -136,7 +139,7 @@ class BusPowerTest {
 			for (int i = 0; i < 8; i++) {
 				board.invoke("id:screen", "write", "x");
 			}
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		cabled(machine);
 		machine.pressPower();
@@ -145,8 +148,8 @@ class BusPowerTest {
 
 	@Test
 	void aTerminalTwoComputersReachIsOnOneBusAtATimeAndPaidForByThatOne() {
-		Machine first = machine(HALT);
-		Machine second = machine(HALT);
+		Machine first = machine(PARKS);
+		Machine second = machine(PARKS);
 		cabled(first);
 		TestBus other = cabled(second);
 		assertThat(second.board().bus().devices()).as("the first holds it").doesNotContain(screen);
@@ -170,7 +173,7 @@ class BusPowerTest {
 		Machine machine = machine(board -> {
 			board.invoke("console", "write", "hi\n");
 			board.waitForInterrupt(1000, "nothing");
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		cabled(machine);
 		machine.pressPower();
@@ -184,7 +187,7 @@ class BusPowerTest {
 
 	@Test
 	void aComputerThatGoesAwayLeavesItsTerminalsDark() {
-		Machine machine = machine(HALT);
+		Machine machine = machine(PARKS);
 		cabled(machine);
 		machine.pressPower();
 		assertThat(screen.buffer().isBlank()).isFalse();
@@ -195,7 +198,7 @@ class BusPowerTest {
 
 	@Test
 	void aTerminalThatLeavesTheBusLosesPowerAndOneThatJoinsGetsIt() {
-		Machine machine = machine(HALT);
+		Machine machine = machine(PARKS);
 		machine.pressPower();
 		TestBus bus = cabled(machine);
 		assertThat(screen.power().powered()).isTrue();

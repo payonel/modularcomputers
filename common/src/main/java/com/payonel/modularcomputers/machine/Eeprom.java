@@ -233,6 +233,17 @@ public final class Eeprom implements Device {
 		return change(vars -> vars.withOrder(numbers));
 	}
 
+	@Method(doc = "getRestoreOnPowerLoss(): whether the computer powers itself back on when power comes back after it was lost (a BIOS setup's restore on AC power loss); off at first")
+	public Result getRestoreOnPowerLoss(Arguments args) {
+		return Result.ok(storage.nvram().restoreOnPowerLoss());
+	}
+
+	@Method(doc = "setRestoreOnPowerLoss(on): whether the computer powers itself back on when power comes back after it was lost (its board does, by itself)")
+	public Result setRestoreOnPowerLoss(Arguments args) {
+		boolean on = args.checkBoolean(0);
+		return change(vars -> vars.withRestoreOnPowerLoss(on));
+	}
+
 	@Method(doc = "setBootNext([number]): the entry to boot next time only (the bootloader clears it as it boots); none clears it")
 	public Result setBootNext(Arguments args) {
 		long number = args.get(0) == null ? BootVariables.NONE : args.checkInteger(0);

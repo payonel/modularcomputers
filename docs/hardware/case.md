@@ -28,7 +28,8 @@ Place the case and open it by right-clicking the window into the case on its bac
 motherboard: a green board with a socket for every part. Fill it with parts by hand or by
 shift-clicking them in from your inventory. The power button is on the back too; sneak and
 right-click anywhere on the case presses it as well. The power light is green when the computer is
-on, and amber when it is on but its CPU has stopped.
+on. It blinks amber when the computer [aborted](/hardware/cpu/#aborts): it's off, and stays blinking
+until it's next powered on.
 
 Every tier is the same board. A lower tier has the first sockets of each kind, and the rest are
 greyed out, in the same places.

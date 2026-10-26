@@ -39,8 +39,12 @@ dependencies {
 	testImplementation "org.assertj:assertj-core:${project.assertj_version}"
 }
 
+/** Test JVMs side by side, classes shared among them (each JVM its own statics, so no test sees another's). */
+def TEST_FORKS = Math.max(1, Runtime.runtime.availableProcessors().intdiv(4))
+
 test {
 	useJUnitPlatform()
+	maxParallelForks = TEST_FORKS
 	// The manual's Lua is tested (DocsLuaTest, and McosTest runs docs/examples): its pages are inputs.
 	inputs.dir(rootProject.file('docs')).withPropertyName('manual').withPathSensitivity(PathSensitivity.RELATIVE)
 	testLogging {

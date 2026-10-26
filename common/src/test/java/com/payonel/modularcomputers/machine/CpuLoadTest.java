@@ -14,11 +14,12 @@ class CpuLoadTest {
 	private final Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 
 	@Test
-	void aBlankEepromIsAPanic() {
+	void aBlankEepromAborts() {
 		machine.board().setCpu(new Cpu(CpuTier.TIER_1));
 		machine.board().setEeprom(new Eeprom(""));
 		machine.pressPower();
-		assertThat(machine.board().virtualBus().console().screen().row(0).strip()).isEqualTo(Cpu.ABORT + Cpu.BLANK);
+		assertThat(machine.isAborted()).isTrue();
+		assertThat(machine.lastShutdown().message()).isEqualTo(Cpu.BLANK);
 	}
 
 	@Test
@@ -28,7 +29,7 @@ class CpuLoadTest {
 		Eeprom eeprom = new Eeprom("");
 		eeprom.flash(board -> {
 			ran.set(true);
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		machine.board().setEeprom(eeprom);
 		machine.pressPower();

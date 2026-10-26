@@ -38,12 +38,8 @@ public final class ProgramRunner implements Runner {
 		}
 	}
 
-	/** The program returned, without halting: a panic. */
+	/** The program returned out of its EEPROM: an abort. */
 	private record Returned() implements Request {
-	}
-
-	/** The program halted the CPU. */
-	private record Halt() implements Request {
 	}
 
 	/** The program turned the machine off, or asked for a restart. */
@@ -98,6 +94,11 @@ public final class ProgramRunner implements Runner {
 	}
 
 	@Override
+	public List<String> waitingFor() {
+		return state == State.WAITING && pending instanceof Wait wait ? wait.sources() : List.of();
+	}
+
+	@Override
 	public long answered() {
 		return answered;
 	}
@@ -132,12 +133,8 @@ public final class ProgramRunner implements Runner {
 				case Returned returned -> {
 					return state = State.RETURNED;
 				}
-				case Halt halt -> {
-					thread.interrupt(); // its halt() never returns: the thread unwinds
-					return state = State.HALTED;
-				}
 				case Power power -> {
-					thread.interrupt(); // as halt(): never returns
+					thread.interrupt(); // its poweroff() never returns: the thread unwinds
 					return state = power.end();
 				}
 				case Crashed crashed -> {
@@ -165,7 +162,7 @@ public final class ProgramRunner implements Runner {
 
 	@Override
 	public void stop() {
-		state = State.HALTED;
+		state = State.STOPPED;
 		thread.interrupt();
 	}
 
@@ -237,7 +234,9 @@ public final class ProgramRunner implements Runner {
 		@SuppressWarnings("unchecked")
 		public List<String> waitForInterrupt(double seconds, String... sources) {
 			long now = (long) (Long) runner.request(new Call(Board::uptime));
-			return (List<String>) runner.request(new Wait(now + Math.max(0, Math.round(seconds * 20)), List.of(sources)));
+			long ticks = Math.max(0, Math.round(seconds * 20));
+			long until = ticks > Long.MAX_VALUE - now ? Long.MAX_VALUE : now + ticks; // (a wait for ever doesn't wrap round into the past)
+			return (List<String>) runner.request(new Wait(until, List.of(sources)));
 		}
 
 		@Override
@@ -248,6 +247,11 @@ public final class ProgramRunner implements Runner {
 		@Override
 		public PowerInfo power() {
 			return call(Board::power);
+		}
+
+		@Override
+		public java.util.Map<String, Object> lastShutdown() {
+			return call(Board::lastShutdown);
 		}
 
 		@Override
@@ -273,12 +277,6 @@ public final class ProgramRunner implements Runner {
 		@Override
 		public Result setLabel(String address, String label) {
 			return call(board -> board.setLabel(address, label));
-		}
-
-		@Override
-		public void halt() {
-			runner.request(new Halt());
-			throw new Stopped(); // not reached: the host stops the thread
 		}
 
 		@Override

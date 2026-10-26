@@ -37,7 +37,8 @@ computers really work.
   `~/.gradle/gradle.properties`). Never edit them; report needs and bugs to the "lua thread" (another
   agent session; it can't grant permissions). Take the latest builds when told to update. Their bugs
   look like ours: check against stock Lua's semantics.
-- **Commands:** `./gradlew build` (compile and unit tests, seconds); `./gradlew testAll` (unit tests,
+- **Commands:** `./gradlew :common:test --tests '*SomeTest'` while iterating (seconds);
+  `./gradlew build` (compile and unit tests, about a minute: parallel JVMs); `./gradlew testAll` (unit tests,
   server game tests on both loaders, Fabric client game tests on Xvfb against the release jar)
   before claiming anything works. `.agents/TESTING.md` has the details; `scripts/headless.sh` runs a
   client on a virtual display (`:fabric:runClient` plays in `fabric/run`).
@@ -86,7 +87,7 @@ computers really work.
 - **Named constants**, each with a comment, for every tunable; no magic numbers.
 - **No old-save compatibility:** formats change freely, without shims.
 - **Debugging:** run one quick test before a long suite after a risky change
-  (`--tests '*McosTest.haltHalts'`, under `timeout`). A test that fails alone but passes with its
+  (`--tests '*McosTest.haltPowersOff'`, under `timeout`). A test that fails alone but passes with its
   class is a timing bug (a cold JVM's slow board calls make a different, legal state): make that
   state on purpose. Spawns failing at random are usually memory running out. Before shrinking
   memory peaks, compare what stays resident to the minimum. A hang is a thread dump away.
@@ -181,8 +182,19 @@ blank, and its files leave the world save when the player takes it.
   a case's block entity holds one, and so will a golem; a `BoardHost` says only where it is, which
   way it faces, and how its holder is saved and shown. Which slots it has is its `BoardLayout`
   (`CaseTier`'s). One board, so a fix to it is a fix for every holder.
-- A CPU only runs what the EEPROM holds (a fixed slot, like a reset vector) and aborts (ABRT, a
-  panic) when it can't. The motherboard owns the bus (cases change; the board's firmware doesn't).
+- A CPU only runs what the EEPROM holds (a fixed slot, like a reset vector). The motherboard owns
+  the bus (cases change; the board's firmware doesn't).
+- **No halted state; aborts** (user design, 2026-10-26): the only clean ways out are the board's
+  `poweroff` and `reboot` (and the power button); anything else aborts: off, its power light
+  blinking amber until the next power-on (`Machine.isAborted`). Aborts are a program leaving its
+  EEPROM (returning, or an error), nothing to run at power-on, its power running out, its CPU or RAM
+  changing under it, or its program not saved with the world (`Shutdown.Cause`); disks, cards, the
+  EEPROM and batteries swap while it runs. Why is the board's record (`Shutdown`, a chipset's
+  power-failure flags, saved with it), read at the next boot (`board.lastShutdown()`; mcos's
+  `/sys/firmware/last_shutdown` and its log), and by the planned scanner without powering it on.
+  mcos's `halt` powers off. **Restore on AC power loss** is the EEPROM's NVRAM (it goes with the
+  chip, as a BIOS setting goes with its board's CMOS): a power-lost abort powers itself back on when
+  power returns. Tests' programs park (`Program.park`: a wait nothing raises) instead of halting.
 - **Boot order is the EEPROM's NVRAM, not the bus's** (user design, 2026-10-25): a case's sockets are
   fixed connectors, as a motherboard's ports, and the EEPROM keeps UEFI's boot variables on its item
   (`ModComponents.NVRAM`, `BootVariables`): entries (a disk by its id, a file, a label), BootOrder,
@@ -735,6 +747,13 @@ Lessons from mistakes, each with its test:
 - **Compare a view's tabs by lane, not identity:** `SideTabs` makes its tabs afresh at each call,
   so `tab == open` is never true (the open tab's mark never showed). (`BotGolemClientGameTest`: the
   crafting tab ringed)
+- **A power press can end in an abort at once** (no EEPROM, a program returning in its first turn):
+  the light shows what the press came to, from the board (`BoardAssembly.pressPower`, for every
+  holder), never "on" for an `ON` press. (`cpuWithoutEepromAbortsAndItsLightBlinks`,
+  `aProgramReturningAsItStartsShowsItsAbortAtThePress`)
+- **A wait for ever wraps round:** a deadline is now plus its length, and `Long.MAX_VALUE` ticks
+  added to now is in the past, so a Java program's park (`Program.park`) answered at once and spun.
+  Saturate a deadline at the end of time. (`RuntimeTest.callsAreImmediate...`)
 - An hfs file shows its writes only at close: watch a file a program keeps open on `/tmp` (tmpfs).
 - Typing more than 256 keys at once in a test drops the rest (a terminal's key queue): split lines.
 - Lua 5.5 for-loop variables are constants (a compile error when the script loads: `LuaScriptsTest`

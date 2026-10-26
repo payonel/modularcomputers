@@ -27,7 +27,7 @@ The yardstick is a running computer: a tier 1 CPU running plus one terminal,
 | CPU tier 1, waiting for an [interrupt](/concepts/interrupts/) | 50 W |
 | CPU tier 2, waiting | 20 W |
 | CPU tier 3, waiting | 5 W |
-| CPU, halted | nothing |
+| CPU, off | nothing |
 | A [terminal](/devices/terminal/), while it has power | 10 W |
 | One write to a terminal | 1 unit, once |
 

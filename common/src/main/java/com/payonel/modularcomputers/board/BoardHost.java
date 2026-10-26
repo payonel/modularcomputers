@@ -33,11 +33,11 @@ public interface BoardHost {
 	void syncToClients();
 
 	/**
-	 * Shows whether it could run, is on, halted, and shows a screen (a case's power button and
+	 * Shows whether it could run, is on, is off after a fault (aborted), and shows a screen (a case's power button and
 	 * front); whether that changed, and then it was sent to clients with the board's state too (the
 	 * board doesn't send it again: a case's block update carries its block entity).
 	 */
-	boolean showPowerState(boolean ready, boolean powered, boolean halted, boolean screen);
+	boolean showPowerState(boolean ready, boolean powered, boolean aborted, boolean screen);
 
 	/** Sends its terminal's changed rows to the players near it. */
 	void syncDisplay(Terminal display);

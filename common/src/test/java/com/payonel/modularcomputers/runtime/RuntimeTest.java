@@ -92,14 +92,14 @@ class RuntimeTest {
 				board.invoke("id:screen", "getSize");
 				calls.incrementAndGet();
 			}
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(calls.get()).as("power-on runs the first turn").isEqualTo(20);
 		machine.tick();
 		assertThat(calls.get()).isEqualTo(40);
 		machine.tick();
 		assertThat(calls.get()).isEqualTo(50);
-		assertThat(machine.runner()).as("the program returned: the CPU halts").isEmpty();
+		assertThat(com.payonel.modularcomputers.machine.Parked.parked(machine)).as("done: parked").isTrue();
 		assertThat(machine.isPowered()).as("power stays on").isTrue();
 	}
 
@@ -114,7 +114,7 @@ class RuntimeTest {
 			seen.add(board.doc("id:sensor-1", "read").orElseThrow());
 			seen.add(board.invoke("id:screen", "getSize").values());
 			seen.add(board.status().capacity());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(seen).containsExactly(
 			List.of(new Board.DeviceInfo("id:screen", "id:screen", "terminal"), new Board.DeviceInfo("id:sensor-1", "id:sensor-1", "hearing")),
@@ -132,7 +132,7 @@ class RuntimeTest {
 			seen.add(board.list());
 			seen.add(board.type(card).orElseThrow());
 			seen.add(board.invoke(card, "read").first());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat((List<Object>) seen.get(0)).as("listed once, by its path, with its id").containsExactlyInAnyOrder(
 			new Board.DeviceInfo("id:screen", "id:screen", "terminal"), new Board.DeviceInfo("exp:0", card, "hearing"));
@@ -148,7 +148,7 @@ class RuntimeTest {
 			errors.add(board.invoke("id:screen", "write", true).error());
 			errors.add(board.invoke("id:sensor-1", "explode").error());
 			errors.add(board.invoke("id:screen", "write", "hi").failed() ? "failed" : "ok");
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		assertThat(errors).containsExactly("no such device: nowhere", "no such method: fly",
 			"bad argument #1 (string expected, got boolean)", "device error: java.lang.IllegalStateException: boom", "ok");
@@ -164,7 +164,7 @@ class RuntimeTest {
 			seen.add(board.waitForInterrupt(60));
 			seen.add(board.invoke("id:sensor-1", "read").first());
 			seen.add(board.waitForInterrupt(0));
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		machine.tick();
 		machine.tick();
@@ -181,7 +181,7 @@ class RuntimeTest {
 			board.list();
 			seen.add(board.waitForInterrupt(0.5)); // 10 ticks
 			seen.add(board.uptime());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		for (int i = 0; i < 9; i++) {
 			machine.tick();
@@ -198,7 +198,7 @@ class RuntimeTest {
 			board.list();
 			seen.add(board.waitForInterrupt(60));
 			seen.add(board.list().stream().map(Board.DeviceInfo::address).toList());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		machine.tick();
 		bus.uncable("id:sensor-1"); // the sensor was unplugged
@@ -208,13 +208,13 @@ class RuntimeTest {
 
 	@Test
 	void theMotherboardChecksItsCpuAndPowerEveryTick() {
-		run(board -> board.waitForInterrupt(60));
+		run(com.payonel.modularcomputers.machine.Program::park); // (a wait for any interrupt would end at the screen's, and the program with it: an abort)
 		assertThat(machine.tick()).isEqualTo(Machine.Supervision.OK);
 		power[0] = false;
 		assertThat(machine.tick()).isEqualTo(Machine.Supervision.LOST_POWER);
 		assertThat(machine.isPowered()).isFalse();
 		power[0] = true;
-		run(board -> board.waitForInterrupt(60));
+		run(com.payonel.modularcomputers.machine.Program::park); // (a wait for any interrupt would end at the screen's, and the program with it: an abort)
 		machine.board().setCpu(null);
 		assertThat(machine.tick()).isEqualTo(Machine.Supervision.LOST_CPU);
 		assertThat(machine.isPowered()).isFalse();
@@ -236,7 +236,7 @@ class RuntimeTest {
 	}
 
 	@Test
-	void aCrashShowsTheAbortScreenAfterTheCallsBeforeIt() {
+	void aCrashAbortsAfterTheCallsBeforeIt() {
 		run(board -> {
 			for (int i = 0; i < 25; i++) {
 				board.uptime();
@@ -245,31 +245,29 @@ class RuntimeTest {
 		});
 		assertThat(display.buffer().isBlank()).as("still running its first turn").isTrue();
 		machine.tick();
-		assertThat(display.buffer().row(0).strip()).isEqualTo(Cpu.ABORT + Cpu.CRASHED + "out of cheese");
-		assertThat(machine.isPowered()).isTrue();
+		assertThat(machine.lastShutdown().message()).isEqualTo(Cpu.CRASHED + "out of cheese");
+		assertThat(machine.isAborted()).isTrue();
 	}
 
 	@Test
-	void haltingEndsTheProgramWithPowerOnAndTheScreenKept() {
+	void poweringOffEndsTheProgramCleanly() {
 		List<String> after = new ArrayList<>();
 		run(board -> {
 			board.invoke("console", "write", "bye\n");
-			board.halt();
-			after.add("ran on"); // never: halt doesn't return
+			board.poweroff();
+			after.add("ran on"); // never: poweroff doesn't return
 		});
 		machine.tick();
-		assertThat(machine.runner()).as("the CPU is halted").isEmpty();
-		assertThat(machine.isPowered()).as("power stays on").isTrue();
-		assertThat(display.buffer().row(0).strip()).isEqualTo("bye");
+		assertThat(machine.isPowered()).isFalse();
+		assertThat(machine.isAborted()).as("a clean way out").isFalse();
 		assertThat(after).isEmpty();
 	}
 
 	@Test
-	void returningWithoutHaltingIsAPanic() {
+	void returningOutOfTheEepromAborts() {
 		run(board -> board.invoke("console", "write", "bye\n"));
-		assertThat(machine.runner()).isEmpty();
-		assertThat(machine.isPowered()).as("power stays on, as after any abort").isTrue();
-		assertThat(display.buffer().row(0).strip()).isEqualTo(Cpu.ABORT + Cpu.RETURNED);
+		assertThat(machine.isAborted()).isTrue();
+		assertThat(machine.lastShutdown().cause()).isEqualTo(com.payonel.modularcomputers.machine.Shutdown.Cause.RETURNED);
 	}
 
 	@Test

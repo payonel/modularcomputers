@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 class LuaScriptsTest {
 	@Test
 	void aScriptIsReadAsItsBytes() {
-		assertThat(LuaScripts.read("eeprom/hello")).startsWith("-- hello, world").contains("board.halt()");
+		assertThat(LuaScripts.read("eeprom/hello")).startsWith("-- hello, world").contains("board.waitForInterrupt()");
 		assertThatThrownBy(() -> LuaScripts.read("eeprom/nothing")).hasMessageContaining("eeprom/nothing.lua");
 	}
 

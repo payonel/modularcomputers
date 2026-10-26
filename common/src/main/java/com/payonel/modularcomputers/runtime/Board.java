@@ -78,6 +78,14 @@ public interface Board {
 	/** The case's power: its store, its batteries and its load. */
 	PowerInfo power();
 
+	/**
+	 * Why the computer last stopped, as its board records it (a chipset's power-failure flags):
+	 * {cause, message, time}: cause "none", "clean", "button", or an abort ("power lost", "cpu
+	 * changed", "ram changed", "no program", "returned", "crashed"), message what it says (a
+	 * crash's error), time the world's (ticks).
+	 */
+	Map<String, Object> lastShutdown();
+
 	/** The board's hardware: case tier, CPU, RAM. */
 	HardwareInfo hardware();
 
@@ -131,15 +139,9 @@ public interface Board {
 	long time();
 
 	/**
-	 * Halts the CPU for good, like {@code cli; hlt} or Linux's {@code reboot(HALT)}: the program
-	 * ends here and never returns, and power stays on (the screens keep what they show). A
-	 * program must end this way: returning instead is a panic, as when Linux's init exits.
-	 */
-	void halt();
-
-	/**
 	 * Turns the machine off, as ACPI's soft-off (S5): the program ends here, and the computer is
-	 * off as if its power button were pressed. Never returns.
+	 * off as if its power button were pressed. Never returns. This and {@link #reboot} are a
+	 * program's only clean ways out: leaving its EEPROM (returning, or an error) is an abort.
 	 */
 	void poweroff();
 

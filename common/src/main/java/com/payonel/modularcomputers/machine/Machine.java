@@ -44,6 +44,24 @@ public final class Machine {
 		LOST_POWER,
 	}
 
+	/** Why it last stopped (the board's record: see {@link Shutdown}); saved with it. */
+	private Shutdown last = Shutdown.NONE;
+	/** The CPU it started with: another in its socket (or none) while it runs aborts it. */
+	private Cpu cpuAtStart;
+	/** Loaded on, its parts not yet back: the CPU it finds at its next look is the one it runs on. */
+	private boolean cpuUnknown;
+
+	/** Whether the CPU in its socket isn't the one it started with. */
+	private boolean cpuChanged() {
+		if (cpuUnknown && board.cpu().isPresent()) {
+			cpuUnknown = false;
+			cpuAtStart = board.cpu().get();
+		}
+		return board.cpu().orElse(null) != cpuAtStart;
+	}
+	/** Whether it powers itself on when power comes back after a power loss (the EEPROM's setting: restore on AC power loss). */
+	private BooleanSupplier restoreOnPowerLoss = () -> false;
+
 	private final Motherboard board;
 	private final BooleanSupplier power;
 	private final MotherboardApi api;
@@ -54,7 +72,7 @@ public final class Machine {
 	private long cpuTicks;
 	/** Ticks it waited for an interrupt since then. */
 	private long waitingTicks;
-	/** Whether the CPU executed in the last whole tick (or waited, or was halted). */
+	/** Whether the CPU executed in the last whole tick (or waited). */
 	private boolean executedLastTick;
 	/** Calls answered this tick, by the tick's turn and any interrupt turns. */
 	private int callsThisTick;
@@ -83,7 +101,7 @@ public final class Machine {
 		this.board = board;
 		this.power = power;
 		this.api = new MotherboardApi(board, () -> uptime, () -> runner == null ? 0 : runner.memoryUsed(),
-			() -> runner == null ? com.payonel.modularcomputers.runtime.MemoryAccount.UNLIMITED : runner.memoryAccount());
+			() -> runner == null ? com.payonel.modularcomputers.runtime.MemoryAccount.UNLIMITED : runner.memoryAccount(), () -> last);
 		board.bus().devices().forEach(this::wireWake);
 	}
 
@@ -159,16 +177,19 @@ public final class Machine {
 			if (wakeAsked) {
 				wakeAsked = false;
 				waker.run(); // a device woke it, as its power button would (a wake from a frame that came while it was on is dropped)
+			} else if (last.cause() == Shutdown.Cause.POWER_LOST && power.getAsBoolean() && board.cpu().isPresent()
+				&& restoreOnPowerLoss.getAsBoolean()) {
+				waker.run(); // power's back, and its EEPROM says to come back on (restore on AC power loss)
 			}
 			return Supervision.OK;
 		}
 		wakeAsked = false;
-		if (board.cpu().isEmpty()) {
-			cutPower();
+		if (cpuChanged()) {
+			abort(Shutdown.Cause.CPU_CHANGED, board.cpu().isEmpty() ? "its CPU was taken out" : "its CPU was swapped");
 			return Supervision.LOST_CPU;
 		}
 		if (!power.getAsBoolean()) {
-			cutPower();
+			abort(Shutdown.Cause.POWER_LOST, "its power ran out");
 			return Supervision.LOST_POWER;
 		}
 		uptime++;
@@ -233,25 +254,68 @@ public final class Machine {
 			cpuTicks++; // it executed this tick (waiting all through, it draws its waiting draw instead)
 		}
 		if (state == Runner.State.CRASHED) {
-			board.cpu().ifPresent(cpu -> cpu.crashed(board, runner.crash()));
+			abort(Shutdown.Cause.CRASHED, Cpu.crashMessage(runner.crash()));
+			return;
 		} else if (state == Runner.State.RETURNED) {
-			board.cpu().ifPresent(cpu -> cpu.returned(board));
+			abort(Shutdown.Cause.RETURNED, Cpu.RETURNED);
+			return;
 		}
 		if (state == Runner.State.POWERED_OFF || state == Runner.State.REBOOTING) {
 			runner = null;
+			stopped(Shutdown.Cause.CLEAN, "");
 			cutPower(); // ACPI soft-off: as the power button does
 			if (state == Runner.State.REBOOTING) {
 				pressPower(); // and on again: the CPU boots its EEPROM afresh
 			}
 			return;
 		}
-		if (state != Runner.State.RUNNING && state != Runner.State.WAITING) {
-			runner = null; // the CPU is halted; power stays on, and the screens keep what they show
-			setAccepting(false);
-		}
 		if (executed) {
 			board.bus().devices().forEach(Device::flush);
 		}
+	}
+
+	/** Records why it stopped (the world's time). */
+	private void stopped(Shutdown.Cause cause, String message) {
+		last = new Shutdown(cause, message, board.chassis().time());
+	}
+
+	/**
+	 * A fault: why it's recorded, and the machine is off (its light blinking amber until it's next
+	 * powered on). Any way out but the board's own power-off or restart is one.
+	 */
+	private void abort(Shutdown.Cause cause, String message) {
+		stopped(cause, message);
+		cutPower();
+	}
+
+	/** Why it last stopped (the board's record). */
+	public Shutdown lastShutdown() {
+		return last;
+	}
+
+	/** Off after a fault (see {@link Shutdown}): its light blinks amber until it's next powered on. */
+	public boolean isAborted() {
+		return !powered && last.aborted();
+	}
+
+	/** After a load: why it last stopped. */
+	public void restoreShutdown(Shutdown shutdown) {
+		last = shutdown;
+	}
+
+	/** Loaded on, but with no saved program to go on with: an abort, never on with nothing running. */
+	public void programUnsaved() {
+		if (powered && runner == null) {
+			abort(Shutdown.Cause.UNSAVED, UNSAVED);
+		}
+	}
+
+	/** What an unsaved program's abort says. */
+	public static final String UNSAVED = "its program wasn't saved with the world";
+
+	/** Where its EEPROM's restore-on-power-loss setting is read (the chip in its slot, when power comes back). */
+	public void restoreOnPowerLossWith(BooleanSupplier setting) {
+		this.restoreOnPowerLoss = setting;
 	}
 
 	private void cutPower() {
@@ -287,7 +351,7 @@ public final class Machine {
 
 	/**
 	 * What it draws now, in power units a tick: the CPU at its tier's rate for what it did last
-	 * tick (running or waiting; halted, nothing), and every powered device on its bus at its own
+	 * tick (running or waiting), and every powered device on its bus at its own
 	 * draw. Per-call costs (a terminal's writes) come and go, so they aren't in it. Nothing while off.
 	 */
 	public long currentDraw() {
@@ -307,7 +371,7 @@ public final class Machine {
 	/**
 	 * Power used since the last call, up to game time {@code now}, in power units:
 	 * the CPU's own (its tier's running draw for each tick it executed, its waiting draw for each
-	 * tick it waited for an interrupt, nothing while halted) and what its bus
+	 * tick it waited for an interrupt) and what its bus
 	 * devices owe (see {@link BusPower}; a device shared with another computer pays once, to
 	 * whichever collects first). Nothing while off.
 	 */
@@ -338,7 +402,7 @@ public final class Machine {
 	/**
 	 * Whether the devices on its bus take data (keys, events) now (user, 2026-10-13). A device takes
 	 * data only while all three hold: a board holds it on its bus, the board powers it, and the
-	 * board's CPU runs a program (not halted, aborted or off). When any ends, it drops all it holds;
+	 * board's CPU runs a program (not aborted or off). When any ends, it drops all it holds;
 	 * until they hold again, it drops what comes in. This machine's devices are on its bus and held
 	 * by it, and it powers them while it's on, so it's on with a program running.
 	 */
@@ -398,13 +462,9 @@ public final class Machine {
 		return powered;
 	}
 
-	/** On, but its CPU has stopped: the program halted, or the CPU aborted or crashed. Power stays on. */
-	public boolean isHalted() {
-		return powered && runner == null;
-	}
-
 	public PowerPress pressPower() {
 		if (powered) {
+			stopped(Shutdown.Cause.BUTTON, "");
 			cutPower();
 			return PowerPress.OFF;
 		}
@@ -423,10 +483,17 @@ public final class Machine {
 		executedThisTick = false;
 		board.bus().devices().forEach(this::supply);
 		memoryAtStart = board.chassis().memory();
-		adopt(cpu.get().powerOn(board).orElse(null));
-		if (runner != null) {
-			startAccepting();
+		cpuAtStart = cpu.get();
+		cpuUnknown = false;
+		Runner started;
+		try {
+			started = cpu.get().powerOn(board);
+		} catch (Cpu.Fault fault) {
+			abort(Shutdown.Cause.NO_PROGRAM, fault.getMessage()); // nothing to run: off, its light blinking
+			return PowerPress.ON;
 		}
+		adopt(started);
+		startAccepting();
 		run(); // the CPU starts executing right away
 		return PowerPress.ON;
 	}
@@ -449,7 +516,7 @@ public final class Machine {
 
 	/**
 	 * The running program's state, to save with the computer (a Lua CPU's, by Styx); empty when
-	 * nothing runs or it can't be saved now (it then comes back halted). Server thread.
+	 * nothing runs or it can't be saved now (it then comes back aborted, "unsaved"). Server thread.
 	 */
 	public Optional<byte[]> persistProgram() {
 		if (!powered || runner == null) {
@@ -472,10 +539,16 @@ public final class Machine {
 		}
 		try {
 			memoryAtStart = board.chassis().memory();
+			cpuAtStart = board.cpu().get();
 			adopt(board.cpu().get().resume(saved).orElse(null));
-			setAccepting(runner != null); // it goes on: what its devices kept for it (saved with them) stays
+			if (runner == null) {
+				abort(Shutdown.Cause.UNSAVED, UNSAVED); // (nothing came of it: never on with nothing running)
+				return;
+			}
+			setAccepting(true); // it goes on: what its devices kept for it (saved with them) stays
 		} catch (RuntimeException e) {
-			com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A saved computer didn't restore; its CPU comes back halted", e);
+			com.payonel.modularcomputers.ModularComputers.LOGGER.warn("A saved computer didn't restore; it aborts", e);
+			abort(Shutdown.Cause.CRASHED, "its saved program didn't restore: " + e.getMessage());
 			return;
 		}
 		run();
@@ -485,16 +558,14 @@ public final class Machine {
 	private List<com.payonel.modularcomputers.runtime.Board.MemoryInfo> memoryAtStart = List.of();
 
 	/**
-	 * Call after the parts changed. RAM put in or taken out while the CPU runs a program aborts it
-	 * (user, 2026-10-13), as a real machine crashes: the CPU's abort screen, power stays on.
-	 * Returns whether it did.
+	 * Call after the parts changed. RAM put in, taken out or swapped while it runs aborts it (user,
+	 * 2026-10-13), as a real machine crashes. Returns whether it did.
 	 */
 	public boolean memoryChanged() {
-		if (!powered || runner == null || board.chassis().memory().equals(memoryAtStart)) {
+		if (!powered || board.chassis().memory().equals(memoryAtStart)) {
 			return false;
 		}
-		stopProgram();
-		board.cpu().ifPresent(cpu -> cpu.memoryChanged(board));
+		abort(Shutdown.Cause.RAM_CHANGED, Cpu.RAM_CHANGED);
 		return true;
 	}
 
@@ -503,10 +574,10 @@ public final class Machine {
 	 * was running.
 	 */
 	public boolean cpuRemoved() {
-		if (!powered || board.cpu().isPresent()) {
+		if (!powered || !cpuChanged()) {
 			return false;
 		}
-		cutPower();
+		abort(Shutdown.Cause.CPU_CHANGED, board.cpu().isEmpty() ? "its CPU was taken out" : "its CPU was swapped");
 		return true;
 	}
 
@@ -518,6 +589,7 @@ public final class Machine {
 		if (!powered || power.getAsBoolean()) {
 			return false;
 		}
+		stopped(Shutdown.Cause.POWER_LOST, "its power ran out");
 		cutPower();
 		return true;
 	}
@@ -589,10 +661,11 @@ public final class Machine {
 	/**
 	 * Sets the switch from a save or a sync, without booting or cutting power: the devices
 	 * restore their own state. The program comes back with {@link #resumeProgram} (a Lua CPU's);
-	 * without it, the CPU is halted.
+	 * without it, it aborts ({@link #programUnsaved}).
 	 */
 	public void restorePowered(boolean powered) {
 		this.powered = powered;
+		cpuUnknown = powered; // (its parts come after: it takes the CPU it finds at its next look)
 		if (powered) {
 			board.bus().devices().forEach(this::supply);
 		}

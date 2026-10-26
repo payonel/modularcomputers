@@ -72,8 +72,9 @@ class LuaRunnerTest {
 		}
 	}
 
-	private void untilHalted() {
-		settle(() -> machine.runner().isEmpty());
+	/** Until its program is parked (waiting for good, as every program here ends) or it stopped. */
+	private void untilParked() {
+		settle(() -> com.payonel.modularcomputers.machine.Parked.parked(machine));
 	}
 
 	private String row(int row) {
@@ -99,9 +100,9 @@ class LuaRunnerTest {
 			collectgarbage() -- (as stock Lua: growing a stack never collects, so the next call may fail until something does)
 			board.invoke("console", "write", tostring(total == stick) .. " " .. tostring(fits) .. " "
 			  .. tostring(used > 0 and used < 64 * 1024) .. " " .. tostring(ok) .. " " .. tostring(err))
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""".formatted(stick));
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).as("the RAM is the program's; used is counted above the baseline; past it, Lua's own error")
 			.isEqualTo("true true true false not enough memory");
 	}
@@ -124,18 +125,20 @@ class LuaRunnerTest {
 				return java.util.List.of();
 			}
 		});
-		boot("board.halt()");
-		assertThat(row(0)).isEqualTo("ABRT: " + Cpu.NO_RAM);
+		boot("while true do board.waitForInterrupt(nil, 'park') end");
+		assertThat(machine.isAborted()).as("off, its light blinking").isTrue();
+		assertThat(machine.lastShutdown().cause()).isEqualTo(com.payonel.modularcomputers.machine.Shutdown.Cause.NO_PROGRAM);
+		assertThat(machine.lastShutdown().message()).isEqualTo(Cpu.NO_RAM);
 	}
 
 	@Test
 	void helloWorldOnTheConsoleThenHalt() {
 		boot("""
 			board.invoke("console", "write", "hello world\\n")
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			error("halt returned")
 			""");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("hello world");
 		assertThat(screen.buffer().rows().getFirst().strip()).as("on the terminal too").isEqualTo("hello world");
 		assertThat(machine.isPowered()).as("power stays on").isTrue();
@@ -156,9 +159,9 @@ class LuaRunnerTest {
 			local ok, w, h = board.invoke("id:screen", "getSize")
 			local bad, why = board.invoke("id:nothing", "write", "x")
 			board.invoke("console", "write", tostring(ok) .. " " .. w .. "x" .. h .. " " .. tostring(bad) .. " " .. why)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).startsWith("true 50x16 false ");
 	}
 
@@ -168,9 +171,9 @@ class LuaRunnerTest {
 			local devices = board.list()
 			local hw = board.hardware()
 			board.invoke("console", "write", #devices .. " " .. devices[1].type .. " " .. hw.cpu.tier .. " " .. math.type(board.uptime()))
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("1 terminal 3 integer");
 	}
 
@@ -180,9 +183,9 @@ class LuaRunnerTest {
 			local n = 0
 			for i = 1, 1000000 do n = n + 1 end
 			board.invoke("console", "write", "counted " .. n)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("counted 1000000");
 	}
 
@@ -191,9 +194,9 @@ class LuaRunnerTest {
 		boot("""
 			for i = 1, 300 do board.invoke("id:screen", "getSize") end
 			board.invoke("console", "write", "done")
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("done");
 	}
 
@@ -202,10 +205,10 @@ class LuaRunnerTest {
 		boot("""
 			local pending = board.waitForInterrupt(1, "id:screen")
 			board.invoke("console", "write", "woke " .. #pending)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		settle(() -> machine.runner().map(r -> r.state() == Runner.State.WAITING).orElse(false));
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("woke 0");
 	}
 
@@ -215,11 +218,11 @@ class LuaRunnerTest {
 			local pending = board.waitForInterrupt(nil, "console") -- a bound terminal's keys come through the console
 			local ok, key = board.invoke("console", "read")
 			board.invoke("console", "write", "woke " .. pending[1] .. " " .. key)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		settle(() -> machine.runner().map(r -> r.state() == Runner.State.WAITING).orElse(false));
 		screen.press("x");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("woke console x");
 	}
 
@@ -235,21 +238,21 @@ class LuaRunnerTest {
 			local first = inner()
 			local sorted = inner()
 			board.invoke("console", "write", first .. " " .. sorted)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("plain yield 123");
 	}
 
 	@Test
-	void aHaltFromInsideASortStopsIt() {
+	void aPowerOffFromInsideASortStopsIt() {
 		boot("""
-			pcall(table.sort, {3, 1, 2}, function(a, b) board.halt() return a < b end)
+			pcall(table.sort, {3, 1, 2}, function(a, b) board.poweroff() return a < b end)
 			board.invoke("console", "write", "still here")
 			""");
-		untilHalted();
-		assertThat(row(0)).as("nothing after the halt").isEmpty();
-		assertThat(machine.isPowered()).isTrue();
+		settle(() -> !machine.isPowered());
+		assertThat(row(0)).as("nothing after the power-off").isEmpty();
+		assertThat(machine.lastShutdown().cause()).as("a clean way out").isEqualTo(com.payonel.modularcomputers.machine.Shutdown.Cause.CLEAN);
 	}
 
 	@Test
@@ -266,7 +269,7 @@ class LuaRunnerTest {
 			local _, image = board.invoke("eeprom", "get")
 			if string.match(image, "%-%- rebooted$") then
 			  board.invoke("console", "write", "again")
-			  board.halt()
+			  while true do board.waitForInterrupt(nil, 'park') end
 			end
 			board.invoke("eeprom", "set", image .. string.char(10) .. "-- rebooted")
 			board.reboot()
@@ -290,9 +293,9 @@ class LuaRunnerTest {
 			table.sort(names)
 			board.invoke("console", "write", table.concat(names, ",") .. " " .. tostring(host) .. " "
 			  .. tostring(load("return debug")() == debug) .. " " .. tostring(debug.getregistry))
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).as("the sandbox's debug has only what a program needs for its own frozen coroutines, and a traceback")
 			.isEqualTo("isfrozen,thaw,traceback nil true nil");
 	}
@@ -315,9 +318,9 @@ class LuaRunnerTest {
 	@Test
 	void aReflashedImageKeepsItsBytesAcrossAReboot() {
 		Eeprom eeprom = new Eeprom("""
-			local next = 'board.invoke("console", "write", "length " .. #"' .. string.char(233) .. '") board.halt()'
+			local next = 'board.invoke("console", "write", "length " .. #"' .. string.char(233) .. '") while true do board.waitForInterrupt(nil, "park") end'
 			board.invoke("eeprom", "set", next)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
@@ -325,10 +328,10 @@ class LuaRunnerTest {
 		TestBus.of(machine, devices);
 		machine.board().setEeprom(eeprom);
 		machine.pressPower();
-		untilHalted();
+		untilParked();
 		machine.pressPower();
 		machine.pressPower();
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).as("one byte, still one byte").isEqualTo("length 1");
 	}
 
@@ -354,7 +357,7 @@ class LuaRunnerTest {
 			  board.waitForInterrupt(0.25, "id:screen")
 			end
 			board.invoke("console", "write", " total " .. total)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		settle(() -> row(0).startsWith("12"));
 		byte[] saved = machine.persistProgram().orElseThrow();
@@ -362,7 +365,7 @@ class LuaRunnerTest {
 		Terminal screen2 = new Terminal(Resolution.DEFAULT);
 		Machine again = reloaded(screen2);
 		again.resumeProgram(saved);
-		settle(again, () -> again.runner().isEmpty());
+		settle(again, () -> com.payonel.modularcomputers.machine.Parked.parked(again));
 		assertThat(again.board().virtualBus().console().screen().row(0).strip()).as("its locals and its loop, as they were").endsWith("6 total 21");
 		again.pressPower();
 	}
@@ -419,9 +422,9 @@ class LuaRunnerTest {
 			end
 			collectgarbage()
 			board.invoke("console", "write", "bad " .. bad .. (finalized > 0 and " finalized" or " none finalized"))
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).as("every reply its own call's, and no call left spinning").isEqualTo("bad 0 finalized");
 	}
 
@@ -435,7 +438,7 @@ class LuaRunnerTest {
 		boot("""
 			local _, n = board.invoke("id:counter", "hit")
 			board.invoke("console", "write", "hits " .. n)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
 		long end = System.nanoTime() + 5_000_000_000L;
@@ -452,7 +455,7 @@ class LuaRunnerTest {
 		again.setServer(server::add);
 		again.restorePowered(true);
 		again.resumeProgram(saved);
-		settle(again, () -> again.runner().isEmpty());
+		settle(again, () -> com.payonel.modularcomputers.machine.Parked.parked(again));
 		assertThat(counter.hits).as("the saved program makes its call, once").isEqualTo(1);
 		assertThat(again.board().virtualBus().console().screen().row(0).strip()).isEqualTo("hits 1");
 		again.pressPower();
@@ -471,7 +474,7 @@ class LuaRunnerTest {
 			local _, n = board.invoke("id:counter", "hit")
 			for i = 1, 3000000 do x = x + 1 end
 			board.invoke("console", "write", "hits " .. n)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
 		settle(runner::alive);
@@ -485,7 +488,7 @@ class LuaRunnerTest {
 		again.setServer(server::add);
 		again.restorePowered(true);
 		again.resumeProgram(saved);
-		settle(again, () -> again.runner().isEmpty());
+		settle(again, () -> com.payonel.modularcomputers.machine.Parked.parked(again));
 		assertThat(again.board().virtualBus().console().screen().row(0).strip()).isEqualTo("hits 1");
 		assertThat(counter.hits).as("the call was made once").isEqualTo(1);
 		again.pressPower();
@@ -493,7 +496,7 @@ class LuaRunnerTest {
 
 	@Test
 	void aWaitSavedPartwayEndsOnItsDeadlineOnTheSavedClock() {
-		boot("board.waitForInterrupt(4, \"nothing\") board.halt()"); // 80 ticks
+		boot("board.waitForInterrupt(4, \"nothing\") while true do board.waitForInterrupt(nil, 'park') end"); // 80 ticks
 		settle(() -> machine.uptime() >= 40 && machine.runner().map(r -> r.state() == Runner.State.WAITING).orElse(false));
 		byte[] saved = machine.persistProgram().orElseThrow();
 		long at = machine.uptime();
@@ -501,7 +504,7 @@ class LuaRunnerTest {
 		Machine again = reloaded(new Terminal(Resolution.DEFAULT));
 		again.restoreUptime(at);
 		again.resumeProgram(saved);
-		settle(again, () -> again.runner().isEmpty());
+		settle(again, () -> com.payonel.modularcomputers.machine.Parked.parked(again));
 		assertThat(again.uptime()).as("it ended when it would have, not a whole wait later").isBetween(80L, 86L);
 		again.pressPower();
 	}
@@ -512,7 +515,7 @@ class LuaRunnerTest {
 			local n = 0
 			for i = 1, 3000000 do n = n + 1 end
 			board.invoke("console", "write", "counted " .. n)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
 		settle(runner::alive);
@@ -523,7 +526,7 @@ class LuaRunnerTest {
 		again.resumeProgram(saved);
 		assertThat(baseline).as("measured at boot").isPositive();
 		assertThat(((LuaRunner) again.runner().orElseThrow()).memory().baseline()).as("kept with the save, not measured again").isEqualTo(baseline);
-		settle(again, () -> again.runner().isEmpty());
+		settle(again, () -> com.payonel.modularcomputers.machine.Parked.parked(again));
 		assertThat(again.board().virtualBus().console().screen().row(0).strip()).isEqualTo("counted 3000000");
 		again.pressPower();
 	}
@@ -542,7 +545,7 @@ class LuaRunnerTest {
 			board.waitForInterrupt(0.5, "nothing")
 			board.invoke(file, "write", "after")
 			board.invoke(file, "close")
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		settle(() -> machine.runner().map(r -> r.state() == Runner.State.WAITING).orElse(false));
 		byte[] saved = machine.persistProgram().orElseThrow();
@@ -552,7 +555,7 @@ class LuaRunnerTest {
 		devices2.put("sata:0", new com.payonel.modularcomputers.device.Disk(com.payonel.modularcomputers.device.DiskTier.TIER_1, world.resolve("disk-a")));
 		TestBus.of(again, devices2);
 		again.resumeProgram(saved);
-		settle(again, () -> again.runner().isEmpty());
+		settle(again, () -> com.payonel.modularcomputers.machine.Parked.parked(again));
 		assertThat(java.nio.file.Files.readString(world.resolve("disk-a/log.txt"))).as("its handle, writes and all, came back").isEqualTo("before after");
 		again.pressPower();
 	}
@@ -561,22 +564,22 @@ class LuaRunnerTest {
 	void theBootloaderRunsTheFirstDisksInit(@org.junit.jupiter.api.io.TempDir java.nio.file.Path world) throws Exception {
 		java.nio.file.Path folder = world.resolve("boot-disk");
 		java.nio.file.Files.createDirectories(folder);
-		java.nio.file.Files.writeString(folder.resolve("init.lua"), "board.invoke('console', 'write', 'booted from ' .. ...) board.halt()");
+		java.nio.file.Files.writeString(folder.resolve("init.lua"), "board.invoke('console', 'write', 'booted from ' .. ...) while true do board.waitForInterrupt(nil, 'park') end");
 		Map<String, Device> devices = new LinkedHashMap<>();
 		devices.put("id:screen", screen);
 		devices.put("sata:0", new com.payonel.modularcomputers.device.Disk(com.payonel.modularcomputers.device.DiskTier.TIER_1, world.resolve("empty-disk")));
 		devices.put("sata:1", new com.payonel.modularcomputers.device.Disk(com.payonel.modularcomputers.device.DiskTier.TIER_1, folder));
 		TestBus.of(machine, devices);
 		boot(com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/boot"));
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("booted from sata:1");
 	}
 
 	@Test
 	void theBootloaderWithNoBootableDiskSaysSo() {
 		boot(com.payonel.modularcomputers.machine.LuaScripts.read("eeprom/boot"));
-		untilHalted();
-		assertThat(row(0)).isEqualTo("boot: no bootable disk");
+		settle(() -> machine.runner().map(r -> r.waitingFor().contains("console")).orElse(false));
+		assertThat(row(0)).as("waiting for a key to try again").startsWith("boot: no bootable disk");
 	}
 
 	/** RAM sticks of {@code tier} in the case, for the board's ring. */
@@ -609,7 +612,7 @@ class LuaRunnerTest {
 		  keys = keys .. (bytes or "")
 		end
 		board.invoke("console", "write", keys)
-		board.halt()
+		while true do board.waitForInterrupt(nil, 'park') end
 		""";
 
 	@Test
@@ -620,7 +623,7 @@ class LuaRunnerTest {
 		screen.press("a");
 		screen.press("b");
 		screen.press("c");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("abc");
 		assertThat(runner.answered()).as("the read came from the inbox: only the write reached the server").isEqualTo(1);
 	}
@@ -639,12 +642,12 @@ class LuaRunnerTest {
 			  keys = keys .. key
 			end
 			board.invoke("console", "write", keys)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
 		screen.press("a");
 		screen.press("b");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("ab");
 		assertThat(runner.answered()).as("only the write reached the server: interrupts are level-triggered").isEqualTo(1);
 	}
@@ -665,12 +668,12 @@ class LuaRunnerTest {
 			board.waitForInterrupt(nil, "id:redstone") -- warm: answered on the computer's thread
 			board.invoke("id:redstone", "pull")
 			board.invoke("console", "write", "done")
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
 		card.sense(0, 1);
 		card.sense(0, 2);
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("done");
 		assertThat(runner.handedOver()).as("one wait and the write reached the server thread").isEqualTo(2);
 	}
@@ -692,7 +695,7 @@ class LuaRunnerTest {
 			local ready = board.waitForInterrupt(nil, "console", "id:redstone") -- the inbox has the card's events, but the key is news
 			table.sort(ready)
 			board.invoke("console", "write", " " .. table.concat(ready, ","))
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		for (int i = 1; i <= 3; i++) {
 			card.sense(0, i);
@@ -706,7 +709,7 @@ class LuaRunnerTest {
 			Thread.onSpinWait();
 		}
 		assertThat(runner.state()).as("its wait went to the server thread, not answered from the inbox without the key").isEqualTo(Runner.State.WAITING);
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("busy console,id:redstone");
 	}
 
@@ -733,14 +736,14 @@ class LuaRunnerTest {
 			  typed = typed .. table.concat(take(ring))
 			end
 			board.invoke("console", "write", typed)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
 		settle(() -> runner.state() == Runner.State.RUNNING && runner.queuedCalls() == 0);
 		screen.press("a");
 		screen.press("b");
 		screen.press("c");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("abc");
 		assertThat(runner.answered()).as("the bytes came with no call: only the write reached the server").isEqualTo(1);
 	}
@@ -763,13 +766,13 @@ class LuaRunnerTest {
 			  got = got + #take(ring)
 			end
 			board.invoke("console", "write", first .. " " .. got)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		settle(() -> machine.runner().map(runner -> runner.state() == Runner.State.RUNNING).orElse(false));
 		for (int i = 1; i <= 5; i++) {
 			card.sense(0, i);
 		}
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).as("2 at first (its room), then all 5").isEqualTo("2 5");
 		assertThat(card.pull(new Arguments(java.util.List.of())).first()).as("none left in the card, none lost").isNull();
 	}
@@ -793,7 +796,7 @@ class LuaRunnerTest {
 			  typed = typed .. table.concat(take(ring))
 			end
 			board.invoke("console", "write", typed)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
 		long end = System.nanoTime() + 10_000_000_000L;
@@ -813,7 +816,7 @@ class LuaRunnerTest {
 		again.resumeProgram(saved);
 		settle(again, () -> again.runner().map(r -> r.state() == Runner.State.RUNNING).orElse(false));
 		loaded.press("c");
-		settle(again, () -> again.runner().isEmpty());
+		settle(again, () -> com.payonel.modularcomputers.machine.Parked.parked(again));
 		assertThat(again.board().virtualBus().console().screen().row(0).strip()).as("none lost, in order").isEqualTo("bc");
 		again.pressPower();
 	}
@@ -830,7 +833,7 @@ class LuaRunnerTest {
 			  typed = typed .. table.concat(take(ring))
 			end
 			board.invoke("console", "write", typed)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
 		long end = System.nanoTime() + 10_000_000_000L;
@@ -856,7 +859,7 @@ class LuaRunnerTest {
 		settle(again, () -> again.runner().map(r -> r.state() == Runner.State.RUNNING).orElse(false));
 		loaded.press("c");
 		loaded.press("d");
-		settle(again, () -> again.runner().isEmpty());
+		settle(again, () -> com.payonel.modularcomputers.machine.Parked.parked(again));
 		assertThat(again.board().virtualBus().console().screen().row(0).strip()).as("none lost, in order").isEqualTo("abcd");
 		again.pressPower();
 	}
@@ -892,10 +895,10 @@ class LuaRunnerTest {
 			end
 			local typed = table.concat(take(ring))
 			board.invoke("console", "write", tostring(debug.isfrozen(child)) .. " " .. typed)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		typeAt(200, Map.of(10, "k"));
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).as("the child stopped where it was; the key in the ring").isEqualTo("true k");
 	}
 
@@ -915,9 +918,9 @@ class LuaRunnerTest {
 			local again, result = debug.thaw(child)
 			board.trap() -- no stop in the chain: returns at once
 			board.invoke("console", "write", first .. " | " .. tostring(again) .. " " .. tostring(result))
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).as("the resume returned as if frozen; the thaw ran on to the end").isEqualTo("true nil true | true back");
 	}
 
@@ -937,9 +940,9 @@ class LuaRunnerTest {
 			  ok, n = debug.thaw(child)
 			end
 			board.invoke("console", "write", (stops > 1 and "stopped" or "ran through") .. " " .. tostring(n))
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).as("the timer: its scheduler got control back each slice").isEqualTo("stopped 3000000");
 	}
 
@@ -959,10 +962,10 @@ class LuaRunnerTest {
 			  debug.thaw(child)
 			end
 			board.invoke("console", "write", stops .. " " .. (ring.tail - ring.head))
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		typeAt(400, Map.of(5, "a", 20, "b"));
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).as("one stop; both keys came").isEqualTo("1 2");
 	}
 
@@ -974,7 +977,7 @@ class LuaRunnerTest {
 		screen.press("a");
 		screen.press("b");
 		screen.press("c");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("abc");
 		assertThat(runner.answered()).as("the read went to the device (taking every byte), and the write").isEqualTo(2);
 	}
@@ -1022,7 +1025,7 @@ class LuaRunnerTest {
 			  keys = keys .. (bytes or "")
 			end
 			board.invoke("console", "write", keys)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		for (String key : new String[] {"a", "b", "c", "d"}) {
 			screen.press(key);
@@ -1037,39 +1040,52 @@ class LuaRunnerTest {
 		loaded.restore(terminalSaved); // its block loads
 		Machine again = reloaded(loaded);
 		again.resumeProgram(saved); // goes on: what its devices kept for it stays
-		settle(again, () -> again.runner().isEmpty());
+		settle(again, () -> com.payonel.modularcomputers.machine.Parked.parked(again));
 		assertThat(again.board().virtualBus().console().screen().row(0).strip()).as("none lost, in order").isEqualTo("abcd");
 		again.pressPower();
 	}
 
 	@Test
-	void anErrorIsTheAbortScreen() {
+	void anErrorAbortsWithItsMessage() {
 		boot("local x = nil\nx.y = 1\n");
-		untilHalted();
-		assertThat(row(0)).startsWith(Cpu.ABORT + Cpu.CRASHED + "eeprom:2:");
+		settle(machine::isAborted);
+		assertThat(machine.lastShutdown().message()).startsWith(Cpu.CRASHED + "eeprom:2:");
 	}
 
 	@Test
-	void fallingOffTheEndIsAPanic() {
+	void fallingOffTheEndAborts() {
 		boot("local x = 1\n");
-		untilHalted();
-		assertThat(row(0)).isEqualTo(Cpu.ABORT + Cpu.RETURNED);
+		settle(machine::isAborted);
+		assertThat(machine.lastShutdown().message()).isEqualTo(Cpu.RETURNED);
 	}
 
 	@Test
-	void textThatIsntLuaShowsLuasMessage() {
+	void textThatIsntLuaAbortsWithLuasMessage() {
 		boot("This is not a Lua program.\n");
-		untilHalted();
-		assertThat(row(0)).startsWith(Cpu.ABORT + Cpu.EEPROM + "eeprom:");
+		settle(machine::isAborted);
+		assertThat(machine.lastShutdown().message()).startsWith(Cpu.EEPROM + "eeprom:");
+	}
+
+	@Test
+	void theFirmwareReadsWhyItLastStopped() {
+		boot("local x = nil\nx.y = 1\n");
+		settle(machine::isAborted);
+		boot("""
+			local last = board.lastShutdown()
+			board.invoke("console", "write", last.cause .. "|" .. last.message:sub(1, 22))
+			while true do board.waitForInterrupt(nil, 'park') end
+			""");
+		untilParked();
+		assertThat(row(0)).isEqualTo("crashed|" + (Cpu.CRASHED + "eeprom:2:").substring(0, 22));
 	}
 
 	@Test
 	void noFilesOrProcessesOfTheServer() {
 		boot("""
 			board.invoke("console", "write", tostring(io) .. tostring(os) .. tostring(require) .. tostring(dofile) .. tostring(print))
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
-		untilHalted();
+		untilParked();
 		assertThat(row(0)).isEqualTo("nilnilnilnilnil");
 	}
 }

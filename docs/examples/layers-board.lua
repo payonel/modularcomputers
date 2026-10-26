@@ -22,7 +22,9 @@ for _, device in ipairs(board.list()) do
 end
 if not card then
   write("no redstone card\n")
-  board.halt()
+  while true do
+    board.waitForInterrupt() -- (nothing to do: it waits, the machine on, its message showing)
+  end
 end
 
 write("watching the lever\n")

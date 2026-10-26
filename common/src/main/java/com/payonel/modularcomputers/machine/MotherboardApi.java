@@ -34,8 +34,10 @@ final class MotherboardApi implements Board {
 	private int listedChanges;
 
 	MotherboardApi(Motherboard board, LongSupplier uptime, LongSupplier memoryUsed,
-		java.util.function.Supplier<com.payonel.modularcomputers.runtime.MemoryAccount> account) {
+		java.util.function.Supplier<com.payonel.modularcomputers.runtime.MemoryAccount> account,
+		java.util.function.Supplier<Shutdown> shutdown) {
 		this.board = board;
+		this.shutdown = shutdown;
 		this.uptime = uptime;
 		this.memoryUsed = memoryUsed;
 		this.account = account;
@@ -61,6 +63,19 @@ final class MotherboardApi implements Board {
 	@Override
 	public PowerInfo power() {
 		return board.chassis().power();
+	}
+
+	/** Why it last stopped: the machine's record. */
+	private final java.util.function.Supplier<Shutdown> shutdown;
+
+	@Override
+	public Map<String, Object> lastShutdown() {
+		Shutdown last = shutdown.get();
+		Map<String, Object> answer = new java.util.LinkedHashMap<>();
+		answer.put("cause", last.cause().word());
+		answer.put("message", last.message());
+		answer.put("time", last.time());
+		return answer;
 	}
 
 	@Override
@@ -174,12 +189,6 @@ final class MotherboardApi implements Board {
 	@Override
 	public long time() {
 		return board.chassis().time();
-	}
-
-	/** Halting is the program runner's: it stops the program's thread, so it never reaches the host as a call. */
-	@Override
-	public void halt() {
-		throw new UnsupportedOperationException("halt() is handled by the program runner");
 	}
 
 	@Override

@@ -300,8 +300,9 @@ The kernel's log (the last 200 entries) since the entry numbered `after`, oldest
 source, id, text}` each. `"clear"` empties it. `dmesg` reads it.
 
 ### sys.reboot(how)
-`"halt"`, `"poweroff"` or `"restart"`: every process ends (its files closed, so the disks get what was
-written), then the CPU halts, the computer turns off, or it restarts.
+`"poweroff"` or `"restart"`: every process ends (its files closed, so the disks get what was
+written), then the computer turns off, or restarts. Anything else fails with `EINVAL`: the board has
+no halted state (a CPU stopped with the power on), only these clean ways out.
 
 ## Libraries
 

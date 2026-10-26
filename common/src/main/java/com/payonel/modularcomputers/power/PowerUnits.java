@@ -7,7 +7,7 @@ package com.payonel.modularcomputers.power;
  * tier 1 runs one for ten days by default. Times shown to players ("DD:MM:SS") are at that rate.
  */
 public final class PowerUnits {
-	/** A CPU, each tick it executes (nothing while halted or waiting for an interrupt). */
+	/** A CPU, each tick it executes (nothing while off, its waiting rate while it waits for an interrupt). */
 	public static final int CPU = 100;
 	/** A terminal, each tick it has power. */
 	public static final int TERMINAL = 10;

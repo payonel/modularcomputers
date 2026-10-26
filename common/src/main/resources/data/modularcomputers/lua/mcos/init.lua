@@ -1383,10 +1383,11 @@ function syscalls.poll(p, request, fds, seconds)
   return k.BLOCK
 end
 
--- reboot("halt" | "poweroff" | "restart"), as Linux's reboot(2) with LINUX_REBOOT_CMD_HALT,
--- _POWER_OFF and _RESTART: every process ends (its files closed: the disks get what was written),
--- then the board halts the CPU, turns the machine off, or restarts it.
-local REBOOT = {halt = "halt", poweroff = "poweroff", restart = "reboot"}
+-- reboot("poweroff" | "restart"), as Linux's reboot(2) with LINUX_REBOOT_CMD_POWER_OFF and
+-- _RESTART: every process ends (its files closed: the disks get what was written), then the board
+-- turns the machine off, or restarts it. (No halt: a CPU that stops with power on isn't a state
+-- this board has; the board's power-off and restart are a program's only clean ways out.)
+local REBOOT = {poweroff = "poweroff", restart = "reboot"}
 
 function syscalls.reboot(p, request, how)
   local board_call = REBOOT[how]
@@ -1626,6 +1627,12 @@ local function sysinit()
   console.foreground = p.pgid
 end
 
+-- Why the computer last stopped (its board's record): /sys/firmware/last_shutdown's, and the log's
+-- when it was an abort (a fault: what a script looks for after the next boot).
+k.lastShutdown = board.lastShutdown()
+if k.lastShutdown and k.lastShutdown.cause ~= "none" and k.lastShutdown.cause ~= "clean" and k.lastShutdown.cause ~= "button" then
+  k.log("kernel", "", "last shutdown: " .. k.lastShutdown.cause .. (k.lastShutdown.message ~= "" and ": " .. k.lastShutdown.message or ""))
+end
 hotplug()
 sysinit()
 while true do

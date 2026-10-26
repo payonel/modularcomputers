@@ -10,7 +10,7 @@
 --   "slice"                       the slice is spent: a point where the host may save the machine;
 --                                 resumed at once
 --   "call", name, args...         a board call (list, status, type, methods, doc, info, uptime,
---                                 time, setLabel, power, hardware, invoke; board.uptime asks
+--                                 time, setLabel, power, lastShutdown, hardware, invoke; board.uptime asks
 --                                 "clock" instead, the same clock answered at once), carried out on the server thread, where
 --                                 devices live; answered with its values
 --   "baseline"                    the sandbox is built: the host measures the memory held as the
@@ -22,7 +22,6 @@
 --                                 it would have; held: what the inbox holds, by address); answered with
 --                                 the pending sources, as a sequence, and the device data taken
 --                                 for the inbox: {address, method, value} each
---   "halt"                        the CPU halts; never resumed
 --   "poweroff", "reboot"          the machine turns off, or off and on again; never resumed
 --
 -- Rings (user design, 2026-10-14): a program may give this file a ring for a source
@@ -58,7 +57,7 @@
 -- and what it ends with: "returned" (the EEPROM's code returned: a panic), "abort", why (the
 -- EEPROM's text didn't load), or an error (the EEPROM's code crashed).
 --
--- Syscalls freeze instead of yielding: every board call, a wait and a halt records its request and cuts user_co's budget to one step; the budget
+-- Syscalls freeze instead of yielding: every board call, a wait and a power-off records its request and cuts user_co's budget to one step; the budget
 -- callback then freezes user_co's whole chain, wherever it is (inside coroutines, a sort's
 -- comparison, a gsub callback), and the freeze lands here. The host answers, user_co thaws, and the
 -- syscall returns the answer. No user coroutine sees a yield, and pcall can't catch a freeze.
@@ -287,6 +286,8 @@ sandbox.board = {
   time = function() return call("call", "time") end,
   setLabel = function(address, label) return call("call", "setLabel", address, label) end,
   power = function() return call("call", "power") end,
+  -- why it last stopped, as its board recorded it: {cause, message, time} (an abort's cause and what it said)
+  lastShutdown = function() return call("call", "lastShutdown") end,
   hardware = function() return call("call", "hardware") end,
   -- true and the method's values, or false and why it failed (a device never stops the machine);
   -- a read of a device's stream comes from the inbox when it has some. An empty queue whose device
@@ -439,10 +440,6 @@ sandbox.board = {
   trap = function()
     syscall("trap")
     usermode(true)
-  end,
-  -- the CPU stops; power stays on. It never returns.
-  halt = function()
-    syscall("halt")
   end,
   -- the machine turns off (ACPI soft-off), as its power button does. It never returns.
   poweroff = function()

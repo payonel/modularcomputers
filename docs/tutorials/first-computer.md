@@ -109,15 +109,14 @@ A real PC refuses to start in specific ways, and so does this one.
 |---|---|---|
 | Pressing power clicks, but the light never comes on and nothing starts | The case has no charge. | Charge a battery (step 1) and fit it in a UPS socket. |
 | An error beep, and the light flashes green for a moment | There is no CPU. | Fit a CPU. |
-| The screen shows `ABRT: no RAM installed` on a gray background | There is no RAM. | Fit a RAM stick. |
-| `ABRT: no EEPROM installed` | There is no EEPROM. | Fit an EEPROM in the ROM socket. |
-| `ABRT: EEPROM is blank` | The EEPROM was wiped (crafting one alone wipes it). | Use a new EEPROM, which comes with the boot program. |
-| `boot: no bootable disk`, and the light turns amber | The EEPROM looked for a disk with `/init.lua` and found none. | Fit a mcos disk in a SATA socket. |
+| The light blinks amber at once, and the screen stays dark | The CPU has nothing to run: no RAM, no EEPROM, or a blank EEPROM (crafting one alone wipes it). | Fit a RAM stick and an EEPROM; a new EEPROM comes with the boot program. |
+| `boot: no bootable disk: press a key to try again` | The EEPROM looked for a disk with `/init.lua` and found none. | Fit a mcos disk in a SATA socket, then press a key. |
 | The light is green but the screen is blank | The screen is not on the bus. | Move it against a side of the case that is not its front, with the glass out. |
 
-The amber light always means the computer is on but its CPU has stopped. Press power twice (off,
-then on) to start it again. Taking RAM out or putting it in while the computer runs also stops it
-with `ABRT: RAM changed while running`.
+A blinking amber light always means the computer [aborted](/hardware/cpu/#aborts): it stopped in a
+way it shouldn't have, and turned off. Press power to start it again; once mcos is up,
+`cat /sys/firmware/last_shutdown/cause` says why. Taking RAM out or putting it in while the
+computer runs aborts it too, as does taking out its CPU.
 
 ## Turning it off
 

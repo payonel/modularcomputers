@@ -131,7 +131,7 @@ public class CaseTierGameTest {
 			seen.add(board.info("eeprom").orElseThrow().get("label"));
 			board.invoke("eeprom", "set", "boot code");
 			seen.add(board.setLabel("eeprom", "flashed").failed());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		computer.pressPower();
 		Board.PowerInfo power = (Board.PowerInfo) seen.get(0);
@@ -171,7 +171,7 @@ public class CaseTierGameTest {
 			Handle file = (Handle) board.invoke("sata:0", "open", "/hello.txt", "w").first();
 			board.invoke(file, "write", "hello world save");
 			board.invoke(file, "close");
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		computer.pressPower();
 		java.nio.file.Path folder = CaseBlockEntity.diskFolder(helper.getLevel().getServer(), id);
@@ -191,7 +191,7 @@ public class CaseTierGameTest {
 		TestPrograms.flash(other, board -> {
 			Handle file = (Handle) board.invoke("sata:0", "open", "/hello.txt").first();
 			seen.add(board.invoke(file, "read", 100).first());
-			board.halt();
+			com.payonel.modularcomputers.machine.Program.park(board);
 		});
 		other.pressPower();
 		helper.assertValueEqual(seen, List.of("hello world save"), "what the other computer read");

@@ -37,10 +37,6 @@ class OwnOsExamplesTest extends McosHarness {
 		assertThat(machine.runner()).as(() -> "still running; the screen:\n" + screen()).isPresent();
 	}
 
-	private void untilOff() {
-		settle(() -> !machine.isPowered());
-	}
-
 	@Test
 	void theHelloOsSaysHelloAndTurnsTheComputerOff() {
 		bootOwn(example("os-hello"));

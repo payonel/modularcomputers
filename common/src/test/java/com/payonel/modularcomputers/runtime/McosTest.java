@@ -130,10 +130,10 @@ class McosTest extends McosHarness {
 	}
 
 	@Test
-	void haltHalts() {
+	void haltPowersOff() {
 		boot();
 		type("halt\r");
-		untilHalted();
+		untilOff();
 	}
 
 	@Test
@@ -144,7 +144,7 @@ class McosTest extends McosHarness {
 		type("t\r"); // not "halt": the line was flushed
 		untilIdle();
 		type("halt\r");
-		untilHalted();
+		untilOff();
 	}
 
 	@Test
@@ -215,7 +215,7 @@ class McosTest extends McosHarness {
 		type("\u0004"); // end of file ends it too
 		untilIdle();
 		type("halx\u007ft\r"); // Backspace erases
-		untilHalted();
+		untilOff();
 	}
 
 	@Test
@@ -248,7 +248,7 @@ class McosTest extends McosHarness {
 			.contains("console\n", "null\n", "eeprom\n", "storage0\n", "storage1\n", "terminal0\n");
 		assertThat(read(root().resolve("devs"))).contains("storage0", "storage1", "sata:1", "eeprom ", "terminal0", "id:");
 		// written: one set at close, the whole of it (cp writes it in pieces)
-		file("new.lua", "-- " + "x".repeat(9000) + "\nboard.halt()\n");
+		file("new.lua", "-- " + "x".repeat(9000) + "\nwhile true do board.waitForInterrupt(nil, 'park') end\n");
 		type("cp /new.lua /dev/eeprom; touch /done\r");
 		untilFile(root().resolve("done"), "");
 		assertThat(machine.board().eeprom().orElseThrow().image()).isEqualTo(read(root().resolve("new.lua")));
@@ -1284,7 +1284,7 @@ class McosTest extends McosHarness {
 		type("\u0003touch /still\r"); // ^C doesn't reach it (a background job ignores it); halt ends it
 		untilFile(root().resolve("still"), "");
 		type("halt\r");
-		untilHalted();
+		untilOff();
 	}
 
 	@Test

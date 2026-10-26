@@ -125,9 +125,10 @@ OS clear the order (the next pages' shell can: `call eeprom setBootOrder {}`), o
   at the top of the disk, not in a folder) and that the disk is in the case.
 - **`boot: sata:1: init.lua:7: ...`:** your file isn't valid Lua; the message says the line and why. Fix it
   from mcos, and try again.
-- **The screen goes gray with `ABRT:` and a message:** your OS crashed while running (an error), or
-  it ended. An OS must never return: when `init.lua` runs out of code, the CPU has nothing left to
-  run, and aborts. This one ends with `board.poweroff()`, which never returns.
+- **The light blinks amber:** your OS [aborted](/hardware/cpu/#aborts): it crashed (an error), or it
+  ended. An OS must never return: when `init.lua` runs out of code, the CPU has nothing left to run,
+  and aborts. This one ends with `board.poweroff()`, which never returns. Why is kept on the board
+  for the next boot: `board.lastShutdown()`, or in mcos `/sys/firmware/last_shutdown/`.
 - **mcos boots instead:** `BootNext` isn't set: `efibootmgr -v` says what is, and `(not present)`
   for an entry whose disk isn't on the bus. Set it again with `efibootmgr -n 0`, then `reboot`.
 

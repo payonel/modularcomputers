@@ -5,7 +5,6 @@ import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
-import com.payonel.modularcomputers.machine.Cpu;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.runtime.Runner;
 import java.nio.file.Files;
@@ -57,7 +56,7 @@ public class DiskGameTest {
 		// Booted, and waiting at the shell for a key (not what mcos says: tests don't pin the OS).
 		helper.succeedWhen(() -> {
 			helper.assertTrue(computer.machine().runner().map(runner -> runner.state() == Runner.State.WAITING).orElse(false), "waiting for a key");
-			helper.assertTrue(!computer.terminal().buffer().row(0).startsWith(Cpu.ABORT), "no abort: " + computer.terminal().buffer().row(0));
+			helper.assertTrue(!computer.machine().isAborted(), "no abort: " + computer.machine().lastShutdown());
 		});
 	}
 

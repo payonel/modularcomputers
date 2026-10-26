@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 class MachineTest {
 	private final Terminal display = new Terminal(Resolution.DEFAULT);
-	private final Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
+	private Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 	/** The case's devices once it has a CPU: two disks and a cabled screen. */
 	private TestBus bus;
 	private static final String DISPLAY = "id:display";
@@ -23,7 +23,7 @@ class MachineTest {
 	private static final String GREETING = "hello world";
 	private static final Program HELLO = board -> {
 		board.invoke("console", "write", GREETING + "\n");
-		board.halt();
+		com.payonel.modularcomputers.machine.Program.park(board);
 	};
 
 	private Machine withParts(boolean cpu, Program program) {
@@ -61,7 +61,7 @@ class MachineTest {
 	@Test
 	void withoutCpuPressingPowerIsRefused() {
 		int[] runs = {0};
-		withParts(false, board -> { runs[0]++; board.halt(); });
+		withParts(false, board -> { runs[0]++; com.payonel.modularcomputers.machine.Program.park(board); });
 		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.NO_CPU);
 		assertThat(machine.isPowered()).isFalse();
 		assertThat(runs[0]).isZero();
@@ -94,7 +94,7 @@ class MachineTest {
 	@Test
 	void pressingPowerTogglesAndEachPowerOnRunsTheProgram() {
 		int[] runs = {0};
-		withParts(true, board -> { runs[0]++; board.halt(); });
+		withParts(true, board -> { runs[0]++; com.payonel.modularcomputers.machine.Program.park(board); });
 		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
 		assertThat(machine.isPowered()).isTrue();
 		assertThat(runs[0]).isEqualTo(1);
@@ -107,7 +107,7 @@ class MachineTest {
 	@Test
 	void theProgramGetsTheMotherboardApi() {
 		List<List<String>> seen = new java.util.ArrayList<>();
-		withParts(true, board -> { seen.add(board.list().stream().map(com.payonel.modularcomputers.runtime.Board.DeviceInfo::address).toList()); board.halt(); });
+		withParts(true, board -> { seen.add(board.list().stream().map(com.payonel.modularcomputers.runtime.Board.DeviceInfo::address).toList()); com.payonel.modularcomputers.machine.Program.park(board); });
 		machine.pressPower();
 		assertThat(seen).containsExactly(List.of(Motherboard.sata(0), Motherboard.sata(1), DISPLAY)); // a case's own, in connector order, then the cabled
 	}
@@ -115,7 +115,7 @@ class MachineTest {
 	@Test
 	void installingACpuDoesNotTurnTheMachineOn() {
 		int[] runs = {0};
-		withParts(false, board -> { runs[0]++; board.halt(); });
+		withParts(false, board -> { runs[0]++; com.payonel.modularcomputers.machine.Program.park(board); });
 		machine.board().setCpu(new Cpu(CpuTier.TIER_3));
 		assertThat(machine.isPowered()).isFalse();
 		assertThat(runs[0]).isZero();
@@ -141,32 +141,73 @@ class MachineTest {
 	}
 
 	@Test
-	void noEepromShowsTheAbortScreen() {
+	void noEepromAbortsAndTheBoardRecordsWhy() {
 		withParts(true, null);
 		machine.pressPower();
-		assertThat(machine.isPowered()).as("power stays on").isTrue();
-		assertThat(screen().row(0).strip()).isEqualTo(Cpu.ABORT + Cpu.NO_EEPROM);
-		assertThat(screen().foreground(0, 0)).isEqualTo(Cpu.ABORT_FOREGROUND);
-		// The whole screen turns soft gray, not just the text.
-		Resolution size = screen().resolution();
-		for (int row = 0; row < size.rows(); row++) {
-			for (int column = 0; column < size.columns(); column++) {
-				assertThat(screen().background(column, row)).isEqualTo(Cpu.ABORT_BACKGROUND);
-			}
-		}
+		assertThat(machine.isPowered()).as("off").isFalse();
+		assertThat(machine.isAborted()).as("aborted: its light blinks amber").isTrue();
+		assertThat(machine.lastShutdown().cause()).isEqualTo(Shutdown.Cause.NO_PROGRAM);
+		assertThat(machine.lastShutdown().message()).isEqualTo(Cpu.NO_EEPROM);
 	}
 
 	@Test
-	void aCrashingProgramShowsTheAbortScreen() {
+	void aCrashingProgramAbortsWithItsError() {
 		withParts(true, board -> {
 			board.invoke("console", "write", "booting\n");
 			throw new IllegalStateException("out of cheese");
 		});
 		machine.pressPower();
-		assertThat(machine.isPowered()).as("power stays on").isTrue();
-		assertThat(screen().row(0).strip()).as("the abort screen replaces what was there")
-			.isEqualTo(Cpu.ABORT + Cpu.CRASHED + "out of cheese");
-		assertThat(screen().background(0, 5)).isEqualTo(Cpu.ABORT_BACKGROUND);
+		assertThat(machine.isAborted()).isTrue();
+		assertThat(machine.lastShutdown().cause()).isEqualTo(Shutdown.Cause.CRASHED);
+		assertThat(machine.lastShutdown().message()).isEqualTo(Cpu.CRASHED + "out of cheese");
+		machine.board().setEeprom(new Eeprom(Program::park)); // (fixed: this one runs)
+		machine.pressPower();
+		assertThat(machine.isAborted()).as("powered on again: not blinking").isFalse();
+		assertThat(machine.lastShutdown().cause()).as("the record kept for the next boot to read").isEqualTo(Shutdown.Cause.CRASHED);
+	}
+
+	@Test
+	void aPowerOffIsCleanAndThePowerButtonToo() {
+		withParts(true, com.payonel.modularcomputers.runtime.Board::poweroff);
+		machine.pressPower();
+		assertThat(machine.isPowered()).isFalse();
+		assertThat(machine.isAborted()).isFalse();
+		assertThat(machine.lastShutdown().cause()).isEqualTo(Shutdown.Cause.CLEAN);
+		withParts(true, Program::park);
+		machine.pressPower();
+		machine.pressPower();
+		assertThat(machine.isAborted()).isFalse();
+		assertThat(machine.lastShutdown().cause()).isEqualTo(Shutdown.Cause.BUTTON);
+	}
+
+	@Test
+	void losingPowerAbortsAndPowerComingBackRestoresItWhenItsEepromSaysSo() {
+		boolean[] supply = {true};
+		boolean[] restore = {false};
+		machine = new Machine(new Motherboard(Hardware.computer(), new com.payonel.modularcomputers.bus.Bus()), () -> supply[0]);
+		machine.restoreOnPowerLossWith(() -> restore[0]);
+		withParts(true, Program::park);
+		machine.pressPower();
+		supply[0] = false;
+		machine.tick();
+		assertThat(machine.isAborted()).isTrue();
+		assertThat(machine.lastShutdown().cause()).isEqualTo(Shutdown.Cause.POWER_LOST);
+		supply[0] = true;
+		machine.tick();
+		assertThat(machine.isPowered()).as("off: restore on power loss is off").isFalse();
+		restore[0] = true;
+		machine.tick();
+		assertThat(machine.isPowered()).as("on again by itself").isTrue();
+	}
+
+	@Test
+	void aCpuSwappedOrRamChangedWhileItRunsAborts() {
+		withParts(true, Program::park);
+		machine.pressPower();
+		machine.board().setCpu(new Cpu(CpuTier.TIER_3)); // (another CPU, as the board sets one when its stack changes)
+		machine.tick();
+		assertThat(machine.lastShutdown().cause()).isEqualTo(Shutdown.Cause.CPU_CHANGED);
+		assertThat(machine.isAborted()).isTrue();
 	}
 
 	@Test
@@ -196,7 +237,7 @@ class MachineTest {
 	@Test
 	void restoringPowerStateDoesNotBoot() {
 		int[] runs = {0};
-		withParts(true, board -> { runs[0]++; board.halt(); });
+		withParts(true, board -> { runs[0]++; com.payonel.modularcomputers.machine.Program.park(board); });
 		machine.restorePowered(true);
 		assertThat(machine.isPowered()).isTrue();
 		assertThat(runs[0]).isZero();

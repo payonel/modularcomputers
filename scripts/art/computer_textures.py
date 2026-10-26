@@ -94,9 +94,12 @@ LIT = {
 	# No CPU: the same colors, faded and not glowing (the model drops the emission too).
 	"off_faded": [(150, 104, 98), (124, 72, 66), (100, 58, 54)],
 	"on_faded": [(118, 150, 114), (84, 124, 84), (64, 100, 66)],
-	# On, its CPU halted (the OS called halt): amber, like a standby light.
-	"halted": [(255, 236, 150), (236, 190, 40), (176, 132, 20)],
+	# Off after a fault (an abort: power lost, its CPU or RAM changed, its program left its EEPROM):
+	# amber, blinking (its texture's two frames: lit, then unlit), until it's next powered on.
+	"aborted": [(255, 236, 150), (236, 190, 40), (176, 132, 20)],
+	"unlit": [(92, 84, 64), (70, 64, 48), (52, 48, 36)],
 }
+BLINK_TICKS = 10  # each of the aborted light's frames, in ticks (it blinks once a second)
 
 def button_face(state):
 	"""3x3 lit button: highlight top-left, shadow bottom-right."""
@@ -145,7 +148,7 @@ def power(state):
 			im.putpixel((HOUSING[0] + 1 + dx, HOUSING[1] + 1 + dy), c)
 	return im
 
-GUI_STATES = ("off", "on", "off_faded", "on_faded", "halted")
+GUI_STATES = ("off", "on", "off_faded", "on_faded", "aborted", "unlit")
 
 def gui_button():
 	"""GUI power button, one 5x5 frame per state in GUI_STATES: housing ring plus the same face."""
@@ -411,8 +414,15 @@ def tier3_battery_item():
 
 for name, fn in [("front_screen", front_screen), ("front", case_front), ("front_plain", case_front_plain), ("side", side), ("top", top), ("back", back), ("bottom", bottom)]:
 	fn().save(f"{OUT}/case_{name}.png")
-for state in LIT:
+for state in ("off", "on", "off_faded", "on_faded"):
 	power(state).save(f"{OUT}/case_power_{state}.png")
+# The aborted light: lit and unlit frames, one under the other, animated (Minecraft's .mcmeta).
+blink = Image.new("RGB", (16, 32))
+blink.paste(power("aborted"), (0, 0))
+blink.paste(power("unlit"), (0, 16))
+blink.save(f"{OUT}/case_power_aborted.png")
+with open(f"{OUT}/case_power_aborted.png.mcmeta", "w") as f:
+	f.write('{\n\t"animation": {\n\t\t"frametime": %d\n\t}\n}\n' % BLINK_TICKS)
 gui_button().save(f"{OUT}/../gui/power_button.png")
 case_button().save(f"{OUT}/../gui/case_button.png")
 for name, fn in [("tier1_cpu", tier1_cpu_item), ("tier2_cpu", tier2_cpu_item), ("tier3_cpu", tier3_cpu_item), ("eeprom", eeprom_item),

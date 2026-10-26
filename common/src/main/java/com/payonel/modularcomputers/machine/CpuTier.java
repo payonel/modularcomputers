@@ -3,7 +3,7 @@ package com.payonel.modularcomputers.machine;
 /**
  * What a CPU tier brings (user design, 2026-10-11): how many devices its bus holds (its "address
  * width": bus capacity comes entirely from the CPU), and what it draws, in power units a tick,
- * while it executes and while it waits for an interrupt. Halted, every tier draws nothing.
+ * while it executes and while it waits for an interrupt. Off, every tier draws nothing.
  * Higher tiers draw more running and less waiting, as real chips with deeper idle states do. The
  * case's own devices count against the bus as much as external ones (user): a tier 1's 4 hold the
  * essentials (an EEPROM, a battery, a disk, and one card or external device), not a full case.

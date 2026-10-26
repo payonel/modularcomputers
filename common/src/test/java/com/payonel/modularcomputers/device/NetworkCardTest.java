@@ -113,6 +113,7 @@ class NetworkCardTest {
 		card.place(world, BlockPos.ZERO, NOW);
 		Machine machine = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 		machine.board().setCpu(new Cpu(CpuTier.TIER_1));
+		machine.board().setEeprom(new com.payonel.modularcomputers.machine.Eeprom(com.payonel.modularcomputers.machine.Program::park));
 		new com.payonel.modularcomputers.machine.TestBus(machine).card(card, id);
 		assertThat(sender.send(args(card.address(), "wake up")).first()).as("off, and not listening: nobody hears").isEqualTo(false);
 		assertThat(card.setWake(args("wake")).first()).isNull();

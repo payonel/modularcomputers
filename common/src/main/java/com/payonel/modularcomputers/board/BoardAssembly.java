@@ -32,6 +32,7 @@ import com.payonel.modularcomputers.machine.Eeprom;
 import com.payonel.modularcomputers.machine.Hardware;
 import com.payonel.modularcomputers.machine.Machine;
 import com.payonel.modularcomputers.machine.Motherboard;
+import com.payonel.modularcomputers.machine.Shutdown;
 import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.power.BatteryCharge;
 import com.payonel.modularcomputers.power.BatteryTier;
@@ -77,6 +78,12 @@ import net.minecraft.world.level.storage.ValueOutput;
  */
 public final class BoardAssembly {
 	private static final String POWERED = "powered";
+	/** Why it last stopped (the board's record: {@link Shutdown}). */
+	private static final String SHUTDOWN_CAUSE = "shutdown_cause";
+	private static final String SHUTDOWN_MESSAGE = "shutdown_message";
+	private static final String SHUTDOWN_TIME = "shutdown_time";
+	/** The CPU stack installed: another in its slot is another CPU. */
+	private ItemStack installedCpu;
 	private static final String DISPLAY = "display";
 	private static final String CONSOLE = "console";
 	/** The saved external bus order. */
@@ -263,6 +270,9 @@ public final class BoardAssembly {
 		machine.board().setChassis(new BoardChassis());
 		machine.describedBy(host::describe);
 		machine.wakeWith(this::pressPower); // a network card's wake presses its power button: it clicks and lights
+		// Restore on AC power loss: its EEPROM's setting, read from the chip in its slot when power comes back.
+		machine.restoreOnPowerLossWith(() -> ModItems.isEeprom(parts.getItem(CaseMenu.EEPROM_SLOT))
+			&& parts.getItem(CaseMenu.EEPROM_SLOT).getOrDefault(ModComponents.NVRAM, com.payonel.modularcomputers.machine.BootVariables.EMPTY).restoreOnPowerLoss());
 	}
 
 	private Terminal newDisplay(TerminalTier tier) {
@@ -577,6 +587,10 @@ public final class BoardAssembly {
 			byte[] saved = savedProgram;
 			savedProgram = null;
 			machine.resumeProgram(saved);
+		} else if (unsavedProgram) {
+			unsavedProgram = false;
+			machine.programUnsaved();
+			showPowerState();
 		}
 		host.syncDisplay(display);
 	}
@@ -647,7 +661,7 @@ public final class BoardAssembly {
 
 	/** Shows its state on its host (a case's power button); whether that changed. */
 	public boolean showPowerState() {
-		boolean changed = host.showPowerState(ready(), machine.isPowered(), machine.isHalted(), screenInSlot());
+		boolean changed = host.showPowerState(ready(), machine.isPowered(), machine.isAborted(), screenInSlot());
 		if (changed) {
 			syncedPowerPercent = power.percent();
 		}
@@ -685,6 +699,7 @@ public final class BoardAssembly {
 	 */
 	public Machine.PowerPress pressPower() {
 		Machine.PowerPress result = machine.pressPower();
+		showPowerState(); // what the press came to, an abort in it too (no EEPROM: off at once, blinking), for every holder
 		host.setChanged();
 		Level level = host.level();
 		if (level == null) {
@@ -822,12 +837,14 @@ public final class BoardAssembly {
 		seenPartHolds = PartHolds.version();
 		mine(boardId, server, kept); // (its board: what a copy of it would be placed as)
 		Motherboard board = machine.board();
-		CpuItem cpuItem = parts.getItem(CaseMenu.CPU_SLOT).getItem() instanceof CpuItem cpu ? cpu : null;
+		ItemStack cpuStack = parts.getItem(CaseMenu.CPU_SLOT);
+		CpuItem cpuItem = cpuStack.getItem() instanceof CpuItem cpu ? cpu : null;
 		if (cpuItem == null) {
 			board.setCpu(null);
-		} else if (board.cpu().map(cpu -> cpu.tier() != cpuItem.tier()).orElse(true)) {
-			board.setCpu(new Cpu(cpuItem.tier()));
+		} else if (cpuStack != installedCpu || board.cpu().isEmpty()) {
+			board.setCpu(new Cpu(cpuItem.tier())); // another CPU (even one like it): a running machine aborts
 		}
+		installedCpu = cpuItem == null ? null : cpuStack;
 		// The EEPROM reads and writes the item in its slot directly (EepromSlot): no copy of its text.
 		ItemStack stack = parts.getItem(CaseMenu.EEPROM_SLOT);
 		UUID serial = ModItems.isEeprom(stack) ? stack.get(ModComponents.SERIAL) : null;
@@ -1047,6 +1064,10 @@ public final class BoardAssembly {
 	 */
 	public void save(ValueOutput output, boolean syncing) {
 		output.putBoolean(POWERED, machine.isPowered());
+		Shutdown last = machine.lastShutdown();
+		output.putString(SHUTDOWN_CAUSE, last.cause().word());
+		output.putString(SHUTDOWN_MESSAGE, last.message());
+		output.putLong(SHUTDOWN_TIME, last.time());
 		output.putLong(UPTIME, machine.uptime());
 		output.putInt(POWER_BUFFER, power.level());
 		if (machine.board().busCapacityOverride() != null) {
@@ -1087,6 +1108,8 @@ public final class BoardAssembly {
 	/** Loads it from its host's data. */
 	public void load(ValueInput input) {
 		machine.restorePowered(input.getBooleanOr(POWERED, false));
+		machine.restoreShutdown(new Shutdown(Shutdown.Cause.of(input.getStringOr(SHUTDOWN_CAUSE, "none")),
+			input.getStringOr(SHUTDOWN_MESSAGE, ""), input.getLongOr(SHUTDOWN_TIME, 0)));
 		machine.restoreUptime(input.getLongOr(UPTIME, 0));
 		power.set(input.getIntOr(POWER_BUFFER, 0));
 		machine.board().overrideBusCapacity(input.getInt(BUS_CAPACITY_OVERRIDE).orElse(null));
@@ -1123,7 +1146,11 @@ public final class BoardAssembly {
 			buffer.get(bytes);
 			return bytes;
 		}).filter(bytes -> machine.isPowered()).orElse(null);
+		unsavedProgram = machine.isPowered() && savedProgram == null;
 	}
+
+	/** Loaded on with no program saved (it couldn't be): it aborts at its first tick. */
+	private boolean unsavedProgram;
 
 	/** A board's part slots, whose parts hold slots of their own (a crafting card's, on the card). */
 	public interface PartContents {

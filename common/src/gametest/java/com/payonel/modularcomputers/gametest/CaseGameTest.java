@@ -5,7 +5,6 @@ import com.payonel.modularcomputers.block.CaseBlockEntity;
 import com.payonel.modularcomputers.block.ModBlocks;
 import com.payonel.modularcomputers.bus.DeviceType;
 import com.payonel.modularcomputers.command.ModCommands;
-import com.payonel.modularcomputers.display.TextBuffer;
 import com.payonel.modularcomputers.item.ModComponents;
 import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.machine.Cpu;
@@ -61,19 +60,19 @@ public class CaseGameTest {
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		computer.pressPower(); // the Lua CPU runs on its own thread; its calls are carried out on the server thread
 		helper.succeedWhen(() -> {
-			helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "boot: no bootable disk", "the EEPROM's bootloader, with no disk");
-			helper.assertTrue(computer.machine().isPowered() && computer.machine().runner().isEmpty(), "then halted, power on");
+			helper.assertTrue(computer.terminal().buffer().row(0).strip().startsWith("boot: no bootable disk"), "the EEPROM's bootloader, with no disk");
+			helper.assertTrue(computer.machine().runner().map(runner -> runner.waitingFor().contains("console")).orElse(false), "then waiting for a key to try again");
 		});
 	}
 
 	@GameTest(maxTicks = 100)
-	public void thePowerLightIsGreenWhileItRunsAndAmberOnceItsHalted(GameTestHelper helper) {
+	public void thePowerLightIsGreenWhileItRunsAndBlinksAmberOnceItAborts(GameTestHelper helper) {
 		CaseBlockEntity computer = place(helper);
 		TestPrograms.withScreen(computer);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER1_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		ItemStack eeprom = new ItemStack(ModItems.EEPROM);
-		eeprom.set(ModComponents.EEPROM_IMAGE, "board.waitForInterrupt(0.5, \"nothing\") board.halt()");
+		eeprom.set(ModComponents.EEPROM_IMAGE, "board.waitForInterrupt(0.5, \"nothing\")"); // then it returns out of its EEPROM: an abort
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, eeprom);
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
 		computer.pressPower();
@@ -81,16 +80,17 @@ public class CaseGameTest {
 			.thenIdle(2)
 			.thenExecute(() -> {
 				helper.assertBlockProperty(POS, CaseBlock.POWERED, true);
-				helper.assertBlockProperty(POS, CaseBlock.HALTED, false); // green: it runs
+				helper.assertBlockProperty(POS, CaseBlock.ABORTED, false); // green: it runs
 			})
-			.thenWaitUntil(() -> helper.assertBlockProperty(POS, CaseBlock.HALTED, true)) // amber: halted, power on
+			.thenWaitUntil(() -> helper.assertBlockProperty(POS, CaseBlock.ABORTED, true)) // blinking amber: aborted, off
 			.thenExecute(() -> {
-				helper.assertBlockProperty(POS, CaseBlock.POWERED, true);
-				computer.pressPower(); // off
+				helper.assertBlockProperty(POS, CaseBlock.POWERED, false);
+				helper.assertTrue(computer.machine().lastShutdown().cause() == com.payonel.modularcomputers.machine.Shutdown.Cause.RETURNED, "why, kept for the next boot");
+				computer.pressPower(); // on again
 			})
 			.thenWaitUntil(() -> {
-				helper.assertBlockProperty(POS, CaseBlock.POWERED, false);
-				helper.assertBlockProperty(POS, CaseBlock.HALTED, false);
+				helper.assertBlockProperty(POS, CaseBlock.POWERED, true);
+				helper.assertBlockProperty(POS, CaseBlock.ABORTED, false); // green again, until it returns again
 			})
 			.thenSucceed();
 	}
@@ -110,9 +110,9 @@ public class CaseGameTest {
 			.thenWaitUntil(() -> helper.assertTrue(computer.machine().runner().isPresent(), "it runs"))
 			.thenExecute(() -> computer.parts().setItem(CaseMenu.RAM_SLOTS, ItemStack.EMPTY))
 			.thenWaitUntil(() -> {
-				helper.assertValueEqual(computer.terminal().buffer().row(0).strip(), "ABRT: " + Cpu.RAM_CHANGED, "the CPU aborts");
-				helper.assertTrue(computer.machine().isPowered() && computer.machine().runner().isEmpty(), "power stays on, the CPU stopped");
-				helper.assertBlockProperty(POS, CaseBlock.HALTED, true);
+				helper.assertTrue(computer.machine().isAborted(), "it aborts: off");
+				helper.assertTrue(computer.machine().lastShutdown().cause() == com.payonel.modularcomputers.machine.Shutdown.Cause.RAM_CHANGED, "why: its RAM");
+				helper.assertBlockProperty(POS, CaseBlock.ABORTED, true);
 			})
 			.thenSucceed();
 	}
@@ -125,9 +125,9 @@ public class CaseGameTest {
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM)); // no RAM, no boot
 		ItemStack chip = new ItemStack(ModItems.EEPROM);
 		chip.set(ModComponents.EEPROM_IMAGE, """
-			board.invoke("eeprom", "set", 'board.invoke("console", "write", "second script") board.halt()')
+			board.invoke("eeprom", "set", [[board.invoke("console", "write", "second script") while true do board.waitForInterrupt(nil, 'park') end]])
 			board.invoke("console", "write", "first script")
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, chip);
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
@@ -159,7 +159,7 @@ public class CaseGameTest {
 			  board.waitForInterrupt(0.5, "nothing")
 			end
 			board.invoke("console", "write", " total " .. total)
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, eeprom);
 		computer.parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER1_BATTERY.charged());
@@ -178,9 +178,27 @@ public class CaseGameTest {
 			.thenWaitUntil(() -> {
 				CaseBlockEntity again = helper.getBlockEntity(POS, CaseBlockEntity.class);
 				helper.assertTrue(again.terminal().buffer().row(0).strip().endsWith("6 total 21"), "it goes on: " + again.terminal().buffer().row(0).strip());
-				helper.assertTrue(again.machine().isPowered() && again.machine().runner().isEmpty(), "and halts");
+				helper.assertTrue(TestPrograms.parked(again.machine()), "and parks");
 			})
 			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 100)
+	public void aComputerLoadedOnWithoutItsProgramAborts(GameTestHelper helper) {
+		CaseBlockEntity computer = install(place(helper), true, true); // a Java program: it can't be saved
+		computer.pressPower();
+		var registries = helper.getLevel().registryAccess();
+		net.minecraft.nbt.CompoundTag saved = computer.saveWithoutMetadata(registries);
+		helper.assertTrue(!saved.contains("program"), "nothing saved to go on with");
+		computer.pressPower(); // (this one's off; the saved one comes back)
+		helper.setBlock(POS, net.minecraft.world.level.block.Blocks.AIR);
+		CaseBlockEntity again = place(helper);
+		again.loadWithComponents(net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, registries, saved));
+		helper.succeedWhen(() -> {
+			helper.assertTrue(again.machine().isAborted(), "off, blinking: never on with nothing running");
+			helper.assertTrue(again.machine().lastShutdown().cause() == com.payonel.modularcomputers.machine.Shutdown.Cause.UNSAVED, "why: " + again.machine().lastShutdown());
+			helper.assertBlockProperty(POS, CaseBlock.ABORTED, true);
+		});
 	}
 
 	@GameTest
@@ -382,12 +400,13 @@ public class CaseGameTest {
 	}
 
 	@GameTest
-	public void cpuWithoutEepromShowsTheAbortScreen(GameTestHelper helper) {
+	public void cpuWithoutEepromAbortsAndItsLightBlinks(GameTestHelper helper) {
 		CaseBlockEntity computer = install(place(helper), true, false);
 		computer.pressPower();
-		TextBuffer screen = computer.terminal().buffer();
-		helper.assertValueEqual(screen.row(0).strip(), Cpu.ABORT + Cpu.NO_EEPROM, "abort message");
-		helper.assertValueEqual(screen.background(10, 10), Cpu.ABORT_BACKGROUND, "abort screen background");
+		helper.assertTrue(computer.machine().isAborted(), "off, aborted");
+		helper.assertValueEqual(computer.machine().lastShutdown().message(), Cpu.NO_EEPROM, "why, for the next boot");
+		helper.assertBlockProperty(POS, CaseBlock.POWERED, false);
+		helper.assertBlockProperty(POS, CaseBlock.ABORTED, true);
 		helper.succeed();
 	}
 
@@ -497,8 +516,14 @@ public class CaseGameTest {
 
 	@GameTest
 	public void stateSurvivesSaveAndLoad(GameTestHelper helper) {
-		CaseBlockEntity computer = install(place(helper), true, false);
-		computer.pressPower(); // abort screen: colored cells and a moved cursor
+		CaseBlockEntity computer = install(place(helper), true, true);
+		int blank = computer.terminal().buffer().background(3, 3);
+		TestPrograms.flash(computer, board -> { // colored cells and a moved cursor
+			board.invoke("console", "write", "\u001B[44m\u001B[2J\u001B[Hhello\r\n");
+			com.payonel.modularcomputers.machine.Program.park(board);
+		});
+		computer.pressPower();
+		helper.assertTrue(computer.terminal().buffer().background(3, 3) != blank, "colored");
 		var registries = helper.getLevel().registryAccess();
 		BlockState state = computer.getBlockState();
 		BlockEntity loaded = BlockEntity.loadStatic(computer.getBlockPos(), state, computer.saveWithFullMetadata(registries), registries);
@@ -509,7 +534,7 @@ public class CaseGameTest {
 		helper.assertTrue(reloaded.parts().getItem(CaseMenu.CPU_SLOT).is(ModItems.TIER3_CPU), "CPU after reload");
 		helper.assertTrue(reloaded.machine().board().cpu().isPresent(), "CPU installed after reload");
 		helper.assertValueEqual(reloaded.terminal().buffer().rows(), computer.terminal().buffer().rows(), "display text after reload");
-		helper.assertValueEqual(reloaded.terminal().buffer().background(3, 3), Cpu.ABORT_BACKGROUND, "display colors after reload");
+		helper.assertValueEqual(reloaded.terminal().buffer().background(3, 3), computer.terminal().buffer().background(3, 3), "display colors after reload");
 		var console = reloaded.machine().board().virtualBus().console();
 		helper.assertValueEqual(console.decoder().row(), 1, "console cursor after reload");
 		helper.assertValueEqual(java.util.Arrays.toString(console.decoder().state()),

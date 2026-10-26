@@ -8,6 +8,6 @@
 		"up": "modularcomputers:block/case_top",
 		"down": "modularcomputers:block/case_bottom",
 		"particle": "modularcomputers:block/case_side",
-		"button": "modularcomputers:block/case_power_halted"
+		"button": "modularcomputers:block/case_power_aborted"
 	}
 }

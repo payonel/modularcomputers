@@ -160,6 +160,17 @@ public class BotGolemGameTest {
 		});
 	}
 
+	@GameTest
+	public void aProgramReturningAsItStartsShowsItsAbortAtThePress(GameTestHelper helper) {
+		BotGolem golem = golem(helper, board -> {
+		});
+		helper.runAfterDelay(1, () -> {
+			golem.board().pressPower(); // (its first turn runs in the press: it returns, an abort)
+			helper.assertTrue(!golem.machine().isPowered() && golem.powerLight().aborted(), "off, blinking amber at once: " + golem.powerLight());
+			helper.succeed();
+		});
+	}
+
 	@GameTest(maxTicks = 60)
 	public void itDoesNothingOnItsOwn(GameTestHelper helper) {
 		BotGolem golem = golem(helper, board -> {
@@ -178,7 +189,7 @@ public class BotGolemGameTest {
 
 	@GameTest(maxTicks = 60)
 	public void onItsLegsNothingShovesIt(GameTestHelper helper) {
-		BotGolem golem = golem(helper, board -> board.halt());
+		BotGolem golem = golem(helper, com.payonel.modularcomputers.machine.Program::park);
 		// A pig walking into it, a push, a knockback: once it stands, none moves it.
 		var pig = helper.spawn(net.minecraft.world.entity.EntityTypes.PIG, START);
 		helper.startSequence()
@@ -196,7 +207,7 @@ public class BotGolemGameTest {
 
 	@GameTest(maxTicks = 40)
 	public void itsSolidNothingWalksThroughIt(GameTestHelper helper) {
-		BotGolem golem = golem(helper, board -> board.halt());
+		BotGolem golem = golem(helper, com.payonel.modularcomputers.machine.Program::park);
 		var pig = helper.spawn(net.minecraft.world.entity.EntityTypes.PIG, START.west().west().east()); // (a block west of it: START is at x 1)
 		pig.snapTo(golem.getX() - 1.5, golem.getY(), golem.getZ(), 0, 0);
 		helper.startSequence()
@@ -211,7 +222,7 @@ public class BotGolemGameTest {
 
 	@GameTest
 	public void aPlayersHitPicksItUpWithItsParts(GameTestHelper helper) {
-		BotGolem golem = golem(helper, board -> board.halt());
+		BotGolem golem = golem(helper, com.payonel.modularcomputers.machine.Program::park);
 		golem.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(net.minecraft.world.item.Items.IRON_PICKAXE));
 		golem.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, new ItemStack(net.minecraft.world.item.Items.COBBLESTONE));
 		var player = GameTests.serverPlayer(helper);

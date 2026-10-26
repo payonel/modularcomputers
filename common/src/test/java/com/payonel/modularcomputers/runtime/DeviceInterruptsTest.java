@@ -176,7 +176,7 @@ class DeviceInterruptsTest {
 		bus.eeprom(new Eeprom("""
 			local got = board.waitForInterrupt(%d, "%s")
 			board.invoke("console", "write", tostring(got[1]))
-			board.halt()
+			while true do board.waitForInterrupt(nil, 'park') end
 			""".formatted(WAIT_SECONDS, name)));
 		assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
 		settle(() -> machine.runner().map(r -> r.state() == Runner.State.WAITING).orElse(false));
@@ -184,7 +184,7 @@ class DeviceInterruptsTest {
 		serve();
 		machine.tick(); // the tick after its data came: the wait is answered in it
 		assertThat(machine.runner().map(Runner::state)).as("woken at the next tick").isNotEqualTo(java.util.Optional.of(Runner.State.WAITING));
-		settle(() -> machine.runner().isEmpty());
+		settle(() -> com.payonel.modularcomputers.machine.Parked.parked(machine));
 		assertThat(screen.buffer().row(0).strip()).as("answered by the name it was asked by").isEqualTo(name);
 	}
 

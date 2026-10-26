@@ -24,7 +24,7 @@ The programs in mcos's `/bin`. Each page is the program's man page: the same tex
 | [find](/programs/find/) | search for files in a directory tree |
 | [free](/programs/free/) | display the amount of memory in use and free |
 | [grep](/programs/grep/) | print lines that match a pattern |
-| [halt](/programs/halt/) | stop the computer |
+| [halt](/programs/halt/) | stop the computer, turning it off |
 | [head](/programs/head/) | output the first part of files |
 | [hostname](/programs/hostname/) | show or set the host's name |
 | [kill](/programs/kill/) | send a signal to a process |
