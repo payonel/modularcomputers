@@ -75,14 +75,10 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 
 ## Robots: the bot golem, then drones
 
-- **Walking: pathfinding as a mode, and where a move ends** (the user, 2026-10-25, still deciding):
-  the golem's walk goes by the game's pathfinder (it finds its way round things), which the user
-  finds interesting but isn't sure of; it may become an option or a mode beside a plain one (a
-  straight step, as a turtle's or OC's robot's). Whichever it is, a move must end at a
-  deterministic place (the point asked for, exactly), or programs for set operations (rows, grids,
-  a farm) are very hard to write: today a walk counts as arrived within a block of its point, and
-  the pathfinder turns the golem as it goes. Flight is to be looked at the same way. Waiting on the
-  user before changing walk or fly.
+- **Walking, decided and built (2026-10-25):** a pose (odometry from an origin a dimension), whole-
+  block walks ending exactly, straight without pathfinding (the default), the game's pathfinder as
+  a mode, walkTo/flyTo from the pose. Still to consider: whether the field card's moves should land
+  on block middles too (they're exact offsets now), and a GPS card for world positions.
 - **The bot golem** (user design, 2026-10-24), next to build: an entity a block in size, an iron
   golem's look, walking as fast as a player. Its GUI is a case's (CPU, RAM, EEPROM, disk, battery,
   cards: none soldered) in the golem's own art, and it holds only a tier 1 screen. One slot holds a

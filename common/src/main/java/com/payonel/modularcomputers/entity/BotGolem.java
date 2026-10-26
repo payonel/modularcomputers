@@ -21,7 +21,10 @@ import com.payonel.modularcomputers.network.ScreenRowsPayload;
 import com.payonel.modularcomputers.platform.Platform;
 import com.payonel.modularcomputers.runtime.Result;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -92,6 +95,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	public static final double THRUST_SPEED = 1.25;
 	/** How fast it comes down onto its legs, in blocks a tick. */
 	private static final double LANDING_SPEED = 0.25;
+	/** How far from its legs it starts slowing, in blocks, and its slowest then (a share of its speed). */
+	private static final double LANDING_EASE = 1;
+	private static final double LANDING_SLOWEST = 0.1;
 	/** How near a flight's point counts as there, in blocks. */
 	private static final double FLOWN = 0.05;
 	/** A tick's flight that makes less than this share of its step is blocked (something in the way). */
@@ -109,6 +115,13 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	/** How far under its sockets its sparks start, in blocks (round the beam's middle). */
 	private static final double BEAM_SPARKS_DOWN = 0.15;
 	private static final String HOVERING_SAVED = "hovering";
+	private static final String PATHFINDING_SAVED = "pathfinding";
+	private static final String ORIGINS_SAVED = "origins";
+	private static final com.mojang.serialization.Codec<Origin> ORIGIN_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.create(origin -> origin.group(
+		Vec3.CODEC.fieldOf("at").forGetter(Origin::at),
+		com.mojang.serialization.Codec.FLOAT.fieldOf("yaw").forGetter(Origin::yaw)
+	).apply(origin, Origin::new));
+	private static final com.mojang.serialization.Codec<Map<String, Origin>> ORIGINS_CODEC = com.mojang.serialization.Codec.unboundedMap(com.mojang.serialization.Codec.STRING, ORIGIN_CODEC);
 	/** Its legs' height, in blocks: three pixels (its model's); without them it's that much shorter. */
 	public static final float LEG_HEIGHT = 3 / 16f;
 	/** How far from its legs it can attach them, in blocks (their middles). */
@@ -121,8 +134,31 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private final RoboticsDevice robotics = new RoboticsDevice();
 	/** Its senses and its hand, in the world. */
 	private final GolemHands hands = new GolemHands(this);
-	/** Where a walk is going (null: none). */
+	/** Where a walk with pathfinding is going (null: none): its block's middle. */
 	private Vec3 target;
+	/** A walk without pathfinding: the blocks' middles still to step to, in order (null: none). */
+	private java.util.ArrayDeque<Vec3> steps;
+	/** The step under way (null: none): from one block's middle, on its floor, to the next's, and how far along (0 to 1). */
+	private Vec3 stepFrom;
+	private Vec3 stepTo;
+	private double stepDone;
+	/** The elevation its walk is to end at (the block its feet are in). */
+	private int goal;
+	/** Its heading as its move began: given back as it ends (a pathfinder turns it as it goes). */
+	private float heading = Float.NaN;
+	/** A flight with pathfinding: its way's points still to fly to, after {@link #flyTo} (null: none). */
+	private java.util.ArrayDeque<Vec3> flightPath;
+	/** Whether its moves find their way round things (the game's pathfinder) or go straight: off by default, lost when it's picked up. */
+	private boolean pathfinding;
+	/**
+	 * Its pose's origins, a dimension's each (by its id): where it stood and faced when its pose was
+	 * last reset there. Kept through reboots and shoves; lost when it's picked up (an item keeps none).
+	 */
+	private final Map<String, Origin> origins = new HashMap<>();
+
+	/** A pose's origin: the middle of the block it stood on, and its heading, a right angle. */
+	record Origin(Vec3 at, float yaw) {
+	}
 	/** The heading a turn is going to, in degrees (NaN: none). */
 	private float turnTo = Float.NaN;
 	/** Where it was last tick, while walking: what it walked since. */
@@ -271,13 +307,43 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			if (EnergyField.held(BotGolem.this)) {
 				return "held in a field: its field moves it";
 			}
-			turnTo = Float.NaN;
-			getNavigation().stop();
-			hands.stopBreaking();
-			target = position().add(inFrame(forward, right, up));
-			walkedFrom = position();
-			pathed = false; // (its tick finds the way, once it stands: the game plans no path for a mob in the air)
+			begin();
+			Vec3 start = middle();
+			goal = GolemSteps.elevation(getY()) + (int) up;
+			if (pathfinding) {
+				target = start.add(inFrame(forward, right, 0)).add(0, up, 0);
+				walkedFrom = position();
+				pathed = false; // (its tick finds the way, once it stands: the game plans no path for a mob in the air)
+				return null;
+			}
+			// Straight: forward, then right, a block's middle each, without turning.
+			steps = new java.util.ArrayDeque<>();
+			Vec3 at = start;
+			Vec3 ahead = inFrame(Math.signum(forward), 0, 0);
+			for (int i = 0; i < Math.abs(forward); i++) {
+				at = at.add(ahead);
+				steps.add(at);
+			}
+			Vec3 aside = inFrame(0, Math.signum(right), 0);
+			for (int i = 0; i < Math.abs(right); i++) {
+				at = at.add(aside);
+				steps.add(at);
+			}
+			setNoGravity(true); // (it moves itself, step by step)
 			return null;
+		}
+
+		@Override
+		public String walkTo(double forward, double right, double up) {
+			Vec3 to = fromOrigin(forward, right, up);
+			Vec3 d = to.subtract(middle());
+			double ahead = Math.round(d.dot(inFrame(1, 0, 0)));
+			double aside = Math.round(d.dot(inFrame(0, 1, 0)));
+			double rise = GolemSteps.elevation(to.y) - GolemSteps.elevation(getY());
+			if (Math.abs(ahead) > RoboticsDevice.MAX_WALK || Math.abs(aside) > RoboticsDevice.MAX_WALK || Math.abs(rise) > RoboticsDevice.MAX_WALK) {
+				return "too far: at most " + (int) RoboticsDevice.MAX_WALK + " blocks each way";
+			}
+			return walk(ahead, aside, rise);
 		}
 
 		@Override
@@ -285,7 +351,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			getNavigation().stop();
 			hands.stopBreaking();
 			target = null;
-			turnTo = Mth.wrapDegrees(getYRot() + (float) degrees);
+			turnTo = Mth.wrapDegrees(rightAngle(getYRot()) + (float) degrees);
 			return null;
 		}
 
@@ -293,9 +359,21 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		public void stop() {
 			getNavigation().stop();
 			hands.stopBreaking();
-			target = null;
+			if (target != null || steps != null) {
+				if (stepFrom != null) {
+					setPos(stepFrom); // (back onto the last block's middle it reached)
+				} else {
+					Vec3 middle = middle();
+					setPos(middle.x, getY(), middle.z);
+				}
+				endWalk();
+			}
 			turnTo = Float.NaN;
-			flyTo = null; // (flying or landing: it hovers there)
+			if (flyTo != null) {
+				flyTo = null; // (flying or landing: it hovers there)
+				flightPath = null;
+				restoreHeading();
+			}
 			landing = null;
 		}
 
@@ -304,9 +382,44 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			if (EnergyField.held(BotGolem.this)) {
 				return "held in a field: its field moves it";
 			}
+			begin();
 			takeOff();
-			flyTo = position().add(inFrame(forward, right, up));
-			return null;
+			Vec3 middle = middle();
+			return flyToward(new Vec3(middle.x, getY(), middle.z).add(inFrame(forward, right, up)));
+		}
+
+		@Override
+		public String flyTo(double forward, double right, double up) {
+			if (EnergyField.held(BotGolem.this)) {
+				return "held in a field: its field moves it";
+			}
+			Vec3 to = fromOrigin(forward, right, up).add(0, LEG_HEIGHT, 0); // (its torso's height, its feet there)
+			if (to.distanceTo(position()) > RoboticsDevice.MAX_FLIGHT * Math.sqrt(3)) {
+				return "too far: at most " + (int) RoboticsDevice.MAX_FLIGHT + " blocks each way";
+			}
+			begin();
+			takeOff();
+			return flyToward(to);
+		}
+
+		@Override
+		public Result pose() {
+			return Result.ok(BotGolem.this.pose());
+		}
+
+		@Override
+		public void resetPose() {
+			BotGolem.this.resetPose();
+		}
+
+		@Override
+		public boolean pathfinding() {
+			return pathfinding;
+		}
+
+		@Override
+		public void pathfinding(boolean on) {
+			pathfinding = on;
 		}
 
 		@Override
@@ -511,6 +624,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				placed = true;
 				board.placed();
 			}
+			origin(); // (its first tick here, or a dimension it's new to: its pose's origin, where it is)
 			move();
 			thrust();
 			hands.tick();
@@ -518,12 +632,122 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 	}
 
+	// ---- its pose and its moves' frame ---------------------------------------------------------
+
+	/** A heading turned to the nearest right angle. */
+	static float rightAngle(float yaw) {
+		return Math.round(yaw / 90f) * 90f;
+	}
+
+	/** The middle of the block it stands in, at its height. */
+	private Vec3 middle() {
+		return new Vec3(Math.floor(getX()) + 0.5, getY(), Math.floor(getZ()) + 0.5);
+	}
+
+	/** Its feet's height: its torso alone stands its legs' height above them (it took off where they stood). */
+	private double feet() {
+		return getY() - (legs() ? 0 : LEG_HEIGHT);
+	}
+
+	/** This dimension's id: each has its own pose. */
+	private String dimension() {
+		return level().dimension().identifier().toString();
+	}
+
+	/** Its pose's origin here, made now if it has none (its first power-on, or a dimension it's new to). */
+	private Origin origin() {
+		Origin origin = origins.get(dimension());
+		if (origin == null) {
+			resetPose();
+			origin = origins.get(dimension());
+		}
+		return origin;
+	}
+
+	/** Makes where it is its pose's origin here: onto its block's middle, facing the nearest right angle. */
+	public void resetPose() {
+		Vec3 middle = middle();
+		setPos(middle.x, getY(), middle.z);
+		face(rightAngle(getYRot()));
+		origins.put(dimension(), new Origin(new Vec3(middle.x, feet(), middle.z), getYRot()));
+	}
+
+	/** Where it is from its origin, in the origin's frame: {forward, right, up, heading}. */
+	public Map<String, Object> pose() {
+		Origin origin = origin();
+		Vec3 d = new Vec3(getX(), feet(), getZ()).subtract(origin.at());
+		float yaw = origin.yaw() * Mth.DEG_TO_RAD;
+		Map<String, Object> pose = new LinkedHashMap<>();
+		pose.put("forward", tidy(d.dot(new Vec3(-Mth.sin(yaw), 0, Mth.cos(yaw)))));
+		pose.put("right", tidy(d.dot(new Vec3(-Mth.cos(yaw), 0, -Mth.sin(yaw)))));
+		pose.put("up", tidy(d.y));
+		pose.put("heading", tidy(Mth.positiveModulo(getYRot() - origin.yaw(), 360f)));
+		return pose;
+	}
+
+	/** A pose's number: whole when it's within a hair of whole (a sine's rounding isn't a program's business). */
+	private static Object tidy(double value) {
+		double whole = Math.rint(value);
+		if (Math.abs(value - whole) < POSE_HAIR) {
+			return (long) whole;
+		}
+		return value;
+	}
+
+	/** How near a whole number a pose's counts as it, in blocks or degrees. */
+	private static final double POSE_HAIR = 1e-6;
+
+	/** The point {@code forward}, {@code right} and {@code up} blocks from its origin, in the origin's frame. */
+	private Vec3 fromOrigin(double forward, double right, double up) {
+		Origin origin = origin();
+		float yaw = origin.yaw() * Mth.DEG_TO_RAD;
+		return origin.at().add(-Mth.sin(yaw) * forward - Mth.cos(yaw) * right, up, Mth.cos(yaw) * forward - Mth.sin(yaw) * right);
+	}
+
+	/** A move begins: what it was doing stops, and it faces the nearest right angle (given back as it ends). */
+	private void begin() {
+		turnTo = Float.NaN;
+		getNavigation().stop();
+		hands.stopBreaking();
+		target = null;
+		steps = null;
+		stepFrom = stepTo = null;
+		face(rightAngle(getYRot()));
+		heading = getYRot();
+	}
+
+	/** Its heading back as its move began. */
+	private void restoreHeading() {
+		if (!Float.isNaN(heading)) {
+			face(heading);
+			heading = Float.NaN;
+		}
+	}
+
+	/** A walk's over (arrived, blocked or stopped): its heading back, gravity its own. */
+	private void endWalk() {
+		target = null;
+		steps = null;
+		stepFrom = stepTo = null;
+		setNoGravity(thrusting());
+		restoreHeading();
+	}
+
 	/** A point {@code forward}, {@code right} and {@code up} blocks from it, in its own frame, as a step from where it is. */
 	private Vec3 inFrame(double forward, double right, double up) {
 		float yaw = getYRot() * Mth.DEG_TO_RAD;
 		// Minecraft's heading: 0 faces south (+Z), 90 west; to its right is a quarter turn more.
-		return new Vec3(-Mth.sin(yaw) * forward - Mth.cos(yaw) * right, up, Mth.cos(yaw) * forward - Mth.sin(yaw) * right);
+		double x = -Mth.sin(yaw) * forward - Mth.cos(yaw) * right;
+		double z = Mth.cos(yaw) * forward - Mth.sin(yaw) * right;
+		if (getYRot() == rightAngle(getYRot())) { // (a right angle: its frame's steps whole, as its walks are)
+			x = Math.rint(x * FRAME_GRAIN) / FRAME_GRAIN;
+			z = Math.rint(z * FRAME_GRAIN) / FRAME_GRAIN;
+		}
+		return new Vec3(x, up, z);
 	}
+
+	/** How finely a right-angled frame's steps are kept: a sine's last bits dropped. */
+	private static final double FRAME_GRAIN = 1e6;
 
 	/** Its thrusters take over: its legs, if it stands on them, left standing where it is, its torso where it was. */
 	private void takeOff() {
@@ -586,11 +810,40 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 	}
 
+	/** Starts flying to a point: straight, or with pathfinding by the game's way for fliers (a bee's), round what's in the way; null, or why not. */
+	private String flyToward(Vec3 to) {
+		flightPath = null;
+		if (pathfinding) {
+			var navigation = new net.minecraft.world.entity.ai.navigation.FlyingPathNavigation(this, level());
+			Path path = navigation.createPath(BlockPos.containing(to), 0);
+			if (path == null || !path.canReach()) {
+				return "no way there";
+			}
+			flightPath = new java.util.ArrayDeque<>();
+			for (int i = 1; i < path.getNodeCount(); i++) {
+				var node = path.getNode(i);
+				flightPath.add(new Vec3(node.x + 0.5, node.y + LEG_HEIGHT, node.z + 0.5));
+			}
+			flightPath.add(to); // (and its point, exactly)
+			flyTo = flightPath.poll();
+			return null;
+		}
+		flyTo = to;
+		return null;
+	}
+
 	/** A tick's flight toward its point: there, it hovers (arrived); held back, it hovers (blocked). */
 	private void flyStep() {
 		Vec3 left = flyTo.subtract(position());
 		if (left.length() <= FLOWN) {
+			setPos(flyTo);
+			if (flightPath != null && !flightPath.isEmpty()) {
+				flyTo = flightPath.poll(); // (the next of its way's points)
+				return;
+			}
 			flyTo = null;
+			flightPath = null;
+			restoreHeading();
 			robotics.arrived();
 			robotics.hovering();
 			return;
@@ -601,6 +854,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		setDeltaMovement(Vec3.ZERO);
 		if (position().distanceTo(from) < step.length() * BLOCKED_SHARE) {
 			flyTo = null;
+			flightPath = null;
+			restoreHeading();
 			robotics.blocked("something in the way");
 			robotics.hovering();
 		}
@@ -616,7 +871,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 		Vec3 left = landing.position().subtract(position());
 		if (left.length() > ON_LEGS) {
-			Vec3 step = left.scale(Math.min(1, LANDING_SPEED / left.length()));
+			// Over its last block it slows, settling onto its legs (the user's), as a craft easing down.
+			double speed = LANDING_SPEED * Math.max(LANDING_SLOWEST, Math.min(1, left.length() / LANDING_EASE));
+			Vec3 step = left.scale(Math.min(1, speed / left.length()));
 			if (left.length() > LEGS_REACH) {
 				Vec3 from = position();
 				move(net.minecraft.world.entity.MoverType.SELF, step);
@@ -702,13 +959,16 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	/** Its walk or turn under way, a tick of it: what it walked paid, and how it ended told. */
 	private void move() {
+		if (steps != null) {
+			stepWalk();
+		}
 		if (target != null && !pathed) {
 			if (!onGround()) {
 				return; // (in the air: it walks once it lands)
 			}
 			Path path = getNavigation().createPath(target.x, target.y, target.z, 0);
 			if (path == null) {
-				target = null;
+				endWalk();
 				robotics.blocked("no way there");
 				return;
 			}
@@ -720,11 +980,19 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			walkedFrom = position();
 			if (getNavigation().isDone()) {
 				boolean there = position().subtract(target).horizontalDistance() < ARRIVED;
-				target = null;
+				Vec3 to = target;
 				if (there) {
+					setPos(to.x, getY(), to.z); // (onto its block's middle, exactly)
+				} else {
+					Vec3 middle = middle();
+					setPos(middle.x, getY(), middle.z); // (the middle of the last block it reached)
+				}
+				boolean level = GolemSteps.elevation(getY()) == goal;
+				endWalk();
+				if (there && level) {
 					robotics.arrived();
 				} else {
-					robotics.blocked("no way there");
+					robotics.blocked(there ? "not at the height asked" : "no way there");
 				}
 			}
 		}
@@ -738,6 +1006,112 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				robotics.turned();
 			}
 		}
+	}
+
+	/** How fast it steps, in blocks a tick: a player's walking pace (4.317 blocks a second). */
+	private static final double STEP_SPEED = 4.317 / 20;
+	/** A jump's share of a step it rises over (then it goes on, up there); a drop's share it goes before it falls. */
+	private static final double JUMP_SHARE = 0.4;
+	private static final double DROP_SHARE = 0.5;
+
+	/** A walk without pathfinding, a tick of it: the next block's floor judged (GolemSteps), and stepped onto. */
+	private void stepWalk() {
+		if (stepTo == null) {
+			Vec3 next = steps.peek();
+			if (next == null) {
+				boolean level = GolemSteps.elevation(getY()) == goal;
+				endWalk();
+				if (level) {
+					robotics.arrived();
+				} else {
+					robotics.blocked("not at the height asked");
+				}
+				return;
+			}
+			String why = stepOnto(next);
+			if (why != null) {
+				endWalk();
+				robotics.blocked(why);
+				return;
+			}
+			steps.poll();
+		}
+		stepDone = Math.min(1, stepDone + STEP_SPEED);
+		double rise = stepTo.y - stepFrom.y;
+		double y;
+		if (rise > 0) {
+			y = stepFrom.y + rise * Math.min(1, stepDone / JUMP_SHARE);
+		} else if (rise < 0) {
+			y = stepFrom.y + (stepDone < DROP_SHARE ? 0 : rise * (stepDone - DROP_SHARE) / (1 - DROP_SHARE));
+		} else {
+			y = stepFrom.y;
+		}
+		setPos(Mth.lerp(stepDone, stepFrom.x, stepTo.x), y, Mth.lerp(stepDone, stepFrom.z, stepTo.z));
+		setDeltaMovement(Vec3.ZERO);
+		calculateEntityAnimation(false); // (its legs swing as it goes)
+		if (stepDone >= 1) {
+			setPos(stepTo);
+			stepFrom = stepTo = null;
+			robotics.walked(1);
+		}
+	}
+
+	/** Starts a step onto the block whose middle is {@code next}: null, or why it can't (the walk's blocked there). */
+	private String stepOnto(Vec3 next) {
+		double here = getY();
+		double floor = floorAt(next.x, next.z, here);
+		if (Double.isNaN(floor)) {
+			return fits(next.x, here, next.z) ? "too far down" : "a wall";
+		}
+		BlockPos feet = BlockPos.containing(next.x, floor + POSE_HAIR, next.z);
+		var state = level().getBlockState(feet);
+		if (state.getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) {
+			return "lava";
+		} else if (state.is(net.minecraft.tags.BlockTags.FIRE)) {
+			return "fire";
+		} else if (state.getFluidState().is(net.minecraft.tags.FluidTags.WATER) && level().getFluidState(feet.below()).is(net.minecraft.tags.FluidTags.WATER)) {
+			return "deep water";
+		}
+		String why = GolemSteps.step(here, floor, goal);
+		if (why != null) {
+			return why;
+		}
+		if (floor > here && !fits(getX(), floor, getZ())) {
+			return "no room to jump"; // (a ceiling over it)
+		}
+		stepFrom = position();
+		stepTo = new Vec3(next.x, floor, next.z);
+		stepDone = 0;
+		return null;
+	}
+
+	/**
+	 * Where its feet would stand at the block whose middle is {@code x}, {@code z}: the highest floor
+	 * there, from a jump above {@code feet} to a drop below, its body fitting on it; NaN for none.
+	 */
+	private double floorAt(double x, double z, double feet) {
+		int top = Mth.floor(feet + GolemSteps.MAX_JUMP);
+		int bottom = Mth.floor(feet) - GolemSteps.MAX_DROP - 1;
+		for (int y = top; y >= bottom; y--) {
+			BlockPos at = BlockPos.containing(x, y, z);
+			var shape = level().getBlockState(at).getCollisionShape(level(), at, net.minecraft.world.phys.shapes.CollisionContext.of(this));
+			if (shape.isEmpty()) {
+				continue;
+			}
+			double surface = y + shape.max(net.minecraft.core.Direction.Axis.Y);
+			if (surface > feet + GolemSteps.MAX_JUMP + POSE_HAIR || surface < feet - GolemSteps.MAX_DROP - POSE_HAIR) {
+				continue;
+			}
+			if (fits(x, surface, z)) {
+				return surface;
+			}
+		}
+		return Double.NaN;
+	}
+
+	/** Whether its body fits with its feet at {@code x}, {@code y}, {@code z}. */
+	private boolean fits(double x, double y, double z) {
+		return level().noCollision(this, getBoundingBox().move(x - getX(), y - getY(), z - getZ()));
 	}
 
 	/** Faces {@code yaw}, all of it: its body, its head. */
@@ -949,6 +1323,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		super.addAdditionalSaveData(output);
 		output.putBoolean(LEGS_SAVED, legs());
 		output.putBoolean(HOVERING_SAVED, hovering); // (a save isn't a power cut: it hovers on)
+		output.putBoolean(PATHFINDING_SAVED, pathfinding);
+		output.store(ORIGINS_SAVED, ORIGINS_CODEC, Map.copyOf(origins));
 		board.save(output, false);
 	}
 
@@ -957,6 +1333,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		super.readAdditionalSaveData(input);
 		legs(input.getBooleanOr(LEGS_SAVED, true));
 		hovering = input.getBooleanOr(HOVERING_SAVED, false);
+		pathfinding = input.getBooleanOr(PATHFINDING_SAVED, false);
+		origins.clear();
+		input.read(ORIGINS_SAVED, ORIGINS_CODEC).ifPresent(origins::putAll);
 		board.load(input);
 	}
 }

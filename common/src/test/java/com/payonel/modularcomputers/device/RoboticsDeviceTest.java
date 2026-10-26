@@ -76,12 +76,18 @@ class RoboticsDeviceTest {
 	}
 
 	@Test
-	void turnsByNameOrDegrees() {
+	void turnsRightAnglesOnly() {
 		device.turn(args("left"));
 		device.turn(args("around"));
-		device.turn(args(45L));
-		assertThat(asked).containsExactly("turn -90.0", "turn 180.0", "turn 45.0");
+		assertThat(device.turn(args(45L)).error()).as("no degrees: right angles only (the user's)").startsWith("not a way to turn");
+		assertThat(asked).containsExactly("turn -90.0", "turn 180.0");
 		assertThat(device.turn(args("up")).error()).startsWith("not a way to turn");
+	}
+
+	@Test
+	void walksAreWholeBlocks() {
+		assertThat(device.walk(args(1.5)).error()).isEqualTo("whole blocks expected");
+		assertThat(device.walk(args(2.0, -1L)).failed()).isFalse();
 	}
 
 	@Test

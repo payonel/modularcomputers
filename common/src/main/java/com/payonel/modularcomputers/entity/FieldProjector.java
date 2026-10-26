@@ -133,6 +133,9 @@ public final class FieldProjector implements FieldCard.Projector {
 			}
 		} else {
 			Vec3 there = at.world(point[0], point[1], point[2]);
+			if (there.distanceTo(at.origin()) > FieldCard.RANGE + FieldCard.REACH) {
+				return Result.fail("too far: " + (int) FieldCard.RANGE + " blocks from its computer at most"); // (it senses no farther than it reaches)
+			}
 			target = level.get().getEntities((Entity) null, new AABB(there, there).inflate(FieldCard.REACH),
 					entity -> holdable(entity) && entity.getBoundingBox().getCenter().distanceTo(there) <= FieldCard.REACH)
 				.stream().min(Comparator.comparingDouble(entity -> entity.getBoundingBox().getCenter().distanceTo(there))).orElse(null);

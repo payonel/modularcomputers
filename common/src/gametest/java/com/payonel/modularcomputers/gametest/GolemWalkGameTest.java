@@ -1,0 +1,268 @@
+package com.payonel.modularcomputers.gametest;
+
+import com.payonel.modularcomputers.entity.BotGolem;
+import com.payonel.modularcomputers.runtime.Arguments;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SlabBlock;
+import net.minecraft.world.level.block.state.properties.SlabType;
+import net.minecraft.world.phys.Vec3;
+
+/**
+ * A golem's walks and its pose (user design, 2026-10-25): without pathfinding (the default) a walk
+ * goes straight, whole blocks, onto a block's middle exactly, without turning (sideways, backwards),
+ * stepping freely within its elevation, jumping a block at a time only up toward its height and
+ * dropping at most three only down toward it, never into lava; with pathfinding it finds its way,
+ * and still ends exactly, facing as it was. Its pose is from its origin (its first tick, resetPose,
+ * each dimension's own), kept through reboots and shoves, lost when it's picked up.
+ */
+public class GolemWalkGameTest {
+	/** Where the golem stands (BotGolemGameTest's start), facing east (+X: its forward). */
+	private static final BlockPos AT = new BlockPos(1, 1, 1);
+
+	private static Arguments args(Object... values) {
+		return new Arguments(java.util.Arrays.asList(values));
+	}
+
+	private static void same(GameTestHelper helper, Object got, Object expected, String what) {
+		helper.assertTrue(Objects.equals(got, expected), what + ": expected " + expected + ", got " + got);
+	}
+
+	/** Its pose now, as a program reads it. */
+	@SuppressWarnings("unchecked")
+	private static Map<String, Object> pose(BotGolem golem) {
+		return (Map<String, Object>) golem.robotics().pose(args()).first();
+	}
+
+	private static Map<String, Object> at(long forward, long right, Object up) {
+		return Map.of("forward", forward, "right", right, "up", up, "heading", 0L);
+	}
+
+	/** Each robotics event, as it comes. */
+	private static List<Object> events(GameTestHelper helper, BotGolem golem) {
+		List<Object> events = new java.util.ArrayList<>();
+		helper.onEachTick(() -> {
+			Object event;
+			while ((event = golem.robotics().pull(args()).first()) != null) {
+				events.add(event);
+			}
+		});
+		return events;
+	}
+
+	/** Its last event, once it has one more than {@code before}. */
+	private static Object last(List<Object> events) {
+		return events.isEmpty() ? null : events.getLast();
+	}
+
+	private static Map<String, Object> blocked(String why) {
+		return Map.of("event", "blocked", "why", why);
+	}
+
+	private static final Map<String, Object> ARRIVED = Map.of("event", "arrived");
+
+	/** A walk from where it is, and the event it ends in, then a check. */
+	private static void walks(GameTestHelper helper, Object[] walk, Map<String, Object> ending, Map<String, Object> pose) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> helper.assertTrue(!golem.robotics().walk(args(walk)).failed(), "it starts"))
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its walk ended"))
+			.thenExecute(() -> {
+				same(helper, last(events), ending, "how it ended");
+				same(helper, pose(golem), pose, "where");
+				same(helper, golem.getYRot(), BotGolemGameTest.EAST, "facing as it was");
+			})
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 200)
+	public void aWalkEndsExactlyOnTheBlocksMiddleFacingAsItWas(GameTestHelper helper) {
+		walks(helper, new Object[] {3L}, ARRIVED, at(3, 0, 0L));
+	}
+
+	@GameTest(maxTicks = 200)
+	public void itWalksSidewaysAndBackwardsWithoutTurning(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(0L, 2L)))
+			.thenExecuteAfter(1, () -> same(helper, golem.getYRot(), BotGolemGameTest.EAST, "not turning as it goes"))
+			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "to its right"))
+			.thenExecute(() -> {
+				events.clear();
+				golem.robotics().walk(args(-1L));
+			})
+			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "backwards"))
+			.thenExecute(() -> {
+				same(helper, pose(golem), at(-1, 2, 0L), "back one, two to its right");
+				Vec3 rel = golem.position().subtract(helper.absoluteVec(Vec3.ZERO));
+				helper.assertTrue(rel.x % 1 == 0.5 && Math.abs(rel.z % 1) == 0.5, "on a block's middle: " + rel);
+			})
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 200)
+	public void aLevelWalkStepsOntoASlabButNotOnUpABlock(GameTestHelper helper) {
+		helper.setBlock(AT.east(), Blocks.STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM));
+		helper.setBlock(AT.east(2), Blocks.STONE);
+		walks(helper, new Object[] {3L}, blocked("a step up"), at(1, 0, 0.5));
+	}
+
+	@GameTest(maxTicks = 200)
+	public void upOneJumpsABlockAndAJumpItCantMakeIsBlockedAtTheHeight(GameTestHelper helper) {
+		helper.setBlock(AT.east(2), Blocks.STONE);
+		helper.setBlock(AT.east(3), Blocks.STONE);
+		walks(helper, new Object[] {3L, 0L, 1L}, ARRIVED, at(3, 0, 1L));
+	}
+
+	@GameTest(maxTicks = 200)
+	public void upOneOnTheFlatEndsBlockedNotAtTheHeight(GameTestHelper helper) {
+		walks(helper, new Object[] {2L, 0L, 1L}, blocked("not at the height asked"), at(2, 0, 0L));
+	}
+
+	@GameTest(maxTicks = 200)
+	public void aLevelWalkStopsAtAnEdgeAndDownThreeDropsOffIt(GameTestHelper helper) {
+		// It stands on a platform three up; the floor's below its edge.
+		for (int y = 1; y <= 3; y++) {
+			helper.setBlock(AT.atY(y), Blocks.STONE);
+		}
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		golem.setPos(golem.getX(), golem.getY() + 3, golem.getZ());
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> {
+				golem.robotics().resetPose(args()); // (its origin up there)
+				golem.robotics().walk(args(2L));
+			})
+			.thenWaitUntil(() -> same(helper, last(events), blocked("a drop"), "at the edge"))
+			.thenExecute(() -> {
+				same(helper, pose(golem), at(0, 0, 0L), "still on its platform");
+				events.clear();
+				golem.robotics().walk(args(2L, 0L, -3L));
+			})
+			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "dropped"))
+			.thenExecute(() -> same(helper, pose(golem), at(2, 0, -3L), "three down"))
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 200)
+	public void itWontDropFourAtOnce(GameTestHelper helper) {
+		for (int y = 1; y <= 4; y++) {
+			helper.setBlock(AT.atY(y), Blocks.STONE);
+		}
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		golem.setPos(golem.getX(), golem.getY() + 4, golem.getZ());
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(1L, 0L, -4L)))
+			.thenWaitUntil(() -> same(helper, last(events), blocked("too far down"), "four is more than a player falls unhurt"))
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 200)
+	public void itWontWalkIntoLava(GameTestHelper helper) {
+		helper.setBlock(AT.east(2), Blocks.LAVA);
+		walks(helper, new Object[] {3L}, blocked("lava"), at(1, 0, 0L));
+	}
+
+	@GameTest(maxTicks = 300)
+	public void itsPoseOutlastsARebootAndAShoveAndWalkToGoesBackToItsOrigin(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(2L, 1L)))
+			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "walked"))
+			.thenExecute(() -> {
+				golem.machine().pressPower(); // (off)
+			})
+			.thenExecuteAfter(2, () -> golem.machine().pressPower()) // (and on: a reboot)
+			.thenExecuteAfter(3, () -> {
+				same(helper, pose(golem), at(2, 1, 0L), "kept through a reboot");
+				golem.setPos(golem.getX() + 0.3, golem.getY(), golem.getZ()); // (shoved)
+				double shoved = ((Number) pose(golem).get("forward")).doubleValue();
+				helper.assertTrue(Math.abs(shoved - 2.3) < 1e-6, "a shove counted: " + shoved);
+				events.clear();
+				helper.assertTrue(!golem.robotics().walkTo(args(0L, 0L)).failed(), "home");
+			})
+			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "back"))
+			.thenExecute(() -> same(helper, pose(golem), at(0, 0, 0L), "at its origin exactly"))
+			.thenSucceed();
+	}
+
+	@GameTest
+	public void resetPoseCentresItFacingARightAngleAndPickingItUpLosesItsPose(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		golem.setPos(golem.getX() + 0.2, golem.getY(), golem.getZ() - 0.3);
+		golem.setYRot(BotGolemGameTest.EAST + 30);
+		golem.robotics().resetPose(args());
+		same(helper, golem.getYRot(), BotGolemGameTest.EAST, "a right angle");
+		Vec3 rel = golem.position().subtract(helper.absoluteVec(Vec3.ZERO));
+		helper.assertTrue(Math.abs(rel.x - 1.5) < 1e-9 && Math.abs(rel.z - 1.5) < 1e-9, "on its block's middle: " + rel);
+		same(helper, pose(golem), at(0, 0, 0L), "its origin");
+		golem.setPos(golem.getX() + 2, golem.getY(), golem.getZ());
+		// Picked up and set down again: an item keeps no pose; its new origin is where it's set.
+		BotGolem again = com.payonel.modularcomputers.entity.ModEntities.BOT_GOLEM.create(helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.SPAWN_ITEM_USE);
+		again.fromItem(golem.asItem());
+		again.snapTo(golem.getX(), golem.getY(), golem.getZ(), BotGolemGameTest.EAST, 0);
+		same(helper, pose(again), at(0, 0, 0L), "a new origin where it was set down");
+		helper.succeed();
+	}
+
+	@GameTest(maxTicks = 200)
+	public void eachDimensionHasItsOwnPose(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(2L)))
+			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "walked"))
+			.thenExecute(() -> {
+				var nether = helper.getLevel().getServer().getLevel(net.minecraft.world.level.Level.NETHER);
+				var there = (BotGolem) golem.teleport(new net.minecraft.world.level.portal.TeleportTransition(nether, new Vec3(0.5, 100, 0.5), Vec3.ZERO,
+					BotGolemGameTest.EAST, 0, net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING));
+				helper.assertTrue(there != null, "it went");
+				same(helper, pose(there), at(0, 0, 0L), "a new pose, there");
+				var back = (BotGolem) there.teleport(new net.minecraft.world.level.portal.TeleportTransition(helper.getLevel(),
+					helper.absoluteVec(Vec3.atBottomCenterOf(AT.east(2))), Vec3.ZERO, BotGolemGameTest.EAST, 0, net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING));
+				same(helper, pose(back), at(2, 0, 0L), "its old one, back here");
+				back.discard();
+			})
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 400)
+	public void withPathfindingItGoesRoundAWallAndStillEndsExactlyFacingAsItWas(GameTestHelper helper) {
+		helper.setBlock(AT.east(2), Blocks.STONE);
+		helper.setBlock(AT.east(2).above(), Blocks.STONE);
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> {
+				golem.robotics().setPathfinding(args(true));
+				same(helper, ((Map<?, ?>) golem.robotics().get(args()).first()).get("pathfinding"), true, "on");
+				golem.robotics().walk(args(4L));
+			})
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "ended"))
+			.thenExecute(() -> {
+				same(helper, last(events), ARRIVED, "round the wall");
+				same(helper, pose(golem), at(4, 0, 0L), "exactly");
+				same(helper, golem.getYRot(), BotGolemGameTest.EAST, "facing as it was");
+			})
+			.thenSucceed();
+	}
+
+	@GameTest(maxTicks = 200)
+	public void flyToGoesToAPointFromItsOrigin(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().flyTo(args(2L, -1L, 3L)))
+			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "flown"))
+			.thenExecute(() -> same(helper, pose(golem), at(2, -1, 3L), "there, from its origin"))
+			.thenSucceed();
+	}
+}

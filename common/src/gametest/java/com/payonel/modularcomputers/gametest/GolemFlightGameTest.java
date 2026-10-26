@@ -219,6 +219,12 @@ public class GolemFlightGameTest {
 			})
 			.thenWaitUntil(() -> helper.assertTrue(field(golem).get(args()).first() instanceof java.util.Map<?, ?> now && "holding".equals(now.get("state")), "up"))
 			.thenExecute(() -> {
+				double x = golem.getX();
+				golem.push(1.0, 0, 0); // (a shove: its field holds it where it is)
+				helper.assertTrue(Math.abs(golem.getX() - x) < 1e-6, "not shoved");
+			})
+			.thenExecuteAfter(5, () -> {
+				helper.assertTrue(Math.abs(golem.getDeltaMovement().x) < 1e-6, "still not shoved: " + golem.getDeltaMovement());
 				helper.assertTrue(golem.legs() && !golem.flying() && !golem.onGround(), "on its legs, off the ground, and not flying");
 				same(helper, golem.robotics().fly(args(1.0)).error(), "held in a field: its field moves it", "its thrusters wait");
 				same(helper, golem.robotics().swing(args("front")).first(), RoboticsDevice.BREAKING, "it digs");
