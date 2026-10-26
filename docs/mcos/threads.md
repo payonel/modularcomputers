@@ -63,9 +63,10 @@ Fails with `EDEADLK` joining itself.
 
 Ends the thread where it is (its mutexes let go). Its `join` gives `false, "killed"`.
 
-### t:status() → "running", "sleeping", "ended" or nil
+### t:status() → "running", "suspended", "dead" or nil
 
-`sleeping`: blocked in a call. `ended`: done, not yet joined. `nil`: joined, gone.
+`suspended`: waiting in a call (a read, a poll, a sleep, a lock). `dead`: done, not yet joined. `nil`:
+joined, gone. (Lua's coroutine words, as OpenOS's threads used; `ps` keeps Linux's for processes.)
 
 ### thread.current() → tid
 

@@ -196,7 +196,7 @@ Ends a thread where it is; its mutexes are let go.
 The calling thread's id; the main thread's is the process's pid.
 
 ### sys.threads() → list
-The process's threads, `{tid, state}` each: `running`, `sleeping`, or `ended` (not yet joined).
+The process's threads, `{tid, state}` each: `running`, `suspended` (waiting in a call), or `dead` (ended, not yet joined).
 
 ### sys.mutex() → id, sys.lock(id[, seconds]) → true, sys.unlock(id) → true
 A mutex of the process. `lock` waits until no other thread holds it (`EDEADLK` if the caller does,

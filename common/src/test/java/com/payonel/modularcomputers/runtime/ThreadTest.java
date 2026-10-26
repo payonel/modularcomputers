@@ -51,6 +51,37 @@ class ThreadTest extends McosHarness {
 		assertThat(read(root().resolve("out"))).isEqualTo("woke true\n");
 	}
 
+	/**
+	 * The user's case: a thread started while its main thread waits (a shell's prompt, here a read)
+	 * runs, says it's running, and finishes. A thread's own fields read through to its process's when
+	 * unset, once, so it took its main thread's "blocked" and never ran (seen failing).
+	 */
+	@Test
+	void aThreadStartedWhileItsMainThreadWaitsRunsAndFinishes() {
+		file("t.lua", """
+			local thread = require("thread")
+			local sys = require("sys")
+			local busy = thread.create(function()
+			  local x = 0
+			  for i = 1, 200000 do x = x + 1 end -- (only the timer stops it)
+			  local f = io.open("/busy", "w") f:write("done") f:close()
+			end)
+			local watcher = thread.create(function()
+			  local f = io.open("/status", "w") f:write(busy:status(), "\\n") f:close()
+			end)
+			io.read("l") -- (the main thread waits: for a line that comes once the busy thread's done)
+			local f = io.open("/after", "w") f:write(tostring(busy:status()), " ", tostring(watcher:status()), "\\n") f:close()
+			""");
+		boot();
+		type("lua /t.lua 2> /err\r");
+		untilFile(root().resolve("busy"), "done");
+		assertThat(read(root().resolve("status"))).as("running, not waiting: it was never in a call").isEqualTo("running\n");
+		untilIdle();
+		type("go\r");
+		untilFile(root().resolve("after"), "dead dead\n");
+		assertThat(read(root().resolve("err"))).isEmpty();
+	}
+
 	@Test
 	void aThreadBlockedReadingLeavesTheOthersRunning() {
 		file("t.lua", """
@@ -92,12 +123,15 @@ class ThreadTest extends McosHarness {
 			add(strs(forever:join()))
 			add(strs(forever:status()))
 			add(strs(sys.join(thread.current())))
+			local quick = thread.create(function() end)
+			sys.sleep(0.05)
+			add(quick:status()) -- (ended, not yet joined)
 			local f = io.open("/out", "w") f:write(table.concat(results, "\\n"), "\\n") f:close()
 			""");
 		assertThat(status).as(() -> "its errors: " + read(root().resolve("err"))).isEqualTo("0\n");
 		assertThat(read(root().resolve("out"))).isEqualTo(String.join("\n",
-			"true,5,sum", "false,boom", "nil,Connection timed out,ETIMEDOUT", "sleeping", "true", "false,killed", "nil",
-			"nil,Resource deadlock avoided,EDEADLK") + "\n");
+			"true,5,sum", "false,boom", "nil,Connection timed out,ETIMEDOUT", "suspended", "true", "false,killed", "nil",
+			"nil,Resource deadlock avoided,EDEADLK", "dead") + "\n");
 		assertThat(read(root().resolve("err"))).as("a thread's error, said on stderr").contains("thread", "boom");
 	}
 

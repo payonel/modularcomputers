@@ -46,7 +46,7 @@ function Thread:kill()
   return sys.cancel(self.tid)
 end
 
--- t:status(): "running", "sleeping" (blocked in a call), "ended" (not yet joined), or nil, gone.
+-- t:status(): "running", "suspended" (waiting in a call), "dead" (ended, not yet joined), or nil, gone.
 function Thread:status()
   for _, each in ipairs(sys.threads()) do
     if each.tid == self.tid then
