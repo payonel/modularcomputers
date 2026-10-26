@@ -183,7 +183,7 @@ when there were none it could take. It fails with `no container there` or `no sl
 ### fly(forward[, right[, up]]) → true, or nil and why
 
 A tier 2 golem's: its thrusters' calls (`fly`, `flyTo`, `hover`, `land`) fail on a tier 1 with `no
-thrusters: a tier 2 golem's` (it walks; its own [energy field](/devices/energy-field-card/) can
+thrusters` (it walks; its own [energy field](/devices/energy-field-card/) can
 still carry it).
 
 Flies on its thrusters to the point that many blocks from it, in its own frame, straight there and

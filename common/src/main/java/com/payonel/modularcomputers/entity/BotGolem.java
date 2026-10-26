@@ -109,7 +109,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	/** Its leg sockets, each this far to its side of its middle, in blocks: where its legs' tops are (BotGolemModel's, 2 pixels), and its beams come from. */
 	public static final float SOCKET_SIDE = 2 / 16f;
 	/** What a tier 1 golem says to a flight on thrusters: it has none (it walks; a field can still carry it). */
-	public static final String NO_THRUSTERS = "no thrusters: a tier 2 golem's";
+	public static final String NO_THRUSTERS = "no thrusters";
 	/** Its beams: red, as its sockets' redstone (scripts/art/bot_golem_textures.py's clamps), and how many motes a socket a tick. */
 	private static final int BEAM_COLOR = 0xE8281E;
 	private static final float BEAM_SIZE = 0.9f;

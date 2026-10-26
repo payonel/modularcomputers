@@ -68,7 +68,7 @@ its hands.
 A golem flies two ways, each with its price:
 
 - **Its thrusters, legs off.** A tier 2 golem has them (a tier 1's thruster calls answer `no
-  thrusters: a tier 2 golem's`): its nozzles are the collars round its legs' sockets. `fly` leaves its legs standing where it was and
+  thrusters`): its nozzles are the collars round its legs' sockets. `fly` leaves its legs standing where it was and
   fires red beams from their empty sockets: it flies at 25 blocks a second, much faster than it
   walks or its field flies it, needs no card, and costs five running CPUs' power a tick. On its
   thrusters it has no footing: it uses no tools (buttons, doors and levers yes: a tool in its hand
