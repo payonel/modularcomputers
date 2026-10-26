@@ -5,8 +5,10 @@ order: 150
 ---
 
 The Bot Golem is a robot a block high, built like an iron golem: a computer you can walk anywhere.
-It holds a computer's parts, its face is a tier 1 screen, and a robotics device soldered onto its
-board is the only way it moves. It never acts on its own: a program drives it.
+It holds a computer's parts (a CPU, RAM, an EEPROM, a battery, a disk and two cards: what you put
+in), and a robotics device soldered onto its board is the only way it moves. Its face is a screen
+if you put a tier 1 screen in its gold slot; without one it has an empty bezel and runs all the
+same. It never acts on its own: a program drives it.
 
 <div class="infobox" markdown="1">
 
@@ -17,7 +19,7 @@ board is the only way it moves. It never acts on its own: a program drives it.
 | Stack | 1 (it keeps its parts) |
 | Size | A block high, through a one-block gap |
 | Speed | A player's walking pace |
-| Slots | CPU, EEPROM, a battery, 2 RAM, 1 disk, a tier 1 screen (its face), 2 cards, its hands |
+| Slots | CPU, EEPROM, a battery, 2 RAM, 1 disk, a tier 1 screen (its face, optional), 2 cards, its hands |
 | Soldered | Its robotics device, on its last expansion lane |
 | Getting one | Creative only, for now |
 
@@ -95,24 +97,31 @@ It runs on its battery, as a case does: swap the battery, or walk it onto a
 program tells its robotics device to act. See [Robotics device](/devices/robotics/) for
 what a program can do with it, and its examples.
 
-## A whole job: a tree on a ledge
+## A whole job: fell a tree
 
-This program uses all of it: the robotics device, a [crafting card](/devices/crafting-card/) for
-storage, and an [energy field card](/devices/energy-field-card/) to fly with its legs on, so it can
-cut. Set it up:
+An advanced example, using all of it: the robotics device, a [crafting card](/devices/crafting-card/)
+for storage, and an [energy field card](/devices/energy-field-card/) to fly. In its own field the
+golem keeps its legs and its tools; in the air it works its axe at a fifth of its speed, as a player
+in the air does. Set it up:
 
 1. A golem with a CPU, RAM, an EEPROM, a battery, a disk with mcos, a crafting card and an energy
-   field card (a screen in its gold slot to watch it).
-2. A chest right in front of it, with an axe in it.
-3. A tree on a ledge: its trunk 5 blocks ahead of the golem, its lowest log 10 blocks up (the
-   ledge under it, and under the spot beside it), the way up and over clear.
+   field card (a screen in its gold slot, to watch it).
+2. A chest right behind it, with an axe in it (any slot).
+3. A tree ahead of it, within 8 blocks: on flat ground, or up on a cliff or a ledge (it climbs up to
+   12 blocks).
 
 Save the program as `/home/golem-tree.lua` and run `lua /home/golem-tree.lua` (or `lua
-/home/golem-tree.lua 6 3` for a tree 6 up and 3 ahead). The golem takes the axe, holds itself in
-its field, legs and all, flies up beside the trunk, cuts the logs from the air (at a fifth of its
-speed, off the ground; its field lifting it to reach the ones above), flies home, lets its field
-go to land on its legs at the chest, and puts the wood and the axe away. It says each step as it goes, and why it stopped
-if something's in its way.
+/home/golem-tree.lua 5 4` to look 5 blocks ahead and climb at most 4). The golem empties its hands
+into the chest, takes the axe, holds itself in its field, and flies forward a block at a time until a
+log is in front of it, climbing whatever's in its way. It cuts the trunk from the air, clearing the
+leaves over its head as its field lifts it, then comes home exactly the way it went and lands on its
+legs.
+
+Home, it leaves everything ready to run again: the axe back in the chest's first slot, the wood and
+whatever else it carries (saplings, sticks) in the chest, its hands and storage empty. If anything
+goes wrong, it comes home just the same and says what happened: `there's no axe in the chest behind
+me, so I came home`, or `while looking for a tree, I found a cliff (minecraft:stone) higher than 12
+blocks, so I came home`.
 
 ```lua
 {% include golem-tree.lua %}

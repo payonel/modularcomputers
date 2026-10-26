@@ -131,6 +131,12 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 
 ## The Lua CPU and the server
 
+- **A save test failed once under testAll's load** (2026-10-25, LuaRunnerTest.aSaveCarriesOutNoCalls...,
+  "the save made no call": the counter was 1): it passes alone and with its class, every time. The
+  test waits for queuedCalls() > 0, then persists; nothing in it serves the server queue, so no call
+  should be made. Find what made it (a call answered off the server thread? queuedCalls counting a
+  call other than the hit?), make that state on purpose in a test, and fix it: a save that moves data
+  between a program and its devices would be a real bug.
 - **A wait on every source reports the console and its terminal raised with nothing to read**
   (seen 2026-10-24, writing the own-OS shell: `board.waitForInterrupt(0.1)` with no sources, right
   after `board.invoke("console", "read")` took a line, answers `{"console", "id:screen"}`, and a read
