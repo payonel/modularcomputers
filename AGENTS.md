@@ -578,6 +578,15 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   alone (said on stderr, its join's). `sys.thread`, `join`, `cancel`, `gettid`, `threads`, `mutex`,
   `lock`, `unlock`; `lib/thread.lua` over them. A syscall's task is the one it's given, never "the
   one resumed last" (a blocked one is served without being resumed).
+- **openos runs OpenComputers programs** (user design, 2026-10-25: wine's way, as a command): a
+  machine of its own in the program's process (`usr/lib/openos/machine.lua`), its native part over
+  mcos's calls (component, by an adapter a device type, `openos/device/<type>.lua`; computer, its
+  signals a queue that one `sys.poll` fills from the terminal, devices and ports; unicode;
+  filesystem; shell), and OpenOS's own libraries ported onto it (`openos/lib`: event, term, tty,
+  keyboard...; MIT, `/usr/share/openos/LICENSE`), so programs see OpenOS's behavior. The gpu is
+  escape sequences on the process's terminal (kitty's every-key mode with associated text gives
+  key_down and key_up; DECCRA and DECFRA its copy and fill). Fidelity: what openos can't do is an
+  error saying so, never something else (the user's).
 - **`sys.poll(fds, seconds)`** is poll(2) (`IN`, `PRI`, `OUT`; `HUP`, `ERR` unasked), in `sys` (mcos's
   POSIX layer), since Lua's `io` is C's stdio; `sys.fileno` gives an io file's descriptor. A
   redstone file is always readable and reports a change as `PRI` (a sysfs GPIO's way).
@@ -721,6 +730,10 @@ Lessons from mistakes, each with its test:
   task fields, unset, read its process's (`__index = p`), so a thread started while its main thread
   waited took that wait as its own and never ran (and could have taken its pending syscall). Own
   fields answer nil when unset. (`aThreadStartedWhileItsMainThreadWaitsRunsAndFinishes`)
+- **The clock is the firmware's, not a board call:** `board.uptime` was a call to the server thread
+  (a tick each), so a loop reading the time (OpenOS's event loop) ran a tick a read and its timers
+  came late; it's the firmware's `clock` now, answered at once. A read of something the firmware
+  has never goes to the server. (`OpenOsTest.sleepsAndTimersAreTheEventLibrarys`)
 - **A trend needs readings apart:** one look at a file reads it several times (a stat, an open), so a
   store's last reading was always a moment ago and never showed it charging. Compare against one at
   least a second old. (`sysShowsThePowerSupplies`)

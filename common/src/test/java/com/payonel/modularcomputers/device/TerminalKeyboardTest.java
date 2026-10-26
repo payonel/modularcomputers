@@ -63,6 +63,26 @@ class TerminalKeyboardTest {
 	}
 
 	@Test
+	void withAssociatedTextAPressCarriesWhatItTyped() {
+		terminal.write("\u001B[>27u"); // disambiguate, event types, every key, associated text
+		terminal.key('a', SHIFT, PRESS, "A");
+		terminal.key('a', SHIFT, RELEASE, "A"); // (a release types nothing)
+		terminal.key('e', 0, PRESS, "é");
+		terminal.key('c', CONTROL, PRESS, "");
+		terminal.key('x', 0, PRESS, "\u0003"); // (a control character isn't text)
+		terminal.key(UP, 0, PRESS, "");
+		assertThat(sent()).isEqualTo("\u001B[97;2;65u\u001B[97;2:3u\u001B[101;1;233u\u001B[99;5u\u001B[120u\u001B[A");
+	}
+
+	@Test
+	void associatedTextNeedsEveryKeyReported() {
+		terminal.write("\u001B[>17u"); // disambiguate and associated text: text keys still send their text, typed
+		terminal.key('a', 0, PRESS, "a");
+		terminal.type("a");
+		assertThat(sent()).isEqualTo("a");
+	}
+
+	@Test
 	void disambiguatingAloneLeavesTextAndSendsCtrlAsEscapeCodes() {
 		terminal.write("\u001B[>1u");
 		terminal.key('c', CONTROL, PRESS);

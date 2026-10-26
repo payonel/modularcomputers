@@ -1,0 +1,50 @@
+.TH OPENOS 1 "" "" "mcos Manual"
+.SH NAME
+openos \- run an OpenComputers program
+.SH SYNOPSIS
+.B openos
+.I program
+.RI [ args ]
+.SH DESCRIPTION
+.B openos
+runs a program written for OpenComputers' OpenOS on mcos, as wine runs a
+Windows program on Linux: in a machine of its own, with OpenComputers'
+.BR component ,
+.B computer
+and
+.B unicode
+libraries, and OpenOS's own libraries (event, term, keyboard, shell,
+filesystem, serialization, text, sides, colors, uuid, robot), ported.
+.I program
+is a path, with or without its
+.BR .lua .
+.PP
+The gpu draws on the program's terminal (its screen, a tier's colors and
+size), and the keyboard and mouse are the terminal's (key_down, key_up,
+touch, drag, drop, scroll, clipboard). Devices are components by an adapter:
+the EEPROM (eeprom), a redstone card (redstone), a network card (modem, over
+UDP), a golem's robotics (robot). Other devices aren't components. Ctrl+C is
+OpenOS's: an interrupted signal; Ctrl+Alt+C ends the program.
+.PP
+Whatever OpenOS had that
+.B openos
+doesn't is an error saying so, never something else done instead: a
+library (process, thread, internet...), a method (a gpu's video memory, a
+robot's tanks).
+.SH EXIT STATUS
+What the program's
+.B os.exit
+gave, or the integer it returned; 0 when it ends; 1 when it fails, its error
+on standard error; 127 when the program isn't there.
+.SH NOTES
+mcos's commands run where OpenOS's would:
+.B os.execute
+and
+.B shell.execute
+run mcos's
+.BR sh .
+A modem message of one string is that string, so mcos programs (nc -u) talk
+with it. A golem's inventory is its hand, one slot. A redstone face's input
+is its level, the card's own output included.
+.SH SEE ALSO
+.BR lua (1)

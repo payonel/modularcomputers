@@ -40,6 +40,7 @@ The programs in mcos's `/bin`. Each page is the program's man page: the same tex
 | [mount](/programs/mount/) | list or mount filesystems |
 | [mv](/programs/mv/) | move or rename files |
 | [nc](/programs/nc/) | send and receive over TCP or UDP |
+| [openos](/programs/openos/) | run an OpenComputers program |
 | [poweroff](/programs/poweroff/) | turn the computer off |
 | [ps](/programs/ps/) | list the processes |
 | [rc](/programs/rc/) | start, stop and enable services |

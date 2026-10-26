@@ -1,0 +1,33 @@
+-- openos program [args]: runs an OpenComputers program (written for OpenOS) on mcos, as wine runs
+-- a Windows program on Linux: in a machine of its own (/usr/lib/openos/machine.lua), with
+-- OpenComputers' component, computer and unicode, and OpenOS's libraries (event, term, keyboard,
+-- shell, filesystem, serialization...: OpenOS's own, ported), over mcos's devices and terminal. The
+-- program's path is as given, or with .lua added. What it uses that openos doesn't have is an
+-- error that says so. The exit status is the program's: what os.exit gave, 0 when it ends, 1 when
+-- it fails (its error on stderr).
+local sys = require("sys")
+
+local USAGE = "usage: openos program [args]\n"
+
+local argv = table.pack(...)
+if argv.n == 0 or argv[1] == "-h" or argv[1] == "--help" then
+  io.stderr:write(USAGE)
+  return argv.n == 0 and 2 or 0
+end
+local path = argv[1]
+local st = sys.stat(path)
+if (not st or st.type == "directory") and not path:match("%.lua$") then
+  local lua = sys.stat(path .. ".lua")
+  if lua and lua.type ~= "directory" then
+    path, st = path .. ".lua", lua
+  end
+end
+if not st then
+  io.stderr:write("openos: ", path, ": No such file or directory\n")
+  return 127
+elseif st.type == "directory" then
+  io.stderr:write("openos: ", path, ": Is a directory\n")
+  return 126
+end
+io.stdout:flush()
+return require("openos.machine").run(path, table.pack(table.unpack(argv, 2, argv.n)))

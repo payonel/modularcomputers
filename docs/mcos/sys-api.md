@@ -263,6 +263,9 @@ See [Networking](/mcos/networking/) for how they behave.
 ### sys.bind(fd, port) → port
 ### sys.sendto(fd, data, address, port) → count
 ### sys.recvfrom(fd) → data, address, port
+### sys.recvmsg(fd) → data, address, port, info
+As `recvfrom`, and where the datagram came in: `{interface, to, distance}` (the card's interface name,
+its address, and how far the datagram came, in blocks), as `recvmsg`'s `IP_PKTINFO` says.
 ### sys.listen(fd[, backlog]) → true
 ### sys.accept(fd) → fd, address, port
 ### sys.connect(fd, address, port) → true

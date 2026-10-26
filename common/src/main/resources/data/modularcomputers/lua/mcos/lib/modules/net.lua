@@ -8,8 +8,9 @@
 -- "broadcast" is every card's address (255.255.255.255's role). A frame to one of this computer's
 -- own cards, or a broadcast, reaches its own sockets too, as Linux loops them back.
 --
--- UDP ("dgram"): bind(port), sendto(data, address, port), recvfrom() (data, address, port), a read
--- takes one datagram's data. Its header: source and destination port (length and checksum are
+-- UDP ("dgram"): bind(port), sendto(data, address, port), recvfrom() (data, address, port), recvmsg()
+-- (data, address, port, and where it came in: {interface, to (that card's address), distance}, as
+-- recvmsg's IP_PKTINFO says the interface, and a radio's signal), a read takes one datagram's data. Its header: source and destination port (length and checksum are
 -- skipped: a frame knows its length, and nothing corrupts one). sendto says when the other card
 -- didn't take it (ENOBUFS: it's busy; EHOSTUNREACH); a datagram it took with no socket for it, or
 -- no room in the socket's queue, is dropped there, as UDP's are: "taken" is the card's, not the
@@ -354,22 +355,23 @@ end
 
 -- ---- receiving ----------------------------------------------------------------------------------
 
--- A UDP datagram: to the socket bound to its port (dropped when there's none, or its queue is full).
-local function udp(data, from)
+-- A UDP datagram: to the socket bound to its port (dropped when there's none, or its queue is full),
+-- with the card it came in on ('to', its address) and how far it came.
+local function udp(data, from, to, distance)
   if #data < UDP_SIZE then
     return
   end
   local _, source, port = string.unpack(UDP_HEADER, data)
   local socket = ports[UDP][port]
   if socket and #socket.queue < QUEUE then
-    socket.queue[#socket.queue + 1] = {data:sub(UDP_SIZE + 1), from, source}
+    socket.queue[#socket.queue + 1] = {data:sub(UDP_SIZE + 1), from, source, to, distance}
   end
 end
 
-local function receive(data, from)
+local function receive(data, from, to, distance)
   local protocol = data:byte(1)
   if protocol == UDP then
-    udp(data, from)
+    udp(data, from, to, distance)
   elseif protocol == TCP then
     tcp(data, from)
   end
@@ -380,7 +382,7 @@ end
 local function pump()
   while loop[1] do
     local frame = table.remove(loop, 1)
-    receive(frame[1], frame[2])
+    receive(frame[1], frame[2], frame[2], 0) -- (its own card: it came no distance)
   end
   for _, nic in ipairs(interfaces()) do
     nics[nic.id] = true
@@ -389,12 +391,12 @@ local function pump()
       if not (ok and frame) then
         break -- (k.take listens for the next)
       end
-      receive(frame.data, frame.from)
+      receive(frame.data, frame.from, nic.address, frame.distance)
     end
   end
   while loop[1] do
     local frame = table.remove(loop, 1)
-    receive(frame[1], frame[2])
+    receive(frame[1], frame[2], frame[2], 0)
   end
 end
 
@@ -584,7 +586,25 @@ function net.recvfrom(socket)
   if not datagram then
     return k.BLOCK
   end
+  socket.last = datagram -- (recvmsg's: where it came in)
   return datagram[1], datagram[2], datagram[3]
+end
+
+-- recvmsg(): as recvfrom, and where the datagram came in: {interface (eth0...), to (the card's
+-- address), distance (how far it came, in blocks)}.
+function net.recvmsg(socket)
+  local data, from, port = net.recvfrom(socket)
+  if data == k.BLOCK or not data then
+    return data, from, port
+  end
+  local datagram = socket.last
+  local name
+  for _, nic in ipairs(interfaces()) do
+    if nic.address == datagram[4] then
+      name = nic.name
+    end
+  end
+  return data, from, port, {interface = name, to = datagram[4], distance = datagram[5]}
 end
 
 -- listen([backlog]): it takes connections on its port (one is given, if it has none).

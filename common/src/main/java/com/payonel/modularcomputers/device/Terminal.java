@@ -328,7 +328,12 @@ public final class Terminal implements Device {
 	 * flags), if anything.
 	 */
 	public void key(int key, int modifiers, int event) {
-		String sent = TerminalKeyboard.encode(key, modifiers, event, decoder.keyboardFlags(), decoder.cursorKeysApplication());
+		key(key, modifiers, event, "");
+	}
+
+	/** A key event and the text it typed (kitty's associated text, sent when a program asks for it). */
+	public void key(int key, int modifiers, int event, String text) {
+		String sent = TerminalKeyboard.encode(key, modifiers, event, decoder.keyboardFlags(), decoder.cursorKeysApplication(), text);
 		if (sent != null) {
 			press(sent);
 		}

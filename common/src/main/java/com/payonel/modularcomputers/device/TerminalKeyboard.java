@@ -17,8 +17,10 @@ package com.payonel.modularcomputers.device;
  * {@link com.payonel.modularcomputers.display.VtDecoder#keyboardFlags}): 1 disambiguates (Escape,
  * and Ctrl or Alt with a text key, as {@code CSI code;mods u}), 2 reports repeats and releases
  * ({@code :2}, {@code :3}), 8 reports every key as an escape code (text keys, modifiers and locks
- * too; typed text is then not sent). Flags 4 (alternate keys) and 16 (associated text) are taken
- * and not reported.
+ * too; typed text is then not sent), 16 (with 8) adds the text a press typed to its code, as
+ * {@code CSI code;mods;text u}, text a code point each, colon-separated (the screen sends a key with
+ * the text it typed: {@link #encode}'s {@code text}). Flag 4 (alternate keys) is taken and not
+ * reported.
  */
 public final class TerminalKeyboard {
 	public static final int PRESS = 1;
@@ -77,6 +79,9 @@ public final class TerminalKeyboard {
 	private static final int DISAMBIGUATE = 1;
 	private static final int EVENT_TYPES = 2;
 	private static final int ALL_KEYS = 8;
+	private static final int ASSOCIATED_TEXT = 16;
+	/** The most code points a key's text may carry (a key types one; a dead key's composition, two). */
+	public static final int MAX_TEXT = 4;
 	private static final String ESC = "\u001B";
 	private static final String CSI = ESC + "[";
 	private static final String SS3 = ESC + "O";
@@ -89,11 +94,28 @@ public final class TerminalKeyboard {
 		return (flags & ALL_KEYS) == 0;
 	}
 
-	/**
-	 * What a key event sends, by the keyboard flags ({@code flags}) and cursor-keys mode in effect;
-	 * null when it sends nothing (a release in legacy mode, a text key whose text comes typed).
-	 */
+	/** As {@link #encode(int, int, int, int, boolean, String)}, for a key that typed no text. */
 	public static String encode(int key, int modifiers, int event, int flags, boolean cursorKeysApplication) {
+		return encode(key, modifiers, event, flags, cursorKeysApplication, "");
+	}
+
+	/**
+	 * Whether a key's text is fit to send: at most {@link #MAX_TEXT} code points, none a control
+	 * character (C0, DEL, C1), as typed text is.
+	 */
+	public static boolean printable(String text) {
+		if (text.codePointCount(0, text.length()) > MAX_TEXT) {
+			return false;
+		}
+		return text.codePoints().noneMatch(c -> c < ' ' || c == 0x7F || c >= 0x80 && c < 0xA0);
+	}
+
+	/**
+	 * What a key event sends, by the keyboard flags ({@code flags}) and cursor-keys mode in effect,
+	 * and {@code text}, what the key typed ("" none: only a press or repeat types); null when it sends
+	 * nothing (a release in legacy mode, a text key whose text comes typed).
+	 */
+	public static String encode(int key, int modifiers, int event, int flags, boolean cursorKeysApplication, String text) {
 		boolean all = (flags & ALL_KEYS) != 0;
 		boolean events = (flags & EVENT_TYPES) != 0;
 		boolean disambiguate = (flags & DISAMBIGUATE) != 0 || all;
@@ -150,6 +172,11 @@ public final class TerminalKeyboard {
 			return CSI + tilde + suffix + "~";
 		}
 		String csiU = CSI + key + suffix + "u";
+		if (all && (flags & ASSOCIATED_TEXT) != 0 && event != RELEASE && !text.isEmpty() && printable(text)) {
+			StringBuilder codes = new StringBuilder();
+			text.codePoints().forEach(c -> codes.append(codes.isEmpty() ? "" : ":").append(c));
+			csiU = CSI + key + (suffix.isEmpty() ? ";1" : suffix) + ";" + codes + "u"; // (the text's field: kitty's third)
+		}
 		if (key == ESCAPE) {
 			return disambiguate ? csiU : (mods & ALT) != 0 ? ESC + ESC : ESC;
 		}

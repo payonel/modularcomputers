@@ -110,8 +110,9 @@ All tiers use the same VT decoder, and differ in colors:
 
 It understands the common xterm subset: cursor movement, erasing and editing, scroll regions, SGR
 (bold, reverse, 16, 256 and 24-bit colors), the alternate screen, the cursor's shape, device status
-and cursor position reports, and the kitty keyboard protocol (flags 1, 2 and 8). Anything else is
-parsed and ignored. A BEL (`\a`) rings the terminal's bell at its block.
+and cursor position reports, the kitty keyboard protocol (flags 1, 2, 8 and 16: a key's
+press with the text it typed), and a VT420's rectangle copy and fill (DECCRA `ESC[t;l;b;r;1;t;l;1$v`,
+DECFRA `ESC[c;t;l;b;r$x`). Anything else is parsed and ignored. A BEL (`\a`) rings the terminal's bell at its block.
 
 Every tier reads text as UTF-8, as terminal emulators do today: a program writes UTF-8 bytes, and
 the terminal shows the characters (a byte that isn't UTF-8 shows as `�`). Each character takes the

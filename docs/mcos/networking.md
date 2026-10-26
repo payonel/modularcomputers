@@ -43,6 +43,8 @@ sys.sendto(s, data, from, port)           -- answer it
   frame holds 8192, and the header takes 5); more fails with `EMSGSIZE`.
 - `sys.recvfrom(fd)`: the oldest datagram's data, the sender's address and port; it waits for one. A
   plain `sys.read` takes one datagram's data.
+- `sys.recvmsg(fd)`: as `recvfrom`, and a table saying where it came in: `interface` (`eth0`), `to`
+  (that card's address) and `distance` (how far it came, in blocks; 0 from this computer).
 
 **UDP has no remote dependency.** A datagram's answer is the card's alone. The other computer's
 kernel never answers (there is no ICMP), and it drops what has no socket or no room, as UDP does. A

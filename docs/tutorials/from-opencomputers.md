@@ -8,6 +8,9 @@ Modular Computers is OpenComputers' idea built again, but its computers run mcos
 so the way you do things is Linux's. This page maps what you knew in OpenComputers to how it's done
 here. Where something has no equivalent, it says so.
 
+To run an OpenComputers program as it is, use [`openos`](/mcos/openos/): it gives the program
+OpenComputers' libraries and OpenOS's, over mcos.
+
 ## The bus, not components
 
 OpenComputers called a computer's parts and attached blocks *components*. Here they're *devices*, on

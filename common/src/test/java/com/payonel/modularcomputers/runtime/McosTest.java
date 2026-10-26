@@ -2153,7 +2153,7 @@ class McosTest extends McosHarness {
 		devices.put(Motherboard.exp(0), card); // (a card in a slot, as in a case)
 		file("big.lua", """
 			local out = io.open("/big", "w")
-			for i = 1, 3000 do
+			for i = 1, 2000 do -- (written twice on a tier 1 disk, with mcos: it fits)
 			  out:write(string.format("line %05d of the file that goes there and back\\n", i))
 			end
 			out:close()
@@ -2173,7 +2173,7 @@ class McosTest extends McosHarness {
 		type("lua /big.lua; rcp /big " + theirs + ":/big; rsh " + theirs + " cat /big > /back; echo $? > /st\r");
 		untilFile(root().resolve("st"), "0\n");
 		String sent = read(root().resolve("big"));
-		assertThat(sent).hasSize(3000 * 48);
+		assertThat(sent).hasSize(2000 * 48);
 		assertThat(read(other.root.resolve("big"))).as("there, whole").isEqualTo(sent);
 		assertThat(read(root().resolve("back"))).as("and back, whole").isEqualTo(sent);
 	}
