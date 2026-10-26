@@ -1,5 +1,6 @@
 package com.payonel.modularcomputers.entity;
 
+import com.payonel.modularcomputers.machine.GolemLayout;
 import static com.payonel.modularcomputers.ModularComputers.id;
 
 import com.payonel.modularcomputers.platform.Platform;
@@ -18,8 +19,18 @@ public final class ModEntities {
 	/** How far away players see it move, in chunks (an iron golem's). */
 	private static final int GOLEM_TRACKING = 10;
 
-	public static final EntityType<BotGolem> BOT_GOLEM = register("bot_golem",
-		EntityType.Builder.<BotGolem>of(BotGolem::new, MobCategory.MISC).sized(GOLEM_WIDTH, GOLEM_HEIGHT).clientTrackingRange(GOLEM_TRACKING));
+	/** A tier 1 golem walks; a tier 2 flies too (GolemLayout's tiers). */
+	public static final EntityType<BotGolem> TIER1_BOT_GOLEM = register("tier1_bot_golem",
+		EntityType.Builder.<BotGolem>of((type, level) -> new BotGolem(type, level, GolemLayout.TIER_1), MobCategory.MISC).sized(GOLEM_WIDTH, GOLEM_HEIGHT)
+			.clientTrackingRange(GOLEM_TRACKING));
+	public static final EntityType<BotGolem> TIER2_BOT_GOLEM = register("tier2_bot_golem",
+		EntityType.Builder.<BotGolem>of((type, level) -> new BotGolem(type, level, GolemLayout.TIER_2), MobCategory.MISC).sized(GOLEM_WIDTH, GOLEM_HEIGHT)
+			.clientTrackingRange(GOLEM_TRACKING));
+
+	/** A golem of a tier's type. */
+	public static EntityType<BotGolem> botGolem(GolemLayout tier) {
+		return tier == GolemLayout.TIER_1 ? TIER1_BOT_GOLEM : TIER2_BOT_GOLEM;
+	}
 
 	/** A field's own box: small (it's drawn round what it holds, whatever its size), never in the way. */
 	private static final float FIELD_SIZE = 0.25f;
@@ -42,7 +53,8 @@ public final class ModEntities {
 
 	/** Forces the static registration above, and gives the living ones their attributes. */
 	public static void init() {
-		Platform.INSTANCE.entityAttributes(BOT_GOLEM, BotGolem::attributes);
+		Platform.INSTANCE.entityAttributes(TIER1_BOT_GOLEM, BotGolem::attributes);
+		Platform.INSTANCE.entityAttributes(TIER2_BOT_GOLEM, BotGolem::attributes);
 	}
 
 	private static <T extends net.minecraft.world.entity.Entity> EntityType<T> register(String name, EntityType.Builder<T> builder) {

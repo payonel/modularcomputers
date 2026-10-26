@@ -24,22 +24,26 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * A bot golem, picked up: used on a block, it stands there, facing the player, with the parts and
- * board id it kept. Its torso alone (its legs detached) is one too, and is placed without legs.
+ * board id it kept, of its tier. A tier 2's torso alone (its legs left where it flew from) is one
+ * too, and is placed without legs.
  * Used sneaking (in the air or on a block), it opens its parts view where it is, in the hand (the
  * user's): its parts and its hands read and written on the item, their one home, its board off
  * (an item runs nothing).
  */
 public final class BotGolemItem extends HintedItem {
-	/** Whether it's a whole golem (or its torso alone). */
+	/** Its tier, and whether it's a whole golem (or its torso alone: a tier 2's). */
+	private final GolemLayout tier;
 	private final boolean legs;
 
-	public BotGolemItem(Properties properties) {
-		this(properties, true);
+	public BotGolemItem(Properties properties, GolemLayout tier, boolean legs) {
+		super(properties);
+		this.tier = tier;
+		this.legs = legs;
 	}
 
-	public BotGolemItem(Properties properties, boolean legs) {
-		super(properties);
-		this.legs = legs;
+	/** Its tier. */
+	public GolemLayout tier() {
+		return tier;
 	}
 
 	@Override
@@ -71,7 +75,7 @@ public final class BotGolemItem extends HintedItem {
 			}
 			return InteractionResult.FAIL;
 		}
-		BotGolem golem = ModEntities.BOT_GOLEM.create(level, EntitySpawnReason.SPAWN_ITEM_USE);
+		BotGolem golem = ModEntities.botGolem(tier).create(level, EntitySpawnReason.SPAWN_ITEM_USE);
 		if (golem == null) {
 			return InteractionResult.FAIL;
 		}
@@ -98,10 +102,11 @@ public final class BotGolemItem extends HintedItem {
 	/** Its parts view, for the golem in the player's {@code hand}, open while it's still that stack there. */
 	public static void openParts(ServerPlayer player, InteractionHand hand) {
 		ItemStack golem = player.getItemInHand(hand);
+		GolemLayout tier = golem.getItem() instanceof BotGolemItem item ? item.tier() : GolemLayout.TIER_1;
 		Supplier<ItemStack> held = () -> player.getItemInHand(hand) == golem ? golem : ItemStack.EMPTY;
-		Platform.INSTANCE.openMenu(player, new SimpleMenuProvider((id, inventory, who) -> new CaseMenu(ModMenus.GOLEM, id, inventory,
+		Platform.INSTANCE.openMenu(player, new SimpleMenuProvider((id, inventory, who) -> new CaseMenu(ModMenus.golem(tier), id, inventory,
 			new Parts(held), new SimpleContainerData(CaseMenu.POWER_DATA), who.blockPosition(), HostRef.of(who),
-			opener -> opener.getItemInHand(hand) == golem, GolemLayout.BOT_GOLEM, new ItemContents(held, ModComponents.HAND_SLOTS, ItemContents.in(ModComponents.HANDS), () -> {
+			opener -> opener.getItemInHand(hand) == golem, tier, new ItemContents(held, ModComponents.HAND_SLOTS, ItemContents.in(ModComponents.HANDS), () -> {
 			})), golem.getHoverName()), HostRef.of(player));
 	}
 

@@ -62,13 +62,17 @@ public final class ModItems {
 	public static final Item INTERNET_CARD = register("internet_card");
 	/** Runs server commands: creative only (OpenComputers' debug card). */
 	public static final Item OPERATOR_CARD = register("operator_card");
-	/** A bot golem, picked up (its parts in it): creative only until the Advanced Robotics Assembly makes them. */
-	public static final Item BOT_GOLEM = register("bot_golem", BotGolemItem::new, ModItems::holdsData);
-	/** A bot golem's torso, its legs detached (its parts in it), and its legs: crafted together, one over the other, they're a golem again. */
-	public static final Item BOT_GOLEM_TORSO = register("bot_golem_torso", properties -> new BotGolemItem(properties, false), ModItems::holdsData);
-	public static final Item BOT_GOLEM_LEGS = register("bot_golem_legs", GolemLegsItem::new, UnaryOperator.identity());
+	/** Bot golems, picked up (their parts in them): creative only until the Advanced Robotics Assembly makes them. A tier 1 walks; a tier 2 flies too. */
+	public static final Item TIER1_BOT_GOLEM = register("tier1_bot_golem",
+		properties -> new BotGolemItem(properties, com.payonel.modularcomputers.machine.GolemLayout.TIER_1, true), ModItems::holdsData);
+	public static final Item TIER2_BOT_GOLEM = register("tier2_bot_golem",
+		properties -> new BotGolemItem(properties, com.payonel.modularcomputers.machine.GolemLayout.TIER_2, true), ModItems::holdsData);
+	/** A tier 2 golem's torso, its legs left behind as it flew (its parts in it), and its legs: crafted together, one over the other, they're a golem again. */
+	public static final Item TIER2_BOT_GOLEM_TORSO = register("tier2_bot_golem_torso",
+		properties -> new BotGolemItem(properties, com.payonel.modularcomputers.machine.GolemLayout.TIER_2, false), ModItems::holdsData);
+	public static final Item TIER2_BOT_GOLEM_LEGS = register("tier2_bot_golem_legs", GolemLegsItem::new, UnaryOperator.identity());
 	/** Items with no recipe on purpose: the creative tab's (and giveall's). */
-	public static final List<Item> CREATIVE_ONLY = List.of(OPERATOR_CARD, BOT_GOLEM, BOT_GOLEM_TORSO, BOT_GOLEM_LEGS);
+	public static final List<Item> CREATIVE_ONLY = List.of(OPERATOR_CARD, TIER1_BOT_GOLEM, TIER2_BOT_GOLEM, TIER2_BOT_GOLEM_TORSO, TIER2_BOT_GOLEM_LEGS);
 	public static final Item MOTION_SENSOR_CARD = register("motion_sensor_card");
 	public static final Item AUDIO_SENSOR_CARD = register("audio_sensor_card");
 	public static final Item WEATHER_SENSOR_CARD = register("weather_sensor_card");

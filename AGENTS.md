@@ -296,8 +296,11 @@ files.
 
 ### The bot golem
 
-A robot a block high, an iron golem's look (user design, 2026-10-24): an entity holding a
-`BoardAssembly` (as a case does) in `GolemLayout`'s slots: a battery, 2 RAM, a disk, a gold slot
+A robot a block high, an iron golem's look (user design, 2026-10-24), in two tiers (the user's,
+2026-10-26: a tier 1 walks; a tier 2 flies too, has a second battery bay and 4 RAM, the same cards
+and storage, and looks more advanced: dark steel, its nozzles' collars round its leg sockets; an
+entity type a tier, so the board's layout is fixed as it's made): an entity holding a
+`BoardAssembly` (as a case does) in `GolemLayout`'s slots: its batteries, its RAM, a disk, a gold slot
 taking only a tier 1 screen (its face, drawn by `TerminalFace` as a case's front), 2 cards, and its
 robotics device soldered onto the last lane (`/dev/robotics0`), the only way it moves and acts: it
 never acts on its own (no goals). The device walks it to a point relative to itself, at a player's
@@ -324,7 +327,7 @@ moves them. What a broken block drops (or its hand is given) is caught: its stor
 off hand (a background catch, the user's: atypical, so storage is always preferred), else it stays
 in the world, and the `broke` event says whether it kept it all.
 - **It flies two ways, each with its price** (the user's design, 2026-10-25), never with its legs
-  on and its tools whole: on its **thrusters**, built into every golem, no card (`fly`, `hover`,
+  on and its tools whole: on its **thrusters**, built into a tier 2 (a tier 1's thruster calls fail: `no thrusters`), no card (`fly`, `hover`,
   `land`), its legs left standing where it took off (`GolemLegs`, a boat's kind of object), red
   beams from their sockets, 25 blocks a second, five CPUs' power a tick; legless it walks nowhere,
   swings no tool (one in hand works as an empty hand: buttons, doors, its legs popped up), ignores

@@ -108,6 +108,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private static final double DRIFT = 0.005;
 	/** Its leg sockets, each this far to its side of its middle, in blocks: where its legs' tops are (BotGolemModel's, 2 pixels), and its beams come from. */
 	public static final float SOCKET_SIDE = 2 / 16f;
+	/** What a tier 1 golem says to a flight on thrusters: it has none (it walks; a field can still carry it). */
+	public static final String NO_THRUSTERS = "no thrusters: a tier 2 golem's";
 	/** Its beams: red, as its sockets' redstone (scripts/art/bot_golem_textures.py's clamps), and how many motes a socket a tick. */
 	private static final int BEAM_COLOR = 0xE8281E;
 	private static final float BEAM_SIZE = 0.9f;
@@ -179,12 +181,26 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	public static java.util.function.Consumer<BotGolem> clientRoar = golem -> {
 	};
 
-	public BotGolem(EntityType<? extends PathfinderMob> type, Level level) {
+	/** Its tier: its board's slots, and whether it has thrusters. */
+	private final GolemLayout tier;
+
+	public BotGolem(EntityType<? extends PathfinderMob> type, Level level, GolemLayout tier) {
 		super(type, level);
-		board = new BoardAssembly(new GolemHost(), GolemLayout.BOT_GOLEM, TerminalTier.TIER_1);
+		this.tier = tier;
+		board = new BoardAssembly(new GolemHost(), tier, TerminalTier.TIER_1);
 		robotics.moveWith(new Legs());
 		board.solder(Motherboard.exp(GolemLayout.ROBOTICS_LANE), robotics);
 		setPersistenceRequired();
+	}
+
+	/** Its tier: its board's slots, and whether it flies on thrusters (tier 2). */
+	public GolemLayout tier() {
+		return tier;
+	}
+
+	/** Why it can't fly on thrusters (a tier 1 has none), or null. */
+	private String noThrusters() {
+		return tier.thrusters() ? null : NO_THRUSTERS;
 	}
 
 	/** Its attributes: a player's walking speed, a pathfinding range for its longest walk. */
@@ -379,6 +395,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 		@Override
 		public String fly(double forward, double right, double up) {
+			if (noThrusters() != null) {
+				return noThrusters();
+			}
 			if (EnergyField.held(BotGolem.this)) {
 				return "held in a field: its field moves it";
 			}
@@ -390,6 +409,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 		@Override
 		public String flyTo(double forward, double right, double up) {
+			if (noThrusters() != null) {
+				return noThrusters();
+			}
 			if (EnergyField.held(BotGolem.this)) {
 				return "held in a field: its field moves it";
 			}
@@ -424,6 +446,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 		@Override
 		public String hover() {
+			if (noThrusters() != null) {
+				return noThrusters();
+			}
 			if (EnergyField.held(BotGolem.this)) {
 				return "held in a field: its field moves it";
 			}
@@ -434,6 +459,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 		@Override
 		public String land() {
+			if (noThrusters() != null) {
+				return noThrusters();
+			}
 			if (legs()) {
 				return "already on its legs";
 			}
@@ -1169,8 +1197,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	@Override
 	public AbstractContainerMenu createMenu(int id, Inventory inventory, Player player) {
-		return new CaseMenu(ModMenus.GOLEM, id, inventory, board.parts(), board.powerData(), blockPosition(), HostRef.of(this),
-			board.parts()::stillValid, GolemLayout.BOT_GOLEM, new HandSlot());
+		return new CaseMenu(ModMenus.golem(tier), id, inventory, board.parts(), board.powerData(), blockPosition(), HostRef.of(this),
+			board.parts()::stillValid, tier, new HandSlot());
 	}
 
 	/** Its hands as a container of two slots, for its parts view: its main hand and its off hand, read and written there. */
@@ -1265,7 +1293,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	/** It as its item: its parts and its board's id with it, as a case keeps them when broken. */
 	public ItemStack asItem() {
-		ItemStack item = new ItemStack(legs() ? ModItems.BOT_GOLEM : ModItems.BOT_GOLEM_TORSO);
+		ItemStack item = new ItemStack(tier == GolemLayout.TIER_1 ? ModItems.TIER1_BOT_GOLEM : legs() ? ModItems.TIER2_BOT_GOLEM : ModItems.TIER2_BOT_GOLEM_TORSO);
 		List<ItemStack> parts = new ArrayList<>();
 		for (int slot = 0; slot < board.parts().getContainerSize(); slot++) {
 			parts.add(board.parts().getItem(slot).copy());

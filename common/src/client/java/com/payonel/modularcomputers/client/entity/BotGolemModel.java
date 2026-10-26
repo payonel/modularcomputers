@@ -12,7 +12,8 @@ import net.minecraft.util.Mth;
 /**
  * The bot golem's model: an iron golem's shape, a block high (15 pixels): a head whose front is its
  * screen, a broad body, long arms hanging to its knees, short legs. Its arms and legs swing as it
- * walks, as an iron golem's. With a crafting card in, a tiny chest on its back, sunk in its frame. Its texture's layout is scripts/art/bot_golem_textures.py's.
+ * walks, as an iron golem's. With a crafting card in, a tiny chest on its back, sunk in its frame.
+ * Both tiers share it: a tier 2 differs only in its skin. Its texture's layout is scripts/art/bot_golem_textures.py's.
  */
 public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 	/** The texture's size, in texels. */
@@ -34,6 +35,9 @@ public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 	private final ModelPart leftLeg;
 	/** The tiny chest on its back, shown while it has a crafting card. */
 	private final ModelPart chest;
+	/** A tier 2's nozzles: collars round its legs' sockets, under its body (where its beams come out). */
+	private final ModelPart rightNozzle;
+	private final ModelPart leftNozzle;
 
 	public BotGolemModel(ModelPart root) {
 		super(root);
@@ -42,6 +46,8 @@ public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 		rightLeg = root.getChild("right_leg");
 		leftLeg = root.getChild("left_leg");
 		chest = root.getChild("chest");
+		rightNozzle = root.getChild("right_nozzle");
+		leftNozzle = root.getChild("left_nozzle");
 	}
 
 	/** Its legs alone, as they stand when detached: its leg boxes, the same texture. */
@@ -65,6 +71,9 @@ public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 		root.addOrReplaceChild("left_leg", CubeListBuilder.create().texOffs(42, 12).mirror().addBox(-1.5f, 0, -1.5f, 3, 3, 3), PartPose.offset(2, 21, 0));
 		// Its back is +Z: the chest sticks a pixel and a half out of it, the rest sunk in its frame.
 		root.addOrReplaceChild("chest", CubeListBuilder.create().texOffs(0, 24).addBox(-2.5f, 1, 1, 5, 4, 3), PartPose.offset(0, 15, 0));
+		// A tier 2's nozzles: a collar under its body round each leg's socket, a pixel wider than the leg.
+		root.addOrReplaceChild("right_nozzle", CubeListBuilder.create().texOffs(20, 24).addBox(-4, 6, -2, 4, 1, 4), PartPose.offset(0, 15, 0));
+		root.addOrReplaceChild("left_nozzle", CubeListBuilder.create().texOffs(20, 24).mirror().addBox(0, 6, -2, 4, 1, 4), PartPose.offset(0, 15, 0));
 		return LayerDefinition.create(mesh, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 	}
 
@@ -78,6 +87,8 @@ public final class BotGolemModel extends EntityModel<BotGolemRenderer.State> {
 	public void setupAnim(BotGolemRenderer.State state) {
 		super.setupAnim(state);
 		chest.visible = state.chest;
+		rightNozzle.visible = state.thrusters;
+		leftNozzle.visible = state.thrusters;
 		rightLeg.visible = state.legs;
 		leftLeg.visible = state.legs;
 		root().y = state.legs ? 0 : LEG_PIXELS; // (its torso on the ground; model y is down)

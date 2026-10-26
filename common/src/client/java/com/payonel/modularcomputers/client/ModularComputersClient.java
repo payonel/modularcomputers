@@ -74,7 +74,8 @@ public final class ModularComputersClient {
 		renderers.register(ModBlocks.EXPANSION_HUB_ENTITY, context -> new OutlineRenderer<>());
 		renderers.register(ModBlocks.ROBOTIC_PISTON_ENTITY, context -> new OutlineRenderer<>());
 		renderers.register(ModBlocks.PHOTOMASK_ENTITY, context -> new PhotomaskRenderer());
-		renderers.entity(com.payonel.modularcomputers.entity.ModEntities.BOT_GOLEM, com.payonel.modularcomputers.client.entity.BotGolemRenderer::new);
+		renderers.entity(com.payonel.modularcomputers.entity.ModEntities.TIER1_BOT_GOLEM, com.payonel.modularcomputers.client.entity.BotGolemRenderer::new);
+		renderers.entity(com.payonel.modularcomputers.entity.ModEntities.TIER2_BOT_GOLEM, com.payonel.modularcomputers.client.entity.BotGolemRenderer::new);
 		renderers.entity(com.payonel.modularcomputers.entity.ModEntities.ENERGY_FIELD, com.payonel.modularcomputers.client.entity.EnergyFieldRenderer::new);
 		renderers.entity(com.payonel.modularcomputers.entity.ModEntities.GOLEM_LEGS, com.payonel.modularcomputers.client.entity.GolemLegsRenderer::new);
 		// The cards that bring a tab (and a panel) to their computer's views.
@@ -86,7 +87,8 @@ public final class ModularComputersClient {
 
 	public static void screens(Screens screens) {
 		screens.register(ModMenus.CASE, CaseScreen::new);
-		screens.register(ModMenus.GOLEM, CaseScreen::new); // (its art by its board: a golem's)
+		screens.register(ModMenus.TIER1_GOLEM, CaseScreen::new); // (its art by its board: a golem's)
+		screens.register(ModMenus.TIER2_GOLEM, CaseScreen::new);
 		screens.register(ModMenus.CHARGING_PAD, com.payonel.modularcomputers.client.screen.ChargingPadScreen::new);
 		screens.register(ModMenus.EXPANSION_HUB, CardHolderScreen::new);
 		screens.register(ModMenus.ROBOTIC_PISTON, CardHolderScreen::new);

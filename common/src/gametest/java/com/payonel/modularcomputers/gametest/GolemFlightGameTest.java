@@ -256,7 +256,7 @@ public class GolemFlightGameTest {
 			.thenExecuteAfter(3, () -> same(helper, golem.robotics().use(args("front")).first(), "used", "it popped them up"))
 			.thenExecute(() -> {
 				helper.assertTrue(!standing.isAlive(), "gone from the world");
-				helper.assertTrue(golem.getMainHandItem().is(ModItems.BOT_GOLEM_LEGS), "in its hand: " + golem.getMainHandItem());
+				helper.assertTrue(golem.getMainHandItem().is(ModItems.TIER2_BOT_GOLEM_LEGS), "in its hand: " + golem.getMainHandItem());
 			})
 			.thenSucceed();
 	}
@@ -267,12 +267,12 @@ public class GolemFlightGameTest {
 		});
 		golem.legs(false);
 		ItemStack torso = golem.asItem();
-		helper.assertTrue(torso.is(ModItems.BOT_GOLEM_TORSO), "picked up as its torso: " + torso);
-		CraftingInput input = CraftingInput.of(1, 2, List.of(torso, new ItemStack(ModItems.BOT_GOLEM_LEGS)));
+		helper.assertTrue(torso.is(ModItems.TIER2_BOT_GOLEM_TORSO), "picked up as its torso: " + torso);
+		CraftingInput input = CraftingInput.of(1, 2, List.of(torso, new ItemStack(ModItems.TIER2_BOT_GOLEM_LEGS)));
 		var recipe = helper.getLevel().recipeAccess().getRecipeFor(RecipeType.CRAFTING, input, helper.getLevel());
 		helper.assertTrue(recipe.isPresent(), "torso over legs is a recipe");
 		ItemStack made = recipe.get().value().assemble(input);
-		helper.assertTrue(made.is(ModItems.BOT_GOLEM), "a golem: " + made);
+		helper.assertTrue(made.is(ModItems.TIER2_BOT_GOLEM), "a golem: " + made);
 		same(helper, made.get(ModComponents.SERIAL), golem.board().boardId(), "its board's id kept");
 		NonNullList<ItemStack> parts = NonNullList.withSize(CaseMenu.PART_SLOTS, ItemStack.EMPTY);
 		made.getOrDefault(net.minecraft.core.component.DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.EMPTY).copyInto(parts);

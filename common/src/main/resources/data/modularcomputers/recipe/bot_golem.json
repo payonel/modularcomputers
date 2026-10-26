@@ -2,14 +2,14 @@
 	"type": "modularcomputers:golem_assembly",
 	"category": "misc",
 	"key": {
-		"T": "modularcomputers:bot_golem_torso",
-		"L": "modularcomputers:bot_golem_legs"
+		"T": "modularcomputers:tier2_bot_golem_torso",
+		"L": "modularcomputers:tier2_bot_golem_legs"
 	},
 	"pattern": [
 		"T",
 		"L"
 	],
 	"result": {
-		"id": "modularcomputers:bot_golem"
+		"id": "modularcomputers:tier2_bot_golem"
 	}
 }

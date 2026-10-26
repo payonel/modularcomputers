@@ -50,10 +50,15 @@ public class BotGolemGameTest {
 		}
 	}
 
-	/** A golem at the start, facing east, with a board: running {@code program} once pressed on. */
+	/** A tier 2 golem at the start, facing east, with a board: running {@code program} once pressed on. */
 	static BotGolem golem(GameTestHelper helper, Program program) {
+		return golem(helper, program, ModEntities.TIER2_BOT_GOLEM);
+	}
+
+	/** A golem of a tier at the start, facing east, with a board: running {@code program} once pressed on. */
+	static BotGolem golem(GameTestHelper helper, Program program, net.minecraft.world.entity.EntityType<BotGolem> tier) {
 		floor(helper);
-		BotGolem golem = ModEntities.BOT_GOLEM.create(helper.getLevel(), EntitySpawnReason.COMMAND);
+		BotGolem golem = tier.create(helper.getLevel(), EntitySpawnReason.COMMAND);
 		Vec3 at = helper.absoluteVec(Vec3.atBottomCenterOf(START));
 		golem.snapTo(at.x, at.y, at.z, EAST, 0);
 		golem.setYBodyRot(EAST);
@@ -214,7 +219,7 @@ public class BotGolemGameTest {
 		golem.hurtServer(helper.getLevel(), helper.getLevel().damageSources().playerAttack(player), 1);
 		helper.assertTrue(golem.isRemoved(), "gone from the world");
 		var items = helper.getLevel().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, golem.getBoundingBox().inflate(2));
-		helper.assertTrue(items.size() == 1 && items.get(0).getItem().is(ModItems.BOT_GOLEM), "dropped as its item: " + items);
+		helper.assertTrue(items.size() == 1 && items.get(0).getItem().is(ModItems.TIER2_BOT_GOLEM), "dropped as its item: " + items);
 		ItemStack item = items.get(0).getItem();
 		List<ItemStack> parts = item.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY).nonEmptyItemCopyStream().toList();
 		helper.assertTrue(parts.stream().anyMatch(part -> part.is(ModItems.TIER3_CPU)), "its CPU in it: " + parts);
@@ -222,7 +227,7 @@ public class BotGolemGameTest {
 		helper.assertTrue(hands(item).get(ModComponents.MAIN_HAND).is(net.minecraft.world.item.Items.IRON_PICKAXE)
 			&& hands(item).get(ModComponents.OFF_HAND).is(net.minecraft.world.item.Items.COBBLESTONE), "what it held, kept: " + hands(item));
 		// Set down again, it holds them still.
-		BotGolem again = ModEntities.BOT_GOLEM.create(helper.getLevel(), EntitySpawnReason.SPAWN_ITEM_USE);
+		BotGolem again = ModEntities.TIER2_BOT_GOLEM.create(helper.getLevel(), EntitySpawnReason.SPAWN_ITEM_USE);
 		again.fromItem(item);
 		helper.assertTrue(again.getMainHandItem().is(net.minecraft.world.item.Items.IRON_PICKAXE) && again.getOffhandItem().is(net.minecraft.world.item.Items.COBBLESTONE),
 			"set down, it holds them: " + again.getMainHandItem() + ", " + again.getOffhandItem());
@@ -238,9 +243,9 @@ public class BotGolemGameTest {
 
 	@GameTest
 	public void itsGoldSlotTakesOnlyATier1Screen(GameTestHelper helper) {
-		helper.assertTrue(CaseMenu.accepts(GolemLayout.BOT_GOLEM, CaseMenu.EXP_SLOTS, new ItemStack(com.payonel.modularcomputers.block.ModBlocks.TIER1_SCREEN)), "a tier 1 screen");
-		helper.assertTrue(!CaseMenu.accepts(GolemLayout.BOT_GOLEM, CaseMenu.EXP_SLOTS, new ItemStack(com.payonel.modularcomputers.block.ModBlocks.TIER2_SCREEN)), "not a tier 2");
-		helper.assertTrue(!CaseMenu.available(GolemLayout.BOT_GOLEM, CaseMenu.EXP_SLOTS + GolemLayout.ROBOTICS_LANE), "its robotics lane: no slot");
+		helper.assertTrue(CaseMenu.accepts(GolemLayout.TIER_2, CaseMenu.EXP_SLOTS, new ItemStack(com.payonel.modularcomputers.block.ModBlocks.TIER1_SCREEN)), "a tier 1 screen");
+		helper.assertTrue(!CaseMenu.accepts(GolemLayout.TIER_2, CaseMenu.EXP_SLOTS, new ItemStack(com.payonel.modularcomputers.block.ModBlocks.TIER2_SCREEN)), "not a tier 2");
+		helper.assertTrue(!CaseMenu.available(GolemLayout.TIER_2, CaseMenu.EXP_SLOTS + GolemLayout.ROBOTICS_LANE), "its robotics lane: no slot");
 		helper.succeed();
 	}
 
@@ -260,7 +265,7 @@ public class BotGolemGameTest {
 		net.minecraft.core.NonNullList<ItemStack> parts = net.minecraft.core.NonNullList.withSize(CaseMenu.PART_SLOTS, ItemStack.EMPTY);
 		parts.set(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		parts.set(CaseMenu.EXP_SLOTS + lane, card);
-		ItemStack golem = new ItemStack(ModItems.BOT_GOLEM_TORSO);
+		ItemStack golem = new ItemStack(ModItems.TIER2_BOT_GOLEM_TORSO);
 		golem.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(parts));
 		golem.set(ModComponents.HANDS, ItemContainerContents.fromItems(List.of(new ItemStack(net.minecraft.world.item.Items.IRON_AXE))));
 		var player = GameTests.serverPlayer(helper);
@@ -303,5 +308,46 @@ public class BotGolemGameTest {
 		player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, ItemStack.EMPTY);
 		helper.assertTrue(!menu.stillValid(player), "closed once it's out of the hand");
 		helper.succeed();
+	}
+
+	/** Each tier's board (the user's): a tier 2 has a second battery bay and four RAM slots to a tier 1's one and two; the same cards and storage. */
+	@GameTest
+	public void eachTierHasItsBatteriesAndRam(GameTestHelper helper) {
+		helper.assertTrue(!CaseMenu.available(GolemLayout.TIER_1, CaseMenu.UPS_SLOT + 1) && CaseMenu.available(GolemLayout.TIER_2, CaseMenu.UPS_SLOT + 1),
+			"a second battery bay on tier 2 only");
+		helper.assertTrue(CaseMenu.available(GolemLayout.TIER_1, CaseMenu.RAM_SLOTS + 1) && !CaseMenu.available(GolemLayout.TIER_1, CaseMenu.RAM_SLOTS + 2),
+			"two RAM slots on tier 1");
+		helper.assertTrue(CaseMenu.available(GolemLayout.TIER_2, CaseMenu.RAM_SLOTS + 3), "four on tier 2");
+		helper.assertTrue(CaseMenu.available(GolemLayout.TIER_1, CaseMenu.SATA_SLOTS) && !CaseMenu.available(GolemLayout.TIER_2, CaseMenu.SATA_SLOTS + 1)
+			&& CaseMenu.available(GolemLayout.TIER_2, CaseMenu.EXP_SLOTS + 2) && !CaseMenu.available(GolemLayout.TIER_2, CaseMenu.EXP_SLOTS + GolemLayout.ROBOTICS_LANE),
+			"the same disk and cards on both");
+		helper.succeed();
+	}
+
+	/** A tier 1 golem only walks: its thrusters' calls say it has none (its field can still lift it); picked up, it's a tier 1's item. */
+	@GameTest(maxTicks = 100)
+	public void aTier1GolemHasNoThrusters(GameTestHelper helper) {
+		BotGolem golem = golem(helper, board -> {
+			while (true) {
+				board.waitForInterrupt(1000, "nothing");
+			}
+		}, ModEntities.TIER1_BOT_GOLEM);
+		golem.board().parts().setItem(CaseMenu.UPS_SLOT, ModItems.TIER3_BATTERY.charged());
+		golem.board().parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.ENERGY_FIELD_CARD));
+		helper.runAfterDelay(1, () -> golem.board().pressPower());
+		helper.runAfterDelay(5, () -> {
+			var none = new com.payonel.modularcomputers.runtime.Arguments(List.of());
+			var up = new com.payonel.modularcomputers.runtime.Arguments(List.of(0.0, 0.0, 1.0));
+			for (var said : List.of(golem.robotics().fly(up), golem.robotics().flyTo(up), golem.robotics().hover(none), golem.robotics().land(none))) {
+				helper.assertTrue(BotGolem.NO_THRUSTERS.equals(said.error()), "no thrusters: " + said);
+			}
+			helper.assertTrue(golem.legs() && !golem.thrusting(), "still on its legs");
+			var field = golem.board().cards().stream().filter(com.payonel.modularcomputers.device.FieldCard.class::isInstance)
+				.map(com.payonel.modularcomputers.device.FieldCard.class::cast).findFirst().orElseThrow();
+			var held = field.capture(new com.payonel.modularcomputers.runtime.Arguments(List.of("self")));
+			helper.assertTrue(held.error() == null, "its field holds it all the same: " + held);
+			helper.assertTrue(golem.asItem().is(ModItems.TIER1_BOT_GOLEM), "picked up, a tier 1's item: " + golem.asItem());
+			helper.succeed();
+		});
 	}
 }

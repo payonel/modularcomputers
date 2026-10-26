@@ -57,7 +57,7 @@ public class ChargingPadGameTest {
 
 	/** A golem standing at {@code at}, with a flat battery (and nothing running: a pad charges it all the same). */
 	private static BotGolem golem(GameTestHelper helper, BlockPos at) {
-		BotGolem golem = ModEntities.BOT_GOLEM.create(helper.getLevel(), EntitySpawnReason.COMMAND);
+		BotGolem golem = ModEntities.TIER2_BOT_GOLEM.create(helper.getLevel(), EntitySpawnReason.COMMAND);
 		Vec3 pos = helper.absoluteVec(Vec3.atBottomCenterOf(at)).add(0, ChargingPadBlock.HEIGHT / 16.0, 0);
 		golem.snapTo(pos.x, pos.y, pos.z, 0, 0);
 		helper.getLevel().addFreshEntity(golem);

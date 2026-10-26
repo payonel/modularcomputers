@@ -28,11 +28,21 @@ public final class ModMenus {
 	public static final MenuType<PhotomaskMenu> PHOTOMASK = Registry.register(BuiltInRegistries.MENU, id("photomask"),
 		Platform.INSTANCE.menuType(PhotomaskMenu::new));
 
-	/** A bot golem's parts view: its board, in its iron chest (the case view's, for an entity). */
-	public static final MenuType<CaseMenu> GOLEM = Registry.register(BuiltInRegistries.MENU, id("golem"),
-		Platform.INSTANCE.hostMenuType((id, inventory, host) -> new CaseMenu(ModMenus.GOLEM, id, inventory,
-			new net.minecraft.world.SimpleContainer(CaseMenu.PART_SLOTS), new net.minecraft.world.inventory.SimpleContainerData(CaseMenu.POWER_DATA),
-			BlockPos.ZERO, host, player -> true, com.payonel.modularcomputers.machine.GolemLayout.BOT_GOLEM, new net.minecraft.world.SimpleContainer(2))));
+	/** A bot golem's parts view: its board, in its iron chest (the case view's, for an entity), a menu a tier (its slots). */
+	public static final MenuType<CaseMenu> TIER1_GOLEM = golemMenu("tier1_golem", com.payonel.modularcomputers.machine.GolemLayout.TIER_1);
+	public static final MenuType<CaseMenu> TIER2_GOLEM = golemMenu("tier2_golem", com.payonel.modularcomputers.machine.GolemLayout.TIER_2);
+
+	/** A golem's parts view, of its tier. */
+	public static MenuType<CaseMenu> golem(com.payonel.modularcomputers.machine.GolemLayout tier) {
+		return tier == com.payonel.modularcomputers.machine.GolemLayout.TIER_1 ? TIER1_GOLEM : TIER2_GOLEM;
+	}
+
+	private static MenuType<CaseMenu> golemMenu(String name, com.payonel.modularcomputers.machine.GolemLayout tier) {
+		return Registry.register(BuiltInRegistries.MENU, id(name),
+			Platform.INSTANCE.hostMenuType((id, inventory, host) -> new CaseMenu(golem(tier), id, inventory,
+				new net.minecraft.world.SimpleContainer(CaseMenu.PART_SLOTS), new net.minecraft.world.inventory.SimpleContainerData(CaseMenu.POWER_DATA),
+				BlockPos.ZERO, host, player -> true, tier, new net.minecraft.world.SimpleContainer(2))));
+	}
 
 	public static final MenuType<ChargingPadMenu> CHARGING_PAD = Registry.register(BuiltInRegistries.MENU, id("charging_pad"),
 		Platform.INSTANCE.menuType(ChargingPadMenu::new));

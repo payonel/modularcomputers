@@ -71,7 +71,7 @@ public final class GolemAssemblyRecipe extends ShapedRecipe {
 	public ItemStack assemble(CraftingInput input) {
 		ItemStack golem = super.assemble(input);
 		for (ItemStack stack : input.items()) {
-			if (stack.is(ModItems.BOT_GOLEM_TORSO)) {
+			if (stack.is(ModItems.TIER2_BOT_GOLEM_TORSO)) {
 				return stack.transmuteCopy(golem.getItem(), 1); // (all the torso kept)
 			}
 		}

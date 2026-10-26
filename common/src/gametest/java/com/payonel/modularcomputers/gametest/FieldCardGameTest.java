@@ -187,7 +187,7 @@ public class FieldCardGameTest {
 			.thenExecuteAfter(3, () -> {
 				FieldCard card = field(golem.board());
 				start[0] = golem.getY();
-				same(helper, card.capture(args(FieldCard.SELF)).first(), "modularcomputers:bot_golem", "it holds itself");
+				same(helper, card.capture(args(FieldCard.SELF)).first(), "modularcomputers:tier2_bot_golem", "it holds itself");
 				// Farther than a case's field reaches: it carries its card with it.
 				helper.assertTrue(!card.move(args(0.0, 0.0, LIFT)).failed(), "it moves");
 			})

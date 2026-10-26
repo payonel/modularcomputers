@@ -73,7 +73,7 @@ public class TreeJobGameTest {
 
 	/** The golem: a board booting mcos off its disk, a screen, its crafting card and its energy field card. */
 	private static BotGolem golem(GameTestHelper helper) {
-		BotGolem golem = ModEntities.BOT_GOLEM.create(helper.getLevel(), EntitySpawnReason.COMMAND);
+		BotGolem golem = ModEntities.TIER2_BOT_GOLEM.create(helper.getLevel(), EntitySpawnReason.COMMAND);
 		Vec3 at = helper.absoluteVec(Vec3.atBottomCenterOf(START));
 		golem.snapTo(at.x, at.y, at.z, BotGolemGameTest.EAST, 0);
 		golem.setYBodyRot(BotGolemGameTest.EAST);

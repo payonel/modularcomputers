@@ -25,9 +25,12 @@ import net.minecraft.resources.Identifier;
  * from its leg sockets, tapering and flickering.
  */
 public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRenderer.State, BotGolemModel> {
-	private static final Identifier TEXTURE = ModularComputers.id("textures/entity/bot_golem.png");
+	private static final Identifier TEXTURE = ModularComputers.id("textures/entity/tier1_bot_golem.png");
 	/** No screen in its gold slot: its face an empty bezel. */
-	private static final Identifier TEXTURE_BLANK = ModularComputers.id("textures/entity/bot_golem_blank.png");
+	private static final Identifier TEXTURE_BLANK = ModularComputers.id("textures/entity/tier1_bot_golem_blank.png");
+	/** A tier 2's skin: the same model, more advanced plating (scripts/art/bot_golem_textures.py). */
+	private static final Identifier TIER2_TEXTURE = ModularComputers.id("textures/entity/tier2_bot_golem.png");
+	private static final Identifier TIER2_TEXTURE_BLANK = ModularComputers.id("textures/entity/tier2_bot_golem_blank.png");
 	/** Its shadow's radius, in blocks. */
 	private static final float SHADOW = 0.4f;
 	/** Its glass on its face, in pixels: from the face's left edge and the head's top, and its size. */
@@ -106,6 +109,8 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 		boolean legs = true;
 		/** Its thrusters fire: their beams show. */
 		boolean thrusting;
+		/** It has thrusters (a tier 2): its skin is a tier 2's. */
+		boolean thrusters;
 		/** Its age this frame, in ticks: what its beams flicker by. */
 		float time;
 		final TerminalFace.State face = new TerminalFace.State();
@@ -124,12 +129,16 @@ public final class BotGolemRenderer extends MobRenderer<BotGolem, BotGolemRender
 		state.chest = golem.hasCraftingCard();
 		state.legs = golem.legs();
 		state.thrusting = golem.thrusting();
+		state.thrusters = golem.tier().thrusters();
 		state.time = golem.tickCount + partialTick;
 		TerminalFace.extract(golem.terminal(), state.screen, state.face);
 	}
 
 	@Override
 	public Identifier getTextureLocation(State state) {
+		if (state.thrusters) {
+			return state.screen ? TIER2_TEXTURE : TIER2_TEXTURE_BLANK;
+		}
 		return state.screen ? TEXTURE : TEXTURE_BLANK;
 	}
 

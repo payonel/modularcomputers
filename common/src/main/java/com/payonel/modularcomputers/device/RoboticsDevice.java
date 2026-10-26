@@ -235,7 +235,7 @@ public final class RoboticsDevice implements Device {
 		return Result.ok(true);
 	}
 
-	@Method(doc = "flyTo(forward[, right[, up]]): flies to the point that many blocks from its pose's origin, in the origin's frame (as pose gives them), as fly does; true at once (its event: arrived, or blocked and why), or false and why")
+	@Method(doc = "flyTo(forward[, right[, up]]): (a tier 2 golem's) flies to the point that many blocks from its pose's origin, in the origin's frame (as pose gives them), as fly does; true at once (its event: arrived, or blocked and why), or false and why")
 	public Result flyTo(Arguments args) {
 		double forward = args.checkNumber(0);
 		double right = args.count() > 1 ? args.checkNumber(1) : 0;
@@ -399,7 +399,7 @@ public final class RoboticsDevice implements Device {
 		return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
 	}
 
-	@Method(doc = "fly(forward[, right[, up]]): flies on its thrusters to the point that many blocks from it, in its own frame (from its block's middle), without turning, straight there (never through blocks; with pathfinding, round them); its legs, if it stands on them, are left standing where it was, and its thrusters fire beams from their sockets. Flying or hovering it uses no tools (buttons and doors yes) and can be shoved. True at once (its event: arrived, or blocked and why), or false and why")
+	@Method(doc = "fly(forward[, right[, up]]): (a tier 2 golem's) flies on its thrusters to the point that many blocks from it, in its own frame (from its block's middle), without turning, straight there (never through blocks; with pathfinding, round them); its legs, if it stands on them, are left standing where it was, and its thrusters fire beams from their sockets. Flying or hovering it uses no tools (buttons and doors yes) and can be shoved. True at once (its event: arrived, or blocked and why), or false and why")
 	public Result fly(Arguments args) {
 		double forward = args.checkNumber(0);
 		double right = args.count() > 1 ? args.checkNumber(1) : 0;
@@ -415,7 +415,7 @@ public final class RoboticsDevice implements Device {
 		return Result.ok(true);
 	}
 
-	@Method(doc = "hover(): holds itself where it is on its thrusters (its legs, if it stands on them, left standing there), until it flies, lands, or its program ends: then it falls, and powers off")
+	@Method(doc = "hover(): (a tier 2 golem's) holds itself where it is on its thrusters (its legs, if it stands on them, left standing there), until it flies, lands, or its program ends: then it falls, and powers off")
 	public Result hover(Arguments args) {
 		String why = body.hover();
 		if (why != null) {
@@ -425,7 +425,7 @@ public final class RoboticsDevice implements Device {
 		return Result.ok(true);
 	}
 
-	@Method(doc = "land(): comes down onto its legs, standing below it (within three blocks to the side), and onto them; true at once (its event: landed, or blocked and why), or false and why (no legs there: it goes on hovering)")
+	@Method(doc = "land(): (a tier 2 golem's) comes down onto its legs, standing below it (within three blocks to the side), and onto them; true at once (its event: landed, or blocked and why), or false and why (no legs there: it goes on hovering)")
 	public Result land(Arguments args) {
 		String why = body.land();
 		if (why != null) {

@@ -206,7 +206,7 @@ public class GolemWalkGameTest {
 		same(helper, pose(golem), at(0, 0, 0L), "its origin");
 		golem.setPos(golem.getX() + 2, golem.getY(), golem.getZ());
 		// Picked up and set down again: an item keeps no pose; its new origin is where it's set.
-		BotGolem again = com.payonel.modularcomputers.entity.ModEntities.BOT_GOLEM.create(helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.SPAWN_ITEM_USE);
+		BotGolem again = com.payonel.modularcomputers.entity.ModEntities.TIER2_BOT_GOLEM.create(helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.SPAWN_ITEM_USE);
 		again.fromItem(golem.asItem());
 		again.snapTo(golem.getX(), golem.getY(), golem.getZ(), BotGolemGameTest.EAST, 0);
 		same(helper, pose(again), at(0, 0, 0L), "a new origin where it was set down");

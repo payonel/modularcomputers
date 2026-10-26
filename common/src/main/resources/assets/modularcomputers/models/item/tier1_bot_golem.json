@@ -1,6 +1,6 @@
 {
 	"parent": "minecraft:item/generated",
 	"textures": {
-		"layer0": "modularcomputers:item/bot_golem"
+		"layer0": "modularcomputers:item/tier1_bot_golem"
 	}
 }

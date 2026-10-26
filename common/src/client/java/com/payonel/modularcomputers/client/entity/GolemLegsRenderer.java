@@ -15,7 +15,7 @@ import net.minecraft.resources.Identifier;
 
 /** Draws a golem's legs standing alone: its model's legs, its texture, turned as they were left. */
 public final class GolemLegsRenderer extends EntityRenderer<GolemLegs, GolemLegsRenderer.State> {
-	private static final Identifier TEXTURE = ModularComputers.id("textures/entity/bot_golem.png");
+	private static final Identifier TEXTURE = ModularComputers.id("textures/entity/tier2_bot_golem.png");
 	/** Model space to the world's: flipped, as every entity model is, its ground (24 pixels) at the feet. */
 	private static final float MODEL_GROUND = 1.501f;
 

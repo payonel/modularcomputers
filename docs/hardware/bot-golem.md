@@ -6,7 +6,9 @@ order: 150
 
 The Bot Golem is a robot a block high, built like an iron golem: a computer you can walk anywhere.
 It holds a computer's parts (a CPU, RAM, an EEPROM, a battery, a disk and two cards: what you put
-in), and a robotics device soldered onto its board is the only way it moves. Its face is a screen
+in), and a robotics device soldered onto its board is the only way it moves. It comes in two
+tiers: a **tier 1** walks; a **tier 2**, in dark steel, walks and flies on its thrusters, and has
+room for a second battery and four RAM sticks. Its face is a screen
 if you put a tier 1 screen in its gold slot; without one it has an empty bezel and runs all the
 same. It never acts on its own: a program drives it.
 
@@ -19,14 +21,15 @@ same. It never acts on its own: a program drives it.
 | Stack | 1 (it keeps its parts) |
 | Size | A block high, through a one-block gap |
 | Speed | A player's walking pace |
-| Slots | CPU, EEPROM, a battery, 2 RAM, 1 disk, a tier 1 screen (its face, optional), 2 cards, its hands |
+| Slots | CPU, EEPROM, 1 disk, a tier 1 screen (its face, optional), 2 cards, its hands; tier 1: a battery, 2 RAM; tier 2: 2 batteries, 4 RAM |
+| Flies | Tier 2, on its thrusters (either tier, held in its own energy field) |
 | Soldered | Its robotics device, on its last expansion lane |
 | Getting one | Creative only, for now |
 
 </div>
 
-![Two bot golems: one with a screen in, its face lit; one without, an empty bezel](/assets/img/bot-golems.png)
-*A golem with a tier 1 screen in its gold slot, and one without: its face an empty bezel.*
+![A tier 2 golem in dark steel, its screen lit, and a tier 1 in iron on a charging pad](/assets/img/bot-golems.png)
+*A tier 2 golem, its tier 1 screen lit in its gold slot, and a tier 1 charging on a pad.*
 
 ## Use
 
@@ -64,7 +67,8 @@ its hands.
 
 A golem flies two ways, each with its price:
 
-- **Its thrusters, legs off.** Every golem has them. `fly` leaves its legs standing where it was and
+- **Its thrusters, legs off.** A tier 2 golem has them (a tier 1's thruster calls answer `no
+  thrusters: a tier 2 golem's`): its nozzles are the collars round its legs' sockets. `fly` leaves its legs standing where it was and
   fires red beams from their empty sockets: it flies at 25 blocks a second, much faster than it
   walks or its field flies it, needs no card, and costs five running CPUs' power a tick. On its
   thrusters it has no footing: it uses no tools (buttons, doors and levers yes: a tool in its hand
@@ -88,7 +92,7 @@ Its legs, emerald and redstone clamps on top, plug into sockets under its torso.
 
 A right click on legs pops them up into your inventory (the golem's `use` pops them into its own),
 and their item, used on a block, stands them there. A fallen torso lies on the ground, off, as its
-legs do: hit it to pick it up as a Bot Golem Torso (its parts in it), or right-click it for its
+legs do: hit it to pick it up as a Tier 2 Bot Golem Torso (its parts in it), or right-click it for its
 view. A torso crafted over its legs, in any crafting grid (2x2 is
 enough), is the golem again, with all it kept.
 

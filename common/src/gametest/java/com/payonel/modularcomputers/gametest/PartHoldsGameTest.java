@@ -120,7 +120,7 @@ public class PartHoldsGameTest {
 				helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
 			}
 		}
-		BotGolem golem = com.payonel.modularcomputers.entity.ModEntities.BOT_GOLEM.create(helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+		BotGolem golem = com.payonel.modularcomputers.entity.ModEntities.TIER2_BOT_GOLEM.create(helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
 		var at = helper.absoluteVec(net.minecraft.world.phys.Vec3.atBottomCenterOf(POS));
 		golem.snapTo(at.x, at.y, at.z, 0, 0);
 		helper.getLevel().addFreshEntity(golem);

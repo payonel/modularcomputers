@@ -72,7 +72,7 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 				server.overworld().setBlock(without, com.payonel.modularcomputers.block.ModBlocks.CHARGING_PAD.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
 				((com.payonel.modularcomputers.block.ChargingPadBlockEntity) server.overworld().getBlockEntity(without)).cards()
 					.setItem(com.payonel.modularcomputers.block.ChargingPadBlockEntity.BATTERY, ModItems.TIER1_BATTERY.charged());
-				BotGolem charging = golem(server.overworld(), without);
+				BotGolem charging = golem(server.overworld(), without, ModEntities.TIER1_BOT_GOLEM); // (a tier 1, beside the tier 2: their skins)
 				charging.snapTo(charging.getX(), charging.getY() + com.payonel.modularcomputers.block.ChargingPadBlock.HEIGHT / 16.0, charging.getZ(), NORTH, 0);
 				charging.setYBodyRot(NORTH);
 				charging.setYHeadRot(NORTH);
@@ -299,9 +299,14 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 		return golem.board().busEntries().stream().map(com.payonel.modularcomputers.board.BoardAssembly.BusEntry::key).toList();
 	}
 
-	/** A golem at {@code pos}, facing south, with a CPU, RAM, an EEPROM and a battery. */
+	/** A tier 2 golem at {@code pos}, facing south, with a CPU, RAM, an EEPROM and a battery. */
 	private static BotGolem golem(net.minecraft.server.level.ServerLevel level, BlockPos pos) {
-		BotGolem golem = ModEntities.BOT_GOLEM.create(level, EntitySpawnReason.COMMAND);
+		return golem(level, pos, ModEntities.TIER2_BOT_GOLEM);
+	}
+
+	/** A golem of a tier at {@code pos}, facing south, with a CPU, RAM, an EEPROM and a battery. */
+	private static BotGolem golem(net.minecraft.server.level.ServerLevel level, BlockPos pos, net.minecraft.world.entity.EntityType<BotGolem> tier) {
+		BotGolem golem = tier.create(level, EntitySpawnReason.COMMAND);
 		golem.snapTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, SOUTH, 0);
 		golem.setYBodyRot(SOUTH);
 		golem.setYHeadRot(SOUTH);

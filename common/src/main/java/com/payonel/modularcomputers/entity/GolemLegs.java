@@ -64,7 +64,7 @@ public final class GolemLegs extends Entity {
 	@Override
 	public InteractionResult interact(Player player, InteractionHand hand, Vec3 location) {
 		if (level() instanceof ServerLevel && isAlive()) {
-			ItemStack legs = new ItemStack(ModItems.BOT_GOLEM_LEGS);
+			ItemStack legs = new ItemStack(ModItems.TIER2_BOT_GOLEM_LEGS);
 			if (!player.getInventory().add(legs) && level() instanceof ServerLevel server) {
 				spawnAtLocation(server, legs);
 			}
@@ -77,7 +77,7 @@ public final class GolemLegs extends Entity {
 	@Override
 	public boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
 		if (source.getEntity() instanceof Player && isAlive()) {
-			spawnAtLocation(level, new ItemStack(ModItems.BOT_GOLEM_LEGS));
+			spawnAtLocation(level, new ItemStack(ModItems.TIER2_BOT_GOLEM_LEGS));
 			discard();
 			return true;
 		}

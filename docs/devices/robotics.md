@@ -182,6 +182,10 @@ when there were none it could take. It fails with `no container there` or `no sl
 
 ### fly(forward[, right[, up]]) → true, or nil and why
 
+A tier 2 golem's: its thrusters' calls (`fly`, `flyTo`, `hover`, `land`) fail on a tier 1 with `no
+thrusters: a tier 2 golem's` (it walks; its own [energy field](/devices/energy-field-card/) can
+still carry it).
+
 Flies on its thrusters to the point that many blocks from it, in its own frame, straight there and
 never through blocks, at 25 blocks a second (its field flies it at 10; a player sprints at under
 6). If it stands on its legs, they're left standing where it was: the thrusters fire red beams from
@@ -197,7 +201,7 @@ field moves it`, or `too far` beyond 64 blocks each way. Up to 64 blocks each wa
 Holds itself where it is on its thrusters (its legs, if it stands on them, left standing there),
 until it flies or lands. A shove moves it, and it drifts to a stop. If its program ends while its
 thrusters hold it up, or its power runs out, it falls and powers off: its torso lies on the ground,
-off, to be picked up as a Bot Golem Torso.
+off, to be picked up as a Tier 2 Bot Golem Torso.
 
 ### land() → true, or nil and why
 
