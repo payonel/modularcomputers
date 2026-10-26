@@ -13,7 +13,7 @@
 --   use FACE                    (front, back, left, right, up or down: its own)
 --   swing FACE
 --   stop
---   origin [forward [right [up [heading]]]]  (its origin set: where it is is that far from it; none: here)
+--   position [forward [right [up [heading]]]]  (says where it is, its origin moved to make it so; none: its origin here)
 --   pathfinding on|off
 -- How an action went comes as an event (poll's PRI; the pull ioctl: arrived, blocked, turned,
 -- stopped, landed, broke, failed). Its scan, its hand and containers are ioctls (scan, held, take...).
@@ -49,8 +49,8 @@ return {
       return {action = action, face = words[2]}
     elseif (action == "stop" or action == "hover" or action == "land") and #words == 1 then
       return {action = action}
-    elseif action == "origin" and #words <= 5 then
-      local at = {action = "setOrigin"}
+    elseif action == "position" and #words <= 5 then
+      local at = {action = "setPosition"}
       for i, field in ipairs({"forward", "right", "up", "heading"}) do
         if words[i + 1] then
           at[field] = number(words[i + 1])

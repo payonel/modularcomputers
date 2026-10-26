@@ -430,8 +430,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 
 		@Override
-		public String setOrigin(long forward, long right, long up, int heading) {
-			BotGolem.this.setOrigin(forward, right, up, heading);
+		public String setPosition(long forward, long right, long up, int heading) {
+			BotGolem.this.setPosition(forward, right, up, heading);
 			return null;
 		}
 
@@ -687,18 +687,18 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private Origin origin() {
 		Origin origin = origins.get(dimension());
 		if (origin == null) {
-			setOrigin(0, 0, 0, 0);
+			setPosition(0, 0, 0, 0);
 			origin = origins.get(dimension());
 		}
 		return origin;
 	}
 
 	/**
-	 * Sets its origin here so that where it is (moved onto its block's middle, turned to the nearest
-	 * right angle) is {@code forward}, {@code right}, {@code up} blocks from it, facing
-	 * {@code heading} degrees to the origin's right (a right angle): all 0, its origin where it is.
+	 * Says where it is here (moved onto its block's middle, turned to the nearest right angle):
+	 * {@code forward}, {@code right}, {@code up} blocks from its origin, facing {@code heading} degrees
+	 * to the origin's right (a right angle), its origin moved to make it so: all 0, its origin where it is.
 	 */
-	public void setOrigin(long forward, long right, long up, int heading) {
+	public void setPosition(long forward, long right, long up, int heading) {
 		Vec3 middle = middle();
 		setPos(middle.x, getY(), middle.z);
 		face(rightAngle(getYRot()));

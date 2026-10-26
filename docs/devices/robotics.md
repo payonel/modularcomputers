@@ -46,7 +46,7 @@ written is an action, taking effect as it's written:
 | `use face` | Uses what it holds on the space at a face |
 | `swing face` | Swings what it holds at a face: hits a mob, or breaks the block |
 | `stop` | Stops, on the last block's middle it reached (flying: it hovers there) |
-| `origin [forward [right [up [heading]]]]` | Sets its origin, where it is being that far from it (none: here) |
+| `position [forward [right [up [heading]]]]` | Says where it is, its origin moved to make it so (none: its origin here) |
 | `pathfinding on`, `pathfinding off` | Whether its moves find their way round things |
 
 A line that isn't one fails the write with `EINVAL`. How an action went comes as an event: the
@@ -111,15 +111,15 @@ Where it is from its origin, in the origin's frame: blocks forward, to the right
 heading in degrees to the origin's right (0, 90, 180 or 270). Exact: after a walk the numbers are
 whole; a shove (on its thrusters) shows as a fraction. See [where it is](#where-it-is-its-position).
 
-### setOrigin([forward[, right[, up[, heading]]]]) → true
+### setPosition([forward[, right[, up[, heading]]]]) → true
 
-Sets its origin, in this dimension, so that where it is now is that far from it: whole blocks
-forward, right and up in the origin's frame, and facing `heading` degrees to the origin's right (0,
-90, 180 or 270). Each is 0 when not given, so `setOrigin()` makes where it is the origin, and its
-position all zeros. It moves onto its block's middle and turns to the nearest right angle first.
-From a place whose position you know in another frame (a map's, a GPS's), it gives `position` that
-frame: `setOrigin(12, -3, 0, 90)` says "I'm 12 forward, 3 left of its origin, facing its right".
-Fails with `whole blocks expected` or `a right angle expected`.
+Says where it is now: whole blocks forward, right and up from its origin, in the origin's frame,
+facing `heading` degrees to the origin's right (0, 90, 180 or 270). Its origin, in this dimension,
+moves to make it so, and `position` then gives exactly these numbers. Each is 0 when not given, so
+`setPosition()` makes where it stands the origin. It moves onto its block's middle and turns to the
+nearest right angle first. From a place you know in another frame (a map's, a GPS's fix), it gives
+`position` that frame: `setPosition(12, -3, 65, 90)` says "I'm 12 forward, 3 left and 65 up from
+the origin, facing its right". Fails with `whole blocks expected` or `a right angle expected`.
 
 ### setPathfinding(on) → true
 
@@ -237,7 +237,7 @@ origin's way, as a real robot's odometry does: what moves it (walking, flying, a
 it, a shove) moves its position. Not where it is in the world: no compass, no coordinates.
 
 - **Its origin** is where it stood, on its block's middle, and the way it faced, a right angle. It's
-  set the first time the golem runs (powered on, or set down), by `setOrigin`, and in each
+  set the first time the golem runs (powered on, or set down), by `setPosition`, and in each
   dimension it first comes to: each dimension keeps its own, so back in the overworld it has its old
   origin again.
 - **It lasts**: through reboots, power cuts, shoves and field flight. It's lost only when the golem

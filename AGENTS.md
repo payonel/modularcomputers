@@ -307,7 +307,7 @@ never acts on its own (no goals). The device walks it to a point relative to its
 walking pace, turns it, and stops it; each ends in an event. **Its moves are deterministic** (the
 user's design, 2026-10-25): it knows no world position (a GPS card later) but always its exact
 **position** (the user's word: robotics' "pose"), odometry from an origin a dimension (set at its
-first tick there or by `setOrigin`, where it is or so that where it is is a given place: a GPS's, on a
+first tick there or by `setPosition`, saying where it is: its origin there, or a given place, a GPS's fix, on a
 block's middle at a right angle; kept through reboots, shoves, fields; lost only when it's an item),
 and `walkTo`/`flyTo` go to points from it. A walk is whole blocks and ends on the asked block's
 middle, facing as it began (a move squares its heading up, and gives it back), or `blocked` on the

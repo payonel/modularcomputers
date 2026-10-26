@@ -80,13 +80,16 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   range), what it scans and reports (where, relative to what: the computer knows no world
   position), its power (a battery in it), whether the computer can answer on it (a line on its
   display, a beep).
+  It could also read a machine's state (the user's, 2026-10-26): why an aborted computer stopped (its
+  board's last shutdown record: power lost, its CPU or RAM changed, its program's error and stack),
+  without powering it on, as a technician's probe reads a dead board.
 
 ## Robots: the bot golem, then drones
 
 - **A GPS card** (the user's, 2026-10-26: players may work in world coordinates if they choose):
   a card that gives where it is in the world, data only, never coupled to the robotics device (no
   method added to it, no talking to it). A program uses its numbers, optionally, with the robotics
-  device's `setOrigin(forward, right, up, heading)` (where it is, from an origin) to put its
+  device's `setPosition(forward, right, up, heading)` (where it is, from its origin) to put its
   position in the world's frame. Open: the axes (forward north (-z), right east (+x), up y, so a
   program passes its fix as `-z, x, y`); its heading (a fix has none, as a real GPS's: move a block
   and fix again); its precision (whole blocks, a block's middle), range or satellites.

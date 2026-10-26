@@ -17,7 +17,7 @@ import net.minecraft.world.phys.Vec3;
  * goes straight, whole blocks, onto a block's middle exactly, without turning (sideways, backwards),
  * stepping freely within its elevation, jumping a block at a time only up toward its height and
  * dropping at most three only down toward it, never into lava; with pathfinding it finds its way,
- * and still ends exactly, facing as it was. Its position is from its origin (its first tick, setOrigin,
+ * and still ends exactly, facing as it was. Its position is from its origin (its first tick, setPosition,
  * each dimension's own), kept through reboots and shoves, lost when it's picked up.
  */
 public class GolemWalkGameTest {
@@ -136,7 +136,7 @@ public class GolemWalkGameTest {
 		golem.setPos(golem.getX(), golem.getY() + 3, golem.getZ());
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> {
-				golem.robotics().setOrigin(args()); // (its origin up there)
+				golem.robotics().setPosition(args()); // (its origin up there)
 				golem.robotics().walk(args(2L));
 			})
 			.thenWaitUntil(() -> same(helper, last(events), blocked("a drop"), "at the edge"))
@@ -195,11 +195,11 @@ public class GolemWalkGameTest {
 	}
 
 	@GameTest
-	public void setOriginCentresItFacingARightAngleAndPickingItUpLosesItsOrigin(GameTestHelper helper) {
+	public void setPositionCentresItFacingARightAngleAndPickingItUpLosesItsOrigin(GameTestHelper helper) {
 		BotGolem golem = GolemFlightGameTest.golem(helper, false);
 		golem.setPos(golem.getX() + 0.2, golem.getY(), golem.getZ() - 0.3);
 		golem.setYRot(BotGolemGameTest.EAST + 30);
-		golem.robotics().setOrigin(args());
+		golem.robotics().setPosition(args());
 		same(helper, golem.getYRot(), BotGolemGameTest.EAST, "a right angle");
 		Vec3 rel = golem.position().subtract(helper.absoluteVec(Vec3.ZERO));
 		helper.assertTrue(Math.abs(rel.x - 1.5) < 1e-9 && Math.abs(rel.z - 1.5) < 1e-9, "on its block's middle: " + rel);
@@ -267,19 +267,18 @@ public class GolemWalkGameTest {
 	}
 
 	/**
-	 * setOrigin with a place (the user's: a GPS's numbers, say): where it is becomes that far from
-	 * the origin, facing that way, and its walks and walkTo go by that frame. Not whole, or not a
+	 * setPosition with a place (the user's: a GPS's fix, say): position gives exactly those numbers, and its walks and walkTo go by that frame. Not whole, or not a
 	 * right angle, it's refused.
 	 */
 	@GameTest(maxTicks = 200)
-	public void setOriginGivesItsPositionAKnownPlacesFrame(GameTestHelper helper) {
+	public void setPositionGivesItsPositionAKnownPlacesFrame(GameTestHelper helper) {
 		BotGolem golem = GolemFlightGameTest.golem(helper, false);
 		List<Object> events = events(helper, golem);
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> {
-				helper.assertTrue(golem.robotics().setOrigin(args(1.5)).failed(), "half a block refused");
-				helper.assertTrue(golem.robotics().setOrigin(args(0L, 0L, 0L, 45L)).failed(), "45 degrees refused");
-				helper.assertTrue(!golem.robotics().setOrigin(args(12L, -3L, 0L, 90L)).failed(), "set");
+				helper.assertTrue(golem.robotics().setPosition(args(1.5)).failed(), "half a block refused");
+				helper.assertTrue(golem.robotics().setPosition(args(0L, 0L, 0L, 45L)).failed(), "45 degrees refused");
+				helper.assertTrue(!golem.robotics().setPosition(args(12L, -3L, 0L, 90L)).failed(), "set");
 				same(helper, position(golem), Map.of("forward", 12L, "right", -3L, "up", 0L, "heading", 90L), "where it said it is");
 				golem.robotics().walk(args(2L)); // (its own forward: the origin's right, as it faces 90)
 			})

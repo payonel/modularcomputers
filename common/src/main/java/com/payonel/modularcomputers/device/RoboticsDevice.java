@@ -100,11 +100,11 @@ public final class RoboticsDevice implements Device {
 		}
 
 		/**
-		 * Sets its origin so that where it is now (on its block's middle, facing the nearest right
-		 * angle) is {@code forward}, {@code right}, {@code up} from it, facing {@code heading}
-		 * (degrees to the origin's right, a right angle): null, or why not.
+		 * Says where it is now (on its block's middle, facing the nearest right angle): {@code forward},
+		 * {@code right}, {@code up} from its origin, facing {@code heading} (degrees to the origin's
+		 * right, a right angle), its origin moved to make it so: null, or why not.
 		 */
-		default String setOrigin(long forward, long right, long up, int heading) {
+		default String setPosition(long forward, long right, long up, int heading) {
 			return "no position";
 		}
 
@@ -253,13 +253,13 @@ public final class RoboticsDevice implements Device {
 		return Result.ok(true);
 	}
 
-	@Method(doc = "position(): where it is from its origin, in the origin's frame: {forward, right, up, heading} (blocks; heading in degrees to the origin's right: 0, 90, 180 or 270). The origin is set where it stands when it's first powered on, in each dimension it first comes to, and by setOrigin; kept through reboots, shoves and fields, each dimension's its own; lost only when it's picked up")
+	@Method(doc = "position(): where it is from its origin, in the origin's frame: {forward, right, up, heading} (blocks; heading in degrees to the origin's right: 0, 90, 180 or 270). The origin is set where it stands when it's first powered on, in each dimension it first comes to, and by setPosition; kept through reboots, shoves and fields, each dimension's its own; lost only when it's picked up")
 	public Result position(Arguments args) {
 		return body.position();
 	}
 
-	@Method(doc = "setOrigin([forward[, right[, up[, heading]]]]): sets its origin (in this dimension) so that where it is now is that far from it, in whole blocks, facing heading (degrees to the origin's right: 0, 90, 180 or 270); all 0 when not given: its origin where it is. It moves onto its block's middle and turns to the nearest right angle first. (From a known place, a GPS's say, it gives position the place's frame.)")
-	public Result setOrigin(Arguments args) {
+	@Method(doc = "setPosition([forward[, right[, up[, heading]]]]): says where it is now, in whole blocks from its origin, facing heading (degrees to the origin's right: 0, 90, 180 or 270), its origin (in this dimension) moved to make it so: position then gives exactly these; all 0 when not given: its origin where it is. It moves onto its block's middle and turns to the nearest right angle first. (A place known in another frame, a GPS's fix say, gives position that frame.)")
+	public Result setPosition(Arguments args) {
 		long[] at = new long[3];
 		for (int i = 0; i < at.length; i++) {
 			double value = args.count() > i && args.get(i) != null ? args.checkNumber(i) : 0;
@@ -272,7 +272,7 @@ public final class RoboticsDevice implements Device {
 		if (heading != Math.rint(heading) || Math.floorMod((long) heading, 90) != 0) {
 			return Result.fail("a right angle expected (0, 90, 180 or 270), got " + args.get(3));
 		}
-		String why = body.setOrigin(at[0], at[1], at[2], (int) Math.floorMod((long) heading, 360));
+		String why = body.setPosition(at[0], at[1], at[2], (int) Math.floorMod((long) heading, 360));
 		return why == null ? Result.ok() : Result.fail(why);
 	}
 
@@ -480,7 +480,7 @@ public final class RoboticsDevice implements Device {
 		return Result.ok(now);
 	}
 
-	@Method(doc = "set(action): does an action, as a table: {action = \"walk\", \"walkTo\", \"fly\" or \"flyTo\", forward, right, up}, {action = \"turn\", way}, {action = \"use\", face}, {action = \"swing\", face}, {action = \"pathfinding\", on}, or {action = \"hover\"}, {action = \"land\"}, {action = \"stop\"}, {action = \"setOrigin\", forward, right, up, heading}")
+	@Method(doc = "set(action): does an action, as a table: {action = \"walk\", \"walkTo\", \"fly\" or \"flyTo\", forward, right, up}, {action = \"turn\", way}, {action = \"use\", face}, {action = \"swing\", face}, {action = \"pathfinding\", on}, or {action = \"hover\"}, {action = \"land\"}, {action = \"stop\"}, {action = \"setPosition\", forward, right, up, heading}")
 	public Result set(Arguments args) {
 		Object value = args.get(0);
 		if (!(value instanceof Map<?, ?> action)) {
@@ -500,12 +500,12 @@ public final class RoboticsDevice implements Device {
 					default -> flyTo(to);
 				};
 			}
-			case "setOrigin" -> {
+			case "setPosition" -> {
 				rest.add(number(action.get("forward")));
 				rest.add(number(action.get("right")));
 				rest.add(number(action.get("up")));
 				rest.add(number(action.get("heading")));
-				yield setOrigin(new Arguments(rest));
+				yield setPosition(new Arguments(rest));
 			}
 			case "pathfinding" -> {
 				rest.add(Boolean.TRUE.equals(action.get("on")));
@@ -522,7 +522,7 @@ public final class RoboticsDevice implements Device {
 				yield action.get("action").equals("use") ? use(new Arguments(rest)) : swing(new Arguments(rest));
 			}
 			case "stop" -> stop(new Arguments(rest));
-			default -> Result.fail("not an action: " + action.get("action") + " (walk, walkTo, fly, flyTo, turn, use, swing, hover, land, stop, setOrigin or pathfinding)");
+			default -> Result.fail("not an action: " + action.get("action") + " (walk, walkTo, fly, flyTo, turn, use, swing, hover, land, stop, setPosition or pathfinding)");
 		};
 	}
 
