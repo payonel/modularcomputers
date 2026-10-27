@@ -14,10 +14,16 @@ Gradle and exits with a pass/fail code.
 
 `./gradlew build` (compile, jars, unit tests) is the fast inner loop and never starts
 Minecraft. One class or test is quicker still (Gradle's own cost is about a second):
-`./gradlew :common:test --tests '*DiskTest'`, or `'*McosTest.haltPowersOff'`. The unit tests run
-in several JVMs side by side (`maxParallelForks` in `common/build.gradle`, a quarter of the cores:
-each JVM its own statics, so no test sees another's), so the suite takes about as long as its
-slowest class (`McosTest`, under a minute). A failing test that waits out its 10 s settle costs 10
+`./gradlew :common:test --tests '*DiskTest'`, or `'*McosTest.haltPowersOff'`. The unit tests use the
+whole host (the user's: popo is for this): a JVM a core (`maxParallelForks` in `common/build.gradle`,
+each JVM its own statics, so no test sees another's), and `McosTest`, the longest class, runs its
+tests side by side (`@Execution(CONCURRENT)`: each its own machine, world and disk folders, named
+uniquely, since a disk is known by its folder's name). The suite takes about 20 s. So the host is
+loaded flat out, and tests are written for it: the tests' server ticks only once the computer needs
+it or has had a tick's time (`TestServer.awaitHost`), a computer gets a whole tick's server time
+(`modularcomputers.serverMillisPerTick`), and a test makes the state it checks on purpose (a wait at
+the server before the keys come, a busy loop bound to the clock the test's ticks move), never by
+a loop's length or a margin. A failing test that waits out its 10 s settle costs 10
 s each: a run with many failures is slow for that reason, not the suite. Loom adds the server game tests to `check`, and `fabric/build.gradle` takes them back out.
 Run `./gradlew testAll` before committing.
 

@@ -63,6 +63,7 @@ class LuaRunnerTest {
 			while ((task = server.poll()) != null) {
 				task.run();
 			}
+			TestServer.awaitHost(machine);
 			machine.tick();
 			try {
 				Thread.sleep(1);
@@ -442,12 +443,15 @@ class LuaRunnerTest {
 			""");
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
 		long end = System.nanoTime() + 5_000_000_000L;
-		while (runner.queuedCalls() == 0) { // its call is queued; the server thread (this test) hasn't made it
+		// A call queued, the server thread (this test) not making it: the hit, or the write after it when
+		// the power-on's own turn made the hit (a fast computer's thread queues it in time for that).
+		while (runner.queuedCalls() == 0 && !com.payonel.modularcomputers.machine.Parked.parked(machine)) {
 			assertThat(System.nanoTime()).isLessThan(end);
 			Thread.onSpinWait();
 		}
+		int before = counter.hits;
 		byte[] saved = machine.persistProgram().orElseThrow();
-		assertThat(counter.hits).as("the save made no call: the device is as the save found it").isZero();
+		assertThat(counter.hits).as("the save made no call: the device is as the save found it").isEqualTo(before);
 		machine.unload();
 		Machine again = new Machine(new Motherboard(Hardware.computer(), new Bus()));
 		again.board().setCpu(new Cpu(CpuTier.TIER_3));
@@ -505,7 +509,9 @@ class LuaRunnerTest {
 		again.restoreUptime(at);
 		again.resumeProgram(saved);
 		settle(again, () -> com.payonel.modularcomputers.machine.Parked.parked(again));
-		assertThat(again.uptime()).as("it ended when it would have, not a whole wait later").isBetween(80L, 86L);
+		// (by its deadline, 80, on the saved clock; a starved host's ticks go on as its thread catches up,
+		// so the bound is the mistake's: a whole wait after the restore, at + 80)
+		assertThat(again.uptime()).as("it ended when it would have, not a whole wait later").isBetween(80L, at + 79);
 		again.pressPower();
 	}
 
@@ -602,9 +608,30 @@ class LuaRunnerTest {
 		});
 	}
 
+	// "local busy = board.uptime() while board.uptime() < busy + 2 do end", in the programs below:
+	// busy (never waiting) until the machine's clock moves on, which only the test's ticks do, so
+	// what the test does before it next ticks comes while the program is busy, however loaded the
+	// host (a counted loop could end first on a starved test thread).
+
+	/** Reads keys until it has 3, each read after a wait: the wait comes first. */
+	private static final String WAITS_FOR_KEYS = """
+		local keys = ""
+		while #keys < 3 do
+		  board.waitForInterrupt(nil, "console")
+		  local _, bytes = board.invoke("console", "read") -- every byte waiting
+		  keys = keys .. (bytes or "")
+		end
+		board.invoke("console", "write", keys)
+		while true do board.waitForInterrupt(nil, 'park') end
+		""";
+
+	/** Until its program waits on {@code source} at the server thread. */
+	private void untilWaitingOn(String source) {
+		settle(() -> machine.runner().map(r -> r.waitingFor().contains(source)).orElse(false));
+	}
+
 	private static final String TYPED = """
-		local n = 0
-		for i = 1, 3000000 do n = n + 1 end -- (the keys are typed meanwhile)
+		local busy = board.uptime() while board.uptime() < busy + 2 do end -- (the keys are typed meanwhile)
 		local keys = ""
 		while #keys < 3 do
 		  board.waitForInterrupt(nil, "console")
@@ -618,11 +645,10 @@ class LuaRunnerTest {
 	@Test
 	void aWaitFillsTheInboxSoReadsNeedNoCall() {
 		ram(3); // 4 a device
-		boot(TYPED);
+		boot(WAITS_FOR_KEYS);
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
-		screen.press("a");
-		screen.press("b");
-		screen.press("c");
+		untilWaitingOn("console"); // its wait at the server thread, which answers it with the keys (into the inbox)
+		screen.press("abc"); // (as one: a key a wake would answer with the first alone)
 		untilParked();
 		assertThat(row(0)).isEqualTo("abc");
 		assertThat(runner.answered()).as("the read came from the inbox: only the write reached the server").isEqualTo(1);
@@ -632,9 +658,7 @@ class LuaRunnerTest {
 	void readingPastTheLastKeyIsFreeWhenNothingIsRaised() {
 		ram(3);
 		boot("""
-			local n = 0
-			for i = 1, 3000000 do n = n + 1 end -- (both keys are typed meanwhile)
-			board.waitForInterrupt(nil, "console")
+			board.waitForInterrupt(nil, "console") -- at the server thread when they're typed
 			local keys = ""
 			while true do
 			  local _, key = board.invoke("console", "read") -- the last read finds the queue empty, the console quiet: nil
@@ -645,8 +669,8 @@ class LuaRunnerTest {
 			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
-		screen.press("a");
-		screen.press("b");
+		untilWaitingOn("console");
+		screen.press("ab"); // (as one: its wait answered with both, into the inbox)
 		untilParked();
 		assertThat(row(0)).isEqualTo("ab");
 		assertThat(runner.answered()).as("only the write reached the server: interrupts are level-triggered").isEqualTo(1);
@@ -661,8 +685,7 @@ class LuaRunnerTest {
 		devices.put("id:redstone", card);
 		TestBus.of(machine, devices);
 		boot("""
-			local n = 0
-			for i = 1, 3000000 do n = n + 1 end -- (both events come meanwhile)
+			local busy = board.uptime() while board.uptime() < busy + 2 do end -- (both events come meanwhile)
 			board.waitForInterrupt(nil, "id:redstone") -- cold: the server thread answers, and fills the inbox
 			board.invoke("id:redstone", "pull")
 			board.waitForInterrupt(nil, "id:redstone") -- warm: answered on the computer's thread
@@ -758,7 +781,7 @@ class LuaRunnerTest {
 		boot(READ_RING + """
 			local ring = board.ring("id:redstone", 2)
 			local n = 0
-			for i = 1, 3000000 do n = n + 1 end -- the events come meanwhile
+			local busy = board.uptime() while board.uptime() < busy + 2 do end -- the events come meanwhile
 			local first = ring.tail - ring.head -- full: no more than its room
 			local got = #take(ring)
 			while got < 5 do -- room again: the rest comes
@@ -871,6 +894,7 @@ class LuaRunnerTest {
 			while ((task = server.poll()) != null) {
 				task.run();
 			}
+			TestServer.awaitHost(machine);
 			machine.tick();
 			if (keys.containsKey(tick)) {
 				screen.press(keys.get(tick));
@@ -991,8 +1015,7 @@ class LuaRunnerTest {
 		devices.put("id:redstone", card);
 		TestBus.of(machine, devices);
 		boot("""
-			local n = 0
-			for i = 1, 3000000 do n = n + 1 end -- (the keys and events come meanwhile)
+			local busy = board.uptime() while board.uptime() < busy + 2 do end -- (the keys and events come meanwhile)
 			board.waitForInterrupt(nil, "console", "id:redstone") -- cold: every key in one read, and 2 events
 			board.invoke("console", "write", "waited")
 			board.waitForInterrupt(1000, "nothing")

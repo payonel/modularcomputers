@@ -39,12 +39,23 @@ dependencies {
 	testImplementation "org.assertj:assertj-core:${project.assertj_version}"
 }
 
-/** Test JVMs side by side, classes shared among them (each JVM its own statics, so no test sees another's). */
-def TEST_FORKS = Math.max(1, Runtime.runtime.availableProcessors().intdiv(4))
+/**
+ * Test JVMs side by side, classes shared among them (each JVM its own statics, so no test sees
+ * another's): a JVM a core, the host's to use (the user's: the dev machine is for this).
+ */
+def TEST_FORKS = Runtime.runtime.availableProcessors()
 
 test {
 	useJUnitPlatform()
 	maxParallelForks = TEST_FORKS
+	// A class marked @Execution(CONCURRENT) runs its tests side by side in its JVM (McosTest, the
+	// longest); every other class runs as before, a test at a time.
+	systemProperty 'junit.jupiter.execution.parallel.enabled', 'true'
+	systemProperty 'junit.jupiter.execution.parallel.mode.default', 'same_thread'
+	systemProperty 'junit.jupiter.execution.parallel.config.strategy', 'dynamic'
+	// A computer's server time a tick, a whole tick's (LuaRunner.SERVER_NANOS_PER_TICK): the host is
+	// loaded flat out, and a starved test thread spent the game's millisecond before it worked.
+	systemProperty 'modularcomputers.serverMillisPerTick', '50'
 	// The manual's Lua is tested (DocsLuaTest, and McosTest runs docs/examples): its pages are inputs.
 	inputs.dir(rootProject.file('docs')).withPropertyName('manual').withPathSensitivity(PathSensitivity.RELATIVE)
 	testLogging {

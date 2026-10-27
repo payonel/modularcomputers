@@ -38,7 +38,8 @@ computers really work.
   agent session; it can't grant permissions). Take the latest builds when told to update. Their bugs
   look like ours: check against stock Lua's semantics.
 - **Commands:** `./gradlew :common:test --tests '*SomeTest'` while iterating (seconds);
-  `./gradlew build` (compile and unit tests, about a minute: parallel JVMs); `./gradlew testAll` (unit tests,
+  `./gradlew build` (compile and unit tests, about 20 s: they use the whole host, a JVM a core, so
+  tests are written for a loaded host: `.agents/TESTING.md`); `./gradlew testAll` (unit tests,
   server game tests on both loaders, Fabric client game tests on Xvfb against the release jar)
   before claiming anything works. `.agents/TESTING.md` has the details; `scripts/headless.sh` runs a
   client on a virtual display (`:fabric:runClient` plays in `fabric/run`).
@@ -751,6 +752,13 @@ Lessons from mistakes, each with its test:
   the light shows what the press came to, from the board (`BoardAssembly.pressPower`, for every
   holder), never "on" for an `ON` press. (`cpuWithoutEepromAbortsAndItsLightBlinks`,
   `aProgramReturningAsItStartsShowsItsAbortAtThePress`)
+- **`a and b or c` gives c when b is false:** a redstone file's poll readiness was
+  `device.pull and changed or nil`, so "not changed" became nil, "no PRI of its own", and the
+  device's news (held until a read or an ioctl) made the poll ready for ever: the door example spun
+  its computer. Write the branch out when b can be false. (`theDoorOpensOnAPress...`)
+- **A test's server ticks at the computer's pace:** a loop ticking every millisecond ran a starved
+  computer's clock ahead of its code on a loaded host (timeouts expired, deadlines passed early),
+  which hid the spinning door. (`TestServer.awaitHost`)
 - **A wait for ever wraps round:** a deadline is now plus its length, and `Long.MAX_VALUE` ticks
   added to now is in the past, so a Java program's park (`Program.park`) answered at once and spun.
   Saturate a deadline at the end of time. (`RuntimeTest.callsAreImmediate...`)

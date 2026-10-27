@@ -434,8 +434,13 @@ local function devicefile(device, mode)
       if not changed and device.pull then
         changed = drain() -- (none: k.take listens for the next)
       end
-      -- (a device without events leaves PRI to its news: withmethods')
-      return {IN = true, PRI = device.pull and changed or nil, OUT = device.set ~= nil}
+      -- (a device without events leaves PRI to its news, withmethods': nil; one with them says,
+      -- false too, never "and changed or nil", which makes a false nil and its news ready for ever)
+      local pri = nil
+      if device.pull then
+        pri = changed
+      end
+      return {IN = true, PRI = pri, OUT = device.set ~= nil}
     end,
     -- A change a poll took, for a pull ioctl; the last one pulled is the change looked at (PRI off).
     held = function(self)

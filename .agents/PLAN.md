@@ -107,10 +107,12 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   ends in its `stopped` event always (now only when it was moving), once settled, so a program
   waits for the settle as for any slow action, by its event, never by polling `state()`. When it
   can't settle (something on the block's middle), it ends in `blocked` and why instead.
-- **POST debug LEDs** (to propose to the user, 2026-10-26): an aborted computer's why is readable
-  only after a boot that works (or with the scanner), so a computer that can't boot at all (no RAM)
-  shows only its blinking light. Real boards light a CPU/DRAM/VGA/BOOT LED or a two-digit Q-code;
-  the parts view could mark the faulty socket from the board's shutdown record.
+- **The board's own log, behind a warning triangle** (the user's, 2026-10-26; a BMC's event log and
+  console, apart from the OS): an aborted computer's why is otherwise readable only after a boot that
+  works (or with the scanner), so one that can't boot (no RAM) shows only its blinking light. A
+  triangle in the case view's button column, lit amber after an abort, opens a small read-only
+  terminal the firmware writes (each abort's cause and message, a crash's error and stack): not a
+  bus device, never written by user programs.
 - **A `shoved` event** (the user's, 2026-10-26; the device rule's "every change to its state"): a
   shove moves the golem without its program, so it reports it, with its `position()` after (maybe
   off a block's middle: a program settles with `stop()` before it measures).
@@ -122,8 +124,10 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   event each; a `blocked` one drops the rest, its event saying how many; `stop()` clears the queue,
   then settles. A new walk then queues behind the last instead of replacing it (change course:
   `stop()` first, as a motion controller's; `stop()` is the cancel: the queue cleared, settled,
-  start over). Tags go on every device's slow actions, the ones ending in an event (a craft, a
-  request, a Disk Station's job), not on methods answering at once; the manual teaches them on all
+  start over). Every method of every device answers with a tag (the user's, 2026-10-26: one rule, very
+  intuitive, over the hardware's split of untagged register reads and tagged commands); a read's
+  tag simply never has an event. Open: where the tag goes in an answer without breaking `local ok,
+  why = robot.walk(5)` (to propose before building); the manual teaches them on all
   three layers (the board, `sys`, `devices`).
 - **Walking, decided and built (2026-10-25):** a position (odometry from an origin a dimension), whole-
   block walks ending exactly, straight without pathfinding (the default), the game's pathfinder as

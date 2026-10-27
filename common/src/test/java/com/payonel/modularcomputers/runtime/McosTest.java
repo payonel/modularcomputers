@@ -31,8 +31,10 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * mcos (Lua), booted from a disk through the bootloader, as a player would: commands typed at its
  * shell. Tests bring their own programs and check what they do (files on the disks, the computer
- * halting or running), never what mcos says.
+ * off or running), never what mcos says. Its tests run side by side (the suite's longest class):
+ * each its own machine, disk folder and world.
  */
+@org.junit.jupiter.api.parallel.Execution(org.junit.jupiter.api.parallel.ExecutionMode.CONCURRENT)
 class McosTest extends McosHarness {
 	/** Another computer running mcos from a disk of its own, on this test's server thread, with a network card in {@code world}. */
 	private final class Other {
@@ -42,7 +44,7 @@ class McosTest extends McosHarness {
 		final com.payonel.modularcomputers.device.NetworkCard card;
 
 		Other(String name, Object world, java.util.UUID id) {
-			root = McosTest.this.world.resolve(name);
+			root = diskFolder(name);
 			LuaScripts.copyTree("mcos", root);
 			card = networkCard(world, id);
 			Eeprom eeprom = new Eeprom(LuaScripts.read("eeprom/boot"));
@@ -91,20 +93,37 @@ class McosTest extends McosHarness {
 	 */
 	@Test
 	void readingTheClockCostsNoTicks() {
-		file("clock.lua", """
-			local sys = require("sys")
-			local first = sys.uptime()
-			for _ = 1, 40 do
-			  sys.uptime()
-			end
-			local out = io.open("/out", "w")
-			out:write(sys.uptime() - first < 0.5 and "fast" or ("slow: " .. (sys.uptime() - first)), "\\n")
-			out:close()
-			""");
+		// Counted in board calls, not time (a loaded host's ticks go on whatever the program does):
+		// the same script reading the clock 40 times or none costs the same calls, give or take the
+		// shell's own; a read a call (the clock as a board call) would be 40 more.
+		for (int reads : new int[] {0, CLOCK_READS}) {
+			file("clock" + reads + ".lua", """
+				local sys = require("sys")
+				for _ = 1, %d do
+				  sys.uptime()
+				end
+				local out = io.open("/out%d", "w")
+				out:write("done\\n")
+				out:close()
+				""".formatted(reads, reads));
+		}
 		boot();
-		type("lua /clock.lua\r");
-		untilFile(root().resolve("out"), "fast\n");
+		long[] calls = new long[2];
+		int run = 0;
+		for (int reads : new int[] {0, CLOCK_READS}) {
+			untilIdle();
+			long before = machine.runner().orElseThrow().answered();
+			type("lua /clock" + reads + ".lua\r");
+			untilFile(root().resolve("out" + reads), "done\n");
+			untilIdle();
+			calls[run++] = machine.runner().orElseThrow().answered() - before;
+		}
+		assertThat(calls[1] - calls[0]).as("calls for %d reads of the clock, more than for none: %s", CLOCK_READS, java.util.Arrays.toString(calls))
+			.isLessThan(CLOCK_READS / 2);
 	}
+
+	/** How often the clock test reads the clock. */
+	private static final int CLOCK_READS = 40;
 
 	/** recvmsg says where a datagram came in: the card it came in on, and how far it came. */
 	@Test
@@ -744,7 +763,7 @@ class McosTest extends McosHarness {
 
 	@Test
 	void aDiskStationsFileSaysWhatsInItAndALineWrittenIsAnAction() {
-		Disk target = new Disk(DiskTier.TIER_2, world.resolve("station-disk"));
+		Disk target = new Disk(DiskTier.TIER_2, diskFolder("station-disk"));
 		var station = new com.payonel.modularcomputers.device.DiskStation(new com.payonel.modularcomputers.device.DiskStation.Bay() {
 			@Override
 			public Disk disk(String which) {
@@ -773,7 +792,7 @@ class McosTest extends McosHarness {
 
 	@Test
 	void aDisksFileIsItsBytesByOffsetAndAFilesystemsDiskRefusesIt() {
-		Path folder = world.resolve("raw-disk");
+		Path folder = diskFolder("raw-disk");
 		Disk raw = new Disk(DiskTier.TIER_1, folder);
 		raw.format(Disk.RAW);
 		devices.put("sata:1", raw);
@@ -1166,7 +1185,7 @@ class McosTest extends McosHarness {
 		type("lsdev > /before\r");
 		settle(() -> Files.isRegularFile(root().resolve("before")) && read(root().resolve("before")).contains("storage0"));
 		assertThat(read(root().resolve("before"))).doesNotContain("storage1");
-		devices.put("sata:1", new Disk(DiskTier.TIER_1, world.resolve("late")));
+		devices.put("sata:1", new Disk(DiskTier.TIER_1, diskFolder("late")));
 		TestBus.of(machine, devices);
 		untilIdle();
 		type("lsdev > /after\r");

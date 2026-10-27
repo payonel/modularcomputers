@@ -42,6 +42,13 @@ abstract class McosHarness {
 
 	@TempDir
 	Path world;
+	/** This test's mark on its disks' folders: a disk is known by its folder's name (its id), so tests side by side never share one. */
+	private final String run = java.util.UUID.randomUUID().toString();
+
+	/** A disk's folder in the world, by a name unique to this test (as the game's are UUIDs). */
+	Path diskFolder(String name) {
+		return world.resolve(name + "-" + run);
+	}
 
 	McosHarness() {
 		devices.put("id:screen", screen);
@@ -58,7 +65,7 @@ abstract class McosHarness {
 
 	/** The boot disk's folder (mcos's files, and the test's). */
 	Path root() {
-		return world.resolve("mcos-disk");
+		return diskFolder("mcos-disk");
 	}
 
 	/** Puts a file on the boot disk before it boots. */
@@ -74,7 +81,7 @@ abstract class McosHarness {
 
 	/** A second disk, at sata:1, with its folder. */
 	Path dataDisk() {
-		Path folder = world.resolve("data-disk");
+		Path folder = diskFolder("data-disk");
 		devices.put("sata:1", new Disk(DiskTier.TIER_1, folder));
 		return folder;
 	}
@@ -101,11 +108,13 @@ abstract class McosHarness {
 	void settle(BooleanSupplier done) {
 		long end = System.nanoTime() + 20_000_000_000L;
 		while (!done.getAsBoolean()) {
-			assertThat(System.nanoTime()).as(() -> "settled in time; the screen:\n" + screen()).isLessThan(end);
+			assertThat(System.nanoTime()).as(() -> "settled in time (at tick " + machine.uptime() + ", its program "
+				+ machine.runner().map(r -> r.state() + " on " + r.waitingFor()).orElse("gone") + "); the screen:\n" + screen()).isLessThan(end);
 			Runnable task;
 			while ((task = server.poll()) != null) {
 				task.run();
 			}
+			TestServer.awaitHost(machine);
 			machine.tick();
 			for (Runnable tick : ticks) {
 				tick.run(); // (another computer's, and what a test does each tick)

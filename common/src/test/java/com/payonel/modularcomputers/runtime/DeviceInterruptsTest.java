@@ -183,7 +183,8 @@ class DeviceInterruptsTest {
 		STIMULI.get(device.getClass()).accept(device);
 		serve();
 		machine.tick(); // the tick after its data came: the wait is answered in it
-		assertThat(machine.runner().map(Runner::state)).as("woken at the next tick").isNotEqualTo(java.util.Optional.of(Runner.State.WAITING));
+		assertThat(machine.runner().map(Runner::waitingFor).orElse(java.util.List.of())).as("woken at the next tick: its wait answered (its thread goes on when it's scheduled)")
+			.doesNotContain(name);
 		settle(() -> com.payonel.modularcomputers.machine.Parked.parked(machine));
 		assertThat(screen.buffer().row(0).strip()).as("answered by the name it was asked by").isEqualTo(name);
 	}
@@ -202,6 +203,7 @@ class DeviceInterruptsTest {
 		while (!done.getAsBoolean()) {
 			assertThat(System.nanoTime()).as("settled in time").isLessThan(end);
 			serve();
+			TestServer.awaitHost(machine);
 			machine.tick();
 			try {
 				Thread.sleep(1);

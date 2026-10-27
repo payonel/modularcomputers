@@ -75,8 +75,14 @@ import java.util.function.Supplier;
  * library's functions and userdata, named by their path) are worked out the same way in both.
  */
 public final class LuaRunner implements Runner {
-	/** How long a computer's board calls may use the server thread each tick. */
-	public static final long SERVER_NANOS_PER_TICK = TimeUnit.MILLISECONDS.toNanos(1);
+	/**
+	 * How long a computer's board calls may use the server thread each tick: a millisecond, or what
+	 * the {@link #SERVER_MILLIS_PROPERTY} system property says (the unit tests give a whole tick: their
+	 * host runs them all at once, and a starved test thread spent its millisecond before it worked).
+	 */
+	public static final long SERVER_NANOS_PER_TICK = TimeUnit.MILLISECONDS.toNanos(Long.getLong(LuaRunner.SERVER_MILLIS_PROPERTY, 1));
+	/** The system property that sets {@link #SERVER_NANOS_PER_TICK}, in milliseconds. */
+	public static final String SERVER_MILLIS_PROPERTY = "modularcomputers.serverMillisPerTick";
 	/** The firmware, in the mod's Lua scripts. */
 	private static final String FIRMWARE = "cpu/machine";
 	/** What the VM opens: the firmware needs debug (budgets, freezing); it hands out what it chooses. */
