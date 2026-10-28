@@ -139,8 +139,8 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
     - **The internet card, call by call** (2026-10-28): a request's tag is its handle (the user's: as
       an fd), naming it in its later calls, each with a tag of its own whose event carries its
       payload. `request(url, method, headers[, length])` ends once its request line and headers are
-      sent; `write(tag, data)` takes what it can (capped), its event saying how much (the user's:
-      the program writes again with the rest; a body of unknown length goes chunked, `length` for a
+      sent; `write(tag, data)` takes what fits, answering `tag, n` at once, its event once they're
+      sent (the user's: the program writes again with the rest; a body of unknown length goes chunked, `length` for a
       server that wants `Content-Length`); `response(tag)` finishes the body and ends once the status
       and headers are in (asking for the response ends the upload, as Java's `getInputStream`:
       a request ending at its headers would deadlock an upload); `read(tag, n)` ends with the next
@@ -199,8 +199,12 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
     lets go, so nothing of the old plan runs after; a device's kind shows in `/sys` and
     its manual page (at layer 1 a tag and a direct answer can both be numbers); `dmesg` logs an
     event's name, tag and size, never its data; a queued `write` (the sound card's, the internet
-    card's): open, being settled with the user (proposed: whole or refused at once, `full` or `too
-    large`, ending when its bytes are played or sent, so `devices.sync` means done with no `drain`); a reboot drops every device's queue, as power-off does (the
+    card's) takes what fits (the user's), answering at once `tag, n` (the room is checked as the call
+    arrives, so the count is part of its acceptance, as the tag is: a queued call answers at once
+    only what was accepted, how it ended coming in its event); none fits, no tag (`full`); its event
+    comes once the bytes it took have played or been sent, so `devices.sync` means done, and the
+    sound card needs no `drain`; a field card's capture outlives the process that made it (the
+    user's: a command; the field holds until it's released); a reboot drops every device's queue, as power-off does (the
     tag counter starts again).
   - **To rewrite when built:** `lib/http.lua`, `wget`, `curl`, `aplay` (the sound card's `sync`), the
     robotics and redstone drivers, `lib/devices.lua`, the manual's examples and its three-layer
