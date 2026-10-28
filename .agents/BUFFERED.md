@@ -128,4 +128,4 @@ Each step lands with its tests (a bug's seen failing first), the manual and AGEN
 - [x] **9. A deep code review** by a reviewer who didn't write it (a subagent given this spec and
   the diff: blocked threads that never wake, lost events, races between threads and devices, a
   command that runs twice or never, what new players will find confusing), and its findings fixed.
-- [ ] **10. The report** to the user.
+- [x] **10. The report** to the user (a review page, not committed: https://claude.ai/artifact/8N5pNi4MVZykTLioJgFroh).
