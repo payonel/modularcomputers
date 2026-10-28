@@ -148,11 +148,15 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
    them out. On its legs it presses pressure plates.
 2. **The crafting card** (built), in any computer: storage (a 3x3 crafting grid, the rest storage), its
    own tab on the right of the computer's GUI (a tab button each card), where a player crafts by
-   hand; its API needs robotics (a case's calls fail, "no robotics available": its Shift details
-   say so), and crafting programmatically takes time and
-   cards craft at once (more cards, more throughput); the output goes to storage, no room: the craft
-   fails; it picks items up from the world and drops them, moves them to and from the hand and
+   hand; its API needs robotics (a case's calls fail, "no robotics": its Shift details say so), and a
+   craft is its robot's hands' work (a tick, one card at a time, after its moves); the output goes
+   to storage, no room: the craft fails; it picks items up from the world and drops them, moves them to and from the hand and
    containers. With one in, a tiny chest on its back, partly sunk in its frame.
+   **Still to come: timed recipes** (the user's, 2026-10-28), when a mod's recipe has a time of its
+   own: the robot's hands set it up (a tick, robotics busy as now), then the time is the card's
+   process, the card busy and the robot free (to walk, or to set up a craft on another card: two
+   cards' timed crafts overlap). Maybe an animation on the chest on its back while one runs. The
+   hint says nothing of what runs side by side (the user's: it only confuses).
 3. **The energy field card** (built) (any computer): suspends a creature or an item in a translucent blue
    sphere; held, it falls in place and can't act, move, attack or react (a creeper doesn't blow);
    the field moves, and what it holds with it (lift a player to a higher floor). Never blocks (one

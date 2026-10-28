@@ -18,7 +18,7 @@ goes into its storage.
 | Where | Any expansion slot of a computer or a [Bot Golem](/hardware/bot-golem/) |
 | `/dev` | `crafting0` (`crafting1` the next) |
 | Slots | 1 to 9 its grid (rows left to right, top to bottom), 10 to 25 its storage |
-| A craft | Half a second (10 ticks) |
+| A craft | A tick (a twentieth of a second) |
 | Power | A running CPU's tick for each craft, and each move |
 | Recipe | Crafting table, chip, chest over three copper nuggets over three gold nuggets |
 
@@ -89,7 +89,7 @@ device's `held`: `damage`, `maxDamage`, `label` where they apply).
 
 ### craft([count]) → true
 
-Crafts what its grid makes, `count` times (1), each taking half a second, what it makes going into
+Crafts what its grid makes, `count` times (1), each taking a tick, what it makes going into
 its storage. A command: it answers at once, and its robot is busy until it's done. Its event,
 `craft`: `ok` and its `result`, `{name, count}` (how many it made), or not and why (`no recipe`,
 `empty grid`, `no room`: its storage can't take what it made, so the craft isn't made and

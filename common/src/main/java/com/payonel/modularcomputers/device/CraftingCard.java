@@ -25,8 +25,8 @@ public final class CraftingCard extends Card implements Buffered, RoboticsDevice
 	public static final int GRID = 9;
 	public static final int STORAGE = 16;
 	public static final int SLOTS = GRID + STORAGE;
-	/** How long a craft takes, in ticks: a player's pace at a crafting table, about. */
-	public static final int CRAFT_TICKS = 10;
+	/** How long a craft takes, in ticks: its robot's hands at the grid, as quick as a player's click at a crafting table. */
+	public static final int CRAFT_TICKS = 1;
 	/** What a craft costs: a running CPU's tick. */
 	public static final int CRAFT_COST = PowerUnits.CPU;
 	/** What moving items costs (a move, a pick up, a drop, a container's): a running CPU's tick. */

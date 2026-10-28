@@ -29,7 +29,7 @@ import net.minecraft.world.phys.AABB;
 
 /**
  * The crafting card (user design, 2026-10-24): in a robot, a program crafts from its grid into its
- * storage, a craft taking time, two cards crafting at once; a craft with no room fails, its grid
+ * storage, a craft taking time, two cards crafting in turn; a craft with no room fails, its grid
  * left as it was; what the robot breaks goes to its storage; drop fills a container there and
  * drops the rest; store answers true only when nothing's left. In a case its methods need
  * robotics, but a player crafts with it by hand in the case's view.

@@ -388,8 +388,9 @@ the card goes. Any computer takes it, and its view gets a tab a card (right of t
 player crafts by hand, as at a crafting table (the game's result slot). Its methods need robotics:
 in a case they fail (`no robotics`), in a robot `CraftingBench` works them (the game's recipes;
 what's made into storage, all or nothing: no room, no craft). Its methods are its robot's commands
-(all but `pull`): a craft takes time and keeps the robot busy (the user's, 2026-10-27), so a robot
-crafts with one card at a time. Its `/dev` file reads as its
+(all but `pull`, `list` and `get`): robotics is how a robot handles things, its hands at a grid too
+(the user's, 2026-10-27 and -28), so a craft waits for its moves to end, keeps the robot busy a tick
+(a click at a table), and a robot crafts with one card at a time. Its `/dev` file reads as its
 items (`name count` a line) and a line written dumps its storage (below, or at the face named).
 A view's tabs are one mechanism (`SideTabs`, the user's): a tab for each card whose kind
 registered one, each opening its panel left of the board (the bus order is the parts view's own
