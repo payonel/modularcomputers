@@ -109,7 +109,8 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   terminal the firmware writes (each abort's cause and message, a crash's error and stack): not a
   bus device, never written by user programs.
 - **Tags, and the robot's queue** (the user's design, 2026-10-26 and 27, worked out together; the
-  manual teaches it on all three layers, the board, `sys` and `devices`):
+  manual teaches it on all three layers, the board, `sys` and `devices`). Its spec and build, being
+  built: `.agents/TAGS.md`.
   - **Tags are layer 0's** (the firmware's): it sees every call, the ones it answers itself too (the
     inbox, the clock), so it numbers them, one counter a computer, always increasing (saved with the
     Lua state by Styx), and a call to the host carries its tag (`"call", tag, ...`) so a device sees
