@@ -106,7 +106,7 @@ class DiskStationTest {
 	void setTakesAnActionAndGetSaysWhatsInIt() {
 		bay.disks.put(DiskStation.TARGET, disk("g"));
 		assertThat(station.set(args(Map.of("action", "wipe"))).failed()).isFalse();
-		assertThat(station.set(args(Map.of("action", "explode"))).error()).startsWith("no such action");
+		assertThat(station.set(args(Map.of("action", "explode"))).error()).isEqualTo("not an action: explode");
 		@SuppressWarnings("unchecked")
 		Map<String, Object> state = (Map<String, Object>) station.get(args()).first();
 		assertThat(state).doesNotContainKey(DiskStation.SOURCE);

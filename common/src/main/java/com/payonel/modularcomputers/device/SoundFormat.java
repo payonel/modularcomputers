@@ -29,11 +29,11 @@ public record SoundFormat(int rate, String encoding, int channels, int block) {
 	/** Why it isn't one the card plays, or null. */
 	public String invalid() {
 		if (!RATES.contains(rate)) {
-			return "unsupported rate: " + rate + " (" + RATES + ")";
+			return "unsupported rate: " + rate;
 		} else if (!ENCODINGS.contains(encoding)) {
-			return "unsupported encoding: " + encoding + " (" + String.join(", ", ENCODINGS) + ")";
+			return "unsupported encoding: " + encoding;
 		} else if (channels < 1 || channels > MAX_CHANNELS) {
-			return "unsupported channels: " + channels + " (1 or 2)";
+			return "unsupported channels: " + channels;
 		} else if (encoding.equals(IMA_ADPCM) && (block <= ImaAdpcm.HEADER * channels || block > MAX_BLOCK || block % (4 * channels) != 0)) {
 			return "bad ADPCM block size: " + block;
 		}

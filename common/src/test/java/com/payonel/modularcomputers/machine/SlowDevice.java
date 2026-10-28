@@ -23,6 +23,18 @@ public final class SlowDevice implements com.payonel.modularcomputers.bus.Device
 	/** Ticks left of the command running (0: idle). */
 	private long left;
 	private long done;
+	/**
+	 * Which refusal (busy) the work running ends at, just as it refuses (0: none): its end comes
+	 * between the refusal and the kernel's next look, the race a loaded host makes now and then, made
+	 * on purpose.
+	 */
+	private int endsAtRefusal;
+	private int refusals;
+
+	/** Its work's end comes just as it refuses a command, the {@code nth} time it does. */
+	public void endAsItRefuses(int nth) {
+		endsAtRefusal = nth;
+	}
 
 	@Override
 	public DeviceType type() {
@@ -36,7 +48,14 @@ public final class SlowDevice implements com.payonel.modularcomputers.bus.Device
 
 	@Override
 	public String refusal(String method) {
-		return left > 0 ? BUSY : null;
+		if (left <= 0) {
+			return null;
+		}
+		if (++refusals == endsAtRefusal) {
+			left = 1;
+			tick(); // (busy, and then done: its end is waiting before anyone looks)
+		}
+		return BUSY;
 	}
 
 	@Method(doc = "work(ticks): works that many ticks; true at once (its event: work)")

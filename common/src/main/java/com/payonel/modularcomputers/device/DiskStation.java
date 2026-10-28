@@ -136,7 +136,7 @@ public final class DiskStation implements Device {
 	public Result set(Arguments args) {
 		Object action = args.checkTable(0).get("action");
 		if (!(action instanceof String name) || !ACTIONS.contains(name)) {
-			return Result.fail("no such action: " + action + " (" + String.join(", ", ACTIONS) + ")");
+			return Result.fail("not an action: " + action);
 		}
 		return act(name);
 	}
@@ -150,7 +150,7 @@ public final class DiskStation implements Device {
 			case "clone" -> clone(none);
 			case "install" -> install(none);
 			case "update" -> update(none);
-			default -> Result.fail("no such action: " + action);
+			default -> Result.fail("not an action: " + action);
 		};
 	}
 }

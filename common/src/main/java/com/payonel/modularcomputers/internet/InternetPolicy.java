@@ -24,14 +24,14 @@ public record InternetPolicy(boolean enabled, List<String> allow, List<String> d
 	/** Why a host can't be reached at these addresses, or null: it can. */
 	public String refused(String host, List<InetAddress> addresses) {
 		if (!enabled) {
-			return "the internet is turned off on this server";
+			return "disabled";
 		}
 		if (addresses.isEmpty()) {
 			return "unknown host";
 		}
 		for (InetAddress address : addresses) {
 			if (listed(deny, host, address)) {
-				return "denied by this server";
+				return "denied";
 			}
 		}
 		for (InetAddress address : addresses) {
@@ -53,17 +53,17 @@ public record InternetPolicy(boolean enabled, List<String> allow, List<String> d
 			}
 			int first = bytes[0] & 0xFF;
 			if (six.isLoopbackAddress() || six.isAnyLocalAddress()) {
-				return "a loopback or unspecified address";
+				return "loopback";
 			} else if (six.isLinkLocalAddress() || six.isSiteLocalAddress()) {
-				return "a link-local address";
+				return "link-local";
 			} else if ((first & 0xFE) == 0xFC) {
-				return "a private address (unique local)";
+				return "private";
 			} else if (six.isMulticastAddress()) {
-				return "a multicast address";
+				return "multicast";
 			} else if (first == 0x20 && (bytes[1] & 0xFF) == 0x01 && (bytes[2] & 0xFF) == 0x0D && (bytes[3] & 0xFF) == 0xB8) {
-				return "a documentation address"; // 2001:db8::/32
+				return "documentation"; // 2001:db8::/32
 			} else if (first == 0x20 && bytes[1] == 0x01 && bytes[2] == 0 && bytes[3] == 0) {
-				return "a Teredo address (an IPv4 address hidden in it)"; // 2001::/32
+				return "teredo"; // 2001::/32: an IPv4 address hidden in it
 			}
 			return null;
 		}
@@ -71,21 +71,21 @@ public record InternetPolicy(boolean enabled, List<String> allow, List<String> d
 		int a0 = b[0] & 0xFF;
 		int a1 = b[1] & 0xFF;
 		if (a0 == 0 || address.isAnyLocalAddress()) {
-			return "an unspecified address"; // 0.0.0.0/8: "this network" (0.0.0.0 is this host on Linux)
+			return "unspecified"; // 0.0.0.0/8: "this network" (0.0.0.0 is this host on Linux)
 		} else if (a0 == 127) {
-			return "a loopback address (the server itself)";
+			return "loopback"; // (the server itself)
 		} else if (a0 == 10 || a0 == 172 && a1 >= 16 && a1 <= 31 || a0 == 192 && a1 == 168) {
-			return "a private address (the server's network)";
+			return "private"; // (the server's network)
 		} else if (a0 == 169 && a1 == 254) {
-			return "a link-local address (a cloud's metadata lives here)";
+			return "link-local"; // (a cloud's metadata lives here)
 		} else if (a0 == 100 && a1 >= 64 && a1 <= 127) {
-			return "a shared address (carrier-grade NAT)";
+			return "shared"; // (carrier-grade NAT)
 		} else if (a0 == 192 && a1 == 0 && (b[2] & 0xFF) == 0) {
-			return "a reserved address (IETF protocol assignments)";
+			return "reserved"; // (IETF protocol assignments)
 		} else if (a0 == 198 && (a1 == 18 || a1 == 19)) {
-			return "a reserved address (benchmarking)";
+			return "reserved"; // (benchmarking)
 		} else if (a0 >= 224) {
-			return "a multicast or reserved address";
+			return "reserved"; // (multicast, or reserved)
 		}
 		return null;
 	}

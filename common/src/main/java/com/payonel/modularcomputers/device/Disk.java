@@ -56,6 +56,8 @@ import java.util.stream.Stream;
 public final class Disk implements Device {
 	public static final String HFS = "hfs";
 	public static final String RAW = "raw";
+	/** Why an image can't go onto it, before the bytes it needs: more than its tier holds. */
+	public static final String TOO_BIG = "too big: ";
 	/** What each file or directory costs on top of its bytes, like an inode. */
 	public static final int ENTRY = 512;
 	/** Open files at once, all programs together. */
@@ -643,7 +645,7 @@ public final class Disk implements Device {
 			String mode = source.mode();
 			long needed = mode.equals(RAW) ? source.tier.bytes() : source.used();
 			if (needed > tier.bytes()) {
-				throw new Refused("doesn't fit: " + needed + " bytes, on a disk of " + tier.bytes());
+				throw new Refused(TOO_BIG + needed); // (bytes it needs, more than its tier holds)
 			}
 			formatted(mode);
 			try {

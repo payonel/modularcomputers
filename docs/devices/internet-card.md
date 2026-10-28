@@ -35,7 +35,7 @@ proxies, cookies or server details; it names itself `ModularComputers`.
 
 A server's operator can turn it off (`internet_enabled`) and allow or deny hosts and ranges
 (`internet_allow`, `internet_deny`). When it is off, `request` fails with
-`the internet is turned off on this server`.
+`disabled`.
 
 Timeouts: 10 seconds to connect, 30 with nothing read, 10 minutes in all. The status line and
 headers together are at most 64 KiB. The methods are `GET`, `HEAD`, `POST`, `PUT`, `DELETE`, `PATCH`
@@ -59,7 +59,7 @@ brought.
 ```
 GET https://example.com/ 200 143ms 1256
 POST https://example.com/paste 201 310ms 42
-GET http://10.0.0.1/ - 2ms 0 refused: a private address (the server's network)
+GET http://10.0.0.1/ - 2ms 0 refused: private
 ```
 
 - **Reading** gives the next line; with none waiting, a read waits for one. `cat /dev/internet0`
@@ -87,10 +87,12 @@ options)` makes a request (`options.method`, `headers`, `body`, `follow` to foll
 Starts a request and gives its handle (a number) at once. The method defaults to `GET`, or `POST`
 when there is a body. `headers` is a table of names and values. The body is a string. The URL must be
 `http` or `https` with a host. It fails with a message when the request cannot be made:
-`not an http or https URL`, `not a method it sends`, `a header the card writes itself`, a body
-over 1 MiB, `too many requests open (4)`, or `the server's internet is busy: try again soon`.
-Whether the address is allowed is judged as the request runs, and a refusal is the request's
-failure (`refused: ...`). A request costs power.
+`not a URL: `, `not http: `, `no host: ` or `credentials: ` and the URL (credentials in a URL
+aren't sent), `not a method: `, `not a header: ` or `reserved header: ` (one the card writes
+itself) and what it was, `too long: 1048576` (a body over 1 MiB), `too many open: 4`, or
+`server busy`. Whether the address is allowed is judged as the request runs, and a refusal is the
+request's failure: `refused: ` and why (`loopback`, `private`, `link-local`, `shared`, `multicast`,
+`reserved`, `unspecified`, `documentation`, `teredo`, `denied`, `disabled`). A request costs power.
 
 ### response(handle) → {status, message, headers} or false
 

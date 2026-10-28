@@ -76,7 +76,7 @@ public final class CraftingBench implements CraftingCard.Bench {
 		CraftingInput.Positioned positioned = slots.grid().asPositionedCraftInput();
 		CraftingInput input = positioned.input();
 		if (input.isEmpty()) {
-			return Result.fail("nothing in its grid");
+			return Result.fail("empty grid");
 		}
 		ServerLevel world = level.get();
 		Optional<RecipeHolder<CraftingRecipe>> recipe = world.recipeAccess().getRecipeFor(RecipeType.CRAFTING, input, world);
@@ -193,7 +193,7 @@ public final class CraftingBench implements CraftingCard.Bench {
 			return Result.ok(0);
 		}
 		if (!target.isEmpty() && !ItemStack.isSameItemSameComponents(source, target)) {
-			return Result.fail("slot " + to + " holds something else");
+			return Result.fail("slot taken: " + to);
 		}
 		int room = target.isEmpty() ? source.getMaxStackSize() : target.getMaxStackSize() - target.getCount();
 		int moving = Math.min(count, Math.min(room, source.getCount()));
@@ -290,7 +290,7 @@ public final class CraftingBench implements CraftingCard.Bench {
 			return Result.fail("no container there");
 		}
 		if (to > container.getContainerSize()) {
-			return Result.fail("no slot " + to + " (it has " + container.getContainerSize() + ")");
+			return Result.fail("no slot: " + to);
 		}
 		Direction side = golem.hands().direction(face).getOpposite();
 		int left = count;
@@ -319,7 +319,7 @@ public final class CraftingBench implements CraftingCard.Bench {
 			return Result.fail("no container there");
 		}
 		if (slot > container.getContainerSize()) {
-			return Result.fail("no slot " + slot + " (it has " + container.getContainerSize() + ")");
+			return Result.fail("no slot: " + slot);
 		}
 		Direction side = golem.hands().direction(face).getOpposite();
 		int taken = 0;

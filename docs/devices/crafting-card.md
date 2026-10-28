@@ -90,13 +90,13 @@ device's `held`: `damage`, `maxDamage`, `label` where they apply).
 Crafts what its grid makes, `count` times (1), each taking half a second, what it makes going into
 its storage. A command: it answers at once, and its robot is busy until it's done. Its event,
 `craft`: `ok` and its `result`, `{name, count}` (how many it made), or not and why (`no recipe`,
-`nothing in its grid`, `no room`: its storage can't take what it made, so the craft isn't made and
+`empty grid`, `no room`: its storage can't take what it made, so the craft isn't made and
 the grid is as it was), its `result` saying how many it made before it stopped.
 
 ### move(from, to[, count]) → number
 
-Moves items from one of its slots to another (all, or `count`): how many went. Fails with `slot N
-holds something else`.
+Moves items from one of its slots to another (all, or `count`): how many went. Fails with
+`slot taken: ` and the slot, when it holds something else, or `no slot: ` and the slot.
 
 ### equip(slot) → true
 

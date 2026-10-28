@@ -190,7 +190,7 @@ final class MotherboardApi implements Board {
 		if (invalid != null) {
 			return Result.fail(invalid);
 		}
-		return device.relabel(text) ? Result.ok() : Result.fail("it can't have a label");
+		return device.relabel(text) ? Result.ok() : Result.fail("not labelable");
 	}
 
 	@Override

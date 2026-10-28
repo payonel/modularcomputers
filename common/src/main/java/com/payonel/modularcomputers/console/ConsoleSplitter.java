@@ -204,7 +204,7 @@ public final class ConsoleSplitter {
 			unbound.add(address);
 			settle();
 			return Result.ok(true);
-		}).orElseGet(() -> Result.fail("not a terminal on the bus: " + args.checkString(0)));
+		}).orElseGet(() -> Result.fail("not a terminal: " + args.checkString(0)));
 	}
 
 	@Method(doc = "bind(address): puts a terminal back in the console's group, and draws the console on it")
@@ -215,7 +215,7 @@ public final class ConsoleSplitter {
 				redraw(terminal);
 			}
 			return Result.ok(true);
-		}).orElseGet(() -> Result.fail("not a terminal on the bus: " + args.checkString(0)));
+		}).orElseGet(() -> Result.fail("not a terminal: " + args.checkString(0)));
 	}
 
 	/** The terminals in the group, in bus order (a plain pass: every key read and written looks). */

@@ -222,7 +222,7 @@ Swings what it holds at a face, as a player's left click, standing on its legs. 
 `"attacked"`. Else the block there starts breaking: `"breaking"`, a command running till it's
 broken. Its event, `swing`: `ok`, and its `result`, `{block, kept, dropped}` (the block's name;
 `kept`: true when it caught all the block dropped, else false and how many it `dropped` into the
-world), or not and why (`the block changed`, `what it held changed`; `held` when a field took hold
+world), or not and why (`block changed`, `hand changed`, `not broken`; `held` when a field took hold
 of it). It fails with `nothing there`, `unbreakable` or `no legs` (on its thrusters: no footing).
 
 ### contents([face]) → list, or nil and why
@@ -244,7 +244,7 @@ container there`.
 
 Takes items from the container at a face (in front, when none is given) into its hand: from `slot`, or the first it can take (the
 same as it holds, when it holds something); all its hand can hold, or `count`. How many came: 0
-when there were none it could take. It fails with `no container there` or `no slot`.
+when there were none it could take. It fails with `no container there` or `no slot: ` and the slot.
 
 ### fly(forward[, right[, up]]) → true
 

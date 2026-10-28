@@ -812,6 +812,11 @@ Lessons from mistakes, each with its test:
   (`[[\d]]`) for patterns, and capture a test program's stderr (`2> /err`) to see why it failed.
 - A class in the mixin package can't be loaded as an ordinary class (Mixin reserves the package):
   helpers the mixins call live elsewhere (`entity/GolemFear`), and each mixin is its own file.
+- **What's taken while blocking may be what the wait is for:** a command refused busy takes the
+  device's events into its files before it blocks, and those can hold the running command's end
+  (it came between the refusal and the look): a wait for that end then never wakes, as nothing is
+  left to raise the interrupt (the square example hung on a loaded host). A command whose blocking
+  took anything asks again before it blocks. (`aCommandWhoseWaitEndedAsItWasRefusedRunsAtOnce`)
 - **A golem resting on its own legs is on the ground:** `fly()` takes off where it stands, its torso
   on its legs (solid), so `onGround()` stayed true and a hovering golem took no shove. Whether it
   stands asks `standing()` (on the ground, thrusters off). (`shovedInTheAirItHoldsItsPlanAndSaysSo`)

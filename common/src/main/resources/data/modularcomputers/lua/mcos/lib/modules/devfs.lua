@@ -172,13 +172,15 @@ local function deepcopy(value)
 end
 
 -- Takes what device 'id' has waiting into every file open on it: the device's last answer (true,
--- nil once it has nothing; or false and why, its failure).
+-- nil once it has nothing; or false and why, its failure), and how many it took.
 local function deliver(id)
+  local taken = 0
   while true do
     local ok, event = k.take(id, "pull")
     if not ok or event == nil then
-      return ok, event
+      return ok, event, taken
     end
+    taken = taken + 1
     for _, queue in pairs(readers[id] or {}) do
       if #queue >= FILE_EVENTS then
         table.remove(queue, 1)
@@ -224,9 +226,11 @@ end
 
 -- A buffered device's command (one at a time) from a process: while the device is busy (or a
 -- robot held), the calling thread blocks, only it, and is asked again (its events taken into its
--- files first, so its interrupt is down and the next is the running command's end). A stop of the
--- device meanwhile ends the wait: what the threads were feeding it was stopped (ECANCELED).
--- Without a syscall to block (a file closing as its process ends), busy is EBUSY.
+-- files first, so its interrupt is down and the next is the running command's end). Events taken
+-- then may hold that end already (it came between the refusal and the look): then it's asked again
+-- at once, as an end already taken raises nothing to wake it. A stop of the device meanwhile ends
+-- the wait: what the threads were feeding it was stopped (ECANCELED). Without a syscall to block (a
+-- file closing as its process ends), busy is EBUSY.
 local stopped = {} -- by device id: how many stops it's had
 
 local function command(id, method, ...)
@@ -235,14 +239,17 @@ local function command(id, method, ...)
     return nil, "stopped", "ECANCELED"
   end
   local answer = table.pack(board.invoke(id, method, ...))
-  if not answer[1] and (answer[2] == "busy" or answer[2] == "held") then
+  while not answer[1] and (answer[2] == "busy" or answer[2] == "held") do
     if not request then
       return nil, answer[2], "EBUSY"
     end
     request.stops = request.stops or (stopped[id] or 0)
-    deliver(id)
-    k.listen(id)
-    return k.BLOCK
+    local _, _, taken = deliver(id)
+    if taken == 0 then
+      k.listen(id) -- (nothing came: what ends the wait will raise the device's interrupt)
+      return k.BLOCK
+    end
+    answer = table.pack(board.invoke(id, method, ...)) -- (what came may be the end it waited for)
   end
   if answer[1] and method == "stop" then
     stopped[id] = (stopped[id] or 0) + 1

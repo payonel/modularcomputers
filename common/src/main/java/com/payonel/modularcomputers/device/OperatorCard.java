@@ -65,7 +65,7 @@ public final class OperatorCard extends Card {
 		}
 		Result result = command(new Arguments(java.util.List.of(text)));
 		if (!result.failed() && result.first() instanceof Map<?, ?> answer && Boolean.FALSE.equals(answer.get("success"))) {
-			return Result.fail(last.isEmpty() ? "it failed" : last.strip()); // (a write that failed says why)
+			return Result.fail(last.isEmpty() ? "failed" : last.strip()); // (a write that failed says why: the command's own words)
 		}
 		return result;
 	}

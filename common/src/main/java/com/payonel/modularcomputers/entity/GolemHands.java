@@ -370,11 +370,11 @@ final class GolemHands {
 		// Another block there ends it; the same block with its state changed doesn't (leaves losing
 		// their log, a crop growing), as a player's breaking goes on.
 		if (!state.is(breakingState.getBlock())) {
-			fail("the block changed");
+			fail("block changed");
 			return;
 		}
 		if (!ItemStack.isSameItem(golem.getMainHandItem(), breakingWith)) {
-			fail("what it held changed");
+			fail("hand changed");
 			return;
 		}
 		ServerPlayer player = hand(breakingFace);
@@ -391,7 +391,7 @@ final class GolemHands {
 			AABB around = new AABB(pos).inflate(1);
 			Set<Integer> before = level().getEntitiesOfClass(ItemEntity.class, around, entity -> true).stream().map(Entity::getId).collect(Collectors.toSet());
 			if (!player.gameMode.destroyBlock(pos)) {
-				golem.robotics().failed("couldn't break it");
+				golem.robotics().failed("not broken");
 				return;
 			}
 			level().levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, pos, net.minecraft.world.level.block.Block.getId(state));
@@ -489,7 +489,7 @@ final class GolemHands {
 		}
 		int moving = Math.min(count, hand.getCount());
 		if (to > container.getContainerSize()) {
-			return Result.fail("no slot " + to + " (it has " + container.getContainerSize() + ")");
+			return Result.fail("no slot: " + to);
 		}
 		ItemStack left = put(container, to, hand.split(moving), direction(face).getOpposite());
 		hand.grow(left.getCount());
@@ -505,7 +505,7 @@ final class GolemHands {
 			return Result.fail("no container there");
 		}
 		if (slot > container.getContainerSize()) {
-			return Result.fail("no slot " + slot + " (it has " + container.getContainerSize() + ")");
+			return Result.fail("no slot: " + slot);
 		}
 		Direction side = direction(face).getOpposite();
 		ItemStack hand = golem.getMainHandItem();

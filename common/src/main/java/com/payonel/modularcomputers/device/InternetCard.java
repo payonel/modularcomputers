@@ -115,11 +115,11 @@ public final class InternetCard extends Card {
 	@Method(doc = "request(url[, method[, headers[, body]]]): starts an HTTP or HTTPS request (GET, or POST with a body; headers a table); returns its handle")
 	public Result request(Arguments args) {
 		if (!policy.get().enabled()) {
-			return Result.fail("the internet is turned off on this server");
+			return Result.fail("disabled");
 		} else if (open.size() >= MAX_OPEN) {
-			return Result.fail("too many requests open (" + MAX_OPEN + ")");
+			return Result.fail("too many open: " + MAX_OPEN);
 		} else if (RUNNING.get() >= MAX_RUNNING) {
-			return Result.fail("the server's internet is busy: try again soon");
+			return Result.fail("server busy");
 		}
 		String url = args.checkString(0);
 		String method = args.get(1) instanceof String verb ? verb : null;

@@ -108,7 +108,7 @@ class DiskFormatsTest {
 		Disk big = disk("big", DiskTier.TIER_2);
 		big.format(Disk.RAW);
 		write(small, "/keep", "kept");
-		assertThat(small.cloneFrom(big).error()).as("a raw tier 2 is bigger than a tier 1").startsWith("doesn't fit");
+		assertThat(small.cloneFrom(big).error()).as("a raw tier 2 is bigger than a tier 1").startsWith(Disk.TOO_BIG);
 		assertThat(read(small, "/keep")).as("nothing changed").isEqualTo("kept");
 		for (Disk disk : List.of(source, target, small, big)) {
 			disk.retire();

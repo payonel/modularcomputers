@@ -142,7 +142,7 @@ most 256 bytes (`wake message too long`). Returns the old message.
 ### getStrength(), setStrength(blocks)
 
 A WLAN card's signal strength (see [WLAN Cards](/devices/wlan-card/)). On a wired card both fail with
-`a wired card has no signal strength`.
+`wired`.
 
 ## Events
 

@@ -63,7 +63,7 @@ What the last command said (its `output`), or `""` before the first.
 ### set({command = text}) → {success, result, output}
 
 Runs a command, as `command` does: what a line written to the file does. A command that fails makes
-this call fail, with what it said (`it failed` when it said nothing). A table without a `command`
+this call fail, with what it said (`failed` when it said nothing). A table without a `command`
 string fails with `no command`.
 
 ## Events

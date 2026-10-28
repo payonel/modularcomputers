@@ -1141,7 +1141,7 @@ public final class LuaRunner implements Runner {
 				}
 				return target instanceof Handle handle ? board.invoke(handle, method, rest) : board.invoke(String.valueOf(target), method, rest);
 			};
-			default -> board -> Result.fail("no board call '" + name + "'");
+			default -> board -> Result.fail("no board call: " + name);
 		};
 		Call request = new Call(call, new CompletableFuture<>());
 		calls.add(request);

@@ -51,7 +51,7 @@ The station's file is text, as a sysfs attribute is.
   as they were when it was first read; seek back to the start to read them afresh.
 - **Write**: each line written is an action, done at once: `format`, `wipe`, `clone`, `install` or
   `update`. Any other line fails the write with `EINVAL`, and so does an action the station refuses
-  (no disk, no power, it doesn't fit). Through `io`, a write is buffered: the line goes when the
+  (no disk, no power, too big). Through `io`, a write is buffered: the line goes when the
   file is flushed or closed, and that call reports the failure.
 - For `sys.poll`, the file is always ready to read and to write, and never has `PRI` (the station has
   no interrupt).
@@ -88,7 +88,7 @@ Makes the target raw, with no filesystem. Everything on it is gone.
 ### clone() → nothing
 
 Makes the target a copy of the source: its format and its contents, with the files' times kept.
-Fails with `no source disk` when the source slot is empty, and with `doesn't fit` when what is on
+Fails with `no source disk` when the source slot is empty, and with `too big: ` and the bytes it needs when what is on
 the source is larger than the target: an hfs source's used bytes, or a raw source's whole capacity
 (a raw source needs a target as big). Nothing changes when it is refused.
 
@@ -110,7 +110,7 @@ the disk has none, and an empty slot is left out of the table.
 ### set({action = name}) → nothing
 
 Does an action by its name: `format`, `wipe`, `clone`, `install` or `update`. Any other name fails
-with `no such action`.
+with `not an action: ` and what it was.
 
 ## Events
 

@@ -215,7 +215,7 @@ public final class FieldCard extends Card implements Buffered {
 				yield move(new Arguments(rest));
 			}
 			case "release" -> release(new Arguments(rest));
-			default -> Result.fail("not an action: " + action.get("action") + " (capture, move or release)");
+			default -> Result.fail("not an action: " + action.get("action"));
 		};
 	}
 

@@ -20,6 +20,31 @@ class BufferedMcosTest extends McosHarness {
 		ticks.add(slow::tick); // (its ticks: a work counts down with the machine's)
 	}
 
+	/**
+	 * A command refused busy whose running one ends before the kernel looks (its end taken into the
+	 * files as the thread blocks) is asked again at once: else it waits for an end already come, for
+	 * ever (a loaded host's race: the square example hung on it).
+	 */
+	@org.junit.jupiter.params.ParameterizedTest
+	@org.junit.jupiter.params.provider.ValueSource(ints = {1, 2, 3})
+	void aCommandWhoseWaitEndedAsItWasRefusedRunsAtOnce(int refusal) {
+		slow.endAsItRefuses(refusal); // (at the first refusal, or a later one: the kernel asks again before it idles)
+		file("race.lua", """
+			local devices = require("devices")
+			local slow = assert(devices.open("fabricator0"))
+			assert(slow.work(50))
+			assert(slow.work(1)) -- refused busy, and the first's end comes with the refusal
+			assert(devices.ended(slow, "work")) -- (the first's)
+			assert(devices.ended(slow, "work")) -- (the second's)
+			local out = io.open("/out", "w")
+			out:write(slow.peek(), "\\n")
+			out:close()
+			""");
+		boot();
+		type("lua /race.lua\r");
+		untilFile(root().resolve("out"), "2\n");
+	}
+
 	/** The user's case: a thread through a series of blocking commands, another making progress all the while. */
 	@Test
 	void aThreadRunningBlockingCommandsLeavesItsOtherThreadsRunning() {

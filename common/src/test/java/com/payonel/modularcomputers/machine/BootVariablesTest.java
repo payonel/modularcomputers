@@ -23,15 +23,15 @@ class BootVariablesTest {
 	@Test
 	void anEntryNeedsAnIdAPathFromTheTopAndALabelThatCanBeOne() {
 		BootVariables vars = BootVariables.EMPTY;
-		assertThatThrownBy(() -> vars.withEntry(0, "sata:1", null, null)).hasMessageContaining("id:<uuid>");
+		assertThatThrownBy(() -> vars.withEntry(0, "sata:1", null, null)).hasMessage("not an id: sata:1");
 		assertThatThrownBy(() -> vars.withEntry(0, "id:not-a-uuid", null, null)).hasMessageContaining("not an id");
-		assertThatThrownBy(() -> vars.withEntry(0, DISK.toUpperCase().replace("ID:", "id:"), null, null)).hasMessageContaining("as the bus writes");
-		assertThatThrownBy(() -> vars.withEntry(0, DISK, "init.lua", null)).hasMessageContaining("top");
-		assertThatThrownBy(() -> vars.withEntry(0, DISK, "/my os.lua", null)).hasMessageContaining("printable");
-		assertThatThrownBy(() -> vars.withEntry(0, DISK, "/" + "a".repeat(BootVariables.MAX_PATH), null)).hasMessageContaining("at most");
-		assertThatThrownBy(() -> vars.withEntry(0, DISK, null, "x".repeat(40))).hasMessageContaining("label");
-		assertThatThrownBy(() -> vars.withEntry(BootVariables.ENTRIES, DISK, null, null)).hasMessageContaining("numbered");
-		assertThatThrownBy(() -> vars.withEntry(-1, DISK, null, null)).hasMessageContaining("numbered");
+		assertThatThrownBy(() -> vars.withEntry(0, DISK.toUpperCase().replace("ID:", "id:"), null, null)).hasMessageContaining("not an id: ");
+		assertThatThrownBy(() -> vars.withEntry(0, DISK, "init.lua", null)).hasMessage("not absolute: init.lua");
+		assertThatThrownBy(() -> vars.withEntry(0, DISK, "/my os.lua", null)).hasMessage("not printable");
+		assertThatThrownBy(() -> vars.withEntry(0, DISK, "/" + "a".repeat(BootVariables.MAX_PATH), null)).hasMessage("too long: " + BootVariables.MAX_PATH);
+		assertThatThrownBy(() -> vars.withEntry(0, DISK, null, "x".repeat(40))).hasMessage("too long: " + com.payonel.modularcomputers.bus.Label.MAX);
+		assertThatThrownBy(() -> vars.withEntry(BootVariables.ENTRIES, DISK, null, null)).hasMessage("not an entry: " + BootVariables.ENTRIES);
+		assertThatThrownBy(() -> vars.withEntry(-1, DISK, null, null)).hasMessage("not an entry: -1");
 	}
 
 	@Test
@@ -44,7 +44,7 @@ class BootVariablesTest {
 	void theOrderAndBootNextNameEntriesThatExistOnceEach() throws Exception {
 		BootVariables vars = BootVariables.EMPTY.withEntry(0, DISK, null, null).withEntry(1, OTHER, "/boot/os.lua", null);
 		assertThatThrownBy(() -> vars.withOrder(List.of(0L, 2L))).hasMessageContaining("no Boot0002");
-		assertThatThrownBy(() -> vars.withOrder(List.of(0L, 0L))).hasMessageContaining("twice");
+		assertThatThrownBy(() -> vars.withOrder(List.of(0L, 0L))).hasMessage("twice: Boot0000");
 		assertThatThrownBy(() -> vars.withNext(5)).hasMessageContaining("no Boot0005");
 		BootVariables ordered = vars.withOrder(List.of(1L, 0L)).withNext(0);
 		assertThat(ordered.toTry()).as("BootNext's first, then the order's, each once")
@@ -68,7 +68,7 @@ class BootVariablesTest {
 		assertThat(eeprom.setBootEntry(args(0L, DISK, null, "mcos")).failed()).isFalse();
 		var refused = eeprom.setBootEntry(args(1L, "storage1"));
 		assertThat(refused.failed()).isTrue();
-		assertThat(refused.error()).contains("id:<uuid>");
+		assertThat(refused.error()).startsWith("not an id: ");
 		assertThat(eeprom.setBootOrder(args(Map.of(1L, 0L))).failed()).isFalse();
 		assertThat(eeprom.setBootOrder(args(Map.of(1L, 4L))).failed()).as("no such entry").isTrue();
 		assertThat(eeprom.setBootNext(args(0L)).failed()).isFalse();

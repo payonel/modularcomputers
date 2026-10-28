@@ -114,15 +114,15 @@ public final class HttpExchange implements Runnable {
 		}
 		String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
 		if (!scheme.equals("http") && !scheme.equals("https")) {
-			throw new IllegalArgumentException("not an http or https URL: " + url);
+			throw new IllegalArgumentException("not http: " + url);
 		} else if (uri.getHost() == null || uri.getRawUserInfo() != null) {
-			throw new IllegalArgumentException(uri.getRawUserInfo() != null ? "credentials in a URL aren't sent: " + url : "no host in " + url);
+			throw new IllegalArgumentException(uri.getRawUserInfo() != null ? "credentials: " + url : "no host: " + url); // (credentials in a URL aren't sent)
 		}
 		String verb = method == null ? (body == null ? "GET" : "POST") : method.toUpperCase(Locale.ROOT);
 		if (!METHODS.contains(verb)) {
-			throw new IllegalArgumentException("not a method it sends: " + method);
+			throw new IllegalArgumentException("not a method: " + method);
 		} else if (body != null && body.length > MAX_BODY) {
-			throw new IllegalArgumentException("a request's body is at most " + MAX_BODY + " bytes");
+			throw new IllegalArgumentException("too long: " + MAX_BODY);
 		}
 		Map<String, String> checked = new LinkedHashMap<>();
 		for (var header : headers.entrySet()) {
@@ -131,7 +131,7 @@ public final class HttpExchange implements Runnable {
 			if (!name.matches("[!#$%&'*+.^_`|~0-9A-Za-z-]+") || value.chars().anyMatch(c -> c == '\r' || c == '\n' || c == 0)) {
 				throw new IllegalArgumentException("not a header: " + name);
 			} else if (OWN.contains(name.toLowerCase(Locale.ROOT))) {
-				throw new IllegalArgumentException("a header the card writes itself: " + name);
+				throw new IllegalArgumentException("reserved header: " + name); // (one the card writes itself)
 			}
 			checked.put(name, value);
 		}
@@ -179,7 +179,7 @@ public final class HttpExchange implements Runnable {
 	/** Past its deadline: it ends. */
 	private void inTime() throws IOException {
 		if (System.nanoTime() > deadline) {
-			throw new java.net.SocketTimeoutException("took too long");
+			throw new java.net.SocketTimeoutException("timed out");
 		}
 	}
 
@@ -280,7 +280,7 @@ public final class HttpExchange implements Runnable {
 				try {
 					left = Long.parseLong(length.strip());
 				} catch (NumberFormatException e) {
-					throw new IOException("a bad Content-Length");
+					throw new IOException("bad content-length");
 				}
 				copy(in, left);
 			} else {
@@ -322,7 +322,7 @@ public final class HttpExchange implements Runnable {
 			try {
 				length = Long.parseLong(size, 16);
 			} catch (NumberFormatException e) {
-				throw new IOException("a bad chunk");
+				throw new IOException("bad chunk");
 			}
 			if (length == 0) {
 				headers(in, budget); // (its trailer)
@@ -341,7 +341,7 @@ public final class HttpExchange implements Runnable {
 			if (c < 0) {
 				throw new IOException("the connection closed early");
 			} else if (--budget[0] < 0) {
-				throw new IOException("its headers are too long");
+				throw new IOException("headers too long");
 			} else if (c == '\n') {
 				String text = line.toString(StandardCharsets.ISO_8859_1);
 				return text.endsWith("\r") ? text.substring(0, text.length() - 1) : text;

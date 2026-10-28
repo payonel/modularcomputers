@@ -85,7 +85,7 @@ A method's ioctl answers what the method does (`true` for one that answers nothi
 Sets what it plays. Any field left out stays. `encoding` is `"u8"`, `"s16le"` or `"ima_adpcm"`.
 An unsupported value fails with a message such as
 `unsupported rate: 9000 ([8000, 11025, 22050, 44100])`, `unsupported encoding: ...` or
-`unsupported channels: 3 (1 or 2)`. `block` is for ADPCM only (WAV's block align: at most 8192, a
+`unsupported channels: 3`. `block` is for ADPCM only (WAV's block align: at most 8192, a
 multiple of 4 times the channels, and larger than 4 bytes a channel, else
 `bad ADPCM block size: ...`); switching to ADPCM without one gives 512 bytes a channel. What was
 queued goes, unless the new format is the same as the old.

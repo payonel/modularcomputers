@@ -52,7 +52,7 @@ public final class DiskStationBlockEntity extends CardHolderBlockEntity {
 				case DiskStation.NO_SOURCE -> NO_SOURCE;
 				case DiskStation.NO_POWER -> NO_POWER;
 				case Disk.READ_ONLY -> READ_ONLY;
-				default -> error.startsWith("doesn't fit") ? NO_FIT : FAILED;
+				default -> error.startsWith(com.payonel.modularcomputers.device.Disk.TOO_BIG) ? NO_FIT : FAILED;
 			};
 		}
 	}

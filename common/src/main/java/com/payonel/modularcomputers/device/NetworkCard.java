@@ -205,13 +205,13 @@ public final class NetworkCard extends Card {
 
 	@Method(doc = "getStrength(): how far its signal reaches, in blocks (a WLAN card's; OpenComputers')")
 	public Result getStrength(Arguments args) {
-		return wireless() ? Result.ok((long) strength) : Result.fail("a wired card has no signal strength");
+		return wireless() ? Result.ok((long) strength) : Result.fail("wired");
 	}
 
 	@Method(doc = "setStrength(blocks): how far its signal reaches, up to its tier's (16, 400); a send costs more the farther it reaches; returns what it's set to")
 	public Result setStrength(Arguments args) {
 		if (!wireless()) {
-			return Result.fail("a wired card has no signal strength");
+			return Result.fail("wired");
 		}
 		strength = (int) Math.clamp(args.checkInteger(0), 0, maxRange());
 		changed(); // (it's kept with the card's state)

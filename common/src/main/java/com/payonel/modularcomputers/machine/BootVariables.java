@@ -98,7 +98,7 @@ public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, in
 		for (long number : numbers) {
 			int at = existing(number);
 			if (now.contains(at)) {
-				throw new Invalid("Boot" + name(at) + " is in the order twice");
+				throw new Invalid("twice: Boot" + name(at)); // (in the order twice)
 			}
 			now.add(at);
 		}
@@ -132,7 +132,7 @@ public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, in
 
 	private static int number(long number) throws Invalid {
 		if (number < 0 || number >= ENTRIES) {
-			throw new Invalid("an entry is numbered 0 to " + (ENTRIES - 1));
+			throw new Invalid("not an entry: " + number); // (0 to ENTRIES - 1)
 		}
 		return (int) number;
 	}
@@ -148,12 +148,12 @@ public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, in
 	/** Why {@code disk} can't name a disk (an id, {@code id:<uuid>}, as the bus writes it), or null. */
 	public static String diskInvalid(String disk) {
 		if (!disk.startsWith(ID_PREFIX)) {
-			return "a disk is named by its id: id:<uuid>";
+			return "not an id: " + disk;
 		}
 		try {
 			String uuid = disk.substring(ID_PREFIX.length());
 			if (!UUID.fromString(uuid).toString().equals(uuid)) {
-				return "not an id as the bus writes one: " + disk;
+				return "not an id: " + disk; // (not as the bus writes one)
 			}
 		} catch (IllegalArgumentException e) {
 			return "not an id: " + disk;
@@ -164,11 +164,11 @@ public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, in
 	/** Why {@code path} can't be an entry's file (absolute, printable, at most {@link #MAX_PATH}), or null. */
 	public static String pathInvalid(String path) {
 		if (!path.startsWith("/")) {
-			return "a path starts at the disk's top: /";
+			return "not absolute: " + path;
 		} else if (path.length() > MAX_PATH) {
-			return "a path is at most " + MAX_PATH + " characters";
+			return "too long: " + MAX_PATH;
 		} else if (!path.chars().allMatch(c -> c > ' ' && c < 0x7F)) {
-			return "a path is printable characters, without spaces";
+			return "not printable"; // (nor a space)
 		}
 		return null;
 	}

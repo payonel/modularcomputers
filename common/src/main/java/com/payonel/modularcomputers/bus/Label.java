@@ -29,9 +29,9 @@ public record Label(Supplier<String> read, Consumer<String> write) {
 	/** Why {@code label} can't be one (too long, or not printable), or null. */
 	public static String invalid(String label) {
 		if (label.length() > MAX) {
-			return "a label is at most " + MAX + " characters";
+			return "too long: " + MAX;
 		} else if (!label.codePoints().allMatch(c -> c >= ' ' && c != 0x7F)) {
-			return "a label is printable characters";
+			return "not printable";
 		}
 		return null;
 	}

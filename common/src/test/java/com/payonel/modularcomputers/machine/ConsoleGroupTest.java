@@ -143,7 +143,7 @@ class ConsoleGroupTest {
 
 	@Test
 	void onlyTerminalsOnTheBusCanBeUnbound() {
-		assertThat(console().unbind(address("sata:0")).error()).isEqualTo("not a terminal on the bus: sata:0");
+		assertThat(console().unbind(address("sata:0")).error()).isEqualTo("not a terminal: sata:0");
 		assertThat(console().unbind(address("id:gone")).failed()).isTrue();
 		assertThat(console().unbind(address("id:first")).failed()).isFalse();
 		assertThat(console().isBound("id:first")).isFalse();
