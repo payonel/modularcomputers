@@ -149,20 +149,33 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
     the origin don't move: what it interrupted never happened, so the next command returns to the
     plan first.
   - **No `hover`:** `fly()` is "take off where it stands, and hold" (as `fly(0, 0, 0)` already is).
-  - **A field holding the golem is stasis** (the user's: as a held mob can't act): its queue pauses,
-    the command under way too, and goes on once it's let go (`held`, `released` events). Open: a
-    golem in its own field, a tier 1's only way off the ground and the reason it keeps its tools in
-    the air: stasis too, or only another computer's field?
+  - **A field holding the golem is stasis for its robotics, not its computer** (the user's: as a held
+    mob can't act), whoever's field it is, its own too: its queue pauses, the command under way too,
+    and goes on once it's let go (`held`, `released` events); its program, sensors and other cards
+    run on, and its own field card still carries it. So a golem in its own field travels but can't
+    dig or place (AGENTS.md's "it keeps its tools" in its own field changes).
   - **Sensors report from the body, relative to their computer** (the user's: cases and robots
     alike): in a robot, forward, right and up (its own frame, as the field card's already are); in a
     case, its front and right as `Face` names them. The motion and audio sensors' world `x, y, z`
     go: they can't be turned into a robot's moves, and they leak its world heading. Reacting to a
     sensor from a drifted spot means returning to the plan first (`fly()`), or adding the drift.
-  - **Other cards that act at a robot's faces** (the crafting card's `drop`, `pickup`, `store`,
-    `take`; the field card's `capture` at a point or `"self"`) have the same ordering need. Open: join
-    the robot's queue (a CNC's toolhead commands in its G-code stream; recommended), or stay apart
-    with a program waiting for the robot's tag. The crafting card's `craft` and the field card's
-    `move` are tagged, with one ending event each (`craft(5)`: one, with the count made).
+  - **What needs robotics joins the robot's queue** (the user's line): the crafting card works only in
+    a robot, so its face actions (`drop`, `pickup`, `store`, `take`) queue and run from the plan, as
+    `swing` and `use` do (a CNC's toolhead commands in its G-code stream); its `craft` keeps its own
+    tag and timing (one ending event: `craft(5)`, one, with the count made). The energy field card
+    works in a case too: its commands stay its own, tagged (`move`: one ending event), its positions
+    in its computer's frame, from the body.
+  - **The devices layer's one wait: `devices.sync(dev, ...[, seconds])`** (the user's): blocks until
+    every tag issued through those handles and not yet ended has ended, and returns every event it
+    took meanwhile, in order (the untagged ones too: a `shoved`, a sensor's: nothing lost by
+    waiting); with a timeout, what it has and the tags still out. CUDA's
+    `cudaDeviceSynchronize`, OpenGL's `glFinish`, Marlin's `M400`. A library function, never a
+    method on a device's table (a sound card has its own `sync()`), and every device's (every method
+    returns a tag): the robot's queue, crafts, field moves, internet requests, a Disk Station's jobs
+    if they become slow, assembly machines (the user's idea). Several devices at once
+    (`devices.sync(robot, crafter)`). Each handle keeps its own buffer of events, so a process's
+    threads each see them all (a pump thread and a watcher). Later: the sound card's `sync()` as
+    tagged writes that end when played, so `devices.sync(dsp)` replaces it.
   - **The ioctl report** (the user's, to keep current as the APIs change): every device method and
     what `sys.ioctl` gives back, from the code, grouped by device, at
     https://claude.ai/artifact/YXP5MWRaU7rjee75jUnonm. Misalignments it shows, to settle into one
