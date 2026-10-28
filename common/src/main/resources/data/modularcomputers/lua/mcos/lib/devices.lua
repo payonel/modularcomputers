@@ -11,6 +11,7 @@
 --   for name, method in pairs(robot) do print(name, method) end   -- each its description
 --   local name = devices.wait("charger", 10)        -- the first charger, waiting up to 10 s for one
 --   local event = devices.event(robot)              -- its next event, waiting for one
+--   local ok, why = devices.ended(robot, "walk")    -- a buffered command's end: true, or false and why
 local sys = require("sys")
 local fs = require("fs")
 
@@ -180,6 +181,20 @@ function devices.event(device, seconds)
       return nil, "timed out"
     end
     sys.poll({[opened.fd] = {PRI = true}}, left)
+  end
+end
+
+-- A buffered device's command's end (.agents/BUFFERED.md): waits for 'method''s next completion
+-- event on 'device' (taking the events before it: news a program wanting it reads with event
+-- instead), and answers true, or false and why it failed (or nil and why the wait did).
+function devices.ended(device, method, seconds)
+  while true do
+    local got, why = devices.event(device, seconds)
+    if not got then
+      return nil, why
+    elseif got.event == method and got.ok ~= nil then
+      return got.ok, got.why
+    end
   end
 end
 

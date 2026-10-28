@@ -580,6 +580,19 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   doc (so a doc begins with its signature: `walk(forward[, right]): ...`). No `/sys/devices` tree:
   the bus is flat (`sysfs.lua`). `/dev`'s names coming and going are inotify notices
   (`CREATE /dev/charger0`, udev's way), so a program waits for a device as for a file.
+- **Buffered devices** (the user's design, 2026-10-28; spec `.agents/BUFFERED.md`): a device that
+  acts over time (`Buffered`) runs one command at a time; a command while one runs is refused `busy`
+  at the board (layer 0, which can't wait: a board call freezes the whole program), and mcos blocks
+  the calling thread only until the device is free (devfs's `command`, asked again as each command's
+  end event comes), so more work in flight means threads. Its live state, its events and `stop` are
+  free (`Buffered.free`); a `stop` also ends the threads waiting on it (`ECANCELED`). Each command's
+  end is an event named after its method, `ok`, why (`EventQueue.ended`). No queue, no tags, no
+  fault state: a failure ends its own command only (the user's: a robot stuck on its first failure
+  looks broken). A tags-and-queues design came first and was set aside as too error-prone.
+- **A device's events go to every file open on it** (the user's): devfs takes them (`deliver`) and
+  gives each file its own copy, bounded, so a program and a `cat` each see them all; a file's
+  readiness counts what it holds (a poll that took the events itself would otherwise wait for a
+  line that already fell).
 - **`lib/devices.lua` is user space's convenience over `/dev`, `/sys` and inotify** (the user's;
   `sys` stays the kernel's calls): a device opened as a table of its methods (ioctls; `tostring` a
   method's doc, as OpenComputers' proxies), the bus listed, `devices.wait` for one to come,
@@ -752,6 +765,10 @@ Lessons from mistakes, each with its test:
   the light shows what the press came to, from the board (`BoardAssembly.pressPower`, for every
   holder), never "on" for an `ON` press. (`cpuWithoutEepromAbortsAndItsLightBlinks`,
   `aProgramReturningAsItStartsShowsItsAbortAtThePress`)
+- **A file's readiness counts the events it holds:** a poll that took its device's events into its
+  own copy, before the kernel saw the device's line rise, waited for ever: its readiness came only
+  from the kernel's news, and the line was already down. (`theTallyCountsWhatBothSensorsSee...`,
+  two threads on two sensors)
 - **`a and b or c` gives c when b is false:** a redstone file's poll readiness was
   `device.pull and changed or nil`, so "not changed" became nil, "no PRI of its own", and the
   device's news (held until a read or an ioctl) made the poll ready for ever: the door example spun

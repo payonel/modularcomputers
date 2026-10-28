@@ -10,8 +10,8 @@ import java.util.Map;
  * says how many were lost ({@code lost}), so a program can tell (this is the card's own choice of
  * what to drop: a device keeps its data until there's room for it, until it can't).
  */
-final class EventQueue {
-	static final int CAPACITY = 32;
+public final class EventQueue {
+	public static final int CAPACITY = 32;
 	private final ArrayDeque<Map<String, Object>> events = new ArrayDeque<>();
 	private final InterruptLine line;
 	/** Its card, told when its contents change. */
@@ -20,13 +20,13 @@ final class EventQueue {
 	private final java.util.function.BooleanSupplier accepting;
 	private long lost;
 
-	EventQueue(InterruptLine line, Runnable changed, java.util.function.BooleanSupplier accepting) {
+	public EventQueue(InterruptLine line, Runnable changed, java.util.function.BooleanSupplier accepting) {
 		this.line = line;
 		this.changed = changed;
 		this.accepting = accepting;
 	}
 
-	void add(Map<String, Object> event) {
+	public void add(Map<String, Object> event) {
 		if (!accepting.getAsBoolean()) {
 			return; // its card takes no data now
 		}
@@ -59,7 +59,24 @@ final class EventQueue {
 		return true;
 	}
 
-	Map<String, Object> pull() {
+	/**
+	 * A buffered device's command ended (.agents/BUFFERED.md): {@code {event = method, ok = true[,
+	 * result]}}, or {@code {event = method, ok = false, why}} when it failed (or was stopped). News.
+	 */
+	public void ended(String method, boolean ok, String why, Object result) {
+		Map<String, Object> event = new java.util.LinkedHashMap<>();
+		event.put("event", method);
+		event.put("ok", ok);
+		if (!ok) {
+			event.put("why", why);
+		}
+		if (result != null) {
+			event.put("result", com.payonel.modularcomputers.runtime.Values.normalize(result));
+		}
+		add(event);
+	}
+
+	public Map<String, Object> pull() {
 		Map<String, Object> event = events.pollFirst();
 		if (event != null) {
 			changed.run();
@@ -68,11 +85,11 @@ final class EventQueue {
 	}
 
 
-	boolean pending() {
+	public boolean pending() {
 		return !events.isEmpty();
 	}
 
-	void clear() {
+	public void clear() {
 		if (events.isEmpty() && lost == 0) {
 			return; // nothing changed
 		}
@@ -82,14 +99,14 @@ final class EventQueue {
 	}
 
 	/** What it holds, to save: the events waiting, and how many were lost since the last kept. */
-	void save(Map<String, Object> saved) {
+	public void save(Map<String, Object> saved) {
 		saved.put("events", java.util.List.copyOf(events));
 		saved.put("lost", lost);
 	}
 
 	/** Takes back what {@link #save} kept. */
 	@SuppressWarnings("unchecked")
-	void restore(Map<String, Object> saved) {
+	public void restore(Map<String, Object> saved) {
 		events.clear();
 		if (saved.get("events") instanceof java.util.List<?> kept) {
 			for (Object event : kept) {

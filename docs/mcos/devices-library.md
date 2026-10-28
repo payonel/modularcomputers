@@ -70,6 +70,13 @@ local done = devices.event(robot)          -- arrived, or blocked and why
 print(done.event, done.why)
 ```
 
+### devices.ended(device, method[, seconds]) → true, or false and why
+
+For a [buffered device](#buffered-devices): waits for the next end of one of its commands, `method`'s,
+and says how it went: `true`, or `false` and why it failed (`stopped` when a `stop` cut it short).
+It takes the events before that one: a program that also wants those reads them with
+`devices.event` instead. With `seconds`, nil and `timed out` after that long.
+
 ### devices.close(device) → true
 
 Closes its file.
@@ -88,9 +95,38 @@ local pad = assert(devices.open(name))
 print("charging pad here: " .. name)
 ```
 
+## Buffered devices
+
+A device that acts over time runs one command at a time: a robot, an energy field card, a redstone
+card, a robotic piston. A command given while another runs **waits**: the call blocks its thread,
+and only its thread, until the device is free, then starts and returns. So a series of commands runs
+in order, each starting as the one before ends, and a program that wants to do something else
+meanwhile does it in another thread:
+
+```lua
+local devices = require("devices")
+local thread = require("thread")
+local robot = assert(devices.open("robotics0"))
+local walker = thread.create(function()
+  robot.walk(3)        -- returns as it starts
+  robot.turn("right")  -- waits for the walk to end, then starts
+  robot.walk(2)
+end)
+-- ... this thread goes on meanwhile ...
+walker:join()
+```
+
+A read is a command too, so it waits its turn and answers once the command before it has ended. A
+device's live state (`get`), its events (`pull`) and its `stop` never wait. A `stop` also ends every
+thread waiting to give that device a command: their calls fail with `stopped` (`ECANCELED`). Each
+command's end is an event named after its method, `ok` and, when it failed, why:
+`{event = "walk", ok = false, why = "blocked: minecraft:oak_log front"}`.
+
 ## Events
 
-A device's events are its file's: `devices.event` waits for the next and takes it. To wait for
+A device's events are its file's: `devices.event` waits for the next and takes it. Every file open
+on a device gets each of its events, so a program and a `cat` of its file each see them all; threads
+sharing one file share its events (whichever reads first). To wait for
 several things at once (a device, a socket, the keyboard), poll them all yourself, its descriptor
 (`devices.info(device).fd`) for `PRI`, and take its events with its `pull` method:
 

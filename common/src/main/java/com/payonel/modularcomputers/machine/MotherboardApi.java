@@ -137,6 +137,13 @@ final class MotherboardApi implements Board {
 		if (device.isEmpty()) {
 			return Result.fail("no such device: " + address);
 		}
+		if (device.get() instanceof com.payonel.modularcomputers.device.Buffered buffered && !buffered.free().contains(method)
+			&& DeviceMethods.of(device.get()).containsKey(method)) {
+			String refused = buffered.refusal();
+			if (refused != null) {
+				return Result.fail(refused); // a command while another runs: nothing done (mcos waits, its thread only)
+			}
+		}
 		try {
 			return DeviceMethods.invoke(device.get(), method, new Arguments(Arrays.asList(args), account.get()));
 		} catch (IllegalArgumentException e) {

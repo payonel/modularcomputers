@@ -96,9 +96,9 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
 Each step lands with its tests (a bug's seen failing first), the manual and AGENTS.md, and passes
 `./gradlew testAll` before its commit.
 
-- [ ] **1. The board:** `Buffered` (free methods, active, busy), completion events, `busy` and
+- [x] **1. The board:** `Buffered` (free methods, active, busy), completion events, `busy` and
   `held` refusals in the board's call. Tests (a test buffered device).
-- [ ] **2. mcos:** a command blocks its thread while the device is busy; `stop` ends blocked
+- [x] **2. mcos:** a command blocks its thread while the device is busy; `stop` ends blocked
   submitters; events to every open file; `lib/devices.lua`'s `ended`. Tests, among them (the
   user's): one thread running a series of blocking commands on a buffered device while another
   thread of the same process makes progress meanwhile (it isn't held up by the first's waits).

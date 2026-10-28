@@ -1410,7 +1410,9 @@ local function serve(p)
     return
   end
   -- (the reply is pcall's: true and the answer; a process only ever asks for what its sys holds)
+  k.request = request -- (the one being served: what blocks keeps its state there, asked again: devfs's commands)
   local reply = table.pack(pcall(syscalls[request[1]], p, request, table.unpack(request, 2, request.n)))
+  k.request = nil
   if not reply[1] then
     printk("sys." .. request[1] .. ": " .. tostring(reply[2])) -- a kernel bug, not the process's
     reply = table.pack(true, fail("EINVAL"))

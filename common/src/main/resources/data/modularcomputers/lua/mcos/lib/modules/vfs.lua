@@ -47,6 +47,7 @@ local ERRNO = {
   ENAMETOOLONG = "File name too long",
   EDEADLK = "Resource deadlock avoided",
   ETIMEDOUT = "Connection timed out",
+  ECANCELED = "Operation canceled",
 }
 
 function vfs.fail(name)

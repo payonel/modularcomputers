@@ -152,6 +152,104 @@ local function driverof(device)
   return driver
 end
 
+-- A device's events, for every file open on it (the user's: each reader sees them all, a script and
+-- a cat alike): whoever asks takes what the device has (k.take, which listens when it has nothing),
+-- and every file open on it gets its own copy, in order. A file's own events are bounded: past
+-- FILE_EVENTS the oldest go (a file nobody reads can't grow without end), the next one counting them
+-- (lost), as a device's own queue does.
+local FILE_EVENTS = 32
+local readers = {} -- by device id: {[a file's key] = {its events, oldest first}}
+
+local function deepcopy(value)
+  if type(value) ~= "table" then
+    return value
+  end
+  local c = {}
+  for key, v in pairs(value) do
+    c[key] = deepcopy(v)
+  end
+  return c
+end
+
+-- Takes what device 'id' has waiting into every file open on it: the device's last answer (true,
+-- nil once it has nothing; or false and why, its failure).
+local function deliver(id)
+  while true do
+    local ok, event = k.take(id, "pull")
+    if not ok or event == nil then
+      return ok, event
+    end
+    for _, queue in pairs(readers[id] or {}) do
+      if #queue >= FILE_EVENTS then
+        table.remove(queue, 1)
+        queue.lost = (queue.lost or 0) + 1
+      end
+      local own = deepcopy(event)
+      if queue.lost and type(own) == "table" then
+        own.lost, queue.lost = (own.lost or 0) + queue.lost, nil
+      end
+      queue[#queue + 1] = own
+    end
+  end
+end
+
+-- A file ('key', its own) takes device 'id''s events from now on, or no more.
+local function enlist(id, key)
+  readers[id] = readers[id] or {}
+  readers[id][key] = readers[id][key] or {}
+end
+
+local function delist(id, key)
+  if readers[id] then
+    readers[id][key] = nil
+    if next(readers[id]) == nil then
+      readers[id] = nil
+    end
+  end
+end
+
+-- A file's next event of device 'id': true and it (nil: none now, and the kernel listens for one), or
+-- false and why (the device's failure, once what it took is given).
+local function nextevent(id, key)
+  enlist(id, key)
+  local ok, why = deliver(id)
+  local queue = readers[id][key]
+  if queue[1] ~= nil then
+    return true, table.remove(queue, 1)
+  elseif not ok then
+    return false, why
+  end
+  return true, nil
+end
+
+-- A buffered device's command (.agents/BUFFERED.md) from a process: while the device is busy (or a
+-- robot held), the calling thread blocks, only it, and is asked again (its events taken into its
+-- files first, so its interrupt is down and the next is the running command's end). A stop of the
+-- device meanwhile ends the wait: what the threads were feeding it was stopped (ECANCELED).
+-- Without a syscall to block (a file closing as its process ends), busy is EBUSY.
+local stopped = {} -- by device id: how many stops it's had
+
+local function command(id, method, ...)
+  local request = k.request
+  if request and request.stops ~= nil and request.stops ~= (stopped[id] or 0) then
+    return nil, "stopped", "ECANCELED"
+  end
+  local answer = table.pack(board.invoke(id, method, ...))
+  if not answer[1] and (answer[2] == "busy" or answer[2] == "held") then
+    if not request then
+      return nil, answer[2], "EBUSY"
+    end
+    request.stops = request.stops or (stopped[id] or 0)
+    deliver(id)
+    k.listen(id)
+    return k.BLOCK
+  end
+  if answer[1] and method == "stop" then
+    stopped[id] = (stopped[id] or 0) + 1
+  end
+  return table.unpack(answer, 1, answer.n)
+end
+
 -- An event device's file (a sensor's, with events to pull and no get): read only; each event is a
 -- line (its driver's), and a read with none waiting waits for one, as a keyboard's does. Ready to
 -- poll (IN) while one waits. An event a poll took and nothing read yet is the file's to give a
@@ -159,13 +257,15 @@ end
 local function eventfile(id, driver)
   local line, at = "", 0
   local event -- (the one in 'line', while none of it is read)
+  local file = {type = "device"}
+  file.eventkey = file -- (its own copy of the device's events: the pull ioctl takes from it too)
   -- An event to read: true (one is in 'line'), false (none waiting: the kernel listens for one), or
   -- the device's failure.
   local function take()
     if at < #line then
       return true
     end
-    local ok, got = k.take(id, "pull")
+    local ok, got = nextevent(id, file)
     if not ok then
       return failed(got)
     elseif got == nil then
@@ -174,30 +274,33 @@ local function eventfile(id, driver)
     line, at, event = driver and driver.get(got) or tostring(got) .. "\n", 0, got
     return true
   end
-  return {
-    type = "device",
-    events = function(self)
-      return {IN = take() ~= false}
-    end,
-    held = function(self)
-      local got = event
-      if got ~= nil then
-        line, at, event = "", 0, nil
-      end
-      return got
-    end,
-    read = function(self, n)
-      local got, why, errno = take()
-      if got == nil then
-        return nil, why, errno
-      elseif not got then
-        return k.BLOCK
-      end
-      local chunk = line:sub(at + 1, at + n)
-      at, event = at + #chunk, nil
-      return chunk
-    end,
-  }
+  function file.events(self)
+    local got = take() ~= false
+    return {IN = got, PRI = got or nil} -- (an event in its own copy is news to it, whether or not the kernel saw the line rise)
+  end
+  function file.held(self)
+    local got = event
+    if got ~= nil then
+      line, at, event = "", 0, nil
+    end
+    return got
+  end
+  function file.read(self, n)
+    local got, why, errno = take()
+    if got == nil then
+      return nil, why, errno
+    elseif not got then
+      return k.BLOCK
+    end
+    local chunk = line:sub(at + 1, at + n)
+    at, event = at + #chunk, nil
+    return chunk
+  end
+  function file.close(self)
+    delist(id, file)
+    return true
+  end
+  return file
 end
 
 -- A disk's file: its bytes from offset 0 to its capacity, as a block device's, read and written
@@ -408,12 +511,13 @@ local function devicefile(device, mode)
   local written = nil -- what's been written: all of it (kept for close), or a line not yet ended
   local changed = false -- a change came in since the file was last read from its start (poll's PRI)
   local kept = {} -- the events drain took, for a pull ioctl (held), oldest first
+  local key = {} -- (its own copy of the device's events)
   -- Each event the device has waiting (a redstone card's changes), taken and kept for a pull
   -- ioctl: true if there was one. (A failure counts: the next read reports it.)
   local function drain()
     local any = false
     while true do
-      local ok, event = k.take(id, "pull")
+      local ok, event = nextevent(id, key)
       if not ok or event == nil then
         return any or not ok
       end
@@ -427,14 +531,17 @@ local function devicefile(device, mode)
     if value == nil then
       return fail("EINVAL")
     end
-    local ok, why = board.invoke(id, "set", value)
-    if not ok then
-      return failed(why, "EINVAL")
+    local ok, why, errno = command(id, "set", value)
+    if ok == k.BLOCK then
+      return k.BLOCK
+    elseif not ok then
+      return failed(why, errno or "EINVAL")
     end
     return true
   end
   return {
     type = "device",
+    eventkey = key,
     -- As a sysfs attribute, for poll: always readable (IN, a read gives the state at once); PRI once
     -- the state changed since it was read from its start (as a GPIO's value file).
     events = function(self)
@@ -472,9 +579,11 @@ local function devicefile(device, mode)
     end,
     read = function(self, n)
       if data == nil then
-        local ok, got = board.invoke(id, "get")
-        if not ok then
-          return failed(got)
+        local ok, got, errno = command(id, "get")
+        if ok == k.BLOCK then
+          return k.BLOCK -- (a buffered device's get waits its turn)
+        elseif not ok then
+          return failed(got, errno)
         end
         data = driver and driver.get(got) or tostring(got or "")
       end
@@ -488,18 +597,31 @@ local function devicefile(device, mode)
         written[#written + 1] = bytes
         return #bytes
       end
-      written = (written or "") .. bytes
-      for line in written:gmatch("([^\n]*)\n") do
+      local request = k.request
+      if not (request and request.absorbed) then
+        written = (written or "") .. bytes
+        if request then
+          request.absorbed = true -- (asked again after a block: these bytes are in already)
+        end
+      end
+      while true do
+        local line, rest = written:match("^([^\n]*)\n(.*)$")
+        if not line then
+          break
+        end
         local ok, why, errno = set(line)
-        if not ok then
+        if ok == k.BLOCK then
+          return k.BLOCK -- (a buffered device busy: this line and the rest wait their turn)
+        elseif not ok then
           written = nil
           return nil, why, errno
         end
+        written = rest
       end
-      written = written:match("[^\n]*$")
       return #bytes
     end,
     close = function(self)
+      delist(id, key)
       local value = written
       written = nil
       if lines then
@@ -570,10 +692,22 @@ local function withmethods(d, device)
         return event -- (one a poll took: the file's, first)
       end
     end
+    if op == "pull" and d.eventkey and select("#", ...) == 0 then
+      local ok, event = nextevent(id, d.eventkey) -- (its own copy: every file sees every event)
+      if not ok then
+        return failed(event)
+      end
+      return event
+    end
     if op == "setLabel" then
       return k.setlabel(device, ...)
     end
-    local answer = table.pack(board.invoke(id, op, ...))
+    local answer = table.pack(command(id, op, ...))
+    if answer[1] == k.BLOCK then
+      return k.BLOCK -- (a buffered device busy: this thread waits, only it)
+    elseif answer[1] == nil and answer[3] then
+      return nil, answer[2], answer[3] -- (stopped while it waited)
+    end
     if answer[1] and opens and opens[op] and answer[2] ~= nil then
       open[answer[2]] = opens[op] -- (its handle: open until its close, or the file's)
     elseif answer[1] and closes[op] then
@@ -596,10 +730,14 @@ local function withmethods(d, device)
     end
     return table.unpack(answer, 2, answer.n)
   end
+  if device.pull and d.eventkey then
+    enlist(id, d.eventkey) -- (every event from its open on: none taken before it's read is lost to it)
+  end
   d.events = function(self)
     local ready = events and events(self) or {}
     if ready.PRI == nil then
-      if k.news[id] then
+      local queue = d.eventkey and readers[id] and readers[id][d.eventkey]
+      if k.news[id] or queue and queue[1] ~= nil then
         ready.PRI = true
       else
         k.listen(id) -- (its interrupt wakes a poll waiting on it)
