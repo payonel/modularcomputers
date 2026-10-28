@@ -581,7 +581,11 @@ class McosTest extends McosHarness {
 		assertThat(card.range()).isEqualTo(4);
 	}
 
+	/** What the tests that change the internet card's policy (one for every card) lock: tests here run side by side. */
+	private static final String INTERNET_POLICY = "InternetCard.policy";
+
 	@Test
+	@org.junit.jupiter.api.parallel.ResourceLock(INTERNET_POLICY)
 	void curlAndWgetMakeRequestsThroughTheInternetCardAndTheServersOwnMachineIsRefused() throws IOException {
 		com.sun.net.httpserver.HttpServer web = com.sun.net.httpserver.HttpServer.create(
 			new java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 0);
@@ -623,6 +627,63 @@ class McosTest extends McosHarness {
 			assertThat(read(root().resolve("c2"))).isEmpty();
 			assertThat(read(root().resolve("c4"))).as("not allowed: refused").isEqualTo("7\n");
 		} finally {
+			com.payonel.modularcomputers.device.InternetCard.policyFrom(() -> com.payonel.modularcomputers.internet.InternetPolicy.DEFAULT);
+			web.stop(0);
+		}
+	}
+
+	/**
+	 * A request a process leaves open is closed with its file (as a socket's connection is): a
+	 * response that never ends would otherwise hold one of the card's few requests for good.
+	 */
+	@Test
+	@org.junit.jupiter.api.parallel.ResourceLock(INTERNET_POLICY)
+	void requestsAProcessLeavesOpenCloseWithItsFile() throws IOException {
+		java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+		com.sun.net.httpserver.HttpServer web = com.sun.net.httpserver.HttpServer.create(
+			new java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(), 0), 0);
+		web.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
+		web.createContext("/", exchange -> {
+			exchange.sendResponseHeaders(200, 0); // (a body that never ends)
+			exchange.getResponseBody().write("x".getBytes());
+			exchange.getResponseBody().flush();
+			try {
+				done.await();
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+			exchange.close();
+		});
+		web.start();
+		String url = "http://127.0.0.1:" + web.getAddress().getPort() + "/";
+		com.payonel.modularcomputers.device.InternetCard.policyFrom(
+			() -> new com.payonel.modularcomputers.internet.InternetPolicy(true, java.util.List.of("127.0.0.1"), java.util.List.of()));
+		try {
+			var card = new com.payonel.modularcomputers.device.InternetCard();
+			devices.put(Motherboard.exp(0), card);
+			ticks.add(card::tick); // (its block's tick)
+			file("leave.lua", """
+				local sys = require("sys")
+				local card = assert(sys.open("/dev/internet0"))
+				for _ = 1, %d do
+				  assert(sys.ioctl(card, "request", "%s"))
+				end
+				-- (ends without closing them)
+				""".formatted(com.payonel.modularcomputers.device.InternetCard.MAX_OPEN, url));
+			file("again.lua", """
+				local sys = require("sys")
+				local card = assert(sys.open("/dev/internet0"))
+				local handle, why = sys.ioctl(card, "request", "%s")
+				local out = io.open("/again", "w")
+				out:write(handle and "taken" or tostring(why), "\\n")
+				out:close()
+				""".formatted(url));
+			boot();
+			type("lua /leave.lua; lua /again.lua\r");
+			settle(() -> java.nio.file.Files.isRegularFile(root().resolve("again")) && read(root().resolve("again")).endsWith("\n")); // (written at its close)
+			assertThat(read(root().resolve("again"))).as("the first program's requests closed with its file: room for another").isEqualTo("taken\n");
+		} finally {
+			done.countDown();
 			com.payonel.modularcomputers.device.InternetCard.policyFrom(() -> com.payonel.modularcomputers.internet.InternetPolicy.DEFAULT);
 			web.stop(0);
 		}

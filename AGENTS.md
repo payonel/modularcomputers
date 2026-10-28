@@ -759,6 +759,10 @@ Lessons from mistakes, each with its test:
 - **A test's server ticks at the computer's pace:** a loop ticking every millisecond ran a starved
   computer's clock ahead of its code on a loaded host (timeouts expired, deadlines passed early),
   which hid the spinning door. (`TestServer.awaitHost`)
+- **What a device holds open for a file closes with the file:** an internet request is a connection
+  nothing else ends, so a process that died mid-download kept one of the card's 4 for good, and
+  four of those locked the card. A driver's `opens` names such a method and its closer, and devfs
+  closes what a file left open when it closes. (`requestsAProcessLeavesOpenCloseWithItsFile`)
 - **A wait for ever wraps round:** a deadline is now plus its length, and `Long.MAX_VALUE` ticks
   added to now is in the past, so a Java program's park (`Program.park`) answered at once and spun.
   Saturate a deadline at the end of time. (`RuntimeTest.callsAreImmediate...`)

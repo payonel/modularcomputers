@@ -194,11 +194,13 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
     connection: as closing a socket's fd does), its pending calls ending `cancelled`. Today's leak
     of that is a bug, fixed apart from this plan.
   - **The rest, as proposed:** a queued device's `/dev` file's read blocks only the reading process
-    until its event (the driver issues the call); `stop()` works in stasis (a queue operation, not a
-    motion: the commands end `cancelled`, the golem stays held); a device's kind shows in `/sys` and
+    until its event (the driver issues the call); `stop()` in stasis needs no exception (the user's
+    rule above): its arrival clears the queue, and its halt waits like any command until the field
+    lets go, so nothing of the old plan runs after; a device's kind shows in `/sys` and
     its manual page (at layer 1 a tag and a direct answer can both be numbers); `dmesg` logs an
-    event's name, tag and size, never its data; a sound card's `write` is all or nothing (accepted
-    whole if it fits, `full` if not); a reboot drops every device's queue, as power-off does (the
+    event's name, tag and size, never its data; a queued `write` (the sound card's, the internet
+    card's): open, being settled with the user (proposed: whole or refused at once, `full` or `too
+    large`, ending when its bytes are played or sent, so `devices.sync` means done with no `drain`); a reboot drops every device's queue, as power-off does (the
     tag counter starts again).
   - **To rewrite when built:** `lib/http.lua`, `wget`, `curl`, `aplay` (the sound card's `sync`), the
     robotics and redstone drivers, `lib/devices.lua`, the manual's examples and its three-layer
@@ -227,7 +229,8 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
     plan explicitly. `position()` is queued and answers the plan. No way to accept drift into the
     plan for now (`replan`, `settle`, `resetOrigin` were tried and dropped: names didn't land); no
     `drift()` method: the `shoved` event carries the drift (its total), and `get()` shows it.
-  - **`stop()` is forceful:** it clears the queue (each command `cancelled`), then runs alone at once:
+  - **`stop()` is forceful, and an ordinary queued request** (the user's): its arrival at the device
+    clears the queue (each command `cancelled`), and it's then all that's queued, so it runs at once:
     it halts where it is, as soon as it can (mid-block, or hovering in place), without centering, and
     ends in `stopped` with its tag and `at`, where it really stopped from its origin. The plan and
     the origin don't move: what it interrupted never happened, so the next command returns to the

@@ -141,6 +141,17 @@ end
 -- one look.
 local drivers = {}
 
+-- A device's driver (false: none), looked for once a type.
+local function driverof(device)
+  local kind = device.type or ""
+  local driver = drivers[kind]
+  if driver == nil then
+    driver = k.driver(kind) or false
+    drivers[kind] = driver
+  end
+  return driver
+end
+
 -- An event device's file (a sensor's, with events to pull and no get): read only; each event is a
 -- line (its driver's), and a read with none waiting waits for one, as a keyboard's does. Ready to
 -- poll (IN) while one waits. An event a poll took and nothing read yet is the file's to give a
@@ -387,12 +398,8 @@ local function devicefile(device, mode)
   if (reads and not (device.get or events)) or (writes and not device.set) then
     return fail("EACCES")
   end
-  local id, kind = device.id, device.type or ""
-  local driver = drivers[kind]
-  if driver == nil then
-    driver = k.driver(kind) or false
-    drivers[kind] = driver
-  end
+  local id = device.id
+  local driver = driverof(device)
   if events then
     return eventfile(id, driver)
   end
@@ -517,6 +524,26 @@ end
 -- (ENODEV: the device is gone).
 local function withmethods(d, device)
   local id, own, events, read = device.id, d.ioctl, d.events, d.read
+  -- What this file's calls opened and nothing else ends (a driver's 'opens': an internet request, a
+  -- connection, by the method that closes it), closed with the file, as a socket's connection is.
+  local driver = driverof(device)
+  local opens, open = driver and driver.opens, {}
+  local closes = {}
+  for _, method in pairs(opens or {}) do
+    closes[method] = true
+  end
+  local close = d.close
+  d.close = function(self)
+    local result, why, errno = true
+    if close then
+      result, why, errno = close(self)
+    end
+    for handle, method in pairs(open) do
+      board.invoke(id, method, handle) -- (gone already, or the device is: nothing to do)
+    end
+    open = {}
+    return result, why, errno
+  end
   if read then
     d.read = function(self, ...)
       local got = table.pack(read(self, ...))
@@ -547,6 +574,11 @@ local function withmethods(d, device)
       return k.setlabel(device, ...)
     end
     local answer = table.pack(board.invoke(id, op, ...))
+    if answer[1] and opens and opens[op] and answer[2] ~= nil then
+      open[answer[2]] = opens[op] -- (its handle: open until its close, or the file's)
+    elseif answer[1] and closes[op] then
+      open[(...)] = nil
+    end
     if not answer[1] then
       local why = tostring(answer[2])
       if why:find("^no such device") then

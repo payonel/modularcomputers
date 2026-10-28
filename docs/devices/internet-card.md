@@ -107,7 +107,9 @@ its reads with why, after what had come. Each piece costs power.
 ### close(handle) → nothing
 
 Stops a request: its connection closes and what it had waiting goes. A program closes every request
-it makes, finished or not: a card has only 4.
+it makes, finished or not: a card has only 4. In mcos, a request still open when the file it was
+made through closes (its program ended, or crashed) is closed with it, as closing a socket closes
+its connection.
 
 ### pull() → entry or nil
 

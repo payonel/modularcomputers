@@ -5,6 +5,10 @@
 --   GET http://10.0.0.1/ - 2ms 0 refused: a private address (the server's network)
 -- (The card keeps only the last few: someone reading sees what's current.)
 return {
+  -- A request opens a connection that only close ends: what a file's requests leave open is closed
+  -- with the file (devfs), as a socket's connection is, so a process that dies mid-download doesn't
+  -- hold one of the card's few requests for good.
+  opens = {request = "close"},
   get = function(entry)
     local status = entry.why and "-" or tostring(entry.status)
     return entry.method .. " " .. entry.url .. " " .. status .. " " .. entry.millis .. "ms " .. entry.bytes
