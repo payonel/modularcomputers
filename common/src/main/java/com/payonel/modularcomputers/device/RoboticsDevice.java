@@ -52,8 +52,6 @@ public final class RoboticsDevice implements Device, Buffered {
 	public static final String LANDING = "landing";
 	/** What it's doing while it goes back to its plan (a shove, a stop off it). */
 	public static final String RETURNING = "returning";
-	/** What it's doing while a crafting card in it crafts (its robot is busy). */
-	public static final String CRAFTING = "crafting";
 	/** What it's doing while a field holds it: its robotics frozen. */
 	public static final String HELD = "held";
 	/** What it's doing while it falls on its legs (nothing it was asked: a block gone under it). */
@@ -256,14 +254,6 @@ public final class RoboticsDevice implements Device, Buffered {
 	};
 	/** The command running (its method's name, or {@link #RETURN}; null: none). */
 	private String active;
-	/** Another of its parts whose work the command running is (a crafting card crafting), or null. */
-	private Part owner;
-
-	/** Another part of the robot whose work keeps it busy (a crafting card's craft). */
-	public interface Part {
-		/** The robot was stopped: the part's work stops too (it says so itself). */
-		void robotStopped();
-	}
 	private boolean accepting;
 	/** The command under way at the save it was loaded from (its end is due: interrupted), or null. */
 	private String interrupted;
@@ -317,7 +307,6 @@ public final class RoboticsDevice implements Device, Buffered {
 			return;
 		}
 		active = null;
-		owner = null;
 		if (STOPPED.equals(why) || INTERRUPTED.equals(why)) {
 			body.replanHere();
 		} else {
@@ -409,15 +398,8 @@ public final class RoboticsDevice implements Device, Buffered {
 		return started;
 	}
 
-	@Method(doc = "stop(): stops what it's doing at once, where it is, no centering (flying, it hovers there; a block it was breaking is left as it is; a crafting card's craft ends too): the command running ends, stopped. Its plan becomes where it stopped (on its legs, the block it's nearest: its next positional command steps onto its middle first). Never waits; answers where it really stopped, {forward, right, up, heading} from its origin")
+	@Method(doc = "stop(): stops what it's doing at once, where it is, no centering (flying, it hovers there; a block it was breaking is left as it is): the command running ends, stopped. Its plan becomes where it stopped (on its legs, the block it's nearest: its next positional command steps onto its middle first). Never waits; answers where it really stopped, {forward, right, up, heading} from its origin")
 	public Result stop(Arguments args) {
-		Part part = owner;
-		if (part != null) { // (a part's work, a craft: it stops, and its part says so)
-			owner = null;
-			active = null;
-			part.robotStopped();
-			changed();
-		}
 		body.stop();
 		end(false, STOPPED, null);
 		Result at = body.position();
@@ -540,7 +522,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		changed();
 	}
 
-	@Method(doc = "get(): live, never waiting: {state, legs, pathfinding, position, planned, drift}: what it's doing now (idle, walking, turning, breaking, flying, hovering, landing, returning, crafting, falling or held), whether it stands on its legs, whether it finds its way round things, where it really is and its plan (each as position gives it), and how far it's off its plan ({forward, right, up}; none when it's on it)")
+	@Method(doc = "get(): live, never waiting: {state, legs, pathfinding, position, planned, drift}: what it's doing now (idle, walking, turning, breaking, flying, hovering, landing, returning, falling or held), whether it stands on its legs, whether it finds its way round things, where it really is and its plan (each as position gives it), and how far it's off its plan ({forward, right, up}; none when it's on it)")
 	public Result get(Arguments args) {
 		Map<String, Object> now = new LinkedHashMap<>();
 		now.put("state", state());
@@ -718,31 +700,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	/** A command was refused while it fell: its landing's news must come, however short the fall. */
 	private boolean waitedOnFall;
 
-	/**
-	 * Another of its parts makes it busy (a crafting card in it crafting: {@code method}, "craft"):
-	 * null when it took it, else why not (busy, held).
-	 */
-	public String begin(String method, Part part) {
-		String refused = refusal(method);
-		if (refused != null) {
-			return refused;
-		}
-		active = method;
-		owner = part;
-		changed();
-		return null;
-	}
-
-	/** What {@code part} began ({@link #begin}) ended: it's free again (the part raises its own event). */
-	public void done(Part part) {
-		if (part != null && part == owner) {
-			active = null;
-			owner = null;
-			changed();
-		}
-	}
-
-	/** Whether a field holds it (its robotics frozen): its parts' work pauses too. */
+	/** Whether a field holds it (its robotics frozen): its parts' work pauses too (a crafting card's craft). */
 	public boolean isFrozen() {
 		return body.frozen();
 	}
@@ -762,7 +720,7 @@ public final class RoboticsDevice implements Device, Buffered {
 			case "land" -> LANDING;
 			case "swing" -> BREAKING;
 			case RETURN -> RETURNING;
-			default -> CRAFTING;
+			default -> active; // (no other runs over time)
 		};
 	}
 
@@ -797,12 +755,6 @@ public final class RoboticsDevice implements Device, Buffered {
 			return BUSY;
 		}
 		return null;
-	}
-
-	/** While a part's work keeps it busy (a craft), that part's news ends a wait: its end. */
-	@Override
-	public Object blocker(String method) {
-		return owner;
 	}
 
 	/** Whether it's running a command now (its body's ticks ask: a stop, a freeze). */
@@ -854,7 +806,6 @@ public final class RoboticsDevice implements Device, Buffered {
 			body.stop();
 			body.release(); // (its thrusters stop with its program: what they held up falls)
 			active = null;
-			owner = null;
 			changed();
 		}
 	}
@@ -872,7 +823,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	public Map<String, Object> saved() {
 		Map<String, Object> saved = new LinkedHashMap<>();
 		events.save(saved);
-		if (active != null && owner == null) { // (a part's work is the part's to save: a card's craft)
+		if (active != null) {
 			saved.put("active", active);
 		}
 		return saved;

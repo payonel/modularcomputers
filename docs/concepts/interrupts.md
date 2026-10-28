@@ -75,7 +75,7 @@ and why), which raises its interrupt: the device's "idle again".
 - **At the board**, a command given while another runs is refused at once, `false, "busy"`, doing
   nothing: the call still never waits. Wait for the running command's end (its interrupt), then
   give it again. When another device's news ends the wait, the refusal names it too, by its id
-  (`false, "busy", "id:..."`): a crafting card waiting for its robot, a robot for its card's craft.
+  (`false, "busy", "id:..."`): a crafting card waiting for its robot's walk.
 - **Under mcos**, the kernel does that for you: a command to a busy device blocks the thread that
   gave it, and only that thread, until the device can take it, then starts it and returns. So a
   series of commands runs in order, and more work at once means more

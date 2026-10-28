@@ -25,7 +25,7 @@ public interface Buffered {
 
 	/**
 	 * The device whose news ends the wait {@link #refusal} just gave, when it isn't this one (null): a
-	 * crafting card waiting for its robot to be free, a robot waiting for a card's craft. The board's
+	 * crafting card waiting for its robot's moves to end. The board's
 	 * refusal names it, so a program (and mcos) knows which device to wait on.
 	 */
 	default Object blocker(String method) {

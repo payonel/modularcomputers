@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * What wakes a command waiting on a buffered device, in mcos (the code review's cases): another
- * device's news (a robot and its crafting card wait on each other), news another thread's waiting
+ * device's news (a crafting card waits for its robot's moves), news another thread's waiting
  * command took, a stop written as a line, a close's last line, a write that never came back, and a
  * wait for an end with a time limit while other news keeps coming.
  */
@@ -26,6 +26,9 @@ class BufferedWaitsMcosTest extends McosHarness {
 	private final int[] left = {0};
 	/** How many ticks a walk takes (a block's worth, about). */
 	private static final int WALK_TICKS = 6;
+	/** The robot's crafting card (null: none), and what it was doing at each of the robot's arrivals. */
+	private CraftingCard card;
+	private final List<String> cardAtArrivals = Collections.synchronizedList(new java.util.ArrayList<>());
 
 	BufferedWaitsMcosTest() {
 		robotics.moveWith(new RoboticsDevice.Body() {
@@ -55,6 +58,9 @@ class BufferedWaitsMcosTest extends McosHarness {
 		});
 		ticks.add(() -> {
 			if (left[0] > 0 && --left[0] == 0) {
+				if (card != null) {
+					cardAtArrivals.add(card.state());
+				}
 				robotics.arrived(); // (the move under way ends)
 			}
 		});
@@ -118,29 +124,36 @@ class BufferedWaitsMcosTest extends McosHarness {
 		});
 		ticks.add(card::tick);
 		devices.put(Motherboard.exp(0), card);
+		this.card = card;
 		return card;
 	}
 
-	/** The robot waits for its card's craft (the card's end, not the robot's, ends that wait). */
+	/**
+	 * A craft's start costs its robot nothing (the user's): the robot walks while its card crafts, the
+	 * card's next craft waits for its own, and a wait for the craft's end is the program's sync.
+	 */
 	@Test
-	void aRobotsCommandWaitingForItsCardsCraftRunsOnceItsCrafted() {
+	void theRobotWalksWhileItsCardCraftsAndTheCardsNextCraftWaitsForIt() {
 		card();
 		file("craftwalk.lua", """
 			local devices = require("devices")
 			local card = assert(devices.open("crafting0"))
 			local robot = assert(devices.open("robotics0"))
-			assert(card.craft(2))
-			assert(robot.walk(1)) -- waits: its robot's busy crafting
+			assert(card.craft(50))
+			assert(robot.walk(1)) -- at once: the craft is the card's
 			assert(devices.ended(robot, "walk"))
-			local ok, why, made = devices.ended(card, "craft")
+			assert(card.craft(1)) -- waits: the card's crafting
+			local _, _, first = devices.ended(card, "craft")
+			local ok, _, second = devices.ended(card, "craft")
 			local out = io.open("/out", "w")
-			out:write(tostring(ok), " ", made.count, "\\n")
+			out:write(first.count, " ", tostring(ok), " ", second.count, "\\n")
 			out:close()
 			""");
 		boot();
 		type("lua /craftwalk.lua\r");
-		untilFile(root().resolve("out"), "true 8\n");
+		untilFile(root().resolve("out"), "200 true 4\n");
 		assertThat(asked).containsExactly("walk 1");
+		assertThat(cardAtArrivals).as("the walk ended while the card crafted").containsExactly(CraftingCard.CRAFTING);
 	}
 
 	/** The card waits for its robot's walk (the robot's end ends it). */
@@ -163,25 +176,27 @@ class BufferedWaitsMcosTest extends McosHarness {
 		assertThat(asked).containsExactly("walk 3", "store front");
 	}
 
-	/** A robot's stop ends its card's craft, which says so: the robot's free, the card's done. */
+	/** A card's craft is its own: its robot's stop leaves it, and the card's stop ends it, which says so. */
 	@Test
-	void aRobotsStopEndsItsCardsCraftWhichSaysSo() {
+	void aCardsStopEndsItsCraftAndItsRobotsStopLeavesIt() {
 		CraftingCard card = card();
 		file("stopcraft.lua", """
 			local devices = require("devices")
 			local card = assert(devices.open("crafting0"))
 			local robot = assert(devices.open("robotics0"))
 			assert(card.craft(50))
-			robot.stop()
-			local ok, why = devices.ended(card, "craft")
-			assert(robot.walk(1)) -- (free at once)
+			robot.stop() -- (the robot's own: the craft goes on)
+			assert(robot.walk(1))
+			assert(devices.ended(robot, "walk"))
+			card.stop()
+			local ok, why, made = devices.ended(card, "craft")
 			local out = io.open("/out", "w")
-			out:write(tostring(ok), " ", why, "\\n")
+			out:write(tostring(ok), " ", why, " ", tostring(made.count >= 20), "\\n")
 			out:close()
 			""");
 		boot();
 		type("lua /stopcraft.lua\r");
-		untilFile(root().resolve("out"), "false stopped\n");
+		untilFile(root().resolve("out"), "false stopped true\n");
 		assertThat(card.state()).as("its craft's over").isEqualTo(CraftingCard.IDLE);
 	}
 

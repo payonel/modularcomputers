@@ -29,7 +29,7 @@ import net.minecraft.world.phys.AABB;
 
 /**
  * The crafting card (user design, 2026-10-24): in a robot, a program crafts from its grid into its
- * storage, a craft taking time, two cards crafting in turn; a craft with no room fails, its grid
+ * storage, a craft taking time, two cards crafting at once, their robot free meanwhile; a craft with no room fails, its grid
  * left as it was; what the robot breaks goes to its storage; drop fills a container there and
  * drops the rest; store answers true only when nothing's left. In a case its methods need
  * robotics, but a player crafts with it by hand in the case's view.
@@ -126,29 +126,25 @@ public class CraftingCardGameTest {
 	}
 
 	@GameTest(maxTicks = 100)
-	public void twoCardsCraftOneAfterTheOtherTheRobotBusyMeanwhile(GameTestHelper helper) {
-		int crafts = 3;
+	public void twoCardsCraftAtOnceTheirRobotFreeMeanwhile(GameTestHelper helper) {
+		int crafts = 5;
 		BotGolem golem = golem(helper, Map.of(LANE, card(sticks(crafts)), SECOND_LANE, card(sticks(crafts))));
 		long[] asked = {-1};
-		String[] second = {null};
-		boolean[] started = {false};
+		String[] refused = {"unasked", "unasked", "unasked"};
 		helper.runAfterDelay(3, () -> {
-			crafting(golem, LANE).craft(args((long) crafts));
-			second[0] = crafting(golem, SECOND_LANE).craft(args((long) crafts)).error(); // (its robot's busy crafting: the user's)
+			refused[0] = crafting(golem, LANE).craft(args((long) crafts)).error();
+			refused[1] = crafting(golem, SECOND_LANE).craft(args((long) crafts)).error(); // (the craft is the card's: the user's)
+			refused[2] = golem.robotics().refusal("walk"); // (a craft's start costs its robot nothing)
 			asked[0] = helper.getTick();
 		});
-		helper.onEachTick(() -> {
-			if (asked[0] >= 0 && !started[0] && !golem.robotics().busy()) {
-				started[0] = !crafting(golem, SECOND_LANE).craft(args((long) crafts)).failed(); // (the first's done: now the second)
-			}
-		});
 		helper.succeedWhen(() -> {
-			helper.assertTrue(com.payonel.modularcomputers.device.Buffered.BUSY.equals(second[0]), "the second waited: " + second[0]);
+			helper.assertTrue(refused[0] == null && refused[1] == null, "both started: " + refused[0] + ", " + refused[1]);
+			helper.assertTrue(refused[2] == null, "its robot free: " + refused[2]);
 			for (int lane : new int[] {LANE, SECOND_LANE}) {
 				helper.assertTrue(slot(golem, lane, CraftingCard.GRID).getCount() == 4 * crafts, "lane " + lane + "'s sticks: " + slot(golem, lane, CraftingCard.GRID));
 			}
 			long took = helper.getTick() - asked[0];
-			helper.assertTrue(took >= 2 * crafts * CraftingCard.CRAFT_TICKS, "one after the other: " + took + " ticks");
+			helper.assertTrue(took < 2 * crafts * CraftingCard.CRAFT_TICKS, "side by side: " + took + " ticks");
 		});
 	}
 

@@ -25,8 +25,7 @@ goes into its storage.
 </div>
 
 Its slots are on the card itself: take the card out and its items go with it, into another
-computer or robot. A robot crafts with one card at a time: a craft is its robot's work, and keeps
-it busy until it's done.
+computer or robot.
 
 ## In its computer's view
 
@@ -48,13 +47,16 @@ Programs work the card only in a robot: crafting, moving its items and its file 
 robotics to do the work. In a case every method fails with `no robotics` (the card's details, with
 Shift held, say so); its tab still works by hand.
 
-Its methods are its robot's [commands](/devices/robotics/#one-command-at-a-time): each waits while
-the robot is doing something else (a walk, a swing, another card's craft), a robot held in a field
-waits until it's let go, and a craft keeps the robot busy until it's crafted (paused while a field
-holds the robot). Its face actions (`drop`, `store`, `take`, `pickup`, a line written) are where the
-robot is, so a robot shoved off its plan goes back to it first. Its `pull`, `list` and `get` (its
-own slots) never wait. At the board a command refused because its robot is busy names the robot
-(`false, "busy", "id:..."`): its news ends the wait. A stop of its robot ends its craft.
+Its methods are [commands](/devices/robotics/#one-command-at-a-time) that come after the robot's:
+each waits while the robot is doing something else (a walk, a swing), and a robot held in a field
+waits until it's let go, so what a program does at a chest comes after its walk there. Its face
+actions (`drop`, `store`, `take`, `pickup`, a line written) are where the robot is, so a robot
+shoved off its plan goes back to it first. A craft costs the robot nothing: once started it's the
+card's own work, and the card is busy until it's crafted (its next command waits for it) while the
+robot is free to walk and act (paused while a field holds the robot). Its `pull`, `list`, `get` (its
+own slots) and `stop` never wait. At the board a command refused because its robot is busy names
+the robot (`false, "busy", "id:..."`): its news ends the wait; one refused while the card crafts is
+`false, "busy"`, the card's own news ending it.
 
 ## In mcos
 
@@ -90,11 +92,18 @@ device's `held`: `damage`, `maxDamage`, `label` where they apply).
 ### craft([count]) → true
 
 Crafts what its grid makes, `count` times (1), each taking a tick, what it makes going into
-its storage. A command: it answers at once, and its robot is busy until it's done. Its event,
+its storage. A command: once the robot's moves end it answers at once, and the card is busy until
+it's done, its robot free (a wait for its event is a program's sync). Its event,
 `craft`: `ok` and its `result`, `{name, count}` (how many it made), or not and why (`no recipe`,
 `empty grid`, `no room`: its storage can't take what it made, so the craft isn't made and
-the grid is as it was; `stopped`, its robot stopped), its `result` saying how many it made before
-it stopped.
+the grid is as it was; `stopped`, its `stop`), its `result` saying how many it made before it
+stopped.
+
+### stop() → true
+
+Ends a craft under way at once: its event says `stopped`, with how many it made. Never waits; in
+mcos it also ends every thread's wait to give the card a command (`ECANCELED`). The robot's own
+`stop` leaves the card's craft alone.
 
 ### move(from, to[, count]) → number
 
@@ -145,7 +154,7 @@ Its oldest event, or nil.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `craft` | `ok`, `why`, `result` (`{name, count}`) | a craft ended: the crafts asked for are made, or one couldn't be (why, and how many were made before it); `interrupted` when its world was saved during it |
+| `craft` | `ok`, `why`, `result` (`{name, count}`) | a craft ended: the crafts asked for are made, or one couldn't be (why, and how many were made before it); `stopped` by its `stop`; `interrupted` when its world was saved during it |
 
 ## Example
 

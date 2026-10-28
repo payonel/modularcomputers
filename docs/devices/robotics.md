@@ -45,9 +45,9 @@ waits for it. A failure ends that command only: the next one runs as any would.
 Four methods never wait: `get` (what it's doing now, and where it really is), `pull` (its events),
 `stop` (it stops at once), and `set` (it does an action as its method would, waiting as it would,
 but a stop at once). Under the board's own calls, a command while another runs is refused at once
-with `busy`, doing nothing (mcos turns that into the wait); while a [crafting
-card](/devices/crafting-card/)'s craft keeps it busy, the refusal names that card too
-(`false, "busy", "id:..."`), as its end is the one to wait for.
+with `busy`, doing nothing (mcos turns that into the wait). A [crafting
+card](/devices/crafting-card/)'s commands wait for the robot's moves too, but its craft is the
+card's own: the robot is free while it crafts.
 
 ## Its plan
 
@@ -65,7 +65,7 @@ drift: while it falls it's busy (`falling`), and once down its plan follows it d
 (`fell`, and how far), so a robot digging down goes on from where it landed.
 
 `stop` stops it at once, where it is: no centering, no squaring up. The command running ends
-`stopped` (a crafting card's craft too), and every thread waiting to give it a command is told so
+`stopped`, and every thread waiting to give it a command is told so
 (`ECANCELED`): a stop stops the plan a program's threads were feeding it. Its plan becomes where it
 stopped: in the air the point it's at (it hovers there, holding it), on its legs the block it's
 nearest, so the next positional command steps onto that block's middle first, never back to where
@@ -168,7 +168,7 @@ angle from its origin's.
 ### stop() → {forward, right, up, heading}
 
 Stops what it's doing at once, where it is, with no centering (flying, it hovers there; a block it
-was breaking is left as it is; a crafting card's craft ends too): the command running ends,
+was breaking is left as it is): the command running ends,
 `stopped`, and in mcos so does every thread's wait to give it a command (`ECANCELED`). Never waits.
 Answers where it really stopped, from its origin. Its plan becomes where it stopped (on its legs, the
 block it's nearest: its next positional command steps onto its middle first).

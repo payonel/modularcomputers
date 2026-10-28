@@ -87,9 +87,10 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
   `setPosition`). No tools in a field, nor in the air (legless it has no footing: the user's rule
   from the legs' design), so a job up a cliff is carried there and set down (the tree job, built
   so). `get` stays free while held: a program follows the carry with it.
-- The crafting card's methods are its robot's commands (busy while the robot is; `craft` keeps the
-  robot busy until it's crafted, so a robot crafts with one card at a time); in a case they fail
-  `no robotics`.
+- The crafting card's commands wait for its robot's (busy while the robot is); in a case they fail
+  `no robotics`. (Changed after the build, the user's, 2026-10-28: a craft's start costs the robot
+  nothing, the craft is the card's own work, a tick a craft, its `stop` the card's own; the build's
+  first form had `craft` keep the robot busy, a robot crafting with one card at a time.)
 - Events are named after their methods (today's `arrived`, `turned`, `broke`... go).
 
 ### The others

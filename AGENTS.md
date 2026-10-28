@@ -387,10 +387,12 @@ vanilla contents component, read and written by `CraftingStorage`, its one home)
 the card goes. Any computer takes it, and its view gets a tab a card (right of the buttons) where a
 player crafts by hand, as at a crafting table (the game's result slot). Its methods need robotics:
 in a case they fail (`no robotics`), in a robot `CraftingBench` works them (the game's recipes;
-what's made into storage, all or nothing: no room, no craft). Its methods are its robot's commands
-(all but `pull`, `list` and `get`): robotics is how a robot handles things, its hands at a grid too
-(the user's, 2026-10-27 and -28), so a craft waits for its moves to end, keeps the robot busy a tick
-(a click at a table), and a robot crafts with one card at a time. Its `/dev` file reads as its
+what's made into storage, all or nothing: no room, no craft). Its commands (all but `pull`, `list`,
+`get` and `stop`) come after its robot's: robotics is how a robot handles things, its hands at a
+grid too (the user's, 2026-10-27 and -28), so each waits for the robot's moves to end. A craft's
+start costs the robot nothing: the craft is then the card's own work, a tick a craft, the card busy
+(its next command waits) and the robot free, so cards craft side by side; its `stop` is its own,
+and the robot's leaves it (one device's stop isn't another's). Its `/dev` file reads as its
 items (`name count` a line) and a line written dumps its storage (below, or at the face named).
 A view's tabs are one mechanism (`SideTabs`, the user's): a tab for each card whose kind
 registered one, each opening its panel left of the board (the bus order is the parts view's own
@@ -601,7 +603,7 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   the bus is flat (`sysfs.lua`). `/dev`'s names coming and going are inotify notices
   (`CREATE /dev/charger0`, udev's way), so a program waits for a device as for a file.
 - **Buffered devices** (the user's design, 2026-10-28; its spec and build, `.agents/BUFFERED.md`):
-  a device that acts over time (`Buffered`: robotics with the crafting card, the field card, the
+  a device that acts over time (`Buffered`: robotics, the crafting card, the field card, the
   redstone card, the robotic piston; the sound and internet cards stay direct, streams with their
   own flow control) runs one command at a time; a command while one runs is refused `busy`
   at the board (layer 0, which can't wait: a board call freezes the whole program), and mcos blocks
@@ -614,8 +616,8 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   (the user's: a robot stuck on its first failure looks broken). A tags-and-queues design came first
   and was set aside as too error-prone.
   - **A device busy for another's sake names it** (`Buffered.blocker`): the board's refusal is
-    `false, "busy", "<its id>"` (a crafting card waiting for its robot, a robot for a card's craft:
-    one busy state, two interrupt lines), and mcos listens on both. `busy` and `held` mean "wait":
+    `false, "busy", "<its id>"` (a crafting card waiting for its robot's moves: the robot's busy
+    state, the card's interrupt line), and mcos listens on both. `busy` and `held` mean "wait":
     no device method fails with them (a field's target in another field is `captured`).
   - **mcos asks a waiting command again at most once a tick** unless one of its devices raised its
     interrupt (the board's state moves a tick at a time); news its retry takes into other files
@@ -836,8 +838,8 @@ Lessons from mistakes, each with its test:
   left to raise the interrupt (the square example hung on a loaded host). A command whose blocking
   took anything asks again before it blocks. (`aCommandWhoseWaitEndedAsItWasRefusedRunsAtOnce`)
 - **Two devices sharing one busy state need one wake:** a robot's crafting card was refused busy
-  while the robot walked, and mcos listened on the card, whose line never rose when the walk ended
-  (and the other way round). A device busy for another's sake names it, and the waiter hears both.
+  while the robot walked, and mcos listened on the card, whose line never rose when the walk ended.
+  A device busy for another's sake names it, and the waiter hears both.
   (`BufferedWaitsMcosTest`: the robot and its card)
 - **A wait's reason is reserved:** mcos blocks on `busy` and `held` from any device, so a field
   capture failing `held` (the target in another field) waited for ever. Only refusals say them.
