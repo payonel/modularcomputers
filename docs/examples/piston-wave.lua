@@ -4,7 +4,7 @@
 -- sys.devices() lists the pistons (type "actuator") in bus order, which you set at the computer;
 -- each has a file in /dev (actuator0, actuator1...) whose ioctls are its methods. Each piston is
 -- pushed on its front side (or the side given), one after another, DELAY seconds apart, for as
--- many rounds as asked. A piston that refuses ("cannot push") is reported and the wave goes on.
+-- many rounds as asked. A piston that refuses ("blocked: north") is reported and the wave goes on.
 local sys = require("sys")
 
 local DELAY = 0.25   -- seconds between one piston and the next

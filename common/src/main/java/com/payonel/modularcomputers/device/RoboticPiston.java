@@ -1,5 +1,7 @@
 package com.payonel.modularcomputers.device;
 
+import com.payonel.modularcomputers.bus.InterruptLine;
+
 import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.bus.DeviceType;
@@ -14,8 +16,12 @@ import java.util.List;
  * one with its cable port, as a real piston pushes, by the side's name. {@code push} is a pulse: the
  * arm goes out and comes back on its own; {@code extend} leaves it out until {@code retract}. Every
  * move costs power, whether it moved anything or not; extending an arm that's out already is free.
+ * <p>
+ * It's buffered (.agents/BUFFERED.md): each move is a command, ending in its event once the arm has
+ * moved ({@link #tick}, its block's): a push once the arm is back. A move that can't start (the
+ * cable's side, nothing that moves, no arm out to retract) is refused at once.
  */
-public final class RoboticPiston implements Device {
+public final class RoboticPiston implements Device, Buffered {
 	/** Where its front is: the face opposite its cable port (null until its block says). */
 	private java.util.function.Supplier<Face> front = () -> null;
 
@@ -24,9 +30,22 @@ public final class RoboticPiston implements Device {
 	}
 	/** What a push costs, moved or not: five ticks of a running CPU. */
 	public static final int PUSH_COST = 5 * PowerUnits.CPU;
-	public static final String CANNOT_PUSH = "cannot push";
+	/** Why a push or an extend can't start, and the side: the cable's, an arm out there, or what won't move. */
+	public static final String CANNOT_PUSH = "blocked";
+	/** Why a retract can't start, and the side: no arm out there. */
 	public static final String NOT_EXTENDED = "not extended";
+	/** A vanilla piston's move, in ticks: an extend's or a retract's time. */
+	public static final int MOVE_TICKS = 2;
+	/** A push's time: out, and back (its block's arm time). */
+	public static final int PUSH_TICKS = com.payonel.modularcomputers.block.RoboticPistonBlock.ARM_TICKS + MOVE_TICKS;
 	private final BusPower power = new BusPower(0);
+	private final InterruptLine line = new InterruptLine();
+	private boolean accepting;
+	private final EventQueue events = new EventQueue(line, () -> {
+	}, () -> accepting);
+	/** The move running: its method, and the ticks till it's done (0: none). */
+	private String moving;
+	private int left;
 
 	/** How the arm on a side moves. */
 	public enum Motion {
@@ -72,17 +91,17 @@ public final class RoboticPiston implements Device {
 		this.arms = arms;
 	}
 
-	@Method(doc = "push(side): pushes as a piston does on that side (north, south, east, west, up or down; or front, back, left, right: its front is opposite its cable), and the arm comes back on its own; true, or false and \"cannot push\" (the cable's side, an arm out there, or something that won't move)")
+	@Method(doc = "push(side): pushes as a piston does on that side (north, south, east, west, up or down; or front, back, left, right: its front is opposite its cable), and the arm comes back on its own. A command: true at once (its event: push, once the arm is back), or false and why it can't (blocked: the side: its cable's, an arm out there, or something that won't move)")
 	public Result push(Arguments args) {
 		return move(args, Motion.PUSH);
 	}
 
-	@Method(doc = "extend(side): pushes on that side and leaves the arm out until retract(side); true (also when it's out already: free), or false and \"cannot push\"")
+	@Method(doc = "extend(side): pushes on that side and leaves the arm out until retract(side). A command: true at once (its event: extend, once it's out; at once when it's out already: free), or false and why (blocked: the side)")
 	public Result extend(Arguments args) {
 		return move(args, Motion.EXTEND);
 	}
 
-	@Method(doc = "retract(side): takes the arm on that side back in (a sticky piston pulls what's in front of it); true, or false and \"not extended\"")
+	@Method(doc = "retract(side): takes the arm on that side back in (a sticky piston pulls what's in front of it). A command: true at once (its event: retract, once it's in), or false and why (not extended: the side)")
 	public Result retract(Arguments args) {
 		return move(args, Motion.RETRACT);
 	}
@@ -98,10 +117,66 @@ public final class RoboticPiston implements Device {
 		if (moved != Moved.ALREADY_OUT) {
 			power.charge(PUSH_COST);
 		}
+		String method = motion.name().toLowerCase(java.util.Locale.ROOT);
 		return switch (moved) {
-			case DONE, ALREADY_OUT -> Result.ok(true);
-			case CANNOT_PUSH -> Result.fail(CANNOT_PUSH);
-			case NOT_EXTENDED -> Result.fail(NOT_EXTENDED);
+			case DONE -> {
+				moving = method;
+				left = motion == Motion.PUSH ? PUSH_TICKS : MOVE_TICKS;
+				yield Result.ok(true);
+			}
+			case ALREADY_OUT -> {
+				events.ended(method, true, null, null); // (out already: done as it starts)
+				yield Result.ok(true);
+			}
+			case CANNOT_PUSH -> Result.fail(CANNOT_PUSH + ": " + side);
+			case NOT_EXTENDED -> Result.fail(NOT_EXTENDED + ": " + side);
 		};
+	}
+
+	@Override
+	public java.util.Set<String> free() {
+		return java.util.Set.of("pull");
+	}
+
+	@Override
+	public String refusal() {
+		return moving != null ? BUSY : null;
+	}
+
+	/** Its block's tick: a move running counts down, and ends. */
+	public void tick() {
+		if (moving != null && --left <= 0) {
+			String method = moving;
+			moving = null;
+			events.ended(method, true, null, null);
+		}
+	}
+
+	@Method(doc = "pull(): its oldest event, a move's end ({event, ok}), or nil")
+	public Result pull(Arguments args) {
+		return Result.ok(events.pull());
+	}
+
+	@Override
+	public String streamMethod() {
+		return "pull";
+	}
+
+	@Override
+	public boolean interruptPending() {
+		return events.pending();
+	}
+
+	@Override
+	public InterruptLine interruptLine() {
+		return line;
+	}
+
+	@Override
+	public void accepting(boolean accepting) {
+		this.accepting = accepting;
+		if (!accepting) {
+			events.clear(); // (its program's gone: what it held for it goes; a move under way finishes in the world)
+		}
 	}
 }

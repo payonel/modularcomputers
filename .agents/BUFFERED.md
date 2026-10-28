@@ -102,7 +102,7 @@ Each step lands with its tests (a bug's seen failing first), the manual and AGEN
   submitters; events to every open file; `lib/devices.lua`'s `ended`. Tests, among them (the
   user's): one thread running a series of blocking commands on a buffered device while another
   thread of the same process makes progress meanwhile (it isn't held up by the first's waits).
-- [ ] **3. The redstone card and the piston.**
+- [x] **3. The redstone card and the piston.**
 - [ ] **4. The energy field card.**
 - [ ] **5. Robotics and the crafting card:** one command at a time, the plan, drift, `stop`, stasis,
   the field's carry, events by method, `hover` gone, dry strings; its driver; the golem's tests;

@@ -46,8 +46,8 @@ public class RoboticPistonGameTest {
 	public void theCablesSideAndWhatWontMoveCantBePushed(GameTestHelper helper) {
 		RoboticPistonBlockEntity piston = piston(helper, ModBlocks.ROBOTIC_PISTON);
 		helper.setBlock(PISTON.west(), Blocks.OBSIDIAN);
-		helper.assertValueEqual(push(piston, "down").error(), RoboticPiston.CANNOT_PUSH, "the cable's side");
-		helper.assertValueEqual(push(piston, "west").error(), RoboticPiston.CANNOT_PUSH, "obsidian");
+		helper.assertValueEqual(push(piston, "down").error(), RoboticPiston.CANNOT_PUSH + ": down", "the cable's side");
+		helper.assertValueEqual(push(piston, "west").error(), RoboticPiston.CANNOT_PUSH + ": west", "obsidian");
 		helper.assertBlockPresent(Blocks.OBSIDIAN, PISTON.west());
 		helper.assertTrue(push(piston, "sideways").failed(), "no such side");
 		helper.succeed();
@@ -62,10 +62,10 @@ public class RoboticPistonGameTest {
 	public void anExtendedArmStaysOutUntilRetracted(GameTestHelper helper) {
 		RoboticPistonBlockEntity piston = piston(helper, ModBlocks.ROBOTIC_STICKY_PISTON);
 		helper.setBlock(PISTON.north(), Blocks.STONE);
-		helper.assertValueEqual(move(piston, "retract", "north").error(), RoboticPiston.NOT_EXTENDED, "nothing out to retract");
+		helper.assertValueEqual(move(piston, "retract", "north").error(), RoboticPiston.NOT_EXTENDED + ": north", "nothing out to retract");
 		helper.assertTrue(!move(piston, "extend", "north").failed(), "extend");
 		helper.assertTrue(!move(piston, "extend", "north").failed(), "extend again: it's out, true");
-		helper.assertValueEqual(push(piston, "north").error(), RoboticPiston.CANNOT_PUSH, "a push needs its arm in");
+		helper.assertValueEqual(push(piston, "north").error(), RoboticPiston.CANNOT_PUSH + ": north", "a push needs its arm in");
 		var registries = helper.getLevel().registryAccess();
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertBlockPresent(ModBlocks.ROBOTIC_PISTON_ARM, PISTON.north()))

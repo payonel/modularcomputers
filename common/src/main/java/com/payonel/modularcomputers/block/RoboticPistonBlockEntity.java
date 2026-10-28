@@ -64,6 +64,7 @@ public final class RoboticPistonBlockEntity extends CardHolderBlockEntity {
 
 	/** Server, every tick: arms whose push is over go back (an arm found out with no time, after a load, goes back too). */
 	void serverTick() {
+		device.tick(); // (a move running counts down: its command ends as its arm has moved)
 		long now = level.getGameTime();
 		for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
 			if (armOut(side) && !armsOut.containsKey(side)) {

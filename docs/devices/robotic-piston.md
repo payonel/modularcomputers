@@ -42,22 +42,17 @@ free.
 Its file is `/dev/actuator0` (`actuator1` for the next; its type is `actuator`, as
 [`lsdev`](/programs/lsdev/) names it).
 
-- **Read:** it has no data, so a read says what it is, a line each:
-
-  ```
-  type actuator
-  id id:3f2a...
-  path -
-  label -
-  methods extend push retract
-  ```
-
+- **Read:** its events, a move's end a line (`push ok`, `extend ok`), as they come; a read with none
+  waiting waits for one.
 - **Write:** refused: opening it to write fails with `EACCES`.
-- **Poll:** always ready for `IN` (that text). It has no interrupt, so never `PRI`.
-- **ioctls:** its methods below, by name, with the side as their argument. A move that is refused is
-  `nil`, its message (`cannot push`, `not extended`, `no such face: ...`) and `EINVAL`; a piston that
-  has left the bus (its cable cut, say) is `ENODEV`. `setLabel` sets its label, as on every
-  device file.
+- **Poll:** ready for `IN` and `PRI` while a move's end is waiting to be read.
+- **ioctls:** its methods below, by name, with the side as their argument. A move that can't start is
+  `nil`, its message (`blocked: north`, `not extended: north`, `no such face: ...`) and `EINVAL`; a
+  piston that has left the bus (its cable cut, say) is `ENODEV`. `setLabel` sets its label, as on
+  every device file.
+
+A piston is a [buffered device](/mcos/devices-library/#buffered-devices): it does one move at a
+time. A move given while one runs waits, in mcos its thread only, until the arm has moved.
 
 <!-- lua-fragment -->
 ```lua
@@ -72,22 +67,29 @@ no front it knows, or `left` and `right` when its front is up or down.
 
 ### push(side) → true
 
-Pushes on that side. The arm goes out and comes back on its own. Fails with `cannot push` on the
-cable's side, when an arm is out there already, or when something in front will not move.
+Pushes on that side. The arm goes out and comes back on its own; its event, `push`, once it's back.
+Fails at once with `blocked: <side>` on the cable's side, when an arm is out there already, or when
+something in front will not move.
 
 ### extend(side) → true
 
-Pushes and leaves the arm out until `retract`. Gives `true` also when the arm is out already
-(and then it stays out, free). Fails with `cannot push` otherwise as `push` does.
+Pushes and leaves the arm out until `retract`; its event, `extend`, once it's out. Gives `true` also
+when the arm is out already (and then it stays out, free, its event at once). Fails at once with
+`blocked: <side>` otherwise, as `push` does.
 
 ### retract(side) → true
 
-Takes the arm on that side back in; a sticky piston pulls what is in front of it. Fails with
-`not extended` when there is no arm out there.
+Takes the arm on that side back in; a sticky piston pulls what is in front of it. Its event,
+`retract`, once it's in. Fails at once with `not extended: <side>` when there is no arm out there.
+
+### pull() → event or nil
+
+Its oldest event, or `nil`.
 
 ## Events
 
-None.
+A move's end: `{event = "push", ok = true}` (or `extend`, `retract`). Its file reads them as lines,
+`push ok`.
 
 ## Examples
 

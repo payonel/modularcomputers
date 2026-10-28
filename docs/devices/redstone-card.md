@@ -53,8 +53,8 @@ down 0 0
 Each line is `face level powered`. The state is taken at the first read after the file is opened
 or sought back to its start, so a read from the start always gives the faces as they are then.
 
-A line written, `face powered`, sets that face as soon as the line is written (flushed), as a sysfs
-attribute does: `north 11`. Relative names work too (`front 15`). A line that is not a face and a
+A line written, `face powered`, sets that face at the card's next tick after the line is written
+(flushed), as a sysfs attribute does: `north 11`. Relative names work too (`front 15`). A line that is not a face and a
 number fails the write with `EINVAL`, and so does an unknown face (`no such face`).
 
 The file is always readable (`poll`'s `IN`) and writable (`OUT`). A change to any face since the
@@ -78,6 +78,11 @@ the next ones `pull` answers, and once a program has pulled them all, `PRI` is o
 change (as reading the file from its start turns it off). So a program can wait with `sys.poll`
 and then take every change with `pull` until it answers nil.
 
+The card is a [buffered device](/mcos/devices-library/#buffered-devices): a change in the world takes
+a tick, so a `set` is applied at the card's next tick, and the card takes one command at a time. A
+`set` or a `get` given while a `set` waits is held, in mcos its thread only, until it's applied: a
+`get` after a `set` always sees it. A line written to the file waits the same way.
+
 ## Methods
 
 ### get([sides]) → table
@@ -92,12 +97,14 @@ answers the face that is the block's front, by its world name). An unknown face 
 local west = sys.ioctl(fd, "get", {"west"}).west.level
 ```
 
-### set(sides) → table
+### set(sides) → true
 
-Takes a table in the same shape and sets each face it names: `{north = {powered = 11}}`.
+Takes a table in the same shape and sets each face it names, at the card's next tick:
+`{north = {powered = 11}}`.
 `powered` is the signal to put out; it is clamped to 0 through 15 and must be an integer
 (`north: powered: integer expected`). `level` is what is detected, so it is ignored, and a face the
-table leaves out stays as it was. Returns every face, as `get()`. The arguments are all checked
+table leaves out stays as it was. Answers `true` at once; once applied, its event, `set`, carries
+every face as `get()` gives them (`result`). The arguments are all checked
 before anything changes, so a table with one bad face changes nothing. An unknown face fails with
 `no such face`; a face that is not a table, with `north: table expected`. Each output that changes
 costs a tick of a running CPU's power.
@@ -109,8 +116,7 @@ sys.ioctl(fd, "set", {north = {powered = 15}, up = {powered = 0}})
 
 ### pull() → event or nil
 
-The oldest change waiting, as an event table (see Events), or nil when none waits. Each is taken
-once.
+The oldest event waiting (see Events), or nil when none waits. Each is taken once.
 
 <!-- lua-fragment -->
 ```lua
@@ -119,8 +125,9 @@ local event = sys.ioctl(fd, "pull")  -- {name = "redstone", side = "west", level
 
 ## Events
 
-Any change to a face's state raises an event, from wherever it came: a signal coming in, this
-card's own `set`, or another card in the block. Its fields are the face as it is now:
+A change to a face's state from the world raises an event: a signal coming in, or another card in
+the block. This card's own changes don't: its `set`'s event says them. A face's event is the face as
+it is now:
 
 | Field | Value |
 |---|---|
@@ -128,6 +135,8 @@ card's own `set`, or another card in the block. Its fields are the face as it is
 | `side` | the face, by world name |
 | `level` | the signal there, 0 to 15 |
 | `powered` | this card's output there |
+
+A `set`'s end is `{event = "set", ok = true, result = {north = {level = 15, powered = 15}, ...}}`.
 
 At most 32 wait. When more come, the oldest is dropped and the next event carries `lost`, the number
 dropped. The events are kept across a save, and dropped when no program runs on the computer.

@@ -69,16 +69,17 @@ public class CardGameTest {
 		CaseBlockEntity computer = helper.getBlockEntity(POS, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + 2, new ItemStack(ModItems.REDSTONE_CARD));
 		helper.setBlock(POS.east(), Blocks.REDSTONE_LAMP);
+		RedstoneCard[] second = {null};
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertValueEqual(computer.machine().board().bus().devices().stream().filter(RedstoneCard.class::isInstance).count(),
 				2L, "both cards on the bus"))
 			.thenExecute(() -> {
-				RedstoneCard second = computer.machine().board().bus().devices().stream().filter(RedstoneCard.class::isInstance)
+				second[0] = computer.machine().board().bus().devices().stream().filter(RedstoneCard.class::isInstance)
 					.map(RedstoneCard.class::cast).filter(card -> card != first).findFirst().orElseThrow();
-				first.set(args(Map.of("east", Map.of("powered", 15L))));
-				helper.assertValueEqual(level(second, "east"), 15L, "the other card reads the first's signal");
-				helper.assertValueEqual(field(second, "east", "powered"), 0L, "but puts out none");
+				first.set(args(Map.of("east", Map.of("powered", 15L)))); // (applied at its next tick)
 			})
+			.thenWaitUntil(() -> helper.assertValueEqual(level(second[0], "east"), 15L, "the other card reads the first's signal"))
+			.thenExecute(() -> helper.assertValueEqual(field(second[0], "east", "powered"), 0L, "but puts out none"))
 			.thenWaitUntil(() -> helper.assertBlockProperty(POS.east(), RedstoneLampBlock.LIT, true))
 			.thenSucceed();
 	}
@@ -100,8 +101,9 @@ public class CardGameTest {
 					events.add((Map<?, ?>) event);
 				}
 				helper.assertTrue(events.stream().anyMatch(e -> "west".equals(e.get("side")) && Long.valueOf(15).equals(e.get("level"))), "the change, as an event: " + events);
-				helper.assertTrue(events.stream().anyMatch(e -> "east".equals(e.get("side")) && Long.valueOf(15).equals(e.get("powered"))),
-					"its own change too: " + events);
+				helper.assertTrue(events.stream().anyMatch(e -> "set".equals(e.get("event")) && e.get("result") instanceof Map<?, ?> faces
+					&& faces.get("east") instanceof Map<?, ?> east && Long.valueOf(15).equals(east.get("powered"))), "its own change: its set's end: " + events);
+				helper.assertTrue(events.stream().noneMatch(e -> "east".equals(e.get("side"))), "and no face's event for it: " + events);
 				card.set(args(Map.of("east", Map.of("powered", 0L))));
 			})
 			.thenWaitUntil(() -> helper.assertBlockProperty(POS.east(), RedstoneLampBlock.LIT, false))
@@ -148,9 +150,10 @@ public class CardGameTest {
 		RedstoneCard card = (RedstoneCard) hub.card(0).orElseThrow();
 		card.power().supply(this); // (as a running computer's bus powers it)
 		card.set(args(Map.of("front", Map.of("powered", 6L), "left", Map.of("powered", 2L))));
-		helper.assertValueEqual(field(card, "east", "powered"), 6L, "its front: east, the way the hub faces");
-		helper.assertValueEqual(field(card, "south", "powered"), 2L, "its left, as we see it facing its front: south");
-		helper.succeed();
+		helper.succeedWhen(() -> {
+			helper.assertValueEqual(field(card, "east", "powered"), 6L, "its front: east, the way the hub faces");
+			helper.assertValueEqual(field(card, "south", "powered"), 2L, "its left, as we see it facing its front: south");
+		});
 	}
 
 	/**

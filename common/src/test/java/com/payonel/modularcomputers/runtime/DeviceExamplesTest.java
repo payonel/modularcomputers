@@ -329,7 +329,7 @@ class DeviceExamplesTest extends McosHarness {
 		assertThat(moves.getFirst()).as("its front is east").isEqualTo(new Move("pusher", "east", RoboticPiston.Motion.PUSH));
 		server.add(() -> blocked[0] = true);
 		java.nio.file.Path log = root().resolve("home/pusher.log");
-		settle(() -> Files.isRegularFile(log) && read(log).contains("blocked: cannot push\n"));
+		settle(() -> Files.isRegularFile(log) && read(log).contains("blocked: east\n"));
 		int now = moves.size();
 		settle(() -> moves.size() >= now + 2); // (it tries again)
 		server.add(() -> blocked[0] = false);

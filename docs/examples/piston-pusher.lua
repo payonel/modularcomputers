@@ -2,7 +2,7 @@
 -- conveyor does: lua piston-pusher.lua [side] &
 --
 -- push is a pulse: the arm goes out and comes back by itself. When nothing will move (the line
--- of blocks is too long, or something immovable is in the way) the push fails with "cannot push":
+-- of blocks is too long, or something immovable is in the way) the push fails ("blocked: east"):
 -- the program says so once, waits longer, and tries again, so it costs little while blocked.
 -- Every push costs power, moved or not.
 local sys = require("sys")
@@ -31,7 +31,7 @@ while true do
     sys.sleep(PERIOD)
   else
     if not blocked then
-      log("blocked: " .. tostring(why))
+      log(tostring(why))
     end
     blocked = true
     sys.sleep(BLOCKED)

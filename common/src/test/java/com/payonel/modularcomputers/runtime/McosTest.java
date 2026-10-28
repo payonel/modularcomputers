@@ -931,7 +931,7 @@ class McosTest extends McosHarness {
 	}
 
 	@Test
-	void aLineWrittenToARedstoneFileTakesEffectAtOnceSoAPulseWorks() {
+	void aLineWrittenToARedstoneFileTakesEffectAtItsNextTickSoAPulseWorks() {
 		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
 		devices.put(Motherboard.exp(0), card); // (a card in a slot, as in a case)
 		boot();
@@ -947,8 +947,7 @@ class McosTest extends McosHarness {
 			f:close()
 			""");
 		type("lua /pulse.lua; touch /done\r");
-		settle(() -> Files.isRegularFile(root().resolve("started")));
-		assertThat(card.output(0)).as("the first line, set with the file still open").isEqualTo(15);
+		settle(() -> Files.isRegularFile(root().resolve("started")) && card.output(0) == 15); // (the first line, set with the file still open, at its tick)
 		untilFile(root().resolve("done"), "");
 		assertThat(card.output(0)).isZero();
 	}

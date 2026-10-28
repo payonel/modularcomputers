@@ -32,7 +32,7 @@ class RoboticPistonTest {
 		piston.extend(new Arguments(List.of("up")));
 		assertThat(owed()).isEqualTo(RoboticPiston.PUSH_COST);
 		piston.moveWith((side, motion) -> RoboticPiston.Moved.CANNOT_PUSH);
-		assertThat(piston.push(new Arguments(List.of("up"))).error()).isEqualTo(RoboticPiston.CANNOT_PUSH);
+		assertThat(piston.push(new Arguments(List.of("up"))).error()).isEqualTo(RoboticPiston.CANNOT_PUSH + ": up");
 		assertThat(owed()).isEqualTo(RoboticPiston.PUSH_COST);
 	}
 }

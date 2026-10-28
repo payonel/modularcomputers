@@ -74,6 +74,7 @@ public final class CardWorld {
 		}
 		switch (card) {
 			case RedstoneCard redstone -> {
+				redstone.tick(); // (a set waiting is applied: a change a tick)
 				for (int face = 0; face < REDSTONE_FACES.size(); face++) {
 					Direction side = REDSTONE_FACES.get(face);
 					redstone.sense(face, level.getSignal(pos.relative(side), side));

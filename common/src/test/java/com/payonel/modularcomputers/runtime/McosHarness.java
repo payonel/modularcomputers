@@ -116,6 +116,13 @@ abstract class McosHarness {
 			}
 			TestServer.awaitHost(machine);
 			machine.tick();
+			for (Device device : devices.values()) {
+				if (device instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
+					redstone.tick(); // (its block's tick, as the world's: a set waiting is applied)
+				} else if (device instanceof com.payonel.modularcomputers.device.RoboticPiston piston) {
+					piston.tick(); // (a move running counts down)
+				}
+			}
 			for (Runnable tick : ticks) {
 				tick.run(); // (another computer's, and what a test does each tick)
 			}

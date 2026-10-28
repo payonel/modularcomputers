@@ -28,8 +28,13 @@ import java.util.function.IntUnaryOperator;
  * powered = 0} beside a first that puts out 15). {@code get} and {@code set} answer the whole table;
  * {@code set} takes the same table and changes only what it names: {@code powered} (a level is what's
  * detected, so it's ignored). A change costs power; without power, it puts out nothing.
+ * <p>
+ * It's buffered (.agents/BUFFERED.md): {@code set} and {@code get} are commands. A {@code set} is
+ * applied at its next tick ({@link #tick}: a change in the world takes a tick, so at most one a
+ * tick, the user's), and ends then in its event, every face as {@code get} gives it ({@code result});
+ * its own changes raise no face's event (that one says them), the world's still do.
  */
-public final class RedstoneCard extends Card {
+public final class RedstoneCard extends Card implements Buffered {
 	/** The faces, in its order (as {@code CardWorld.REDSTONE_FACES}); programs name them as {@link Face} does. */
 	public static final List<Face> SIDES = List.of(Face.NORTH, Face.SOUTH, Face.EAST, Face.WEST, Face.UP, Face.DOWN);
 	/** A redstone signal's strength, at most (Minecraft's 0 to 15). */
@@ -47,6 +52,8 @@ public final class RedstoneCard extends Card {
 	private final int[][] reported = new int[SIDES.size()][2];
 	/** What the block's cards put out on a face, the strongest: this card alone, until the block says. */
 	private IntUnaryOperator block = side -> output[side];
+	/** The faces a {@code set} named, waiting for its tick: face index to signal (null: none waiting). */
+	private Map<Integer, Integer> pending;
 	/** Tells the world its outputs changed (the block it's in updates its neighbours). */
 	private Runnable onOutput = () -> {
 	};
@@ -104,13 +111,13 @@ public final class RedstoneCard extends Card {
 		}
 	}
 
-	@Method(doc = "get([sides]): every face as {level (the signal there, coming in or put out by the block's cards), powered (this card's)} by name (north, south, east, west, up, down; front, back, left and right are taken too, as the block faces); with a table, only the faces it names (as keys or as a list)")
+	@Method(doc = "get([sides]): every face as {level (the signal there, coming in or put out by the block's cards), powered (this card's)} by name (north, south, east, west, up, down; front, back, left and right are taken too, as the block faces); with a table, only the faces it names (as keys or as a list). A command: it waits behind a set")
 	public Result get(Arguments args) {
 		Map<?, ?> asked = args.optTable(0);
 		return Result.ok(sides(asked == null ? allSides() : named(asked)));
 	}
 
-	@Method(doc = "set(sides): sets each face named: powered, the signal it puts out (0 to 15); level is what's detected, so it's ignored; returns every face, as get()")
+	@Method(doc = "set(sides): sets each face named: powered, the signal it puts out (0 to 15); level is what's detected, so it's ignored. A command: true at once; applied at its next tick, its event then: set, every face as get() (result)")
 	public Result set(Arguments args) {
 		Map<Integer, Integer> settings = new LinkedHashMap<>();
 		for (Map.Entry<?, ?> entry : args.checkTable(0).entrySet()) {
@@ -126,24 +133,50 @@ public final class RedstoneCard extends Card {
 				settings.put(side, (int) Math.clamp(((Number) value).longValue(), 0, MAX_SIGNAL));
 			}
 		}
-		// All checked: now it changes.
+		pending = settings; // (all checked: it changes at its next tick)
+		changed();
+		return Result.ok(true);
+	}
+
+	@Override
+	public Set<String> free() {
+		return Set.of("pull");
+	}
+
+	@Override
+	public String refusal() {
+		return pending != null ? BUSY : null;
+	}
+
+	/** Its tick (its block's): a {@code set} waiting is applied, and ends. */
+	public void tick() {
+		if (pending == null) {
+			return;
+		}
+		Map<Integer, Integer> settings = pending;
+		pending = null;
 		boolean changedOutput = false;
 		for (Map.Entry<Integer, Integer> setting : settings.entrySet()) {
-			if (output[setting.getKey()] != setting.getValue()) {
+			int side = setting.getKey();
+			if (output[side] != setting.getValue()) {
 				power.charge(CHANGE_COST);
-				output[setting.getKey()] = setting.getValue();
+				output[side] = setting.getValue();
 				changedOutput = true;
 			}
 		}
 		if (changedOutput) {
 			changed();
+			for (int side : settings.keySet()) {
+				reported[side][0] = level(side); // (its own change: the set's event says it, no face's)
+				reported[side][1] = output[side];
+			}
 			onOutput.run(); // (the block's other cards report: their levels may change)
 			report();
 		}
-		return Result.ok(sides(allSides()));
+		events.ended("set", true, null, sides(allSides()));
 	}
 
-	@Method(doc = "pull(): the oldest change to a face, from wherever it came, as {name, side, level, powered} (the face as it is now), or nil")
+	@Method(doc = "pull(): its oldest event, or nil: a face the world changed, {name, side, level, powered} (the face as it is now), or a command's end, {event, ok, why, result}")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -198,6 +231,11 @@ public final class RedstoneCard extends Card {
 		saved.put("input", Arrays.stream(input).mapToObj(v -> (Object) (long) v).toList());
 		saved.put("output", Arrays.stream(output).mapToObj(v -> (Object) (long) v).toList());
 		saved.put("reported", Arrays.stream(reported).flatMapToInt(Arrays::stream).mapToObj(v -> (Object) (long) v).toList());
+		if (pending != null) {
+			Map<String, Object> waiting = new LinkedHashMap<>(); // (a set accepted before the save is still applied, and still ends)
+			pending.forEach((side, signal) -> waiting.put(SIDES.get(side).id(), (long) signal));
+			saved.put("pending", waiting);
+		}
 		return saved;
 	}
 
@@ -206,6 +244,21 @@ public final class RedstoneCard extends Card {
 		events.restore(saved);
 		restoreSides(saved.get("input"), input);
 		restoreSides(saved.get("output"), output);
+		pending = null;
+		if (saved.get("pending") instanceof Map<?, ?> waiting) {
+			pending = new LinkedHashMap<>();
+			for (Map.Entry<?, ?> entry : waiting.entrySet()) {
+				int side = -1;
+				for (int i = 0; i < SIDES.size(); i++) {
+					if (SIDES.get(i).id().equals(entry.getKey())) {
+						side = i;
+					}
+				}
+				if (side >= 0 && entry.getValue() instanceof Long signal) {
+					pending.put(side, (int) Math.clamp(signal, 0, MAX_SIGNAL));
+				}
+			}
+		}
 		if (saved.get("reported") instanceof List<?> values) {
 			for (int i = 0; i < values.size() && i < reported.length * 2; i++) {
 				reported[i / 2][i % 2] = values.get(i) instanceof Long v ? (int) Math.clamp(v, 0, MAX_SIGNAL) : 0;
@@ -225,6 +278,7 @@ public final class RedstoneCard extends Card {
 	@Override
 	protected void dropData() {
 		events.clear();
+		pending = null; // (its program's gone: a set waiting goes with it)
 	}
 
 	@Override
@@ -240,6 +294,7 @@ public final class RedstoneCard extends Card {
 	/** Power's gone: it puts out nothing. */
 	@Override
 	public void powerOff() {
+		pending = null;
 		boolean any = false;
 		for (int i = 0; i < output.length; i++) {
 			any |= output[i] != 0;

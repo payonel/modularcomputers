@@ -69,9 +69,12 @@ class SavedStateTest {
 		card.sense(5, 9);
 		RedstoneCard loaded = new RedstoneCard();
 		loaded.restore(card.saved());
-		assertThat(loaded.output(0)).isEqualTo(7);
-		assertThat(loaded.pull(args()).first()).as("its own change, first").isEqualTo(Map.of("name", "redstone", "side", "north", "level", 7L, "powered", 7L));
-		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("name", "redstone", "side", "down", "level", 9L, "powered", 0L));
+		loaded.accepting(true);
+		assertThat(loaded.pull(args()).first()).as("the world's change, kept").isEqualTo(Map.of("name", "redstone", "side", "down", "level", 9L, "powered", 0L));
+		assertThat(loaded.refusal()).as("its set, saved before its tick: still waiting").isEqualTo("busy");
+		loaded.tick();
+		assertThat(loaded.output(0)).as("and applied after the load").isEqualTo(7);
+		assertThat(((Map<?, ?>) loaded.pull(args()).first()).get("event")).as("and it still ends").isEqualTo("set");
 		loaded.sense(5, 9);
 		assertThat(loaded.pull(args()).first()).as("the same signal after a load is no change").isNull();
 	}

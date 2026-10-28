@@ -35,13 +35,17 @@ class RedstoneCardTest {
 
 	@Test
 	void setPoweredPutsOutASignalAndItsLevelIsTheStrongestThere() {
-		var sides = sides(card.set(args(Map.of("north", Map.of("powered", 9L)))).first());
+		assertThat(card.set(args(Map.of("north", Map.of("powered", 9L)))).first()).as("a command: true at once").isEqualTo(true);
+		assertThat(card.output(NORTH)).as("applied at its next tick").isZero();
+		card.tick();
 		assertThat(card.output(NORTH)).isEqualTo(9);
+		var sides = sides(card.get(args()).first());
 		assertThat(sides.get("north")).containsEntry("powered", 9L).as("its own signal is the level there").containsEntry("level", 9L);
-		assertThat(sides).as("set answers every face").hasSize(6);
+		assertThat(sides).hasSize(6);
 		card.sense(NORTH, 12);
 		assertThat(sides(card.get(args()).first()).get("north")).containsEntry("level", 12L).containsEntry("powered", 9L);
 		card.set(args(Map.of("north", Map.of("powered", 99L))));
+		card.tick();
 		assertThat(card.output(NORTH)).as("15 at most").isEqualTo(RedstoneCard.MAX_SIGNAL);
 	}
 
@@ -54,6 +58,7 @@ class RedstoneCardTest {
 	@Test
 	void setIgnoresALevelItIsWhatsDetected() {
 		card.set(args(Map.of("north", Map.of("level", 9L))));
+		card.tick();
 		assertThat(card.output(NORTH)).isZero();
 	}
 
@@ -97,7 +102,11 @@ class RedstoneCardTest {
 		int[] block = {0};
 		card.block(side -> side == DOWN ? block[0] : 0);
 		card.set(args(Map.of("north", Map.of("powered", 5L))));
-		assertThat(card.pull(args()).first()).as("its own set").isEqualTo(Map.of("name", "redstone", "side", "north", "level", 5L, "powered", 5L));
+		card.tick();
+		@SuppressWarnings("unchecked")
+		Map<String, Object> set = (Map<String, Object>) card.pull(args()).first();
+		assertThat(set).as("its own set: its command's end, no face's change").containsEntry("event", "set").containsEntry("ok", true);
+		assertThat(sides(set.get("result")).get("north")).containsEntry("level", 5L).containsEntry("powered", 5L);
 		block[0] = 12; // another card in the block puts out 12 below
 		card.report();
 		assertThat(card.pull(args()).first()).as("another card's").isEqualTo(Map.of("name", "redstone", "side", "down", "level", 12L, "powered", 0L));
@@ -109,6 +118,7 @@ class RedstoneCardTest {
 	void aFaceIsNamedByTheWorldsNameOrByItsBlocksFront() {
 		card.frontFrom(() -> Face.EAST); // (its case faces east: facing it, we look west, and its left is south)
 		card.set(args(Map.of("front", Map.of("powered", 4L), "left", Map.of("powered", 2L))));
+		card.tick();
 		assertThat(card.output(2)).as("east, its front").isEqualTo(4);
 		assertThat(card.output(1)).as("south, its left").isEqualTo(2);
 		assertThat(sides(card.get(args(List.of("front"))).first()).keySet()).as("answered by the world's names").containsExactly("east");
