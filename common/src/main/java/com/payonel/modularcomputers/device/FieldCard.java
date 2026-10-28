@@ -19,7 +19,7 @@ import java.util.Map;
  * with it: in a golem it's how it flies. Holding costs power each tick, a move each block; without
  * power, or with no program running, it lets go. A {@link Projector} does the work in the world.
  * <p>
- * It's buffered (.agents/BUFFERED.md): {@code capture}, {@code move} and {@code set} are commands;
+ * It's buffered ({@link Buffered}): {@code capture}, {@code move} and {@code set} are commands;
  * a move runs until it's arrived or blocked, its end its event ({@code move}). {@code scan},
  * {@code get}, {@code pull} and {@code release} are free: a program can always let go, and a move
  * under way then ends, stopped.
@@ -90,7 +90,7 @@ public final class FieldCard extends Card implements Buffered {
 	}
 
 	@Override
-	public String refusal() {
+	public String refusal(String method) {
 		return state.equals(MOVING) ? BUSY : null;
 	}
 
@@ -200,7 +200,7 @@ public final class FieldCard extends Card implements Buffered {
 	@Method(doc = "set(action): does an action, as a table: {action = \"capture\", target}, {action = \"move\", forward, right, up}, or {action = \"release\"} (its file's lines are these)")
 	public Result set(Arguments args) {
 		if (!(args.get(0) instanceof Map<?, ?> action)) {
-			return Result.fail("an action table expected");
+			return Result.fail("not a table");
 		}
 		java.util.List<Object> rest = new java.util.ArrayList<>();
 		return switch (String.valueOf(action.get("action"))) {

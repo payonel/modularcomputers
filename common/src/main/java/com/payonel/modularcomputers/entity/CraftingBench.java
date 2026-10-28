@@ -51,6 +51,12 @@ public final class CraftingBench implements CraftingCard.Bench {
 	}
 
 	@Override
+	public com.payonel.modularcomputers.device.RoboticsDevice robot() {
+		BotGolem golem = robot.get();
+		return golem == null ? null : golem.robotics();
+	}
+
+	@Override
 	public Result list() {
 		List<Object> list = new ArrayList<>();
 		for (int slot = 0; slot < CraftingCard.SLOTS; slot++) {

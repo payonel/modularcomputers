@@ -36,21 +36,13 @@ public final class GolemSteps {
 			return null; // (within its elevation: free)
 		}
 		if (next > now) {
-			if (goal <= now) {
-				return "a step up";
-			} else if (next - now > 1 || to - from > MAX_JUMP + EPSILON) {
-				return "too high to jump";
-			} else if (next > goal) {
-				return "above where it was to go";
+			if (goal <= now || next - now > 1 || to - from > MAX_JUMP + EPSILON || next > goal) {
+				return "too high: " + (next - now); // (a step up its walk wasn't to make, or more than a jump)
 			}
 			return null;
 		}
-		if (goal >= now) {
-			return "a drop";
-		} else if (from - to > MAX_DROP + EPSILON) {
-			return "too far down";
-		} else if (next < goal) {
-			return "below where it was to go";
+		if (goal >= now || from - to > MAX_DROP + EPSILON || next < goal) {
+			return "too low: " + (now - next); // (a drop its walk wasn't to make, or more than it takes)
 		}
 		return null;
 	}

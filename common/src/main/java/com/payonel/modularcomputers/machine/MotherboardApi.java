@@ -139,7 +139,7 @@ final class MotherboardApi implements Board {
 		}
 		if (device.get() instanceof com.payonel.modularcomputers.device.Buffered buffered && !buffered.free().contains(method)
 			&& DeviceMethods.of(device.get()).containsKey(method)) {
-			String refused = buffered.refusal();
+			String refused = buffered.refusal(method);
 			if (refused != null) {
 				return Result.fail(refused); // a command while another runs: nothing done (mcos waits, its thread only)
 			}

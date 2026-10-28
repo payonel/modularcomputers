@@ -109,6 +109,14 @@ tasks.register("runProductionClientGameTest", net.fabricmc.loom.task.prod.Client
 	timeout = java.time.Duration.ofMinutes(10)
 }
 
+// Some of the server game tests, for a quicker look (-PgameTests='modularcomputers:golemflightgametest/*'):
+// Fabric API's filter, the game's test selector on the tests' ids (<mod>:<class>/<method>, lowercase).
+tasks.named("runGameTest", JavaExec) {
+	if (project.hasProperty("gameTests")) {
+		jvmArgs("-Dfabric-api.gametest.filter=${project.property('gameTests')}")
+	}
+}
+
 // Loom puts the server game tests under `check`, which would make every `build` boot a Minecraft
 // server. Keep `build` fast (compile, jars, unit tests) and run the game tests from `testAll`.
 tasks.named("check") {

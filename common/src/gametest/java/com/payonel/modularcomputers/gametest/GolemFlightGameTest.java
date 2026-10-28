@@ -89,7 +89,7 @@ public class GolemFlightGameTest {
 	}
 
 	private static java.util.Map<String, Object> event(String name) {
-		return java.util.Map.of("event", name);
+		return java.util.Map.of("event", name, "ok", true);
 	}
 
 	@GameTest(maxTicks = 100)
@@ -108,7 +108,7 @@ public class GolemFlightGameTest {
 				same(helper, golem.robotics().state(), RoboticsDevice.FLYING, "flying");
 				took[0] = (int) helper.getTick();
 			})
-			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("arrived")), "arrived: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "arrived: " + events))
 			.thenExecute(() -> {
 				helper.assertTrue(Math.abs(golem.getX() - start[1] - 4) < NEAR && Math.abs(golem.getY() - start[0] - LIFT - BotGolem.LEG_HEIGHT) < NEAR,
 					"there: " + (golem.getX() - start[1]) + ", " + (golem.getY() - start[0]));
@@ -128,10 +128,10 @@ public class GolemFlightGameTest {
 		golem.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_AXE));
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> golem.robotics().fly(args(0.0, 0.0, LIFT + 1)))
-			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("arrived")), "up: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "up: " + events))
 			.thenExecute(() -> {
 				same(helper, golem.robotics().walk(args(1.0)).error(), "no legs", "it walks nowhere");
-				same(helper, golem.robotics().swing(args("front")).error(), "no legs: it can't swing without its footing", "no tools");
+				same(helper, golem.robotics().swing(args("front")).error(), "no legs", "no tools");
 				// Its axe works as an empty hand: the button beside it is pressed.
 				same(helper, golem.robotics().use(args("front")).first(), "used", "a button pressed");
 				helper.assertTrue(golem.getMainHandItem().is(Items.IRON_AXE), "its axe back in its hand");
@@ -140,21 +140,35 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
-	@GameTest(maxTicks = 100)
-	public void hoveringItCanBeShovedAndDriftsToAStop(GameTestHelper helper) {
+	@GameTest(maxTicks = 160)
+	public void shovedInTheAirItHoldsItsPlanAndSaysSo(GameTestHelper helper) {
 		BotGolem golem = golem(helper, false);
 		double[] at = new double[1];
+		double[] most = {0};
+		List<Object> events = new java.util.ArrayList<>();
+		helper.onEachTick(() -> {
+			Object event;
+			while ((event = golem.robotics().pull(args()).first()) != null) {
+				events.add(event);
+			}
+			most[0] = Math.max(most[0], golem.getX() - at[0]);
+		});
 		helper.startSequence()
-			.thenExecuteAfter(3, () -> helper.assertTrue(!golem.robotics().hover(args()).failed(), "it hovers"))
-			.thenExecuteAfter(2, () -> {
+			.thenExecuteAfter(3, () -> helper.assertTrue(!golem.robotics().fly(args()).failed(), "it takes off where it stands: fly() with nothing to go to"))
+			.thenWaitUntil(() -> helper.assertTrue(golem.robotics().state().equals(RoboticsDevice.HOVERING), "holding there: " + golem.robotics().state()))
+			.thenExecute(() -> {
 				at[0] = golem.getX();
+				most[0] = 0;
 				golem.push(1.0, 0, 0); // (a shove: as a player's walk into it, a blast)
 			})
-			.thenExecuteAfter(10, () -> {
-				helper.assertTrue(golem.getX() - at[0] > SHOVED, "shoved: " + (golem.getX() - at[0]));
-				helper.assertTrue(golem.getDeltaMovement().length() < 0.01, "and stopped: " + golem.getDeltaMovement());
-				helper.assertTrue(golem.thrusting() && !golem.onGround(), "still hovering");
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(e -> e instanceof java.util.Map<?, ?> m && "shoved".equals(m.get("event"))),
+				"it says it was shoved: " + events))
+			.thenWaitUntil(() -> {
+				helper.assertTrue(most[0] > SHOVED, "shoved off: " + most[0]);
+				helper.assertTrue(Math.abs(golem.getX() - at[0]) < 0.06 && golem.robotics().state().equals(RoboticsDevice.HOVERING),
+					"back on its plan, holding it as a drone does: " + (golem.getX() - at[0]) + " " + golem.robotics().state());
 			})
+			.thenExecute(() -> helper.assertTrue(golem.thrusting() && !golem.onGround(), "still in the air"))
 			.thenSucceed();
 	}
 
@@ -164,9 +178,9 @@ public class GolemFlightGameTest {
 		List<Object> events = events(helper, golem);
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> golem.robotics().fly(args(0.0, 1.0, LIFT)))
-			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("arrived")), "up: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "up: " + events))
 			.thenExecute(() -> helper.assertTrue(!golem.robotics().land(args()).failed(), "it lands"))
-			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("landed")), "landed: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("land")), "landed: " + events))
 			.thenExecute(() -> {
 				helper.assertTrue(golem.legs() && !golem.thrusting(), "on its legs, its thrusters off");
 				same(helper, legs(helper).size(), 0, "its legs are its own again");
@@ -182,9 +196,9 @@ public class GolemFlightGameTest {
 		List<Object> events = events(helper, golem);
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> golem.robotics().fly(args(5.0, 0.0, 1.0)))
-			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("arrived")), "away: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "away: " + events))
 			.thenExecute(() -> {
-				same(helper, golem.robotics().land(args()).error(), "no legs there to land on", "refused");
+				same(helper, golem.robotics().land(args()).error(), "no legs below", "refused");
 				helper.assertTrue(golem.thrusting() && golem.machine().isPowered(), "hovering on");
 			})
 			.thenSucceed();
@@ -196,7 +210,7 @@ public class GolemFlightGameTest {
 		List<Object> events = events(helper, golem);
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> golem.robotics().fly(args(0.0, 0.0, LIFT)))
-			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("arrived")), "up: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "up: " + events))
 			.thenExecute(() -> golem.robotics().accepting(false)) // (as its board says when its program ends)
 			.thenWaitUntil(() -> helper.assertTrue(golem.onGround() && !golem.thrusting(), "fallen"))
 			.thenExecute(() -> {
@@ -206,31 +220,41 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
+	/**
+	 * A field holding it (its own too) freezes its robotics (the user's): no moves, no tools, its
+	 * commands refused held; the field's carry moves its origin with it, so where it's set down its
+	 * position reads as before (its robotics never saw the carry).
+	 */
 	@GameTest(maxTicks = 200)
-	public void inItsOwnFieldItKeepsItsLegsAndItsToolsAndIsntFlying(GameTestHelper helper) {
-		helper.setBlock(FRONT.above(2), Blocks.DIRT);
+	public void inAFieldItsRoboticsFreezeAndTheCarryMovesItsOrigin(GameTestHelper helper) {
 		BotGolem golem = golem(helper, true);
 		List<Object> events = events(helper, golem);
-		golem.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_SHOVEL));
+		Object[] before = {null};
+		BlockPos[] from = {null};
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> {
+				before[0] = golem.robotics().position(args()).first();
+				from[0] = golem.blockPosition();
 				helper.assertTrue(!field(golem).capture(args(FieldCard.SELF)).failed(), "it holds itself");
-				field(golem).move(args(0.0, 0.0, LIFT));
+				field(golem).move(args(2.0, 0.0, LIFT)); // (forward two, and up: its field carries it)
 			})
-			.thenWaitUntil(() -> helper.assertTrue(field(golem).get(args()).first() instanceof java.util.Map<?, ?> now && "holding".equals(now.get("state")), "up"))
+			.thenWaitUntil(() -> helper.assertTrue(field(golem).get(args()).first() instanceof java.util.Map<?, ?> now && "holding".equals(now.get("state")), "carried"))
 			.thenExecute(() -> {
 				double x = golem.getX();
 				golem.push(1.0, 0, 0); // (a shove: its field holds it where it is)
 				helper.assertTrue(Math.abs(golem.getX() - x) < 1e-6, "not shoved");
+				same(helper, golem.robotics().state(), RoboticsDevice.HELD, "its robotics frozen");
+				same(helper, golem.robotics().refusal("swing"), RoboticsDevice.HELD, "no tools in a field");
+				same(helper, golem.robotics().refusal("walk"), RoboticsDevice.HELD, "no moves");
+				helper.assertTrue(events.contains(java.util.Map.of("event", "frozen")), "it said so: " + events);
+				field(golem).release(args()); // (it comes down onto its legs, two ahead)
 			})
-			.thenExecuteAfter(5, () -> {
-				helper.assertTrue(Math.abs(golem.getDeltaMovement().x) < 1e-6, "still not shoved: " + golem.getDeltaMovement());
-				helper.assertTrue(golem.legs() && !golem.flying() && !golem.onGround(), "on its legs, off the ground, and not flying");
-				same(helper, golem.robotics().fly(args(1.0)).error(), "held in a field: its field moves it", "its thrusters wait");
-				same(helper, golem.robotics().swing(args("front")).first(), RoboticsDevice.BREAKING, "it digs");
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "thawed")), "down, and thawed: " + events))
+			.thenExecute(() -> {
+				same(helper, golem.robotics().position(args()).first(), before[0], "its position reads as before: the carry moved its origin");
+				helper.assertTrue(!golem.blockPosition().equals(from[0]), "though it's somewhere else: " + golem.blockPosition());
+				helper.assertTrue(golem.robotics().refusal("walk") == null, "its robotics back");
 			})
-			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(e -> e instanceof java.util.Map<?, ?> m && "broke".equals(m.get("event"))), "dug: " + events))
-			.thenExecute(() -> helper.assertBlockPresent(Blocks.AIR, FRONT.above(2)))
 			.thenSucceed();
 	}
 

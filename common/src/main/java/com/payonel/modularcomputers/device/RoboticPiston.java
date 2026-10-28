@@ -17,7 +17,7 @@ import java.util.List;
  * arm goes out and comes back on its own; {@code extend} leaves it out until {@code retract}. Every
  * move costs power, whether it moved anything or not; extending an arm that's out already is free.
  * <p>
- * It's buffered (.agents/BUFFERED.md): each move is a command, ending in its event once the arm has
+ * It's buffered ({@link Buffered}): each move is a command, ending in its event once the arm has
  * moved ({@link #tick}, its block's): a push once the arm is back. A move that can't start (the
  * cable's side, nothing that moves, no arm out to retract) is refused at once.
  */
@@ -139,7 +139,7 @@ public final class RoboticPiston implements Device, Buffered {
 	}
 
 	@Override
-	public String refusal() {
+	public String refusal(String method) {
 		return moving != null ? BUSY : null;
 	}
 

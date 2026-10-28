@@ -23,25 +23,25 @@ class GolemStepsTest {
 
 	@Test
 	void aLevelWalkWontGoUpOrDownAnElevation() {
-		assertThat(GolemSteps.step(SLAB, 65, 64)).as("from a slab to the full block beside it").isEqualTo("a step up");
-		assertThat(GolemSteps.step(GROUND, 65, 64)).isEqualTo("a step up");
-		assertThat(GolemSteps.step(GROUND, 63, 64)).isEqualTo("a drop");
+		assertThat(GolemSteps.step(SLAB, 65, 64)).as("from a slab to the full block beside it").isEqualTo("too high: 1");
+		assertThat(GolemSteps.step(GROUND, 65, 64)).isEqualTo("too high: 1");
+		assertThat(GolemSteps.step(GROUND, 63, 64)).isEqualTo("too low: 1");
 	}
 
 	@Test
 	void itJumpsABlockAtATimeTowardItsHeightAndNoHigher() {
 		assertThat(GolemSteps.step(GROUND, 65, 65)).isNull();
 		assertThat(GolemSteps.step(SLAB, 65, 65)).as("half a block, into the next elevation").isNull();
-		assertThat(GolemSteps.step(GROUND, 66, 70)).as("two at once").isEqualTo("too high to jump");
+		assertThat(GolemSteps.step(GROUND, 66, 70)).as("two at once").isEqualTo("too high: 2");
 		assertThat(GolemSteps.step(SLAB, 65.5, 70)).as("a slab to a slab a block up: a jump").isNull();
-		assertThat(GolemSteps.step(65, 66, 65)).as("past where it was to go").isEqualTo("a step up");
+		assertThat(GolemSteps.step(65, 66, 65)).as("past where it was to go").isEqualTo("too high: 1");
 	}
 
 	@Test
 	void itDropsUpToThreeAtATimeTowardItsHeightAndNoLower() {
 		assertThat(GolemSteps.step(GROUND, 61, 50)).as("three: a player's fall unhurt").isNull();
-		assertThat(GolemSteps.step(GROUND, 60, 50)).isEqualTo("too far down");
-		assertThat(GolemSteps.step(GROUND, 62, 63)).as("past where it was to go").isEqualTo("below where it was to go");
-		assertThat(GolemSteps.step(GROUND, 65, 60)).as("up, going down").isEqualTo("a step up");
+		assertThat(GolemSteps.step(GROUND, 60, 50)).isEqualTo("too low: 4");
+		assertThat(GolemSteps.step(GROUND, 62, 63)).as("past where it was to go").isEqualTo("too low: 2");
+		assertThat(GolemSteps.step(GROUND, 65, 60)).as("up, going down").isEqualTo("too high: 1");
 	}
 }

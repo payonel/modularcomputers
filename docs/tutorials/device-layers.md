@@ -113,7 +113,7 @@ method's description, its arguments first (from `/sys/class/redstone/redstone0/m
 ## The same for a robot
 
 A [bot golem](/hardware/bot-golem/)'s robotics device works the same way: start a move, then take its
-event (`arrived`, or `blocked` and why). Its moves answer at once; how they went is the event.
+event (`walk`: `ok`, or not and why). Its moves answer at once; how they went is the event.
 
 ```lua
 -- Layer 1 (an OS of its own): its address is "exp:3", where it's soldered.

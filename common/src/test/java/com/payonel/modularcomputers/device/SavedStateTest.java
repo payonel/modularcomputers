@@ -71,7 +71,7 @@ class SavedStateTest {
 		loaded.restore(card.saved());
 		loaded.accepting(true);
 		assertThat(loaded.pull(args()).first()).as("the world's change, kept").isEqualTo(Map.of("name", "redstone", "side", "down", "level", 9L, "powered", 0L));
-		assertThat(loaded.refusal()).as("its set, saved before its tick: still waiting").isEqualTo("busy");
+		assertThat(loaded.refusal("set")).as("its set, saved before its tick: still waiting").isEqualTo("busy");
 		loaded.tick();
 		assertThat(loaded.output(0)).as("and applied after the load").isEqualTo(7);
 		assertThat(((Map<?, ?>) loaded.pull(args()).first()).get("event")).as("and it still ends").isEqualTo("set");

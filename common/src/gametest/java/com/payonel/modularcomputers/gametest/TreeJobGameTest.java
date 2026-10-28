@@ -27,11 +27,12 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * The user's big test: a bot golem running mcos, its manual's program (docs/examples/golem-tree.lua)
- * as a service started at boot: it takes an axe from the chest behind it (from whatever slot), holds
- * itself in its energy field, legs and all, flies forward looking for a tree, climbs the cliff it's
- * on, cuts the trunk from the air, comes home the way it went, and leaves things ready to run again:
- * the axe in the chest's first slot, the wood in the chest, its hands and storage empty. When
- * something's wrong (no axe, a cliff too high) it comes home all the same, tidy, and says why.
+ * as a service started at boot: it takes an axe from the chest behind it (from whatever slot), walks
+ * forward looking for a tree, is carried up the cliff in its own field (frozen there: the field's
+ * moves feel the way), set down on the ledge, cuts the trunk from the ground (no tools in the air,
+ * nor in a field), comes home the way it went, and leaves things ready to run again: the axe in the
+ * chest's first slot, the wood in the chest, its hands and storage empty. When something's wrong
+ * (no axe, a cliff too high) it comes home all the same, tidy, and says why.
  */
 public class TreeJobGameTest {
 	/** Where it starts, facing east (+X), and the chest behind it. */
@@ -39,11 +40,13 @@ public class TreeJobGameTest {
 	private static final BlockPos CHEST = START.west();
 	/** The axe's slot in the chest: not the first (it finds it wherever it is). */
 	private static final int AXE_SLOT = 4;
-	/** The tree: on a cliff this many blocks ahead, its lowest log this far up; two logs, leaves over them. */
+	/** The tree: on a ledge this many blocks ahead, its lowest log this far up; two logs, leaves over them. */
 	private static final int FORWARD = 3;
 	private static final int UP = 2;
 	private static final int LOGS = 2;
 	private static final BlockPos TRUNK = START.east(FORWARD).above(UP);
+	/** The cliff's face, a block before the trunk: the ledge runs from there on, the tree on it. */
+	private static final int CLIFF = FORWARD - 1;
 
 	private static void tree(GameTestHelper helper, boolean axe) {
 		for (int x = 0; x < 8; x++) {
@@ -51,9 +54,13 @@ public class TreeJobGameTest {
 				helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
 			}
 		}
-		// The cliff: stone under the trunk, up to it.
-		for (int y = START.getY(); y < TRUNK.getY(); y++) {
-			helper.setBlock(TRUNK.atY(y), Blocks.STONE);
+		// The cliff: a ledge as high as the trunk's foot, from a block before it on (room to stand).
+		for (int x = START.getX() + CLIFF; x < 8; x++) {
+			for (int z = 0; z < 8; z++) {
+				for (int y = START.getY(); y < TRUNK.getY(); y++) {
+					helper.setBlock(new BlockPos(x, y, z), Blocks.STONE);
+				}
+			}
 		}
 		for (int log = 0; log < LOGS; log++) {
 			helper.setBlock(TRUNK.above(log), Blocks.OAK_LOG);
@@ -71,7 +78,7 @@ public class TreeJobGameTest {
 		}
 	}
 
-	/** The golem: a board booting mcos off its disk, a screen, its crafting card and its energy field card. */
+	/** The golem: a board booting mcos off its disk, a screen, its crafting card and its energy field card (its lift). */
 	private static BotGolem golem(GameTestHelper helper) {
 		BotGolem golem = ModEntities.TIER2_BOT_GOLEM.create(helper.getLevel(), EntitySpawnReason.COMMAND);
 		Vec3 at = helper.absoluteVec(Vec3.atBottomCenterOf(START));

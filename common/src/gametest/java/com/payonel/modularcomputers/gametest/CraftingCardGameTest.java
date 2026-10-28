@@ -117,7 +117,7 @@ public class CraftingCardGameTest {
 			}
 		});
 		helper.succeedWhen(() -> {
-			same(helper, events.isEmpty() ? null : events.getFirst(), Map.of("event", "crafted", "name", "minecraft:stick", "count", 4L), "its event");
+			same(helper, events.isEmpty() ? null : events.getFirst(), Map.of("event", "craft", "ok", true, "result", Map.of("name", "minecraft:stick", "count", 4L)), "its event");
 			helper.assertTrue(slot(golem, LANE, CraftingCard.GRID).is(Items.STICK) && slot(golem, LANE, CraftingCard.GRID).getCount() == 4,
 				"4 sticks in its storage: " + slot(golem, LANE, CraftingCard.GRID));
 			helper.assertTrue(slot(golem, LANE, 0).isEmpty() && slot(golem, LANE, 3).isEmpty(), "its grid used");
@@ -126,22 +126,29 @@ public class CraftingCardGameTest {
 	}
 
 	@GameTest(maxTicks = 100)
-	public void twoCardsCraftAtOnce(GameTestHelper helper) {
+	public void twoCardsCraftOneAfterTheOtherTheRobotBusyMeanwhile(GameTestHelper helper) {
 		int crafts = 3;
 		BotGolem golem = golem(helper, Map.of(LANE, card(sticks(crafts)), SECOND_LANE, card(sticks(crafts))));
 		long[] asked = {-1};
+		String[] second = {null};
+		boolean[] started = {false};
 		helper.runAfterDelay(3, () -> {
 			crafting(golem, LANE).craft(args((long) crafts));
-			crafting(golem, SECOND_LANE).craft(args((long) crafts));
+			second[0] = crafting(golem, SECOND_LANE).craft(args((long) crafts)).error(); // (its robot's busy crafting: the user's)
 			asked[0] = helper.getTick();
 		});
+		helper.onEachTick(() -> {
+			if (asked[0] >= 0 && !started[0] && !golem.robotics().busy()) {
+				started[0] = !crafting(golem, SECOND_LANE).craft(args((long) crafts)).failed(); // (the first's done: now the second)
+			}
+		});
 		helper.succeedWhen(() -> {
+			helper.assertTrue(com.payonel.modularcomputers.device.Buffered.BUSY.equals(second[0]), "the second waited: " + second[0]);
 			for (int lane : new int[] {LANE, SECOND_LANE}) {
 				helper.assertTrue(slot(golem, lane, CraftingCard.GRID).getCount() == 4 * crafts, "lane " + lane + "'s sticks: " + slot(golem, lane, CraftingCard.GRID));
 			}
-			// Each took its three crafts' time, side by side: not six crafts' time.
 			long took = helper.getTick() - asked[0];
-			helper.assertTrue(took < 2 * crafts * CraftingCard.CRAFT_TICKS, "they crafted at once: " + took + " ticks");
+			helper.assertTrue(took >= 2 * crafts * CraftingCard.CRAFT_TICKS, "one after the other: " + took + " ticks");
 		});
 	}
 
@@ -163,7 +170,7 @@ public class CraftingCardGameTest {
 			}
 		});
 		helper.succeedWhen(() -> {
-			same(helper, events.isEmpty() ? null : events.getFirst(), Map.of("event", "failed", "count", 0L, "why", "no room"), "its event");
+			same(helper, events.isEmpty() ? null : events.getFirst(), Map.of("event", "craft", "ok", false, "why", "no room", "result", Map.of("count", 0L)), "its event");
 			helper.assertTrue(slot(golem, LANE, 0).is(Items.OAK_PLANKS) && slot(golem, LANE, 3).is(Items.OAK_PLANKS), "its grid as it was");
 		});
 	}

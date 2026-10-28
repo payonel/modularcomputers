@@ -69,17 +69,22 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
 - `position()` is a command (it waits behind the one running) and answers the plan. `get()` (free,
   live): its state, its real position, its drift, legs, pathfinding.
 - `stop()` (free): the active command ends `stopped`; the golem halts at once where it is (no
-  centering), and `{event = "stop", ok = true, at = {forward, right, up, heading}}` (its real
-  position) follows. The plan and the origin don't move: the next positional command returns to
-  the plan first.
+  centering), and `stop` answers its real position, `{forward, right, up, heading}`, in its call
+  (it's done at once, so no event: a build decision). The plan and the origin don't move: the next
+  positional command returns to the plan first.
+- Its own way back to the plan (after a shove, before a positional command) is a command of its own,
+  ending in a `return` event (`ok`, or why): a build decision, so a failed way back is said.
 - A shove raises `shoved` (news, with the drift: `{forward, right, up}`).
 - Held in a field (any field, its own too): its robotics freezes: the active command pauses, new
   commands are refused `held` (mcos: blocked until it's let go), `stop` still works (ends the
   paused command); `frozen` and `thawed` news. The field's carry moves its origin with it, so
   `position()` reads the same after (the kidnapped robot: re-localize with a fix and
-  `setPosition`). No tools in a field.
+  `setPosition`). No tools in a field, nor in the air (legless it has no footing: the user's rule
+  from the legs' design), so a job up a cliff is carried there and set down (the tree job, built
+  so). `get` stays free while held: a program follows the carry with it.
 - The crafting card's methods are its robot's commands (busy while the robot is; `craft` keeps the
-  robot busy until it's crafted); in a case they fail `no robotics`.
+  robot busy until it's crafted, so a robot crafts with one card at a time); in a case they fail
+  `no robotics`.
 - Events are named after their methods (today's `arrived`, `turned`, `broke`... go).
 
 ### The others
@@ -107,7 +112,7 @@ Each step lands with its tests (a bug's seen failing first), the manual and AGEN
   thread of the same process makes progress meanwhile (it isn't held up by the first's waits).
 - [x] **3. The redstone card and the piston.**
 - [x] **4. The energy field card.**
-- [ ] **5. Robotics and the crafting card:** one command at a time, the plan, drift, `stop`, stasis,
+- [x] **5. Robotics and the crafting card:** one command at a time, the plan, drift, `stop`, stasis,
   the field's carry, events by method, `hover` gone, dry strings; its driver; the golem's tests;
   and (the user's) a thread walking a robot through a series of blocking commands while another
   thread makes progress.

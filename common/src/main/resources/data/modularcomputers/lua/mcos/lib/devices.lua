@@ -184,16 +184,17 @@ function devices.event(device, seconds)
   end
 end
 
--- A buffered device's command's end (.agents/BUFFERED.md): waits for 'method''s next completion
--- event on 'device' (taking the events before it: news a program wanting it reads with event
--- instead), and answers true, or false and why it failed (or nil and why the wait did).
+-- A buffered device's command's end: waits for 'method''s next completion event on 'device'
+-- (taking the events before it: news a program wanting it reads with event instead), and answers
+-- true, or false and why it failed (or nil and why the wait did), and what it gave (a swing's
+-- block, a craft's items), if anything.
 function devices.ended(device, method, seconds)
   while true do
     local got, why = devices.event(device, seconds)
     if not got then
       return nil, why
     elseif got.event == method and got.ok ~= nil then
-      return got.ok, got.why
+      return got.ok, got.why, got.result
     end
   end
 end

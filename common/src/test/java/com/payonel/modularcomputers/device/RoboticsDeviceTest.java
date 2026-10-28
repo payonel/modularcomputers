@@ -57,7 +57,7 @@ class RoboticsDeviceTest {
 		assertThat(device.interruptPending()).isFalse();
 		device.arrived();
 		assertThat(device.interruptPending()).isTrue();
-		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "arrived"));
+		assertThat(device.pull(args()).first()).as("its end: an event named after its method").isEqualTo(Map.of("event", "walk", "ok", true));
 		assertThat(state()).isEqualTo("idle");
 	}
 
@@ -79,36 +79,49 @@ class RoboticsDeviceTest {
 	void turnsRightAnglesOnly() {
 		device.turn(args("left"));
 		device.turn(args("around"));
-		assertThat(device.turn(args(45L)).error()).as("no degrees: right angles only (the user's)").startsWith("not a way to turn");
+		assertThat(device.turn(args(45L)).error()).as("no degrees: right angles only (the user's)").startsWith("not a way");
 		assertThat(asked).containsExactly("turn -90.0", "turn 180.0");
-		assertThat(device.turn(args("up")).error()).startsWith("not a way to turn");
+		assertThat(device.turn(args("up")).error()).isEqualTo("not a way: up");
 	}
 
 	@Test
 	void walksAreWholeBlocks() {
-		assertThat(device.walk(args(1.5)).error()).isEqualTo("whole blocks expected");
+		assertThat(device.walk(args(1.5)).error()).isEqualTo(RoboticsDevice.NOT_WHOLE);
 		assertThat(device.walk(args(2.0, -1L)).failed()).isFalse();
 	}
 
 	@Test
-	void stoppingAWalkSaysSoAndStoppingNothingDoesnt() {
+	void stoppingAWalkEndsItStoppedAndStoppingNothingDoesNothing() {
 		device.stop(args());
 		assertThat(device.interruptPending()).as("nothing was under way").isFalse();
 		device.walk(args(2L));
 		device.stop(args());
-		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "stopped"));
+		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", RoboticsDevice.STOPPED));
+		assertThat(device.refusal("walk")).as("free again at once").isNull();
+	}
+
+	@Test
+	void aCommandWhileOneRunsIsRefusedBusyButGetPullStopAndSetsStopAreFree() {
+		device.walk(args(2L));
+		assertThat(device.refusal("turn")).isEqualTo(Buffered.BUSY);
+		assertThat(device.refusal("position")).as("a read waits its turn too").isEqualTo(Buffered.BUSY);
+		assertThat(device.free()).contains("get", "pull", "stop", "set");
+		assertThat(device.set(args(Map.of("action", "turn", "way", "right"))).error()).as("set refuses its own actions while busy").isEqualTo(Buffered.BUSY);
+		assertThat(device.set(args(Map.of("action", "stop"))).failed()).as("but a stop goes through").isFalse();
+		assertThat(device.refusal("turn")).isNull();
 	}
 
 	@Test
 	void blockedSaysWhy() {
 		device.walk(args(2L));
 		device.blocked("stuck");
-		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "blocked", "why", "stuck"));
+		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "stuck"));
 	}
 
 	@Test
 	void setTakesAnActionTable() {
 		device.set(args(Map.of("action", "walk", "forward", 4L)));
+		device.arrived(); // (one command at a time: the walk ends before the turn)
 		device.set(args(Map.of("action", "turn", "way", "right")));
 		device.set(args(Map.of("action", "stop")));
 		assertThat(asked).containsExactly("walk 4.0 0.0 0.0", "turn 90.0", "stop");
@@ -133,7 +146,7 @@ class RoboticsDeviceTest {
 		loaded.restore(saved);
 		assertThat(loaded.interruptPending()).as("not until a program takes data").isFalse();
 		loaded.accepting(true);
-		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("event", "blocked", "why", RoboticsDevice.INTERRUPTED));
+		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", RoboticsDevice.INTERRUPTED));
 	}
 
 	@Test

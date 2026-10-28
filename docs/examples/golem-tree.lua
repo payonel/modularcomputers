@@ -1,14 +1,19 @@
--- Fell the tree in front, and bring its wood home: a bot golem with a crafting card (its storage) and
--- an energy field card, a chest behind it holding an axe, and a tree somewhere ahead of it, perhaps
--- up on a ledge.
+-- Fell the tree in front, and bring its wood home: a bot golem with a crafting card (its storage)
+-- and an energy field card (its lift), a chest behind it holding an axe, and a tree somewhere ahead
+-- of it, perhaps up on a ledge.
 --   lua golem-tree.lua [reach [climb]]       (looks 8 blocks ahead, climbs a cliff up to 12)
--- It takes the axe from the chest (whatever slot it's in), holds itself in its field, legs and all,
--- and flies forward looking for a log, climbing any cliff it meets; it cuts the trunk from the air
--- (off the ground it works its axe at a fifth of its speed, as a player in the air), comes home the
--- way it went, and lands on its legs. Home, it leaves things ready to run again: the axe in the
--- chest's first slot, the wood and anything else it carries in the chest, its hands and storage
--- empty. If anything goes wrong it comes home all the same, and says what happened.
-local sys = require("sys")
+-- It takes the axe from the chest (whatever slot it's in), and walks forward looking for a log. A
+-- cliff in its way, it holds itself in its field, legs and all, and is carried up it a block at a
+-- time, trying forward at each height: held, its robotics are frozen (it can't look, nor use its
+-- hands), so the field's moves feel the way (a move blocked says what by, and it's carried back to
+-- where it was). Over the top, the field lets it go, and it stands there on its legs and walks on.
+-- At the tree it cuts the trunk from the ground, as far as it reaches (it uses no tools in the air,
+-- nor in a field): the log in front, then, standing where that was, the one over its head. It
+-- comes home the way it went (walked back, carried down), and is set down where it started. Each
+-- command waits for the one before (a device does one at a time), and its end says how it went.
+-- Home, it leaves things ready to run again: the axe in the chest's first slot, the wood and
+-- anything else it carries in the chest, its hands and storage empty. If anything goes wrong it
+-- comes home all the same, and says what happened.
 local devices = require("devices")
 
 local REACH = tonumber(arg[1] or "8")  -- how far ahead it looks for a tree, in blocks
@@ -16,13 +21,11 @@ local CLIMB = tonumber(arg[2] or "12") -- how high a cliff it will climb, in blo
 local CHEST = "back"                   -- where the chest is, its own face
 local AXE = "_axe$"                    -- what an axe's name ends with (minecraft:iron_axe)
 local LOG = "_log$"                    -- what wood's name ends with (minecraft:oak_log)
-local LEAVES = "_leaves$"
 local AXE_SLOT = 1                     -- where the axe goes back, in the chest
-local SETTLE = 1                       -- seconds it takes to drop onto its legs once its field lets go
 
 local robot = assert(devices.open("robotics0"), "no robotics device: run it on a bot golem")
-local field = assert(devices.open("field0"), "no energy field card in the golem")
 local storage = assert(devices.open("crafting0"), "no crafting card in the golem (its storage)")
+local field = assert(devices.open("field0"), "no energy field card in the golem (its lift)")
 
 -- Says what it's doing (its output: a service's log, or the screen).
 local function say(text)
@@ -45,32 +48,84 @@ local function is(face, pattern)
   return name ~= nil and name:match(pattern) ~= nil
 end
 
--- Its field's moves, in order: what it retraces, backwards, to come home exactly the way it went.
+-- Its moves, in order, each {how, forward, up} (how: "walk", or "carry", its field moving it): what
+-- it retraces, backwards, to come home exactly the way it went.
 local moves = {}
 
--- Flies (its field moves it) forward and up; true when it got there, else false and why.
-local function fly(forward, up)
+-- Whether its own field holds it.
+local held = false
+
+-- Where it really is, from its origin: forward, right, up (get answers at once, even while it's held).
+local function where()
+  local now = robot.get().position
+  return now.forward, now.right, now.up
+end
+
+-- Carried in its own field by forward and up (held first, legs and all): true when it got there.
+-- Blocked, it's carried back to where it began (a move all or nothing), and it's false and why.
+local function carry(forward, up)
+  if not held then
+    local ok, why = field.capture("self")
+    if not ok then
+      return false, why
+    end
+    held = true
+  end
+  local f0, r0, u0 = where()
   local ok, why = field.move(forward, 0, up)
-  if not ok then
-    return false, why
+  if ok then
+    ok, why = devices.ended(field, "move") -- (its end: there, or blocked: and by what)
   end
-  ok, why = devices.ended(field, "move") -- (its end: there, or why not)
   if not ok then
-    return false, why
+    local f1, r1, u1 = where()
+    local got = math.sqrt((f1 - f0) ^ 2 + (r1 - r0) ^ 2) -- (how far forward it got: a field doesn't turn it)
+    field.move(forward < 0 and got or -got, 0, u0 - u1)
+    devices.ended(field, "move")
   end
-  moves[#moves + 1] = {forward, up}
-  return true
+  return ok, why
+end
+
+-- Its field lets it go: it stands where it is, on its legs (its robotics back once it's down).
+local function setDown()
+  if held then
+    field.release()
+    held = false
+  end
+end
+
+-- Walks forward and up on its legs (set down first: a command waits while it's held); true when
+-- it got there, else false and why.
+local function walk(forward, up)
+  setDown()
+  local ok, why = robot.walk(forward, 0, up)
+  if ok then
+    ok, why = devices.ended(robot, "walk") -- (its end: there, or why not)
+  end
+  return ok, why
+end
+
+-- A move of the job's ("walk" or "carry"), kept to retrace when it got there.
+local function go(how, forward, up)
+  local ok, why
+  if how == "walk" then
+    ok, why = walk(forward, up)
+  else
+    ok, why = carry(forward, up)
+  end
+  if ok then
+    moves[#moves + 1] = {how, forward, up}
+  end
+  return ok, why
 end
 
 -- Breaks the block at a face with what it holds; problem if it can't.
 local function chop(face, what)
-  local ok, why = robot.swing(face)
-  if not ok then
-    problem("cutting " .. what .. ", it wouldn't: " .. tostring(why))
+  local swung, why = robot.swing(face)
+  if swung == "breaking" then
+    swung, why = devices.ended(robot, "swing") -- (its end: broken, or why not)
   end
-  local swung = devices.event(robot)
-  if swung.event ~= "broke" then
-    problem("cutting " .. what .. ", it stopped: " .. tostring(swung.why or swung.event))
+  if not swung then
+    problem("cutting " .. what .. ", it stopped: " .. tostring(why))
   end
 end
 
@@ -122,72 +177,77 @@ local function takeAxe()
   problem("there's no axe in the chest behind me")
 end
 
--- 2. A tree ahead: forward a block at a time, climbing what's in the way, until a log is in front.
+-- Up the cliff in front, carried a block at a time, trying forward at each height until it's over
+-- the top; then set down there. How high it climbed.
+local function climb()
+  local cliff, climbed = at("front"), 0
+  repeat
+    if climbed >= CLIMB then
+      problem("while looking for a tree, I found a cliff (" .. cliff .. ") higher than " .. CLIMB .. " blocks")
+    end
+    local ok, why = go("carry", 0, 1)
+    if not ok then
+      problem("while looking for a tree, I found a cliff but got blocked climbing it: " .. tostring(why))
+    end
+    climbed = climbed + 1
+  until go("carry", 1, 0) -- (over the top: else blocked, and back where it was)
+  setDown()
+  return climbed
+end
+
+-- 2. A tree ahead: forward a block at a time until a log is in front, carried up any cliff it meets.
 local function findTree()
   local ahead, climbed = 0, 0
   while not is("front", LOG) do
+    if ahead >= REACH then
+      problem("while looking for a tree, I found none within " .. REACH .. " blocks")
+    end
     if at("front") == nil then
-      if ahead >= REACH then
-        problem("while looking for a tree, I found none within " .. REACH .. " blocks")
-      end
-      local ok, why = fly(1, 0)
+      local ok, why = go("walk", 1, 0)
       if not ok then
         problem("while looking for a tree, something stopped me going on: " .. tostring(why))
       end
-      ahead = ahead + 1
     else
-      if climbed >= CLIMB then
-        problem("while looking for a tree, I found a cliff (" .. tostring(at("front")) .. ") higher than " .. CLIMB .. " blocks")
-      end
-      local ok, why = fly(0, 1)
-      if not ok then
-        problem("while looking for a tree, I found a cliff but got blocked climbing it: " .. tostring(why))
-      end
-      climbed = climbed + 1
+      climbed = climbed + climb()
     end
+    ahead = ahead + 1
   end
   say("found a tree " .. ahead .. " blocks ahead" .. (climbed > 0 and ", " .. climbed .. " up" or ""))
 end
 
--- 3. The trunk: its lowest log in front, then each above it, the leaves over its head cleared.
+-- 3. The trunk, as far as it reaches from the ground: the log in front, then, standing where that
+-- was, the one over its head.
 local function cutTrunk()
-  local logs = 0
-  while is("front", LOG) do
-    chop("front", "the trunk")
+  chop("front", "the trunk")
+  local logs = 1
+  local ok, why = go("walk", 1, 0) -- (into its place)
+  if not ok then
+    problem("stepping into the trunk's place, I got blocked: " .. tostring(why))
+  end
+  if is("up", LOG) then
+    chop("up", "the trunk over my head")
     logs = logs + 1
-    -- Up a block, to the next log (what's over its head cleared first): the one it cut is gone.
-    if is("up", LEAVES) or is("up", LOG) then
-      chop("up", "what's over my head")
-    end
-    if at("up") ~= nil then
-      break -- (something it can't cut over its head: as high as it goes)
-    end
-    local ok, why = fly(0, 1)
-    if not ok then
-      problem("going up the trunk, I got blocked: " .. tostring(why))
-    end
   end
   return logs
 end
 
--- 4. Home: its moves retraced, last first; then its field lets go, and it stands on its legs.
+-- 4. Home: its moves retraced, last first (walked back, carried back), then set down where it began.
 local function comeHome()
   for i = #moves, 1, -1 do
-    local back = moves[i]
-    local ok, why = field.move(-back[1], 0, -back[2])
-    if ok then
-      local home, stopped = devices.ended(field, "move")
-      if not home then
-        say("coming home, I got blocked: " .. tostring(stopped) .. ". I'm stuck in the air: help me down")
-        return false
-      end
+    local how, forward, up = table.unpack(moves[i])
+    local ok, why
+    if how == "walk" then
+      ok, why = walk(-forward, -up)
+    else
+      ok, why = carry(-forward, -up)
+    end
+    if not ok then
+      say("coming home, I got blocked: " .. tostring(why) .. ". I'm stuck: help me home")
+      return false
     end
   end
   moves = {}
-  if field.get().state ~= "idle" then
-    field.release()
-    sys.sleep(SETTLE)
-  end
+  setDown()
   return true
 end
 
@@ -197,12 +257,6 @@ local ok, err = pcall(function()
   say("taking the axe")
   takeAxe()
   say("looking for a tree")
-  if field.get().state == "idle" then
-    local held, why = field.capture("self")
-    if not held then
-      problem("I couldn't hold myself in my field: " .. tostring(why))
-    end
-  end
   findTree()
   logs = cutTrunk()
 end)
@@ -214,7 +268,7 @@ local home = comeHome()
 if home then
   -- 5. Ready to run again: the axe in the chest's first slot, the rest in the chest too.
   if robot.held() then
-    local back, why = putAway(AXE_SLOT)
+    local back = putAway(AXE_SLOT)
     if not back then
       putAway() -- (anywhere it fits)
     end

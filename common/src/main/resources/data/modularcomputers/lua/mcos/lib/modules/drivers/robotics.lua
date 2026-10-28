@@ -1,13 +1,15 @@
 -- The robotics device's driver, for its /dev file (as a sysfs attribute: text, a write taking
--- effect at once). A read gives what it's doing now, a word (idle, walking, turning, breaking,
--- flying, hovering or landing), then where it is: "position forward right up heading" (from its
--- origin).
--- A line written is an action:
---   walk forward [right [up]]   (whole blocks from where it is, in its own frame)
+-- effect as it can). A read gives what it's doing now, a word (idle, walking, turning, breaking,
+-- flying, hovering, landing, returning, crafting or held), then where it really is: "position
+-- forward right up heading" (from its origin), its plan ("planned ...", where its last command left
+-- it) and, when it's off its plan, "drift forward right up".
+-- A line written is an action; the device does one at a time, so a line given while one runs
+-- waits for it (the writing thread only), but a stop, which never waits:
+--   walk [forward [right [up]]] (whole blocks from its plan, in its own frame; none: back to its plan)
 --   walkto forward [right [up]] (whole blocks from its origin, in the origin's frame)
---   fly forward [right [up]]    (on its thrusters: its legs left standing where it was)
+--   fly [forward [right [up]]]  (on its thrusters: its legs left standing where it was; none: take
+--                                off where it stands, or back to its plan)
 --   flyto forward [right [up]]  (from its origin)
---   hover
 --   land                        (onto its legs, below it)
 --   turn left|right|around
 --   use FACE                    (front, back, left, right, up or down: its own)
@@ -15,8 +17,9 @@
 --   stop
 --   position [forward [right [up [heading]]]]  (says where it is, its origin moved to make it so; none: its origin here)
 --   pathfinding on|off
--- How an action went comes as an event (poll's PRI; the pull ioctl: arrived, blocked, turned,
--- stopped, landed, broke, failed). Its scan, its hand and containers are ioctls (scan, held, take...).
+-- How an action that runs over time went comes as an event named after it (poll's PRI; the pull
+-- ioctl: {event = "walk", ok, why}), and news (shoved, frozen, thawed). Its scan, its hand and
+-- containers are ioctls (scan, held, take...).
 local function number(word)
   return word and tonumber(word)
 end
@@ -25,11 +28,18 @@ local MOVES = {walk = "walk", walkto = "walkTo", fly = "fly", flyto = "flyTo"}
 
 return {
   get = function(now)
-    local at = now.position
-    if not at then
-      return now.state .. "\n"
+    local text = now.state .. "\n"
+    local at, plan, drift = now.position, now.planned, now.drift
+    if at then
+      text = text .. "position " .. at.forward .. " " .. at.right .. " " .. at.up .. " " .. at.heading .. "\n"
     end
-    return now.state .. "\nposition " .. at.forward .. " " .. at.right .. " " .. at.up .. " " .. at.heading .. "\n"
+    if plan then
+      text = text .. "planned " .. plan.forward .. " " .. plan.right .. " " .. plan.up .. " " .. plan.heading .. "\n"
+    end
+    if drift then
+      text = text .. "drift " .. drift.forward .. " " .. drift.right .. " " .. drift.up .. "\n"
+    end
+    return text
   end,
   line = function(text)
     local words = {}
@@ -37,7 +47,9 @@ return {
       words[#words + 1] = word
     end
     local action = words[1]
-    if MOVES[action] and number(words[2]) and #words <= 4 then
+    if (action == "walk" or action == "fly") and #words == 1 then
+      return {action = action, forward = 0, right = 0, up = 0} -- (back to its plan; fly: off where it stands)
+    elseif MOVES[action] and number(words[2]) and #words <= 4 then
       local right, up = number(words[3]), number(words[4])
       if (words[3] and not right) or (words[4] and not up) then
         return nil
@@ -47,7 +59,7 @@ return {
       return {action = "turn", way = words[2]}
     elseif (action == "use" or action == "swing") and #words == 2 then
       return {action = action, face = words[2]}
-    elseif (action == "stop" or action == "hover" or action == "land") and #words == 1 then
+    elseif (action == "stop" or action == "land") and #words == 1 then
       return {action = action}
     elseif action == "position" and #words <= 5 then
       local at = {action = "setPosition"}

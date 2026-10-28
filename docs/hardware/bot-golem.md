@@ -72,15 +72,17 @@ A golem flies two ways, each with its price:
   fires red beams from their empty sockets: it flies at 25 blocks a second, much faster than it
   walks or its field flies it, needs no card, and costs five running CPUs' power a tick. On its
   thrusters it has no footing: it uses no tools (buttons, doors and levers yes: a tool in its hand
-  works as an empty hand), presses no pressure plates, and can be shoved. `hover` holds it where it
-  is; `land` brings it down onto its legs, below it, and won't with no legs there. Chickens and cows
-  run from it. If its program ends or its power runs out while its thrusters hold it up, it falls
-  and powers off.
+  works as an empty hand), presses no pressure plates, and can be shoved: it says so, and flies
+  back to where its program put it, as a drone holds its place. `fly()` takes it off where it
+  stands and holds it there; `land` brings it down onto its legs, below it, and won't with no legs
+  there. Chickens and cows run from it. If its program ends or its power runs out while its
+  thrusters hold it up, it falls and powers off.
 - **Its own field, legs on.** An [energy field card](/devices/energy-field-card/) holding the golem
   itself (`capture("self")`) carries it, legs and all, at 10 blocks a second, faster than a player
-  runs. It keeps its tools, but off the ground it works them as a player in the air does: it digs
-  at a fifth of its speed. Nothing shoves it (the field holds it), and its field is busy holding it.
-  Mobs don't mind it.
+  runs: a tier 1's way up a cliff. But a field is stasis, for a golem as for any creature: its
+  robotics freezes (no moves, no tools, no looking round: its commands wait until it's let go and
+  down), and since it didn't move itself, its position reads as before when it's set down: its
+  origin was carried with it. Nothing shoves it (the field holds it). Mobs don't mind it.
 
 ![A golem on its thrusters, red beams from its leg sockets, its legs left on the ground](/assets/img/bot-golem-thrusters.png)
 *A golem on its thrusters, its legs left on the ground below.*
@@ -104,22 +106,25 @@ what a program can do with it, and its examples.
 ## A whole job: fell a tree
 
 An advanced example, using all of it: the robotics device, a [crafting card](/devices/crafting-card/)
-for storage, and an [energy field card](/devices/energy-field-card/) to fly. In its own field the
-golem keeps its legs and its tools; in the air it works its axe at a fifth of its speed, as a player
-in the air does. Set it up:
+for storage, and an [energy field card](/devices/energy-field-card/) as its lift. A golem uses its
+tools only standing on its legs (none in the air, none in a field), so it's carried up to the tree,
+set down, and cuts it from the ground. Set it up:
 
 1. A golem with a CPU, RAM, an EEPROM, a battery, a disk with mcos, a crafting card and an energy
    field card (a screen in its gold slot, to watch it).
 2. A chest right behind it, with an axe in it (any slot).
-3. A tree ahead of it, within 8 blocks: on flat ground, or up on a cliff or a ledge (it climbs up to
-   12 blocks).
+3. A tree ahead of it, within 8 blocks: on flat ground, or up on a cliff, with room to stand in front
+   of it on the ledge (it climbs up to 12 blocks).
 
 Save the program as `/home/golem-tree.lua` and run `lua /home/golem-tree.lua` (or `lua
 /home/golem-tree.lua 5 4` to look 5 blocks ahead and climb at most 4). The golem empties its hands
-into the chest, takes the axe, holds itself in its field, and flies forward a block at a time until a
-log is in front of it, climbing whatever's in its way. It cuts the trunk from the air, clearing the
-leaves over its head as its field lifts it, then comes home exactly the way it went and lands on its
-legs.
+into the chest, takes the axe, and walks forward a block at a time until a log is in front of it.
+At a cliff it holds itself in its field and is carried up a block at a time, trying forward at
+each: held, it can't look, so the field's moves feel the way (a move blocked says what by, and it's
+carried back to where it was). Over the top it's let go, on its legs, and walks on. It cuts the
+trunk from the ground, as far as it reaches: the log in front, then, standing where that was, the
+one over its head. Then it comes home exactly the way it went, walked and carried, and is set down
+where it started.
 
 Home, it leaves everything ready to run again: the axe back in the chest's first slot, the wood and
 whatever else it carries (saplings, sticks) in the chest, its hands and storage empty. If anything

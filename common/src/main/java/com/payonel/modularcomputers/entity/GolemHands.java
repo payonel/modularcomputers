@@ -320,7 +320,7 @@ final class GolemHands {
 
 	Result swing(String face) {
 		if (!golem.legs()) {
-			return Result.fail("no legs: it can't swing without its footing");
+			return Result.fail("no legs");
 		}
 		BlockPos pos = at(face);
 		List<Entity> there = entitiesAt(pos).stream().filter(entity -> entity instanceof LivingEntity).toList();

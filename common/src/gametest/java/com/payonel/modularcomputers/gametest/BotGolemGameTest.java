@@ -22,7 +22,7 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * The bot golem in a world (user design, 2026-10-24): its robotics device walks it to a point
- * relative to itself, at a player's walking pace, and says it arrived; a walk with no way there
+ * relative to itself, at a player's walking pace, and its walk's end says it got there; a walk with no way there
  * ends blocked; a turn turns it; it does nothing on its own; a player's hit picks it up, its parts
  * in its item.
  */
@@ -115,7 +115,7 @@ public class BotGolemGameTest {
 			if (started[0] < 0 && golem.robotics().state().equals("walking")) {
 				started[0] = helper.getTick();
 			}
-			if (arrived[0] < 0 && "arrived".equals(last(heard))) {
+			if (arrived[0] < 0 && "walk".equals(last(heard))) {
 				arrived[0] = helper.getTick();
 			}
 		});
@@ -143,7 +143,8 @@ public class BotGolemGameTest {
 		helper.runAfterDelay(1, () -> golem.board().pressPower());
 		helper.succeedWhen(() -> {
 			synchronized (heard) {
-				helper.assertTrue(!heard.isEmpty() && "blocked".equals(heard.get(heard.size() - 1).get("event")), "blocked: " + heard);
+				helper.assertTrue(!heard.isEmpty() && "walk".equals(heard.get(heard.size() - 1).get("event")) && Boolean.FALSE.equals(heard.get(heard.size() - 1).get("ok")),
+					"blocked: " + heard);
 			}
 			helper.assertTrue(at(helper, golem).getX() < 3, "on its side of the wall");
 		});
@@ -155,7 +156,7 @@ public class BotGolemGameTest {
 		BotGolem golem = golem(helper, doing(heard, "turn", "right"));
 		helper.runAfterDelay(1, () -> golem.board().pressPower());
 		helper.succeedWhen(() -> {
-			helper.assertTrue("turned".equals(last(heard)), "turned: " + heard);
+			helper.assertTrue("turn".equals(last(heard)), "turned: " + heard);
 			helper.assertValueEqual(Math.round(net.minecraft.util.Mth.wrapDegrees(golem.getYRot())), 0, "from east, right: south (0)");
 		});
 	}
@@ -349,7 +350,7 @@ public class BotGolemGameTest {
 		helper.runAfterDelay(5, () -> {
 			var none = new com.payonel.modularcomputers.runtime.Arguments(List.of());
 			var up = new com.payonel.modularcomputers.runtime.Arguments(List.of(0.0, 0.0, 1.0));
-			for (var said : List.of(golem.robotics().fly(up), golem.robotics().flyTo(up), golem.robotics().hover(none), golem.robotics().land(none))) {
+			for (var said : List.of(golem.robotics().fly(up), golem.robotics().flyTo(up), golem.robotics().fly(none), golem.robotics().land(none))) {
 				helper.assertTrue(BotGolem.NO_THRUSTERS.equals(said.error()), "no thrusters: " + said);
 			}
 			helper.assertTrue(golem.legs() && !golem.thrusting(), "still on its legs");

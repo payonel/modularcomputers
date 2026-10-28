@@ -41,9 +41,9 @@ every program complete.
 - **News is an event, and an interrupt says it's there.** A device keeps its events until they're
   taken, and its interrupt stays up while one waits (it's level-triggered), so a program never misses
   one by being busy: it waits, then takes them all.
-- **Events are the device's own tables**, the same at every layer: `{event = "arrived"}`, `{event =
-  "blocked", why = "a drop"}`, `{side = "west", level = 15, powered = 0}`. Each device's page lists its
-  events.
+- **Events are the device's own tables**, the same at every layer: `{event = "walk", ok = true}`,
+  `{event = "walk", ok = false, why = "too low: 3"}`, `{side = "west", level = 15, powered = 0}`.
+  Each device's page lists its events.
 
 ## Layer 1: the board
 

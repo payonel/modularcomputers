@@ -70,10 +70,11 @@ local done = devices.event(robot)          -- arrived, or blocked and why
 print(done.event, done.why)
 ```
 
-### devices.ended(device, method[, seconds]) → true, or false and why
+### devices.ended(device, method[, seconds]) → true, or false and why; and its result
 
 For a [buffered device](#buffered-devices): waits for the next end of one of its commands, `method`'s,
-and says how it went: `true`, or `false` and why it failed (`stopped` when a `stop` cut it short).
+and says how it went: `true`, or `false` and why it failed (`stopped` when a `stop` cut it short),
+then what it gave, if anything (its event's `result`: a swing's block, a craft's items).
 It takes the events before that one: a program that also wants those reads them with
 `devices.event` instead. With `seconds`, nil and `timed out` after that long.
 

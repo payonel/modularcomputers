@@ -8,10 +8,11 @@ An energy field card suspends a creature or an item in a sphere of translucent b
 holds falls in place and can't act: it doesn't move, attack or react (a creeper doesn't blow, a
 player can't hit or use anything). The field moves, and what it holds with it: lift a friend to a
 higher floor, or hold a mob out of the way. It never moves blocks. It hums up as it takes hold,
-hums softly round what it holds, and powers down as it lets go. In a [Bot Golem](/hardware/bot-golem/)
-holding itself, it's how the golem flies with its legs on: it keeps its tools (off the ground, it
-digs at a fifth of its speed, as a player in the air), and isn't shoved. Its thrusters fly it
-faster, but only with its legs off, and no tools.
+hums softly round what it holds, and powers down as it lets go. A [Bot Golem](/hardware/bot-golem/)
+held, even by its own field, is in stasis too: its [robotics freezes](/devices/robotics/#held-in-a-field)
+until it's let go and down, and its origin is carried with it. Holding itself, it's how a golem
+goes up with its legs on (a tier 1's way up a cliff); its thrusters fly it faster, but with its legs
+off.
 
 <div class="infobox" markdown="1">
 

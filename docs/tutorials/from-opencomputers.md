@@ -118,12 +118,13 @@ A wake message is a card's method, `setWake`, on its `/dev` file. The internet c
 
 ## Robots
 
-The bot golem's moves are its [robotics device](/devices/robotics/)'s methods, and each move ends
-in an event, so a program waits for it rather than blocking in the call:
+The bot golem's moves are its [robotics device](/devices/robotics/)'s methods. A move answers as it
+starts and ends in an event; the device does one at a time, so the next command waits for it (that
+thread only), and a program that wants to know how a move went waits for its end:
 
 | OpenComputers | Modular Computers |
 |---|---|
-| `robot.forward()` | `robot.walk(1)`, then wait for its `arrived` (or `blocked`) event |
+| `robot.forward()` | `robot.walk(1)`, then `devices.ended(robot, "walk")`: `true`, or `false` and why |
 | `robot.turnLeft()` | `robot.turn("left")` |
 | `robot.detect()`, `robot.detectUp()`... | `robot.scan()`: all six faces at once, by name |
 | `robot.swing()` | `robot.swing("front")`: breaking takes a player's time; its event says when |

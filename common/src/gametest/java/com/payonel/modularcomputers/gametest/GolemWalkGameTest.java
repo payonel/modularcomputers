@@ -38,6 +38,12 @@ public class GolemWalkGameTest {
 		return (Map<String, Object>) golem.robotics().position(args()).first();
 	}
 
+	/** Where it really is (get's, live), not its plan (position's). */
+	@SuppressWarnings("unchecked")
+	private static Map<String, Object> real(BotGolem golem) {
+		return (Map<String, Object>) ((Map<String, Object>) golem.robotics().get(args()).first()).get("position");
+	}
+
 	private static Map<String, Object> at(long forward, long right, Object up) {
 		return Map.of("forward", forward, "right", right, "up", up, "heading", 0L);
 	}
@@ -60,10 +66,12 @@ public class GolemWalkGameTest {
 	}
 
 	private static Map<String, Object> blocked(String why) {
-		return Map.of("event", "blocked", "why", why);
+		return Map.of("event", "walk", "ok", false, "why", why);
 	}
 
-	private static final Map<String, Object> ARRIVED = Map.of("event", "arrived");
+	private static final Map<String, Object> ARRIVED = Map.of("event", "walk", "ok", true);
+	private static final Map<String, Object> WALKED_TO = Map.of("event", "walkTo", "ok", true);
+	private static final Map<String, Object> FLOWN_TO = Map.of("event", "flyTo", "ok", true);
 
 	/** A walk from where it is, and the event it ends in, then a check. */
 	private static void walks(GameTestHelper helper, Object[] walk, Map<String, Object> ending, Map<String, Object> position) {
@@ -110,7 +118,7 @@ public class GolemWalkGameTest {
 	public void aLevelWalkStepsOntoASlabButNotOnUpABlock(GameTestHelper helper) {
 		helper.setBlock(AT.east(), Blocks.STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM));
 		helper.setBlock(AT.east(2), Blocks.STONE);
-		walks(helper, new Object[] {3L}, blocked("a step up"), at(1, 0, 0.5));
+		walks(helper, new Object[] {3L}, blocked("too high: 1"), at(1, 0, 0.5));
 	}
 
 	@GameTest(maxTicks = 200)
@@ -122,7 +130,7 @@ public class GolemWalkGameTest {
 
 	@GameTest(maxTicks = 200)
 	public void upOneOnTheFlatEndsBlockedNotAtTheHeight(GameTestHelper helper) {
-		walks(helper, new Object[] {2L, 0L, 1L}, blocked("not at the height asked"), at(2, 0, 0L));
+		walks(helper, new Object[] {2L, 0L, 1L}, blocked("height: -1"), at(2, 0, 0L));
 	}
 
 	@GameTest(maxTicks = 200)
@@ -139,7 +147,7 @@ public class GolemWalkGameTest {
 				golem.robotics().setPosition(args()); // (its origin up there)
 				golem.robotics().walk(args(2L));
 			})
-			.thenWaitUntil(() -> same(helper, last(events), blocked("a drop"), "at the edge"))
+			.thenWaitUntil(() -> same(helper, last(events), blocked("too low: 3"), "at the edge"))
 			.thenExecute(() -> {
 				same(helper, position(golem), at(0, 0, 0L), "still on its platform");
 				events.clear();
@@ -160,14 +168,14 @@ public class GolemWalkGameTest {
 		golem.setPos(golem.getX(), golem.getY() + 4, golem.getZ());
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> golem.robotics().walk(args(1L, 0L, -4L)))
-			.thenWaitUntil(() -> same(helper, last(events), blocked("too far down"), "four is more than a player falls unhurt"))
+			.thenWaitUntil(() -> same(helper, last(events), blocked("too low"), "four is more than a player falls unhurt"))
 			.thenSucceed();
 	}
 
 	@GameTest(maxTicks = 200)
 	public void itWontWalkIntoLava(GameTestHelper helper) {
 		helper.setBlock(AT.east(2), Blocks.LAVA);
-		walks(helper, new Object[] {3L}, blocked("lava"), at(1, 0, 0L));
+		walks(helper, new Object[] {3L}, blocked("blocked: minecraft:lava front"), at(1, 0, 0L));
 	}
 
 	@GameTest(maxTicks = 300)
@@ -184,12 +192,13 @@ public class GolemWalkGameTest {
 			.thenExecuteAfter(3, () -> {
 				same(helper, position(golem), at(2, 1, 0L), "kept through a reboot");
 				golem.setPos(golem.getX() + 0.3, golem.getY(), golem.getZ()); // (shoved)
-				double shoved = ((Number) position(golem).get("forward")).doubleValue();
+				double shoved = ((Number) real(golem).get("forward")).doubleValue();
 				helper.assertTrue(Math.abs(shoved - 2.3) < 1e-6, "a shove counted: " + shoved);
+				same(helper, position(golem), at(2, 1, 0L), "its plan, where its walk left it");
 				events.clear();
 				helper.assertTrue(!golem.robotics().walkTo(args(0L, 0L)).failed(), "home");
 			})
-			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "back"))
+			.thenWaitUntil(() -> same(helper, last(events), WALKED_TO, "back"))
 			.thenExecute(() -> same(helper, position(golem), at(0, 0, 0L), "at its origin exactly"))
 			.thenSucceed();
 	}
@@ -261,7 +270,7 @@ public class GolemWalkGameTest {
 		List<Object> events = events(helper, golem);
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> golem.robotics().flyTo(args(2L, -1L, 3L)))
-			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "flown"))
+			.thenWaitUntil(() -> same(helper, last(events), FLOWN_TO, "flown"))
 			.thenExecute(() -> same(helper, position(golem), at(2, -1, 3L), "there, from its origin"))
 			.thenSucceed();
 	}
@@ -288,7 +297,7 @@ public class GolemWalkGameTest {
 				events.clear();
 				golem.robotics().walkTo(args(12L, -3L, 0L));
 			})
-			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "back"))
+			.thenWaitUntil(() -> same(helper, last(events), WALKED_TO, "back"))
 			.thenExecute(() -> same(helper, position(golem), Map.of("forward", 12L, "right", -3L, "up", 0L, "heading", 90L), "where it set it"))
 			.thenSucceed();
 	}

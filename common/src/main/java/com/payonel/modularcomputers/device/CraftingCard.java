@@ -20,7 +20,7 @@ import java.util.Map;
  * containers round the robot and the world (picking up, dropping). A {@link Bench} does the work
  * on the items; the card does the asking, the timing and the telling.
  */
-public final class CraftingCard extends Card {
+public final class CraftingCard extends Card implements Buffered {
 	/** The crafting grid's slots (1 to 9, its rows left to right, top to bottom), and the storage's after them (10 on). */
 	public static final int GRID = 9;
 	public static final int STORAGE = 16;
@@ -32,7 +32,7 @@ public final class CraftingCard extends Card {
 	/** What moving items costs (a move, a pick up, a drop, a container's): a running CPU's tick. */
 	public static final int MOVE_COST = PowerUnits.CPU;
 	/** Why its methods fail in a computer that isn't a robot. */
-	public static final String NO_ROBOTICS = "no robotics available";
+	public static final String NO_ROBOTICS = "no robotics";
 	public static final String IDLE = "idle";
 	public static final String CRAFTING = "crafting";
 
@@ -74,6 +74,11 @@ public final class CraftingCard extends Card {
 		 * the first it can) into its slot {@code to} (0: where they fit in its storage): how many.
 		 */
 		Result take(String face, int slot, int count, int to);
+
+		/** The robotics of the robot it's in (null: none): its actions are that robot's commands. */
+		default RoboticsDevice robot() {
+			return null;
+		}
 	}
 
 	private final InterruptLine line = new InterruptLine();
@@ -126,7 +131,7 @@ public final class CraftingCard extends Card {
 		}
 
 		private Result none() {
-			return Result.fail("not installed");
+			return Result.fail("no bench");
 		}
 	};
 	/** Crafts still to make, of those asked for, and those made so far. */
@@ -174,20 +179,43 @@ public final class CraftingCard extends Card {
 	}
 
 	private void finish(String name, String why) {
-		Map<String, Object> event = new LinkedHashMap<>();
-		event.put("event", name);
+		Map<String, Object> result = new LinkedHashMap<>();
 		if (craftedName != null) {
-			event.put("name", craftedName);
+			result.put("name", craftedName);
 		}
-		event.put("count", crafted);
-		if (why != null) {
-			event.put("why", why);
-		}
+		result.put("count", (long) crafted);
 		toCraft = 0;
 		crafted = 0;
 		craftedName = null;
+		RoboticsDevice robot = bench.robot();
+		if (robot != null) {
+			robot.done("craft"); // (its robot is free again)
+		}
 		changed();
-		events.add(event);
+		events.ended("craft", "crafted".equals(name), why, result);
+	}
+
+	/** Only its events are free: each other method is its robot's command. */
+	@Override
+	public java.util.Set<String> free() {
+		return java.util.Set.of("pull");
+	}
+
+	/**
+	 * Why it can't take {@code method} now: busy while it crafts, else what its robot says (busy, held;
+	 * its face actions are where the robot is, so off its plan it goes back first). In a case, nothing
+	 * here: its methods fail, no robotics.
+	 */
+	@Override
+	public String refusal(String method) {
+		RoboticsDevice robot = bench.robot();
+		if (robot == null) {
+			return null;
+		}
+		if (toCraft > 0) {
+			return BUSY;
+		}
+		return robot.refusal(method);
 	}
 
 	/** What it's doing now. */
@@ -205,7 +233,7 @@ public final class CraftingCard extends Card {
 		return no != null ? no : bench.list();
 	}
 
-	@Method(doc = "craft([count]): crafts what its grid makes, count times (1), each taking half a second, what it makes going to its storage; true at once (its event: crafted, with name and count, or failed and why: no recipe, no room), or false and why")
+	@Method(doc = "craft([count]): crafts what its grid makes, count times (1), each taking half a second, what it makes going to its storage; its robot is busy meanwhile. A command: true at once (its event: craft, ok, result {name, count}, or not and why: no recipe, no room), or false and why")
 	public Result craft(Arguments args) {
 		Result no = needsRobotics();
 		if (no != null) {
@@ -213,7 +241,14 @@ public final class CraftingCard extends Card {
 		}
 		int count = args.count() > 0 ? count(args, 0) : 1;
 		if (toCraft > 0) {
-			return Result.fail("already crafting");
+			return Result.fail(BUSY);
+		}
+		RoboticsDevice robot = bench.robot();
+		if (robot != null) {
+			String refused = robot.begin("craft"); // (the robot's busy while it crafts, the user's)
+			if (refused != null) {
+				return Result.fail(refused);
+			}
 		}
 		toCraft = count;
 		crafted = 0;
@@ -322,7 +357,7 @@ public final class CraftingCard extends Card {
 		return no != null ? no : bench.list();
 	}
 
-	@Method(doc = "pull(): its oldest event, {event = \"crafted\", name, count} or {event = \"failed\", why, count}, or nil")
+	@Method(doc = "pull(): its oldest event, a craft's end ({event = \"craft\", ok, why, result = {name, count}}), or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -376,6 +411,9 @@ public final class CraftingCard extends Card {
 	@Override
 	protected void dropData() {
 		events.clear();
+		if (toCraft > 0 && bench.robot() != null) {
+			bench.robot().done("craft");
+		}
 		toCraft = 0;
 		crafted = 0;
 	}

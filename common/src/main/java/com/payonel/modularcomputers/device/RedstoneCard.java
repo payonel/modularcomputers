@@ -29,7 +29,7 @@ import java.util.function.IntUnaryOperator;
  * {@code set} takes the same table and changes only what it names: {@code powered} (a level is what's
  * detected, so it's ignored). A change costs power; without power, it puts out nothing.
  * <p>
- * It's buffered (.agents/BUFFERED.md): {@code set} and {@code get} are commands. A {@code set} is
+ * It's buffered ({@link Buffered}): {@code set} and {@code get} are commands. A {@code set} is
  * applied at its next tick ({@link #tick}: a change in the world takes a tick, so at most one a
  * tick, the user's), and ends then in its event, every face as {@code get} gives it ({@code result});
  * its own changes raise no face's event (that one says them), the world's still do.
@@ -144,7 +144,7 @@ public final class RedstoneCard extends Card implements Buffered {
 	}
 
 	@Override
-	public String refusal() {
+	public String refusal(String method) {
 		return pending != null ? BUSY : null;
 	}
 

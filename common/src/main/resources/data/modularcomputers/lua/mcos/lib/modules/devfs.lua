@@ -222,7 +222,7 @@ local function nextevent(id, key)
   return true, nil
 end
 
--- A buffered device's command (.agents/BUFFERED.md) from a process: while the device is busy (or a
+-- A buffered device's command (one at a time) from a process: while the device is busy (or a
 -- robot held), the calling thread blocks, only it, and is asked again (its events taken into its
 -- files first, so its interrupt is down and the next is the running command's end). A stop of the
 -- device meanwhile ends the wait: what the threads were feeding it was stopped (ECANCELED).

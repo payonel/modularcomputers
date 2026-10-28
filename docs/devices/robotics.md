@@ -28,30 +28,81 @@ its [position](#where-it-is-its-position).
 
 </div>
 
+## One command at a time
+
+The device does one thing at a time, as a real robot's controller runs one motion: its methods are
+**commands**, and a command given while another runs waits for it. In mcos only the thread that gave
+it waits (a blocking write's way); the program's other threads and processes go on. So a program
+gives its moves in order and they happen in order, and more work at once means
+[threads](/mcos/threads/): one walks the robot while another watches a sensor.
+
+A command answers as soon as it has started: `true` (a read answers what it read). One that runs
+over time (a walk, a flight, a turn, a landing, a block breaking) ends in an event named after it,
+`{event = "walk", ok = true}`, or `ok = false` and why (`blocked: minecraft:stone front`), and
+[`devices.ended`](/mcos/devices-library/)
+waits for it. A failure ends that command only: the next one runs as any would.
+
+Four methods never wait: `get` (what it's doing now, and where it really is), `pull` (its events),
+`stop` (it stops at once), and `set` (it does an action as its method would, waiting as it would,
+but a stop at once). Under the board's own calls, a command while another runs is refused at once
+with `busy`, doing nothing (mcos turns that into the wait).
+
+## Its plan
+
+Every command runs from its **plan**: where its last command left it, on a block's middle, facing a
+right angle. `walk(1)` twice is two blocks from where the first began, whatever happened between.
+If something knocks it off its plan (a shove, in the air), it **drifts**: it says so (`shoved`, with
+how far), and the next command that depends on where it is (a move, a turn, a scan, its hand's
+actions) first takes it back to its plan (`returning`), then runs. Hovering on its thrusters it
+holds its plan as a drone does: shoved, it flies back by itself. `position` gives its plan; `get`
+gives where it really is, and its drift.
+
+`stop` stops it at once, where it is: no centering, no squaring up. The command running ends
+`stopped`, and every thread waiting to give it a command is told so (`ECANCELED`): a stop stops the
+plan a program's threads were feeding it. Its plan doesn't move, so the next positional command
+takes it back to its plan first.
+
+## Held in a field
+
+Held in an [energy field](/devices/energy-field-card/), any field, its own too, a robot is in
+stasis, as any creature is: its robotics freezes. What it was doing pauses (a block it was breaking
+is left: no tools in a field), new commands wait (`held`, under the board's calls) until the field
+lets it go and it's down, and `stop` still works. It says so: `frozen`, then `thawed`.
+
+The field's carry is no move of its own, so its odometry never sees it: when it's down again, its
+origin has moved with it, and `position` reads as before. Like a robot picked up and set down
+elsewhere, it has to be told where it is (`setPosition`, from a fix) if that matters. Its own field
+is how a tier 1 golem gets up a cliff: [the tree job](/hardware/bot-golem/) is carried up one, feeling its way
+with the field's moves (it can't look while it's held), and set down on the ledge.
+
 ## In mcos
 
 `/dev/robotics0` reads as what it's doing now, a word (`idle`, `walking`, `turning`, `breaking`,
-`flying`, `hovering` or `landing`), then where it is, a line: `position forward right up heading`. A line
-written is an action, taking effect as it's written:
+`flying`, `hovering`, `landing`, `returning`, `crafting` or `held`), then where it really is, a
+line: `position forward right up heading`, its plan, `planned forward right up heading`, and when
+it's off its plan, `drift forward right up`. A line written is an action, as a command (a line
+given while one runs waits for it, the writing thread only; a `stop` never waits):
 
 | Line | Does |
 |---|---|
-| `walk forward [right [up]]` | Walks whole blocks from where it is, in its own frame |
+| `walk forward [right [up]]` | Walks whole blocks from its plan, in its own frame |
+| `walk` | Walks back onto its plan |
 | `walkto forward [right [up]]` | Walks to whole blocks from its origin, in the origin's frame |
-| `fly forward [right [up]]` | Flies on its thrusters that far from where it is, its legs left standing |
+| `fly forward [right [up]]` | Flies on its thrusters that far from its plan, its legs left standing |
+| `fly` | Takes off where it stands and holds there; in the air, back to its plan |
 | `flyto forward [right [up]]` | Flies to a point from its origin |
-| `hover` | Holds itself where it is on its thrusters |
 | `land` | Comes down onto its legs, below it |
 | `turn left`, `turn right`, `turn around` | Turns a right angle in place (or two) |
 | `use face` | Uses what it holds on the space at a face |
 | `swing face` | Swings what it holds at a face: hits a mob, or breaks the block |
-| `stop` | Stops, on the last block's middle it reached (flying: it hovers there) |
+| `stop` | Stops at once, where it is |
 | `position [forward [right [up [heading]]]]` | Says where it is, its origin moved to make it so (none: its origin here) |
 | `pathfinding on`, `pathfinding off` | Whether its moves find their way round things |
 
 A line that isn't one fails the write with `EINVAL`. How an action went comes as an event: the
-file is ready for `sys.poll`'s `PRI` while one waits, and the `pull` ioctl takes it. The file's
-ioctls are the device's methods, by name, in any open mode: `sys.ioctl(fd, "walk", 3)`.
+file is ready for `sys.poll`'s `PRI` while one waits, and the `pull` ioctl takes it. Each file open
+on the device gets every event (a script and a `cat` each see them all). The file's ioctls are the
+device's methods, by name, in any open mode: `sys.ioctl(fd, "walk", 3)`.
 
 ```sh
 echo "walk 3" > /dev/robotics0
@@ -73,43 +124,51 @@ strong as a player's swing at that pace: full strength once the weapon has recov
 
 What a broken block drops is caught: into the robot's storage (a [crafting card](/devices/crafting-card/)'s)
 first, else its off hand catches it, in the background (when it's empty, or holds the same). What it
-can't catch stays in the world, and the `broke` event says so (`kept`, `dropped`), so a program knows
-from the one event. Anything the hand is given besides (a filled bucket from a stack of empty ones)
-is caught the same way. `swap` puts what the off hand caught in its hand, to store or use.
+can't catch stays in the world, and the swing's event says so (its `result`: `kept`, `dropped`), so
+a program knows from the one event. Anything the hand is given besides (a filled bucket from a stack
+of empty ones) is caught the same way. `swap` puts what the off hand caught in its hand, to store or
+use.
 
-On its legs it presses pressure plates and trips tripwires, as anything walking does.
+It uses its tools only standing on its legs: in the air (on its thrusters) it has no footing, and
+in a field none at all. On its legs it presses pressure plates and trips tripwires, as anything
+walking does.
 
 ## Methods
 
 ### walk(forward[, right[, up]]) → true
 
 Walks to the block `forward` whole blocks the way it faces, `right` to its right (negative: its
-left), its elevation changing by `up`, onto the block's middle, exactly, facing as it was. How it
-gets there is below ([Walking](#walking)). It answers at once; its event says how it went:
-`arrived`, or `blocked` and why, on the middle of the last block it reached. A walk or turn under
-way is given up. It fails with `whole blocks expected` or `too far: at most 64 blocks each way`.
+left), its elevation changing by `up`, from its plan, onto the block's middle, exactly, facing as it
+was. How it gets there is below ([Walking](#walking)). With no arguments it walks back onto its
+plan. A command; its event, `walk`: `ok`, or not and why, on the middle of the last block it
+reached (its plan then). It fails with `not whole`, `too far: 64` (blocks each way at most), or
+`no legs`.
 
 ### walkTo(forward[, right[, up]]) → true
 
 Walks, as `walk` does, to the block that many whole blocks from its origin, in the origin's
-frame: the numbers `position` gives. `walkTo(0, 0, 0)` goes home.
+frame: the numbers `position` gives. `walkTo(0, 0, 0)` goes home. Its event: `walkTo`.
 
 ### turn(way) → true
 
-Turns a right angle in place: `"left"` or `"right"`, or two, `"around"`. Its event: `turned`. It
-fails with `not a way to turn` for anything else: its heading is always a right angle from its
-origin's.
+Turns a right angle in place: `"left"` or `"right"`, or two, `"around"`, from its plan's heading.
+Its event: `turn`. It fails with `not a way: ` and what it was given: its heading is always a right
+angle from its origin's.
 
-### stop() → true
+### stop() → {forward, right, up, heading}
 
-Stops walking, turning, flying or landing: a walk stops on the middle of the last block it reached,
-facing as it was; a flight hovers where it is. Its event, when it was doing something: `stopped`.
+Stops what it's doing at once, where it is, with no centering (flying, it hovers there; a block it
+was breaking is left as it is): the command running ends, `stopped`, and in mcos so does every
+thread's wait to give it a command (`ECANCELED`). Never waits. Answers where it really stopped,
+from its origin. Its plan and its origin stay, so its next positional command goes back to its plan
+first.
 
 ### position() → {forward, right, up, heading}
 
-Where it is from its origin, in the origin's frame: blocks forward, to the right and up, and its
-heading in degrees to the origin's right (0, 90, 180 or 270). Exact: after a walk the numbers are
-whole; a shove (on its thrusters) shows as a fraction. See [where it is](#where-it-is-its-position).
+Its plan, from its origin, in the origin's frame: blocks forward, to the right and up, and its
+heading in degrees to the origin's right (0, 90, 180 or 270). A command: it waits behind the one
+running, so it gives where that one left it. Where it really is, a shove included, is `get`'s. See
+[where it is](#where-it-is-its-position).
 
 ### setPosition([forward[, right[, up[, heading]]]]) → true
 
@@ -119,7 +178,7 @@ moves to make it so, and `position` then gives exactly these numbers. Each is 0 
 `setPosition()` makes where it stands the origin. It moves onto its block's middle and turns to the
 nearest right angle first. From a place you know in another frame (a map's, a GPS's fix), it gives
 `position` that frame: `setPosition(12, -3, 65, 90)` says "I'm 12 forward, 3 left and 65 up from
-the origin, facing its right". Fails with `whole blocks expected` or `a right angle expected`.
+the origin, facing its right". Fails with `not whole` or `not a right angle: ` and the heading.
 
 ### setPathfinding(on) → true
 
@@ -154,15 +213,17 @@ Uses what it holds on the space at a face, as a player's right click. A mob ther
 a lever, a log stripped with an axe); an empty space gets what it holds placed into it, against a
 neighbouring block, or with nothing to place against, what it holds is used the way it looks (a
 bucket into water). Answers `"placed"` or `"used"`; fails with `nothing happened`, `nothing to
-place against` or `nothing there`.
+place against` or `nothing there`. In the air a tool in its hand works as an empty hand (buttons,
+doors and levers yes).
 
 ### swing(face) → what, or nil and why
 
-Swings what it holds at a face, as a player's left click. A mob there is hit: `"attacked"`. Else
-the block there starts breaking: `"breaking"`, and its event says how it went: `broke` (with the
-block's name, and `kept`: true when it caught all the block dropped, else false and how many it
-`dropped` into the world), or `failed` and why (`the block changed`, `what it held changed`). A walk or turn
-under way is given up. It fails with `nothing there` or `unbreakable`.
+Swings what it holds at a face, as a player's left click, standing on its legs. A mob there is hit:
+`"attacked"`. Else the block there starts breaking: `"breaking"`, a command running till it's
+broken. Its event, `swing`: `ok`, and its `result`, `{block, kept, dropped}` (the block's name;
+`kept`: true when it caught all the block dropped, else false and how many it `dropped` into the
+world), or not and why (`the block changed`, `what it held changed`; `held` when a field took hold
+of it). It fails with `nothing there`, `unbreakable` or `no legs` (on its thrusters: no footing).
 
 ### contents([face]) → list, or nil and why
 
@@ -185,46 +246,53 @@ Takes items from the container at a face (in front, when none is given) into its
 same as it holds, when it holds something); all its hand can hold, or `count`. How many came: 0
 when there were none it could take. It fails with `no container there` or `no slot`.
 
-### fly(forward[, right[, up]]) → true, or nil and why
+### fly(forward[, right[, up]]) → true
 
-A tier 2 golem's: its thrusters' calls (`fly`, `flyTo`, `hover`, `land`) fail on a tier 1 with `no
-thrusters` (it walks; its own [energy field](/devices/energy-field-card/) can
-still carry it).
+A tier 2 golem's: its thrusters' calls (`fly`, `flyTo`, `land`) fail on a tier 1 with `no
+thrusters` (it walks; its own [energy field](/devices/energy-field-card/) can still carry it).
 
-Flies on its thrusters to the point that many blocks from it, in its own frame, straight there and
-never through blocks, at 25 blocks a second (its field flies it at 10; a player sprints at under
+Flies on its thrusters to the point that many blocks from its plan, in its own frame, straight there
+and never through blocks, at 25 blocks a second (a field carries it at 10; a player sprints at under
 6). If it stands on its legs, they're left standing where it was: the thrusters fire red beams from
-their sockets. On its thrusters it walks nowhere (`no legs`), swings nothing (no tools: `no legs:
-it can't swing without its footing`), presses no pressure plates, and can be shoved; it still uses
-what's round it (buttons, doors, levers: a tool in its hand works as an empty hand), places what it
-holds, and its other cards work. Its event: `arrived` (then it hovers there), or `blocked`, `something
-in the way`. Its thrusters cost five running CPUs' power a tick. Fails with `held in a field: its
-field moves it`, or `too far` beyond 64 blocks each way. Up to 64 blocks each way.
+their sockets. With no arguments, on its legs, it takes off where it stands and holds there; in
+the air, it flies back onto its plan. On its thrusters it walks nowhere (`no legs`), swings nothing
+(`no legs`), presses no pressure plates, and can be shoved (it flies back to its plan, saying
+`shoved`); it still uses what's round it (buttons, doors, levers: a tool in its hand works as an
+empty hand), places what it holds, and its other cards work. Its event, `fly`: `ok` (then it holds
+there), or not and why (`blocked: minecraft:stone up`). Its thrusters cost five running CPUs' power a
+tick. Fails with `too far: 64`.
 
-### hover() → true, or nil and why
+If its program ends while its thrusters hold it up, or its power runs out, it falls and powers off:
+its torso lies on the ground, off, to be picked up as a Tier 2 Bot Golem Torso.
 
-Holds itself where it is on its thrusters (its legs, if it stands on them, left standing there),
-until it flies or lands. A shove moves it, and it drifts to a stop. If its program ends while its
-thrusters hold it up, or its power runs out, it falls and powers off: its torso lies on the ground,
-off, to be picked up as a Tier 2 Bot Golem Torso.
+### flyTo(forward[, right[, up]]) → true
 
-### land() → true, or nil and why
+Flies, as `fly` does, to the point that many blocks from its origin, in the origin's frame. Its
+event: `flyTo`.
 
-Comes down onto its legs, standing below it (within three blocks to its side), and onto them; a
-field holding it lets go. Its event: `landed`, or `blocked` and why (`something in the way`, `its
-legs are gone`: it hovers there). Fails with `no legs there to land on` (it goes on hovering) or
-`already on its legs`. A right click pops legs up into an inventory, its own `use` too.
+### land() → true
 
-### get() → {state, legs, pathfinding, position}
+Comes down onto its legs, standing below it (within three blocks to its side), and onto them. Its
+event, `land`: `ok`, or not and why (`blocked: ...`, `no legs below` when they've gone: it hovers
+there). Fails with `no legs below` (it goes on hovering) or `on legs`. A right click pops legs up
+into an inventory, its own `use` too.
 
-What it's doing now (`idle`, `walking`, `turning`, `breaking`, `flying`, `hovering` or `landing`),
-whether it stands on its legs, whether it finds its way round things, and where it is.
+### get() → {state, legs, pathfinding, position, planned, drift}
+
+Live, never waiting: what it's doing now (`idle`, `walking`, `turning`, `breaking`, `flying`,
+`hovering`, `landing`, `returning`, `crafting` or `held`), whether it stands on its legs, whether it
+finds its way round things, where it really is and its plan (each as `position` gives it), and how
+far it's off its plan (`{forward, right, up}`; none when it's on it). It answers while a field
+holds it too: a program can follow the carry.
 
 ### set(action) → true
 
-An action as a table: `{action = "walk", forward, right, up}`, `{action = "fly", forward, right,
-up}`, `{action = "turn", way}`, `{action = "use", face}`, `{action = "swing", face}`,
-`{action = "hover"}`, `{action = "land"}`, or `{action = "stop"}` (the file's lines are these).
+An action as a table: `{action = "walk"}` (or `"walkTo"`, `"fly"`, `"flyTo"`, with `forward`,
+`right`, `up`), `{action = "turn", way}`, `{action = "use", face}`, `{action = "swing", face}`,
+`{action = "land"}`, `{action = "stop"}`, `{action = "pathfinding", on}`, or
+`{action = "setPosition", forward, right, up, heading}` (the file's lines are these). It does what
+the method does, waiting as it would; a stop never waits. Fails with `not a table` or
+`not an action: ` and what it was.
 
 ### pull() → event or nil
 
@@ -233,15 +301,18 @@ Its oldest event, or nil.
 ## Where it is: its position
 
 A robot always knows exactly how far it is from its origin, and which way it faces from the
-origin's way, as a real robot's odometry does: what moves it (walking, flying, a field carrying
-it, a shove) moves its position. Not where it is in the world: no compass, no coordinates.
+origin's way, as a real robot's odometry does: what it does itself (walking, flying, turning) moves
+its position. Not where it is in the world: no compass, no coordinates.
 
 - **Its origin** is where it stood, on its block's middle, and the way it faced, a right angle. It's
   set the first time the golem runs (powered on, or set down), by `setPosition`, and in each
   dimension it first comes to: each dimension keeps its own, so back in the overworld it has its old
   origin again.
-- **It lasts**: through reboots, power cuts, shoves and field flight. It's lost only when the golem
-  is picked up (its item keeps no position): set down again, it has a new origin there.
+- **Its plan** is where its last command left it; `position` gives it. A shove moves it off its plan
+  for a while (`get`'s `drift`), never the plan itself.
+- **It lasts**: through reboots, power cuts and shoves. A field's carry takes its origin with it
+  ([held in a field](#held-in-a-field)). It's lost when the golem is picked up (its item keeps no
+  position): set down again, it has a new origin there.
 - **Its heading is always a right angle** from the origin's: a move begins by squaring it up, and
   ends by giving it back, so pathfinding's turns never leave it facing a new way.
 
@@ -259,35 +330,35 @@ a stair's lower half is the ground's elevation:
 - **Down** only while `up` is below: at most 3 blocks at a time, as far as a player falls unhurt.
 - **Never past `up`**, and never into lava, fire or deep water.
 
-It ends at exactly the elevation `up` asked, or it's `blocked`. The reasons: `a step up`, `a drop`,
-`too high to jump`, `too far down`, `a wall`, `no room to jump`, `lava`, `fire`, `deep water`, `not at
-the height asked`.
+It ends at exactly the elevation `up` asked, or its walk ends not `ok`, and why: `too high: ` (a
+step up it wasn't to make, or more than a jump: how many blocks), `too low: ` (a drop it wasn't to
+make, or more than 3: how many), `too low` (no floor within its drop), `blocked: ` and the block in
+the way and its face (a wall, a ceiling, lava, fire, deep water: `blocked: minecraft:lava front`),
+or `height: ` and how far from the height asked it ended.
 
 | From | To | `up = 0` | `up = 1` | `up = -3` |
 |---|---|---|---|---|
 | ground | a slab | walks | walks | walks |
-| a slab | the full block beside it | blocked | jumps | blocked |
-| ground | a block up | blocked | jumps | blocked |
-| ground | the flat beyond | walks; ends `not at the height asked` if `up` wasn't met | | |
-| ground | 3 down | blocked | blocked | drops |
-| ground | 4 down | blocked | blocked | blocked (`too far down`) |
+| a slab | the full block beside it | `too high: 1` | jumps | `too high: 1` |
+| ground | a block up | `too high: 1` | jumps | `too high: 1` |
+| ground | the flat beyond | walks; ends `height: -1` if `up` wasn't met | | |
+| ground | 3 down | `too low: 3` | `too low: 3` | drops |
+| ground | 4 down | `too low` | `too low` | `too low` |
 
 **With pathfinding** it finds its way, as a mob does: round walls, up stairs and slabs, jumping a
 block and dropping up to 3, turning as it goes. It still ends on the asked block's middle, at the
-asked elevation, facing as it began, or it's `blocked`. A flight with pathfinding flies round things
-too.
+asked elevation, facing as it began, or it's not `ok` (`no path`). A flight with pathfinding flies
+round things too.
 
 ## Events
 
 | `event` | Other fields | When |
 |---|---|---|
-| `arrived` | | a walk or a flight got there |
-| `blocked` | `why` | a walk can't go on: `no way there`; a flight or a landing: `something in the way`; `interrupted` when its world was saved during it |
-| `turned` | | a turn is done |
-| `stopped` | | `stop` ended a walk, turn, swing, flight or landing |
-| `broke` | `block`, `kept`, `dropped` | a swing broke the block (its name); whether it caught all it dropped, and how many it didn't |
-| `failed` | `why` | a swing couldn't go on |
-| `landed` | | it's down on its legs again |
+| `walk`, `walkTo`, `fly`, `flyTo`, `turn`, `land`, `swing` | `ok`, `why`, `result` | that command ended: `ok`, or not and why (`stopped` when a `stop` cut it short; `interrupted` when its world was saved during it); a swing's `result` is `{block, kept, dropped}` |
+| `return` | `ok`, `why` | its way back to its plan ended (after a shove, or before a positional command) |
+| `shoved` | `drift` (`{forward, right, up}`) | something knocked it off its plan |
+| `frozen` | | a field took hold of it: its robotics paused |
+| `thawed` | | the field let go and it's down: its robotics back, its origin carried |
 
 Its interrupt is raised when an event comes, and stays raised while one waits. With no program
 running on its board it takes no data: its events go, and it stops.
@@ -312,7 +383,7 @@ Walk somewhere and back home with `walkTo`, from its origin:
 {% include robotics-home.lua %}
 ```
 
-Walk round a square with the device's methods, waiting for each move:
+Walk round a square through the device's ioctls, each move waiting for the one before:
 
 ```lua
 {% include robotics-square.lua %}

@@ -323,8 +323,14 @@ user's design, 2026-10-25): it knows no world position (a GPS card later) but al
 first tick there or by `setPosition`, saying where it is: its origin there, or a given place, a GPS's fix, on a
 block's middle at a right angle; kept through reboots, shoves, fields; lost only when it's an item),
 and `walkTo`/`flyTo` go to points from it. A walk is whole blocks and ends on the asked block's
-middle, facing as it began (a move squares its heading up, and gives it back), or `blocked` on the
-last middle reached; turns are right angles. Without pathfinding (the default) it walks straight,
+middle, facing as it began (a move squares its heading up, and gives it back), or not `ok` on the
+last middle reached (its plan then); turns are right angles. **It runs from its plan** (the user's
+design, 2026-10-27): its robotics is buffered (one command at a time), each command measured from
+where the last left it; a shove off it (in the air) is drift, said as `shoved` news, and the next
+positional command (`RoboticsDevice.POSITIONAL`: moves, turns, scans, its hand's) goes back first
+(its own `return` event), as a hover holds its plan like a drone. `position` is the plan (a
+command, so it waits its turn); `get` is live (where it really is, its drift). `stop` is free and
+at once, where it is (no centering), answering where; the plan and the origin stay. Without pathfinding (the default) it walks straight,
 forward then right, never turning (it strafes and backs up), by `GolemSteps`: free within its
 elevation (the block its feet are in: slabs), a block up at a time only toward `up`, down three at
 most only toward it. With pathfinding (`setPathfinding`, kept like the origin) the game's pathfinder
@@ -334,21 +340,23 @@ viewer's), since it knows no compass; a block's direction it reads is turned int
 scans all six spaces at once, and works with its hand (its main hand, one item: a slot in its view,
 kept on its item when picked up) as a player does, through the loader's fake player standing where
 it is (`Platform.fakePlayer`, `GolemHands`): the game's own interactions (placing, doors, buttons,
-buckets), breaking in a player's time with its tool (on its legs: a player off the ground digs at a
-fifth), a hit with its weapon's damage (its modifiers put on the fake player, which never ticks, and
+buckets), breaking in a player's time with its tool (standing on its legs only: legless it has no
+footing, in a field it's frozen), a hit with its weapon's damage (its modifiers put on the fake player, which never ticks, and
 its swing's strength from the time since its last), a container's items in and out as a hopper
 moves them. What a broken block drops (or its hand is given) is caught: its storage first, else its
 off hand (a background catch, the user's: atypical, so storage is always preferred), else it stays
-in the world, and the `broke` event says whether it kept it all.
+in the world, and the swing's end says whether it kept it all.
 - **It flies two ways, each with its price** (the user's design, 2026-10-25), never with its legs
-  on and its tools whole: on its **thrusters**, built into a tier 2 (a tier 1's thruster calls fail: `no thrusters`), no card (`fly`, `hover`,
-  `land`), its legs left standing where it took off (`GolemLegs`, a boat's kind of object), red
+  on and its tools whole: on its **thrusters**, built into a tier 2 (a tier 1's thruster calls fail: `no thrusters`), no card (`fly`, `land`;
+  `fly()` takes off where it stands), its legs left standing where it took off (`GolemLegs`, a boat's kind of object), red
   beams from their sockets, 25 blocks a second, five CPUs' power a tick; legless it walks nowhere,
   swings no tool (one in hand works as an empty hand: buttons, doors, its legs popped up), ignores
   block triggers, and can be shoved; `land` comes down onto its legs below it and refuses with none
-  there. Or held in **its own field**, legs and all (10 blocks a second): it keeps its tools, but off
-  the ground its fake player digs at a fifth, as a player in the air; nothing shoves it; it isn't
-  flying. Legless with nothing holding it up (its program ended, its power gone, a field let go), it
+  there. Or carried in **a field**, its own too, legs and all (10 blocks a second): stasis, as for
+  any creature (the user's, 2026-10-27): its robotics freezes (commands refused `held`, mcos waiting;
+  a swing under way ends; no tools, no looking), `frozen` and `thawed` news, and the carry moves its
+  origin with it (its odometry never saw it: a kidnapped robot, told where it is by `setPosition`);
+  nothing shoves it; it isn't flying. Legless with nothing holding it up (its program ended, its power gone, a field let go), it
   falls and powers off, a torso on the ground. Picked up legless it's a torso item; torso over legs
   is a golem again (`GolemAssemblyRecipe`, the torso's components kept). Either item, used crouching
   in a hand, opens its parts view on the item (the user's): parts, hands and cards' slots read and
@@ -360,8 +368,9 @@ in the world, and the `broke` event says whether it kept it all.
   when nothing it was asked to move is left, else `false` and how many are (never `false, 0`);
   no container is a failure (nil and why). `drop` fills a container there first and answers how
   many went into the world. A face left out is the front for containers, below for drops. A player's hit picks it up as its item, parts kept; nothing else harms
-it; it's solid, as a boat is (players walk into it, not through it), and on its legs nothing
-shoves it (players, mobs, knockback; in the air it's pushed). Creative
+it; it's solid, as a boat is (players walk into it, not through it), and standing nothing shoves
+it (players, mobs, knockback; `standing`: on the ground, thrusters off; hovering it's pushed, even
+resting on its own legs). Creative
 only until the Advanced Robotics Assembly. Its board's state reaches players by
 `BoardStatePayload` (an entity has no block update), its screen's rows as a block's do.
 
@@ -371,9 +380,10 @@ Storage and a 3x3 grid on a card (user design, 2026-10-24): its slots live on it
 vanilla contents component, read and written by `CraftingStorage`, its one home), so they go where
 the card goes. Any computer takes it, and its view gets a tab a card (right of the buttons) where a
 player crafts by hand, as at a crafting table (the game's result slot). Its methods need robotics:
-in a case they fail (`no robotics available`, the user's words), in a robot `CraftingBench` works
-them (the game's recipes; what's made into storage, all or nothing: no room, no craft). A craft
-takes time and each card crafts on its own, so cards add throughput. Its `/dev` file reads as its
+in a case they fail (`no robotics`), in a robot `CraftingBench` works them (the game's recipes;
+what's made into storage, all or nothing: no room, no craft). Its methods are its robot's commands
+(all but `pull`): a craft takes time and keeps the robot busy (the user's, 2026-10-27), so a robot
+crafts with one card at a time. Its `/dev` file reads as its
 items (`name count` a line) and a line written dumps its storage (below, or at the face named).
 A view's tabs are one mechanism (`SideTabs`, the user's): a tab for each card whose kind
 registered one, each opening its panel left of the board (the bus order is the parts view's own
@@ -389,7 +399,10 @@ creeper's fuse dies and it can't blow, a player can't attack, use or break (thei
 is overridden by teleports). Positions are in its computer's frame (`FieldProjector.Frame`: a
 block's front and right as `Face` names them; a robot's heading and its own right), and it reaches
 16 blocks from its computer, except a robot holding itself, which carries the card. It lets go
-without power or a running program (it's ticked powered or not, so it knows).
+without power or a running program (it's ticked powered or not, so it knows), never because the
+process that captured ends. A robot it holds is in stasis too (its robotics frozen, its origin
+carried: the bot golem's). Its `capture`, `move` and `set` are commands (buffered); `release` is
+free, so a program can always let go.
 
 ### The charging pad
 
@@ -794,6 +807,9 @@ Lessons from mistakes, each with its test:
   (`[[\d]]`) for patterns, and capture a test program's stderr (`2> /err`) to see why it failed.
 - A class in the mixin package can't be loaded as an ordinary class (Mixin reserves the package):
   helpers the mixins call live elsewhere (`entity/GolemFear`), and each mixin is its own file.
+- **A golem resting on its own legs is on the ground:** `fly()` takes off where it stands, its torso
+  on its legs (solid), so `onGround()` stayed true and a hovering golem took no shove. Whether it
+  stands asks `standing()` (on the ground, thrusters off). (`shovedInTheAirItHoldsItsPlanAndSaysSo`)
 - **A block's state isn't the block:** leaves change state as their log goes, crops as they grow;
   what's tied to a block (a golem's breaking) compares the block, not its state.
   (`aBlockWhoseStateChangesWhileItsBrokenStillBreaks`)

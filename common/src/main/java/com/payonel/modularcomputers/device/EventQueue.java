@@ -60,7 +60,7 @@ public final class EventQueue {
 	}
 
 	/**
-	 * A buffered device's command ended (.agents/BUFFERED.md): {@code {event = method, ok = true[,
+	 * A buffered device's command ended ({@link Buffered}): {@code {event = method, ok = true[,
 	 * result]}}, or {@code {event = method, ok = false, why}} when it failed (or was stopped). News.
 	 */
 	public void ended(String method, boolean ok, String why, Object result) {
