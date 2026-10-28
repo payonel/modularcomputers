@@ -100,35 +100,74 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   over the network is the same block to all. Distances are already from block to block (a card's
   place is its block), rounded to 0.1 m: whole-block fixes come out exact for beacons spread well
   apart, rounding worse far off (a check with numbers, then a test, before it's documented as a
-  tutorial). Needs a settled robot to measure from: `stop()` settles it whenever it's called, moving or
-  not (the user's: after a shove, say): what it was doing stops, then it moves, as a walk does, onto
-  the middle of the block it's in (in the air, at a whole block's height too) and turns to the
-  nearest right angle (its heading squared for good, not given back), each only if it's off; it
-  ends in its `stopped` event always (now only when it was moving), once settled, so a program
-  waits for the settle as for any slow action, by its event, never by polling `state()`. When it
-  can't settle (something on the block's middle), it ends in `blocked` and why instead.
+  tutorial). It measures from its plan exactly: `walk()` or `fly()` with no arguments (below) puts
+  it back on its block's middle at a right angle, and its tag says when.
 - **The board's own log, behind a warning triangle** (the user's, 2026-10-26; a BMC's event log and
   console, apart from the OS): an aborted computer's why is otherwise readable only after a boot that
   works (or with the scanner), so one that can't boot (no RAM) shows only its blinking light. A
   triangle in the case view's button column, lit amber after an abort, opens a small read-only
   terminal the firmware writes (each abort's cause and message, a crash's error and stack): not a
   bus device, never written by user programs.
-- **A `shoved` event** (the user's, 2026-10-26; the device rule's "every change to its state"): a
-  shove moves the golem without its program, so it reports it, with its `position()` after (maybe
-  off a block's middle: a program settles with `stop()` before it measures).
-- **Command tags and a move queue** (the user's, 2026-10-26: a careful walk, forward 10 and only
-  then right; and a state read is always a race): every action answers with a tag and its ending
-  event carries it (NVMe's and NCQ's command tags), so a program waits for its own answer and older
-  news is plainly older. Actions queue on the device, a motion controller's command buffer (G-code,
-  a 3D printer's planner), bounded (a full queue refuses at once: the handshake), run in order, an
-  event each; a `blocked` one drops the rest, its event saying how many; `stop()` clears the queue,
-  then settles. A new walk then queues behind the last instead of replacing it (change course:
-  `stop()` first, as a motion controller's; `stop()` is the cancel: the queue cleared, settled,
-  start over). Every method of every device answers with a tag (the user's, 2026-10-26: one rule, very
-  intuitive, over the hardware's split of untagged register reads and tagged commands); a read's
-  tag simply never has an event. Open: where the tag goes in an answer without breaking `local ok,
-  why = robot.walk(5)` (to propose before building); the manual teaches them on all
-  three layers (the board, `sys`, `devices`).
+- **Tags, and the robot's queue** (the user's design, 2026-10-26 and 27, worked out together; the
+  manual teaches it on all three layers, the board, `sys` and `devices`):
+  - **Tags are layer 0's** (the firmware's): it sees every call, the ones it answers itself too (the
+    inbox, the clock), so it numbers them, one counter a computer, always increasing (saved with the
+    Lua state by Styx), and a call to the host carries its tag (`"call", tag, ...`) so a device sees
+    it in its arguments and puts it in the event it ends with. At layer 0 the tag takes `ok`'s place:
+    `board.invoke` answers `tag, values...` or `false, why` (any number is true in Lua: nothing that
+    tests `ok` changes; a failed call started nothing, so has no tag). Older is smaller, across
+    devices. Real code meets tags at completion (NVMe's command ID, io_uring's `user_data`); a
+    program's own cookie on a call, carried back in its event (io_uring's), is an idea for layer 1.
+  - **Every tag ends in exactly one event:** done (`arrived`, `turned`, `crafted`...), failed
+    (`blocked`, `failed`), or `cancelled`, as NVMe completes an aborted command. Today an action can
+    vanish (a new walk or `hover` drops a flight with no event): that goes.
+  - **Layer 1 (`sys.ioctl`) never blocks:** a call answers at once, with its tag; outcomes are events.
+    Blocking forms (issue, then wait for its own tag) are layer 2's convenience (`devices`). Open: the
+    tag's place in an ioctl's answer, which is the method's own value (an action's `true` is the
+    natural slot; a read's answer is its data).
+  - **Everything a robot does is queued and tagged** (the user's: what depends on where it is, or on
+    its hand, has an order), a motion controller's command buffer (G-code, a 3D printer's planner):
+    its moves, `swing`, `use`, `swap`, `store`, `take`, `scan`, `held`, `contents`, `setPosition`,
+    `setPathfinding` and `position()`. Only `get()` (the `/dev` file's read: its live state, the
+    queue, the running tag, its drift) and `pull` answer outside the queue. Bounded: a full queue
+    refuses at once, and its interrupt says when there's room (the handshake). An argument that's
+    wrong fails the call at once (no tag: nothing queued); what only running finds (already on its
+    legs, holding nothing) is the command's `failed` event. Saved with the device. The program
+    ending, aborting or its robotics losing power drops the queue and stops it.
+  - **Commands run from the plan:** each command's place is where the ones before it leave the golem
+    (the plan), and relative moves are measured from it, so `fly(A) + fly(B) == walk(A) + walk(B)`
+    (the user's: predictable). A shove (only in the air: nothing shoves it on its legs) or a field's
+    carry is drift: the next command returns to its plan first, so `fly(A) + shove + swing ==
+    fly(A) + swing`, and `fly(A) + field(B) + fly(B) == fly(A) + fly(B)` (the user's: the field moves
+    the golem, the golem doesn't move itself). `walk()` or `fly()` with no arguments returns to the
+    plan explicitly. `position()` is queued and answers the plan. No way to accept drift into the
+    plan for now (`replan`, `settle`, `resetOrigin` were tried and dropped: names didn't land); no
+    `drift()` method: the `shoved` event carries the drift (its total), and `get()` shows it.
+  - **`stop()` is forceful:** it clears the queue (each command `cancelled`), then runs alone at once:
+    it halts where it is, as soon as it can (mid-block, or hovering in place), without centering, and
+    ends in `stopped` with its tag and `at`, where it really stopped from its origin. The plan and
+    the origin don't move: what it interrupted never happened, so the next command returns to the
+    plan first.
+  - **No `hover`:** `fly()` is "take off where it stands, and hold" (as `fly(0, 0, 0)` already is).
+  - **A field holding the golem is stasis** (the user's: as a held mob can't act): its queue pauses,
+    the command under way too, and goes on once it's let go (`held`, `released` events). Open: a
+    golem in its own field, a tier 1's only way off the ground and the reason it keeps its tools in
+    the air: stasis too, or only another computer's field?
+  - **Sensors report from the body, relative to their computer** (the user's: cases and robots
+    alike): in a robot, forward, right and up (its own frame, as the field card's already are); in a
+    case, its front and right as `Face` names them. The motion and audio sensors' world `x, y, z`
+    go: they can't be turned into a robot's moves, and they leak its world heading. Reacting to a
+    sensor from a drifted spot means returning to the plan first (`fly()`), or adding the drift.
+  - **Other cards that act at a robot's faces** (the crafting card's `drop`, `pickup`, `store`,
+    `take`; the field card's `capture` at a point or `"self"`) have the same ordering need. Open: join
+    the robot's queue (a CNC's toolhead commands in its G-code stream; recommended), or stay apart
+    with a program waiting for the robot's tag. The crafting card's `craft` and the field card's
+    `move` are tagged, with one ending event each (`craft(5)`: one, with the count made).
+  - **The ioctl report** (the user's, to keep current as the APIs change): every device method and
+    what `sys.ioctl` gives back, from the code, grouped by device, at
+    https://claude.ai/artifact/YXP5MWRaU7rjee75jUnonm. Misalignments it shows, to settle into one
+    intuitive pattern: `false` as a value (send, both `store`s; `response`, `read`, `sync`'s "not
+    yet") beside failures as `nil, why, errno`; the internet card's request handles are already tags.
 - **Walking, decided and built (2026-10-25):** a position (odometry from an origin a dimension), whole-
   block walks ending exactly, straight without pathfinding (the default), the game's pathfinder as
   a mode, walkTo/flyTo from the origin. Still to consider: whether the field card's moves should land
