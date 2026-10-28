@@ -120,7 +120,7 @@ public final class FieldProjector implements FieldCard.Projector {
 		if (FieldCard.SELF.equals(id)) {
 			target = self.get();
 			if (target == null) {
-				return Result.fail("no robot to hold: its computer isn't one");
+				return Result.fail("not a robot");
 			}
 		} else if (id != null) {
 			try {
@@ -129,22 +129,22 @@ public final class FieldProjector implements FieldCard.Projector {
 				return Result.fail("not an id: " + id);
 			}
 			if (target == null || !holdable(target)) {
-				return Result.fail("nothing with that id here");
+				return Result.fail("no entity: " + id);
 			}
 		} else {
 			Vec3 there = at.world(point[0], point[1], point[2]);
 			if (there.distanceTo(at.origin()) > FieldCard.RANGE + FieldCard.REACH) {
-				return Result.fail("too far: " + (int) FieldCard.RANGE + " blocks from its computer at most"); // (it senses no farther than it reaches)
+				return Result.fail("too far: " + (int) FieldCard.RANGE); // (it senses no farther than it reaches)
 			}
 			target = level.get().getEntities((Entity) null, new AABB(there, there).inflate(FieldCard.REACH),
 					entity -> holdable(entity) && entity.getBoundingBox().getCenter().distanceTo(there) <= FieldCard.REACH)
 				.stream().min(Comparator.comparingDouble(entity -> entity.getBoundingBox().getCenter().distanceTo(there))).orElse(null);
 			if (target == null) {
-				return Result.fail("nothing there");
+				return Result.fail("no entity");
 			}
 		}
 		if (target != self.get() && target.getBoundingBox().getCenter().distanceTo(at.origin()) > FieldCard.RANGE) {
-			return Result.fail("too far: " + (int) FieldCard.RANGE + " blocks from its computer at most");
+			return Result.fail("too far: " + (int) FieldCard.RANGE);
 		}
 		EnergyField made = ModEntities.ENERGY_FIELD.create(level.get(), EntitySpawnReason.TRIGGERED);
 		if (!made.hold(target, new EnergyField.Listener() {
@@ -169,7 +169,7 @@ public final class FieldProjector implements FieldCard.Projector {
 				card.lost(why);
 			}
 		})) {
-			return Result.fail("another field holds it");
+			return Result.fail("held");
 		}
 		level.get().addFreshEntity(made);
 		field = made;
@@ -179,12 +179,12 @@ public final class FieldProjector implements FieldCard.Projector {
 	@Override
 	public Result move(double forward, double right, double up) {
 		if (field == null) {
-			return Result.fail("holding nothing");
+			return Result.fail("not holding");
 		}
 		Frame at = frame.get();
 		Vec3 by = at.offset(forward, right, up);
 		if (field.holding() != self.get() && field.center().add(by).distanceTo(at.origin()) > FieldCard.RANGE) {
-			return Result.fail("too far: " + (int) FieldCard.RANGE + " blocks from its computer at most");
+			return Result.fail("too far: " + (int) FieldCard.RANGE);
 		}
 		field.moveBy(by);
 		return Result.ok(true);
@@ -220,7 +220,7 @@ public final class FieldProjector implements FieldCard.Projector {
 			return FieldCard.INTERRUPTED; // (its chunk unloaded, its world stopped)
 		}
 		if (field.holding() != self.get() && field.center().distanceTo(frame.get().origin()) > FieldCard.RANGE + FieldCard.REACH) {
-			return "out of range";
+			return "too far: " + (int) FieldCard.RANGE;
 		}
 		return null;
 	}

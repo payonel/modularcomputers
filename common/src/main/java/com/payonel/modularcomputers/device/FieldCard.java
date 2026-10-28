@@ -18,8 +18,13 @@ import java.util.Map;
  * field stays within {@link #RANGE} of its computer, but a robot holding itself carries the card
  * with it: in a golem it's how it flies. Holding costs power each tick, a move each block; without
  * power, or with no program running, it lets go. A {@link Projector} does the work in the world.
+ * <p>
+ * It's buffered (.agents/BUFFERED.md): {@code capture}, {@code move} and {@code set} are commands;
+ * a move runs until it's arrived or blocked, its end its event ({@code move}). {@code scan},
+ * {@code get}, {@code pull} and {@code release} are free: a program can always let go, and a move
+ * under way then ends, stopped.
  */
-public final class FieldCard extends Card {
+public final class FieldCard extends Card implements Buffered {
 	/** How far from its computer it reaches, in blocks: what it finds, holds, and moves to. */
 	public static final double RANGE = 16;
 	/** How near a point given to capture something must be, in blocks. */
@@ -76,7 +81,17 @@ public final class FieldCard extends Card {
 	}
 
 	private Result noProjector() {
-		return projector == null ? Result.fail("not installed") : null;
+		return projector == null ? Result.fail("no projector") : null;
+	}
+
+	@Override
+	public java.util.Set<String> free() {
+		return java.util.Set.of("scan", "get", "pull", "release");
+	}
+
+	@Override
+	public String refusal() {
+		return state.equals(MOVING) ? BUSY : null;
 	}
 
 	/** Each server tick, powered or not: a field held costs its power, and with none it lets go. */
@@ -122,7 +137,7 @@ public final class FieldCard extends Card {
 			return no;
 		}
 		if (!state.equals(IDLE)) {
-			return Result.fail("already holding something");
+			return Result.fail("holding");
 		}
 		Result held;
 		if (args.get(0) instanceof String id) {
@@ -140,14 +155,14 @@ public final class FieldCard extends Card {
 		return held;
 	}
 
-	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, ten blocks a second, never through blocks; true at once (its event: arrived, or blocked), or false and why (holding nothing, too far)")
+	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, ten blocks a second, never through blocks. A command: true at once (its event: move, ok, or not and why: blocked: the block), or false and why it can't start (not holding, too far)")
 	public Result move(Arguments args) {
 		Result no = noProjector();
 		if (no != null) {
 			return no;
 		}
 		if (state.equals(IDLE)) {
-			return Result.fail("holding nothing");
+			return Result.fail("not holding");
 		}
 		Result started = projector.move(args.checkNumber(0), args.count() > 1 ? args.checkNumber(1) : 0, args.count() > 2 ? args.checkNumber(2) : 0);
 		if (!started.failed()) {
@@ -156,12 +171,16 @@ public final class FieldCard extends Card {
 		return started;
 	}
 
-	@Method(doc = "release(): lets what it holds go (it falls from where it is)")
+	@Method(doc = "release(): lets what it holds go (it falls from where it is); never waits: a move under way ends, stopped")
 	public Result release(Arguments args) {
+		boolean wasMoving = state.equals(MOVING);
 		if (projector != null && !state.equals(IDLE)) {
 			projector.release();
 		}
 		state(IDLE);
+		if (wasMoving) {
+			events.ended("move", false, "stopped", null);
+		}
 		return Result.ok();
 	}
 
@@ -200,21 +219,25 @@ public final class FieldCard extends Card {
 		};
 	}
 
-	@Method(doc = "pull(): its oldest event, {event = \"arrived\"}, {event = \"blocked\", why}, or {event = \"lost\", why} (what it held is gone, out of reach, or its power is), or nil")
+	@Method(doc = "pull(): its oldest event, or nil: a move's end, {event = \"move\", ok, why}, or {event = \"lost\", why} (what it held is gone, out of reach, or its power is)")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
 
 	/** Its field got where it was moving. */
 	public void arrived() {
-		state(HOLDING);
-		event("arrived", null);
+		if (state.equals(MOVING)) {
+			state(HOLDING);
+			events.ended("move", true, null, null);
+		}
 	}
 
 	/** Its field's move was stopped. */
 	public void blocked(String why) {
-		state(HOLDING);
-		event("blocked", why);
+		if (state.equals(MOVING)) {
+			state(HOLDING);
+			events.ended("move", false, why, null);
+		}
 	}
 
 	/** It lost what it held ({@code why}): it holds nothing now. */
@@ -222,10 +245,14 @@ public final class FieldCard extends Card {
 		if (state.equals(IDLE)) {
 			return;
 		}
+		boolean wasMoving = state.equals(MOVING);
 		if (projector != null) {
 			projector.release();
 		}
 		state(IDLE);
+		if (wasMoving) {
+			events.ended("move", false, why, null); // (the move it was making ends with it)
+		}
 		event("lost", why);
 	}
 

@@ -99,7 +99,7 @@ public class FieldCardGameTest {
 				helper.assertTrue(EnergyField.held(pig), "the pig is held");
 				helper.assertTrue(!card.move(args(0.0, 0.0, LIFT)).failed(), "it moves");
 			})
-			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : events.getLast(), Map.of("event", "arrived"), "its event"))
+			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : events.getLast(), Map.of("event", "move", "ok", true), "its event"))
 			.thenExecute(() -> held[0] = pig.getY())
 			.thenExecuteAfter(20, () -> {
 				helper.assertTrue(Math.abs(held[0] - start[0] - LIFT) < NEAR, "lifted " + LIFT + ": " + (held[0] - start[0]));
@@ -124,8 +124,8 @@ public class FieldCardGameTest {
 				card.capture(args(pig.getStringUUID()));
 				card.move(args(5.0)); // forward: out of the case's front (+Z), through the wall
 			})
-			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : events.getLast(), Map.of("event", "blocked", "why", "something's in the way"),
-				"its event"))
+			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : events.getLast(), Map.of("event", "move", "ok", false, "why", "blocked: minecraft:stone"),
+				"its event: what's in the way"))
 			.thenExecute(() -> helper.assertTrue(pig.getZ() < helper.absolutePos(new BlockPos(1, 1, 5)).getZ(), "the pig's this side of the wall"))
 			.thenSucceed();
 	}
@@ -152,7 +152,7 @@ public class FieldCardGameTest {
 		Pig pig = helper.spawn(EntityTypes.PIG, PIG);
 		helper.startSequence()
 			.thenExecuteAfter(2, () -> {
-				same(helper, card.capture(args(0.0, 0.0, 4.0)).error(), "nothing there", "a point with nothing near it");
+				same(helper, card.capture(args(0.0, 0.0, 4.0)).error(), "no entity", "a point with nothing near it");
 				helper.assertTrue(card.capture(args(30.0)).error().startsWith("too far"), "a point past its reach: it senses no farther"); // (whatever's there: a neighbour's)
 				card.capture(args(pig.getStringUUID()));
 				helper.assertTrue(card.move(args(0.0, 0.0, FieldCard.RANGE + 1)).error().startsWith("too far"), "a move out of its reach");

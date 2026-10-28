@@ -40,7 +40,11 @@ program written for one computer works however the computer is turned.
 The field holds one thing at a time. It lets go when told to, when what it holds is gone (it dies,
 it's picked up), when it's moved out of reach, when its computer has no power or stops its
 program, and when its world is saved and loaded (a field isn't saved). What it held then falls.
-A move that meets a block stops there: its event says it was blocked.
+A move that meets a block stops there: its event says what was in the way.
+
+The card is a [buffered device](/mcos/devices-library/#buffered-devices): it does one command at a
+time. A `capture`, `move` or `set` given while a move runs waits (in mcos, its thread only) until the
+move ends. `scan`, `get`, `pull` and `release` never wait: a program can always let go.
 
 ## In mcos
 
@@ -81,18 +85,18 @@ each `{id, name, forward, right, up, distance}`.
 
 Holds a creature or an item: an `id` from `scan`, `"self"` (a robot holding itself, legs and all), or a point
 `forward[, right[, up]]` (the nearest thing within a block and a half of it). Answers its name.
-Fails with `already holding something`, `nothing there`, `nothing with that id here`, `too far`,
-`another field holds it`, or in a block, `no robot to hold`.
+Fails with `holding` (it holds something already), `no entity` (nothing near the point),
+`no entity: <id>`, `too far: 16`, `held` (another field holds it), or in a block, `not a robot`.
 
 ### move(forward[, right[, up]]) → true, or nil and why
 
 Moves the field by that much, at 10 blocks a second, never through blocks. It answers at once; its
-event says how it went: `arrived`, or `blocked`. Fails with `holding nothing`, or `too far` (out of
-its reach, unless it holds its own robot).
+event, `move`, says how it went: `ok`, or not and why (`blocked: minecraft:stone`). Fails at once
+with `not holding`, or `too far: 16` (out of its reach, unless it holds its own robot).
 
 ### release() → true
 
-Lets what it holds go: it falls from where it is.
+Lets what it holds go: it falls from where it is. It never waits: a move under way ends, `stopped`.
 
 ### get() → {state, name, forward, right, up}
 
@@ -111,9 +115,8 @@ Its oldest event, or nil.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `arrived` | | a move got there |
-| `blocked` | `why` | a move met a block |
-| `lost` | `why` | it let go on its own: `gone`, `out of range`, `no power`, `interrupted` (its world saved and loaded) |
+| `move` | `ok`, `why` | a move ended: `ok` true when it got there; else why (`blocked: minecraft:stone`, `stopped`) |
+| `lost` | `why` | it let go on its own: `gone`, `too far: 16`, `no power`, `interrupted` (its world saved and loaded) |
 
 ## Example
 

@@ -1,6 +1,7 @@
 -- Lift a friend to a higher floor: hold the nearest player (or any creature) in the energy field,
 -- carry them up FLOORS floors and over onto the floor's edge in front of the computer, and let
--- them go there. Each move is waited for: its event says it arrived, or what stopped it.
+-- them go there. Each move is waited for: its event (move) says whether it got there, or what
+-- stopped it.
 local sys = require("sys")
 
 local FLOOR = 4 -- blocks a floor
@@ -23,8 +24,8 @@ end
 local function go(forward, up)
   assert(sys.ioctl(card, "move", forward, 0, up))
   local moved = event()
-  if moved.event ~= "arrived" then
-    print(moved.event .. ": " .. tostring(moved.why))
+  if not moved.ok then
+    print(tostring(moved.why))
     sys.ioctl(card, "release")
     os.exit(1)
   end

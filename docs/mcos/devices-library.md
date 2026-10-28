@@ -119,7 +119,8 @@ walker:join()
 A read is a command too, so it waits its turn and answers once the command before it has ended. A
 device's live state (`get`), its events (`pull`) and its `stop` never wait. A `stop` also ends every
 thread waiting to give that device a command: their calls fail with `stopped` (`ECANCELED`). Each
-command's end is an event named after its method, `ok` and, when it failed, why:
+command that runs over time (a walk, a move) ends in an event named after its method, `ok` and, when
+it failed, why (one done at once answers in its call):
 `{event = "walk", ok = false, why = "blocked: minecraft:oak_log front"}`.
 
 ## Events

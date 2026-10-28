@@ -26,7 +26,9 @@ the spec the build follows and its checklist, items marked done as they land.
   answer; an action: `true`, its outcome to come).
 - A command while another is active is refused at once with `busy`, doing nothing. A robot held in
   a field refuses commands with `held` (its robotics is frozen).
-- A command's end raises an event (news, as any device's), named after its method:
+- A command that runs over time ends in an event (news, as any device's), named after its method
+  (one done at once, a read or a `capture`, answers in its call: no event, so the stream isn't
+  noise for programs waiting on real ends; a build decision, 2026-10-28):
   `{event = "walk", ok = true}`, or `{event = "walk", ok = false, why = "blocked: minecraft:oak_log
   front"}`; one cut short by `stop` ends `ok = false, why = "stopped"`. It's also the device's "idle
   again", its interrupt pending until the event is taken.
@@ -82,8 +84,9 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
 
 ### The others
 
-- **Energy field card:** `capture`, `move`, `release`, `set` are commands; `move` ends once arrived
-  or blocked; `scan`, `get`, `pull` are free. A capture outlives the process that made it.
+- **Energy field card:** `capture`, `move`, `set` are commands; `move` ends once arrived or blocked
+  (`blocked: minecraft:stone`); `scan`, `get`, `pull` and `release` are free (a program can always
+  let go: a move under way ends `stopped`). A capture outlives the process that made it.
 - **Redstone card:** `set` is a command, ending once applied in the world (at its next tick: at most
   one change a tick), its event carrying every face (`result`); `get` is a command (it sees a `set`
   before it). Its own changes raise no per-face news; the world's still do.
@@ -103,7 +106,7 @@ Each step lands with its tests (a bug's seen failing first), the manual and AGEN
   user's): one thread running a series of blocking commands on a buffered device while another
   thread of the same process makes progress meanwhile (it isn't held up by the first's waits).
 - [x] **3. The redstone card and the piston.**
-- [ ] **4. The energy field card.**
+- [x] **4. The energy field card.**
 - [ ] **5. Robotics and the crafting card:** one command at a time, the plan, drift, `stop`, stasis,
   the field's carry, events by method, `hover` gone, dry strings; its driver; the golem's tests;
   and (the user's) a thread walking a robot through a series of blocking commands while another

@@ -27,6 +27,9 @@ import net.minecraft.world.phys.Vec3;
  * what it held falling). It moves what it holds; it's drawn round it, wherever it is.
  */
 public final class EnergyField extends Entity {
+	/** How far beyond what it holds it looks for what stopped it, in blocks. */
+	private static final double BLOCKED_PROBE = 0.5;
+
 	/** How fast it moves what it holds, in blocks a tick: ten a second (a golem walks four). */
 	public static final double SPEED = 0.5;
 	/** How near the point a move ends counts as there, in blocks. */
@@ -180,7 +183,10 @@ public final class EnergyField extends Entity {
 				listener.moved(moved.length());
 				if (moved.length() < step.length() * STOPPED) {
 					target = null;
-					listener.blocked("something's in the way");
+					// What's in the way: the block a little beyond it, the way it was going.
+					net.minecraft.core.BlockPos ahead = net.minecraft.core.BlockPos.containing(held.position()
+						.add(0, held.getBbHeight() / 2, 0).add(step.normalize().scale(held.getBbWidth() / 2 + BLOCKED_PROBE)));
+					listener.blocked("blocked: " + net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level().getBlockState(ahead).getBlock()));
 				}
 			}
 		}

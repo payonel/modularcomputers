@@ -39,7 +39,7 @@ class FieldExamplesTest extends McosHarness {
 			public Result move(double forward, double right, double up) {
 				asked.add("move " + (long) forward + " " + (long) right + " " + (long) up);
 				boolean stopped = ceiling;
-				server.add(stopped ? () -> card.blocked("something's in the way") : card::arrived);
+				server.add(stopped ? () -> card.blocked("blocked: minecraft:stone") : card::arrived);
 				return Result.ok(true);
 			}
 
@@ -79,7 +79,7 @@ class FieldExamplesTest extends McosHarness {
 		type("lua /lift.lua > /out; echo $? > /status\r");
 		untilFile(root().resolve("status"), "1\n");
 		assertThat(asked).containsExactly("capture b", "move 0 0 4", "release");
-		assertThat(read(root().resolve("out"))).isEqualTo("blocked: something's in the way\n");
+		assertThat(read(root().resolve("out"))).isEqualTo("blocked: minecraft:stone\n");
 	}
 
 	@Test

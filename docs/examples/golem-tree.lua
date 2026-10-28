@@ -54,9 +54,9 @@ local function fly(forward, up)
   if not ok then
     return false, why
   end
-  local moved = devices.event(field)
-  if moved.event ~= "arrived" then
-    return false, moved.why or moved.event
+  ok, why = devices.ended(field, "move") -- (its end: there, or why not)
+  if not ok then
+    return false, why
   end
   moves[#moves + 1] = {forward, up}
   return true
@@ -176,9 +176,9 @@ local function comeHome()
     local back = moves[i]
     local ok, why = field.move(-back[1], 0, -back[2])
     if ok then
-      local moved = devices.event(field)
-      if moved.event ~= "arrived" then
-        say("coming home, I got blocked: " .. tostring(moved.why or moved.event) .. ". I'm stuck in the air: help me down")
+      local home, stopped = devices.ended(field, "move")
+      if not home then
+        say("coming home, I got blocked: " .. tostring(stopped) .. ". I'm stuck in the air: help me down")
         return false
       end
     end
