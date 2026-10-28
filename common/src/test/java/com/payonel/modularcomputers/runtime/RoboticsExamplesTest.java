@@ -204,4 +204,25 @@ class RoboticsExamplesTest extends McosHarness {
 		untilFile(root().resolve("status"), "1\n");
 		assertThat(read(root().resolve("out"))).isEqualTo("digging with minecraft:iron_pickaxe\nstopped after 1: unbreakable\n");
 	}
+
+	@Test
+	void theThreadsProgramWalksASquareInAThreadWhileTheMainThreadGoesOn() {
+		boot();
+		file("threads.lua", example("threads-robot"));
+		type("lua /threads.lua 1 > /out; echo $? > /status\r");
+		untilFile(root().resolve("status"), "0\n");
+		assertThat(asked).containsExactly("walk 3 0 0", "turn 90", "walk 3 0 0", "turn 90", "walk 3 0 0", "turn 90", "walk 3 0 0", "turn 90");
+		assertThat(read(root().resolve("out"))).as("the main thread's count, then the walker's end").containsPattern("^1s: [0-4] sides walked\n")
+			.endsWith("back where it began\n");
+	}
+
+	@Test
+	void theThreadsProgramSaysWhatStoppedTheWalker() {
+		wallAfter = 1;
+		boot();
+		file("threads.lua", example("threads-robot"));
+		type("lua /threads.lua > /out; echo $? > /status\r");
+		untilFile(root().resolve("status"), "0\n");
+		assertThat(read(root().resolve("out"))).endsWith("stopped: blocked: minecraft:stone front\n");
+	}
 }

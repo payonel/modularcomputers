@@ -383,6 +383,12 @@ Walk somewhere and back home with `walkTo`, from its origin:
 {% include robotics-home.lua %}
 ```
 
+A robot's moves in a thread, while the main thread goes on with other work:
+
+```lua
+{% include threads-robot.lua %}
+```
+
 Walk round a square through the device's ioctls, each move waiting for the one before:
 
 ```lua

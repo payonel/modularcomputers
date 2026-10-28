@@ -63,6 +63,27 @@ In [mcos](/mcos/) a read does block: `io.read()` returns when there's a line. Th
 work, the same wait and read done for you: it puts your process to sleep until the device's
 interrupt, and gives you what the device had.
 
+## One command at a time
+
+A device that acts over time is **buffered**, as a real robot's controller runs one motion or a
+printer one job: a [robot](/devices/robotics/), an [energy field card](/devices/energy-field-card/),
+a [redstone card](/devices/redstone-card/) (a change takes effect at its next tick), a
+[robotic piston](/devices/robotic-piston/). It runs one command at a time, and a command that runs
+over time ends in an event named after its method, `{event = "walk", ok = true}` (or `ok = false`
+and why), which raises its interrupt: the device's "idle again".
+
+- **At the board**, a command given while another runs is refused at once, `false, "busy"`, doing
+  nothing: the call still never waits. Wait for the running command's end (its interrupt), then
+  give it again.
+- **Under mcos**, the kernel does that for you: a command to a busy device blocks the thread that
+  gave it, and only that thread, until the device can take it, then starts it and returns. So a
+  series of commands runs in order, and more work at once means more
+  [threads](/mcos/threads/). A device's live state (`get`), its events (`pull`) and its `stop`
+  never wait, and a `stop` also ends the threads waiting to give that device a command.
+
+A failure ends its own command only: the next one runs as any would. There's no queue to drain
+and no fault to clear.
+
 ## Why it matters
 
 A waiting computer draws the CPU's waiting rate, much less than its running rate: see

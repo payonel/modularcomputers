@@ -273,8 +273,9 @@ device data), and user code, as a real CPU runs firmware under an OS.
   data.
 - **Device methods never block** (a real device's registers don't): a method answers at once with
   what the device has (a terminal's `read` with no keys: nil), and a slow action answers once it's
-  started, its outcome an event later. `board.waitForInterrupt` is the only wait; mcos's blocking
-  reads are the kernel waiting for a process.
+  started, its outcome an event later; a buffered device given a command while one runs refuses
+  it (`busy`) rather than wait (see buffered devices, under mcos). `board.waitForInterrupt` is the
+  only wait; mcos's blocking reads and commands are the kernel waiting for a process.
 - **Device failures are soft:** no device can stop the machine; only the program's own error or the
   board's supervision (CPU gone, power gone) ends a run. External devices are hot-plugged: one
   that isn't there isn't on the bus, and calls to it fail at once.
@@ -598,8 +599,10 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   doc (so a doc begins with its signature: `walk(forward[, right]): ...`). No `/sys/devices` tree:
   the bus is flat (`sysfs.lua`). `/dev`'s names coming and going are inotify notices
   (`CREATE /dev/charger0`, udev's way), so a program waits for a device as for a file.
-- **Buffered devices** (the user's design, 2026-10-28; spec `.agents/BUFFERED.md`): a device that
-  acts over time (`Buffered`) runs one command at a time; a command while one runs is refused `busy`
+- **Buffered devices** (the user's design, 2026-10-28; its spec and build, `.agents/BUFFERED.md`):
+  a device that acts over time (`Buffered`: robotics with the crafting card, the field card, the
+  redstone card, the robotic piston; the sound and internet cards stay direct, streams with their
+  own flow control) runs one command at a time; a command while one runs is refused `busy`
   at the board (layer 0, which can't wait: a board call freezes the whole program), and mcos blocks
   the calling thread only until the device is free (devfs's `command`, asked again as each command's
   end event comes), so more work in flight means threads. Its live state, its events and `stop` are

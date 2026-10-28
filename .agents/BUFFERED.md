@@ -118,7 +118,7 @@ Each step lands with its tests (a bug's seen failing first), the manual and AGEN
   thread makes progress.
 - [x] **6. Sensors relative to their computer.**
 - [x] **7. Dry failure strings** for every device, and the tests that read them.
-- [ ] **8. The manual** (devices, concepts, tutorials, examples, the three layers), AGENTS.md's
+- [x] **8. The manual** (devices, concepts, tutorials, examples, the three layers), AGENTS.md's
   decisions.
 - [ ] **9. A deep code review** by a reviewer who didn't write it (a subagent given this spec and
   the diff: blocked threads that never wake, lost events, races between threads and devices, a

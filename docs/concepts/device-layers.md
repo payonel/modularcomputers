@@ -35,9 +35,12 @@ every program complete.
 
 ## Three rules, at every layer
 
-- **A device's methods never wait.** A call answers at once with what the device has now: a
-  redstone card's `pull` with no change gives `nil`, a robot's `walk` answers `true` as it starts.
-  See [Interrupts](/concepts/interrupts/#device-calls-never-wait).
+- **A device's methods never wait at the board.** A call answers at once with what the device has
+  now: a redstone card's `pull` with no change gives `nil`, a robot's `walk` answers `true` as it
+  starts, and a [buffered device](/concepts/interrupts/#one-command-at-a-time) given a command
+  while it runs one answers `false, "busy"`. Under mcos (layers 2 and 3) that command waits
+  instead, its thread only, until the device can take it. See
+  [Interrupts](/concepts/interrupts/#device-calls-never-wait).
 - **News is an event, and an interrupt says it's there.** A device keeps its events until they're
   taken, and its interrupt stays up while one waits (it's level-triggered), so a program never misses
   one by being busy: it waits, then takes them all.
@@ -69,7 +72,8 @@ decides who waits for what. A program uses a device's file as any file:
 
 - **`sys.open("/dev/robotics0")`** gives a file descriptor.
 - **Its ioctls are the device's methods**, by name: `sys.ioctl(fd, "walk", 3)`, answering as the method
-  does (nil and why when it fails).
+  does (nil and why when it fails). A command to a busy device blocks the calling thread until the
+  device can take it.
 - **`sys.poll({[fd] = {PRI = true}}, seconds)`** sleeps until the device has news: `PRI` is its
   interrupt, as the kernel sees it. Then `sys.ioctl(fd, "pull")` takes an event.
 - **Its text is the device too**, for the shell: `cat /dev/redstone0` reads a line a face, and
@@ -91,7 +95,8 @@ libudev is on Linux: it makes nothing new possible, only shorter to write and ea
 - **`devices.open("robotics0")`** gives the device as a table of its methods: `robot.walk(3)` is the
   file's ioctl; `pairs(robot)` lists them, and `tostring(robot.walk)` is what the method does.
 - **`devices.event(robot[, seconds])`** waits for the device's next event and takes it: the poll and
-  the pull, the loop every program writes, once.
+  the pull, the loop every program writes, once. **`devices.ended(robot, "walk")`** waits for that
+  command's end and says how it went: `true`, or `false` and why.
 - **`devices.wait("charger")`** waits for a device to come onto the bus (inotify on `/dev`), and
   **`devices.list`** and **`devices.info`** say what's there.
 

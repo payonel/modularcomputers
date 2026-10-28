@@ -34,9 +34,14 @@ print(ticker:join())                     -- true   done
   method leaves the others running.
 - **They share** the process's globals, its open files (stdin, stdout, a device's file), its directory,
   environment and signal handlers.
-- **Devices are files, so nothing is copied to each thread.** A device's events are its file's: a thread
-  waiting on `/dev/robotics0` takes the events it reads, as any reader of a file does. Two threads
-  reading one device's events share them, one each: give a device to one thread.
+- **Devices are files, so nothing is copied to each thread.** Each file open on a device gets every
+  event (two programs, or two threads that each opened it, both see them all); within one file,
+  whoever reads first takes an event, as any reader of a file does. Threads sharing one open file
+  share its events, one each: give a device's file to one thread, or open it in each.
+- **A device that does one thing at a time** (a robot, a field card: [one command at a
+  time](/concepts/interrupts/#one-command-at-a-time)) makes a thread giving it a command wait until
+  it's free, that thread only: so one thread can drive a robot through a series of moves while
+  another goes on with its work.
 - **The process ends when its main thread does**, its other threads with it, wherever they are (as
   POSIX's return from `main` does). To let a thread finish, `join` it before returning. `os.exit` in any
   thread ends the whole process.
@@ -46,6 +51,15 @@ print(ticker:join())                     -- true   done
   `false` and the error.
 - **Shared tables need a mutex** when more than one thread changes them: a thread can be stopped between
   any two instructions.
+
+## A robot's moves in a thread
+
+The walker takes the robot round a square, each move waiting for the one before and for its end,
+while the main thread goes on, saying each second how far the walk has got:
+
+```lua
+{% include threads-robot.lua %}
+```
 
 ## Functions
 

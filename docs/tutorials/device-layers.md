@@ -113,7 +113,10 @@ method's description, its arguments first (from `/sys/class/redstone/redstone0/m
 ## The same for a robot
 
 A [bot golem](/hardware/bot-golem/)'s robotics device works the same way: start a move, then take its
-event (`walk`: `ok`, or not and why). Its moves answer at once; how they went is the event.
+event (`walk`: `ok`, or not and why). Its moves answer at once; how they went is the event. It does
+[one command at a time](/concepts/interrupts/#one-command-at-a-time): at layer 1 a move given while
+one runs answers `false, "busy"` (wait for its end, then give it again); at layers 2 and 3 it waits,
+its thread only, so moves given in a row happen in order.
 
 ```lua
 -- Layer 1 (an OS of its own): its address is "exp:3", where it's soldered.
@@ -142,8 +145,8 @@ until done
 local devices = require("devices")
 local robot = assert(devices.open("robotics0"))
 robot.walk(3)
-local done = devices.event(robot)
-print(done.event, done.why)
+robot.turn("right")                  -- (waits for the walk: the robot does one at a time)
+print(devices.ended(robot, "walk"))  -- true, or false and why
 ```
 
 ## When it goes wrong

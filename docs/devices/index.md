@@ -95,7 +95,10 @@ device that writes to and reads from every terminal.
 **A call never waits**: a method answers at once with what the device has now (a terminal's `read`
 with no keys gives `nil`), and a slow action answers when it has started, its outcome coming later
 as an event. To wait for a device, use `board.waitForInterrupt`, then call it. See
-[Interrupts](/concepts/interrupts/#device-calls-never-wait).
+[Interrupts](/concepts/interrupts/#device-calls-never-wait). A device that acts over time (a robot, a
+field card, a redstone card, a robotic piston) runs [one command at a
+time](/concepts/interrupts/#one-command-at-a-time): given one while another runs, it answers
+`false, "busy"`; its running command's end event says when to give it again.
 
 A call never stops the machine. If a device is gone, or an argument is wrong, `board.invoke`
 returns `false` and a message such as `bad argument #1 (string expected, got nil)`. This manual
