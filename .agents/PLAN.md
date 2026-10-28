@@ -133,14 +133,33 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
       once a tick, in order: the game's own limit, respected), the robotic piston (its arm takes
       time), the sound card (writes queue to play; `setFormat` between them in order; its `sync()`
       method goes, `devices.sync` does it), and the internet card (the user's: fully queued, not
-      special): `request` ends once its status and headers are in, carrying them (`response` folds
-      in); `read(handle, n)` ends once data is there, carrying the next piece of the body, capped (8
-      KB, say), or `""` at its end; `close` ends once it's closed. No "false: not yet" answers.
+      special). The redstone card's `set` is one call, one tag, one event, however many faces it
+      names (the user's); its own per-face change events go (they'd report a change twice), so a
+      per-face event is the world's (a lever, a neighbour).
+    - **The internet card, call by call** (2026-10-28): a request's tag is its handle (the user's: as
+      an fd), naming it in its later calls, each with a tag of its own whose event carries its
+      payload. `request(url, method, headers[, length])` ends once its request line and headers are
+      sent; `write(tag, data)` takes what it can (capped), its event saying how much (the user's:
+      the program writes again with the rest; a body of unknown length goes chunked, `length` for a
+      server that wants `Content-Length`); `response(tag)` finishes the body and ends once the status
+      and headers are in (asking for the response ends the upload, as Java's `getInputStream`:
+      a request ending at its headers would deadlock an upload); `read(tag, n)` ends with the next
+      piece of the body (capped), `""` at its end; `close(tag)` ends it and every call still pending
+      on it (`cancelled`). No "false: not yet" answers, no card timeouts (the user's: the kernel
+      waits as long as it likes; the process closes its fd to give up). An endless stream flows at
+      the program's pace in bounded memory: a request's buffer full, its thread stops reading the
+      socket, and TCP's window stops the server. Freezable, never persistable (the user's): a save
+      lets the connection run on; an unload or a server stop ends it.
+    - **Order is the device's business** (the user's: a queue or a bag): a device may run any number
+      of tags at once, so long as results match the order of calls wherever order carries meaning
+      (a robot's commands; one request's reads, which would scramble its stream).
     - Direct: the disk (the user's: storage blocks, a user doesn't want to deal with it), the EEPROM,
       terminals, the network card (a send's outcome is decided as the server handles it), the
       Bluetooth card, the operator card, the charging pad, the sensors, and the Disk Station (the
-      user's: storage, so it blocks). Open: its jobs copy whole disks on the server thread today,
-      stalling the game; they need to run off it while the call still blocks.
+      user's: storage, so it blocks; no different from a disk's writes). A performance note for both,
+      not an API question: their host I/O runs on the server thread (a file's close writes it whole;
+      a clone a whole disk, up to 16 MB), which may stall a 50 ms tick. Measure; if it does, do the
+      I/O off the server thread while the calling program waits.
     - Large data a queued device gives comes in capped chunks, one a read.
   - **Each layer has one non-blocking call and one opt-in wait:** `board.invoke` and `board.sync`,
     `sys.ioctl` and `sys.sync`, a device's methods and `devices.sync` (all taking a timeout, giving
@@ -150,6 +169,16 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
     only the calling process (as `read` does), built on the kernel's own event handling;
     `devices.sync` wraps it. Layer 1 otherwise never blocks (the user's: a script pushes all it wants
     into queues, and syncs once).
+  - **The firmware protects programs from devices** (the user's, 2026-10-28): every tag ends in an
+    event, always, whatever happened to its device. The firmware knows every tag it gave out and
+    the device (by id) it went to, and ends itself, with `failed` and why, each one a device can no
+    longer end: a device that left the bus (its chunk unloaded, broken, taken by another board, a
+    device in another chunk that blew up while the computer's was loaded), and after a restore,
+    each tag a device no longer holds (it asks: a device that resumes its work, the robot's queue,
+    keeps its tags; one that can't, a connection, forgets, and the firmware ends them). As a
+    driver fails every outstanding command when its controller resets. So a lost device never
+    leaves a program waiting on an event; a gone device's last events are still read from where
+    its file was.
   - **No room, no tag** (the user's, 2026-10-28; io_uring's `IORING_FEAT_NODROP`): a tag is a promise
     of room for its event, counting the events waiting for the firmware and the completions already
     promised. A program that falls behind fills its device, and new calls fail at once (`false,
