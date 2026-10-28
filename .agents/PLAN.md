@@ -121,11 +121,43 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   - **Every tag ends in exactly one event:** done (`arrived`, `turned`, `crafted`...), failed
     (`blocked`, `failed`), or `cancelled`, as NVMe completes an aborted command. Today an action can
     vanish (a new walk or `hover` drops a flight with no event): that goes.
-  - **Layer 1 (`sys.ioctl`) never blocks** (the user's: every device, the sound card too, so a script
-    pushes all it wants into queues and syncs once): a call answers at once, with its tag; outcomes are events.
-    Blocking forms (issue, then wait for its own tag) are layer 2's convenience (`devices`). Open: the
-    tag's place in an ioctl's answer, which is the method's own value (an action's `true` is the
-    natural slot; a read's answer is its data).
+  - **A device is queued or direct, all its methods alike** (the user's, 2026-10-28: one rule a
+    device, never a method's, which was OpenComputers' direct and indirect calls again). A **queued**
+    device's every call goes through its queue in order and answers its tag (in `ok`'s place at
+    layer 0, the ioctl's answer at layer 1), its answer coming in its ending event, its reads too (a
+    `get` after a `set` sees the `set`); only `pull`, the events themselves, is outside. A **direct**
+    device's calls answer in the call, as today (the program frozen until the server answers), no
+    tags. A tag means an event: a call that answers no tag has no event to come.
+    - Queued: robotics (with the crafting card's actions), the energy field card, the redstone card
+      (the user's: a change in the world takes a tick, so the queue applies a face's `set` at most
+      once a tick, in order: the game's own limit, respected), the robotic piston (its arm takes
+      time), the sound card (writes queue to play; `setFormat` between them in order; its `sync()`
+      method goes, `devices.sync` does it), and the internet card (the user's: fully queued, not
+      special): `request` ends once its status and headers are in, carrying them (`response` folds
+      in); `read(handle, n)` ends once data is there, carrying the next piece of the body, capped (8
+      KB, say), or `""` at its end; `close` ends once it's closed. No "false: not yet" answers.
+    - Direct: the disk (the user's: storage blocks, a user doesn't want to deal with it), the EEPROM,
+      terminals, the network card (a send's outcome is decided as the server handles it), the
+      Bluetooth card, the operator card, the charging pad, the sensors, and the Disk Station (the
+      user's: storage, so it blocks). Open: its jobs copy whole disks on the server thread today,
+      stalling the game; they need to run off it while the call still blocks.
+    - Large data a queued device gives comes in capped chunks, one a read.
+  - **Each layer has one non-blocking call and one opt-in wait:** `board.invoke` and `board.sync`,
+    `sys.ioctl` and `sys.sync`, a device's methods and `devices.sync` (all taking a timeout, giving
+    every event taken meanwhile, in order, and the tags still out). `board.sync(seconds, tags...)`
+    is the firmware's (it knows which device each tag went to), for single-program code (EEPROMs, a
+    tutorial's own OS): it freezes the program, so mcos's kernel never uses it; `sys.sync` blocks
+    only the calling process (as `read` does), built on the kernel's own event handling;
+    `devices.sync` wraps it. Layer 1 otherwise never blocks (the user's: a script pushes all it wants
+    into queues, and syncs once).
+  - **No room, no tag** (the user's, 2026-10-28; io_uring's `IORING_FEAT_NODROP`): a tag is a promise
+    of room for its event, counting the events waiting for the firmware and the completions already
+    promised. A program that falls behind fills its device, and new calls fail at once (`false,
+    "full"` at layer 0; `nil, "full", EAGAIN` at layer 1), its interrupt saying when there's room.
+    Every tag has an event; not every event has a tag. Untagged news (a `shoved`, a sensor's) never
+    takes a tag's room: under pressure the oldest news goes, counted (`lost`), as `EventQueue` does
+    now. What a device holds counts against the program's memory, so a program short of it gets
+    `full` sooner.
   - **Everything a robot does is queued and tagged** (the user's: what depends on where it is, or on
     its hand, has an order), a motion controller's command buffer (G-code, a 3D printer's planner):
     its moves, `swing`, `use`, `swap`, `store`, `take`, `scan`, `held`, `contents`, `setPosition`,
