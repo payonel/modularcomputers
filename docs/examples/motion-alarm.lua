@@ -17,9 +17,9 @@ end
 
 while true do
   local line = motion:read("l")  -- blocks until the sensor has something to say
-  local mob, x, y, z = line:match("^(%S+) (%S+) (%S+) (%S+)$")
+  local mob, forward, right, up = line:match("^(%S+) (%S+) (%S+) (%S+)$")
   if mob then  -- (a line "lost n" says n events were dropped: nothing to sound for)
-    print(mob .. " at " .. x .. " " .. y .. " " .. z)
+    print(mob .. " " .. forward .. " forward, " .. right .. " right, " .. up .. " up")
     set(15)
     sys.sleep(PULSE)
     set(0)

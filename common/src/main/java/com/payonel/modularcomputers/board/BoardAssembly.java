@@ -568,7 +568,7 @@ public final class BoardAssembly {
 		}
 		for (Card card : cards) {
 			if (card != null) {
-				CardWorld.tick(card, level, host.pos(), level.getGameTime()); // cards work where they're installed
+				CardWorld.tick(card, level, host.pos(), frame(), level.getGameTime()); // cards work where they're installed
 			}
 		}
 		// Minecraft writes only what's marked changed (at a save, or an unload): an on machine changes
@@ -732,6 +732,12 @@ public final class BoardAssembly {
 	}
 
 	/** A card that works here: a redstone card's output changes tell its host's neighbours. */
+	/** Its computer's frame, where its cards say things are: a robot's own (its heading, its own right), else its block's. */
+	private com.payonel.modularcomputers.entity.FieldProjector.Frame frame() {
+		return host.robot() != null ? com.payonel.modularcomputers.entity.FieldProjector.Frame.of(host.robot())
+			: com.payonel.modularcomputers.entity.FieldProjector.Frame.of(net.minecraft.world.phys.Vec3.atCenterOf(host.pos()), host.front());
+	}
+
 	private Card cardHere(CardKind kind) {
 		Card card = com.payonel.modularcomputers.device.Cards.make(kind);
 		if (card instanceof com.payonel.modularcomputers.device.OperatorCard operator) {
@@ -742,11 +748,7 @@ public final class BoardAssembly {
 		card.onChange(host::markChanged);
 		card.frontFrom(() -> com.payonel.modularcomputers.device.Face.of(host.front().getName()));
 		if (card instanceof com.payonel.modularcomputers.device.FieldCard field) {
-			// Its frame is its computer's: a robot's own, else its block's.
-			field.projectorIn(new com.payonel.modularcomputers.entity.FieldProjector(field, () -> (ServerLevel) host.level(),
-				() -> host.robot() != null ? com.payonel.modularcomputers.entity.FieldProjector.Frame.of(host.robot())
-					: com.payonel.modularcomputers.entity.FieldProjector.Frame.of(net.minecraft.world.phys.Vec3.atCenterOf(host.pos()), host.front()),
-				host::robot));
+			field.projectorIn(new com.payonel.modularcomputers.entity.FieldProjector(field, () -> (ServerLevel) host.level(), this::frame, host::robot));
 		}
 		if (card instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
 			redstone.block(side -> CardWorld.redstone(cards(), side));

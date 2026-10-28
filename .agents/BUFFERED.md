@@ -116,7 +116,7 @@ Each step lands with its tests (a bug's seen failing first), the manual and AGEN
   the field's carry, events by method, `hover` gone, dry strings; its driver; the golem's tests;
   and (the user's) a thread walking a robot through a series of blocking commands while another
   thread makes progress.
-- [ ] **6. Sensors relative to their computer.**
+- [x] **6. Sensors relative to their computer.**
 - [ ] **7. Dry failure strings** for every device, and the tests that read them.
 - [ ] **8. The manual** (devices, concepts, tutorials, examples, the three layers), AGENTS.md's
   decisions.

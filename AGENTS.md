@@ -284,11 +284,16 @@ device data), and user code, as a real CPU runs firmware under an OS.
 ### Sensors and the Bluetooth card
 
 - **The audio sensor hears what a player at its block would** (the game's range for each sound):
-  the sound the game plays, by its id (`minecraft:entity.pig.ambient`), and where, relative to the
-  block; nothing else (no category). Just what the game plays, never a stand-in (the user's call,
+  the sound the game plays, by its id (`minecraft:entity.pig.ambient`), and where; nothing else
+  (no category). Just what the game plays, never a stand-in (the user's call,
   over subtitles: a skeleton's step is `entity.skeleton.step`, and the stone under it is silent). It hears every sound the server sends players
   (`ServerLevelSounds`, a mixin on `playSeededSound`) and the sounds players make of level events
   (`LevelSounds`, the client's table, kept by hand; a block broken plays its own break sound).
+- **Sensors say where in their computer's frame** (the user's, 2026-10-27): `forward, right, up`
+  from its middle, as the field card's positions (`FieldProjector.Frame`: a block's front and right
+  as `Face` names them, a robot's heading and its own right), never the world's axes, so a program
+  works however its computer is turned, a robot's as it turns. `CardWorld.tick` takes each holder's
+  frame.
 - **A Bluetooth card in a computer is a device:** its link (the board it links to) and its board
   are read and set by programs as by hand, on the card itself (its item).
 

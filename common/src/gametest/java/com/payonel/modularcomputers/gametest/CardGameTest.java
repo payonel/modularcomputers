@@ -54,6 +54,11 @@ public class CardGameTest {
 		return new Arguments(List.of(values));
 	}
 
+	/** Null-safe, as assertValueEqual isn't (a null value crashes the test server). */
+	private static void same(GameTestHelper helper, Object got, Object expected, String what) {
+		helper.assertTrue(java.util.Objects.equals(got, expected), what + ": expected " + expected + ", got " + got);
+	}
+
 	/** A face's field, as the card answers it. */
 	private static Object field(RedstoneCard card, String side, String field) {
 		return ((Map<?, ?>) ((Map<?, ?>) card.get(args()).first()).get(side)).get(field);
@@ -214,7 +219,7 @@ public class CardGameTest {
 	}
 
 	@GameTest(maxTicks = 60)
-	public void aMotionSensorSeesMobsMoveWhereRelativeToItsBlockAndNotItems(GameTestHelper helper) {
+	public void aMotionSensorSeesMobsMoveWhereInItsComputersFrameAndNotItems(GameTestHelper helper) {
 		MotionSensorCard card = computerWith(helper, ModItems.MOTION_SENSOR_CARD, MotionSensorCard.class);
 		ItemEntity drop = new ItemEntity(helper.getLevel(), helper.absolutePos(POS.east(2)).getX() + 0.5, helper.absolutePos(POS).getY() + 0.5,
 			helper.absolutePos(POS).getZ() + 0.5, new ItemStack(Items.DIAMOND));
@@ -235,14 +240,55 @@ public class CardGameTest {
 			.thenExecute(() -> {
 				helper.assertTrue(seen.stream().allMatch(e -> "minecraft:pig".equals(e.get("mob"))), "mobs only: " + seen);
 				Map<?, ?> first = seen.getFirst();
-				helper.assertValueEqual(first.keySet(), java.util.Set.of("mob", "x", "y", "z"), "which mob, and where");
-				helper.assertValueEqual(first.get("z"), -3.0, "three blocks north of it");
+				helper.assertValueEqual(first.keySet(), java.util.Set.of("mob", "forward", "right", "up"), "which mob, and where");
+				same(helper, first.get("forward"), -3.0, "three blocks north of it: behind (its front is south)");
+				same(helper, first.get("right"), 0.0, "straight behind");
+			})
+			.thenSucceed();
+	}
+
+	/** A robot's sensor says where in its own frame (its heading, its own right), so as it turns, what it sees turns with it. */
+	@GameTest(maxTicks = 120)
+	public void aGolemsMotionSensorSaysWhereInItsOwnFrameAsItTurns(GameTestHelper helper) {
+		var golem = GolemFlightGameTest.golem(helper, false); // (facing east)
+		golem.board().parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.MOTION_SENSOR_CARD));
+		BlockPos at = golem.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO));
+		var pig = helper.spawn(EntityTypes.PIG, at.east(3));
+		pig.setNoAi(true);
+		List<Map<?, ?>> seen = new ArrayList<>();
+		helper.onEachTick(() -> {
+			if (!golem.machine().isPowered()) {
+				return;
+			}
+			golem.board().cards().stream().filter(MotionSensorCard.class::isInstance).map(MotionSensorCard.class::cast).findFirst().ifPresent(card -> {
+				Object event;
+				while ((event = card.pull(args()).first()) != null) {
+					seen.add((Map<?, ?>) event);
+				}
+			});
+		});
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(!seen.isEmpty(), "saw it"))
+			.thenExecute(() -> {
+				same(helper, seen.getLast().get("forward"), 3.0, "three blocks ahead (east, its heading)");
+				same(helper, seen.getLast().get("right"), 0.0, "straight ahead");
+				helper.assertTrue(!golem.robotics().turn(args("left")).failed(), "it turns left: north");
+			})
+			.thenWaitUntil(() -> helper.assertTrue(Math.abs(net.minecraft.util.Mth.wrapDegrees(golem.getYRot() - 180)) < 1, "facing north: " + golem.getYRot()))
+			.thenExecute(() -> {
+				seen.clear();
+				pig.teleportTo(pig.getX() + 0.5, pig.getY(), pig.getZ()); // (it moves: half a block further east)
+			})
+			.thenWaitUntil(() -> helper.assertTrue(!seen.isEmpty(), "saw it move"))
+			.thenExecute(() -> {
+				same(helper, seen.getLast().get("forward"), 0.0, "beside it now");
+				same(helper, seen.getLast().get("right"), 3.5, "on its own right (east, facing north)");
 			})
 			.thenSucceed();
 	}
 
 	@GameTest(maxTicks = 60)
-	public void anAudioSensorHearsSoundsAndLevelEventsByIdWhereRelativeToItsBlockWithinTheirRange(GameTestHelper helper) {
+	public void anAudioSensorHearsSoundsAndLevelEventsByIdWhereInItsComputersFrameWithinTheirRange(GameTestHelper helper) {
 		var card = computerWith(helper, ModItems.AUDIO_SENSOR_CARD, com.payonel.modularcomputers.device.AudioSensorCard.class);
 		BlockPos near = helper.absolutePos(POS.north(3));
 		BlockPos far = helper.absolutePos(POS.north(40)); // past a sound's range at its usual volume (16 blocks)
@@ -260,7 +306,7 @@ public class CardGameTest {
 				Object event;
 				while ((event = card.pull(args()).first()) != null) {
 					// (only what this test played, north of it: tests run side by side, and it hears its neighbours' too)
-					if (((Map<?, ?>) event).get("x") instanceof Number x && x.doubleValue() == 0) {
+					if (((Map<?, ?>) event).get("right") instanceof Number right && right.doubleValue() == 0) {
 						heard.add((Map<?, ?>) event);
 					}
 				}
@@ -268,8 +314,8 @@ public class CardGameTest {
 			})
 			.thenExecute(() -> {
 				helper.assertValueEqual(heard.getFirst().get("sound"), "minecraft:entity.piglin.ambient", "the sound the game played, by its id");
-				helper.assertValueEqual(heard.getFirst().keySet(), java.util.Set.of("sound", "x", "y", "z"), "and where: nothing else");
-				helper.assertValueEqual(heard.getFirst().get("z"), -3.0, "three blocks north of it");
+				helper.assertValueEqual(heard.getFirst().keySet(), java.util.Set.of("sound", "forward", "right", "up"), "and where: nothing else");
+				same(helper, heard.getFirst().get("forward"), -3.0, "three blocks north of it: behind (its front is south)");
 				helper.assertValueEqual(heard.get(1).get("sound"), "minecraft:block.dispenser.dispense", "a level event's sound");
 			})
 			.thenSucceed();

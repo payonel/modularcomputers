@@ -83,11 +83,11 @@ class SavedStateTest {
 	void aMotionSensorKeepsItsEvents() {
 		MotionSensorCard card = new MotionSensorCard();
 		card.accepting(true); // on a running board\'s bus
-		card.sense(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", -2.0));
+		card.sense(Map.of("mob", "minecraft:pig", "forward", 1.0, "right", -2.0, "up", 0.0));
 		MotionSensorCard loaded = new MotionSensorCard();
 		loaded.restore(card.saved());
 		assertThat(loaded.interruptPending()).isTrue();
-		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", -2.0));
+		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("mob", "minecraft:pig", "forward", 1.0, "right", -2.0, "up", 0.0));
 	}
 
 	@Test

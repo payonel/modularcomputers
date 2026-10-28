@@ -50,7 +50,7 @@ class ExamplesTest extends McosHarness {
 		type("lua /alarm.lua > /tmp/out &\r");
 		untilIdle();
 		assertThat(card.output(0)).as("quiet until something moves").isZero();
-		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "forward", 1.5, "right", -3.0, "up", 0.0)));
 		settle(() -> card.output(0) == 15);
 	}
 

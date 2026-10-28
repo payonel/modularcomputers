@@ -83,9 +83,9 @@ class SensorExamplesTest extends McosHarness {
 		type("lua /census.lua &\r");
 		untilIdle();
 		server.add(() -> {
-			motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0));
-			motion.sense(Map.of("mob", "minecraft:cow", "x", 2.0, "y", 0.0, "z", 1.0));
-			motion.sense(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", -3.0));
+			motion.sense(Map.of("mob", "minecraft:pig", "forward", 1.5, "right", -3.0, "up", 0.0));
+			motion.sense(Map.of("mob", "minecraft:cow", "forward", 2.0, "right", 1.0, "up", 0.0));
+			motion.sense(Map.of("mob", "minecraft:pig", "forward", 1.0, "right", -3.0, "up", 0.0));
 		});
 		untilFile(root().resolve("home/census.txt"), "minecraft:cow 1\nminecraft:pig 2\n");
 	}
@@ -103,8 +103,8 @@ class SensorExamplesTest extends McosHarness {
 		untilIdle();
 		server.add(() -> {
 			for (int i = 0; i < 3; i++) {
-				first.sense(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", 0.0));
-				second.sense(Map.of("mob", "minecraft:pig", "x", 2.0, "y", 0.0, "z", 0.0));
+				first.sense(Map.of("mob", "minecraft:pig", "forward", 1.0, "right", 0.0, "up", 0.0));
+				second.sense(Map.of("mob", "minecraft:pig", "forward", 2.0, "right", 0.0, "up", 0.0));
 			}
 		});
 		untilFile(root().resolve("home/tally.txt"), "minecraft:pig 6\n");
@@ -120,7 +120,7 @@ class SensorExamplesTest extends McosHarness {
 		type("rc visitors start; rc visitors status > /running\r");
 		settle(() -> Files.exists(root().resolve("running")));
 		untilIdle();
-		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "forward", 1.5, "right", -3.0, "up", 0.0)));
 		settle(() -> Files.exists(root().resolve("home/visitors.log")) && read(root().resolve("home/visitors.log")).contains("minecraft:pig"));
 		type("rc visitors stop; rc visitors status > /stopped; echo $? > /status\r");
 		untilFile(root().resolve("status"), "3\n"); // (LSB's "not running")
@@ -138,7 +138,7 @@ class SensorExamplesTest extends McosHarness {
 		type("rc visitors start; rc visitors status > /running; echo $? > /up\r");
 		untilFile(root().resolve("up"), "0\n");
 		untilIdle();
-		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "forward", 1.5, "right", -3.0, "up", 0.0)));
 		settle(() -> Files.exists(root().resolve("home/visitors.log")) && read(root().resolve("home/visitors.log")).contains("minecraft:pig"));
 		type("rc visitors count > /count; rc visitors restart; rc visitors stop; rc visitors status > /stopped; echo $? > /status\r");
 		untilFile(root().resolve("status"), "3\n");
@@ -157,8 +157,8 @@ class SensorExamplesTest extends McosHarness {
 		type("lua /near.lua &\r");
 		untilIdle();
 		server.add(() -> {
-			motion.sense(Map.of("mob", "minecraft:pig", "x", 6.0, "y", 0.0, "z", 0.0));
-			motion.sense(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", 0.0)); // the nearest: 15 * 7/8
+			motion.sense(Map.of("mob", "minecraft:pig", "forward", 6.0, "right", 0.0, "up", 0.0));
+			motion.sense(Map.of("mob", "minecraft:pig", "forward", 1.0, "right", 0.0, "up", 0.0)); // the nearest: 15 * 7/8
 		});
 		settle(() -> redstone.output(UP) == 13);
 		settle(() -> redstone.output(UP) == 0); // (nothing moves: dark)
@@ -173,13 +173,13 @@ class SensorExamplesTest extends McosHarness {
 		type("lua /sounds.lua &\r");
 		untilIdle();
 		server.add(() -> {
-			audio.hear(Map.of("sound", "minecraft:entity.pig.ambient", "x", 1.0, "y", 0.0, "z", 0.0));
-			audio.hear(Map.of("sound", "minecraft:block.chest.open", "x", 2.5, "y", 0.0, "z", -1.5));
-			audio.hear(Map.of("sound", "minecraft:block.wooden_door.close", "x", 0.5, "y", 1.0, "z", 0.5));
+			audio.hear(Map.of("sound", "minecraft:entity.pig.ambient", "forward", 1.0, "right", 0.0, "up", 0.0));
+			audio.hear(Map.of("sound", "minecraft:block.chest.open", "forward", 2.5, "right", -1.5, "up", 0.0));
+			audio.hear(Map.of("sound", "minecraft:block.wooden_door.close", "forward", 0.5, "right", 0.5, "up", 1.0));
 		});
 		Path log = root().resolve("home/sounds.log");
-		untilFileHas(log, "minecraft:block.wooden_door.close 0.5 1.0 0.5\n");
-		assertThat(read(log)).contains(" minecraft:block.chest.open 2.5 0.0 -1.5\n").doesNotContain("pig");
+		untilFileHas(log, "minecraft:block.wooden_door.close 0.5 0.5 1.0\n");
+		assertThat(read(log)).contains(" minecraft:block.chest.open 2.5 -1.5 0.0\n").doesNotContain("pig");
 		assertThat(read(log).split("\n")).hasSize(2);
 	}
 
@@ -187,14 +187,15 @@ class SensorExamplesTest extends McosHarness {
 	void thePointerLightsTheFaceTowardTheLastSound() {
 		AudioSensorCard audio = new AudioSensorCard();
 		devices.put(Motherboard.exp(0), audio);
+		redstone.frontFrom(() -> com.payonel.modularcomputers.device.Face.EAST); // (its block faces east: back is west)
 		devices.put(Motherboard.exp(1), redstone);
 		boot();
 		file("pointer.lua", example("audio-pointer"));
 		type("lua /pointer.lua &\r");
 		untilIdle();
-		server.add(() -> audio.hear(Map.of("sound", "minecraft:entity.cow.ambient", "x", -3.0, "y", 0.0, "z", 1.0)));
+		server.add(() -> audio.hear(Map.of("sound", "minecraft:entity.cow.ambient", "forward", -3.0, "right", 1.0, "up", 0.0)));
 		settle(() -> redstone.output(WEST) == 15);
-		server.add(() -> audio.hear(Map.of("sound", "minecraft:entity.bat.ambient", "x", 1.0, "y", 5.0, "z", 0.0)));
+		server.add(() -> audio.hear(Map.of("sound", "minecraft:entity.bat.ambient", "forward", 1.0, "right", 0.0, "up", 5.0)));
 		settle(() -> redstone.output(UP) == 15 && redstone.output(WEST) == 0);
 	}
 

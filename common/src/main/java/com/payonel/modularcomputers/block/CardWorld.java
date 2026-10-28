@@ -7,6 +7,7 @@ import com.payonel.modularcomputers.device.NetworkCard;
 import com.payonel.modularcomputers.device.RedstoneCard;
 import com.payonel.modularcomputers.device.SoundCard;
 import com.payonel.modularcomputers.device.WeatherCard;
+import com.payonel.modularcomputers.entity.FieldProjector.Frame;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -53,16 +54,21 @@ public final class CardWorld {
 	private CardWorld() {
 	}
 
-	/** Where a motion sensor is, and the mobs it saw last, where. */
+	/** Where a motion sensor is (and its computer's frame), and the mobs it saw last, where. */
 	private static final class Watch {
 		ServerLevel level;
 		BlockPos pos;
+		Frame frame;
 		long seen;
 		final Map<UUID, double[]> entities = new HashMap<>();
 	}
 
-	/** Each server tick, for each card in the block at {@code pos}. A card works while a running computer powers it. */
-	public static void tick(Card card, ServerLevel level, BlockPos pos, long now) {
+	/**
+	 * Each server tick, for each card in the block at {@code pos}, its computer's {@code frame} (a
+	 * robot's own, else its block's: where its sensors say things are). A card works while a running
+	 * computer powers it.
+	 */
+	public static void tick(Card card, ServerLevel level, BlockPos pos, Frame frame, long now) {
 		if (card instanceof NetworkCard network) {
 			network(network, level, pos, now); // (on or off: one listening for a wake hears while its computer's off)
 		}
@@ -102,12 +108,14 @@ public final class CardWorld {
 				Watch watch = LISTENING.computeIfAbsent(audio, a -> new Watch());
 				watch.level = level;
 				watch.pos = pos;
+				watch.frame = frame;
 				watch.seen = now;
 			}
 			case MotionSensorCard motion -> {
 				Watch watch = WATCHING.computeIfAbsent(motion, m -> new Watch());
 				watch.level = level;
 				watch.pos = pos;
+				watch.frame = frame;
 				watch.seen = now;
 				if (now % MOTION_TICKS == 0) {
 					entities(motion, watch);
@@ -196,7 +204,7 @@ public final class CardWorld {
 			}
 			Map<String, Object> event = new LinkedHashMap<>();
 			event.put("mob", BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString());
-			event.putAll(where(watch.pos, at[0], at[1], at[2]));
+			event.putAll(watch.frame.local(new net.minecraft.world.phys.Vec3(at[0], at[1], at[2])));
 			motion.sense(event);
 		}
 		watch.entities.clear();
@@ -223,7 +231,7 @@ public final class CardWorld {
 			}
 			Map<String, Object> event = new LinkedHashMap<>();
 			event.put("sound", sound.location().toString());
-			event.putAll(where(watch.pos, x, y, z));
+			event.putAll(watch.frame.local(new net.minecraft.world.phys.Vec3(x, y, z)));
 			entry.getKey().hear(event);
 		}
 	}
@@ -250,12 +258,4 @@ public final class CardWorld {
 		}
 	}
 
-	/** Where something is, relative to the block (its center), to a tenth of a block. */
-	private static Map<String, Object> where(BlockPos pos, double x, double y, double z) {
-		Map<String, Object> event = new LinkedHashMap<>();
-		event.put("x", Math.round((x - pos.getX() - 0.5) * 10) / 10.0);
-		event.put("y", Math.round((y - pos.getY() - 0.5) * 10) / 10.0);
-		event.put("z", Math.round((z - pos.getZ() - 0.5) * 10) / 10.0);
-		return event;
-	}
 }

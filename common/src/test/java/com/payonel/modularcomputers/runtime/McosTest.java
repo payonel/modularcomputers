@@ -384,12 +384,12 @@ class McosTest extends McosHarness {
 		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
 		devices.put(Motherboard.exp(0), motion);
 		boot();
-		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "forward", 1.5, "right", -3.0, "up", 0.0)));
 		type("head -n 1 /dev/motion0 > /dev/null; dmesg > /d; dmesg -C; dmesg > /e; touch /done\r");
 		untilFile(root().resolve("done"), "");
 		String log = read(root().resolve("d"));
 		assertThat(log).as("a device joining").containsPattern("motion0 +" + "[0-9a-f-]+ +attached: motion at exp:0");
-		assertThat(log).as("its event").contains("mob=minecraft:pig x=1.5 y=0.0 z=-3.0");
+		assertThat(log).as("its event").contains("forward=1.5 mob=minecraft:pig right=-3.0 up=0.0");
 		assertThat(log).as("a mount").contains("mount");
 		assertThat(log).as("plain into a file: no colors").doesNotContain("\u001b[");
 		assertThat(log.lines().findFirst().orElse("")).as("[time] first").matches("\\[\\d\\d:\\d\\d:\\d\\d\\] .*");
@@ -757,9 +757,9 @@ class McosTest extends McosHarness {
 		boot();
 		type("head -n 1 /dev/hearing0 > /h; touch /done\r");
 		untilIdle(); // head waits: nothing was heard
-		server.add(() -> audio.hear(Map.of("sound", "minecraft:entity.pig.ambient", "x", 1.5, "y", 0.0, "z", -3.0)));
+		server.add(() -> audio.hear(Map.of("sound", "minecraft:entity.pig.ambient", "forward", 1.5, "right", -3.0, "up", 0.0)));
 		untilFile(root().resolve("done"), "");
-		assertThat(read(root().resolve("h"))).isEqualTo("minecraft:entity.pig.ambient 1.5 0.0 -3.0\n");
+		assertThat(read(root().resolve("h"))).isEqualTo("minecraft:entity.pig.ambient 1.5 -3.0 0.0\n");
 	}
 
 	@Test
@@ -790,12 +790,12 @@ class McosTest extends McosHarness {
 		type("head -n 2 /dev/motion0 > /m; touch /done\r");
 		untilIdle(); // head waits: nothing has moved
 		assertThat(root().resolve("done")).doesNotExist();
-		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
-		server.add(() -> motion.sense(Map.of("mob", "minecraft:zombie", "x", 0.0, "y", 0.0, "z", 2.0)));
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "forward", 1.5, "right", -3.0, "up", 0.0)));
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:zombie", "forward", 0.0, "right", 2.0, "up", 0.0)));
 		untilFile(root().resolve("done"), "");
 		String[] lines = read(root().resolve("m")).split("\n");
 		assertThat(lines).hasSize(2);
-		assertThat(lines).containsExactly("minecraft:pig 1.5 0.0 -3.0", "minecraft:zombie 0.0 0.0 2.0");
+		assertThat(lines).containsExactly("minecraft:pig 1.5 -3.0 0.0", "minecraft:zombie 0.0 2.0 0.0");
 	}
 
 	@Test
@@ -805,8 +805,8 @@ class McosTest extends McosHarness {
 		boot();
 		type("cat /dev/motion0 | head -n 1 > /m\r"); // (head ends at its line; cat goes on until it writes again)
 		untilIdle();
-		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
-		untilFile(root().resolve("m"), "minecraft:pig 1.5 0.0 -3.0\n");
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "forward", 1.5, "right", -3.0, "up", 0.0)));
+		untilFile(root().resolve("m"), "minecraft:pig 1.5 -3.0 0.0\n");
 	}
 
 	@Test
@@ -814,12 +814,12 @@ class McosTest extends McosHarness {
 		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
 		devices.put(Motherboard.exp(0), motion); // (a card in a slot, as in a case)
 		boot();
-		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0))); // (before tail starts)
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "forward", 1.5, "right", -3.0, "up", 0.0))); // (before tail starts)
 		untilIdle();
 		type("tail -f /dev/motion0 | head -n 2 > /m\r"); // (head ends at its second line; tail goes on, as GNU's, until it writes again)
 		untilIdle(); // tail shows the one waiting and follows
-		server.add(() -> motion.sense(Map.of("mob", "minecraft:zombie", "x", 0.0, "y", 0.0, "z", 2.0)));
-		untilFile(root().resolve("m"), "minecraft:pig 1.5 0.0 -3.0\nminecraft:zombie 0.0 0.0 2.0\n");
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:zombie", "forward", 0.0, "right", 2.0, "up", 0.0)));
+		untilFile(root().resolve("m"), "minecraft:pig 1.5 -3.0 0.0\nminecraft:zombie 0.0 2.0 0.0\n");
 	}
 
 	@Test
@@ -970,9 +970,9 @@ class McosTest extends McosHarness {
 			""");
 		type("lua /m.lua; touch /done\r");
 		settle(() -> Files.isRegularFile(root().resolve("started")));
-		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.5, "y", 0.0, "z", -3.0)));
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "forward", 1.5, "right", -3.0, "up", 0.0)));
 		untilFile(root().resolve("done"), "");
-		assertThat(read(root().resolve("m"))).isEqualTo("true minecraft:pig 1.5 0.0 -3.0");
+		assertThat(read(root().resolve("m"))).isEqualTo("true minecraft:pig 1.5 -3.0 0.0");
 	}
 
 	@Test
@@ -1019,7 +1019,7 @@ class McosTest extends McosHarness {
 		type("lua /p.lua 2> /err; touch /done\r");
 		untilIdle();
 		assertThat(Files.exists(root().resolve("done")) ? read(root().resolve("err")) : "").as("still waiting").isEmpty();
-		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", 0.0)));
+		server.add(() -> motion.sense(Map.of("mob", "minecraft:pig", "forward", 1.0, "right", 0.0, "up", 0.0)));
 		settle(() -> server.isEmpty());
 		untilIdle();
 		server.add(() -> card.sense(3, 9));

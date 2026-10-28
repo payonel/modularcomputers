@@ -88,6 +88,12 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 	}
 
 	/** A card that works here, at the hub: a redstone card's output changes update the hub's neighbours. */
+	/** Its frame, where its cards say things are: its center, its front, its right as someone facing its front sees it. */
+	private com.payonel.modularcomputers.entity.FieldProjector.Frame frame() {
+		return com.payonel.modularcomputers.entity.FieldProjector.Frame.of(net.minecraft.world.phys.Vec3.atCenterOf(worldPosition),
+			getBlockState().getValue(ExpansionHubBlock.FACING));
+	}
+
 	private Card cardHere(com.payonel.modularcomputers.device.CardKind kind) {
 		Card card = com.payonel.modularcomputers.device.Cards.make(kind);
 		if (card instanceof com.payonel.modularcomputers.device.OperatorCard operator) {
@@ -100,8 +106,7 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 		card.frontFrom(() -> com.payonel.modularcomputers.device.Face.of(getBlockState().getValue(ExpansionHubBlock.FACING).getName()));
 		if (card instanceof com.payonel.modularcomputers.device.FieldCard field) {
 			field.projectorIn(new com.payonel.modularcomputers.entity.FieldProjector(field, () -> (net.minecraft.server.level.ServerLevel) level,
-				() -> com.payonel.modularcomputers.entity.FieldProjector.Frame.of(net.minecraft.world.phys.Vec3.atCenterOf(worldPosition),
-					getBlockState().getValue(ExpansionHubBlock.FACING)), () -> null));
+				this::frame, () -> null));
 		}
 		if (card instanceof com.payonel.modularcomputers.device.RedstoneCard redstone) {
 			redstone.block(side -> CardWorld.redstone(java.util.Arrays.stream(devices).filter(java.util.Objects::nonNull).toList(), side));
@@ -149,7 +154,7 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 	void serverTick() {
 		for (Card card : devices) {
 			if (card != null) {
-				CardWorld.tick(card, (net.minecraft.server.level.ServerLevel) level, worldPosition, level.getGameTime());
+				CardWorld.tick(card, (net.minecraft.server.level.ServerLevel) level, worldPosition, frame(), level.getGameTime());
 			}
 		}
 	}

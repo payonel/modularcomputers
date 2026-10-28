@@ -33,10 +33,11 @@ computer powers it.
 `/dev/hearing0` (`hearing1` for the next) is a read-only file, an event a line:
 
 ```
-minecraft:entity.pig.ambient 1.5 0.0 -3.0
+minecraft:entity.pig.ambient 1.5 -3.0 0.0
 ```
 
-That is `sound x y z`. A read with nothing waiting waits for the next event, and `poll` reports the
+That is `sound forward right up`: the sound's id, and where it came from, in blocks, from its
+computer's middle (1.5 ahead and 3 to its left). A read with nothing waiting waits for the next event, and `poll` reports the
 file readable (`IN`) while one waits. When events were dropped, a line `lost n` comes before the
 next one. Opening it to write fails with `EACCES`.
 
@@ -49,10 +50,11 @@ The file's ioctls are the sensor's methods, by name, in any open mode:
 sensor that is gone answers `ENODEV`. `setLabel` labels it, as for any device (see
 [The sys library](/mcos/sys-api/)).
 
-The file and `pull` take from the same buffer, in order: an event read from the file is gone from
-`pull`, and the other way round. Polling loses nothing: an event a poll found waiting is the next
-one `pull` answers (or the next line read), so a program can wait with `sys.poll` and then take
-events with `pull` until it answers nil.
+Each file open on the sensor gets every event (a program and a `tail -f` each see them all).
+Within one file, its lines and `pull` take from the same events, in order: an event read as a line
+is gone from that file's `pull`, and the other way round. Polling loses nothing: an event a poll
+found waiting is the next one `pull` answers (or the next line read), so a program can wait with
+`sys.poll` and then take events with `pull` until it answers nil.
 
 ## Methods
 
@@ -63,7 +65,7 @@ taken once.
 
 <!-- lua-fragment -->
 ```lua
-local event = sys.ioctl(fd, "pull")  -- {sound = "minecraft:entity.pig.ambient", x = 1.5, y = 0.0, z = -3.0}
+local event = sys.ioctl(fd, "pull")  -- {sound = "minecraft:entity.pig.ambient", forward = 1.5, right = -3.0, up = 0.0}
 ```
 
 ## Events
@@ -71,12 +73,17 @@ local event = sys.ioctl(fd, "pull")  -- {sound = "minecraft:entity.pig.ambient",
 | Field | Value |
 |---|---|
 | `sound` | the sound's id |
-| `x`, `y`, `z` | where it came from, relative to the block's center, in blocks, to one decimal place |
+| `forward`, `right`, `up` | where it came from, from its computer's middle, in its frame, in blocks, to one decimal place |
 | `lost` | present when events were dropped: how many |
 
 Each sound heard raises the sensor's interrupt, which stays raised while any wait. At most 32 wait. When more come, the oldest goes and the next event carries `lost`. Events are kept
-across a save, and dropped while no program runs. The directions are the world's. A
-[sound card](/devices/sound-card/) starting to play is heard once at its start.
+across a save, and dropped while no program runs. A [sound card](/devices/sound-card/) starting to
+play is heard once at its start.
+
+Where is in its computer's frame, as an [energy field card](/devices/energy-field-card/)'s
+positions are: `forward` out of its front, `right` as someone facing the front sees it (as every
+[face](/concepts/faces/) is named), and `up`; in a [Bot Golem](/hardware/bot-golem/), its own
+heading and its own right. So a program written for one computer works however it's turned.
 
 ## Examples
 

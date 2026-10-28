@@ -31,11 +31,11 @@ running computer powers it.
 `/dev/motion0` (`motion1` for the next) is a read-only file, an event a line:
 
 ```
-minecraft:pig 1.5 0.0 -3.0
+minecraft:pig 1.5 -3.0 0.0
 ```
 
-That is `mob x y z`: the entity's type and where it is, in blocks, relative to the sensor's block
-(its center). A read with nothing waiting waits for the next event, as a keyboard does, and `poll`
+That is `mob forward right up`: the entity's type and where it is, in blocks, from its computer's
+middle (1.5 ahead and 3 to its left). A read with nothing waiting waits for the next event, as a keyboard does, and `poll`
 reports the file readable (`IN`) while one waits. When events were dropped, a line `lost n` comes
 before the next one. Opening it to write fails with `EACCES`.
 
@@ -49,10 +49,11 @@ The file's ioctls are the sensor's methods, by name, in any open mode:
 sensor that is gone answers `ENODEV`. `setLabel` labels it, as for any device (see
 [The sys library](/mcos/sys-api/)).
 
-The file and `pull` take from the same buffer, in order: an event read from the file is gone from
-`pull`, and the other way round. Polling loses nothing: an event a poll found waiting is the next
-one `pull` answers (or the next line read), so a program can wait with `sys.poll` and then take
-events with `pull` until it answers nil.
+Each file open on the sensor gets every event (a program and a `tail -f` each see them all).
+Within one file, its lines and `pull` take from the same events, in order: an event read as a line
+is gone from that file's `pull`, and the other way round. Polling loses nothing: an event a poll
+found waiting is the next one `pull` answers (or the next line read), so a program can wait with
+`sys.poll` and then take events with `pull` until it answers nil.
 
 ## Methods
 
@@ -63,7 +64,7 @@ once.
 
 <!-- lua-fragment -->
 ```lua
-local event = sys.ioctl(fd, "pull")  -- {mob = "minecraft:pig", x = 1.5, y = 0.0, z = -3.0}
+local event = sys.ioctl(fd, "pull")  -- {mob = "minecraft:pig", forward = 1.5, right = -3.0, up = 0.0}
 ```
 
 ## Events
@@ -71,15 +72,17 @@ local event = sys.ioctl(fd, "pull")  -- {mob = "minecraft:pig", x = 1.5, y = 0.0
 | Field | Value |
 |---|---|
 | `mob` | the entity's type, such as `minecraft:pig` |
-| `x`, `y`, `z` | its position relative to the block's center, in blocks, to one decimal place (floats) |
+| `forward`, `right`, `up` | where it is from its computer's middle, in its frame, in blocks, to one decimal place (floats) |
 | `lost` | present when events were dropped: how many |
 
 Each event raises the sensor's interrupt, which stays raised while any wait. The sensor keeps at most
 32 events. When it is full the oldest goes, and the next event says how many
 were lost. Events are kept across a save, and dropped while no program runs.
 
-The coordinates are the world's (not relative to the block's front). `x` grows east, `y` up and `z`
-south.
+Where is in its computer's frame, as an [energy field card](/devices/energy-field-card/)'s
+positions are: `forward` out of its front, `right` as someone facing the front sees it (as every
+[face](/concepts/faces/) is named), and `up`; in a [Bot Golem](/hardware/bot-golem/), its own
+heading and its own right. So a program written for one computer works however it's turned.
 
 ## Examples
 
@@ -91,7 +94,7 @@ local line = f:read("l")  -- blocks until the sensor has an event
 print("something moved: " .. line)
 ```
 
-`read("l")` waits until the sensor has an event, then returns it as `mob x y z`. Run it with
+`read("l")` waits until the sensor has an event, then returns it as `mob forward right up`. Run it with
 `lua /watch.lua`.
 
 ### An alarm that never stops watching

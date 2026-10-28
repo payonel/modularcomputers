@@ -55,7 +55,7 @@ class DeviceInterruptsTest {
 			((WeatherCard) device).sense("clear");
 			((WeatherCard) device).sense("rain"); // (a change is an event, not the first look)
 		}),
-		Map.entry(MotionSensorCard.class, device -> ((MotionSensorCard) device).sense(Map.of("mob", "minecraft:pig", "x", 1.0, "y", 0.0, "z", 0.0))),
+		Map.entry(MotionSensorCard.class, device -> ((MotionSensorCard) device).sense(Map.of("mob", "minecraft:pig", "forward", 1.0, "right", 0.0, "up", 0.0))),
 		Map.entry(com.payonel.modularcomputers.device.SoundCard.class, device -> {
 			var card = (com.payonel.modularcomputers.device.SoundCard) device;
 			card.write(new com.payonel.modularcomputers.runtime.Arguments(List.of("x".repeat(20_000)))); // more than fits: refused
@@ -72,7 +72,7 @@ class DeviceInterruptsTest {
 			card.tick(); // (its block's tick: its interrupt)
 		}),
 		Map.entry(com.payonel.modularcomputers.device.AudioSensorCard.class, device -> ((com.payonel.modularcomputers.device.AudioSensorCard) device)
-			.hear(Map.of("sound", "minecraft:entity.pig.ambient", "x", 1.0, "y", 0.0, "z", 0.0))),
+			.hear(Map.of("sound", "minecraft:entity.pig.ambient", "forward", 1.0, "right", 0.0, "up", 0.0))),
 		Map.entry(NetworkCard.class, device -> {
 			NetworkCard card = (NetworkCard) device;
 			card.place(WORLD, net.minecraft.core.BlockPos.ZERO, 0);

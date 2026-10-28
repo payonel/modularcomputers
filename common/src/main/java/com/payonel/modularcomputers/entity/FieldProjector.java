@@ -41,7 +41,7 @@ public final class FieldProjector implements FieldCard.Projector {
 		}
 
 		/** Where a point in the world is in the frame: forward, right, up, to a tenth. */
-		Map<String, Object> local(Vec3 at) {
+		public Map<String, Object> local(Vec3 at) {
 			Vec3 d = at.subtract(origin);
 			Map<String, Object> where = new LinkedHashMap<>();
 			where.put("forward", tenth(d.dot(forward)));
