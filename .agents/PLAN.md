@@ -179,6 +179,30 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
     driver fails every outstanding command when its controller resets. So a lost device never
     leaves a program waiting on an event; a gone device's last events are still read from where
     its file was.
+  - **Events: tags identify, names describe** (the user's, 2026-10-28): a completion's event is named
+    after its method (`{event = "walk", tag, ...}`; today's `arrived`, `turned`... go), ending in
+    `failed` (with why) or `cancelled` instead, so no method may be named either. A completion always
+    has a tag and news never does, so a news name may match a method's without confusion; the
+    issuing program knows each tag's method, so `failed` carries no `method` field.
+  - **Who gets which event, in mcos:** within one fd (a process's threads sharing it), whoever reads
+    first (the user's: a race in the program is the program's, as a deadlock it writes); across fds,
+    a completion goes to the fd that issued its tag, and news to every fd with the device open
+    (Linux's evdev gives each client every event; io_uring a completion to its ring). The kernel's,
+    in devfs (a tag-to-fd table, a copy of news a file): the firmware knows no fds.
+  - **Closing an fd cancels no command** (the user's: sent and gone; a walk runs to its end), but the
+    kernel closes what an fd's calls opened and nothing else ends (an internet request, a
+    connection: as closing a socket's fd does), its pending calls ending `cancelled`. Today's leak
+    of that is a bug, fixed apart from this plan.
+  - **The rest, as proposed:** a queued device's `/dev` file's read blocks only the reading process
+    until its event (the driver issues the call); `stop()` works in stasis (a queue operation, not a
+    motion: the commands end `cancelled`, the golem stays held); a device's kind shows in `/sys` and
+    its manual page (at layer 1 a tag and a direct answer can both be numbers); `dmesg` logs an
+    event's name, tag and size, never its data; a sound card's `write` is all or nothing (accepted
+    whole if it fits, `full` if not); a reboot drops every device's queue, as power-off does (the
+    tag counter starts again).
+  - **To rewrite when built:** `lib/http.lua`, `wget`, `curl`, `aplay` (the sound card's `sync`), the
+    robotics and redstone drivers, `lib/devices.lua`, the manual's examples and its three-layer
+    pages, and the tests that read today's event names.
   - **No room, no tag** (the user's, 2026-10-28; io_uring's `IORING_FEAT_NODROP`): a tag is a promise
     of room for its event, counting the events waiting for the firmware and the completions already
     promised. A program that falls behind fills its device, and new calls fail at once (`false,
