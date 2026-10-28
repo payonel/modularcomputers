@@ -169,7 +169,7 @@ public final class FieldProjector implements FieldCard.Projector {
 				card.lost(why);
 			}
 		})) {
-			return Result.fail("held");
+			return Result.fail("captured"); // (another field holds it: not "held", the robot's wait)
 		}
 		level.get().addFreshEntity(made);
 		field = made;

@@ -19,6 +19,12 @@ public final class EventQueue {
 	/** Whether its card takes data now: events that come while it doesn't are dropped. */
 	private final java.util.function.BooleanSupplier accepting;
 	private long lost;
+	/**
+	 * What it holds came with a load, its program's (going on): the first reset after it (the card
+	 * joining its computer's bus, a hub's chunk loading after the computer's) keeps it, as a save
+	 * isn't a power cut; any reset after that clears. Its program taking or adding events ends it.
+	 */
+	private boolean restored;
 
 	public EventQueue(InterruptLine line, Runnable changed, java.util.function.BooleanSupplier accepting) {
 		this.line = line;
@@ -30,6 +36,7 @@ public final class EventQueue {
 		if (!accepting.getAsBoolean()) {
 			return; // its card takes no data now
 		}
+		restored = false;
 		if (events.size() >= CAPACITY) {
 			events.removeFirst();
 			lost++;
@@ -77,6 +84,7 @@ public final class EventQueue {
 	}
 
 	public Map<String, Object> pull() {
+		restored = false;
 		Map<String, Object> event = events.pollFirst();
 		if (event != null) {
 			changed.run();
@@ -89,13 +97,23 @@ public final class EventQueue {
 		return !events.isEmpty();
 	}
 
-	public void clear() {
+	/**
+	 * Its card was reset (its program's gone, or it joined a bus): its events go, and true; but the
+	 * first reset after a load keeps them (they're the saved program's), false, so its card keeps
+	 * what it restored too (a command under way's end).
+	 */
+	public boolean clear() {
+		if (restored) {
+			restored = false;
+			return false;
+		}
 		if (events.isEmpty() && lost == 0) {
-			return; // nothing changed
+			return true; // nothing changed
 		}
 		events.clear();
 		lost = 0;
 		changed.run();
+		return true;
 	}
 
 	/** What it holds, to save: the events waiting, and how many were lost since the last kept. */
@@ -116,5 +134,6 @@ public final class EventQueue {
 			}
 		}
 		lost = saved.get("lost") instanceof Long n ? n : 0;
+		restored = true;
 	}
 }

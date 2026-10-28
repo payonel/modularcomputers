@@ -45,7 +45,9 @@ waits for it. A failure ends that command only: the next one runs as any would.
 Four methods never wait: `get` (what it's doing now, and where it really is), `pull` (its events),
 `stop` (it stops at once), and `set` (it does an action as its method would, waiting as it would,
 but a stop at once). Under the board's own calls, a command while another runs is refused at once
-with `busy`, doing nothing (mcos turns that into the wait).
+with `busy`, doing nothing (mcos turns that into the wait); while a [crafting
+card](/devices/crafting-card/)'s craft keeps it busy, the refusal names that card too
+(`false, "busy", "id:..."`), as its end is the one to wait for.
 
 ## Its plan
 
@@ -54,13 +56,21 @@ right angle. `walk(1)` twice is two blocks from where the first began, whatever 
 If something knocks it off its plan (a shove, in the air), it **drifts**: it says so (`shoved`, with
 how far), and the next command that depends on where it is (a move, a turn, a scan, its hand's
 actions) first takes it back to its plan (`returning`), then runs. Hovering on its thrusters it
-holds its plan as a drone does: shoved, it flies back by itself. `position` gives its plan; `get`
-gives where it really is, and its drift.
+holds its plan as a drone does: shoved, it flies back by itself. If it can't get back (no path), it
+says so once (`return`, not `ok`, and why), holds where it is, and a positional command given then
+fails with why. `position` gives its plan; `get` gives where it really is, and its drift.
+
+A fall it didn't ask for, on its legs (a block gone from under it, a trapdoor it opened), isn't a
+drift: while it falls it's busy (`falling`), and once down its plan follows it down, and it says so
+(`fell`, and how far), so a robot digging down goes on from where it landed.
 
 `stop` stops it at once, where it is: no centering, no squaring up. The command running ends
-`stopped`, and every thread waiting to give it a command is told so (`ECANCELED`): a stop stops the
-plan a program's threads were feeding it. Its plan doesn't move, so the next positional command
-takes it back to its plan first.
+`stopped` (a crafting card's craft too), and every thread waiting to give it a command is told so
+(`ECANCELED`): a stop stops the plan a program's threads were feeding it. Its plan becomes where it
+stopped: in the air the point it's at (it hovers there, holding it), on its legs the block it's
+nearest, so the next positional command steps onto that block's middle first, never back to where
+the stopped command began. A command cut short by a world's save and load (`interrupted`) plans the
+same way.
 
 ## Held in a field
 
@@ -78,7 +88,7 @@ with the field's moves (it can't look while it's held), and set down on the ledg
 ## In mcos
 
 `/dev/robotics0` reads as what it's doing now, a word (`idle`, `walking`, `turning`, `breaking`,
-`flying`, `hovering`, `landing`, `returning`, `crafting` or `held`), then where it really is, a
+`flying`, `hovering`, `landing`, `returning`, `crafting`, `falling` or `held`), then where it really is, a
 line: `position forward right up heading`, its plan, `planned forward right up heading`, and when
 it's off its plan, `drift forward right up`. A line written is an action, as a command (a line
 given while one runs waits for it, the writing thread only; a `stop` never waits):
@@ -158,10 +168,10 @@ angle from its origin's.
 ### stop() → {forward, right, up, heading}
 
 Stops what it's doing at once, where it is, with no centering (flying, it hovers there; a block it
-was breaking is left as it is): the command running ends, `stopped`, and in mcos so does every
-thread's wait to give it a command (`ECANCELED`). Never waits. Answers where it really stopped,
-from its origin. Its plan and its origin stay, so its next positional command goes back to its plan
-first.
+was breaking is left as it is; a crafting card's craft ends too): the command running ends,
+`stopped`, and in mcos so does every thread's wait to give it a command (`ECANCELED`). Never waits.
+Answers where it really stopped, from its origin. Its plan becomes where it stopped (on its legs, the
+block it's nearest: its next positional command steps onto its middle first).
 
 ### position() → {forward, right, up, heading}
 
@@ -280,7 +290,7 @@ into an inventory, its own `use` too.
 ### get() → {state, legs, pathfinding, position, planned, drift}
 
 Live, never waiting: what it's doing now (`idle`, `walking`, `turning`, `breaking`, `flying`,
-`hovering`, `landing`, `returning`, `crafting` or `held`), whether it stands on its legs, whether it
+`hovering`, `landing`, `returning`, `crafting`, `falling` or `held`), whether it stands on its legs, whether it
 finds its way round things, where it really is and its plan (each as `position` gives it), and how
 far it's off its plan (`{forward, right, up}`; none when it's on it). It answers while a field
 holds it too: a program can follow the carry.
@@ -355,8 +365,9 @@ round things too.
 | `event` | Other fields | When |
 |---|---|---|
 | `walk`, `walkTo`, `fly`, `flyTo`, `turn`, `land`, `swing` | `ok`, `why`, `result` | that command ended: `ok`, or not and why (`stopped` when a `stop` cut it short; `interrupted` when its world was saved during it); a swing's `result` is `{block, kept, dropped}` |
-| `return` | `ok`, `why` | its way back to its plan ended (after a shove, or before a positional command) |
+| `return` | `ok`, `why` | its way back to its plan ended (after a shove, or before a positional command), or couldn't start (`no path`) |
 | `shoved` | `drift` (`{forward, right, up}`) | something knocked it off its plan |
+| `fell` | `by` (blocks) | it came down on its legs from a fall it didn't ask for: its plan followed it |
 | `frozen` | | a field took hold of it: its robotics paused |
 | `thawed` | | the field let go and it's down: its robotics back, its origin carried |
 

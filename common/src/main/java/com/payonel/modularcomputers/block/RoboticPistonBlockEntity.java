@@ -35,6 +35,9 @@ public final class RoboticPistonBlockEntity extends CardHolderBlockEntity {
 			if (level == null || level.isClientSide() || direction == null) {
 				return failed;
 			}
+			if (direction == getBlockState().getValue(RoboticPistonBlock.FACING)) {
+				return RoboticPiston.Moved.CABLE; // (its cable port's side: no arm there)
+			}
 			boolean out = armsOut.containsKey(direction) && armOut(direction);
 			if (retracting) {
 				if (!out) {
@@ -98,7 +101,11 @@ public final class RoboticPistonBlockEntity extends CardHolderBlockEntity {
 		super.saveAdditional(output);
 		output.store(EXTENDED, com.mojang.serialization.Codec.STRING.listOf(), armsOut.entrySet().stream()
 			.filter(arm -> arm.getValue() == HELD).map(arm -> arm.getKey().getName()).toList());
+		DeviceSave.save(output, DEVICE, device); // (its events and a move under way: a save isn't a power cut)
 	}
+
+	/** Its device's saved state's key. */
+	private static final String DEVICE = "device";
 
 	@Override
 	protected void loadAdditional(net.minecraft.world.level.storage.ValueInput input) {
@@ -110,6 +117,7 @@ public final class RoboticPistonBlockEntity extends CardHolderBlockEntity {
 				armsOut.put(direction, HELD);
 			}
 		});
+		DeviceSave.load(input, DEVICE, device);
 	}
 
 	/** Its one slot is the radio slot: a Bluetooth card there links it to its computer instead of a cable. */

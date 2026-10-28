@@ -171,7 +171,7 @@ public final class HttpExchange implements Runnable {
 			case java.net.UnknownHostException unknown -> "unknown host";
 			case java.net.SocketTimeoutException timeout -> "timed out";
 			case java.net.ConnectException refused -> "connection refused";
-			case javax.net.ssl.SSLException tls -> "TLS failed: " + tls.getMessage();
+			case javax.net.ssl.SSLException tls -> "tls: " + tls.getMessage();
 			default -> e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
 		};
 	}
@@ -258,12 +258,12 @@ public final class HttpExchange implements Runnable {
 			statusLine = line(in, budget);
 			String[] parts = statusLine.split(" ", 3);
 			if (parts.length < 2 || !parts[0].startsWith("HTTP/1.")) {
-				throw new IOException("not an HTTP response");
+				throw new IOException("not http");
 			}
 			try {
 				status = Integer.parseInt(parts[1]);
 			} catch (NumberFormatException e) {
-				throw new IOException("not an HTTP response");
+				throw new IOException("not http");
 			}
 			fields = headers(in, budget);
 		} while (status >= 100 && status < 200);
@@ -300,7 +300,7 @@ public final class HttpExchange implements Runnable {
 			int got = in.read(buffer, 0, left < 0 ? CHUNK : (int) Math.min(CHUNK, left));
 			if (got < 0) {
 				if (left > 0) {
-					throw new IOException("the connection closed early");
+					throw new IOException("closed early");
 				}
 				return;
 			}
@@ -339,7 +339,7 @@ public final class HttpExchange implements Runnable {
 		while (true) {
 			int c = in.read();
 			if (c < 0) {
-				throw new IOException("the connection closed early");
+				throw new IOException("closed early");
 			} else if (--budget[0] < 0) {
 				throw new IOException("headers too long");
 			} else if (c == '\n') {

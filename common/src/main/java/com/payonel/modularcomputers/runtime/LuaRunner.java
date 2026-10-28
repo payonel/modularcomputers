@@ -1056,6 +1056,7 @@ public final class LuaRunner implements Runner {
 			if (result.failed()) {
 				values.add(false);
 				values.add(result.error());
+				values.addAll(result.values()); // (what a failure says more: a refusal's device to wait on)
 			} else {
 				values.add(true);
 				values.addAll(result.values());

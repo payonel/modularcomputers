@@ -44,8 +44,9 @@ program, and when its world is saved and loaded (a field isn't saved). What it h
 A move that meets a block stops there: its event says what was in the way.
 
 The card is a [buffered device](/mcos/devices-library/#buffered-devices): it does one command at a
-time. A `capture`, `move` or `set` given while a move runs waits (in mcos, its thread only) until the
-move ends. `scan`, `get`, `pull` and `release` never wait: a program can always let go.
+time. A `capture` or `move` given while a move runs waits (in mcos, its thread only) until the move
+ends, and so does a `set` doing one. `scan`, `get`, `pull` and `release` never wait, nor does a
+`set` (or a line) letting go: a program can always let go.
 
 ## In mcos
 
@@ -73,7 +74,7 @@ echo release > /dev/field0
 ```
 
 Its ioctls are its methods, by name. Its events come as `sys.poll`'s `PRI`, and `pull` takes them.
-`cat /sys/field0` lists its methods.
+`ls /sys/class/field/field0/methods` lists its methods.
 
 ## Methods
 
@@ -87,12 +88,13 @@ each `{id, name, forward, right, up, distance}`.
 Holds a creature or an item: an `id` from `scan`, `"self"` (a robot holding itself, legs and all), or a point
 `forward[, right[, up]]` (the nearest thing within a block and a half of it). Answers its name.
 Fails with `holding` (it holds something already), `no entity` (nothing near the point),
-`no entity: <id>`, `too far: 16`, `held` (another field holds it), or in a block, `not a robot`.
+`no entity: <id>`, `too far: 16`, `captured` (another field holds it), or in a block, `not a robot`.
 
 ### move(forward[, right[, up]]) → true, or nil and why
 
 Moves the field by that much, at 10 blocks a second, never through blocks. It answers at once; its
-event, `move`, says how it went: `ok`, or not and why (`blocked: minecraft:stone`). Fails at once
+event, `move`, says how it went: `ok`, or not and why (`blocked: minecraft:stone`, the block over or
+under it too when it moves up or down; `stopped`; or why it let go, as `lost` says). Fails at once
 with `not holding`, or `too far: 16` (out of its reach, unless it holds its own robot).
 
 ### release() → true
@@ -106,7 +108,8 @@ What it's doing (`idle`, `holding` or `moving`), and what it holds and where.
 ### set(action) → true
 
 An action as a table: `{action = "capture", target}`, `{action = "move", forward, right, up}`,
-`{action = "release"}` (the file's lines are these).
+`{action = "release"}` (the file's lines are these). It never waits itself: a capture or a move in it
+waits as the method would, a release never.
 
 ### pull() → event or nil
 
@@ -116,8 +119,8 @@ Its oldest event, or nil.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `move` | `ok`, `why` | a move ended: `ok` true when it got there; else why (`blocked: minecraft:stone`, `stopped`) |
-| `lost` | `why` | it let go on its own: `gone`, `too far: 16`, `no power`, `interrupted` (its world saved and loaded) |
+| `move` | `ok`, `why` | a move ended: `ok` true when it got there; else why (`blocked: minecraft:stone`, `stopped`, or a `lost` reason: it let go of what it moved) |
+| `lost` | `why` | it let go on its own: `gone`, `too far: 16`, `no power`, `landing` (its robot landing onto its legs), `interrupted` (its world saved and loaded: a move it was making ends first) |
 
 ## Example
 

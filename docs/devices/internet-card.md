@@ -92,13 +92,13 @@ aren't sent), `not a method: `, `not a header: ` or `reserved header: ` (one the
 itself) and what it was, `too long: 1048576` (a body over 1 MiB), `too many open: 4`, or
 `server busy`. Whether the address is allowed is judged as the request runs, and a refusal is the
 request's failure: `refused: ` and why (`loopback`, `private`, `link-local`, `shared`, `multicast`,
-`reserved`, `unspecified`, `documentation`, `teredo`, `denied`, `disabled`). A request costs power.
+`reserved`, `unspecified`, `documentation`, `teredo`, `denied`, `disabled`, `unknown host`). A request costs power.
 
 ### response(handle) → {status, message, headers} or false
 
 The status line and headers once they have come (`headers` by name, in lower case); `false` while
-they have not. It fails with why, when the request did (`refused: ...`, `unknown host`,
-`timed out`).
+they have not. It fails with why, when the request did (`refused: ...`, `timed out`, `closed early`, `not http`,
+`tls: ` and why).
 
 ### read(handle[, n]) → piece, "" or false
 

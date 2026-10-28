@@ -63,17 +63,17 @@ public enum Face {
 			}
 		}
 		if (!RELATIVE.contains(key)) {
-			throw new IllegalArgumentException("no such face: " + name + " (north, south, east, west, up, down, or front, back, left, right)");
+			throw new IllegalArgumentException("no such face: " + name);
 		}
 		if (front == null) {
-			throw new IllegalArgumentException(key + ": no front is known here (name a face by north, south, east, west, up or down)");
+			throw new IllegalArgumentException("no front: " + key); // (only the world's names here)
 		}
 		return switch (key) {
 			case "front" -> front;
 			case "back" -> front.opposite();
 			default -> {
 				if (front == UP || front == DOWN) {
-					throw new IllegalArgumentException(key + ": this block faces " + front.id() + ", so it has no " + key);
+					throw new IllegalArgumentException("no " + key + ": facing " + front.id()); // (a block facing up or down has no left or right)
 				}
 				yield key.equals("left") ? front.clockwise() : front.clockwise().opposite(); // (facing north, we look south: east is our left)
 			}

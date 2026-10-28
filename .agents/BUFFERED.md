@@ -70,8 +70,13 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
   live): its state, its real position, its drift, legs, pathfinding.
 - `stop()` (free): the active command ends `stopped`; the golem halts at once where it is (no
   centering), and `stop` answers its real position, `{forward, right, up, heading}`, in its call
-  (it's done at once, so no event: a build decision). The plan and the origin don't move: the next
-  positional command returns to the plan first.
+  (it's done at once, so no event: a build decision). Its plan becomes where it stopped (in the air
+  the point; on its legs the block it's nearest), changed after the code review (2026-10-28): with
+  the plan left at the stopped command's start, a scan after stopping a walk walked it all the way
+  back. A command `interrupted` by a load plans the same way.
+- A fall on its legs it didn't ask for (a block gone from under it) isn't drift: it's busy while it
+  falls, its plan follows it down, and `fell` news (how far) ends a wait: a build decision from the
+  review (digging down broke every positional command after it).
 - Its own way back to the plan (after a shove, before a positional command) is a command of its own,
   ending in a `return` event (`ok`, or why): a build decision, so a failed way back is said.
 - A shove raises `shoved` (news, with the drift: `{forward, right, up}`).
@@ -120,7 +125,7 @@ Each step lands with its tests (a bug's seen failing first), the manual and AGEN
 - [x] **7. Dry failure strings** for every device, and the tests that read them.
 - [x] **8. The manual** (devices, concepts, tutorials, examples, the three layers), AGENTS.md's
   decisions.
-- [ ] **9. A deep code review** by a reviewer who didn't write it (a subagent given this spec and
+- [x] **9. A deep code review** by a reviewer who didn't write it (a subagent given this spec and
   the diff: blocked threads that never wake, lost events, races between threads and devices, a
   command that runs twice or never, what new players will find confusing), and its findings fixed.
 - [ ] **10. The report** to the user.

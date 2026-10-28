@@ -48,8 +48,13 @@ public class FieldCardGameTest {
 				helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
 			}
 		}
-		helper.setBlock(CASE, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
-		CaseBlockEntity computer = helper.getBlockEntity(CASE, CaseBlockEntity.class);
+		return fieldCase(helper, CASE);
+	}
+
+	/** A running case with a field card in, at {@code at}, facing south; its card. */
+	private static FieldCard fieldCase(GameTestHelper helper, BlockPos at) {
+		helper.setBlock(at, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
+		CaseBlockEntity computer = helper.getBlockEntity(at, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.CPU_SLOT, new ItemStack(ModItems.TIER3_CPU));
 		computer.parts().setItem(CaseMenu.RAM_SLOTS, new ItemStack(ModItems.TIER3_RAM));
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));
@@ -127,6 +132,41 @@ public class FieldCardGameTest {
 			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : events.getLast(), Map.of("event", "move", "ok", false, "why", "blocked: minecraft:stone"),
 				"its event: what's in the way"))
 			.thenExecute(() -> helper.assertTrue(pig.getZ() < helper.absolutePos(new BlockPos(1, 1, 5)).getZ(), "the pig's this side of the wall"))
+			.thenSucceed();
+	}
+
+	/**
+	 * A lift stopped by a ceiling says what stopped it: the block over what it holds, not the air round
+	 * its middle (something tall: a zombie, whose middle is further from its head than a probe across).
+	 */
+	@GameTest(maxTicks = 200)
+	public void aCeilingStopsALiftAndSaysWhatItIs(GameTestHelper helper) {
+		FieldCard card = fieldCase(helper);
+		var zombie = helper.spawn(EntityTypes.ZOMBIE, PIG);
+		zombie.setNoAi(true);
+		helper.setBlock(PIG.above(4), Blocks.STONE); // (a ceiling four up)
+		List<Object> events = events(helper, card);
+		helper.startSequence()
+			.thenExecuteAfter(2, () -> {
+				card.capture(args(zombie.getStringUUID()));
+				card.move(args(0.0, 0.0, 5.0)); // (up, through the ceiling)
+			})
+			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : events.getLast(), Map.of("event", "move", "ok", false, "why", "blocked: minecraft:stone"),
+				"its event: the ceiling"))
+			.thenSucceed();
+	}
+
+	/** Something another field holds can't be captured: captured (not held, which means a robot's wait). */
+	@GameTest(maxTicks = 200)
+	public void whatAnotherFieldHoldsCantBeCapturedAndSaysSo(GameTestHelper helper) {
+		FieldCard one = fieldCase(helper);
+		FieldCard two = fieldCase(helper, CASE.east(3));
+		Pig pig = helper.spawn(EntityTypes.PIG, PIG);
+		helper.startSequence()
+			.thenExecuteAfter(2, () -> {
+				same(helper, one.capture(args(pig.getStringUUID())).first(), "minecraft:pig", "the first holds it");
+				same(helper, two.capture(args(pig.getStringUUID())).error(), "captured", "the second can't");
+			})
 			.thenSucceed();
 	}
 

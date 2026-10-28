@@ -183,9 +183,12 @@ public final class EnergyField extends Entity {
 				listener.moved(moved.length());
 				if (moved.length() < step.length() * STOPPED) {
 					target = null;
-					// What's in the way: the block a little beyond it, the way it was going.
+					// What's in the way: the block a little beyond its box's face, the way it was going (its
+					// height's half up or down, its width's half across).
+					Vec3 way = step.normalize();
+					double extent = held.getBbWidth() / 2 * (Math.abs(way.x) + Math.abs(way.z)) + held.getBbHeight() / 2 * Math.abs(way.y);
 					net.minecraft.core.BlockPos ahead = net.minecraft.core.BlockPos.containing(held.position()
-						.add(0, held.getBbHeight() / 2, 0).add(step.normalize().scale(held.getBbWidth() / 2 + BLOCKED_PROBE)));
+						.add(0, held.getBbHeight() / 2, 0).add(way.scale(extent + BLOCKED_PROBE)));
 					listener.blocked("blocked: " + net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level().getBlockState(ahead).getBlock()));
 				}
 			}

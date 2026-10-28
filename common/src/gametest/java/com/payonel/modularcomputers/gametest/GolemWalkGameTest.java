@@ -301,4 +301,71 @@ public class GolemWalkGameTest {
 			.thenExecute(() -> same(helper, position(golem), Map.of("forward", 12L, "right", -3L, "up", 0L, "heading", 90L), "where it set it"))
 			.thenSucceed();
 	}
+
+	/** A stop's plan is the block it's nearest (no centering), so its next walk goes on from there, not back. */
+	@GameTest(maxTicks = 200)
+	public void aStopsPlanIsTheBlockItsNearestAndTheNextWalkGoesOnFromThere(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		long[] stoppedAt = {0};
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(5L)))
+			.thenExecuteAfter(12, () -> {
+				golem.robotics().stop(args());
+				double forward = ((Number) real(golem).get("forward")).doubleValue();
+				stoppedAt[0] = Math.round(forward);
+				helper.assertTrue(stoppedAt[0] > 0 && stoppedAt[0] < 5, "stopped on the way: " + forward);
+				same(helper, position(golem), at(stoppedAt[0], 0, 0L), "its plan: the block it's nearest");
+				events.clear();
+				golem.robotics().walk(args(1L));
+			})
+			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "walked one more"))
+			.thenExecute(() -> same(helper, position(golem), at(stoppedAt[0] + 1, 0, 0L), "one on from where it stopped"))
+			.thenSucceed();
+	}
+
+	/** A block gone from under it: it falls, its plan follows it down, it says so, and its next walk is from there. */
+	@GameTest(maxTicks = 200)
+	public void aFallItDidntAskForMovesItsPlanDownAndItSaysSo(GameTestHelper helper) {
+		BlockPos ledge = AT.east();
+		helper.setBlock(ledge, Blocks.STONE);
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(1L, 0L, 1L))) // (up onto the ledge)
+			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "up"))
+			.thenExecute(() -> {
+				same(helper, position(golem), at(1, 0, 1L), "on the ledge");
+				events.clear();
+				helper.setBlock(ledge, Blocks.AIR); // (gone from under it)
+			})
+			.thenWaitUntil(() -> same(helper, last(events), Map.of("event", "fell", "by", 1L), "it says it fell"))
+			.thenExecute(() -> {
+				same(helper, position(golem), at(1, 0, 0L), "its plan came down with it");
+				golem.robotics().walk(args(1L));
+			})
+			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "its next walk, from where it fell to"))
+			.thenExecute(() -> same(helper, position(golem), at(2, 0, 0L), "one on"))
+			.thenSucceed();
+	}
+
+	/** Saved mid-walk (its steps hold it up, gravity off), it loads with gravity its own: a walk under way doesn't go on after a load. */
+	@GameTest(maxTicks = 100)
+	public void savedMidWalkItLoadsWithGravity(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(5L)))
+			.thenExecuteAfter(3, () -> {
+				helper.assertTrue(golem.isNoGravity(), "mid-walk: its steps hold it up");
+				var output = net.minecraft.world.level.storage.TagValueOutput.createWithContext(net.minecraft.util.ProblemReporter.DISCARDING,
+					helper.getLevel().registryAccess());
+				golem.saveWithoutId(output);
+				BotGolem loaded = (BotGolem) golem.getType().create(helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.LOAD);
+				loaded.load(net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING,
+					helper.getLevel().registryAccess(), output.buildResult()));
+				helper.assertTrue(!loaded.isNoGravity(), "loaded: gravity its own");
+				loaded.discard();
+			})
+			.thenSucceed();
+	}
 }

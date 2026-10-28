@@ -87,13 +87,13 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 		return CardHolderMenu.hub(id, inventory, cards(), worldPosition, ContainerLevelAccess.create(level, worldPosition));
 	}
 
-	/** A card that works here, at the hub: a redstone card's output changes update the hub's neighbours. */
 	/** Its frame, where its cards say things are: its center, its front, its right as someone facing its front sees it. */
 	private com.payonel.modularcomputers.entity.FieldProjector.Frame frame() {
 		return com.payonel.modularcomputers.entity.FieldProjector.Frame.of(net.minecraft.world.phys.Vec3.atCenterOf(worldPosition),
 			getBlockState().getValue(ExpansionHubBlock.FACING));
 	}
 
+	/** A card that works here, at the hub: a redstone card's output changes update the hub's neighbours. */
 	private Card cardHere(com.payonel.modularcomputers.device.CardKind kind) {
 		Card card = com.payonel.modularcomputers.device.Cards.make(kind);
 		if (card instanceof com.payonel.modularcomputers.device.OperatorCard operator) {

@@ -731,13 +731,13 @@ public final class BoardAssembly {
 		return cause == Machine.Supervision.LOST_POWER ? ModSounds.POWER_DOWN : ModSounds.ERROR_BEEP;
 	}
 
-	/** A card that works here: a redstone card's output changes tell its host's neighbours. */
 	/** Its computer's frame, where its cards say things are: a robot's own (its heading, its own right), else its block's. */
 	private com.payonel.modularcomputers.entity.FieldProjector.Frame frame() {
 		return host.robot() != null ? com.payonel.modularcomputers.entity.FieldProjector.Frame.of(host.robot())
 			: com.payonel.modularcomputers.entity.FieldProjector.Frame.of(net.minecraft.world.phys.Vec3.atCenterOf(host.pos()), host.front());
 	}
 
+	/** A card that works here: a redstone card's output changes tell its host's neighbours. */
 	private Card cardHere(CardKind kind) {
 		Card card = com.payonel.modularcomputers.device.Cards.make(kind);
 		if (card instanceof com.payonel.modularcomputers.device.OperatorCard operator) {

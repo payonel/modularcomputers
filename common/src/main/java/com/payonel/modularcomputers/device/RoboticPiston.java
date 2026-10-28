@@ -19,7 +19,9 @@ import java.util.List;
  * <p>
  * It's buffered ({@link Buffered}): each move is a command, ending in its event once the arm has
  * moved ({@link #tick}, its block's): a push once the arm is back. A move that can't start (the
- * cable's side, nothing that moves, no arm out to retract) is refused at once.
+ * cable's side, nothing that moves, no arm out to retract) is refused at once. Every move of a
+ * method ends in its event, an extend whose arm is out already too (at once): a program waiting for
+ * one never has to know which it was.
  */
 public final class RoboticPiston implements Device, Buffered {
 	/** Where its front is: the face opposite its cable port (null until its block says). */
@@ -30,8 +32,10 @@ public final class RoboticPiston implements Device, Buffered {
 	}
 	/** What a push costs, moved or not: five ticks of a running CPU. */
 	public static final int PUSH_COST = 5 * PowerUnits.CPU;
-	/** Why a push or an extend can't start, and the side: the cable's, an arm out there, or what won't move. */
+	/** Why a push or an extend can't start, and the side: an arm out there, or what won't move. */
 	public static final String CANNOT_PUSH = "blocked";
+	/** Why a move can't start on its cable port's side, and the side: no arm there. */
+	public static final String CABLE = "cable";
 	/** Why a retract can't start, and the side: no arm out there. */
 	public static final String NOT_EXTENDED = "not extended";
 	/** A vanilla piston's move, in ticks: an extend's or a retract's time. */
@@ -63,8 +67,10 @@ public final class RoboticPiston implements Device, Buffered {
 		DONE,
 		/** Extend: the arm was out already (nothing moved, nothing to pay). */
 		ALREADY_OUT,
-		/** It couldn't push (the cable's side, an arm out there, what won't move). */
+		/** It couldn't push (an arm out there, what won't move). */
 		CANNOT_PUSH,
+		/** The side is its cable port's: no arm there. */
+		CABLE,
 		/** Retract: no arm out there. */
 		NOT_EXTENDED
 	}
@@ -91,7 +97,7 @@ public final class RoboticPiston implements Device, Buffered {
 		this.arms = arms;
 	}
 
-	@Method(doc = "push(side): pushes as a piston does on that side (north, south, east, west, up or down; or front, back, left, right: its front is opposite its cable), and the arm comes back on its own. A command: true at once (its event: push, once the arm is back), or false and why it can't (blocked: the side: its cable's, an arm out there, or something that won't move)")
+	@Method(doc = "push(side): pushes as a piston does on that side (north, south, east, west, up or down; or front, back, left, right: its front is opposite its cable), and the arm comes back on its own. A command: true at once (its event: push, once the arm is back), or false and why it can't (cable: the side, its cable port's; blocked: the side, an arm out there, or something that won't move)")
 	public Result push(Arguments args) {
 		return move(args, Motion.PUSH);
 	}
@@ -129,6 +135,7 @@ public final class RoboticPiston implements Device, Buffered {
 				yield Result.ok(true);
 			}
 			case CANNOT_PUSH -> Result.fail(CANNOT_PUSH + ": " + side);
+			case CABLE -> Result.fail(CABLE + ": " + side);
 			case NOT_EXTENDED -> Result.fail(NOT_EXTENDED + ": " + side);
 		};
 	}
@@ -176,7 +183,26 @@ public final class RoboticPiston implements Device, Buffered {
 	public void accepting(boolean accepting) {
 		this.accepting = accepting;
 		if (!accepting) {
-			events.clear(); // (its program's gone: what it held for it goes; a move under way finishes in the world)
+			events.clear(); // (its program's gone: what it held for it goes, but a load's at its first reset; a move under way finishes in the world)
 		}
+	}
+
+	/** Its events waiting and the move under way (a save isn't a power cut: it ends after the load, its program hearing). */
+	@Override
+	public java.util.Map<String, Object> saved() {
+		java.util.Map<String, Object> saved = new java.util.LinkedHashMap<>();
+		events.save(saved);
+		if (moving != null) {
+			saved.put("moving", moving);
+			saved.put("left", (long) left);
+		}
+		return saved;
+	}
+
+	@Override
+	public void restore(java.util.Map<String, Object> saved) {
+		events.restore(saved);
+		moving = saved.get("moving") instanceof String was ? was : null;
+		left = saved.get("left") instanceof Long ticks ? (int) (long) ticks : 0;
 	}
 }

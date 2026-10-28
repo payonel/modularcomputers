@@ -303,4 +303,37 @@ public class GolemFlightGameTest {
 		helper.assertTrue(parts.get(CaseMenu.CPU_SLOT).is(ModItems.TIER3_CPU), "its parts kept: " + parts);
 		helper.succeed();
 	}
+
+	/** Held by a field mid-walk (its steps holding it up), let go: it comes down, thaws, and its walk goes on to its end. */
+	@GameTest(maxTicks = 300)
+	public void heldMidWalkAndLetGoItThawsAndItsWalkEnds(GameTestHelper helper) {
+		BotGolem golem = golem(helper, true);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(3L)))
+			.thenExecuteAfter(4, () -> helper.assertTrue(!field(golem).capture(args(FieldCard.SELF)).failed(), "held mid-walk"))
+			.thenExecuteAfter(5, () -> field(golem).release(args()))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "thawed")), "down and thawed: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "walk", "ok", true)), "its walk ended: " + events))
+			.thenSucceed();
+	}
+
+	/** A flight with no way there (pathfinding) is refused before it does anything: its legs stay on. */
+	@GameTest(maxTicks = 100)
+	public void aFlightWithNoWayThereIsRefusedBeforeItTakesOff(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		for (int x = 0; x < 3; x++) {
+			for (int z = 0; z < 3; z++) {
+				helper.setBlock(AT.offset(x - 1, 3, z - 1), Blocks.STONE);
+				helper.setBlock(AT.offset(x - 1, 4, z - 1), Blocks.STONE); // (solid where it would fly to)
+			}
+		}
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> {
+				golem.robotics().setPathfinding(args(true));
+				same(helper, golem.robotics().fly(args(0.0, 0.0, 3.0)).error(), "no path", "refused");
+				helper.assertTrue(golem.legs() && !golem.thrusting(), "on its legs still, its thrusters off");
+			})
+			.thenSucceed();
+	}
 }

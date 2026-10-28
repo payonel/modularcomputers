@@ -85,7 +85,7 @@ kernel itself, can use a global `board`. It is the motherboard's API:
 | `board.info(address)` | a table about one device: `address`, `id`, `type`, `label` (if it has one) and what its kind adds; nil if there is no such device |
 | `board.methods(address)` | the names of the device's methods, in name order |
 | `board.doc(address, method)` | one line saying what a method does |
-| `board.invoke(address, method, ...)` | calls a method: `true` and its results, or `false` and a message |
+| `board.invoke(address, method, ...)` | calls a method: `true` and its results, or `false` and a message (a busy device's refusal: `busy`, and the id of the device whose news ends the wait when it's another's) |
 | `board.waitForInterrupt(seconds, sources...)` | waits until a source has an interrupt pending, or the time passes; gives the sources that do |
 | `board.setLabel(address, label)` | gives a device a label (see below) |
 

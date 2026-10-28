@@ -35,6 +35,7 @@ class RedstoneCardTest {
 
 	@Test
 	void setPoweredPutsOutASignalAndItsLevelIsTheStrongestThere() {
+		card.accepting(true); // (a set is applied while its program runs)
 		assertThat(card.set(args(Map.of("north", Map.of("powered", 9L)))).first()).as("a command: true at once").isEqualTo(true);
 		assertThat(card.output(NORTH)).as("applied at its next tick").isZero();
 		card.tick();
@@ -116,6 +117,7 @@ class RedstoneCardTest {
 
 	@Test
 	void aFaceIsNamedByTheWorldsNameOrByItsBlocksFront() {
+		card.accepting(true); // (a set is applied while its program runs)
 		card.frontFrom(() -> Face.EAST); // (its case faces east: facing it, we look west, and its left is south)
 		card.set(args(Map.of("front", Map.of("powered", 4L), "left", Map.of("powered", 2L))));
 		card.tick();

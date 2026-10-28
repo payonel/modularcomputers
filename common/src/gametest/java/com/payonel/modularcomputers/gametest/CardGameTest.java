@@ -153,7 +153,8 @@ public class CardGameTest {
 		var hub = helper.getBlockEntity(hubPos, com.payonel.modularcomputers.block.ExpansionHubBlockEntity.class);
 		hub.cards().setItem(0, new ItemStack(ModItems.REDSTONE_CARD));
 		RedstoneCard card = (RedstoneCard) hub.card(0).orElseThrow();
-		card.power().supply(this); // (as a running computer's bus powers it)
+		card.power().supply(this); // (as a running computer's bus powers it, its program taking data)
+		card.accepting(true);
 		card.set(args(Map.of("front", Map.of("powered", 6L), "left", Map.of("powered", 2L))));
 		helper.succeedWhen(() -> {
 			helper.assertValueEqual(field(card, "east", "powered"), 6L, "its front: east, the way the hub faces");
@@ -284,6 +285,64 @@ public class CardGameTest {
 				same(helper, seen.getLast().get("forward"), 0.0, "beside it now");
 				same(helper, seen.getLast().get("right"), 3.5, "on its own right (east, facing north)");
 			})
+			.thenSucceed();
+	}
+
+	/**
+	 * What the world answers a set with (dust beside the card, powered by it) is the set's: its end
+	 * says each face as it is then, and no face's news follows for it.
+	 */
+	@GameTest(maxTicks = 100)
+	public void whatTheWorldAnswersASetWithIsTheSets(GameTestHelper helper) {
+		RedstoneCard card = computerWith(helper, ModItems.REDSTONE_CARD, RedstoneCard.class);
+		helper.setBlock(POS.north().below(), Blocks.STONE);
+		helper.setBlock(POS.north(), Blocks.REDSTONE_WIRE);
+		List<Map<?, ?>> events = new ArrayList<>();
+		helper.onEachTick(() -> {
+			Object event;
+			while ((event = card.pull(args()).first()) != null) {
+				events.add((Map<?, ?>) event);
+			}
+		});
+		helper.startSequence()
+			.thenIdle(3)
+			.thenExecute(() -> card.set(args(Map.of("north", Map.of("powered", 15L)))))
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(e -> "set".equals(e.get("event"))), "on: " + events))
+			.thenIdle(3)
+			.thenExecute(() -> {
+				events.clear();
+				card.set(args(Map.of("north", Map.of("powered", 0L))));
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(e -> "set".equals(e.get("event"))), "off: " + events))
+			.thenIdle(3)
+			.thenExecute(() -> {
+				Map<?, ?> end = events.stream().filter(e -> "set".equals(e.get("event"))).findFirst().orElseThrow();
+				Map<?, ?> north = (Map<?, ?>) ((Map<?, ?>) end.get("result")).get("north");
+				same(helper, north.get("level"), 0L, "its end says the face as it is then: the dust's dark too");
+				helper.assertTrue(events.stream().noneMatch(e -> "north".equals(e.get("side"))), "no news for its own change: " + events);
+			})
+			.thenSucceed();
+	}
+
+	/** A golem's motion sensor sees what moves round it, never the golem itself, however it walks. */
+	@GameTest(maxTicks = 120)
+	public void aGolemsMotionSensorDoesntSeeItsGolem(GameTestHelper helper) {
+		var golem = GolemFlightGameTest.golem(helper, false);
+		golem.board().parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.MOTION_SENSOR_CARD));
+		String itself = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(golem.getType()).toString();
+		List<Map<?, ?>> seen = new ArrayList<>();
+		boolean[] walked = {false};
+		helper.onEachTick(() -> golem.board().cards().stream().filter(MotionSensorCard.class::isInstance).map(MotionSensorCard.class::cast).findFirst()
+			.ifPresent(card -> {
+				Object event;
+				while ((event = card.pull(args()).first()) != null) {
+					seen.add((Map<?, ?>) event);
+				}
+			}));
+		helper.startSequence()
+			.thenExecuteAfter(5, () -> walked[0] = !golem.robotics().walk(args(2L)).failed())
+			.thenWaitUntil(() -> helper.assertTrue(walked[0] && !golem.robotics().busy(), "walked"))
+			.thenExecuteAfter(10, () -> helper.assertTrue(seen.stream().noneMatch(e -> itself.equals(e.get("mob"))), "never itself: " + seen))
 			.thenSucceed();
 	}
 

@@ -80,11 +80,14 @@ public final class CardWorld {
 		}
 		switch (card) {
 			case RedstoneCard redstone -> {
-				redstone.tick(); // (a set waiting is applied: a change a tick)
-				for (int face = 0; face < REDSTONE_FACES.size(); face++) {
-					Direction side = REDSTONE_FACES.get(face);
-					redstone.sense(face, level.getSignal(pos.relative(side), side));
-				}
+				Runnable sense = () -> {
+					for (int face = 0; face < REDSTONE_FACES.size(); face++) {
+						Direction side = REDSTONE_FACES.get(face);
+						redstone.sense(face, level.getSignal(pos.relative(side), side));
+					}
+				};
+				sense.run();
+				redstone.tick(sense); // (a set waiting is applied: a change a tick; what the world answers is its)
 			}
 			case WeatherCard weather -> {
 				if (now % 20 == 0) {
@@ -195,8 +198,12 @@ public final class CardWorld {
 		int range = MotionSensorCard.RANGE;
 		AABB box = new AABB(watch.pos).inflate(range);
 		Map<UUID, double[]> now = new HashMap<>();
-		for (Entity entity : watch.level.getEntities((Entity) null, box, entity -> entity.isAlive() && entity instanceof LivingEntity)) {
-			double[] at = {entity.getX(), entity.getY(), entity.getZ()};
+		// Living things, but its own computer (a golem: what holds the frame's middle), where they are by
+		// their middles (as the field card's scan says).
+		for (Entity entity : watch.level.getEntities((Entity) null, box, entity -> entity.isAlive() && entity instanceof LivingEntity
+			&& !entity.getBoundingBox().contains(watch.frame.origin()))) {
+			net.minecraft.world.phys.Vec3 middle = entity.getBoundingBox().getCenter();
+			double[] at = {middle.x, middle.y, middle.z};
 			now.put(entity.getUUID(), at);
 			double[] was = watch.entities.get(entity.getUUID());
 			if (was != null && Math.abs(at[0] - was[0]) < MOVED && Math.abs(at[1] - was[1]) < MOVED && Math.abs(at[2] - was[2]) < MOVED) {

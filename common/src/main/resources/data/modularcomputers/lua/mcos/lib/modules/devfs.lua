@@ -181,6 +181,7 @@ local function deliver(id)
       return ok, event, taken
     end
     taken = taken + 1
+    k.delivered = true -- (into other files' queues too: their waiters have news, a pass of their own)
     for _, queue in pairs(readers[id] or {}) do
       if #queue >= FILE_EVENTS then
         table.remove(queue, 1)
@@ -228,30 +229,76 @@ end
 -- robot held), the calling thread blocks, only it, and is asked again (its events taken into its
 -- files first, so its interrupt is down and the next is the running command's end). Events taken
 -- then may hold that end already (it came between the refusal and the look): then it's asked again
--- at once, as an end already taken raises nothing to wake it. A stop of the device meanwhile ends
--- the wait: what the threads were feeding it was stopped (ECANCELED). Without a syscall to block (a
--- file closing as its process ends), busy is EBUSY.
+-- at once, as an end already taken raises nothing to wake it. When the board names another device
+-- whose news ends the wait (a crafting card's robot, a robot's crafting card), it hears both. It's
+-- asked at most once a tick unless one of them raised its interrupt (the board's state changes a
+-- tick at a time). A stop of the device, or of the one it waits on, ends the wait: what the threads
+-- were feeding it was stopped (ECANCELED); a line "stop" written is one. Without a syscall to block
+-- (a file closing as its process ends), busy is EBUSY.
 local stopped = {} -- by device id: how many stops it's had
+local COMMAND_TRIES = 4 -- times a command is asked again at once, news having come with each refusal
+
+-- Whether a stop of the device, or of the one it waits on, came since the request began waiting.
+local function cancelled(request)
+  for device, count in pairs(request.stops) do
+    if (stopped[device] or 0) ~= count then
+      return true
+    end
+  end
+  return false
+end
+
+-- Whether a call is a stop: stop, or set's {action = "stop"} (a line "stop" written).
+local function isstop(method, arg)
+  return method == "stop" or method == "set" and type(arg) == "table" and arg.action == "stop"
+end
 
 local function command(id, method, ...)
   local request = k.request
-  if request and request.stops ~= nil and request.stops ~= (stopped[id] or 0) then
+  if request and request.stops and cancelled(request) then
     return nil, "stopped", "ECANCELED"
   end
+  if request and request.waitedat == board.uptime() and not k.news[id] and not (request.blocker and k.news[request.blocker]) then
+    k.listen(id) -- (asked this tick already, and nothing's been raised since: no call for nothing; the idle
+    if request.blocker then -- wait hears it, as it forgets what it listened for each time)
+      k.listen(request.blocker)
+    end
+    return k.BLOCK
+  end
   local answer = table.pack(board.invoke(id, method, ...))
+  local tries = 0
   while not answer[1] and (answer[2] == "busy" or answer[2] == "held") do
     if not request then
       return nil, answer[2], "EBUSY"
     end
-    request.stops = request.stops or (stopped[id] or 0)
+    -- The board names another device when its news ends the wait (a card's robot): hear both.
+    local blocker = answer[3]
+    request.blocker = blocker
+    if not request.stops then
+      request.stops = {[id] = stopped[id] or 0}
+    end
+    if blocker and request.stops[blocker] == nil then
+      request.stops[blocker] = stopped[blocker] or 0
+    end
     local _, _, taken = deliver(id)
-    if taken == 0 then
-      k.listen(id) -- (nothing came: what ends the wait will raise the device's interrupt)
+    if blocker then
+      local _, _, also = deliver(blocker)
+      taken = taken + (also or 0)
+    end
+    tries = tries + 1
+    if taken == 0 or tries >= COMMAND_TRIES then
+      -- Nothing came: what ends the wait will raise the device's interrupt. (Or news keeps coming: the
+      -- pass counts it, k.delivered, so it's asked again at the next, never forgotten.)
+      k.listen(id)
+      if blocker then
+        k.listen(blocker)
+      end
+      request.waitedat = taken == 0 and board.uptime() or nil
       return k.BLOCK
     end
     answer = table.pack(board.invoke(id, method, ...)) -- (what came may be the end it waited for)
   end
-  if answer[1] and method == "stop" then
+  if answer[1] and isstop(method, ...) then
     stopped[id] = (stopped[id] or 0) + 1
   end
   return table.unpack(answer, 1, answer.n)
@@ -516,6 +563,7 @@ local function devicefile(device, mode)
   local lines = driver and driver.line
   local data, at = nil, 0
   local written = nil -- what's been written: all of it (kept for close), or a line not yet ended
+  local absorbing, before = nil, nil -- the write whose bytes are in 'written', while it waits; what was there before it
   local changed = false -- a change came in since the file was last read from its start (poll's PRI)
   local kept = {} -- the events drain took, for a pull ioctl (held), oldest first
   local key = {} -- (its own copy of the device's events)
@@ -580,7 +628,13 @@ local function devicefile(device, mode)
       data, at, changed = nil, 0, false
       if device.pull then
         drain()
-        kept = {} -- (read anew: what changed is in the state)
+        local ends = {} -- (read anew: what changed is in the state; a command's end isn't, it stays)
+        for _, event in ipairs(kept) do
+          if type(event) == "table" and event.ok ~= nil then
+            ends[#ends + 1] = event
+          end
+        end
+        kept = ends
       end
       return 0
     end,
@@ -605,10 +659,16 @@ local function devicefile(device, mode)
         return #bytes
       end
       local request = k.request
+      if absorbing and absorbing ~= request then
+        written = before -- (a write that waited and never came back, EINTR or a cancel: its bytes go)
+        absorbing = nil
+      end
       if not (request and request.absorbed) then
+        before = written
         written = (written or "") .. bytes
         if request then
           request.absorbed = true -- (asked again after a block: these bytes are in already)
+          absorbing = request
         end
       end
       while true do
@@ -620,12 +680,28 @@ local function devicefile(device, mode)
         if ok == k.BLOCK then
           return k.BLOCK -- (a buffered device busy: this line and the rest wait their turn)
         elseif not ok then
-          written = nil
+          written, absorbing = nil, nil
           return nil, why, errno
         end
         written = rest
       end
+      absorbing = nil
       return #bytes
+    end,
+    -- Before its last close: a last line with no end is sent (a busy device's waits, the closing
+    -- thread only, its descriptor still open), so its close sends nothing.
+    flush = function(self)
+      if lines and written ~= nil and written ~= "" then
+        local ok, why, errno = set(written)
+        if ok == k.BLOCK then
+          return k.BLOCK
+        end
+        written = nil
+        if not ok then
+          return nil, why, errno
+        end
+      end
+      return true
     end,
     close = function(self)
       delist(id, key)
@@ -738,7 +814,10 @@ local function withmethods(d, device)
     return table.unpack(answer, 2, answer.n)
   end
   if device.pull and d.eventkey then
-    enlist(id, d.eventkey) -- (every event from its open on: none taken before it's read is lost to it)
+    -- Every event from its open on (none taken before it's read is lost to it), and what waits in the
+    -- device still, read by no file yet: a device keeps its events till a program reads them, as a
+    -- keyboard its keys (a command's end left unread too: the next to open it finds it).
+    enlist(id, d.eventkey)
   end
   d.events = function(self)
     local ready = events and events(self) or {}

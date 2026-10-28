@@ -46,7 +46,7 @@ public class RoboticPistonGameTest {
 	public void theCablesSideAndWhatWontMoveCantBePushed(GameTestHelper helper) {
 		RoboticPistonBlockEntity piston = piston(helper, ModBlocks.ROBOTIC_PISTON);
 		helper.setBlock(PISTON.west(), Blocks.OBSIDIAN);
-		helper.assertValueEqual(push(piston, "down").error(), RoboticPiston.CANNOT_PUSH + ": down", "the cable's side");
+		helper.assertValueEqual(push(piston, "down").error(), RoboticPiston.CABLE + ": down", "the cable's side");
 		helper.assertValueEqual(push(piston, "west").error(), RoboticPiston.CANNOT_PUSH + ": west", "obsidian");
 		helper.assertBlockPresent(Blocks.OBSIDIAN, PISTON.west());
 		helper.assertTrue(push(piston, "sideways").failed(), "no such side");

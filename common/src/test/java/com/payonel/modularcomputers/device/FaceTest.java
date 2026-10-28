@@ -30,6 +30,6 @@ class FaceTest {
 	void aNameNoFaceHasOrOneTheBlockCantMeanIsRefusedWithWhy() {
 		assertThatThrownBy(() -> Face.named("sideways", Face.NORTH)).hasMessageContaining("no such face");
 		assertThatThrownBy(() -> Face.named("front", null)).hasMessageContaining("no front");
-		assertThatThrownBy(() -> Face.named("left", Face.UP)).hasMessageContaining("faces up");
+		assertThatThrownBy(() -> Face.named("left", Face.UP)).hasMessage("no left: facing up");
 	}
 }

@@ -17,6 +17,11 @@ public record Result(List<Object> values, String error) {
 		return new Result(List.of(), message == null ? "unknown error" : message);
 	}
 
+	/** A failure that says more: why, then values (a refusal's device to wait on). */
+	public static Result fail(String message, Object... values) {
+		return new Result(Arrays.stream(values).map(Values::normalize).toList(), message == null ? "unknown error" : message);
+	}
+
 	public boolean failed() {
 		return error != null;
 	}

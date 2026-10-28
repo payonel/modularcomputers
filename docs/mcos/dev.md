@@ -43,8 +43,9 @@ takes from its own. The methods each device has are on its page.
 A device that does [one command at a time](/concepts/interrupts/#one-command-at-a-time) (a robot,
 a field card, a redstone card, a robotic piston) makes an ioctl or a write given while it's busy
 wait, the calling thread only, until the device takes it: so commands given in a row happen in
-order. A `stop` of the device ends those waits, `ECANCELED`, and a device gone ends them,
-`ENODEV`.
+order. A `stop` of the device (a line `stop` too) ends those waits, `ECANCELED`, and a device gone
+ends them, `ENODEV`. A last line written with no end goes as the file closes: its close waits for a
+busy device as a write would (a process ending drops it).
 
 ## /sys: what a device is and can do
 

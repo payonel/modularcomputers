@@ -28,8 +28,8 @@ buffer, or what was queued has played out), the [internet card](/devices/interne
 a response) and so on. The bus itself has one, raised when a device joins or leaves.
 
 A device reports every change to its state, from wherever it came, as an event in its own terms,
-and raises its interrupt. For a redstone card, an event says the face, the level, and whether the
-change came in from outside, was the card's own, or was another card's.
+and raises its interrupt. For a redstone card, an event says the face and its level when the world
+or another card changed it; the card's own changes are its `set`'s end, which says every face.
 
 ## How a program sees them
 
@@ -74,12 +74,15 @@ and why), which raises its interrupt: the device's "idle again".
 
 - **At the board**, a command given while another runs is refused at once, `false, "busy"`, doing
   nothing: the call still never waits. Wait for the running command's end (its interrupt), then
-  give it again.
+  give it again. When another device's news ends the wait, the refusal names it too, by its id
+  (`false, "busy", "id:..."`): a crafting card waiting for its robot, a robot for its card's craft.
 - **Under mcos**, the kernel does that for you: a command to a busy device blocks the thread that
   gave it, and only that thread, until the device can take it, then starts it and returns. So a
   series of commands runs in order, and more work at once means more
-  [threads](/mcos/threads/). A device's live state (`get`), its events (`pull`) and its `stop`
-  never wait, and a `stop` also ends the threads waiting to give that device a command.
+  [threads](/mcos/threads/). Each device's page says which of its methods never wait (a robot's
+  `get`, `pull` and `stop`; a field card's `release`); the others are commands, reads too (a
+  robot's `position`, a redstone card's `get`), so they see the command before them done. A `stop`
+  (a line `stop` too) also ends the threads waiting to give that device a command.
 
 A failure ends its own command only: the next one runs as any would. There's no queue to drain
 and no fault to clear.

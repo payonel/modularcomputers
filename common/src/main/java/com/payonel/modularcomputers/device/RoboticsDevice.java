@@ -30,7 +30,8 @@ import java.util.Map;
  * from its <b>plan</b>, where the last one left it: a golem shoved off it in the air holds its plan
  * (it flies back, raising {@code shoved}), and a positional command given while it's off its plan (a
  * shove, a stop mid-walk) sends it back first ({@code return}'s event), refused busy until it's
- * there. Held in a field (any field) its robotics freezes ({@code frozen}, {@code thawed}): what it
+ * there; falling on its legs (a block gone from under it) it's busy till it lands, its plan following
+ * it down ({@code fell}). Held in a field (any field) its robotics freezes ({@code frozen}, {@code thawed}): what it
  * was doing pauses, commands are refused {@code held}, and the field's carry moves its origin with
  * it. {@code get}, {@code pull}, {@code stop} and {@code set} are free ({@code set} refuses its own
  * actions, but a stop, while it's busy).
@@ -55,6 +56,8 @@ public final class RoboticsDevice implements Device, Buffered {
 	public static final String CRAFTING = "crafting";
 	/** What it's doing while a field holds it: its robotics frozen. */
 	public static final String HELD = "held";
+	/** What it's doing while it falls on its legs (nothing it was asked: a block gone under it). */
+	public static final String FALLING = "falling";
 	/** The name of its own way back to its plan, as an event (not a method). */
 	public static final String RETURN = "return";
 	/** Why a command ended when a stop cut it short. */
@@ -133,6 +136,20 @@ public final class RoboticsDevice implements Device, Buffered {
 
 		/** Its plan becomes where it is now (a command ended there). */
 		default void replan() {
+		}
+
+		/**
+		 * Its plan becomes where it is, a command cut short (a stop, a load): on its legs the block it's
+		 * nearest (a block's middle, a right angle: its plan's always so on the ground), in the air the
+		 * point it's at; in a field, its plan as it was (the field's carry moves it).
+		 */
+		default void replanHere() {
+			replan();
+		}
+
+		/** Whether it's falling on its legs, nothing it was asked (a block gone from under it). */
+		default boolean falling() {
+			return false;
 		}
 
 		/** Starts going back to its plan (walking, or in the air flying): null, or why not (its event: return). */
@@ -239,6 +256,14 @@ public final class RoboticsDevice implements Device, Buffered {
 	};
 	/** The command running (its method's name, or {@link #RETURN}; null: none). */
 	private String active;
+	/** Another of its parts whose work the command running is (a crafting card crafting), or null. */
+	private Part owner;
+
+	/** Another part of the robot whose work keeps it busy (a crafting card's craft). */
+	public interface Part {
+		/** The robot was stopped: the part's work stops too (it says so itself). */
+		void robotStopped();
+	}
 	private boolean accepting;
 	/** The command under way at the save it was loaded from (its end is due: interrupted), or null. */
 	private String interrupted;
@@ -283,8 +308,8 @@ public final class RoboticsDevice implements Device, Buffered {
 	}
 
 	/**
-	 * The command running ended: its plan is where it is now (but a stop's: where it stopped isn't
-	 * its plan), and its event says how it went.
+	 * The command running ended: its plan is where it is now (one cut short, by a stop or a load:
+	 * where it is, on its legs the block it's nearest), and its event says how it went.
 	 */
 	private void end(boolean ok, String why, Object result) {
 		String method = active;
@@ -292,7 +317,10 @@ public final class RoboticsDevice implements Device, Buffered {
 			return;
 		}
 		active = null;
-		if (!STOPPED.equals(why)) {
+		owner = null;
+		if (STOPPED.equals(why) || INTERRUPTED.equals(why)) {
+			body.replanHere();
+		} else {
 			body.replan();
 		}
 		changed();
@@ -381,10 +409,16 @@ public final class RoboticsDevice implements Device, Buffered {
 		return started;
 	}
 
-	@Method(doc = "stop(): stops what it's doing at once, where it is, no centering (flying, it hovers there; a block it was breaking is left as it is): the command running ends, stopped. Its plan and its origin stay: its next positional command goes back to its plan first. Never waits; answers where it really stopped, {forward, right, up, heading} from its origin")
+	@Method(doc = "stop(): stops what it's doing at once, where it is, no centering (flying, it hovers there; a block it was breaking is left as it is; a crafting card's craft ends too): the command running ends, stopped. Its plan becomes where it stopped (on its legs, the block it's nearest: its next positional command steps onto its middle first). Never waits; answers where it really stopped, {forward, right, up, heading} from its origin")
 	public Result stop(Arguments args) {
+		Part part = owner;
+		if (part != null) { // (a part's work, a craft: it stops, and its part says so)
+			owner = null;
+			active = null;
+			part.robotStopped();
+			changed();
+		}
 		body.stop();
-		body.holdHere();
 		end(false, STOPPED, null);
 		Result at = body.position();
 		return at.failed() ? Result.ok(true) : Result.ok(at.first());
@@ -506,7 +540,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		changed();
 	}
 
-	@Method(doc = "get(): live, never waiting: {state, legs, pathfinding, position, planned, drift}: what it's doing now (idle, walking, turning, breaking, flying, hovering, landing, returning, crafting or held), whether it stands on its legs, whether it finds its way round things, where it really is and its plan (each as position gives it), and how far it's off its plan ({forward, right, up}; none when it's on it)")
+	@Method(doc = "get(): live, never waiting: {state, legs, pathfinding, position, planned, drift}: what it's doing now (idle, walking, turning, breaking, flying, hovering, landing, returning, crafting, falling or held), whether it stands on its legs, whether it finds its way round things, where it really is and its plan (each as position gives it), and how far it's off its plan ({forward, right, up}; none when it's on it)")
 	public Result get(Arguments args) {
 		Map<String, Object> now = new LinkedHashMap<>();
 		now.put("state", state());
@@ -584,7 +618,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return value == null ? 0L : value;
 	}
 
-	@Method(doc = "pull(): its oldest event, or nil: a command's end, {event = method, ok, why, result} (walk, walkTo, fly, flyTo, turn, land, swing), its way back to its plan's ({event = \"return\", ok, why}), or news: {event = \"shoved\", drift}, {event = \"frozen\"}, {event = \"thawed\"}")
+	@Method(doc = "pull(): its oldest event, or nil: a command's end, {event = method, ok, why, result} (walk, walkTo, fly, flyTo, turn, land, swing), its way back to its plan's ({event = \"return\", ok, why}), or news: {event = \"shoved\", drift}, {event = \"fell\", by}, {event = \"frozen\"}, {event = \"thawed\"}")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -652,32 +686,65 @@ public final class RoboticsDevice implements Device, Buffered {
 			return;
 		}
 		news("shoved", Map.of("drift", drift));
-		if (body.returnToPlan() == null) {
+		String why = body.returnToPlan();
+		if (why == null) {
 			active = RETURN;
 			changed();
+		} else {
+			events.ended(RETURN, false, why, null); // (it can't get back: it says so once, and holds where it is)
+			body.holdHere();
 		}
 	}
+
+	/**
+	 * It came down on its legs from a fall nothing asked for (a block gone from under it), by
+	 * {@code blocks}: its plan followed it down (its odometry felt it), and it says so, when it fell
+	 * far enough to tell ({@link #MIN_FALL}) or a command waited for it to land (its news ends that
+	 * wait).
+	 */
+	public void fell(double blocks) {
+		if (Math.abs(blocks) < MIN_FALL && !waitedOnFall) {
+			return; // (a settling, as it's set down: nothing to say)
+		}
+		waitedOnFall = false;
+		double kept = Math.rint(blocks * FALL_GRAIN) / FALL_GRAIN;
+		news("fell", Map.of("by", kept == Math.rint(kept) ? (Object) (long) kept : kept));
+	}
+
+	/** The least fall it says, in blocks (a settling as it's set down isn't one). */
+	public static final double MIN_FALL = 0.05;
+	/** How finely a fall's distance is said: to a thousandth of a block. */
+	private static final double FALL_GRAIN = 1000;
+	/** A command was refused while it fell: its landing's news must come, however short the fall. */
+	private boolean waitedOnFall;
 
 	/**
 	 * Another of its parts makes it busy (a crafting card in it crafting: {@code method}, "craft"):
 	 * null when it took it, else why not (busy, held).
 	 */
-	public String begin(String method) {
+	public String begin(String method, Part part) {
 		String refused = refusal(method);
 		if (refused != null) {
 			return refused;
 		}
 		active = method;
+		owner = part;
 		changed();
 		return null;
 	}
 
-	/** What {@link #begin} began ended: it's free again (the part raises its own event). */
-	public void done(String method) {
-		if (method.equals(active)) {
+	/** What {@code part} began ({@link #begin}) ended: it's free again (the part raises its own event). */
+	public void done(Part part) {
+		if (part != null && part == owner) {
 			active = null;
+			owner = null;
 			changed();
 		}
+	}
+
+	/** Whether a field holds it (its robotics frozen): its parts' work pauses too. */
+	public boolean isFrozen() {
+		return body.frozen();
 	}
 
 	/** What it's doing now. */
@@ -686,7 +753,7 @@ public final class RoboticsDevice implements Device, Buffered {
 			return HELD;
 		}
 		if (active == null) {
-			return body.hovering() ? HOVERING : IDLE;
+			return body.falling() ? FALLING : body.hovering() ? HOVERING : IDLE;
 		}
 		return switch (active) {
 			case "walk", "walkTo" -> WALKING;
@@ -716,12 +783,26 @@ public final class RoboticsDevice implements Device, Buffered {
 		if (active != null) {
 			return BUSY;
 		}
-		if (POSITIONAL.contains(method) && body.drift() != null && body.returnToPlan() == null) {
+		if (body.falling()) {
+			waitedOnFall = true;
+			return BUSY; // (its landing's news ends the wait)
+		}
+		if (POSITIONAL.contains(method) && body.drift() != null) {
+			String why = body.returnToPlan();
+			if (why != null) {
+				return why; // (it can't get back to its plan: the command can't run where it should)
+			}
 			active = RETURN; // (its way back first: the command waits for it)
 			changed();
 			return BUSY;
 		}
 		return null;
+	}
+
+	/** While a part's work keeps it busy (a craft), that part's news ends a wait: its end. */
+	@Override
+	public Object blocker(String method) {
+		return owner;
 	}
 
 	/** Whether it's running a command now (its body's ticks ask: a stop, a freeze). */
@@ -769,9 +850,11 @@ public final class RoboticsDevice implements Device, Buffered {
 		}
 		if (!accepting) {
 			events.clear();
+			interrupted = null; // (a fresh start: an old program's end isn't the next one's)
 			body.stop();
 			body.release(); // (its thrusters stop with its program: what they held up falls)
 			active = null;
+			owner = null;
 			changed();
 		}
 	}
@@ -789,7 +872,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	public Map<String, Object> saved() {
 		Map<String, Object> saved = new LinkedHashMap<>();
 		events.save(saved);
-		if (active != null) {
+		if (active != null && owner == null) { // (a part's work is the part's to save: a card's craft)
 			saved.put("active", active);
 		}
 		return saved;

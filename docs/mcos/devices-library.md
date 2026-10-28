@@ -76,7 +76,11 @@ For a [buffered device](#buffered-devices): waits for the next end of one of its
 and says how it went: `true`, or `false` and why it failed (`stopped` when a `stop` cut it short),
 then what it gave, if anything (its event's `result`: a swing's block, a craft's items).
 It takes the events before that one: a program that also wants those reads them with
-`devices.event` instead. With `seconds`, nil and `timed out` after that long.
+`devices.event` instead. Ends come in order: after two walks, the first call gives the first's.
+With `seconds`, nil and `timed out` after that long in all. Only a command that can run over time
+ends in an event (each device's page says which): one that answers in its call (a robot's `use`, a
+field card's `capture`) has none to wait for. A device keeps its events until a program reads them,
+an end left unread too: the next program to open the device finds it.
 
 ### devices.close(device) → true
 
@@ -117,8 +121,9 @@ end)
 walker:join()
 ```
 
-A read is a command too, so it waits its turn and answers once the command before it has ended. A
-device's live state (`get`), its events (`pull`) and its `stop` never wait. A `stop` also ends every
+Some reads are commands too (a robot's `position` and `scan`, a redstone card's `get`), so they
+wait their turn and answer once the command before has ended; each device's page says which of its
+methods never wait (a robot's `get`, `pull` and `stop`; a field card's `release`). A `stop` also ends every
 thread waiting to give that device a command: their calls fail with `stopped` (`ECANCELED`). Each
 command that runs over time (a walk, a move) ends in an event named after its method, `ok` and, when
 it failed, why (one done at once answers in its call):

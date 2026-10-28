@@ -81,9 +81,14 @@ public final class RedstoneCard extends Card implements Buffered {
 		if (input[side] != value) {
 			input[side] = value;
 			changed();
-			report();
+			if (!applying) {
+				report();
+			}
 		}
 	}
+
+	/** A set is being applied: what the world answers it with (dust beside it) is the set's, not news. */
+	private boolean applying;
 
 	/** The signal there: the strongest coming in or put out by the block's cards. */
 	private int level(int side) {
@@ -148,9 +153,19 @@ public final class RedstoneCard extends Card implements Buffered {
 		return pending != null ? BUSY : null;
 	}
 
-	/** Its tick (its block's): a {@code set} waiting is applied, and ends. */
+	/** Its tick, with nothing to look at in the world (a test's). */
 	public void tick() {
-		if (pending == null) {
+		tick(() -> {
+		});
+	}
+
+	/**
+	 * Its tick (its block's): a {@code set} waiting is applied, once its program takes data (a set
+	 * restored with a load waits for it), and ends. {@code sense} looks at the world again after (what
+	 * came back, dust beside it, is the set's: its event says each face as it is then).
+	 */
+	public void tick(Runnable sense) {
+		if (pending == null || !isAccepting()) {
 			return;
 		}
 		Map<Integer, Integer> settings = pending;
@@ -166,11 +181,14 @@ public final class RedstoneCard extends Card implements Buffered {
 		}
 		if (changedOutput) {
 			changed();
+			onOutput.run(); // (the block's other cards report: their levels may change)
+			applying = true;
+			sense.run(); // (what the world answers its change with)
+			applying = false;
 			for (int side : settings.keySet()) {
 				reported[side][0] = level(side); // (its own change: the set's event says it, no face's)
 				reported[side][1] = output[side];
 			}
-			onOutput.run(); // (the block's other cards report: their levels may change)
 			report();
 		}
 		events.ended("set", true, null, sides(allSides()));
@@ -274,11 +292,12 @@ public final class RedstoneCard extends Card implements Buffered {
 		}
 	}
 
-	/** It stopped taking data: its events go. */
+	/** It stopped taking data: its events go (but those a load brought, at its first reset: they're its program's). */
 	@Override
 	protected void dropData() {
-		events.clear();
-		pending = null; // (its program's gone: a set waiting goes with it)
+		if (events.clear()) {
+			pending = null; // (its program's gone: a set waiting goes with it)
+		}
 	}
 
 	@Override

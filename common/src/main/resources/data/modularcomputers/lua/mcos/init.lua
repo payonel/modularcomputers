@@ -700,6 +700,16 @@ function syscalls.open(p, request, file, mode)
 end
 
 syscalls.close = withfd(function(p, request, d, fd)
+  if d.refs == 1 and d.flush then -- (its last close: what it holds unsent goes first, waiting if it must)
+    local ok, why, errno = d:flush()
+    if ok == k.BLOCK then
+      return k.BLOCK -- (its descriptor stays open meanwhile)
+    elseif not ok then
+      p.fds[fd] = nil
+      release(d)
+      return nil, why, errno
+    end
+  end
   p.fds[fd] = nil
   return release(d)
 end)
@@ -1651,6 +1661,10 @@ while true do
         if not p.killed and not p.zombie and t.co and not rawget(t, "ended") then
           if t.blocked then
             serve(t) -- what it waits for may have come
+            if k.delivered then
+              k.delivered = false
+              progressed = true -- (its retry took news into others' files: they're served again before an idle)
+            end
           end
           if not t.blocked and t.co then
             run(t)

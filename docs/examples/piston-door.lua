@@ -3,8 +3,9 @@
 --
 -- A sticky robotic piston holds the door's block: extend pushes it out into the doorway (closed),
 -- retract pulls it back (open). The lever's signal comes in on a redstone card (/dev/redstone0, a
--- line a face: "face level powered"), and sys.poll waits for its change (PRI). The piston's file,
--- /dev/actuator0, has no data: its ioctls are its methods, extend and retract, by the side to move.
+-- line a face: "face level powered"), and sys.poll waits for its change (PRI). The piston's
+-- file, /dev/actuator0, reads as its moves' ends; its ioctls are its methods, extend and retract,
+-- by the side to move (each waits for the one before: the piston does one move at a time).
 -- "front" is the side away from its cable, so the program works however the piston is turned.
 local sys = require("sys")
 
@@ -25,7 +26,7 @@ while true do
   local done, why
   if open then
     done, why = sys.ioctl(piston, "retract", SIDE)
-    if not done and why == "not extended" then
+    if not done and why:match("^not extended") then
       done = true  -- (open already)
     end
   else

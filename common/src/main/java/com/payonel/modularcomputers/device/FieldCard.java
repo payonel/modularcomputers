@@ -19,10 +19,10 @@ import java.util.Map;
  * with it: in a golem it's how it flies. Holding costs power each tick, a move each block; without
  * power, or with no program running, it lets go. A {@link Projector} does the work in the world.
  * <p>
- * It's buffered ({@link Buffered}): {@code capture}, {@code move} and {@code set} are commands;
- * a move runs until it's arrived or blocked, its end its event ({@code move}). {@code scan},
- * {@code get}, {@code pull} and {@code release} are free: a program can always let go, and a move
- * under way then ends, stopped.
+ * It's buffered ({@link Buffered}): {@code capture} and {@code move} are commands; a move runs
+ * until it's arrived or blocked, its end its event ({@code move}). {@code scan}, {@code get},
+ * {@code pull} and {@code release} are free: a program can always let go, and a move under way then
+ * ends, stopped. {@code set} is free and refuses its own actions but a release, as they would be.
  */
 public final class FieldCard extends Card implements Buffered {
 	/** How far from its computer it reaches, in blocks: what it finds, holds, and moves to. */
@@ -86,7 +86,7 @@ public final class FieldCard extends Card implements Buffered {
 
 	@Override
 	public java.util.Set<String> free() {
-		return java.util.Set.of("scan", "get", "pull", "release");
+		return java.util.Set.of("scan", "get", "pull", "release", "set");
 	}
 
 	@Override
@@ -203,7 +203,11 @@ public final class FieldCard extends Card implements Buffered {
 			return Result.fail("not a table");
 		}
 		java.util.List<Object> rest = new java.util.ArrayList<>();
-		return switch (String.valueOf(action.get("action"))) {
+		String name = String.valueOf(action.get("action"));
+		if (!name.equals("release") && refusal(name) != null) {
+			return Result.fail(refusal(name)); // (set is free, so a release goes through; its other actions are commands)
+		}
+		return switch (name) {
 			case "capture" -> {
 				rest.add(action.get("target"));
 				yield capture(new Arguments(rest));
@@ -297,10 +301,13 @@ public final class FieldCard extends Card implements Buffered {
 		return line;
 	}
 
-	/** No program runs on its computer: it lets go, and its events go. */
+	/** No program runs on its computer: it lets go, and its events go (but those a load brought, at its first reset). */
 	@Override
 	protected void dropData() {
-		events.clear();
+		if (events.clear()) {
+			interrupted = false;
+			interruptedMove = false;
+		}
 		if (projector != null && !state.equals(IDLE)) {
 			projector.release();
 		}
@@ -318,17 +325,20 @@ public final class FieldCard extends Card implements Buffered {
 		Map<String, Object> saved = new LinkedHashMap<>();
 		events.save(saved);
 		saved.put("holding", !state.equals(IDLE));
+		saved.put("moving", state.equals(MOVING));
 		return saved;
 	}
 
-	/** Why a field held at a save is gone at the load. */
+	/** Why a field held at a save is gone at the load (and a move it was making ended). */
 	public static final String INTERRUPTED = "interrupted";
 	private boolean interrupted;
+	private boolean interruptedMove;
 
 	@Override
 	public void restore(Map<String, Object> saved) {
 		events.restore(saved);
 		interrupted = Boolean.TRUE.equals(saved.get("holding"));
+		interruptedMove = Boolean.TRUE.equals(saved.get("moving"));
 	}
 
 	@Override
@@ -336,6 +346,10 @@ public final class FieldCard extends Card implements Buffered {
 		super.accepting(accepting);
 		if (accepting && interrupted) {
 			interrupted = false;
+			if (interruptedMove) { // (the move it was making ends first, as a live loss's does)
+				interruptedMove = false;
+				events.ended("move", false, INTERRUPTED, null);
+			}
 			event("lost", INTERRUPTED);
 		}
 	}

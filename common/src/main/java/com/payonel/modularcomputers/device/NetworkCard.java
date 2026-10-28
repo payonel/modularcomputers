@@ -197,7 +197,7 @@ public final class NetworkCard extends Card {
 	/** A frame's data, if it fits; sending it costs power. */
 	private String checked(String data) {
 		if (data.length() > MTU) {
-			throw new Arguments.ArgumentError("frame too long: " + data.length() + " bytes, at most " + MTU);
+			throw new Arguments.ArgumentError("too long: " + MTU);
 		}
 		power.charge(wireless() ? (int) Math.ceil(strength * WIRELESS_SEND_COST_PER_BLOCK) : WIRED_SEND_COST);
 		return data;
@@ -232,7 +232,7 @@ public final class NetworkCard extends Card {
 	public Result setWake(Arguments args) {
 		String message = args.optString(0, null);
 		if (message != null && message.length() > MAX_WAKE) {
-			throw new Arguments.ArgumentError("wake message too long: at most " + MAX_WAKE + " bytes");
+			throw new Arguments.ArgumentError("too long: " + MAX_WAKE);
 		}
 		String old = wakeMessage;
 		wakeMessage = message == null || message.isEmpty() ? null : message;

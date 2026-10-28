@@ -68,13 +68,14 @@ no front it knows, or `left` and `right` when its front is up or down.
 ### push(side) → true
 
 Pushes on that side. The arm goes out and comes back on its own; its event, `push`, once it's back.
-Fails at once with `blocked: <side>` on the cable's side, when an arm is out there already, or when
-something in front will not move.
+Fails at once with `cable: <side>` on its cable port's side, and with `blocked: <side>` when an arm
+is out there already, or when something in front will not move.
 
 ### extend(side) → true
 
 Pushes and leaves the arm out until `retract`; its event, `extend`, once it's out. Gives `true` also
-when the arm is out already (and then it stays out, free, its event at once). Fails at once with
+when the arm is out already (and then it stays out, free, its event at once: every extend ends in its
+event, so a program waiting for one never has to know which it was). Fails at once with
 `blocked: <side>` otherwise, as `push` does.
 
 ### retract(side) → true

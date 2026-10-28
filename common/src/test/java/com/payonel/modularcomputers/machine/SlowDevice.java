@@ -36,6 +36,26 @@ public final class SlowDevice implements com.payonel.modularcomputers.bus.Device
 		endsAtRefusal = nth;
 	}
 
+	/** Which refusal raises news as it's given (0: none): news coming during a waiting command's call, on purpose. */
+	private int newsAtRefusal;
+
+	public void newsAsItRefuses(int nth) {
+		newsAtRefusal = nth;
+	}
+
+	/** Its next refusal raises news as it's given. */
+	public void newsAtNextRefusal() {
+		newsAtRefusal = refusals + 1;
+	}
+
+	/** How often it raises news of its own, in its ticks (0: never): a device that's never quiet. */
+	private int chatter;
+	private int ticked;
+
+	public void chatterEvery(int ticks) {
+		chatter = ticks;
+	}
+
 	@Override
 	public DeviceType type() {
 		return DeviceType.FABRICATOR;
@@ -51,7 +71,11 @@ public final class SlowDevice implements com.payonel.modularcomputers.bus.Device
 		if (left <= 0) {
 			return null;
 		}
-		if (++refusals == endsAtRefusal) {
+		refusals++;
+		if (refusals == newsAtRefusal) {
+			events.add(Map.of("event", "news"));
+		}
+		if (refusals == endsAtRefusal) {
 			left = 1;
 			tick(); // (busy, and then done: its end is waiting before anyone looks)
 		}
@@ -92,8 +116,11 @@ public final class SlowDevice implements com.payonel.modularcomputers.bus.Device
 		return Result.ok(events.pull());
 	}
 
-	/** One of its ticks: a work counts down, and ends. */
+	/** One of its ticks: a work counts down, and ends; its chatter, if it has some. */
 	public void tick() {
+		if (chatter > 0 && ++ticked % chatter == 0) {
+			events.add(Map.of("event", "news"));
+		}
 		if (left > 0 && --left == 0) {
 			done++;
 			events.ended("work", true, null, null);

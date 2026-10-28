@@ -607,9 +607,23 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   the calling thread only until the device is free (devfs's `command`, asked again as each command's
   end event comes), so more work in flight means threads. Its live state, its events and `stop` are
   free (`Buffered.free`); a `stop` also ends the threads waiting on it (`ECANCELED`). Each command's
-  end is an event named after its method, `ok`, why (`EventQueue.ended`). No queue, no tags, no
-  fault state: a failure ends its own command only (the user's: a robot stuck on its first failure
-  looks broken). A tags-and-queues design came first and was set aside as too error-prone.
+  end is an event named after its method, `ok`, why (`EventQueue.ended`); a method that can run
+  over time always ends in its event, even when done at once (an extend already out), so a program
+  never has to know which. No queue, no tags, no fault state: a failure ends its own command only
+  (the user's: a robot stuck on its first failure looks broken). A tags-and-queues design came first
+  and was set aside as too error-prone.
+  - **A device busy for another's sake names it** (`Buffered.blocker`): the board's refusal is
+    `false, "busy", "<its id>"` (a crafting card waiting for its robot, a robot for a card's craft:
+    one busy state, two interrupt lines), and mcos listens on both. `busy` and `held` mean "wait":
+    no device method fails with them (a field's target in another field is `captured`).
+  - **mcos asks a waiting command again at most once a tick** unless one of its devices raised its
+    interrupt (the board's state moves a tick at a time); news its retry takes into other files
+    counts as the pass's progress (`k.delivered`), so their waiters are served before an idle.
+  - **What a load brought is its program's:** a device restored from a save keeps its events and a
+    command under way through the first reset after the load (`EventQueue.clear` answering false: a
+    hub's card joining after the program went on), and a restored command's end comes once its
+    program takes data (a redstone set waits to apply, a field's move and a robot's command end
+    `interrupted`, a piston's move goes on); any later reset clears (a fresh boot's).
 - **A device's events go to every file open on it** (the user's): devfs takes them (`deliver`) and
   gives each file its own copy, bounded, so a program and a `cat` each see them all; a file's
   readiness counts what it holds (a poll that took the events itself would otherwise wait for a
@@ -820,6 +834,23 @@ Lessons from mistakes, each with its test:
   (it came between the refusal and the look): a wait for that end then never wakes, as nothing is
   left to raise the interrupt (the square example hung on a loaded host). A command whose blocking
   took anything asks again before it blocks. (`aCommandWhoseWaitEndedAsItWasRefusedRunsAtOnce`)
+- **Two devices sharing one busy state need one wake:** a robot's crafting card was refused busy
+  while the robot walked, and mcos listened on the card, whose line never rose when the walk ended
+  (and the other way round). A device busy for another's sake names it, and the waiter hears both.
+  (`BufferedWaitsMcosTest`: the robot and its card)
+- **A wait's reason is reserved:** mcos blocks on `busy` and `held` from any device, so a field
+  capture failing `held` (the target in another field) waited for ever. Only refusals say them.
+  (`whatAnotherFieldHoldsCantBeCapturedAndSaysSo`)
+- **The game saves what an entity's movement set:** a golem saved mid-step (its walk turning its
+  gravity off) loaded floating, never on the ground, so it never thawed and never walked again; and
+  a field's hold left its gravity off too. What a move sets is put back at a load and a freeze.
+  (`savedMidWalkItLoadsWithGravity`, `heldMidWalkAndLetGoItThawsAndItsWalkEnds`)
+- **An entity's first look at the world comes at its first tick:** a golem just placed isn't on the
+  ground yet, so "not on the ground" made it falling (busy) to a program's first call; a fall needs
+  it to be going down. (`itTakesFromAChestAndPutsBack`)
+- **A close that must send can't block after its descriptor's gone:** a last line to a busy device
+  was lost, its close's retry finding no descriptor (EBADF). A file's `flush` runs first, waiting
+  with the descriptor still open. (`aClosesLastLineWaitsForABusyRobotAndGoes`)
 - **A golem resting on its own legs is on the ground:** `fly()` takes off where it stands, its torso
   on its legs (solid), so `onGround()` stayed true and a hovering golem took no shove. Whether it
   stands asks `standing()` (on the ground, thrusters off). (`shovedInTheAirItHoldsItsPlanAndSaysSo`)

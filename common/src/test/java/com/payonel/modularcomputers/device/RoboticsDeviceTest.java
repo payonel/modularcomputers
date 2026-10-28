@@ -155,4 +155,214 @@ class RoboticsDeviceTest {
 		device.walked(2.5);
 		assertThat(device.power().collect(0)).isEqualTo((long) Math.ceil(2.5 * RoboticsDevice.WALK_COST)); // (by the distance, a part of a block too)
 	}
+
+	/** A body that can drift, fail its way back, fall, and says what it was asked to plan. */
+	private static final class Drifting implements RoboticsDevice.Body {
+		final List<String> asked = new ArrayList<>();
+		Map<String, Object> drift;
+		String noWayBack;
+		boolean falling;
+		boolean frozen;
+
+		@Override
+		public String walk(double forward, double right, double up) {
+			asked.add("walk");
+			return null;
+		}
+
+		@Override
+		public String turn(double degrees) {
+			asked.add("turn");
+			return null;
+		}
+
+		@Override
+		public void stop() {
+			asked.add("stop");
+		}
+
+		@Override
+		public Map<String, Object> drift() {
+			return drift;
+		}
+
+		@Override
+		public String returnToPlan() {
+			asked.add("return");
+			return noWayBack;
+		}
+
+		@Override
+		public void holdHere() {
+			asked.add("hold here");
+		}
+
+		@Override
+		public void replan() {
+			asked.add("replan");
+		}
+
+		@Override
+		public void replanHere() {
+			asked.add("replan here");
+		}
+
+		@Override
+		public boolean falling() {
+			return falling;
+		}
+
+		@Override
+		public boolean frozen() {
+			return frozen;
+		}
+	}
+
+	private static RoboticsDevice with(Drifting body) {
+		RoboticsDevice robot = new RoboticsDevice();
+		robot.moveWith(body);
+		robot.accepting(true);
+		return robot;
+	}
+
+	/** A fresh boot (its devices reset first) isn't given an old program's interrupted end; a program going on after a load is. */
+	@Test
+	void anInterruptedEndGoesToTheProgramGoingOnNotToAFreshBoot() {
+		RoboticsDevice loaded = new RoboticsDevice();
+		loaded.moveWith(new Drifting());
+		loaded.restore(Map.of("active", "walk"));
+		loaded.accepting(false); // (a fresh boot's reset)
+		loaded.accepting(true);
+		assertThat(loaded.pull(args()).first()).as("no old end at a fresh boot").isNull();
+		RoboticsDevice resumed = new RoboticsDevice();
+		resumed.moveWith(new Drifting());
+		resumed.restore(Map.of("active", "walk"));
+		resumed.accepting(true); // (its program goes on)
+		assertThat(resumed.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", RoboticsDevice.INTERRUPTED));
+	}
+
+	/** Shoved where it can't get back from (no path), it says so once and holds where it is: no stream of shoves. */
+	@Test
+	void aWayBackItCantMakeIsSaidOnceAndItHoldsWhereItIs() {
+		Drifting body = new Drifting();
+		body.noWayBack = "no path";
+		RoboticsDevice robot = with(body);
+		robot.drifted(Map.of("forward", 1.5, "right", 0L, "up", 0L));
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "shoved", "drift", Map.of("forward", 1.5, "right", 0L, "up", 0L)));
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "return", "ok", false, "why", "no path"));
+		assertThat(body.asked).containsExactly("return", "hold here");
+		assertThat(robot.busy()).isFalse();
+	}
+
+	/** A positional command given off its plan, with no way back, is refused with why (it can't run where it should). */
+	@Test
+	void aPositionalCommandWithNoWayBackIsRefusedWithWhy() {
+		Drifting body = new Drifting();
+		body.drift = Map.of("forward", 0.5, "right", 0L, "up", 0L);
+		body.noWayBack = "no path";
+		RoboticsDevice robot = with(body);
+		assertThat(robot.refusal("scan")).isEqualTo("no path");
+		body.noWayBack = null;
+		assertThat(robot.refusal("scan")).as("with a way back: it goes, the command waiting").isEqualTo(Buffered.BUSY);
+		assertThat(robot.state()).isEqualTo(RoboticsDevice.RETURNING);
+	}
+
+	/** A stop's plan is where it stopped (the body plans it: on its legs the block it's nearest), not where the stopped command began. */
+	@Test
+	void aStopPlansWhereItStopped() {
+		Drifting body = new Drifting();
+		RoboticsDevice robot = with(body);
+		robot.walk(args(5L));
+		robot.stop(args());
+		assertThat(body.asked).containsExactly("walk", "stop", "replan here");
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "stopped"));
+	}
+
+	/** Falling, it's busy; landed, its news (fell) ends the wait, said even for a short fall when a command waited. */
+	@Test
+	void fallingItsBusyAndItsLandingIsNewsWhenSomethingWaited() {
+		Drifting body = new Drifting();
+		RoboticsDevice robot = with(body);
+		robot.fell(0.01);
+		assertThat(robot.pull(args()).first()).as("a settling: nothing to say").isNull();
+		body.falling = true;
+		assertThat(robot.refusal("walk")).isEqualTo(Buffered.BUSY);
+		assertThat(robot.state()).isEqualTo(RoboticsDevice.FALLING);
+		body.falling = false;
+		robot.fell(0.01);
+		assertThat(robot.pull(args()).first()).as("a command waited: its news").isEqualTo(Map.of("event", "fell", "by", 0.01));
+		robot.fell(1.0);
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "fell", "by", 1L));
+	}
+
+	/** A field holding its robot pauses a craft (the robot's work), as its other commands; let go, it goes on. */
+	@Test
+	void aCraftPausesWhileAFieldHoldsItsRobot() {
+		Drifting body = new Drifting();
+		RoboticsDevice robot = with(body);
+		CraftingCard card = new CraftingCard();
+		card.benchIn(new CraftingCard.Bench() {
+			@Override
+			public boolean robotics() {
+				return true;
+			}
+
+			@Override
+			public RoboticsDevice robot() {
+				return robot;
+			}
+
+			@Override
+			public com.payonel.modularcomputers.runtime.Result list() {
+				return com.payonel.modularcomputers.runtime.Result.ok(List.of());
+			}
+
+			@Override
+			public com.payonel.modularcomputers.runtime.Result craft() {
+				return com.payonel.modularcomputers.runtime.Result.ok(Map.of("name", "minecraft:stick", "count", 4L));
+			}
+
+			@Override
+			public com.payonel.modularcomputers.runtime.Result move(int from, int to, int count) {
+				return null;
+			}
+
+			@Override
+			public com.payonel.modularcomputers.runtime.Result equip(int slot) {
+				return null;
+			}
+
+			@Override
+			public com.payonel.modularcomputers.runtime.Result pickup() {
+				return null;
+			}
+
+			@Override
+			public com.payonel.modularcomputers.runtime.Result drop(String face, int slot, int count) {
+				return null;
+			}
+
+			@Override
+			public com.payonel.modularcomputers.runtime.Result store(String face, int slot, int count, int to) {
+				return null;
+			}
+
+			@Override
+			public com.payonel.modularcomputers.runtime.Result take(String face, int slot, int count, int to) {
+				return null;
+			}
+		});
+		card.accepting(true);
+		assertThat(card.craft(args(1L)).first()).isEqualTo(true);
+		body.frozen = true;
+		for (int tick = 0; tick < 2 * CraftingCard.CRAFT_TICKS; tick++) {
+			card.tick();
+		}
+		assertThat(card.state()).as("paused, held").isEqualTo(CraftingCard.CRAFTING);
+		body.frozen = false;
+		for (int tick = 0; tick < CraftingCard.CRAFT_TICKS; tick++) {
+			card.tick();
+		}
+		assertThat(card.state()).as("let go: done").isEqualTo(CraftingCard.IDLE);
+	}
 }

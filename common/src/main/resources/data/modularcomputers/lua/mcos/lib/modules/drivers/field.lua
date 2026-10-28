@@ -6,7 +6,9 @@
 --   capture self | capture ID | capture forward [right [up]]
 --   move forward [right [up]]
 --   release
--- How a move went comes as an event (poll's PRI; the pull ioctl: arrived, blocked, lost).
+-- A move waits for the one before (a command); a release never waits. How a move went comes as
+-- an event (poll's PRI; the pull ioctl: {event = "move", ok, why}), and losing what it held as
+-- {event = "lost", why}.
 local function number(word)
   return word and tonumber(word)
 end

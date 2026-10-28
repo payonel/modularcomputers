@@ -18,7 +18,17 @@ public interface Buffered {
 
 	/**
 	 * Why it can't take {@code method}'s command now (null: it can): {@link #BUSY} while one runs, or
-	 * its own reason (a golem in a field: held). Asked only for commands, as each comes.
+	 * its own reason (a golem in a field: held). Asked only for commands, as each comes. No method of a
+	 * device fails with these reasons itself: they mean "wait" (mcos blocks on them).
 	 */
 	String refusal(String method);
+
+	/**
+	 * The device whose news ends the wait {@link #refusal} just gave, when it isn't this one (null): a
+	 * crafting card waiting for its robot to be free, a robot waiting for a card's craft. The board's
+	 * refusal names it, so a program (and mcos) knows which device to wait on.
+	 */
+	default Object blocker(String method) {
+		return null;
+	}
 }

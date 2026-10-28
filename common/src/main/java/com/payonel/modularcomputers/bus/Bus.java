@@ -52,6 +52,11 @@ public final class Bus {
 			.map(Map.Entry::getKey).findFirst().orElse(null);
 	}
 
+	/** Where a device is on the bus (its address), if it's on it. */
+	public Optional<String> addressOf(Object device) {
+		return devices.entrySet().stream().filter(entry -> entry.getValue() == device).map(Map.Entry::getKey).findFirst();
+	}
+
 	/** The address of the device at an address or another name for one, if it's on the bus. */
 	public Optional<String> address(String name) {
 		String address = aliases.getOrDefault(name, name);

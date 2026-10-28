@@ -187,10 +187,12 @@ end
 -- A buffered device's command's end: waits for 'method''s next completion event on 'device'
 -- (taking the events before it: news a program wanting it reads with event instead), and answers
 -- true, or false and why it failed (or nil and why the wait did), and what it gave (a swing's
--- block, a craft's items), if anything.
+-- block, a craft's items), if anything. Ends come in order: after two walks, the first call gives
+-- the first's. With seconds, nil and "timed out" after that long in all.
 function devices.ended(device, method, seconds)
+  local deadline = seconds and sys.uptime() + seconds
   while true do
-    local got, why = devices.event(device, seconds)
+    local got, why = devices.event(device, deadline and math.max(0, deadline - sys.uptime()))
     if not got then
       return nil, why
     elseif got.event == method and got.ok ~= nil then

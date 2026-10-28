@@ -100,12 +100,12 @@ The card's address: its id, which other cards send to.
 
 Sends a frame of at most 8192 bytes to the card with that address (with or without `id:`). Gives
 `true` when it was taken, else `false` and `"busy"` or `"unreachable"`. A longer frame fails with
-`frame too long`. Sending costs power. The card never tries again itself.
+`too long: 8192`. Sending costs power. The card never tries again itself.
 
 ### broadcast(data) → count
 
 Sends a frame to every card in reach and gives how many took it. A longer frame than 8192 bytes
-fails with `frame too long`.
+fails with `too long: 8192`.
 
 ### receive() → frame or nil
 
@@ -137,7 +137,7 @@ The wake message, or nil for none.
 ### setWake([message]) → old message or nil
 
 Sets the message that turns the computer on while it is off. Nil or an empty string clears it. At
-most 256 bytes (`wake message too long`). Returns the old message.
+most 256 bytes (`too long: 256`). Returns the old message.
 
 ### getStrength(), setStrength(blocks)
 
