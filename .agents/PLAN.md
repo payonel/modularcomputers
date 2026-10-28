@@ -121,7 +121,8 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   - **Every tag ends in exactly one event:** done (`arrived`, `turned`, `crafted`...), failed
     (`blocked`, `failed`), or `cancelled`, as NVMe completes an aborted command. Today an action can
     vanish (a new walk or `hover` drops a flight with no event): that goes.
-  - **Layer 1 (`sys.ioctl`) never blocks:** a call answers at once, with its tag; outcomes are events.
+  - **Layer 1 (`sys.ioctl`) never blocks** (the user's: every device, the sound card too, so a script
+    pushes all it wants into queues and syncs once): a call answers at once, with its tag; outcomes are events.
     Blocking forms (issue, then wait for its own tag) are layer 2's convenience (`devices`). Open: the
     tag's place in an ioctl's answer, which is the method's own value (an action's `true` is the
     natural slot; a read's answer is its data).
@@ -136,10 +137,8 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
     ending, aborting or its robotics losing power drops the queue and stops it.
   - **Commands run from the plan:** each command's place is where the ones before it leave the golem
     (the plan), and relative moves are measured from it, so `fly(A) + fly(B) == walk(A) + walk(B)`
-    (the user's: predictable). A shove (only in the air: nothing shoves it on its legs) or a field's
-    carry is drift: the next command returns to its plan first, so `fly(A) + shove + swing ==
-    fly(A) + swing`, and `fly(A) + field(B) + fly(B) == fly(A) + fly(B)` (the user's: the field moves
-    the golem, the golem doesn't move itself). `walk()` or `fly()` with no arguments returns to the
+    (the user's: predictable). A shove (only in the air: nothing shoves it on its legs) is drift: the next command returns to its plan first, so `fly(A) + shove + swing ==
+    fly(A) + swing`. `walk()` or `fly()` with no arguments returns to the
     plan explicitly. `position()` is queued and answers the plan. No way to accept drift into the
     plan for now (`replan`, `settle`, `resetOrigin` were tried and dropped: names didn't land); no
     `drift()` method: the `shoved` event carries the drift (its total), and `get()` shows it.
@@ -150,19 +149,30 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
     plan first.
   - **No `hover`:** `fly()` is "take off where it stands, and hold" (as `fly(0, 0, 0)` already is).
   - **A field holding the golem is stasis for its robotics, not its computer** (the user's: as a held
-    mob can't act), whoever's field it is, its own too: its queue pauses, the command under way too,
-    and goes on once it's let go (`held`, `released` events); its program, sensors and other cards
-    run on, and its own field card still carries it. So a golem in its own field travels but can't
-    dig or place (AGENTS.md's "it keeps its tools" in its own field changes).
+    mob can't act), whoever's field it is, its own too: no robotics, no tools (a tier 1's kind of
+    flight, worse than thrusters; AGENTS.md's "it keeps its tools" in its own field changes). Its
+    robotics queue freezes where it is (the command under way too) and goes on once it's let go
+    (`held`, `released` events, without distances); its program, sensors and other cards run on.
+    The field card has its own queue, tagged, in a case or a robot, so a frozen robot doesn't freeze
+    its own field.
+  - **A field's carry moves the origin with the golem** (the user's: unobservable to its robotics,
+    frozen in stasis: robotics' kidnapped robot problem): `position()` reads the same after, every
+    command works from where it was left (a tier 1 travels by its own field, nothing pulls it back),
+    and what the program saved (home, a chest) is offset by the carry until it re-localizes (a GPS
+    fix or the beacons, then `setPosition`). A shove is different: it comes while its robotics runs
+    (holding itself in the air, it feels the push, as a drone's inertial sensors do), so it's drift,
+    reported (`shoved`) and corrected by the next command. AGENTS.md's origin "kept through ...
+    fields" changes.
   - **Sensors report from the body, relative to their computer** (the user's: cases and robots
     alike): in a robot, forward, right and up (its own frame, as the field card's already are); in a
     case, its front and right as `Face` names them. The motion and audio sensors' world `x, y, z`
     go: they can't be turned into a robot's moves, and they leak its world heading. Reacting to a
     sensor from a drifted spot means returning to the plan first (`fly()`), or adding the drift.
   - **What needs robotics joins the robot's queue** (the user's line): the crafting card works only in
-    a robot, so its face actions (`drop`, `pickup`, `store`, `take`) queue and run from the plan, as
-    `swing` and `use` do (a CNC's toolhead commands in its G-code stream); its `craft` keeps its own
-    tag and timing (one ending event: `craft(5)`, one, with the count made). The energy field card
+    a robot, so all its actions queue there, its face actions (`drop`, `pickup`, `store`, `take`)
+    running from the plan as `swing` and `use` do (a CNC's toolhead commands in its G-code stream),
+    and `craft` too (the user's: the robot is busy while it crafts; one ending event, `craft(5)`:
+    one, with the count made). The energy field card
     works in a case too: its commands stay its own, tagged (`move`: one ending event), its positions
     in its computer's frame, from the body.
   - **The devices layer's one wait: `devices.sync(dev, ...[, seconds])`** (the user's): blocks until
