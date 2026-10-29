@@ -95,8 +95,9 @@ libudev is on Linux: it makes nothing new possible, only shorter to write and ea
 - **`devices.open("robotics0")`** gives the device as a table of its methods: `robot.walk(3)` is the
   file's ioctl; `pairs(robot)` lists them, and `tostring(robot.walk)` is what the method does.
 - **`devices.event(robot[, seconds])`** waits for the device's next event and takes it: the poll and
-  the pull, the loop every program writes, once. **`devices.ended(robot, "walk")`** waits for that
-  command's end and says how it went: `true`, or `false` and why.
+  the pull, the loop every program writes, once. **`devices.sync(robot)`** waits until nothing it was
+  given is pending (its `sync`, as the kernel waits on it); how each command went is its end, among
+  its events.
 - **`devices.wait("charger")`** waits for a device to come onto the bus (inotify on `/dev`), and
   **`devices.list`** and **`devices.info`** say what's there.
 

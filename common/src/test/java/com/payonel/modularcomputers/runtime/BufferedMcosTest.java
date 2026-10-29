@@ -34,8 +34,7 @@ class BufferedMcosTest extends McosHarness {
 			local slow = assert(devices.open("fabricator0"))
 			assert(slow.work(50))
 			assert(slow.work(1)) -- refused busy, and the first's end comes with the refusal
-			assert(devices.ended(slow, "work")) -- (the first's)
-			assert(devices.ended(slow, "work")) -- (the second's)
+			assert(devices.sync(slow)) -- (both done)
 			local out = io.open("/out", "w")
 			out:write(slow.peek(), "\\n")
 			out:close()
@@ -185,7 +184,7 @@ class BufferedMcosTest extends McosHarness {
 	}
 
 	@Test
-	void everyFileOpenOnADeviceSeesItsEventsAndEndedSaysHowACommandWent() {
+	void everyFileOpenOnADeviceSeesItsEventsAndAnEndSaysHowItsCommandWent() {
 		file("files.lua", """
 			local devices = require("devices")
 			local one = assert(devices.open("fabricator0"))
@@ -194,7 +193,8 @@ class BufferedMcosTest extends McosHarness {
 			local a, b = devices.event(one), devices.event(two)
 			assert(two.work(50))
 			assert(one.stop())
-			local ok, why = devices.ended(two, "work")
+			local ended = devices.event(two) -- (the second work's end: the stop's)
+			local ok, why = ended.ok, ended.why
 			local _, refused, errno = one.work(0) -- the device's own refusal: at once, nothing started
 			local out = io.open("/out", "w")
 			out:write(a.event, " ", tostring(a.ok), " ", b.event, " ", tostring(b.ok), " ", tostring(ok), " ", why, " ", refused, " ", errno, "\\n")

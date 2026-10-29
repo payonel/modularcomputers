@@ -91,7 +91,13 @@ public final class FieldCard extends Card implements Buffered {
 
 	@Override
 	public String refusal(String method) {
-		return state.equals(MOVING) ? BUSY : null;
+		return busy() ? BUSY : null;
+	}
+
+	/** A move under way (its only command that runs over time). */
+	@Override
+	public boolean busy() {
+		return state.equals(MOVING);
 	}
 
 	/** Each server tick, powered or not: a field held costs its power, and with none it lets go. */

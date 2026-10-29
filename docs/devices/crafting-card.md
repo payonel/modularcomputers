@@ -94,7 +94,7 @@ device's `held`: `damage`, `maxDamage`, `label` where they apply).
 
 Crafts what its grid makes, `count` times (1), each taking a tick, what it makes going into
 its storage. A command: once the robot's moves end it answers at once, and the card is busy until
-it's done, its robot free (a wait for its event is a program's sync). Its event,
+it's done, its robot free (`devices.sync` waits for it). Its event,
 `craft`: `ok` and its `result`, `{name, count}` (how many it made), or not and why (`no recipe`,
 `empty grid`, `no room`: its storage can't take what it made, so the craft isn't made and
 the grid is as it was; `stopped`, its `stop`), its `result` saying how many it made before it
@@ -146,6 +146,12 @@ What `list` gives: its file's read.
 ### set([face]) → true
 
 Drops everything in its storage at a face (below): its file's write.
+
+### sync() → boolean
+
+Whether its queue is empty: `true` when no command of its own is under way, else `false`, its
+interrupt saying when. It never waits; in mcos its ioctl (and `devices.sync`) waits until the queue
+is empty, and answers `true`. How its commands went is in its events.
 
 ### pull() → event or nil
 

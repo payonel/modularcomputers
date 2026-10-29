@@ -83,6 +83,12 @@ event, so a program waiting for one never has to know which it was). Fails at on
 Takes the arm on that side back in; a sticky piston pulls what is in front of it. Its event,
 `retract`, once it's in. Fails at once with `not extended: <side>` when there is no arm out there.
 
+### sync() → boolean
+
+Whether its queue is empty: `true` when no command of its own is under way, else `false`, its
+interrupt saying when. It never waits; in mcos its ioctl (and `devices.sync`) waits until the queue
+is empty, and answers `true`. How its commands went is in its events.
+
 ### pull() → event or nil
 
 Its oldest event, or `nil`.

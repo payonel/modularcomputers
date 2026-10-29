@@ -752,7 +752,8 @@ public final class RoboticsDevice implements Device, Buffered {
 		return null;
 	}
 
-	/** Whether it's running a command now (its body's ticks ask: a stop, a freeze). */
+	/** Whether it's running a command now, its way back to its plan too (its body's ticks ask: a stop, a freeze). */
+	@Override
 	public boolean busy() {
 		return active != null;
 	}

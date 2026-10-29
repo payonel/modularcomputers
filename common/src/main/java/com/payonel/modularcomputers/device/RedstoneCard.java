@@ -150,7 +150,13 @@ public final class RedstoneCard extends Card implements Buffered {
 
 	@Override
 	public String refusal(String method) {
-		return pending != null ? BUSY : null;
+		return busy() ? BUSY : null;
+	}
+
+	/** A set waiting to be applied. */
+	@Override
+	public boolean busy() {
+		return pending != null;
 	}
 
 	/** Its tick, with nothing to look at in the world (a test's). */

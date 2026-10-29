@@ -124,7 +124,7 @@ thread only), and a program that wants to know how a move went waits for its end
 
 | OpenComputers | Modular Computers |
 |---|---|
-| `robot.forward()` | `robot.walk(1)`, then `devices.ended(robot, "walk")`: `true`, or `false` and why |
+| `robot.forward()` | `robot.walk(1)`, then `devices.sync(robot)` to wait for it; how it went is its `walk` event (`devices.event`) |
 | `robot.turnLeft()` | `robot.turn("left")` |
 | `robot.detect()`, `robot.detectUp()`... | `robot.scan()`: all six faces at once, by name |
 | `robot.swing()` | `robot.swing("front")`: breaking takes a player's time; its event says when |

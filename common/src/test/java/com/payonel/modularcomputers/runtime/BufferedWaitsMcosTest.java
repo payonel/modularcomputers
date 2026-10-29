@@ -130,7 +130,7 @@ class BufferedWaitsMcosTest extends McosHarness {
 
 	/**
 	 * A craft's start costs its robot nothing (the user's): the robot walks while its card crafts, the
-	 * card's next craft waits for its own, and a wait for the craft's end is the program's sync.
+	 * card's next craft waits for its own, and a sync waits for its queue to empty.
 	 */
 	@Test
 	void theRobotWalksWhileItsCardCraftsAndTheCardsNextCraftWaitsForIt() {
@@ -141,10 +141,12 @@ class BufferedWaitsMcosTest extends McosHarness {
 			local robot = assert(devices.open("robotics0"))
 			assert(card.craft(50))
 			assert(robot.walk(1)) -- at once: the craft is the card's
-			assert(devices.ended(robot, "walk"))
+			assert(devices.sync(robot))
 			assert(card.craft(1)) -- waits: the card's crafting
-			local _, _, first = devices.ended(card, "craft")
-			local ok, _, second = devices.ended(card, "craft")
+			assert(devices.sync(card))
+			local first, second = devices.event(card), devices.event(card) -- (each craft's end, in order)
+			local ok = second.ok
+			first, second = first.result, second.result
 			local out = io.open("/out", "w")
 			out:write(first.count, " ", tostring(ok), " ", second.count, "\\n")
 			out:close()
@@ -187,9 +189,10 @@ class BufferedWaitsMcosTest extends McosHarness {
 			assert(card.craft(50))
 			robot.stop() -- (the robot's own: the craft goes on)
 			assert(robot.walk(1))
-			assert(devices.ended(robot, "walk"))
+			assert(devices.sync(robot))
 			card.stop()
-			local ok, why, made = devices.ended(card, "craft")
+			local ended = devices.event(card)
+			local ok, why, made = ended.ok, ended.why, ended.result
 			local out = io.open("/out", "w")
 			out:write(tostring(ok), " ", why, " ", tostring(made.count >= 20), "\\n")
 			out:close()
@@ -310,24 +313,69 @@ class BufferedWaitsMcosTest extends McosHarness {
 		untilFile(root().resolve("out"), "news\n");
 	}
 
-	/** An end's wait with a time limit ends then, however much other news comes meanwhile. */
+	/**
+	 * A sync waits until the device's queue is empty, however much news comes meanwhile, its thread
+	 * only, and takes none of the device's events: how the work went is still there to read.
+	 */
 	@Test
-	void endedsTimeLimitHoldsWhileOtherNewsKeepsComing() {
+	void aSyncWaitsForTheQueueThroughOtherNewsAndLeavesItsEvents() {
 		SlowDevice slow = new SlowDevice();
-		slow.chatterEvery(5); // (news four times a second: none of it the end waited for)
+		slow.chatterEvery(5); // (news four times a second: none of it the work's end)
 		devices.put(Motherboard.exp(1), slow);
 		ticks.add(slow::tick);
-		file("timeout.lua", """
+		file("sync.lua", """
 			local devices = require("devices")
+			local sys = require("sys")
+			local thread = require("thread")
 			local slow = assert(devices.open("fabricator0"))
-			local ok, why = devices.ended(slow, "work", 1)
+			local counted, done = 0, false
+			local counter = thread.create(function()
+			  while not done do
+			    counted = counted + 1
+			    sys.sleep(0.05)
+			  end
+			end)
+			assert(slow.work(30))
+			local before = counted
+			local synced = devices.sync(slow)
+			local after = counted
+			local working = slow.get().working
+			local ended
+			repeat
+			  ended = devices.event(slow, 0)
+			until not ended or ended.event == "work"
+			done = true
+			counter:join()
 			local out = io.open("/out", "w")
-			out:write(tostring(ok), " ", tostring(why), "\\n")
+			out:write(tostring(synced), " ", tostring(working), " ", tostring(ended and ended.ok), " ", tostring(after > before), "\\n")
 			out:close()
 			""");
 		boot();
-		type("lua /timeout.lua\r");
-		untilFile(root().resolve("out"), "nil timed out\n");
+		type("lua /sync.lua\r");
+		untilFile(root().resolve("out"), "true false true true\n");
+	}
+
+	/** The robot's sync (the user's case: its walk done before a field picks it up) waits for its walk, its end left to read. */
+	@Test
+	void theRobotsSyncWaitsForItsWalkAndLeavesItsEnd() {
+		file("syncwalk.lua", """
+			local devices = require("devices")
+			local robot = assert(devices.open("robotics0"))
+			assert(robot.walk(3))
+			assert(devices.sync(robot))
+			local f = io.open("/synced", "w")
+			f:write(tostring(robot.get().state), "\\n")
+			f:close()
+			local ended = devices.event(robot, 0)
+			local out = io.open("/out", "w")
+			out:write(tostring(ended and ended.event), " ", tostring(ended and ended.ok), "\\n")
+			out:close()
+			""");
+		boot();
+		type("lua /syncwalk.lua\r");
+		untilFile(root().resolve("out"), "walk true\n");
+		assertThat(read(root().resolve("synced"))).as("synced once its walk was done").isEqualTo("idle\n");
+		assertThat(asked).containsExactly("walk 3");
 	}
 
 	/** A field's release written as a line ("release": set's) never waits, even while a move runs: a program can always let go. */
@@ -376,7 +424,11 @@ class BufferedWaitsMcosTest extends McosHarness {
 			local f = assert(io.open("/dev/field0", "w"))
 			f:write("release\\n")
 			f:close()
-			local ok, why = devices.ended(field, "move")
+			local ended = devices.event(field)
+			while ended.event ~= "move" do
+			  ended = devices.event(field)
+			end
+			local ok, why = ended.ok, ended.why
 			local out = io.open("/out", "w")
 			out:write(tostring(ok), " ", why, "\\n")
 			out:close()

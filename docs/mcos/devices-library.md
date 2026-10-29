@@ -70,17 +70,22 @@ local done = devices.event(robot)          -- arrived, or blocked and why
 print(done.event, done.why)
 ```
 
-### devices.ended(device, method[, seconds]) → true, or false and why; and its result
+### devices.sync(device) → true
 
-For a [buffered device](#buffered-devices): waits for the next end of one of its commands, `method`'s,
-and says how it went: `true`, or `false` and why it failed (`stopped` when a `stop` cut it short),
-then what it gave, if anything (its event's `result`: a swing's block, a craft's items).
-It takes the events before that one: a program that also wants those reads them with
-`devices.event` instead. Ends come in order: after two walks, the first call gives the first's.
-With `seconds`, nil and `timed out` after that long in all. Only a command that can run over time
-ends in an event (each device's page says which): one that answers in its call (a robot's `use`, a
-field card's `capture`) has none to wait for. A device keeps its events until a program reads them,
-an end left unread too: the next program to open the device finds it.
+For a [buffered device](#buffered-devices): waits until its queue is empty, no command of its own
+under way (its `sync` method, which the kernel waits on), and answers `true`, or nil and why the wait
+failed (the device gone). It says nothing of how its commands went, and takes none of its events:
+each command that ran over time ended in an event, read with `devices.event` (`ok`, or `false` and
+why). A device keeps its events until a program reads them: the next program to open the device
+finds those left unread. Fails with `not an opened device with a queue` for one that isn't buffered.
+
+```lua
+local devices = require("devices")
+local robot = assert(devices.open("robotics0"))
+robot.walk(3)
+robot.turn("right")  -- waits for the walk
+devices.sync(robot)  -- waits for the turn: nothing pending
+```
 
 ### devices.close(device) → true
 
@@ -127,7 +132,8 @@ methods never wait (a robot's `get`, `pull` and `stop`; a field card's `release`
 thread waiting to give that device a command: their calls fail with `stopped` (`ECANCELED`). Each
 command that runs over time (a walk, a move) ends in an event named after its method, `ok` and, when
 it failed, why (one done at once answers in its call):
-`{event = "walk", ok = false, why = "blocked: minecraft:oak_log front"}`.
+`{event = "walk", ok = false, why = "blocked: minecraft:oak_log front"}`. `devices.sync` waits until
+nothing is pending (before a field picks the robot up, say: its walk done).
 
 ## Events
 

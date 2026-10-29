@@ -238,6 +238,30 @@ end
 local stopped = {} -- by device id: how many stops it's had
 local COMMAND_TRIES = 4 -- times a command is asked again at once, news having come with each refusal
 
+-- A device's sync from a process (every buffered device's, the sound card's): the device answers
+-- whether its queue is empty (no command of its own under way); while it isn't, the calling thread
+-- blocks, only it, until the device's interrupt. A sync takes no events: those it moves out of the
+-- device go into its files, for their reads (how its commands went), and may hold the end already
+-- (it came between the answer and the look), so it's asked again at once then. Without a syscall to
+-- block (a file closing as its process ends), not empty is EBUSY.
+local function sync(id)
+  local tries = 0
+  while true do
+    local ok, empty = board.invoke(id, "sync")
+    if not ok or empty then
+      return ok, empty
+    elseif not k.request then
+      return nil, "busy", "EBUSY"
+    end
+    local _, _, taken = deliver(id)
+    tries = tries + 1
+    if taken == 0 or tries >= COMMAND_TRIES then
+      k.listen(id) -- (its command's end raises its interrupt)
+      return k.BLOCK
+    end
+  end
+end
+
 -- Whether a stop of the device, or of the one it waits on, came since the request began waiting.
 local function cancelled(request)
   for device, count in pairs(request.stops) do
@@ -785,7 +809,12 @@ local function withmethods(d, device)
     if op == "setLabel" then
       return k.setlabel(device, ...)
     end
-    local answer = table.pack(command(id, op, ...))
+    local answer
+    if op == "sync" and select("#", ...) == 0 then
+      answer = table.pack(sync(id))
+    else
+      answer = table.pack(command(id, op, ...))
+    end
     if answer[1] == k.BLOCK then
       return k.BLOCK -- (a buffered device busy: this thread waits, only it)
     elseif answer[1] == nil and answer[3] then

@@ -38,12 +38,13 @@ gives its moves in order and they happen in order, and more work at once means
 
 A command answers as soon as it has started: `true` (a read answers what it read). One that runs
 over time (a walk, a flight, a turn, a landing, a block breaking) ends in an event named after it,
-`{event = "walk", ok = true}`, or `ok = false` and why (`blocked: minecraft:stone front`), and
-[`devices.ended`](/mcos/devices-library/)
-waits for it. A failure ends that command only: the next one runs as any would.
+`{event = "walk", ok = true}`, or `ok = false` and why (`blocked: minecraft:stone front`).
+[`devices.sync`](/mcos/devices-library/) waits until nothing is pending (before a field picks it up,
+say), and its events say how each went. A failure ends that command only: the next one runs as any
+would.
 
-Four methods never wait: `get` (what it's doing now, and where it really is), `pull` (its events),
-`stop` (it stops at once), and `set` (it does an action as its method would, waiting as it would,
+Five methods never wait: `get` (what it's doing now, and where it really is), `pull` (its events),
+`stop` (it stops at once), `sync` (whether its queue is empty: mcos's sync waits on it), and `set` (it does an action as its method would, waiting as it would,
 but a stop at once). Under the board's own calls, a command while another runs is refused at once
 with `busy`, doing nothing (mcos turns that into the wait). A [crafting
 card](/devices/crafting-card/)'s commands wait for the robot's moves too, but its craft is the
@@ -306,6 +307,12 @@ An action as a table: `{action = "walk"}` (or `"walkTo"`, `"fly"`, `"flyTo"`, wi
 `{action = "setPosition", forward, right, up, heading}` (the file's lines are these). It does what
 the method does, waiting as it would; a stop never waits. Fails with `not a table` or
 `not an action: ` and what it was.
+
+### sync() → boolean
+
+Whether its queue is empty: `true` when no command of its own is under way, else `false`, its
+interrupt saying when. It never waits; in mcos its ioctl (and `devices.sync`) waits until the queue
+is empty, and answers `true`. How its commands went is in its events.
 
 ### pull() → event or nil
 

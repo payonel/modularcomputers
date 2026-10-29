@@ -49,8 +49,11 @@ the spec the build follows and its checklist, items marked done as they land.
 
 ### Layer 2: `lib/devices.lua`
 
-- A device's methods answer as their ioctls do (blocking as above). `devices.ended(dev, method)`
-  waits for that method's next completion event and answers `ok, why` (a careful script's check).
+- A device's methods answer as their ioctls do (blocking as above). `devices.sync(dev)` waits until
+  its queue is empty and answers `true`; how commands went is in its events. (Changed after the
+  build, the user's, 2026-10-29: the build had `devices.ended(dev, method)`, mine, not the user's,
+  waiting for one method's end; the user's design had a sync, and every buffered device has a free
+  `sync` method now, as the sound card's.)
 
 ### Failure strings
 

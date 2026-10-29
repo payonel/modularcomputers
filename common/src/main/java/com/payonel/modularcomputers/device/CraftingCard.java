@@ -225,6 +225,12 @@ public final class CraftingCard extends Card implements Buffered {
 		return toCraft > 0 ? null : bench.robot();
 	}
 
+	/** A craft under way. */
+	@Override
+	public boolean busy() {
+		return toCraft > 0;
+	}
+
 	/** What it's doing now. */
 	public String state() {
 		return toCraft > 0 ? CRAFTING : IDLE;

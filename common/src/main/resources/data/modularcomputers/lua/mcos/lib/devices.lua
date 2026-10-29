@@ -11,7 +11,7 @@
 --   for name, method in pairs(robot) do print(name, method) end   -- each its description
 --   local name = devices.wait("charger", 10)        -- the first charger, waiting up to 10 s for one
 --   local event = devices.event(robot)              -- its next event, waiting for one
---   local ok, why = devices.ended(robot, "walk")    -- a buffered command's end: true, or false and why
+--   devices.sync(robot)                             -- waits until its queue is empty: its walk done
 local sys = require("sys")
 local fs = require("fs")
 
@@ -184,21 +184,15 @@ function devices.event(device, seconds)
   end
 end
 
--- A buffered device's command's end: waits for 'method''s next completion event on 'device'
--- (taking the events before it: news a program wanting it reads with event instead), and answers
--- true, or false and why it failed (or nil and why the wait did), and what it gave (a swing's
--- block, a craft's items), if anything. Ends come in order: after two walks, the first call gives
--- the first's. With seconds, nil and "timed out" after that long in all.
-function devices.ended(device, method, seconds)
-  local deadline = seconds and sys.uptime() + seconds
-  while true do
-    local got, why = devices.event(device, deadline and math.max(0, deadline - sys.uptime()))
-    if not got then
-      return nil, why
-    elseif got.event == method and got.ok ~= nil then
-      return got.ok, got.why, got.result
-    end
+-- devices.sync(device): waits until an opened device's queue is empty, no command of its own under
+-- way (the user's: its sync method, which the kernel waits on): true once it is, or nil and why the
+-- wait failed (the device gone). It says nothing of how the commands went, and takes none of the
+-- device's events: those are read with event (each command's end, ok or why not).
+function devices.sync(device)
+  if not about[device] or not device.sync then
+    return nil, "not an opened device with a queue"
   end
+  return device.sync()
 end
 
 return devices

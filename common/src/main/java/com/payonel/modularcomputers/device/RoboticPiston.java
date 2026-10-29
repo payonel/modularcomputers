@@ -147,7 +147,13 @@ public final class RoboticPiston implements Device, Buffered {
 
 	@Override
 	public String refusal(String method) {
-		return moving != null ? BUSY : null;
+		return busy() ? BUSY : null;
+	}
+
+	/** A move under way. */
+	@Override
+	public boolean busy() {
+		return moving != null;
 	}
 
 	/** Its block's tick: a move running counts down, and ends. */

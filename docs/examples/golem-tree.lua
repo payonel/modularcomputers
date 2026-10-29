@@ -27,6 +27,19 @@ local robot = assert(devices.open("robotics0"), "no robotics device: run it on a
 local storage = assert(devices.open("crafting0"), "no crafting card in the golem (its storage)")
 local field = assert(devices.open("field0"), "no energy field card in the golem (its lift)")
 
+-- How its last command went, once it's done: sync waits until the device's queue is empty, and the
+-- command's end is among its events (ok, or false and why).
+local function ended(device, method)
+  devices.sync(device)
+  local ok, why = true, nil
+  for event in function() return devices.event(device, 0) end do
+    if event.event == method and event.ok ~= nil then
+      ok, why = event.ok, event.why
+    end
+  end
+  return ok, why
+end
+
 -- Says what it's doing (its output: a service's log, or the screen).
 local function say(text)
   print(text)
@@ -74,13 +87,13 @@ local function carry(forward, up)
   local f0, r0, u0 = where()
   local ok, why = field.move(forward, 0, up)
   if ok then
-    ok, why = devices.ended(field, "move") -- (its end: there, or blocked: and by what)
+    ok, why = ended(field, "move") -- (its end: there, or blocked: and by what)
   end
   if not ok then
     local f1, r1, u1 = where()
     local got = math.sqrt((f1 - f0) ^ 2 + (r1 - r0) ^ 2) -- (how far forward it got: a field doesn't turn it)
     field.move(forward < 0 and got or -got, 0, u0 - u1)
-    devices.ended(field, "move")
+    devices.sync(field) -- (done: back where it began)
   end
   return ok, why
 end
@@ -99,7 +112,7 @@ local function walk(forward, up)
   setDown()
   local ok, why = robot.walk(forward, 0, up)
   if ok then
-    ok, why = devices.ended(robot, "walk") -- (its end: there, or why not)
+    ok, why = ended(robot, "walk") -- (its end: there, or why not)
   end
   return ok, why
 end
@@ -122,7 +135,7 @@ end
 local function chop(face, what)
   local swung, why = robot.swing(face)
   if swung == "breaking" then
-    swung, why = devices.ended(robot, "swing") -- (its end: broken, or why not)
+    swung, why = ended(robot, "swing") -- (its end: broken, or why not)
   end
   if not swung then
     problem("cutting " .. what .. ", it stopped: " .. tostring(why))

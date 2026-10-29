@@ -614,7 +614,10 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   at the board (layer 0, which can't wait: a board call freezes the whole program), and mcos blocks
   the calling thread only until the device is free (devfs's `command`, asked again as each command's
   end event comes), so more work in flight means threads. Its live state, its events and `stop` are
-  free (`Buffered.free`); a `stop` also ends the threads waiting on it (`ECANCELED`). Each command's
+  free (`Buffered.free`); a `stop` also ends the threads waiting on it (`ECANCELED`). Every one has
+  `sync` (the user's, 2026-10-29), free: whether its queue (one deep) is empty, as the sound card's
+  OSS sync; mcos's ioctl, and `devices.sync`, wait until it is and answer `true`, taking no events.
+  How a command went is its end event, read as any (no wait on one command's end: the user's). Each command's
   end is an event named after its method, `ok`, why (`EventQueue.ended`); a method that can run
   over time always ends in its event, even when done at once (an extend already out), so a program
   never has to know which. No queue, no tags, no fault state: a failure ends its own command only
@@ -639,7 +642,8 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
 - **`lib/devices.lua` is user space's convenience over `/dev`, `/sys` and inotify** (the user's;
   `sys` stays the kernel's calls): a device opened as a table of its methods (ioctls; `tostring` a
   method's doc, as OpenComputers' proxies), the bus listed, `devices.wait` for one to come,
-  `devices.event` for its next event (the poll and the pull). The manual teaches the three layers
+  `devices.event` for its next event (the poll and the pull), `devices.sync` until nothing's
+  pending. The manual teaches the three layers
   side by side (the board, `sys`, `devices`: concepts/device-layers, tutorials/device-layers).
 - **Threads are the kernel's tasks** (user design, 2026-10-25; Linux's, not OpenOS's): a process is
   one or more, each its own coroutine and syscall under way (one blocked leaves the others running),

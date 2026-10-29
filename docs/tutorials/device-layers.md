@@ -145,8 +145,9 @@ until done
 local devices = require("devices")
 local robot = assert(devices.open("robotics0"))
 robot.walk(3)
-robot.turn("right")                  -- (waits for the walk: the robot does one at a time)
-print(devices.ended(robot, "walk"))  -- true, or false and why
+robot.turn("right")             -- (waits for the walk: the robot does one at a time)
+devices.sync(robot)             -- waits for the turn too: nothing pending
+print(devices.event(robot).ok)  -- the walk's end: true, or false (its why says why)
 ```
 
 ## When it goes wrong

@@ -46,6 +46,22 @@ class BufferedTest {
 			Map.of("event", "work", "ok", true), 1L);
 	}
 
+	/** Every buffered device's sync, free: whether its queue is empty, false while a command runs; it takes no events. */
+	@Test
+	void syncSaysWhetherItsQueueIsEmptyAndTakesNoEvents() {
+		List<Object> seen = new ArrayList<>();
+		run(board -> {
+			seen.add(board.invoke("id:slow", "sync").first()); // idle: empty
+			seen.add(board.invoke("id:slow", "work", 3L).first());
+			seen.add(board.invoke("id:slow", "sync").first()); // free while it works: not empty
+			board.waitForInterrupt(10, "id:slow"); // its end
+			seen.add(board.invoke("id:slow", "sync").first()); // empty again
+			seen.add(board.invoke("id:slow", "pull").first()); // its end still there
+			Program.park(board);
+		});
+		assertThat(seen).containsExactly(true, true, false, true, Map.of("event", "work", "ok", true));
+	}
+
 	@Test
 	void aRefusedCommandDoesNothingAndAStopEndsTheOneRunning() {
 		List<Object> seen = new ArrayList<>();

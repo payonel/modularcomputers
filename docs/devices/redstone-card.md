@@ -114,6 +114,12 @@ costs a tick of a running CPU's power.
 sys.ioctl(fd, "set", {north = {powered = 15}, up = {powered = 0}})
 ```
 
+### sync() → boolean
+
+Whether its queue is empty: `true` when no command of its own is under way, else `false`, its
+interrupt saying when. It never waits; in mcos its ioctl (and `devices.sync`) waits until the queue
+is empty, and answers `true`. How its commands went is in its events.
+
 ### pull() → event or nil
 
 The oldest event waiting (see Events), or nil when none waits. Each is taken once.

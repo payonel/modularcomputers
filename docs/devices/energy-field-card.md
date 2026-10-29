@@ -111,6 +111,12 @@ An action as a table: `{action = "capture", target}`, `{action = "move", forward
 `{action = "release"}` (the file's lines are these). It never waits itself: a capture or a move in it
 waits as the method would, a release never.
 
+### sync() → boolean
+
+Whether its queue is empty: `true` when no command of its own is under way, else `false`, its
+interrupt saying when. It never waits; in mcos its ioctl (and `devices.sync`) waits until the queue
+is empty, and answers `true`. How its commands went is in its events.
+
 ### pull() → event or nil
 
 Its oldest event, or nil.

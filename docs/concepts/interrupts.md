@@ -75,14 +75,18 @@ and why), which raises its interrupt: the device's "idle again".
 - **At the board**, a command given while another runs is refused at once, `false, "busy"`, doing
   nothing: the call still never waits. Wait for the running command's end (its interrupt), then
   give it again. When another device's news ends the wait, the refusal names it too, by its id
-  (`false, "busy", "id:..."`): a crafting card waiting for its robot's walk.
+  (`false, "busy", "id:..."`): a crafting card waiting for its robot's walk. Every such device has
+  `sync`, which never waits either: `true` when its queue is empty (no command of its own under
+  way), else `false`, its interrupt saying when.
 - **Under mcos**, the kernel does that for you: a command to a busy device blocks the thread that
   gave it, and only that thread, until the device can take it, then starts it and returns. So a
   series of commands runs in order, and more work at once means more
   [threads](/mcos/threads/). Each device's page says which of its methods never wait (a robot's
   `get`, `pull` and `stop`; a field card's `release`); the others are commands, reads too (a
   robot's `position`, a redstone card's `get`), so they see the command before them done. A `stop`
-  (a line `stop` too) also ends the threads waiting to give that device a command.
+  (a line `stop` too) also ends the threads waiting to give that device a command. Its `sync`
+  waits until its queue is empty (`devices.sync`), saying nothing of how the commands went: their
+  ends are in its events.
 
 A failure ends its own command only: the next one runs as any would. There's no queue to drain
 and no fault to clear.

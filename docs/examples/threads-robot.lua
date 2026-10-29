@@ -14,15 +14,28 @@ local robot = assert(devices.open("robotics0"))
 
 local walked = 0 -- sides walked so far (the walker counts, the main thread reads)
 
+-- How its last command went, once it's done: sync waits until the device's queue is empty, and the
+-- command's end is among its events (ok, or false and why).
+local function ended(device, method)
+  devices.sync(device)
+  local ok, why = true, nil
+  for event in function() return devices.event(device, 0) end do
+    if event.event == method and event.ok ~= nil then
+      ok, why = event.ok, event.why
+    end
+  end
+  return ok, why
+end
+
 local walker = thread.create(function()
   for side = 1, LAPS * 4 do
     robot.walk(SIDE)
-    local ok, why = devices.ended(robot, "walk") -- (this thread waits; the main one goes on)
+    local ok, why = ended(robot, "walk") -- (this thread waits; the main one goes on)
     if not ok then
       return false, why
     end
     robot.turn("right")
-    devices.ended(robot, "turn")
+    devices.sync(robot)
     walked = side
   end
   return true

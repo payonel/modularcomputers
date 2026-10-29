@@ -67,6 +67,11 @@ public final class SlowDevice implements com.payonel.modularcomputers.bus.Device
 	}
 
 	@Override
+	public boolean busy() {
+		return left > 0;
+	}
+
+	@Override
 	public String refusal(String method) {
 		if (left <= 0) {
 			return null;

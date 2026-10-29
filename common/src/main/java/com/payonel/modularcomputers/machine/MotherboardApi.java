@@ -137,7 +137,7 @@ final class MotherboardApi implements Board {
 		if (device.isEmpty()) {
 			return Result.fail("no such device: " + address);
 		}
-		if (device.get() instanceof com.payonel.modularcomputers.device.Buffered buffered && !buffered.free().contains(method)
+		if (device.get() instanceof com.payonel.modularcomputers.device.Buffered buffered && !buffered.isFree(method)
 			&& DeviceMethods.of(device.get()).containsKey(method)) {
 			String refused = buffered.refusal(method);
 			if (refused != null) {
