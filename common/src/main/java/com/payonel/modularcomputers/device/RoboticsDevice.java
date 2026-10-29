@@ -56,8 +56,24 @@ public final class RoboticsDevice implements Device, Buffered {
 	public static final String HELD = "held";
 	/** What it's doing while it falls on its legs (nothing it was asked: a block gone under it). */
 	public static final String FALLING = "falling";
-	/** The name of its own way back to its plan, as an event (not a method). */
+	/** Its own way back to where its last command left it, as the command running (not a method). */
 	public static final String RETURN = "return";
+	/**
+	 * The event of whatever happened to it that no program asked for (the user's, 2026-10-29: one
+	 * type, so a program tells at once what it asked for from what came to it), {@code what} saying it.
+	 */
+	public static final String NOTICE = "notice";
+	/** A notice's {@code what}: shoved off where its last command left it, in the air (and how far: {@code drift}). */
+	public static final String SHOVED = "shoved";
+	/** A notice's {@code what}: its way back (after a shove, or before a positional command) got it there. */
+	public static final String RETURNED = "returned";
+	/** A notice's {@code what}: its way back didn't get it there, and why; it holds where it is. */
+	public static final String STUCK = "stuck";
+	/** A notice's {@code what}: it came down on its legs from a fall nothing asked for ({@code by}, blocks). */
+	public static final String FELL = "fell";
+	/** A notice's {@code what}: a field took hold of it, or let it go. */
+	public static final String FROZEN = "frozen";
+	public static final String THAWED = "thawed";
 	/** Why a command ended when a stop cut it short. */
 	public static final String STOPPED = "stopped";
 	/** The commands that act where it is: given while it's off its plan, it goes back first. */
@@ -395,7 +411,11 @@ public final class RoboticsDevice implements Device, Buffered {
 			body.replan();
 		}
 		changed();
-		events.ended(method, ok, why, result);
+		if (RETURN.equals(method)) {
+			notice(ok ? RETURNED : STUCK, ok ? null : Map.of("why", why)); // (nobody asked for it: no command's end)
+		} else {
+			events.ended(method, ok, why, result);
+		}
 	}
 
 	@Method(doc = "walkTo(forward[, right[, up]]): walks to the block that many whole blocks from its origin (not an integer: when one isn't), in the origin's frame (as position gives them), as walk does. A command: true at once (its event: walkTo, ok, or not and why), or false and why")
@@ -665,7 +685,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return value == null ? 0L : value;
 	}
 
-	@Method(doc = "pull(): its oldest event, or nil: a command's end, {event = method, ok, why, result} (walk, walkTo, fly, flyTo, turn, land, swing), its way back to where its last command left it ({event = \"return\", ok, why}), or news: {event = \"shoved\", drift}, {event = \"fell\", by}, {event = \"frozen\"}, {event = \"thawed\"}")
+	@Method(doc = "pull(): its oldest event, or nil: a command's end, {event = method, ok, why, result} (walk, walkTo, fly, flyTo, turn, land, swing), or a notice of what happened to it that no program asked for, {event = \"notice\", what, ...}: shoved (drift), returned, stuck (why), fell (by), frozen, thawed")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -709,10 +729,11 @@ public final class RoboticsDevice implements Device, Buffered {
 		end(false, why, null);
 	}
 
-	/** News from the body (not a command's end): {@code shoved} and its drift, {@code frozen}, {@code thawed}. */
-	public void news(String name, Map<String, Object> fields) {
+	/** What happened to it that no program asked for ({@code what}: {@link #SHOVED}...), as a {@link #NOTICE}. */
+	public void notice(String what, Map<String, Object> fields) {
 		Map<String, Object> event = new LinkedHashMap<>();
-		event.put("event", name);
+		event.put("event", NOTICE);
+		event.put("what", what);
 		if (fields != null) {
 			event.putAll(fields);
 		}
@@ -724,7 +745,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		if ("swing".equals(active)) {
 			end(false, HELD, null);
 		}
-		news("frozen", null);
+		notice(FROZEN, null);
 	}
 
 	/** Shoved off its plan in the air (its body found it so, hovering): it says so, and flies back, holding its plan. */
@@ -732,15 +753,30 @@ public final class RoboticsDevice implements Device, Buffered {
 		if (active != null) {
 			return;
 		}
-		news("shoved", Map.of("drift", drift));
+		notice(SHOVED, Map.of("drift", drift));
 		String why = body.returnToPlan();
 		if (why == null) {
 			active = RETURN;
 			changed();
 		} else {
-			events.ended(RETURN, false, why, null); // (it can't get back: it says so once, and holds where it is)
+			notice(STUCK, Map.of("why", why)); // (it can't get back: it says so once, and holds where it is)
 			body.holdHere();
 		}
+	}
+
+	/**
+	 * Shoved again on its way back (its body found the push took it farther off): it says so, as a
+	 * shove of its own (the user's: each shove its notice), and goes on back from where it is.
+	 */
+	public void shovedOnTheWay(Map<String, Object> drift) {
+		if (RETURN.equals(active) && drift != null) {
+			notice(SHOVED, Map.of("drift", drift));
+		}
+	}
+
+	/** Whether it's on its own way back (after a shove, or before a positional command). */
+	public boolean returning() {
+		return RETURN.equals(active);
 	}
 
 	/**
@@ -755,7 +791,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		}
 		waitedOnFall = false;
 		double kept = Math.rint(blocks * FALL_GRAIN) / FALL_GRAIN;
-		news("fell", Map.of("by", kept == Math.rint(kept) ? (Object) (long) kept : kept));
+		notice(FELL, Map.of("by", kept == Math.rint(kept) ? (Object) (long) kept : kept));
 	}
 
 	/** The least fall it says, in blocks (a settling as it's set down isn't one). */

@@ -98,7 +98,7 @@ class DeviceInterruptsTest {
 				card.tick();
 			}
 		}),
-		Map.entry(com.payonel.modularcomputers.device.RoboticsDevice.class, device -> ((com.payonel.modularcomputers.device.RoboticsDevice) device).news("frozen", null)),
+		Map.entry(com.payonel.modularcomputers.device.RoboticsDevice.class, device -> ((com.payonel.modularcomputers.device.RoboticsDevice) device).notice(com.payonel.modularcomputers.device.RoboticsDevice.FROZEN, null)),
 		Map.entry(com.payonel.modularcomputers.device.ChargingPad.class, device -> ((com.payonel.modularcomputers.device.ChargingPad) device).docked("a robot")),
 		Map.entry(Disk.class, device -> ((Disk) device).mkdir(new com.payonel.modularcomputers.runtime.Arguments(List.of("/made")))));
 

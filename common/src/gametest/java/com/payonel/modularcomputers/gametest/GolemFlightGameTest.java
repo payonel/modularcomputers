@@ -202,14 +202,42 @@ public class GolemFlightGameTest {
 				most[0] = 0;
 				golem.push(1.0, 0, 0); // (a shove: as a player's walk into it, a blast)
 			})
-			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(e -> e instanceof java.util.Map<?, ?> m && "shoved".equals(m.get("event"))),
-				"it says it was shoved: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(notices(events, "shoved") == 1, "it says it was shoved: " + events))
 			.thenWaitUntil(() -> {
 				helper.assertTrue(most[0] > SHOVED, "shoved off: " + most[0]);
 				helper.assertTrue(Math.abs(golem.getX() - at[0]) < 0.06 && golem.robotics().state().equals(RoboticsDevice.HOVERING),
 					"back on its plan, holding it as a drone does: " + (golem.getX() - at[0]) + " " + golem.robotics().state());
 			})
-			.thenExecute(() -> helper.assertTrue(golem.thrusting() && !golem.onGround(), "still in the air"))
+			.thenExecute(() -> {
+				helper.assertTrue(golem.thrusting() && !golem.onGround(), "still in the air");
+				helper.assertTrue(notices(events, "returned") == 1, "it says it's back: " + events);
+			})
+			.thenSucceed();
+	}
+
+	/** How many notices of {@code what} (shoved, returned...) are among {@code events}. */
+	private static long notices(List<Object> events, String what) {
+		return events.stream().filter(e -> e instanceof java.util.Map<?, ?> m && "notice".equals(m.get("event")) && what.equals(m.get("what"))).count();
+	}
+
+	/** Shoved again on its way back, it says so again (the user's: each shove its notice), and still gets back. */
+	@GameTest(maxTicks = 200)
+	public void shovedAgainOnItsWayBackItSaysSoAgainAndGetsBack(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
+		double[] at = new double[1];
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().fly(args()))
+			.thenWaitUntil(() -> helper.assertTrue(golem.robotics().state().equals(RoboticsDevice.HOVERING), "holding there: " + golem.robotics().state()))
+			.thenExecute(() -> {
+				at[0] = golem.getX();
+				golem.push(1.0, 0, 0);
+			})
+			.thenWaitUntil(() -> helper.assertTrue(golem.robotics().state().equals(RoboticsDevice.RETURNING), "on its way back: " + golem.robotics().state()))
+			.thenExecuteAfter(2, () -> golem.push(1.0, 0, 0)) // (again, on its way: farther off than its own step left it)
+			.thenWaitUntil(() -> helper.assertTrue(notices(events, "shoved") == 2, "each shove said: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(notices(events, "returned") >= 1 && golem.robotics().state().equals(RoboticsDevice.HOVERING)
+				&& Math.abs(golem.getX() - at[0]) < 0.06, "back, holding it: " + (golem.getX() - at[0]) + " " + events))
 			.thenSucceed();
 	}
 
@@ -287,10 +315,10 @@ public class GolemFlightGameTest {
 				same(helper, golem.robotics().state(), RoboticsDevice.HELD, "its robotics frozen");
 				same(helper, golem.robotics().refusal("swing"), RoboticsDevice.HELD, "no tools in a field");
 				same(helper, golem.robotics().refusal("walk"), RoboticsDevice.HELD, "no moves");
-				helper.assertTrue(events.contains(java.util.Map.of("event", "frozen")), "it said so: " + events);
+				helper.assertTrue(events.contains(java.util.Map.of("event", "notice", "what", "frozen")), "it said so: " + events);
 				field(golem).release(args()); // (it comes down onto its legs, two ahead)
 			})
-			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "thawed")), "down, and thawed: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "notice", "what", "thawed")), "down, and thawed: " + events))
 			.thenExecute(() -> {
 				same(helper, golem.robotics().position(args()).first(), before[0], "its position reads as before: the carry moved its origin");
 				helper.assertTrue(!golem.blockPosition().equals(from[0]), "though it's somewhere else: " + golem.blockPosition());
@@ -354,7 +382,7 @@ public class GolemFlightGameTest {
 			.thenExecuteAfter(3, () -> golem.robotics().walk(args(3L)))
 			.thenExecuteAfter(4, () -> helper.assertTrue(!field(golem).capture(args(FieldCard.SELF)).failed(), "held mid-walk"))
 			.thenExecuteAfter(5, () -> field(golem).release(args()))
-			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "thawed")), "down and thawed: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "notice", "what", "thawed")), "down and thawed: " + events))
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "walk", "ok", true)), "its walk ended: " + events))
 			.thenSucceed();
 	}

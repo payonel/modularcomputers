@@ -338,9 +338,14 @@ entity's moves), else refused, `not an integer: forward 4.4` (where it would end
 A move faces as it began (it squares its heading up, and gives it back), or ends not `ok` on the
 last middle reached; turns are right angles. **Each command goes from where the last left it**
 (the user's design, 2026-10-27; "plan" in the code): its robotics is buffered (one command at a
-time); a shove away from there (in the air) is drift, said as `shoved` news, and the next
-positional command (`RoboticsDevice.POSITIONAL`: moves, turns, scans, its hand's) goes back first
-(its own `return` event), as a hovering drone holds its place. `position` is where the last left it
+time); a shove away from there (in the air) is drift, said as a `shoved` notice, and it flies back
+(a `returned` notice; `stuck` and why when it can't, holding where it is), as a hovering drone
+holds its place; a shove on the way back is said too (a push that takes it farther off than its
+own step left it, once a push episode). A positional command (`RoboticsDevice.POSITIONAL`: turns,
+scans, its hand's) goes back first; a move goes straight to its target, measured from where its
+last command left it. **What no program asked for is one event** (the user's, 2026-10-29),
+`{event = "notice", what}`: shoved, returned, stuck, fell, frozen, thawed; every other event is a
+command's end, named after its method. `position` is where the last left it
 (a command, so it waits its turn); `get` is live (where it really is, its drift). `stop` is free and
 at once, where it is (no centering), answering where; the next command goes on from exactly there,
 on its legs as in the air, its heading the nearest right angle (the user's: a stop squares nothing,
@@ -375,7 +380,7 @@ in the world, and the swing's end says whether it kept it all.
   crafting card's craft under way goes on); what a held robot would do waits, judged by the actor
   (the user's): every crafting card command, its start of a craft and its moves between its own
   slots too, as the robot is what works the card (in a case there's none); `frozen` and
-  `thawed` news, and the carry moves its
+  `thawed` notices, and the carry moves its
   origin with it (its odometry never saw it: a kidnapped robot, told where it is by `setPosition`);
   nothing shoves it; it isn't flying. Legless with nothing holding it up (its program ended, its power gone, a field let go), it
   falls and powers off, a torso on the ground. Picked up legless it's a torso item; torso over legs

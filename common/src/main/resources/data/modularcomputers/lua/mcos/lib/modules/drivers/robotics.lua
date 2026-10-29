@@ -19,7 +19,8 @@
 --   position [forward [right [up [heading]]]]  (says where it is, its origin moved to make it so; none: its origin here)
 --   pathfinding on|off
 -- How an action that runs over time went comes as an event named after it (poll's PRI; the pull
--- ioctl: {event = "walk", ok, why}), and news (shoved, frozen, thawed). Its scan, its hand and
+-- ioctl: {event = "walk", ok, why}), and notices of what no program asked for ({event = "notice", what = "shoved"}: shoved, returned,
+-- stuck, fell, frozen, thawed). Its scan, its hand and
 -- containers are ioctls (scan, held, take...).
 local function number(word)
   return word and tonumber(word)

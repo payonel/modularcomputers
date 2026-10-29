@@ -742,6 +742,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	@Override
 	public void push(double x, double y, double z) {
 		if (!standing()) {
+			pushedOnTheWay |= robotics.returning();
 			super.push(x, y, z);
 		}
 	}
@@ -749,8 +750,48 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	@Override
 	public void knockback(double strength, double x, double z, DamageSource source, float amount, boolean onGround) {
 		if (!standing()) {
+			pushedOnTheWay |= robotics.returning();
 			super.knockback(strength, x, z, source, amount, onGround);
 		}
+	}
+
+	/** Something pushed it on its way back, since its last look: a shove of its own if it took it farther off. */
+	private boolean pushedOnTheWay;
+	/** How far it had left to go back after its own last step (NaN: not on its way back). */
+	private double wayLeft = Double.NaN;
+	/** A shove on this way back said, until a tick comes with no push (a mob leaning on it: one shove, not a push a tick). */
+	private boolean shoveSaid;
+
+	/**
+	 * Each tick of a flight, before its step: on its way back, a push that took it farther off than
+	 * its own last step left it is a new shove (the user's: each its notice), said once until a tick
+	 * comes with no push.
+	 */
+	private void watchTheWayBack() {
+		if (!robotics.returning() || Double.isNaN(wayLeft)) {
+			pushedOnTheWay = false;
+			return;
+		}
+		if (!pushedOnTheWay) {
+			shoveSaid = false;
+		} else if (!shoveSaid && wayBack() > wayLeft + OFF_PLAN) {
+			robotics.shovedOnTheWay(offPlan());
+			shoveSaid = true;
+		}
+		pushedOnTheWay = false;
+	}
+
+	/** Each tick of a flight, after its step: how far it has left to go back (NaN: not on its way back). */
+	private void steppedOnTheWay() {
+		wayLeft = robotics.returning() ? wayBack() : Double.NaN;
+		if (Double.isNaN(wayLeft)) {
+			shoveSaid = false;
+		}
+	}
+
+	/** How far its torso is from where its last command left it. */
+	private double wayBack() {
+		return position().distanceTo(planPoint().add(0, LEG_HEIGHT, 0));
 	}
 
 	@Override
@@ -796,7 +837,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			if (steps != null || stepTo != null) {
 				setNoGravity(true); // (its straight walk goes on, step by step)
 			}
-			robotics.news("thawed", null);
+			robotics.notice(com.payonel.modularcomputers.device.RoboticsDevice.THAWED, null);
 		}
 	}
 
@@ -939,9 +980,11 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	/** How far it's off its plan, {forward, right, up} in the origin's frame, or null when it's on it (or a command runs: it's on its way). */
 	Map<String, Object> drift() {
-		if (robotics.busy()) {
-			return null;
-		}
+		return robotics.busy() ? null : offPlan();
+	}
+
+	/** How far it's off where its last command left it, {forward, right, up} in the origin's frame, or null when it's there (a command running or not). */
+	private Map<String, Object> offPlan() {
 		Origin origin = origin();
 		Map<String, Object> at = positionFromOrigin();
 		double forward = ((Number) at.get("forward")).doubleValue() - origin.plan().x;
@@ -1101,6 +1144,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		if (firing) {
 			robotics.thrusted();
 			beams();
+			watchTheWayBack();
 			if (frozen) {
 				// (a field holds it: its flight pauses)
 			} else if (landing != null) {
@@ -1120,6 +1164,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 					}
 				}
 			}
+			steppedOnTheWay();
 		}
 		boolean up = entityData.get(THRUSTING) || EnergyField.held(this);
 		if (airborne && !up && !legs() && machine().isPowered()) {

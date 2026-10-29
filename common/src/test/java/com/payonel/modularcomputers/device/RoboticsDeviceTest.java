@@ -305,8 +305,8 @@ class RoboticsDeviceTest {
 		body.noWayBack = "no path";
 		RoboticsDevice robot = with(body);
 		robot.drifted(Map.of("forward", 1.5, "right", 0L, "up", 0L));
-		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "shoved", "drift", Map.of("forward", 1.5, "right", 0L, "up", 0L)));
-		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "return", "ok", false, "why", "no path"));
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "shoved", "drift", Map.of("forward", 1.5, "right", 0L, "up", 0L)));
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "stuck", "why", "no path"));
 		assertThat(body.asked).containsExactly("return", "hold here");
 		assertThat(robot.busy()).isFalse();
 	}
@@ -347,9 +347,9 @@ class RoboticsDeviceTest {
 		assertThat(robot.state()).isEqualTo(RoboticsDevice.FALLING);
 		body.falling = false;
 		robot.fell(0.01);
-		assertThat(robot.pull(args()).first()).as("a command waited: its news").isEqualTo(Map.of("event", "fell", "by", 0.01));
+		assertThat(robot.pull(args()).first()).as("a command waited: its news").isEqualTo(Map.of("event", "notice", "what", "fell", "by", 0.01));
 		robot.fell(1.0);
-		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "fell", "by", 1L));
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "fell", "by", 1L));
 	}
 
 	/**

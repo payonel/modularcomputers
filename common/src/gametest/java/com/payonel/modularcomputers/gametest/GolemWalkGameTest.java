@@ -352,7 +352,7 @@ public class GolemWalkGameTest {
 				events.clear();
 				helper.setBlock(ledge, Blocks.AIR); // (gone from under it)
 			})
-			.thenWaitUntil(() -> same(helper, last(events), Map.of("event", "fell", "by", 1L), "it says it fell"))
+			.thenWaitUntil(() -> same(helper, last(events), Map.of("event", "notice", "what", "fell", "by", 1L), "it says it fell"))
 			.thenExecute(() -> {
 				same(helper, position(golem), at(1, 0, 0L), "its plan came down with it");
 				golem.robotics().walk(args(1L));
