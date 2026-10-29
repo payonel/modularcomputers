@@ -155,7 +155,7 @@ public final class FieldCard extends Card implements Buffered {
 		return held;
 	}
 
-	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, ten blocks a second, never through blocks. A command: true at once (its event: move, ok, or not and why: blocked: the block), or false and why it can't start (not holding, too far)")
+	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, never through blocks. A command: true at once (its event: move, ok, or not and why: blocked: the block), or false and why it can't start (not holding, too far)")
 	public Result move(Arguments args) {
 		Result no = noProjector();
 		if (no != null) {

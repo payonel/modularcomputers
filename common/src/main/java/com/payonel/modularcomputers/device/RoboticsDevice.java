@@ -434,7 +434,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return result;
 	}
 
-	@Method(doc = "swing(face): swings what it holds at a face, as a player's left click: a mob there is hit (\"attacked\", as hard as a player's swing: full strength once the weapon has recovered); else the block there starts breaking, in a player's time (a pickaxe for stone, an axe for wood): \"breaking\", a command running till it's broken (its event: swing, ok and result {block, kept, dropped}: the block's name and whether it kept all it dropped, its storage first, else its off hand; or not and why); or false and why")
+	@Method(doc = "swing(face): swings what it holds at a face, as a player's left click: a mob there is hit (\"attacked\", as hard as a player's swing: full strength once the weapon has recovered); else the block there starts breaking, as a player breaks it (its tool matters: a pickaxe for stone, an axe for wood): \"breaking\", a command running till it's broken (its event: swing, ok and result {block, kept, dropped}: the block's name and whether it kept all it dropped, its storage first, else its off hand; or not and why); or false and why")
 	public Result swing(Arguments args) {
 		String face = face(args, 0);
 		Result result = body.swing(face);
@@ -699,11 +699,6 @@ public final class RoboticsDevice implements Device, Buffered {
 	private static final double FALL_GRAIN = 1000;
 	/** A command was refused while it fell: its landing's news must come, however short the fall. */
 	private boolean waitedOnFall;
-
-	/** Whether a field holds it (its robotics frozen): its parts' work pauses too (a crafting card's craft). */
-	public boolean isFrozen() {
-		return body.frozen();
-	}
 
 	/** What it's doing now. */
 	public String state() {

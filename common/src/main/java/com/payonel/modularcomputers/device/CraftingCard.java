@@ -156,9 +156,12 @@ public final class CraftingCard extends Card implements Buffered {
 		return bench;
 	}
 
-	/** Each server tick while it's powered: a craft under way goes on (paused while a field holds its robot), and when its time is up, it's made. */
+	/**
+	 * Each server tick while it's powered: a craft under way goes on, and when its time is up, it's
+	 * made. A field holding its robot doesn't pause it: a field holds robotics only (the user's).
+	 */
 	public void tick() {
-		if (toCraft == 0 || bench.robot() != null && bench.robot().isFrozen()) {
+		if (toCraft == 0) {
 			return;
 		}
 		if (--ticksLeft > 0) {
@@ -237,7 +240,7 @@ public final class CraftingCard extends Card implements Buffered {
 		return no != null ? no : bench.list();
 	}
 
-	@Method(doc = "craft([count]): crafts what its grid makes, count times (1), each taking a tick, what it makes going to its storage. A command: once its robot's moves end it starts, true at once, its robot free and the card busy until its event (craft, ok, result {name, count}, or not and why: no recipe, empty grid, no room, stopped), or false and why")
+	@Method(doc = "craft([count]): crafts what its grid makes, count times (1), what it makes going to its storage. A command: once its robot's moves end it starts, true at once, its robot free and the card busy until its event (craft, ok, result {name, count}, or not and why: no recipe, empty grid, no room, stopped), or false and why")
 	public Result craft(Arguments args) {
 		Result no = needsRobotics();
 		if (no != null) {

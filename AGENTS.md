@@ -360,7 +360,10 @@ in the world, and the swing's end says whether it kept it all.
   block triggers, and can be shoved; `land` comes down onto its legs below it and refuses with none
   there. Or carried in **a field**, its own too, legs and all (10 blocks a second): stasis, as for
   any creature (the user's, 2026-10-27): its robotics freezes (commands refused `held`, mcos waiting;
-  a swing under way ends; no tools, no looking), `frozen` and `thawed` news, and the carry moves its
+  a swing under way ends; no tools, no looking), and only its robotics (the user's, 2026-10-29: its
+  body is held, and robotics is its one device acting in the world), so its other devices go on (a
+  crafting card's craft under way too; the card's commands wait, as for its moves); `frozen` and
+  `thawed` news, and the carry moves its
   origin with it (its odometry never saw it: a kidnapped robot, told where it is by `setPosition`);
   nothing shoves it; it isn't flying. Legless with nothing holding it up (its program ended, its power gone, a field let go), it
   falls and powers off, a torso on the ground. Picked up legless it's a torso item; torso over legs
@@ -599,7 +602,9 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
 - **`/sys` makes devices learnable in the game** (the user's): Linux's `/sys/class` tree, a
   directory a kind, a device by its `/dev` name, its attributes a read-only file each (type, id,
   path, label) and `methods/` a file a method, its arguments and what it does, from its `@Method`
-  doc (so a doc begins with its signature: `walk(forward[, right]): ...`). No `/sys/devices` tree:
+  doc (so a doc begins with its signature: `walk(forward[, right]): ...`). A doc says what a method
+  does, never how long it takes or how fast it goes (the user's, 2026-10-29): timing is the mod's to
+  change (settings, other mods' recipes), so a program waits for an end, never for a time. No `/sys/devices` tree:
   the bus is flat (`sysfs.lua`). `/dev`'s names coming and going are inotify notices
   (`CREATE /dev/charger0`, udev's way), so a program waits for a device as for a file.
 - **Buffered devices** (the user's design, 2026-10-28; its spec and build, `.agents/BUFFERED.md`):

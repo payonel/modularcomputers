@@ -122,7 +122,7 @@ public final class RedstoneCard extends Card implements Buffered {
 		return Result.ok(sides(asked == null ? allSides() : named(asked)));
 	}
 
-	@Method(doc = "set(sides): sets each face named: powered, the signal it puts out (0 to 15); level is what's detected, so it's ignored. A command: true at once; applied at its next tick, its event then: set, every face as get() (result)")
+	@Method(doc = "set(sides): sets each face named: powered, the signal it puts out (0 to 15); level is what's detected, so it's ignored. A command: true at once; once the world has it, its event: set, every face as get() (result)")
 	public Result set(Arguments args) {
 		Map<Integer, Integer> settings = new LinkedHashMap<>();
 		for (Map.Entry<?, ?> entry : args.checkTable(0).entrySet()) {

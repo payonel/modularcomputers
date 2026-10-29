@@ -295,9 +295,12 @@ class RoboticsDeviceTest {
 		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "fell", "by", 1L));
 	}
 
-	/** A field holding its robot pauses a craft (the robot's work), as its other commands; let go, it goes on. */
+	/**
+	 * A field holds a robot's robotics only (the user's): a craft under way, the card's own work, goes
+	 * on while its robot is held, but the card's next command waits for robotics, held.
+	 */
 	@Test
-	void aCraftPausesWhileAFieldHoldsItsRobot() {
+	void aCraftGoesOnWhileAFieldHoldsItsRobotAndTheCardsNextCommandWaits() {
 		Drifting body = new Drifting();
 		RoboticsDevice robot = with(body);
 		CraftingCard card = new CraftingCard();
@@ -355,14 +358,10 @@ class RoboticsDeviceTest {
 		card.accepting(true);
 		assertThat(card.craft(args(1L)).first()).isEqualTo(true);
 		body.frozen = true;
-		for (int tick = 0; tick < 2 * CraftingCard.CRAFT_TICKS; tick++) {
-			card.tick();
-		}
-		assertThat(card.state()).as("paused, held").isEqualTo(CraftingCard.CRAFTING);
-		body.frozen = false;
 		for (int tick = 0; tick < CraftingCard.CRAFT_TICKS; tick++) {
 			card.tick();
 		}
-		assertThat(card.state()).as("let go: done").isEqualTo(CraftingCard.IDLE);
+		assertThat(card.state()).as("held, its craft done").isEqualTo(CraftingCard.IDLE);
+		assertThat(card.refusal("craft")).as("its next command waits for robotics").isEqualTo(RoboticsDevice.HELD);
 	}
 }
