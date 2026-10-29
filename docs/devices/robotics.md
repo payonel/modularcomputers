@@ -62,11 +62,13 @@ What happens to it that no program asked for comes as one kind of event, a **not
 (`{event = "notice", what = ...}`), so a program tells at once what it asked for (a command's end,
 named after its method) from what came to it.
 
-If something knocks it away from where its last command left it (a shove, in the air), it
-**drifts**: it says so (a `shoved` notice, with how far). Hovering on its thrusters it holds its
-place as a drone does: shoved, it flies back by itself (`returning`), and says so when it's there
-(`returned`); shoved again on the way, it says that too. If it can't get back (no path, a block
-put where it was), it says so once (`stuck`, and why) and holds where it is. Its moves still
+If something knocks it away from where its last command left it (a shove in the air, or a piston
+on its legs), it **drifts**: it says so (a `shoved` notice, with how far), once the shove is over.
+It holds its place as a hovering drone does: shoved, it goes back by itself (`returning`), flying
+or walking, and says so when it's there (`returned`); shoved again on the way, it says that too.
+If it can't get back (no path, a block put where it was, a piston's arm still out), it says so once
+(`stuck`, and why) and holds where it is, where it goes on from unchanged: no retries, so a
+program decides (`walk()` or `fly()` takes it back). Its moves still
 measure from where its last command left it, never from where a shove put it: a flight goes
 straight from where it is to its target, measured from that point. A turn, a scan or its hand's
 actions act where it should be, so they take it back first, and stuck, fail with why. `position`

@@ -338,9 +338,10 @@ entity's moves), else refused, `not an integer: forward 4.4` (where it would end
 A move faces as it began (it squares its heading up, and gives it back), or ends not `ok` on the
 last middle reached; turns are right angles. **Each command goes from where the last left it**
 (the user's design, 2026-10-27; "plan" in the code): its robotics is buffered (one command at a
-time); a shove away from there (in the air) is drift, said as a `shoved` notice, and it flies back
-(a `returned` notice; `stuck` and why when it can't, holding where it is), as a hovering drone
-holds its place; a shove on the way back is said too (a push that takes it farther off than its
+time); a shove away from there (in the air, or a piston's standing on its legs: the user's, as
+flight's) is drift, said as a `shoved` notice once the shove's over, and it goes back, flying or
+walking (a `returned` notice; `stuck` and why when it can't, holding where it is, where it goes on
+from unchanged, with no retries), as a hovering drone holds its place; a shove on the way back is said too (a push that takes it farther off than its
 own step left it, once a push episode). A positional command (`RoboticsDevice.POSITIONAL`: turns,
 scans, its hand's) goes back first; a move goes straight to its target, measured from where its
 last command left it. **What no program asked for is one event** (the user's, 2026-10-29),
@@ -396,7 +397,7 @@ in the world, and the swing's end says whether it kept it all.
   many went into the world. A face left out is the front for containers, below for drops. A player's hit picks it up as its item, parts kept; nothing else harms
 it; it's solid, as a boat is (players walk into it, not through it), and standing nothing shoves
 it (players, mobs, knockback; `standing`: on the ground, thrusters off; hovering it's pushed, even
-resting on its own legs). Creative
+resting on its own legs) but a piston, which moves it as it moves anything. Creative
 only until the Advanced Robotics Assembly. Its board's state reaches players by
 `BoardStatePayload` (an entity has no block update), its screen's rows as a block's do.
 
@@ -886,6 +887,11 @@ Lessons from mistakes, each with its test:
 - **A golem resting on its own legs is on the ground:** `fly()` takes off where it stands, its torso
   on its legs (solid), so `onGround()` stayed true and a hovering golem took no shove. Whether it
   stands asks `standing()` (on the ground, thrusters off). (`shovedInTheAirItHoldsItsPlanAndSaysSo`)
+- **What no program asked for moves nothing a program's commands go from:** a robot's way back
+  after a shove ended, when blocked partway, as a blocked walk does, where it was stopped becoming
+  where its next command goes from, so a robot stuck after a shove went on from where it was stuck
+  (`walk()` went nowhere). A way back that fails holds, the last good point kept.
+  (`aWayBackBlockedPartwayHoldsAndKeepsItsLastGoodPoint`, `aPistonShovesItOnItsLegsAndItSaysSo`)
 - **A block's state isn't the block:** leaves change state as their log goes, crops as they grow;
   what's tied to a block (a golem's breaking) compares the block, not its state.
   (`aBlockWhoseStateChangesWhileItsBrokenStillBreaks`)

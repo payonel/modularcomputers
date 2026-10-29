@@ -311,6 +311,23 @@ class RoboticsDeviceTest {
 		assertThat(robot.busy()).isFalse();
 	}
 
+	/**
+	 * A way back blocked partway says so (stuck, why) and holds where it is, where it goes on from left
+	 * the last good point: no program asked for the way back, so its end moves nothing (a blocked walk's
+	 * does). A walk() then takes it back.
+	 */
+	@Test
+	void aWayBackBlockedPartwayHoldsAndKeepsItsLastGoodPoint() {
+		Drifting body = new Drifting();
+		RoboticsDevice robot = with(body);
+		robot.drifted(Map.of("forward", 0.9, "right", 0L, "up", 0L));
+		assertThat(robot.state()).isEqualTo(RoboticsDevice.RETURNING);
+		robot.blocked("blocked: minecraft:piston_head back");
+		robot.pull(args());
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "stuck", "why", "blocked: minecraft:piston_head back"));
+		assertThat(body.asked).as("held there, nothing replanned").containsExactly("return", "hold here");
+	}
+
 	/** A positional command given off its plan, with no way back, is refused with why (it can't run where it should). */
 	@Test
 	void aPositionalCommandWithNoWayBackIsRefusedWithWhy() {

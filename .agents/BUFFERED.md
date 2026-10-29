@@ -83,7 +83,9 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
   falls, its plan follows it down, and a `fell` notice (how far) ends a wait: a build decision from the
   review (digging down broke every positional command after it).
 - Its own way back (after a shove, before a positional command) is a command of its own (others
-  wait for it), said by notices: a build decision, so a failed way back is said.
+  wait for it), said by notices: a build decision, so a failed way back is said. A failed one
+  holds, where it goes on from kept (no retries). A piston shoves it on its legs too, and it walks
+  back (the user's, 2026-10-29).
 - What no program asked for is one event, a notice (the user's, 2026-10-29): `{event = "notice",
   what}`, `shoved` (with the drift: `{forward, right, up}`; on the way back too), `returned`,
   `stuck` (why), `fell` (by), `frozen`, `thawed`. (The build had them as events of their own, the

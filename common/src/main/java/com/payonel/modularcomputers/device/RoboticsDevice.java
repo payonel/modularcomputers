@@ -407,6 +407,8 @@ public final class RoboticsDevice implements Device, Buffered {
 		active = null;
 		if (STOPPED.equals(why) || INTERRUPTED.equals(why)) {
 			body.replanHere();
+		} else if (RETURN.equals(method) && !ok) {
+			body.holdHere(); // (its way back failed: where it goes on from stays the last good point, and it holds where it is)
 		} else {
 			body.replan();
 		}
@@ -748,7 +750,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		notice(FROZEN, null);
 	}
 
-	/** Shoved off its plan in the air (its body found it so, hovering): it says so, and flies back, holding its plan. */
+	/** Shoved off where its last command left it (its body found it so: hovering, or standing idle on its legs): it says so, and goes back. */
 	public void drifted(Map<String, Object> drift) {
 		if (active != null) {
 			return;

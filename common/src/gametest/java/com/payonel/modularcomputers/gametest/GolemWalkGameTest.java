@@ -337,6 +337,41 @@ public class GolemWalkGameTest {
 			.thenSucceed();
 	}
 
+	/**
+	 * A piston shoves it, on its legs too (the user's): it's moved a block and says so, once the push
+	 * is over; its way back is in the piston's arm, so it's stuck there and says why, and holds (no
+	 * retries); the arm gone, a walk() takes it back.
+	 */
+	@GameTest(maxTicks = 100)
+	public void aPistonShovesItOnItsLegsAndItSaysSo(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		BlockPos piston = AT.west();
+		double[] from = {0};
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> {
+				helper.setBlock(piston, com.payonel.modularcomputers.block.ModBlocks.ROBOTIC_PISTON.defaultBlockState()
+					.setValue(com.payonel.modularcomputers.block.RoboticPistonBlock.FACING, net.minecraft.core.Direction.DOWN)); // (its cable below)
+				from[0] = golem.getX();
+				var arm = helper.getBlockEntity(piston, com.payonel.modularcomputers.block.RoboticPistonBlockEntity.class);
+				helper.assertTrue(!arm.device().push(args("east")).failed(), "it pushes");
+			})
+			.thenWaitUntil(() -> helper.assertTrue(golem.getX() - from[0] > 0.9, "shoved a block: " + (golem.getX() - from[0])))
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(e -> e instanceof Map<?, ?> m && "notice".equals(m.get("event")) && "shoved".equals(m.get("what"))),
+				"it says so: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(e -> e instanceof Map<?, ?> m && "notice".equals(m.get("event")) && "stuck".equals(m.get("what"))),
+				"stuck, its way back in the arm: " + events))
+			.thenExecute(() -> {
+				helper.assertTrue(events.stream().noneMatch(e -> e instanceof Map<?, ?> m && m.get("drift") instanceof Map<?, ?> d && ((Number) d.get("forward")).doubleValue() < 0.9),
+					"said once the push was over: " + events);
+				events.clear();
+			})
+			.thenWaitUntil(() -> helper.assertTrue(!helper.getBlockEntity(piston, com.payonel.modularcomputers.block.RoboticPistonBlockEntity.class).device().busy(), "the arm back"))
+			.thenExecuteAfter(2, () -> helper.assertTrue(!golem.robotics().walk(args()).failed(), "back to where its last command left it"))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(ARRIVED) && Math.abs(golem.getX() - from[0]) < 0.06, "walked back: " + (golem.getX() - from[0]) + " " + events))
+			.thenSucceed();
+	}
+
 	/** A block gone from under it: it falls, its plan follows it down, it says so, and its next walk is from there. */
 	@GameTest(maxTicks = 200)
 	public void aFallItDidntAskForMovesItsPlanDownAndItSaysSo(GameTestHelper helper) {

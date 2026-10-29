@@ -809,6 +809,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			}
 			thrust();
 			fall();
+			shovedOnItsLegs();
 			hands.tick();
 			board.tick();
 		}
@@ -861,6 +862,27 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	 * the drop, as a robot's IMU does: not drift, nothing to go back up to), and it says so, the news
 	 * ending a wait for it (commands are busy while it falls).
 	 */
+	/**
+	 * Standing idle on its legs, moved off where its last command left it by something it didn't ask
+	 * for (a piston: the user's, flight's way on the ground too), it says so and walks back, as a
+	 * hovering one flies back; a fall isn't a shove (where it goes on from follows it down).
+	 */
+	private void shovedOnItsLegs() {
+		Vec3 now = position();
+		boolean settled = stoodAt != null && now.distanceTo(stoodAt) <= DRIFT; // (a shove is judged once it's over: a piston moves it over ticks)
+		stoodAt = now;
+		if (!settled || !legs() || thrusting() || frozen || !holding || !standing() || falling() || !Double.isNaN(fallFrom) || robotics.busy()) {
+			return;
+		}
+		Map<String, Object> off = drift();
+		if (off != null) {
+			robotics.drifted(off);
+		}
+	}
+
+	/** Where it stood at its last tick, on its legs: a shove's over once it stays put. */
+	private Vec3 stoodAt;
+
 	private void fall() {
 		if (falling()) {
 			if (Double.isNaN(fallFrom)) {

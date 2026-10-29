@@ -41,7 +41,8 @@ drops as its item, its parts and its board's id kept in it, as a broken case kee
 that item (a golem's or a torso's), crouch and right-click, in the air or at a block, to open its
 parts right there: change its parts, what it holds and its crafting cards' slots without setting it
 down (it's off while it's an item: no bus till it's set down). Nothing else harms it. It's solid: you walk into it, not through it, and can stand on it. While it
-stands on its legs nothing shoves it: not a player walking into it, a mob, or a blast.
+stands on its legs it's hard to shove: not a player walking into it, a mob, or a blast. A piston
+does shove it, and it walks back.
 
 Its parts view is a case's, seen through its iron chest: the same board, the same slots, those its
 size has. Its gold slot takes only a [tier 1 screen](/hardware/screen/), which is its face. Its
