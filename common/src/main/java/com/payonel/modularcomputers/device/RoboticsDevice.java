@@ -85,6 +85,14 @@ public final class RoboticsDevice implements Device, Buffered {
 		/** Starts turning {@code degrees} (to its right; negative: its left); null, or why not. */
 		String turn(double degrees);
 
+		/**
+		 * The degrees to turn (to its right; negative: its left) from the heading its last command left
+		 * it to face {@code way}, one of the world's (north, south, east, west); NaN when it can't tell.
+		 */
+		default double toward(Face way) {
+			return Double.NaN;
+		}
+
 		/** Stops at once, where it is, no centering (a block it was breaking left as it is). */
 		void stop();
 
@@ -429,7 +437,10 @@ public final class RoboticsDevice implements Device, Buffered {
 		return Result.ok();
 	}
 
-	@Method(doc = "turn(way): turns a right angle in place, \"left\" or \"right\", or two, \"around\". A command: true at once (its event: turn), or false and why")
+	/** The world's ways a turn can face (the user's, 2026-10-29: a golem may know north). */
+	private static final java.util.Set<String> CARDINALS = java.util.Set.of("north", "south", "east", "west");
+
+	@Method(doc = "turn(way): turns a right angle in place, \"left\" or \"right\", or two, \"around\"; or to face the world's way, \"north\", \"south\", \"east\" or \"west\" (facing it already: no turn, its event all the same). A command: true at once (its event: turn), or false and why")
 	public Result turn(Arguments args) {
 		double degrees;
 		Object way = args.get(0);
@@ -438,7 +449,7 @@ public final class RoboticsDevice implements Device, Buffered {
 				case "left" -> -90;
 				case "right" -> 90;
 				case "around" -> 180;
-				default -> Double.NaN;
+				default -> CARDINALS.contains(name) ? body.toward(Face.of(name)) : Double.NaN;
 			};
 		} else {
 			degrees = Double.NaN;

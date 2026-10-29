@@ -410,6 +410,11 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 
 		@Override
+		public double toward(com.payonel.modularcomputers.device.Face way) {
+			return Mth.wrapDegrees(Direction.valueOf(way.name()).toYRot() - planYaw()); // (from its plan's heading)
+		}
+
+		@Override
 		public String turn(double degrees) {
 			getNavigation().stop();
 			hands.stopBreaking();

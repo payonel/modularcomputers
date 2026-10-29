@@ -113,6 +113,7 @@ given while one runs waits for it, the writing thread only; a `stop` never waits
 | `flyto forward [right [up]]` | Flies to whole blocks from its origin |
 | `land` | Comes down onto its legs, below it |
 | `turn left`, `turn right`, `turn around` | Turns a right angle in place (or two) |
+| `turn north` (`south`, `east`, `west`) | Turns to face the world's way |
 | `use face` | Uses what it holds on the space at a face |
 | `swing face` | Swings what it holds at a face: hits a mob, or breaks the block |
 | `stop` | Stops at once, where it is |
@@ -174,7 +175,8 @@ frame: the numbers `position` gives. `walkTo(0, 0, 0)` goes home. Its event: `wa
 ### turn(way) → true
 
 Turns a right angle in place: `"left"` or `"right"`, or two, `"around"`, from the heading its last
-command left it.
+command left it; or to face the world's way, `"north"`, `"south"`, `"east"` or `"west"` (facing it
+already, it doesn't turn, and its event comes all the same).
 Its event: `turn`. It fails with `not a way: ` and what it was given: its heading is always a right
 angle from its origin's.
 

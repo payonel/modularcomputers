@@ -56,6 +56,16 @@ class RoboticsDeviceTest {
 			public Result planned() {
 				return left == null ? Result.fail("no position") : Result.ok(left);
 			}
+
+			@Override
+			public double toward(Face way) {
+				return switch (way) { // (facing north)
+					case EAST -> 90;
+					case SOUTH -> 180;
+					case WEST -> -90;
+					default -> 0;
+				};
+			}
 		});
 		device.accepting(true);
 		asked.clear();
@@ -102,6 +112,15 @@ class RoboticsDeviceTest {
 		assertThat(device.turn(args(45L)).error()).as("no degrees: right angles only (the user's)").startsWith("not a way");
 		assertThat(asked).containsExactly("turn -90.0", "turn 180.0");
 		assertThat(device.turn(args("up")).error()).isEqualTo("not a way: up");
+	}
+
+	/** A turn can face the world's way (the user's: a golem may know north): the body says how far, from its heading. */
+	@Test
+	void aTurnFacesTheWorldsWay() {
+		device.turn(args("east"));
+		device.turn(args("north"));
+		device.turn(args("west"));
+		assertThat(asked).as("facing north: a right, none, a left").containsExactly("turn 90.0", "turn 0.0", "turn -90.0");
 	}
 
 	/** Every move must end squared (the user's): whole blocks from its origin, within a 4096th, made exact; else it's refused, saying where it would end. */

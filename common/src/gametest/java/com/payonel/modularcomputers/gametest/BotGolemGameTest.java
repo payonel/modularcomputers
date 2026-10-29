@@ -161,6 +161,18 @@ public class BotGolemGameTest {
 		});
 	}
 
+	/** A turn to the world's way faces it (the user's: a golem may know north). */
+	@GameTest(maxTicks = 100)
+	public void aTurnToTheWorldsWayFacesIt(GameTestHelper helper) {
+		List<Map<?, ?>> heard = new ArrayList<>();
+		BotGolem golem = golem(helper, doing(heard, "turn", "north"));
+		helper.runAfterDelay(1, () -> golem.board().pressPower());
+		helper.succeedWhen(() -> {
+			helper.assertTrue("turn".equals(last(heard)), "turned: " + heard);
+			helper.assertValueEqual(Math.round(Math.abs(net.minecraft.util.Mth.wrapDegrees(golem.getYRot()))), 180, "from east: north (180)");
+		});
+	}
+
 	@GameTest
 	public void aProgramReturningAsItStartsShowsItsAbortAtThePress(GameTestHelper helper) {
 		BotGolem golem = golem(helper, board -> {

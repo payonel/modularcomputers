@@ -12,7 +12,7 @@
 --                                off where it stands, or back to where its last command left it)
 --   flyto forward [right [up]]  (from its origin)
 --   land                        (onto its legs, below it)
---   turn left|right|around
+--   turn left|right|around|north|south|east|west
 --   use FACE                    (front, back, left, right, up or down: its own)
 --   swing FACE
 --   stop
