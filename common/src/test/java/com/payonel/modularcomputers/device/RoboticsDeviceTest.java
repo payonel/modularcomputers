@@ -296,11 +296,12 @@ class RoboticsDeviceTest {
 	}
 
 	/**
-	 * A field holds a robot's robotics only (the user's): a craft under way, the card's own work, goes
-	 * on while its robot is held, but the card's next command waits for robotics, held.
+	 * A field holds a robot's robotics only (the user's): a craft, the card's own work, goes on while
+	 * its robot is held, and a new one starts; its hands' commands (moving items, its face actions)
+	 * wait, held.
 	 */
 	@Test
-	void aCraftGoesOnWhileAFieldHoldsItsRobotAndTheCardsNextCommandWaits() {
+	void aCraftGoesOnWhileAFieldHoldsItsRobotAndItsHandsCommandsWait() {
 		Drifting body = new Drifting();
 		RoboticsDevice robot = with(body);
 		CraftingCard card = new CraftingCard();
@@ -362,6 +363,8 @@ class RoboticsDeviceTest {
 			card.tick();
 		}
 		assertThat(card.state()).as("held, its craft done").isEqualTo(CraftingCard.IDLE);
-		assertThat(card.refusal("craft")).as("its next command waits for robotics").isEqualTo(RoboticsDevice.HELD);
+		assertThat(card.refusal("move")).as("its hands' commands wait for robotics").isEqualTo(RoboticsDevice.HELD);
+		assertThat(card.refusal("take")).as("its face actions too").isEqualTo(RoboticsDevice.HELD);
+		assertThat(card.craft(args(1L)).first()).as("a new craft starts, held").isEqualTo(true);
 	}
 }

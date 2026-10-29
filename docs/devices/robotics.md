@@ -80,8 +80,8 @@ stasis, as any creature is: its robotics freezes. What it was doing pauses (a bl
 is left: no tools in a field), new commands wait (`held`, under the board's calls) until the field
 lets it go and it's down, and `stop` still works. It says so: `frozen`, then `thawed`. Only its
 robotics is held: the robot's body can't act, but its other devices go on (its computer runs, its
-sensors sense, a [crafting card](/devices/crafting-card/)'s craft under way finishes; the card's
-commands wait, as they wait for the robot).
+sensors sense, a [crafting card](/devices/crafting-card/) crafts; what the card asks of its
+hands, moving items and its face actions, waits).
 
 The field's carry is no move of its own, so its odometry never sees it: when it's down again, its
 origin has moved with it, and `position` reads as before. Like a robot picked up and set down

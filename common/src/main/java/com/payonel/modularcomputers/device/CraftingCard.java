@@ -203,9 +203,17 @@ public final class CraftingCard extends Card implements Buffered {
 	}
 
 	/**
+	 * Its commands that are its robot's hands' work, robotics: moving its items (between its slots, to
+	 * and from the robot's hand) and its face actions. A field holding the robot holds these; a craft,
+	 * the card's own, goes on (the user's: a field holds robotics only).
+	 */
+	private static final java.util.Set<String> HANDS = java.util.Set.of("move", "equip", "pickup", "drop", "store", "take", "set");
+
+	/**
 	 * Why it can't take {@code method} now: busy while it crafts, else what its robot says (busy, held;
-	 * its face actions are where the robot is, so off its plan it goes back first). In a case, nothing
-	 * here: its methods fail, no robotics.
+	 * its face actions are where the robot is, so off its plan it goes back first), but held only for
+	 * its hands' commands ({@link #HANDS}): a craft waits for its robot's moves, not for a field. In a
+	 * case, nothing here: its methods fail, no robotics.
 	 */
 	@Override
 	public String refusal(String method) {
@@ -216,7 +224,8 @@ public final class CraftingCard extends Card implements Buffered {
 		if (toCraft > 0) {
 			return BUSY;
 		}
-		return robot.refusal("set".equals(method) ? "drop" : method); // (its line's set drops where the robot is)
+		String refused = robot.refusal("set".equals(method) ? "drop" : method); // (its line's set drops where the robot is)
+		return RoboticsDevice.HELD.equals(refused) && !HANDS.contains(method) ? null : refused;
 	}
 
 	/** Refused for its robot's sake (its moves), the robot's news ends the wait; refused while it crafts, its own. */

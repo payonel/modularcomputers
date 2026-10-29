@@ -53,8 +53,9 @@ waits until it's let go, so what a program does at a chest comes after its walk 
 actions (`drop`, `store`, `take`, `pickup`, a line written) are where the robot is, so a robot
 shoved off its plan goes back to it first. A craft costs the robot nothing: once started it's the
 card's own work, and the card is busy until it's crafted (its next command waits for it) while the
-robot is free to walk and act. A field holding the robot holds its robotics only: a craft under way
-goes on, and the card's next command waits until the robot is let go. Its `pull`, `list`, `get` (its
+robot is free to walk and act. A field holding the robot holds its robotics only: crafting is the card's,
+so a craft goes on and a new one starts, but what its robot's hands do (moving its items, `equip`,
+and its face actions) waits until the robot is let go. Its `pull`, `list`, `get` (its
 own slots) and `stop` never wait. At the board a command refused because its robot is busy names
 the robot (`false, "busy", "id:..."`): its news ends the wait; one refused while the card crafts is
 `false, "busy"`, the card's own news ending it.

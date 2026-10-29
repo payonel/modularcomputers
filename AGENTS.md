@@ -362,7 +362,7 @@ in the world, and the swing's end says whether it kept it all.
   any creature (the user's, 2026-10-27): its robotics freezes (commands refused `held`, mcos waiting;
   a swing under way ends; no tools, no looking), and only its robotics (the user's, 2026-10-29: its
   body is held, and robotics is its one device acting in the world), so its other devices go on (a
-  crafting card's craft under way too; the card's commands wait, as for its moves); `frozen` and
+  crafting card crafts; its hands' commands, robotics, wait: moving items, its face actions); `frozen` and
   `thawed` news, and the carry moves its
   origin with it (its odometry never saw it: a kidnapped robot, told where it is by `setPosition`);
   nothing shoves it; it isn't flying. Legless with nothing holding it up (its program ended, its power gone, a field let go), it

@@ -84,7 +84,7 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
   ending in a `return` event (`ok`, or why): a build decision, so a failed way back is said.
 - A shove raises `shoved` (news, with the drift: `{forward, right, up}`).
 - Held in a field (any field, its own too): its robotics freezes, and only its robotics (the user's,
-  2026-10-29: a crafting card's craft under way goes on): the active command pauses, new
+  2026-10-29: a crafting card crafts on; its hands' commands wait): the active command pauses, new
   commands are refused `held` (mcos: blocked until it's let go), `stop` still works (ends the
   paused command); `frozen` and `thawed` news. The field's carry moves its origin with it, so
   `position()` reads the same after (the kidnapped robot: re-localize with a fix and
