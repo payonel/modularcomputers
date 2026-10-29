@@ -34,7 +34,7 @@ when there is no room.
 
 You need no battery: turning the gear by hand charges its small buffer. With power, it turns by
 itself: a battery in its bay (right-click one on it to put it in), or a running computer that has
-it on its bus (it is a device, joined by cable). It turns once every 5 ticks while there is
+it on its bus (it is a device, joined by cable). It turns while there is
 silicon to print, and idles at 5 W when there is none.
 
 Breaking a photomask keeps what is in it, but its buffer is lost.
@@ -46,4 +46,4 @@ that, a copper ingot, redstone and a copper ingot.
 
 ## Notes
 
-- Silicon is smelted in a blast furnace (200 ticks) from nether quartz.
+- Silicon is smelted in a blast furnace from nether quartz.

@@ -127,7 +127,7 @@ thread only), and a program that wants to know how a move went waits for its end
 | `robot.forward()` | `robot.walk(1)`, then `devices.sync(robot)` to wait for it; how it went is its `walk` event (`devices.event`) |
 | `robot.turnLeft()` | `robot.turn("left")` |
 | `robot.detect()`, `robot.detectUp()`... | `robot.scan()`: all six faces at once, by name |
-| `robot.swing()` | `robot.swing("front")`: breaking takes a player's time; its event says when |
+| `robot.swing()` | `robot.swing("front")`: its event says when the block's broken |
 | `robot.use()`, `robot.place()` | `robot.use("front")` |
 | `robot.suck()`, `robot.drop()` | `take`, `store` (a container), or a [crafting card](/devices/crafting-card/)'s `pickup` and `drop` |
 | the crafting upgrade | the [crafting card](/devices/crafting-card/) |

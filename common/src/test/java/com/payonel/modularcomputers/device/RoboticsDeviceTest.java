@@ -296,12 +296,12 @@ class RoboticsDeviceTest {
 	}
 
 	/**
-	 * A field holds a robot's robotics only (the user's): a craft, the card's own work, goes on while
-	 * its robot is held, and a new one starts; its hands' commands (moving items, its face actions)
-	 * wait, held.
+	 * A field holds a robot's robotics only (the user's): a craft under way, the card's own work, goes
+	 * on while its robot is held, but every command the card is given waits, held: the robot is what
+	 * works the card (the actor), a craft's start and a move between its own slots too.
 	 */
 	@Test
-	void aCraftGoesOnWhileAFieldHoldsItsRobotAndItsHandsCommandsWait() {
+	void aCraftUnderWayGoesOnWhileAFieldHoldsItsRobotAndTheCardsCommandsWait() {
 		Drifting body = new Drifting();
 		RoboticsDevice robot = with(body);
 		CraftingCard card = new CraftingCard();
@@ -363,8 +363,8 @@ class RoboticsDeviceTest {
 			card.tick();
 		}
 		assertThat(card.state()).as("held, its craft done").isEqualTo(CraftingCard.IDLE);
-		assertThat(card.refusal("move")).as("its hands' commands wait for robotics").isEqualTo(RoboticsDevice.HELD);
-		assertThat(card.refusal("take")).as("its face actions too").isEqualTo(RoboticsDevice.HELD);
-		assertThat(card.craft(args(1L)).first()).as("a new craft starts, held").isEqualTo(true);
+		assertThat(card.refusal("craft")).as("a new craft waits: the robot starts it").isEqualTo(RoboticsDevice.HELD);
+		assertThat(card.refusal("move")).as("a move between its own slots too: the robot moves them").isEqualTo(RoboticsDevice.HELD);
+		assertThat(card.refusal("take")).as("and its face actions").isEqualTo(RoboticsDevice.HELD);
 	}
 }

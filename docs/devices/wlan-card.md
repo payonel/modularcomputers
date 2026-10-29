@@ -37,7 +37,7 @@ up to the tier's:
 - A `distance` in a received frame is the straight line between the two blocks, in meters, to one
   decimal place. A card at strength 0 reaches only cards in its own block.
 
-A card tells the world where it is as its block ticks. A card that has not for a couple of ticks
+A card tells the world where it is as its block ticks. A card that has stopped
 (its chunk unloaded, its block broken, the card taken out) is not on the network.
 
 Everything else (addresses, `send`, `broadcast`, `receive`, the `"busy"` and `"unreachable"`

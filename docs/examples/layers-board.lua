@@ -4,7 +4,7 @@
 -- sleep until it has news, and board.invoke to call its methods (pull its changes, set its output).
 -- Device calls never wait: pull answers at once, nil when there's nothing, so the OS waits on the
 -- interrupt first, then takes everything the card has. The card does one command at a time (a set
--- takes effect at its next tick), so a set given before the last one's end answers false, "busy":
+-- ends in its event once it's applied), so a set given before the last one's end answers false, "busy":
 -- the OS keeps what it wants the lamp to be, and sets it once the card's free.
 local LEVER = "west" -- where the lever is (a face, as the card names them)
 local LAMP = "east"  -- where the lamp is

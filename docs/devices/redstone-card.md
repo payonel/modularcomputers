@@ -53,7 +53,7 @@ down 0 0
 Each line is `face level powered`. The state is taken at the first read after the file is opened
 or sought back to its start, so a read from the start always gives the faces as they are then.
 
-A line written, `face powered`, sets that face at the card's next tick after the line is written
+A line written, `face powered`, sets that face once the line is written
 (flushed), as a sysfs attribute does: `north 11`. Relative names work too (`front 15`). A line that is not a face and a
 number fails the write with `EINVAL`, and so does an unknown face (`no such face`).
 
@@ -78,8 +78,8 @@ the next ones `pull` answers, and once a program has pulled them all, `PRI` is o
 change (as reading the file from its start turns it off). So a program can wait with `sys.poll`
 and then take every change with `pull` until it answers nil.
 
-The card is a [buffered device](/mcos/devices-library/#buffered-devices): a change in the world takes
-a tick, so a `set` is applied at the card's next tick, and the card takes one command at a time. A
+The card is a [buffered device](/mcos/devices-library/#buffered-devices): a change in the world isn't
+at once, so a `set` ends in its event once it's applied, and the card takes one command at a time. A
 `set` or a `get` given while a `set` waits is held, in mcos its thread only, until it's applied: a
 `get` after a `set` always sees it. A line written to the file waits the same way.
 
@@ -99,7 +99,7 @@ local west = sys.ioctl(fd, "get", {"west"}).west.level
 
 ### set(sides) → true
 
-Takes a table in the same shape and sets each face it names, at the card's next tick:
+Takes a table in the same shape and sets each face it names:
 `{north = {powered = 11}}`.
 `powered` is the signal to put out; it is clamped to 0 through 15 and must be an integer
 (`north: powered: integer expected`). `level` is what is detected, so it is ignored, and a face the

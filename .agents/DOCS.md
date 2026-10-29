@@ -9,6 +9,10 @@ device with a fixed layout, a reference for every program and API, and numbered 
 - **Facts come from the code**, which is the truth: read the block, item, device, recipe JSON and
   language files. Never invent a number, recipe, tier or behavior; if the code doesn't say, leave it out.
   A page written from memory of OpenComputers is wrong: this is a different mod.
+- **No device timing** (the user's, 2026-10-29): a page says what a device does, never how long it
+  takes, how fast it goes or how often it looks (no "a tick", "10 blocks a second", "a player's
+  walking pace"): timing is the mod's to change, with settings or other mods, and a program waits
+  for an end, never for a time. Power drawn "a tick" is a unit of power, not timing.
 - **Words:** "bus" and "device", never "component". The Java side is "the host".
 - **Names:** "Modular Computers" in full on every page. Never name the machines the mod was built
   on, and never use a person's name other than `payonel`.

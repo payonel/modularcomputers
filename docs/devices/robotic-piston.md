@@ -27,7 +27,7 @@ For the block, the plain and sticky kinds, and how to place it, see
 ## How it moves
 
 A push moves the blocks in front of it with vanilla piston mechanics, slide and all: the arm comes
-out, and goes back by itself after 6 ticks. A sticky piston pulls back what is in front of its arm
+out, and goes back by itself. A sticky piston pulls back what is in front of its arm
 when the arm retracts. An arm cannot be pushed by other pistons.
 
 A piston has a **front**: the side opposite its cable port. A program can name a side by the world's

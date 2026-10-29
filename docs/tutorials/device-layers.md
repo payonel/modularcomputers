@@ -62,9 +62,9 @@ Your OS is the only code running, so it does everything a driver would.
    wait, so the inner loop takes changes until `nil`: then the card's interrupt is down, and the next
    wait sleeps. (Interrupts are level-triggered: a change that comes while the OS is busy keeps the
    line up, so the next wait returns at once. Nothing is lost.)
-4. **Act.** `board.invoke(card, "set", {east = {powered = 15}})` lights the lamp at the card's next
-   tick. Its end comes as an event too (`{event = "set", ok = true, ...}`, no side); the program
-   ignores any event but the lever's face. (A second `set` within that tick answers `false, "busy"`:
+4. **Act.** `board.invoke(card, "set", {east = {powered = 15}})` lights the lamp. Its end
+   comes as an event too (`{event = "set", ok = true, ...}`, no side); the program
+   ignores any event but the lever's face. (A second `set` before the first's end answers `false, "busy"`:
    the card takes one command at a time.)
 
 ## Layer 2: `sys`, step by step

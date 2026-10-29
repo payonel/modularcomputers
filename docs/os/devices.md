@@ -91,8 +91,8 @@ lever's signal, and `powered` stays your card's own (0), so you can tell a signa
 one your card puts out.
 
 A redstone card does [one command at a time](/concepts/interrupts/#one-command-at-a-time): a `set`
-takes effect at its next tick and ends in a `set` event, and a command given before then answers
-`false, "busy"`. Typed at your shell, a tick has always gone by; a program giving commands in a row
+ends in a `set` event once it's applied, and a command given before then answers `false, "busy"`.
+Typed at your shell, it's always been applied by then; a program giving commands in a row
 waits for the end event (`wait`, then `pull`) before the next, as every OS does for a busy device.
 
 ### 4. Run a program

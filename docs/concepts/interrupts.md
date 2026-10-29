@@ -68,7 +68,7 @@ interrupt, and gives you what the device had.
 A device that acts over time is **buffered**, as a real robot's controller runs one motion or a
 printer one job: a [robot](/devices/robotics/), a [crafting card](/devices/crafting-card/), an
 [energy field card](/devices/energy-field-card/),
-a [redstone card](/devices/redstone-card/) (a change takes effect at its next tick), a
+a [redstone card](/devices/redstone-card/), a
 [robotic piston](/devices/robotic-piston/). It runs one command at a time, and a command that runs
 over time ends in an event named after its method, `{event = "walk", ok = true}` (or `ok = false`
 and why), which raises its interrupt: the device's "idle again".

@@ -20,7 +20,6 @@ same. It never acts on its own: a program drives it.
 | Kind | Robot (an entity) |
 | Stack | 1 (it keeps its parts) |
 | Size | A block high, through a one-block gap |
-| Speed | A player's walking pace |
 | Slots | CPU, EEPROM, 1 disk, a tier 1 screen (its face, optional), 2 cards, its hands; tier 1: a battery, 2 RAM; tier 2: 2 batteries, 4 RAM |
 | Flies | Tier 2, on its thrusters (either tier, held in its own energy field) |
 | Soldered | Its robotics device, on its last expansion lane |
@@ -55,7 +54,7 @@ own to change: none is soldered but the robotics device.
 Right of its board, under its buttons, are its hands: what it holds (a tool, blocks to place, a
 bucket), shown in its hand in the world, and under it its off hand, where it catches what it breaks
 when it has no storage. A program uses it as a player would: places blocks, opens
-doors and presses buttons, breaks blocks with a tool in a player's time, hits mobs with a weapon,
+doors and presses buttons, breaks blocks with a tool as a player does, hits mobs with a weapon,
 and moves items to and from a chest in front of it. When you pick the golem up, what it holds goes
 with it. On its legs it presses pressure plates, as anything walking does.
 
@@ -69,8 +68,7 @@ A golem flies two ways, each with its price:
 
 - **Its thrusters, legs off.** A tier 2 golem has them (a tier 1's thruster calls answer `no
   thrusters`): its nozzles are the collars round its legs' sockets. `fly` leaves its legs standing where it was and
-  fires red beams from their empty sockets: it flies at 25 blocks a second, much faster than it
-  walks or its field flies it, needs no card, and costs five running CPUs' power a tick. On its
+  fires red beams from their empty sockets: it needs no card, and costs five running CPUs' power a tick. On its
   thrusters it has no footing: it uses no tools (buttons, doors and levers yes: a tool in its hand
   works as an empty hand), presses no pressure plates, and can be shoved: it says so, and flies
   back to where its program put it, as a drone holds its place. `fly()` takes it off where it
@@ -78,8 +76,7 @@ A golem flies two ways, each with its price:
   there. Chickens and cows run from it. If its program ends or its power runs out while its
   thrusters hold it up, it falls and powers off.
 - **Its own field, legs on.** An [energy field card](/devices/energy-field-card/) holding the golem
-  itself (`capture("self")`) carries it, legs and all, at 10 blocks a second, faster than a player
-  runs: a tier 1's way up a cliff. But a field is stasis, for a golem as for any creature: its
+  itself (`capture("self")`) carries it, legs and all: a tier 1's way up a cliff. But a field is stasis, for a golem as for any creature: its
   robotics freezes (no moves, no tools, no looking round: its commands wait until it's let go and
   down), and since it didn't move itself, its position reads as before when it's set down: its
   origin was carried with it. Nothing shoves it (the field holds it). Mobs don't mind it.

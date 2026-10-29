@@ -11,7 +11,7 @@ higher floor, or hold a mob out of the way. It never moves blocks. It hums up as
 hums softly round what it holds, and powers down as it lets go. A [Bot Golem](/hardware/bot-golem/)
 held, even by its own field, is in stasis too: its [robotics freezes](/devices/robotics/#held-in-a-field)
 until it's let go and down, and its origin is carried with it. Holding itself, it's how a golem
-goes up with its legs on (a tier 1's way up a cliff); its thrusters fly it faster, but with its legs
+goes up with its legs on (a tier 1's way up a cliff); its thrusters fly it too, but with its legs
 off.
 
 <div class="infobox" markdown="1">
@@ -23,7 +23,6 @@ off.
 | Where | Any expansion slot of a computer, an expansion hub, or a golem |
 | `/dev` | `field0` (`field1` the next) |
 | Reach | 16 blocks from its computer (a robot holding itself carries it along) |
-| Speed | 10 blocks a second |
 | Power | Two running CPUs' a tick while it holds something, and a CPU's tick a block moved |
 | Recipe | Ender pearl, chip, amethyst shard over three copper nuggets over three gold nuggets |
 
@@ -92,7 +91,7 @@ Fails with `holding` (it holds something already), `no entity` (nothing near the
 
 ### move(forward[, right[, up]]) → true, or nil and why
 
-Moves the field by that much, at 10 blocks a second, never through blocks. It answers at once; its
+Moves the field by that much, never through blocks. It answers at once; its
 event, `move`, says how it went: `ok`, or not and why (`blocked: minecraft:stone`, the block over or
 under it too when it moves up or down; `stopped`; or why it let go, as `lost` says). Fails at once
 with `not holding`, or `too far: 16` (out of its reach, unless it holds its own robot).

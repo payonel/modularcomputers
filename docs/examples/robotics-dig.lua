@@ -1,5 +1,5 @@
 -- Dig a tunnel: break the block in front with what the robot holds (a pickaxe), walk into the
--- space, and again, LENGTH times. Breaking takes a player's time with that tool: swing answers
+-- space, and again, LENGTH times. It breaks as a player does with that tool: swing answers
 -- "breaking" at once, and its event, swing, says when it's done, or why it couldn't. Each command
 -- waits for the one before it (the device does one at a time), so the program only checks how
 -- each ended. It stops at what it can't break or walk into, and says how far it got.

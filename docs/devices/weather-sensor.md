@@ -20,7 +20,7 @@ A weather sensor tells the weather where its block is, and raises an event when 
 </div>
 
 The weather is one of `clear`, `rain`, `snow` or `thunder`. It is worked out for the sensor's block
-once a second, from the world's weather and the biome there: a block in a desert reads `clear` even
+from the world's weather and the biome there: a block in a desert reads `clear` even
 while it rains elsewhere, and a cold biome reads `snow`. The sensor does not need to see the sky.
 
 ## In mcos

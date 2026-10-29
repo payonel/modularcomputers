@@ -21,7 +21,7 @@ where.
 
 </div>
 
-It has no settings. It looks every 5 ticks (four times a second) at every living entity in a box
+It has no settings. It keeps looking at every living entity in a box
 8 blocks around its block (players too; never the golem it's in), by their middles. An entity that has moved 0.1 of a block or more in any
 direction since the last look, or that it did not see last time, is an event. It works while a
 running computer powers it.

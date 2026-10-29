@@ -80,8 +80,8 @@ stasis, as any creature is: its robotics freezes. What it was doing pauses (a bl
 is left: no tools in a field), new commands wait (`held`, under the board's calls) until the field
 lets it go and it's down, and `stop` still works. It says so: `frozen`, then `thawed`. Only its
 robotics is held: the robot's body can't act, but its other devices go on (its computer runs, its
-sensors sense, a [crafting card](/devices/crafting-card/) crafts; what the card asks of its
-hands, moving items and its face actions, waits).
+sensors sense, a [crafting card](/devices/crafting-card/)'s craft under way finishes); a command
+whose actor is the robot waits, the crafting card's too, as the robot is what works it.
 
 The field's carry is no move of its own, so its odometry never sees it: when it's down again, its
 origin has moved with it, and `position` reads as before. Like a robot picked up and set down
@@ -131,10 +131,10 @@ Its scan, its hand and containers are ioctls: `sys.ioctl(fd, "scan")`, `sys.ioct
 The golem holds one item in its hand, in the hand slot of [its view](/hardware/bot-golem/) (right
 of its board, under its buttons), and has an off hand under it. What it does with it is what a player does: the game's own interactions,
 through a player standing where it is and looking at the space. A block placed, a door opened, a
-bucket filled, a lever flipped, wool sheared from a sheep: each as a player's right click. Breaking
-a block takes a player's time with what it holds (a pickaxe on stone, an axe on wood; the wrong tool
-is slow and may drop nothing), and the tool wears. A hit on a mob does the weapon's damage, as
-strong as a player's swing at that pace: full strength once the weapon has recovered.
+bucket filled, a lever flipped, wool sheared from a sheep: each as a player's right click. It breaks
+a block as a player does with what it holds (a pickaxe for stone, an axe for wood; the wrong tool
+may drop nothing), and the tool wears. A hit on a mob does the weapon's damage, as strong as a
+player's swing: full strength once the weapon has recovered.
 
 What a broken block drops is caught: into the robot's storage (a [crafting card](/devices/crafting-card/)'s)
 first, else its off hand catches it, in the background (when it's empty, or holds the same). What it
@@ -266,8 +266,7 @@ A tier 2 golem's: its thrusters' calls (`fly`, `flyTo`, `land`) fail on a tier 1
 thrusters` (it walks; its own [energy field](/devices/energy-field-card/) can still carry it).
 
 Flies on its thrusters to the point that many blocks from its plan, in its own frame, straight there
-and never through blocks, at 25 blocks a second (a field carries it at 10; a player sprints at under
-6). If it stands on its legs, they're left standing where it was: the thrusters fire red beams from
+and never through blocks. If it stands on its legs, they're left standing where it was: the thrusters fire red beams from
 their sockets. With no arguments, on its legs, it takes off where it stands and holds there; in
 the air, it flies back onto its plan. On its thrusters it walks nowhere (`no legs`), swings nothing
 (`no legs`), presses no pressure plates, and can be shoved (it flies back to its plan, saying
