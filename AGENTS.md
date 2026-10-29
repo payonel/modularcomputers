@@ -336,7 +336,8 @@ where the last left it; a shove off it (in the air) is drift, said as `shoved` n
 positional command (`RoboticsDevice.POSITIONAL`: moves, turns, scans, its hand's) goes back first
 (its own `return` event), as a hover holds its plan like a drone. `position` is the plan (a
 command, so it waits its turn); `get` is live (where it really is, its drift). `stop` is free and
-at once, where it is (no centering), answering where; the plan and the origin stay. Without pathfinding (the default) it walks straight,
+at once, where it is (no centering), answering where; its plan becomes where it stopped (in the air
+the point, on its legs the block it's nearest), the origin stays. Without pathfinding (the default) it walks straight,
 forward then right, never turning (it strafes and backs up), by `GolemSteps`: free within its
 elevation (the block its feet are in: slabs), a block up at a time only toward `up`, down three at
 most only toward it. With pathfinding (`setPathfinding`, kept like the origin) the game's pathfinder
