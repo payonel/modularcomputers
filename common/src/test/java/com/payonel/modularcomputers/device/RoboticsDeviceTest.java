@@ -300,10 +300,8 @@ class RoboticsDeviceTest {
 	 * on while its robot is held, but every command the card is given waits, held: the robot is what
 	 * works the card (the actor), a craft's start and a move between its own slots too.
 	 */
-	@Test
-	void aCraftUnderWayGoesOnWhileAFieldHoldsItsRobotAndTheCardsCommandsWait() {
-		Drifting body = new Drifting();
-		RoboticsDevice robot = with(body);
+	/** A crafting card in {@code robot}, taking data: its bench makes 4 sticks a craft and does nothing else. */
+	private static CraftingCard cardIn(RoboticsDevice robot) {
 		CraftingCard card = new CraftingCard();
 		card.benchIn(new CraftingCard.Bench() {
 			@Override
@@ -357,6 +355,36 @@ class RoboticsDeviceTest {
 			}
 		});
 		card.accepting(true);
+		return card;
+	}
+
+	/**
+	 * The card's commands are its robot's to wait for (the robot decides, the card asks it): a take
+	 * off the robot's plan waits for it to go back (the robot's return, its news the wait's end), and
+	 * a craft waits for that move too, without starting one.
+	 */
+	@Test
+	void aCardsTakeOffItsRobotsPlanWaitsForItToGoBackFirst() {
+		Drifting body = new Drifting();
+		body.drift = Map.of("forward", 0.5, "right", 0L, "up", 0L);
+		RoboticsDevice robot = with(body);
+		CraftingCard card = cardIn(robot);
+		assertThat(card.refusal("craft")).as("a craft isn't where the robot is: no way back for it").isNull();
+		assertThat(card.refusal("take")).as("a take is: it waits").isEqualTo(Buffered.BUSY);
+		assertThat(robot.state()).as("the robot goes back").isEqualTo(RoboticsDevice.RETURNING);
+		assertThat(card.blocker("take")).as("the robot's news ends the wait").isSameAs(robot);
+		assertThat(card.refusal("craft")).as("a craft waits for that move too").isEqualTo(Buffered.BUSY);
+		body.drift = null;
+		robot.arrived(); // (back on its plan)
+		assertThat(card.refusal("take")).as("in position: it takes").isNull();
+		assertThat(body.asked).containsExactly("return", "replan");
+	}
+
+	@Test
+	void aCraftUnderWayGoesOnWhileAFieldHoldsItsRobotAndTheCardsCommandsWait() {
+		Drifting body = new Drifting();
+		RoboticsDevice robot = with(body);
+		CraftingCard card = cardIn(robot);
 		assertThat(card.craft(args(1L)).first()).isEqualTo(true);
 		body.frozen = true;
 		for (int tick = 0; tick < CraftingCard.CRAFT_TICKS; tick++) {
