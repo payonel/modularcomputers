@@ -69,8 +69,10 @@ public final class RoboticsDevice implements Device, Buffered {
 	public static final String RETURNED = "returned";
 	/** A notice's {@code what}: its way back didn't get it there, and why; it holds where it is. */
 	public static final String STUCK = "stuck";
-	/** A notice's {@code what}: it came down on its legs from a fall nothing asked for ({@code by}, blocks). */
+	/** A notice's {@code what}: it came down on its legs from a fall nothing asked for ({@code by}, blocks); as it began, {@link #FALLING}. */
 	public static final String FELL = "fell";
+	/** Its commands taken while it falls (the user's): a tier 2 catches itself on its thrusters, its legs dropped. */
+	private static final java.util.Set<String> CATCHES = java.util.Set.of("fly", "flyTo");
 	/** A notice's {@code what}: a field took hold of it, or let it go. */
 	public static final String FROZEN = "frozen";
 	public static final String THAWED = "thawed";
@@ -205,8 +207,11 @@ public final class RoboticsDevice implements Device, Buffered {
 		default void pathfinding(boolean on) {
 		}
 
-		/** Starts coming down onto its legs, below it (its event: landed, or blocked): null, or why not. */
-		default String land() {
+		/**
+		 * Starts coming down onto its legs, below it (its event: landed, or blocked): null, or why not;
+		 * {@code force}, with none there, straight down onto the ground, legless, still running.
+		 */
+		default String land(boolean force) {
 			return "no thrusters";
 		}
 
@@ -589,9 +594,9 @@ public final class RoboticsDevice implements Device, Buffered {
 		return move.why() != null ? Result.fail(move.why()) : start("fly", body.fly(move.by()[0], move.by()[1], move.by()[2]));
 	}
 
-	@Method(doc = "land(): (a tier 2 golem's) comes down onto its legs, standing below it (within three blocks to the side), and onto them. A command: true at once (its event: land, ok, or not and why), or false and why (no legs below: it goes on hovering)")
+	@Method(doc = "land([force]): (a tier 2 golem's) comes down onto its legs, standing below it (within three blocks to the side), and onto them; force, with none there, comes straight down onto the ground beneath it without them, still running (its thrusters off; it walks nowhere, and flies again to fetch them), as safely as a crash would, but on. A command: true at once (its event: land, ok, or not and why), or false and why (no legs below, without force: it goes on hovering; no ground below)")
 	public Result land(Arguments args) {
-		return start("land", body.land());
+		return start("land", body.land(args.count() > 0 && args.get(0) != null && args.checkBoolean(0)));
 	}
 
 	/** The body got down onto its legs. */
@@ -669,7 +674,10 @@ public final class RoboticsDevice implements Device, Buffered {
 				rest.add(Boolean.TRUE.equals(action.get("on")));
 				yield setPathfinding(new Arguments(rest));
 			}
-			case "land" -> land(new Arguments(rest));
+			case "land" -> {
+				rest.add(Boolean.TRUE.equals(action.get("force")));
+				yield land(new Arguments(rest));
+			}
 			case "turn" -> {
 				rest.add(action.get("way"));
 				yield turn(new Arguments(rest));
@@ -839,7 +847,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		if (active != null) {
 			return BUSY;
 		}
-		if (body.falling()) {
+		if (body.falling() && !CATCHES.contains(method)) {
 			waitedOnFall = true;
 			return BUSY; // (its landing's news ends the wait)
 		}

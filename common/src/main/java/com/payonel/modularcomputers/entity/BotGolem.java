@@ -191,6 +191,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private boolean placed;
 	/** The legs it's landing on (null: none). */
 	private GolemLegs landing;
+	/** Where it's coming down to without its legs (land with force, none there), or null. */
+	private Vec3 groundLanding;
 	/** Where a flight is going (null: none). */
 	private Vec3 flyTo;
 	/** Its thrusters hold it up (flying, or still: hovering), until it lands or they're let go. */
@@ -439,6 +441,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			flyTo = null; // (flying or landing: it hovers there)
 			flightPath = null;
 			landing = null;
+			groundLanding = null;
 		}
 
 		@Override
@@ -559,7 +562,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 
 		@Override
-		public String land() {
+		public String land(boolean force) {
 			if (noThrusters() != null) {
 				return noThrusters();
 			}
@@ -570,8 +573,11 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			GolemLegs below = level().getEntitiesOfClass(GolemLegs.class, getBoundingBox().inflate(LEGS_REACH, RoboticsDevice.MAX_FLIGHT, LEGS_REACH), GolemLegs::isAlive)
 				.stream().filter(legs -> legs.getY() <= getY() + ON_LEGS && legs.position().subtract(BotGolem.this.position()).horizontalDistance() <= LEGS_REACH)
 				.min(java.util.Comparator.comparingDouble(legs -> legs.position().distanceTo(BotGolem.this.position()))).orElse(null);
-			if (below == null) {
+			Vec3 ground = below == null && force ? groundBelow() : null;
+			if (below == null && !force) {
 				return "no legs below";
+			} else if (below == null && ground == null) {
+				return "no ground below";
 			}
 			EnergyField field = EnergyField.fieldOf(BotGolem.this);
 			if (field != null) {
@@ -580,6 +586,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			flyTo = null;
 			hovering = true; // (its thrusters bring it down)
 			landing = below;
+			groundLanding = ground;
 			return null;
 		}
 
@@ -587,6 +594,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		public void release() {
 			flyTo = null;
 			landing = null;
+			groundLanding = null;
 			hovering = false;
 		}
 
@@ -887,6 +895,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		if (falling()) {
 			if (Double.isNaN(fallFrom)) {
 				fallFrom = feet();
+				robotics.notice(RoboticsDevice.FALLING, null); // (as it begins: a tier 2 can catch itself)
 			}
 			return;
 		}
@@ -1143,6 +1152,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		target = null;
 		turnTo = Float.NaN;
 		landing = null;
+		groundLanding = null;
+		fallFrom = Double.NaN; // (caught mid-fall: no fall to say)
 		if (legs() && level() instanceof ServerLevel server) {
 			GolemLegs legs = ModEntities.GOLEM_LEGS.create(server, net.minecraft.world.entity.EntitySpawnReason.TRIGGERED);
 			legs.snapTo(getX(), getY(), getZ(), getYRot(), 0);
@@ -1171,6 +1182,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				// (a field holds it: its flight pauses)
 			} else if (landing != null) {
 				landStep();
+			} else if (groundLanding != null) {
+				groundStep();
 			} else if (flyTo != null) {
 				flyStep();
 			} else {
@@ -1269,6 +1282,48 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	}
 
 	/** A tick's landing: down to its legs (straight onto them once close: they'd stop a collision), and on, its legs gone into it. */
+	/**
+	 * A tick of a landing without its legs (land with force): straight down, slowing over its last
+	 * block, onto what's beneath it; there its thrusters stop, and it rests on the ground, legless,
+	 * still running (not a crash: nothing let go of it).
+	 */
+	private void groundStep() {
+		Vec3 left = groundLanding.subtract(position());
+		if (left.length() > ON_LEGS) {
+			double speed = LANDING_SPEED * Math.max(LANDING_SLOWEST, Math.min(1, left.length() / LANDING_EASE));
+			Vec3 step = left.scale(Math.min(1, speed / left.length()));
+			Vec3 from = position();
+			move(net.minecraft.world.entity.MoverType.SELF, step);
+			setDeltaMovement(Vec3.ZERO);
+			if (position().distanceTo(from) >= step.length() * BLOCKED_SHARE) {
+				return; // (still coming down; something under it sooner, it's down on that)
+			}
+		} else {
+			setPos(groundLanding);
+		}
+		groundLanding = null;
+		hovering = false;
+		thrusters(false);
+		airborne = false; // (down by its own landing: nothing let go of it)
+		robotics.landed();
+	}
+
+	/** Where its torso comes down to straight below it, on what it would rest on (null: nothing within a flight's reach). */
+	private Vec3 groundBelow() {
+		BlockPos at = blockPosition();
+		for (int down = 0; down <= RoboticsDevice.MAX_FLIGHT; down++) {
+			BlockPos pos = at.below(down);
+			var shape = level().getBlockState(pos).getCollisionShape(level(), pos, net.minecraft.world.phys.shapes.CollisionContext.of(this));
+			if (!shape.isEmpty()) {
+				double top = pos.getY() + shape.max(Direction.Axis.Y);
+				if (top <= getY() + HAIR) {
+					return new Vec3(getX(), top, getZ());
+				}
+			}
+		}
+		return null;
+	}
+
 	private void landStep() {
 		if (!landing.isAlive()) {
 			landing = null;

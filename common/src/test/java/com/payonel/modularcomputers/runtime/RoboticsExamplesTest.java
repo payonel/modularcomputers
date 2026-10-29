@@ -90,7 +90,7 @@ class RoboticsExamplesTest extends McosHarness {
 			}
 
 			@Override
-			public String land() {
+			public String land(boolean force) {
 				asked.add("land");
 				server.add(robotics::landed);
 				return null;

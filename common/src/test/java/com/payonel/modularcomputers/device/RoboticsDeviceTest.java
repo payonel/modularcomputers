@@ -361,6 +361,8 @@ class RoboticsDeviceTest {
 		assertThat(robot.pull(args()).first()).as("a settling: nothing to say").isNull();
 		body.falling = true;
 		assertThat(robot.refusal("walk")).isEqualTo(Buffered.BUSY);
+		assertThat(robot.refusal("fly")).as("a tier 2 catches itself on its thrusters (the user's)").isNull();
+		assertThat(robot.refusal("flyTo")).isNull();
 		assertThat(robot.state()).isEqualTo(RoboticsDevice.FALLING);
 		body.falling = false;
 		robot.fell(0.01);

@@ -79,8 +79,9 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
   the rest of a stopped move does). Before the code review (2026-10-28) it went on from where the
   stopped command began, so a scan after stopping a walk walked it all the way back; after it, on
   its legs, from the block it was nearest. A command `interrupted` by a load goes on the same way.
-- A fall on its legs it didn't ask for (a block gone from under it) isn't drift: it's busy while it
-  falls, its plan follows it down, and a `fell` notice (how far) ends a wait: a build decision from the
+- A fall on its legs it didn't ask for (a block gone from under it) isn't drift: a `falling`
+  notice as it begins (the user's, 2026-10-29), its flights taken meanwhile (a tier 2 catches
+  itself, its legs dropped), else it's busy while it falls, its plan follows it down, and a `fell` notice (how far) ends a wait: a build decision from the
   review (digging down broke every positional command after it).
 - Its own way back (after a shove, before a positional command) is a command of its own (others
   wait for it), said by notices: a build decision, so a failed way back is said. A failed one

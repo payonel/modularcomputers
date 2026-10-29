@@ -241,6 +241,60 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
+	/**
+	 * Falling, it says so as it begins, and a tier 2 catches itself (the user's): fly() is taken
+	 * mid-fall, its legs drop, and it flies back to where its last command left it. Out of its legs'
+	 * reach, land() refuses, and land(true) sets it down on the ground without them, still running.
+	 */
+	@GameTest(maxTicks = 300)
+	public void fallingItCatchesItselfOnItsThrustersAndLandsWithoutItsLegsWhenItMust(GameTestHelper helper) {
+		helper.setBlock(FRONT, Blocks.STONE); // (two steps up)
+		helper.setBlock(FRONT.east(), Blocks.STONE);
+		helper.setBlock(FRONT.east().above(), Blocks.STONE);
+		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(1.0, 0.0, 1.0)))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "walk", "ok", true)), "up a step: " + events))
+			.thenExecute(() -> {
+				events.clear();
+				golem.robotics().walk(args(1.0, 0.0, 1.0));
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "walk", "ok", true)), "up two: " + events))
+			.thenExecute(() -> {
+				events.clear();
+				helper.setBlock(FRONT.east().above(), Blocks.AIR); // (gone from under it, and the one under that)
+				helper.setBlock(FRONT.east(), Blocks.AIR);
+			})
+			.thenWaitUntil(() -> helper.assertTrue(notices(events, "falling") == 1, "it says it's falling: " + events))
+			.thenExecute(() -> {
+				same(helper, golem.robotics().state(), RoboticsDevice.FALLING, "still falling");
+				helper.assertTrue(!golem.robotics().fly(args()).failed(), "fly() taken mid-fall");
+				helper.assertTrue(!golem.legs(), "its legs dropped");
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "back up: " + events))
+			.thenExecute(() -> {
+				same(helper, golem.robotics().position(args()).first(), java.util.Map.of("forward", 2L, "right", 0L, "up", 2L, "heading", 0L), "where its last command left it");
+				helper.assertTrue(notices(events, "fell") == 0, "caught: no fall to say: " + events);
+			})
+			.thenWaitUntil(() -> helper.assertTrue(legs(helper).size() == 1 && legs(helper).getFirst().onGround(), "its legs down below"))
+			.thenExecute(() -> {
+				events.clear();
+				golem.robotics().flyTo(args(6L, 0L, 2L)); // (out of its legs' reach)
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("flyTo")), "away from its legs: " + events))
+			.thenExecute(() -> {
+				same(helper, golem.robotics().land(args()).error(), "no legs below", "land() wants its legs");
+				helper.assertTrue(!golem.robotics().land(args(true)).failed(), "land(true) comes down without them");
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("land")), "down: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(golem.onGround() && !golem.legs() && !golem.thrusting(),
+				"on the ground, legless, its thrusters off: " + golem.onGround() + " " + golem.legs() + " " + golem.thrusting() + " " + golem.robotics().state()))
+			.thenExecute(() -> helper.assertTrue(golem.machine().isPowered(), "still running: not a crash"))
+			.thenExecuteAfter(5, () -> helper.assertTrue(golem.machine().isPowered(), "and still running after"))
+			.thenSucceed();
+	}
+
 	@GameTest(maxTicks = 200)
 	public void itLandsOntoItsLegsBelowIt(GameTestHelper helper) {
 		BotGolem golem = golem(helper, false);

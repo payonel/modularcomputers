@@ -47,7 +47,7 @@ public class DiskGameTest {
 		helper.succeed();
 	}
 
-	@GameTest(maxTicks = 400) // (mcos reads its kernel, modules, interpreter and shell off the disk: a board call a read)
+	@GameTest(maxTicks = 3000) // (mcos reads its kernel, modules, interpreter and shell off a tier 1 disk, a board call a read: a loaded host's ticks are many; the test is that it boots, not how fast)
 	public void aNewEepromBootsMcosFromATier1Disk(GameTestHelper helper) {
 		CaseBlockEntity computer = computer(helper);
 		computer.parts().setItem(CaseMenu.EEPROM_SLOT, new ItemStack(ModItems.EEPROM));

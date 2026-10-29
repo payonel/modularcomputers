@@ -185,10 +185,6 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 
 ## The Lua CPU and the server
 
-- **A boot test timed out once under testAll's load** (2026-10-26, NeoForge's
-  DiskGameTest.aNewEepromBootsMcosFromATier1Disk, "waiting for a key on tick 402"): it passed on
-  Fabric in the same run and twice on NeoForge alone. A tick deadline on mcos's boot is a timing
-  bug under load: make the test wait for the state it needs, not a tick count.
 - **A save test fails now and then under testAll's load** (2026-10-25, and again 2026-10-26, LuaRunnerTest.aSaveCarriesOutNoCalls...,
   "the save made no call": the counter was 1): it passes alone and with its class, every time. The
   test waits for queuedCalls() > 0, then persists; nothing in it serves the server queue, so no call

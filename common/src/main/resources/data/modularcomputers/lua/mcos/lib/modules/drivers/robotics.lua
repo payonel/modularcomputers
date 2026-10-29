@@ -12,6 +12,7 @@
 --                                off where it stands, or back to where its last command left it)
 --   flyto forward [right [up]]  (from its origin)
 --   land                        (onto its legs, below it)
+--   land force                  (with no legs there, straight down onto the ground without them)
 --   turn left|right|around|north|south|east|west
 --   use FACE                    (front, back, left, right, up or down: its own)
 --   swing FACE
@@ -61,6 +62,8 @@ return {
       return {action = "turn", way = words[2]}
     elseif (action == "use" or action == "swing") and #words == 2 then
       return {action = action, face = words[2]}
+    elseif action == "land" and #words == 2 and words[2] == "force" then
+      return {action = "land", force = true} -- (straight down, without its legs)
     elseif (action == "stop" or action == "land") and #words == 1 then
       return {action = action}
     elseif action == "position" and #words <= 5 then

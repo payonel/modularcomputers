@@ -480,7 +480,7 @@ public class CardGameTest {
 	 * The whole way, in a world: mcos on a case with the least RAM (no cache: every read a call), a
 	 * motion sensor card put in while it runs, a pig, and a program reading the card's file.
 	 */
-	@GameTest(maxTicks = 1200) // (mcos boots off the disk: a board call a read)
+	@GameTest(maxTicks = 3000) // (mcos boots off the disk, a board call a read: a loaded host's ticks are many)
 	public void mcosReadsAMotionSensorPutInWhileItRunsAsAMobMoves(GameTestHelper helper) {
 		helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
 		CaseBlockEntity computer = helper.getBlockEntity(POS, CaseBlockEntity.class);

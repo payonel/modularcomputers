@@ -75,9 +75,12 @@ actions act where it should be, so they take it back first, and stuck, fail with
 gives where its last command left it; `get` gives where it really is, and its drift.
 `setPosition()` makes where it is its new origin, there and then.
 
-A fall it didn't ask for, on its legs (a block gone from under it, a trapdoor it opened), isn't a
-drift: while it falls it's busy (`falling`), and once down it goes on from where it landed, and it
-says so (a `fell` notice, and how far), so a robot digging down goes on from there.
+A fall it didn't ask for, on its legs (a block gone from under it, a trapdoor it opened, a piston
+off a ledge), isn't a drift: it says so as it begins (a `falling` notice), and while it falls it's
+busy (`falling`), its commands waiting, but for its flights: a tier 2 catches itself on its
+thrusters (`fly()`, back to where its last command left it), its legs dropped to fall on without
+it. Not caught, once down it goes on from where it landed, and it says so (a `fell` notice, and
+how far), so a robot digging down goes on from there.
 
 `stop` stops it at once, where it is: no centering, no squaring up. The command running ends
 `stopped`, and every thread waiting to give it a command is told so (`ECANCELED`): a stop stops
@@ -121,6 +124,7 @@ given while one runs waits for it, the writing thread only; a `stop` never waits
 | `fly` | Takes off where it stands and holds there; in the air, back to where its last command left it |
 | `flyto forward [right [up]]` | Flies to whole blocks from its origin |
 | `land` | Comes down onto its legs, below it |
+| `land force` | With no legs there, comes straight down onto the ground without them |
 | `turn left`, `turn right`, `turn around` | Turns a right angle in place (or two) |
 | `turn north` (`south`, `east`, `west`) | Turns to face the world's way |
 | `use face` | Uses what it holds on the space at a face |
@@ -304,11 +308,14 @@ its torso lies on the ground, off, to be picked up as a Tier 2 Bot Golem Torso.
 Flies, as `fly` does, to the point that many whole blocks from its origin, in the origin's frame.
 Its event: `flyTo`. Fails with `not an integer: ` and the number.
 
-### land() → true
+### land([force]) → true
 
-Comes down onto its legs, standing below it (within three blocks to its side), and onto them. Its
-event, `land`: `ok`, or not and why (`blocked: ...`, `no legs below` when they've gone: it hovers
-there). Fails with `no legs below` (it goes on hovering) or `on legs`. A right click pops legs up
+Comes down onto its legs, standing below it (within three blocks to its side), and onto them. With
+`force` (`land(true)`) and no legs there, it comes straight down onto the ground beneath it without
+them, and stays running, its thrusters off. That's what a crash does, but safely and still on.
+Legless, it walks nowhere; it flies again to fetch its legs and lands onto them. Its event, `land`:
+`ok`, or not and why (`blocked: ...`, `no legs below` when they've gone: it hovers there). Fails
+with `no legs below` (without `force`: it goes on hovering), `no ground below`, or `on legs`. A right click pops legs up
 into an inventory, its own `use` too.
 
 ### get() → {state, legs, pathfinding, position, planned, drift}
@@ -403,6 +410,7 @@ round things too.
 | `shoved` | `drift` (`{forward, right, up}`) | something knocked it away from where its last command left it, in the air (on its way back too) |
 | `returned` | | its way back (after a shove, or before a positional command) got it there |
 | `stuck` | `why` | its way back didn't (`no path`, `blocked: ...`): it holds where it is |
+| `falling` | | a fall it didn't ask for began, on its legs: a tier 2 can catch itself (`fly`) |
 | `fell` | `by` (blocks) | it came down on its legs from a fall it didn't ask for: it goes on from where it landed |
 | `frozen` | | a field took hold of it: its robotics paused |
 | `thawed` | | the field let go and it's down: its robotics back, its origin carried |

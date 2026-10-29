@@ -374,7 +374,9 @@ in the world, and the swing's end says whether it kept it all.
   works as a player off the ground does (its hand's fake player off the ground: the game's rules,
   a break slower), ignores
   block triggers, and can be shoved; `land` comes down onto its legs below it and refuses with none
-  there. Or carried in **a field**, its own too, legs and all (10 blocks a second): stasis, as for
+  there, but `land(true)` (the user's, 2026-10-29: a crash's landing, safely) comes straight down
+  without them, still running; a fall on its legs is a `falling` notice as it begins, and a tier
+  2's flights are taken mid-fall (it catches itself, its legs dropped). Or carried in **a field**, its own too, legs and all (10 blocks a second): stasis, as for
   any creature (the user's, 2026-10-27): its robotics freezes (commands refused `held`, mcos waiting;
   a swing under way ends; no tools, no looking), and only its robotics (the user's, 2026-10-29: its
   body is held, and robotics is its one device acting in the world), so its other devices go on (a
@@ -901,6 +903,10 @@ Lessons from mistakes, each with its test:
 - Mouse buttons are SDL-numbered (left 1, right 3): use the constants. SDL sends typed characters
   only while text input is on: a screen that takes typing turns it on.
 - `.gitignore` patterns without a leading `/` match at any depth: anchor root-only rules.
+- **A game test's `maxTicks` is a deadline it isn't about:** one booting mcos off a disk (a board
+  call a read, a tier 1's the slowest) took over 400 ticks on a loaded host now and then; such a
+  test gets thousands (the tree job's 3000), as it waits for the state it needs anyway.
+  (`aNewEepromBootsMcosFromATier1Disk`)
 - `GameTestHelper.assertValueEqual` throws on a null value (it calls `value.equals`), crashing the
   test server instead of failing the test: compare with `Objects.equals` in an `assertTrue`.
 - An empty dedicated server stops ticking after a minute unless `pause-when-empty-seconds=-1`

@@ -186,7 +186,8 @@ public class GolemHandsGameTest {
 	@GameTest(maxTicks = 200)
 	public void aBlockWhoseStateChangesWhileItsBrokenStillBreaks(GameTestHelper helper) {
 		// Leaves by a log: the log goes as it starts, so the leaves' distance changes under it (a tree cut).
-		helper.setBlock(FRONT, Blocks.OAK_LEAVES);
+		// Persistent: their state still changes, but they never decay mid-break (a random tick's race).
+		helper.setBlock(FRONT, Blocks.OAK_LEAVES.defaultBlockState().setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true));
 		helper.setBlock(FRONT.east(), Blocks.OAK_LOG);
 		List<Object> answers = new ArrayList<>();
 		BotGolem golem = start(helper, answers, call("swing", "front"));
