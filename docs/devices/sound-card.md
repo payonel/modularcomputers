@@ -29,9 +29,9 @@ that is refused waits for the card's interrupt, which comes when at least half t
 The card plays by game time: each tick its block sends what is due, still encoded, to the players
 within 40 blocks, and their games decode and play it. It decodes IMA ADPCM itself.
 
-Mono comes from the card's block. Stereo is two speakers half a block either side of the block, its
-left and right as seen facing its front, because the game does not place a stereo sound in the world.
-See [Faces](/concepts/faces/).
+Mono comes from the card's block. Stereo is two speakers half a block either side of the block, its left
+channel on your left as you face its front, as a pair of speakers is (the block's own right, as
+[faces](/concepts/faces/) are named), because the game does not place a stereo sound in the world.
 
 The card powers on at OSS's defaults: 8000 a second, unsigned 8-bit, mono. Changing the format drops
 what is queued. A new format that is the same as the old one drops nothing.

@@ -19,7 +19,7 @@ hidden: true
 
 A file's header says its format, and <strong>aplay</strong> sets the card to it: PCM (unsigned 8-bit or signed 16-bit) or IMA ADPCM, mono or stereo, at 8000, 11025, 22050 or 44100 samples a second. It writes the file's data as it reads it (a write waits while the card's buffer is full), then waits for what it queued to play out before the next file.
 
-A stereo sound comes from two speakers, the block's left and right as seen facing its front; a mono one from the block. Any other music can be converted on another computer, for example with <strong>ffmpeg</strong>:
+A stereo sound comes from two speakers either side of the block, its left channel on your left as you face its front; a mono one from the block. Any other music can be converted on another computer, for example with <strong>ffmpeg</strong>:
 
 ```text
 ffmpeg -i song.mp3 -ar 22050 -ac 2 -acodec adpcm_ima_wav song.wav

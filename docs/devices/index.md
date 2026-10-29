@@ -118,7 +118,7 @@ tables are sequences or maps.
 
 A device that takes a face takes it as a string. Either a world name (`north`, `south`, `east`,
 `west`, `up`, `down`), or a name relative to the front of the block the device is in (`front`,
-`back`, `left`, `right`, left and right as someone facing the front sees them). A program written
+`back`, `left`, `right`, left and right the block's own, as if it faced out of its front). A program written
 with relative names works however the block is turned. Devices answer with world names. See
 [Faces](/concepts/faces/).
 

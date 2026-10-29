@@ -24,7 +24,7 @@ import net.minecraft.world.phys.Vec3;
 /**
  * An energy field card's work in the world: what's round its computer, in its frame, and the field
  * ({@link EnergyField}) it makes round what it captures. Its computer is a block (its center, its
- * front: right as someone facing it sees it, as every face is) or a robot (its middle, its heading:
+ * front: its own right, as every face is) or a robot (its middle, its heading:
  * its own right).
  */
 public final class FieldProjector implements FieldCard.Projector {
@@ -50,7 +50,7 @@ public final class FieldProjector implements FieldCard.Projector {
 			return where;
 		}
 
-		/** A block's frame: its center, its front, its right as someone facing its front sees it. */
+		/** A block's frame: its center, its front, its own right (as every face is). */
 		public static Frame of(Vec3 center, Direction front) {
 			Direction right = Direction.valueOf(Face.named("right", Face.of(front.getName())).name());
 			return new Frame(center, Vec3.atLowerCornerOf(front.getUnitVec3i()), Vec3.atLowerCornerOf(right.getUnitVec3i()));

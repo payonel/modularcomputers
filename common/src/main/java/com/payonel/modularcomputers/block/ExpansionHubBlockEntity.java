@@ -87,7 +87,7 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 		return CardHolderMenu.hub(id, inventory, cards(), worldPosition, ContainerLevelAccess.create(level, worldPosition));
 	}
 
-	/** Its frame, where its cards say things are: its center, its front, its right as someone facing its front sees it. */
+	/** Its frame, where its cards say things are: its center, its front, its own right (as every face is). */
 	private com.payonel.modularcomputers.entity.FieldProjector.Frame frame() {
 		return com.payonel.modularcomputers.entity.FieldProjector.Frame.of(net.minecraft.world.phys.Vec3.atCenterOf(worldPosition),
 			getBlockState().getValue(ExpansionHubBlock.FACING));

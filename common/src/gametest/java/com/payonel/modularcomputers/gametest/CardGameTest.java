@@ -158,7 +158,7 @@ public class CardGameTest {
 		card.set(args(Map.of("front", Map.of("powered", 6L), "left", Map.of("powered", 2L))));
 		helper.succeedWhen(() -> {
 			helper.assertValueEqual(field(card, "east", "powered"), 6L, "its front: east, the way the hub faces");
-			helper.assertValueEqual(field(card, "south", "powered"), 2L, "its left, as we see it facing its front: south");
+			helper.assertValueEqual(field(card, "north", "powered"), 2L, "its own left, facing east: north");
 		});
 	}
 

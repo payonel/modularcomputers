@@ -146,8 +146,9 @@ what the game can't do:
 
 Every device that takes a face takes it through `Face` (the user's rule for every device, now and
 to come): the world's names (`north`, `south`, `east`, `west`, `up`, `down`: Minecraft's own) or
-names relative to the block's front (`front`, `back`, `left`, `right`, left and right as someone
-facing its front sees them: the user's, as a desktop case's left side panel is on your left), so a
+names relative to the block's front (`front`, `back`, `left`, `right`, left and right the block's
+own, as if it faced out of its front: the user's, 2026-10-29, as OpenComputers' sides, so a block and
+a robot facing the same way agree; a viewer's left came first, and was given up for it), so a
 program written for a block works however it's turned, and configurations compose. Every block that holds devices has a front, with its own
 look, facing the player who placed it (a case's, a hub's card bays), and tells its devices where it
 is (`Card.frontFrom`); a robotic piston's front is opposite its cable port. A device with no block
@@ -308,7 +309,8 @@ room, or when what's queued has played out (`sync`). It plays by game time: each
 sends what's due, still encoded, to the players near it (`SoundCardPayload`), and their games play
 it through a sound whose samples come from a stream (`SoundCardSpeakers`: NeoForge's and Fabric
 API's stream hooks, one class answering both). Stereo is two mono speakers half a block either side
-of the block, its left and right as seen facing its front: OpenAL doesn't place a stereo sound in
+of the block, its left channel on the left of a listener facing its front (a pair of speakers'
+way: the block's own right): OpenAL doesn't place a stereo sound in
 the world. In mcos it's OSS's `/dev/dsp` (`dsp1` the next): an open starts at OSS's defaults (8000,
 u8, mono), so `cat file.raw > /dev/dsp` plays, and OSS's ioctls set the format; `aplay` plays WAV
 files.
@@ -348,8 +350,8 @@ forward then right, never turning (it strafes and backs up), by `GolemSteps`: fr
 elevation (the block its feet are in: slabs), a block up at a time only toward `up`, down three at
 most only toward it. With pathfinding (`setPathfinding`, kept like the origin) the game's pathfinder
 walks it, the flying one flies it, ending exactly all the same. It names faces in its own frame only (`front`, `back`, `left`,
-`right`, `up`, `down`; its left its own, as it turns and walks: not `Face`'s, where left is a
-viewer's), since it knows no compass; a block's direction it reads is turned into that frame. It
+`right`, `up`, `down`; its left its own, as it turns and walks, as `Face`'s is a block's), since it
+knows no compass; a block's direction it reads is turned into that frame. It
 scans all six spaces at once, and works with its hand (its main hand, one item: a slot in its view,
 kept on its item when picked up) as a player does, through the loader's fake player standing where
 it is (`Platform.fakePlayer`, `GolemHands`): the game's own interactions (placing, doors, buttons,

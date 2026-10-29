@@ -118,11 +118,11 @@ class RedstoneCardTest {
 	@Test
 	void aFaceIsNamedByTheWorldsNameOrByItsBlocksFront() {
 		card.accepting(true); // (a set is applied while its program runs)
-		card.frontFrom(() -> Face.EAST); // (its case faces east: facing it, we look west, and its left is south)
+		card.frontFrom(() -> Face.EAST); // (its case faces east: its own left is north)
 		card.set(args(Map.of("front", Map.of("powered", 4L), "left", Map.of("powered", 2L))));
 		card.tick();
 		assertThat(card.output(2)).as("east, its front").isEqualTo(4);
-		assertThat(card.output(1)).as("south, its left").isEqualTo(2);
+		assertThat(card.output(0)).as("north, its left").isEqualTo(2);
 		assertThat(sides(card.get(args(List.of("front"))).first()).keySet()).as("answered by the world's names").containsExactly("east");
 		card.frontFrom(() -> null); // (no block has said where its front is)
 		assertThatThrownBy(() -> card.set(args(Map.of("back", Map.of("powered", 1L))))).hasMessageContaining("no front");

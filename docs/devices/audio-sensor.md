@@ -81,9 +81,9 @@ across a save, and dropped while no program runs. A [sound card](/devices/sound-
 play is heard once at its start.
 
 Where is in its computer's frame, as an [energy field card](/devices/energy-field-card/)'s
-positions are: `forward` out of its front, `right` as someone facing the front sees it (as every
+positions are: `forward` out of its front, `right` its own right (as every
 [face](/concepts/faces/) is named), and `up`; in a [Bot Golem](/hardware/bot-golem/), its own
-heading and its own right. So a program written for one computer works however it's turned.
+heading and its own right, so a case and a golem facing the same way agree. So a program written for one computer works however it's turned.
 
 ## Examples
 

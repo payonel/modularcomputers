@@ -15,8 +15,9 @@ A face is a string, only. There are two kinds of name.
 **The world's names** are Minecraft's own: `north`, `south`, `east`, `west`, `up` and `down`.
 
 **Names relative to the block's front** are `front`, `back`, `left` and `right`. Left and right are
-as someone standing in front of the block, facing it, sees them (as a desktop case's left side panel
-is on your left as you face it).
+the block's own, as if it stood facing out of its front: a block facing north has west on its left.
+Standing in front of it, facing it, its left is on your right. A robot names its sides the same way,
+so a case and a robot facing the same way agree (as OpenComputers' sides do).
 
 A program written with relative names works however the block is turned, and two programs written
 for the same block compose. A program written with the world's names always means the same side of

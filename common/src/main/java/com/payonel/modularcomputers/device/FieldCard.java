@@ -13,8 +13,8 @@ import java.util.Map;
  * An energy field card (user design, 2026-10-24): it suspends a creature or an item in a sphere of
  * energy, where it can't act (it falls in place: no moving, attacking or reacting), moves it, and lets
  * it go. It never moves blocks. Positions are in its computer's frame: {@code forward} out of its
- * front, {@code right}, {@code up} (a block's right as someone facing its front sees it, as every
- * face is; a robot's its own), so a program written for one computer works however it's turned. The
+ * front, {@code right}, {@code up} (a block's own right, as every face is; a
+ * robot's its own), so a program written for one computer works however it's turned. The
  * field stays within {@link #RANGE} of its computer, but a robot holding itself carries the card
  * with it: in a golem it's how it flies. Holding costs power each tick, a move each block; without
  * power, or with no program running, it lets go. A {@link Projector} does the work in the world.

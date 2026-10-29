@@ -133,7 +133,8 @@ public final class CardWorld {
 	private static void sendSound(SoundCard sound, ServerLevel level, BlockPos pos, byte[] played) {
 		int left = -1;
 		if (sound.front() != null && sound.front() != com.payonel.modularcomputers.device.Face.UP && sound.front() != com.payonel.modularcomputers.device.Face.DOWN) {
-			left = Direction.valueOf(com.payonel.modularcomputers.device.Face.named("left", sound.front()).name()).ordinal();
+			// Its left speaker on the left of a listener facing its front, as a pair of speakers is: the block's own right.
+			left = Direction.valueOf(com.payonel.modularcomputers.device.Face.named("right", sound.front()).name()).ordinal();
 		}
 		UUID card = sound.id() != null ? sound.id() : new UUID(pos.asLong(), 0); // (a card without a serial: by its block)
 		var payload = new com.payonel.modularcomputers.network.SoundCardPayload(card, pos.immutable(), left, sound.format(), played);

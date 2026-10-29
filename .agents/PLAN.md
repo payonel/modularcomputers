@@ -164,11 +164,16 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
 4. **Legs** (built): robotics' `detachLegs`: without a field the golem falls over and powers off; inside its
    own field it flies, the field moved by its program, much faster than it walks, its legs left
    behind; `attachLegs` within a small distance of them: it goes to them and lands. In flight it
-   still runs, crafts and acts, but uses no tools (buttons and doors yes) and presses no pressure
-   plates. Power out or off in flight: the torso falls, an object in the world (hit: picked up;
+   still runs, crafts and acts, tools too (as a player off the ground: the user's, 2026-10-29),
+   and presses no pressure plates. Power out or off in flight: the torso falls, an object in the world (hit: picked up;
    right-click: its GUI); torso over legs in a 2x2 grid makes the golem again.
 5. **Mobs** (built): spiders (and skeletons riding them) fear golems; a flying golem scares chickens and
    cows (sheep don't care).
+6. **A golem that knows north** (the user's, 2026-10-29: it may): `turn` taking `north`, `south`,
+   `east`, `west` (turning to face it), and its faces (`scan`, `use`, `swing`, its cards') taking the
+   world's names through `Face` as every other device's do, its relative names its own (`Face`'s
+   left and right are a block's own now, as a robot's). Robots would then be no exception to the
+   Faces rule but for `up` and `down` being relative names too.
 
 ## Getting started in the world
 

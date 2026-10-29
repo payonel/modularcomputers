@@ -34,7 +34,7 @@ off.
 ## Where things are
 
 Positions are in its computer's frame: `forward` out of its front, `right`, and `up`. On a block,
-right is as someone facing its front sees it (as every face is named); a robot's is its own. So a
+right is its own (as every face is named), as a robot's is. So a
 program written for one computer works however the computer is turned.
 
 The field holds one thing at a time. It lets go when told to, when what it holds is gone (it dies,
