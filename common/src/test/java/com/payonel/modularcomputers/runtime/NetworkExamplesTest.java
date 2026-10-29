@@ -66,7 +66,10 @@ class NetworkExamplesTest extends McosHarness {
 			TestBus.of(machine, devices);
 			machine.board().setEeprom(eeprom);
 			assertThat(machine.pressPower()).isEqualTo(Machine.PowerPress.ON);
-			ticks.add(machine::tick);
+			ticks.add(() -> {
+				TestServer.awaitHost(machine); // (the server ticks at every computer's pace, this one's too)
+				machine.tick();
+			});
 		}
 
 		void file(String path, String text) {

@@ -19,8 +19,8 @@ import java.util.Map;
  * frame ({@link #FACES}: it knows no compass), and works with what's in its hand: uses it on a space
  * (places a block, opens a door, presses a button), breaks a block with it (in a player's time), and
  * moves it in and out of a container. It flies on its thrusters (the user's design, 2026-10-25):
- * {@code fly} leaves its legs standing where it is and fires beams from their sockets (no tools, and
- * it can be shoved, while it does), {@code land} brings it down onto its legs. A body ({@link Body}:
+ * {@code fly} leaves its legs standing where it is and fires beams from their sockets (it walks
+ * nowhere, works as a player off the ground does, and can be shoved, while it does), {@code land} brings it down onto its legs. A body ({@link Body}:
  * a golem) does the work, and tells it how it went. Every block walked, every action and every tick
  * its thrusters fire costs power.
  * <p>
@@ -491,7 +491,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
 	}
 
-	@Method(doc = "fly(forward[, right[, up]]): (a tier 2 golem's) flies on its thrusters to the point that many blocks from it, in its own frame (from its block's middle), without turning, straight there (never through blocks; with pathfinding, round them); its legs, if it stands on them, are left standing where it was, and its thrusters fire beams from their sockets. In the air it uses no tools (buttons and doors yes) and can be shoved (it flies back to its plan). Measured from its plan; with no arguments, it takes off where it stands and holds there, or goes back to its plan. A command: true at once (its event: fly, ok, or not and why), or false and why")
+	@Method(doc = "fly(forward[, right[, up]]): (a tier 2 golem's) flies on its thrusters to the point that many blocks from it, in its own frame (from its block's middle), without turning, straight there (never through blocks; with pathfinding, round them); its legs, if it stands on them, are left standing where it was, and its thrusters fire beams from their sockets. In the air it walks nowhere, uses what it holds as a player off the ground does, and can be shoved (it flies back to its plan). Measured from its plan; with no arguments, it takes off where it stands and holds there, or goes back to its plan. A command: true at once (its event: fly, ok, or not and why), or false and why")
 	public Result fly(Arguments args) {
 		double forward = args.count() > 0 && args.get(0) != null ? args.checkNumber(0) : 0;
 		double right = args.count() > 1 && args.get(1) != null ? args.checkNumber(1) : 0;

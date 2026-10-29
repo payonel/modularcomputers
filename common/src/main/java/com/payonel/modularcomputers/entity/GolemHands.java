@@ -41,9 +41,9 @@ import net.minecraft.world.phys.Vec3;
  * A golem's senses and its hand, in the world: what's in the six spaces round it, and what it does
  * with what it holds (its main hand), as a player would, through a fake player standing where it
  * is, looking the way it works ({@link Platform#fakePlayer}): the game's own interactions, so a
- * door, a button, a bucket or a block placed behave as a player's. Breaking a block takes a
- * player's time with the tool held, and what it drops goes to the golem's storage, else stays in
- * the world.
+ * door, a button, a bucket or a block placed behave as a player's. A block breaks as a player
+ * breaks it with the tool held (on its thrusters, as a player off the ground), and what it drops goes
+ * to the golem's storage, else stays in the world.
  */
 final class GolemHands {
 	/** Destroy progress a block needs, as a player's (the game's 1.0). */
@@ -208,7 +208,9 @@ final class GolemHands {
 
 	/**
 	 * Its hand as a player standing where it is, looking toward {@code face}, holding what it holds
-	 * (and nothing else), on the ground when it's on its legs.
+	 * (and nothing else), on the ground only while the golem stands: on its thrusters it works as a
+	 * player off the ground does (the user's: flight can do everything), the game's own rules for it
+	 * (a break's pace).
 	 */
 	private ServerPlayer hand(String face) {
 		ServerPlayer player = Platform.INSTANCE.fakePlayer(level(), Platform.ROBOT);
@@ -220,7 +222,7 @@ final class GolemHands {
 		player.setYHeadRot(yaw);
 		player.getInventory().clearContent();
 		player.setItemInHand(InteractionHand.MAIN_HAND, golem.getMainHandItem());
-		player.setOnGround(golem.onGround());
+		player.setOnGround(golem.standing());
 		player.setShiftKeyDown(false);
 		return player;
 	}
@@ -241,12 +243,6 @@ final class GolemHands {
 		BlockPos pos = at(face);
 		Direction toward = direction(face);
 		ServerPlayer player = hand(face);
-		// Without legs it has no footing to work a tool: one in hand is used as an empty hand (a
-		// button, a door, a lever, its legs popped up), and goes back in its hand after.
-		ItemStack tool = !golem.legs() && player.getMainHandItem().isDamageableItem() ? player.getMainHandItem() : null;
-		if (tool != null) {
-			player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
-		}
 		try {
 			// A mob or an item there: used on it, as a player's click on it (shears on a sheep, legs popped up).
 			for (Entity entity : entitiesAt(pos)) {
@@ -288,13 +284,6 @@ final class GolemHands {
 			}
 			return Result.fail("nothing there");
 		} finally {
-			if (tool != null) {
-				ItemStack given = player.getMainHandItem();
-				player.setItemInHand(InteractionHand.MAIN_HAND, tool);
-				if (!given.isEmpty()) {
-					player.getInventory().add(given); // (what its empty hand was given: kept as the rest)
-				}
-			}
 			done(player);
 		}
 	}
@@ -319,9 +308,6 @@ final class GolemHands {
 	}
 
 	Result swing(String face) {
-		if (!golem.legs()) {
-			return Result.fail("no legs");
-		}
 		BlockPos pos = at(face);
 		List<Entity> there = entitiesAt(pos).stream().filter(entity -> entity instanceof LivingEntity).toList();
 		if (!there.isEmpty()) {

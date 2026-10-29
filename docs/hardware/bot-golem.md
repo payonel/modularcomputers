@@ -69,8 +69,8 @@ A golem flies two ways, each with its price:
 - **Its thrusters, legs off.** A tier 2 golem has them (a tier 1's thruster calls answer `no
   thrusters`): its nozzles are the collars round its legs' sockets. `fly` leaves its legs standing where it was and
   fires red beams from their empty sockets: it needs no card, and costs five running CPUs' power a tick. On its
-  thrusters it has no footing: it uses no tools (buttons, doors and levers yes: a tool in its hand
-  works as an empty hand), presses no pressure plates, and can be shoved: it says so, and flies
+  thrusters it walks nowhere, but does everything else as a player off the ground would (its
+  tools work, a block breaking more slowly), presses no pressure plates, and can be shoved: it says so, and flies
   back to where its program put it, as a drone holds its place. `fly()` takes it off where it
   stands and holds it there; `land` brings it down onto its legs, below it, and won't with no legs
   there. Chickens and cows run from it. If its program ends or its power runs out while its
@@ -103,9 +103,8 @@ what a program can do with it, and its examples.
 ## A whole job: fell a tree
 
 An advanced example, using all of it: the robotics device, a [crafting card](/devices/crafting-card/)
-for storage, and an [energy field card](/devices/energy-field-card/) as its lift. A golem uses its
-tools only standing on its legs (none in the air, none in a field), so it's carried up to the tree,
-set down, and cuts it from the ground. Set it up:
+for storage, and an [energy field card](/devices/energy-field-card/) as its lift. A golem uses no
+tools while a field holds it, so it's carried up to the tree, set down, and cuts it from the ground. Set it up:
 
 1. A golem with a CPU, RAM, an EEPROM, a battery, a disk with mcos, a crafting card and an energy
    field card (a screen in its gold slot, to watch it).

@@ -88,9 +88,9 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
   commands are refused `held` (mcos: blocked until it's let go), `stop` still works (ends the
   paused command); `frozen` and `thawed` news. The field's carry moves its origin with it, so
   `position()` reads the same after (the kidnapped robot: re-localize with a fix and
-  `setPosition`). No tools in a field, nor in the air (legless it has no footing: the user's rule
-  from the legs' design), so a job up a cliff is carried there and set down (the tree job, built
-  so). `get` stays free while held: a program follows the carry with it.
+  `setPosition`). No tools in a field (in the air they work, as a player's off the ground: the user's,
+  2026-10-29, lifting the legs' design's rule), so a job up a cliff carried in its field is set
+  down to cut (the tree job, built so). `get` stays free while held: a program follows the carry with it.
 - The crafting card's commands wait for its robot's (busy while the robot is); in a case they fail
   `no robotics`. (Changed after the build, the user's, 2026-10-28: a craft's start costs the robot
   nothing, the craft is the card's own work, a tick a craft, its `stop` the card's own; the build's

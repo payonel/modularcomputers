@@ -713,7 +713,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	 * Whether it stands, which nothing shoves (on the ground, its thrusters off): hovering is flying,
 	 * even resting on its own legs where it took off (they're under it, solid, so it's on the ground).
 	 */
-	private boolean standing() {
+	boolean standing() {
 		return onGround() && !thrusting();
 	}
 

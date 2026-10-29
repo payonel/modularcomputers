@@ -143,9 +143,9 @@ a program knows from the one event. Anything the hand is given besides (a filled
 of empty ones) is caught the same way. `swap` puts what the off hand caught in its hand, to store or
 use.
 
-It uses its tools only standing on its legs: in the air (on its thrusters) it has no footing, and
-in a field none at all. On its legs it presses pressure plates and trips tripwires, as anything
-walking does.
+It uses its tools on its legs and in the air: on its thrusters it works as a player off the ground
+does (the game's rules for that: a block breaks more slowly). In a field it uses none at all. On its
+legs it presses pressure plates and trips tripwires, as anything walking does.
 
 ## Methods
 
@@ -227,17 +227,16 @@ Uses what it holds on the space at a face, as a player's right click. A mob ther
 a lever, a log stripped with an axe); an empty space gets what it holds placed into it, against a
 neighbouring block, or with nothing to place against, what it holds is used the way it looks (a
 bucket into water). Answers `"placed"` or `"used"`; fails with `nothing happened`, `nothing to
-place against` or `nothing there`. In the air a tool in its hand works as an empty hand (buttons,
-doors and levers yes).
+place against` or `nothing there`.
 
 ### swing(face) → what, or nil and why
 
-Swings what it holds at a face, as a player's left click, standing on its legs. A mob there is hit:
+Swings what it holds at a face, as a player's left click (in the air, as a player off the ground). A mob there is hit:
 `"attacked"`. Else the block there starts breaking: `"breaking"`, a command running till it's
 broken. Its event, `swing`: `ok`, and its `result`, `{block, kept, dropped}` (the block's name;
 `kept`: true when it caught all the block dropped, else false and how many it `dropped` into the
 world), or not and why (`block changed`, `hand changed`, `not broken`; `held` when a field took hold
-of it). It fails with `nothing there`, `unbreakable` or `no legs` (on its thrusters: no footing).
+of it). It fails with `nothing there` or `unbreakable`.
 
 ### contents([face]) → list, or nil and why
 
@@ -268,10 +267,10 @@ thrusters` (it walks; its own [energy field](/devices/energy-field-card/) can st
 Flies on its thrusters to the point that many blocks from its plan, in its own frame, straight there
 and never through blocks. If it stands on its legs, they're left standing where it was: the thrusters fire red beams from
 their sockets. With no arguments, on its legs, it takes off where it stands and holds there; in
-the air, it flies back onto its plan. On its thrusters it walks nowhere (`no legs`), swings nothing
-(`no legs`), presses no pressure plates, and can be shoved (it flies back to its plan, saying
-`shoved`); it still uses what's round it (buttons, doors, levers: a tool in its hand works as an
-empty hand), places what it holds, and its other cards work. Its event, `fly`: `ok` (then it holds
+the air, it flies back onto its plan. On its thrusters it walks nowhere (`no legs`), presses no pressure
+plates, and can be shoved (it flies back to its plan, saying `shoved`); everything else it does as
+on its legs, as a player off the ground does it (its tools, a block breaking more slowly), and its
+other cards work. Its event, `fly`: `ok` (then it holds
 there), or not and why (`blocked: minecraft:stone up`). Its thrusters cost five running CPUs' power a
 tick. Fails with `too far: 64`.
 

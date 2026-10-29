@@ -20,18 +20,16 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.ButtonBlock;
 import net.minecraft.world.level.block.PressurePlateBlock;
-import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
 
 /**
  * A golem's flight (user design, 2026-10-25): on its thrusters ({@code fly}, {@code hover}) its
- * legs stay standing where it took off, it flies straight and fast, uses no tools (its axe as an
- * empty hand: buttons), and can be shoved; {@code land} brings it down onto its legs, and refuses
- * with none below; its program ending mid-air, it falls and powers off. Held in its own field it
- * keeps its legs and its tools (off the ground: at a fifth of their speed), and isn't flying.
+ * legs stay standing where it took off, it flies straight, walks nowhere but uses its tools (the
+ * user's: flight can do everything, breaking as a player off the ground does, the game's rule), and
+ * can be shoved; {@code land} brings it down onto its legs, and refuses with none below; its program
+ * ending mid-air, it falls and powers off. Held in its own field it keeps its legs, and isn't flying.
  * Without legs it presses no plate; its use pops legs up; it's picked up as its torso; torso over
  * legs crafts a golem, its parts kept.
  */
@@ -119,24 +117,42 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
-	@GameTest(maxTicks = 200)
-	public void onItsThrustersItUsesNoToolsButPressesButtons(GameTestHelper helper) {
-		helper.setBlock(FRONT.above(2), Blocks.STONE);
-		helper.setBlock(FRONT.above(3), Blocks.STONE_BUTTON.defaultBlockState().setValue(ButtonBlock.FACE, AttachFace.FLOOR));
+	/** How much longer a break takes off the ground at least (the game's rule: a fifth as fast). */
+	private static final int SLOWER_OFF_THE_GROUND = 3;
+
+	@GameTest(maxTicks = 300)
+	public void onItsThrustersItWalksNowhereButCutsAsAPlayerOffTheGroundDoes(GameTestHelper helper) {
+		helper.setBlock(FRONT, Blocks.OAK_LOG);
+		helper.setBlock(FRONT.above((int) LIFT + 1), Blocks.OAK_LOG);
 		BotGolem golem = golem(helper, false);
 		List<Object> events = events(helper, golem);
 		golem.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_AXE));
+		long[] ticks = new long[4]; // (each swing's start and end)
+		java.util.function.Predicate<Object> cut = event -> event instanceof java.util.Map<?, ?> map && "swing".equals(map.get("event")) && Boolean.TRUE.equals(map.get("ok"));
 		helper.startSequence()
-			.thenExecuteAfter(3, () -> golem.robotics().fly(args(0.0, 0.0, LIFT + 1)))
+			.thenExecuteAfter(3, () -> {
+				same(helper, golem.robotics().swing(args("front")).first(), "breaking", "on its legs");
+				ticks[0] = helper.getTick();
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(cut), "cut on its legs: " + events))
+			.thenExecute(() -> {
+				ticks[1] = helper.getTick();
+				events.clear();
+				golem.robotics().fly(args(0.0, 0.0, LIFT + 1));
+			})
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "up: " + events))
 			.thenExecute(() -> {
 				same(helper, golem.robotics().walk(args(1.0)).error(), "no legs", "it walks nowhere");
-				same(helper, golem.robotics().swing(args("front")).error(), "no legs", "no tools");
-				// Its axe works as an empty hand: the button beside it is pressed.
-				same(helper, golem.robotics().use(args("front")).first(), "used", "a button pressed");
-				helper.assertTrue(golem.getMainHandItem().is(Items.IRON_AXE), "its axe back in its hand");
+				same(helper, golem.robotics().swing(args("front")).first(), "breaking", "its axe works on its thrusters");
+				ticks[2] = helper.getTick();
 			})
-			.thenExecuteAfter(1, () -> helper.assertTrue(helper.getBlockState(FRONT.above(3)).getValue(ButtonBlock.POWERED), "the button's pressed"))
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(cut), "cut in the air: " + events))
+			.thenExecute(() -> {
+				ticks[3] = helper.getTick();
+				helper.assertTrue(helper.getBlockState(FRONT.above((int) LIFT + 1)).isAir(), "the log up there is gone");
+				long standing = ticks[1] - ticks[0], flying = ticks[3] - ticks[2];
+				helper.assertTrue(flying >= SLOWER_OFF_THE_GROUND * standing, "slower off the ground: " + flying + " ticks, against " + standing + " on its legs");
+			})
 			.thenSucceed();
 	}
 

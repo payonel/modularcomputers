@@ -7,8 +7,8 @@
 -- time, trying forward at each height: held, its robotics are frozen (it can't look, nor use its
 -- hands), so the field's moves feel the way (a move blocked says what by, and it's carried back to
 -- where it was). Over the top, the field lets it go, and it stands there on its legs and walks on.
--- At the tree it cuts the trunk from the ground, as far as it reaches (it uses no tools in the air,
--- nor in a field): the log in front, then, standing where that was, the one over its head. It
+-- At the tree it cuts the trunk from the ground, as far as it reaches (it uses no tools in a
+-- field): the log in front, then, standing where that was, the one over its head. It
 -- comes home the way it went (walked back, carried down), and is set down where it started. Each
 -- command waits for the one before (a device does one at a time), and its end says how it went.
 -- Home, it leaves things ready to run again: the axe in the chest's first slot, the wood and

@@ -346,17 +346,18 @@ viewer's), since it knows no compass; a block's direction it reads is turned int
 scans all six spaces at once, and works with its hand (its main hand, one item: a slot in its view,
 kept on its item when picked up) as a player does, through the loader's fake player standing where
 it is (`Platform.fakePlayer`, `GolemHands`): the game's own interactions (placing, doors, buttons,
-buckets), breaking in a player's time with its tool (standing on its legs only: legless it has no
-footing, in a field it's frozen), a hit with its weapon's damage (its modifiers put on the fake player, which never ticks, and
+buckets), breaking in a player's time with its tool (on its thrusters as a player off the ground: the
+user's, 2026-10-29, flight does everything; in a field it's frozen), a hit with its weapon's damage (its modifiers put on the fake player, which never ticks, and
 its swing's strength from the time since its last), a container's items in and out as a hopper
 moves them. What a broken block drops (or its hand is given) is caught: its storage first, else its
 off hand (a background catch, the user's: atypical, so storage is always preferred), else it stays
 in the world, and the swing's end says whether it kept it all.
 - **It flies two ways, each with its price** (the user's design, 2026-10-25), never with its legs
-  on and its tools whole: on its **thrusters**, built into a tier 2 (a tier 1's thruster calls fail: `no thrusters`), no card (`fly`, `land`;
+  on and its tools as on the ground: on its **thrusters**, built into a tier 2 (a tier 1's thruster calls fail: `no thrusters`), no card (`fly`, `land`;
   `fly()` takes off where it stands), its legs left standing where it took off (`GolemLegs`, a boat's kind of object), red
   beams from their sockets, 25 blocks a second, five CPUs' power a tick; legless it walks nowhere,
-  swings no tool (one in hand works as an empty hand: buttons, doors, its legs popped up), ignores
+  works as a player off the ground does (its hand's fake player off the ground: the game's rules,
+  a break slower), ignores
   block triggers, and can be shoved; `land` comes down onto its legs below it and refuses with none
   there. Or carried in **a field**, its own too, legs and all (10 blocks a second): stasis, as for
   any creature (the user's, 2026-10-27): its robotics freezes (commands refused `held`, mcos waiting;
@@ -825,7 +826,9 @@ Lessons from mistakes, each with its test:
   its computer. Write the branch out when b can be false. (`theDoorOpensOnAPress...`)
 - **A test's server ticks at the computer's pace:** a loop ticking every millisecond ran a starved
   computer's clock ahead of its code on a loaded host (timeouts expired, deadlines passed early),
-  which hid the spinning door. (`TestServer.awaitHost`)
+  which hid the spinning door. (`TestServer.awaitHost`) Every computer's: a second computer ticked
+  without it answered rsh's probe after its window, now and then, on a loaded host ("unknown host";
+  timing-bound, `rshFindsAnotherComputerByAPrefixEveryTime`).
 - **What a device holds open for a file closes with the file:** an internet request is a connection
   nothing else ends, so a process that died mid-download kept one of the card's 4 for good, and
   four of those locked the card. A driver's `opens` names such a method and its closer, and devfs
