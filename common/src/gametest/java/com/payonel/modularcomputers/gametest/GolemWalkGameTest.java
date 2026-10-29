@@ -1,5 +1,6 @@
 package com.payonel.modularcomputers.gametest;
 
+import com.payonel.modularcomputers.device.RoboticsDevice;
 import com.payonel.modularcomputers.entity.BotGolem;
 import com.payonel.modularcomputers.runtime.Arguments;
 import java.util.List;
@@ -302,25 +303,37 @@ public class GolemWalkGameTest {
 			.thenSucceed();
 	}
 
-	/** A stop's plan is the block it's nearest (no centering), so its next walk goes on from there, not back. */
+	/**
+	 * A stop squares nothing (the user's): the next walk goes on from exactly where it stopped, and must
+	 * end squared, so a whole block on from between blocks is refused, and the rest of the way ends on
+	 * the block's middle the stopped walk was going to.
+	 */
 	@GameTest(maxTicks = 200)
-	public void aStopsPlanIsTheBlockItsNearestAndTheNextWalkGoesOnFromThere(GameTestHelper helper) {
+	public void afterAStopTheNextWalkGoesOnFromExactlyThereAndEndsSquared(GameTestHelper helper) {
 		BotGolem golem = GolemFlightGameTest.golem(helper, false);
 		List<Object> events = events(helper, golem);
-		long[] stoppedAt = {0};
+		double[] stoppedAt = {0};
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> golem.robotics().walk(args(5L)))
 			.thenExecuteAfter(12, () -> {
 				golem.robotics().stop(args());
-				double forward = ((Number) real(golem).get("forward")).doubleValue();
-				stoppedAt[0] = Math.round(forward);
-				helper.assertTrue(stoppedAt[0] > 0 && stoppedAt[0] < 5, "stopped on the way: " + forward);
-				same(helper, position(golem), at(stoppedAt[0], 0, 0L), "its plan: the block it's nearest");
+				stoppedAt[0] = ((Number) real(golem).get("forward")).doubleValue();
+				helper.assertTrue(stoppedAt[0] > 0 && stoppedAt[0] < 5, "stopped on the way: " + stoppedAt[0]);
+				double from = ((Number) position(golem).get("forward")).doubleValue();
+				helper.assertTrue(Math.abs(from - stoppedAt[0]) < RoboticsDevice.SQUARED, "its next walk from exactly there: " + from);
+				double between = stoppedAt[0] - Math.floor(stoppedAt[0]);
+				if (between >= RoboticsDevice.SQUARED && 1 - between >= RoboticsDevice.SQUARED) {
+					String refused = golem.robotics().walk(args(1L)).error();
+					helper.assertTrue(refused != null && refused.startsWith(RoboticsDevice.NOT_AN_INTEGER + "forward"), "a block on from between blocks: " + refused);
+				}
 				events.clear();
-				golem.robotics().walk(args(1L));
+				golem.robotics().walk(args(5 - stoppedAt[0])); // (the rest of the way)
 			})
-			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "walked one more"))
-			.thenExecute(() -> same(helper, position(golem), at(stoppedAt[0] + 1, 0, 0L), "one on from where it stopped"))
+			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "walked the rest"))
+			.thenExecute(() -> {
+				same(helper, position(golem), at(5, 0, 0L), "on the block's middle it was going to");
+				same(helper, real(golem), at(5, 0, 0L), "really there");
+			})
 			.thenSucceed();
 	}
 

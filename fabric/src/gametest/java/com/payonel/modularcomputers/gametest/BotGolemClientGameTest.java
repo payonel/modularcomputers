@@ -131,7 +131,7 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 			BlockPos flierAt = feet.north(3).east(1);
 			int flierId = singleplayer.getServer().computeOnServer(server -> {
 				BotGolem flier = golem(server.overworld(), flierAt);
-				flier.robotics().fly(new com.payonel.modularcomputers.runtime.Arguments(java.util.List.of(0.0, 0.0, 1.5)));
+				flier.robotics().fly(new com.payonel.modularcomputers.runtime.Arguments(java.util.List.of(0.0, 0.0, 2.0))); // (a flight ends squared: whole blocks up)
 				return flier.getId();
 			});
 			context.waitFor(client -> client.level.getEntity(flierId) instanceof BotGolem shown && shown.thrusting());

@@ -73,10 +73,12 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
   live): its state, its real position, its drift, legs, pathfinding.
 - `stop()` (free): the active command ends `stopped`; the golem halts at once where it is (no
   centering), and `stop` answers its real position, `{forward, right, up, heading}`, in its call
-  (it's done at once, so no event: a build decision). Its plan becomes where it stopped (in the air
-  the point; on its legs the block it's nearest), changed after the code review (2026-10-28): with
-  the plan left at the stopped command's start, a scan after stopping a walk walked it all the way
-  back. A command `interrupted` by a load plans the same way.
+  (it's done at once, so no event: a build decision). The next command goes on from exactly where it
+  stopped, on its legs as in the air, its heading the nearest right angle (the user's, 2026-10-29:
+  a stop squares nothing; every move must end squared, within a 4096th, else `not an integer:`, so
+  the rest of a stopped move does). Before the code review (2026-10-28) it went on from where the
+  stopped command began, so a scan after stopping a walk walked it all the way back; after it, on
+  its legs, from the block it was nearest. A command `interrupted` by a load goes on the same way.
 - A fall on its legs it didn't ask for (a block gone from under it) isn't drift: it's busy while it
   falls, its plan follows it down, and `fell` news (how far) ends a wait: a build decision from the
   review (digging down broke every positional command after it).

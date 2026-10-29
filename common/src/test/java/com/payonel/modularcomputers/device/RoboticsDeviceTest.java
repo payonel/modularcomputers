@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.device;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.payonel.modularcomputers.runtime.Arguments;
+import com.payonel.modularcomputers.runtime.Result;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +17,8 @@ class RoboticsDeviceTest {
 	private final List<String> asked = new ArrayList<>();
 	/** Why the body refuses to walk (null: it walks). */
 	private String refuse;
+	/** Where its last command left it, from its origin (null: no position, its origin then). */
+	private Map<String, Object> left;
 
 	@BeforeEach
 	void body() {
@@ -35,6 +38,23 @@ class RoboticsDeviceTest {
 			@Override
 			public void stop() {
 				asked.add("stop");
+			}
+
+			@Override
+			public String fly(double forward, double right, double up) {
+				asked.add("fly " + forward + " " + right + " " + up);
+				return null;
+			}
+
+			@Override
+			public String walkTo(double forward, double right, double up) {
+				asked.add("walkTo " + forward + " " + right + " " + up);
+				return null;
+			}
+
+			@Override
+			public Result planned() {
+				return left == null ? Result.fail("no position") : Result.ok(left);
 			}
 		});
 		device.accepting(true);
@@ -84,10 +104,28 @@ class RoboticsDeviceTest {
 		assertThat(device.turn(args("up")).error()).isEqualTo("not a way: up");
 	}
 
+	/** Every move must end squared (the user's): whole blocks from its origin, within a 4096th, made exact; else it's refused, saying where it would end. */
 	@Test
-	void walksAreWholeBlocks() {
-		assertThat(device.walk(args(1.5)).error()).isEqualTo(RoboticsDevice.NOT_WHOLE);
+	void aMoveMustEndSquared() {
+		assertThat(device.walk(args(4.4)).error()).as("from a block's middle").isEqualTo("not an integer: forward 4.4");
+		assertThat(device.walk(args(2.0, 0L, 0.5)).error()).as("an elevation's change is whole").isEqualTo("not an integer: up 0.5");
 		assertThat(device.walk(args(2.0, -1L)).failed()).isFalse();
+		device.stop(args());
+		left = Map.of("forward", 0.6, "right", 0L, "up", 0L, "heading", 0L); // (stopped between blocks)
+		assertThat(device.walk(args(4.3)).error()).as("where it would end").isEqualTo("not an integer: forward 4.9");
+		assertThat(device.walk(args(4.4)).failed()).as("the rest of the way: squared").isFalse();
+		device.stop(args());
+		left = Map.of("forward", 0L, "right", 0.6, "up", 0L, "heading", 90L); // (facing the origin's right)
+		assertThat(device.walk(args(4.4)).failed()).as("its frame turned: forward is the origin's right").isFalse();
+		device.stop(args());
+		left = Map.of("forward", 0L, "right", 0L, "up", 0.5, "heading", 0L); // (on a slab)
+		assertThat(device.fly(args(0L, 0L, 1L)).error()).as("a flight's height is its feet's").isEqualTo("not an integer: up 1.5");
+		assertThat(device.fly(args(0L, 0L, 1.5 + 1.0 / 8192)).failed()).as("within a 4096th").isFalse();
+		device.stop(args());
+		assertThat(device.walkTo(args(2.5)).error()).isEqualTo("not an integer: forward 2.5");
+		assertThat(device.walkTo(args(2L, 1L)).failed()).isFalse();
+		assertThat(asked).containsExactly("walk 2.0 -1.0 0.0", "stop", "walk 4.4 0.0 0.0", "stop", "walk 4.4 0.0 0.0", "stop",
+			"fly 0.0 0.0 1.5", "stop", "walkTo 2.0 1.0 0.0");
 	}
 
 	@Test

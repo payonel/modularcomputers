@@ -354,7 +354,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			}
 			begin();
 			Vec3 plan = planPoint();
-			Vec3 start = new Vec3(plan.x, getY(), plan.z); // (from its plan: a stop left it off it, it steps back first)
+			Vec3 start = new Vec3(plan.x, getY(), plan.z); // (from its plan: where it is, even after a stop)
 			goal = GolemSteps.elevation(plan.y) + (int) up;
 			if (pathfinding) {
 				target = start.add(inFrame(forward, right, 0)).add(0, up, 0);
@@ -367,19 +367,28 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			if (BotGolem.this.position().subtract(start).horizontalDistance() > OFF_PLAN) {
 				steps.add(start);
 			}
-			Vec3 at = start;
-			Vec3 ahead = inFrame(Math.signum(forward), 0, 0);
-			for (int i = 0; i < Math.abs(forward); i++) {
-				at = at.add(ahead);
-				steps.add(at);
-			}
-			Vec3 aside = inFrame(0, Math.signum(right), 0);
-			for (int i = 0; i < Math.abs(right); i++) {
-				at = at.add(aside);
-				steps.add(at);
-			}
+			Vec3 at = stepAlong(start, inFrame(Math.signum(forward), 0, 0), Math.abs(forward));
+			stepAlong(at, inFrame(0, Math.signum(right), 0), Math.abs(right));
 			setNoGravity(true); // (it moves itself, step by step)
 			return null;
+		}
+
+		/**
+		 * A straight walk's steps {@code way} (a block, along its frame) from {@code at}, {@code far} in
+		 * all: from a stop between blocks the part onto the next block's middle first, then a block's
+		 * middle each. Where they end.
+		 */
+		private Vec3 stepAlong(Vec3 at, Vec3 way, double far) {
+			double first = far - Math.floor(far);
+			if (first > HAIR) {
+				at = at.add(way.scale(first));
+				steps.add(at);
+			}
+			for (long i = Math.round(far - first); i > 0; i--) {
+				at = at.add(way);
+				steps.add(at);
+			}
+			return at;
 		}
 
 		@Override
@@ -391,8 +400,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			Vec3 plan = planPoint();
 			face(planYaw()); // (its frame's: its plan's heading)
 			Vec3 d = to.subtract(plan);
-			double ahead = Math.round(d.dot(inFrame(1, 0, 0)));
-			double aside = Math.round(d.dot(inFrame(0, 1, 0)));
+			double ahead = Math.rint(d.dot(inFrame(1, 0, 0)) * FRAME_GRAIN) / FRAME_GRAIN; // (from where it is: after a stop, between blocks)
+			double aside = Math.rint(d.dot(inFrame(0, 1, 0)) * FRAME_GRAIN) / FRAME_GRAIN;
 			double rise = GolemSteps.elevation(to.y) - GolemSteps.elevation(plan.y);
 			if (Math.abs(ahead) > RoboticsDevice.MAX_WALK || Math.abs(aside) > RoboticsDevice.MAX_WALK || Math.abs(rise) > RoboticsDevice.MAX_WALK) {
 				return RoboticsDevice.TOO_FAR + (int) RoboticsDevice.MAX_WALK;
@@ -496,10 +505,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			double forward = ((Number) at.get("forward")).doubleValue();
 			double right = ((Number) at.get("right")).doubleValue();
 			double up = ((Number) at.get("up")).doubleValue();
-			if (legs()) { // (on the ground its plan's a block's middle: the one it's nearest)
-				forward = Math.rint(forward);
-				right = Math.rint(right);
-			}
 			float heading = rightAngle(((Number) at.get("heading")).floatValue());
 			origins.put(dimension(), origin().planned(new Vec3(forward, right, up), Mth.positiveModulo(heading, 360f)));
 		}

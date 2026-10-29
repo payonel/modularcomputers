@@ -1,14 +1,15 @@
 -- The robotics device's driver, for its /dev file (as a sysfs attribute: text, a write taking
 -- effect as it can). A read gives what it's doing now, a word (idle, walking, turning, breaking,
--- flying, hovering, landing, returning, crafting or held), then where it really is: "position
--- forward right up heading" (from its origin), its plan ("planned ...", where its last command left
--- it) and, when it's off its plan, "drift forward right up".
+-- flying, hovering, landing, returning, falling or held), then where it really is: "position
+-- forward right up heading" (from its origin), where its last command left it ("planned ...") and,
+-- when it's away from there, "drift forward right up".
 -- A line written is an action; the device does one at a time, so a line given while one runs
 -- waits for it (the writing thread only), but a stop, which never waits:
---   walk [forward [right [up]]] (whole blocks from its plan, in its own frame; none: back to its plan)
+--   walk [forward [right [up]]] (from where its last command left it, in its own frame, ending
+--                                squared; none: back there)
 --   walkto forward [right [up]] (whole blocks from its origin, in the origin's frame)
 --   fly [forward [right [up]]]  (on its thrusters: its legs left standing where it was; none: take
---                                off where it stands, or back to its plan)
+--                                off where it stands, or back to where its last command left it)
 --   flyto forward [right [up]]  (from its origin)
 --   land                        (onto its legs, below it)
 --   turn left|right|around
@@ -48,7 +49,7 @@ return {
     end
     local action = words[1]
     if (action == "walk" or action == "fly") and #words == 1 then
-      return {action = action, forward = 0, right = 0, up = 0} -- (back to its plan; fly: off where it stands)
+      return {action = action, forward = 0, right = 0, up = 0} -- (back to where its last command left it; fly: off where it stands)
     elseif MOVES[action] and number(words[2]) and #words <= 4 then
       local right, up = number(words[3]), number(words[4])
       if (words[3] and not right) or (words[4] and not up) then

@@ -117,6 +117,31 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
+	/** How high the stopped flight's test sends it, in blocks. */
+	private static final double HIGH = 4;
+
+	/** A flight stopped in the air goes on from exactly there, as a walk does (the user's), and the rest of the way ends squared. */
+	@GameTest(maxTicks = 200)
+	public void aFlightStoppedInTheAirGoesOnFromThereAndEndsSquared(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
+		double[] stoppedAt = {0};
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().fly(args(0.0, 0.0, HIGH)))
+			.thenExecuteAfter(1, () -> {
+				golem.robotics().stop(args());
+				java.util.Map<?, ?> live = (java.util.Map<?, ?>) ((java.util.Map<?, ?>) golem.robotics().get(args()).first()).get("position");
+				stoppedAt[0] = ((Number) live.get("up")).doubleValue();
+				helper.assertTrue(stoppedAt[0] > 0 && stoppedAt[0] < HIGH, "stopped on the way up: " + stoppedAt[0]);
+				events.clear();
+				golem.robotics().fly(args(0.0, 0.0, HIGH - stoppedAt[0])); // (the rest of the way)
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "up the rest: " + events))
+			.thenExecute(() -> same(helper, golem.robotics().position(args()).first(),
+				java.util.Map.of("forward", 0L, "right", 0L, "up", (long) HIGH, "heading", 0L), "squared, where it was going"))
+			.thenSucceed();
+	}
+
 	/** How much longer a break takes off the ground at least (the game's rule: a fifth as fast). */
 	private static final int SLOWER_OFF_THE_GROUND = 3;
 

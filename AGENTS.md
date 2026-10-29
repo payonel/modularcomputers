@@ -328,16 +328,22 @@ user's design, 2026-10-25): it knows no world position (a GPS card later) but al
 **position** (the user's word: robotics' "pose"), odometry from an origin a dimension (set at its
 first tick there or by `setPosition`, saying where it is: its origin there, or a given place, a GPS's fix, on a
 block's middle at a right angle; kept through reboots, shoves, fields; lost only when it's an item),
-and `walkTo`/`flyTo` go to points from it. A walk is whole blocks and ends on the asked block's
-middle, facing as it began (a move squares its heading up, and gives it back), or not `ok` on the
-last middle reached (its plan then); turns are right angles. **It runs from its plan** (the user's
-design, 2026-10-27): its robotics is buffered (one command at a time), each command measured from
-where the last left it; a shove off it (in the air) is drift, said as `shoved` news, and the next
+and `walkTo`/`flyTo` go to points from it. **Every move ends squared** (the user's, 2026-10-29):
+on a block's middle, whole blocks from its origin (a flight's feet height too; a walk's `up` is a
+whole change of elevation), within `RoboticsDevice.SQUARED` (a 4096th, the game's own grain for an
+entity's moves), else refused, `not an integer: forward 4.4` (where it would end); `walkTo`,
+`flyTo` and `setPosition` take whole numbers, `walk` and `fly` any (the rest of a stopped move).
+A move faces as it began (it squares its heading up, and gives it back), or ends not `ok` on the
+last middle reached; turns are right angles. **Each command goes from where the last left it**
+(the user's design, 2026-10-27; "plan" in the code): its robotics is buffered (one command at a
+time); a shove away from there (in the air) is drift, said as `shoved` news, and the next
 positional command (`RoboticsDevice.POSITIONAL`: moves, turns, scans, its hand's) goes back first
-(its own `return` event), as a hover holds its plan like a drone. `position` is the plan (a
-command, so it waits its turn); `get` is live (where it really is, its drift). `stop` is free and
-at once, where it is (no centering), answering where; its plan becomes where it stopped (in the air
-the point, on its legs the block it's nearest), the origin stays. Without pathfinding (the default) it walks straight,
+(its own `return` event), as a hovering drone holds its place. `position` is where the last left it
+(a command, so it waits its turn); `get` is live (where it really is, its drift). `stop` is free and
+at once, where it is (no centering), answering where; the next command goes on from exactly there,
+on its legs as in the air, its heading the nearest right angle (the user's: a stop squares nothing,
+and the move after it must still end squared), the origin stays. The docs say "where its last
+command left it", never "plan" (the user's: the word hid what it means). Without pathfinding (the default) it walks straight,
 forward then right, never turning (it strafes and backs up), by `GolemSteps`: free within its
 elevation (the block its feet are in: slabs), a block up at a time only toward `up`, down three at
 most only toward it. With pathfinding (`setPathfinding`, kept like the origin) the game's pathfinder

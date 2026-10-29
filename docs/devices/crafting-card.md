@@ -50,7 +50,7 @@ Its methods are [commands](/devices/robotics/#one-command-at-a-time) that come a
 each waits while the robot is doing something else (a walk, a swing), and a robot held in a field
 waits until it's let go, so what a program does at a chest comes after its walk there. Its face
 actions (`drop`, `store`, `take`, `pickup`, a line written) are where the robot is, so a robot
-shoved off its plan goes back to it first. A craft costs the robot nothing: once started it's the
+shoved away from where its last command left it goes back there first. A craft costs the robot nothing: once started it's the
 card's own work, and the card is busy until it's crafted (its next command waits for it) while the
 robot is free to walk and act. A field holding the robot holds its robotics only: a craft under way is the
 card's, and goes on, but the robot is what works the card (a case has none), so every command the
