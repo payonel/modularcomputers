@@ -104,7 +104,8 @@ what a program can do with it, and its examples.
 
 An advanced example, using all of it: the robotics device, a [crafting card](/devices/crafting-card/)
 for storage, and an [energy field card](/devices/energy-field-card/) as its lift. A golem uses no
-tools while a field holds it, so it's carried up to the tree, set down, and cuts it from the ground. Set it up:
+tools while a field holds it, so it's carried up to the tree, set down, and cuts it from the ground,
+and on its thrusters (a tier 2) up the trunk. Set it up:
 
 1. A golem with a CPU, RAM, an EEPROM, a battery, a disk with mcos, a crafting card and an energy
    field card (a screen in its gold slot, to watch it).
@@ -118,8 +119,9 @@ into the chest, takes the axe, and walks forward a block at a time until a log i
 At a cliff it holds itself in its field and is carried up a block at a time, trying forward at
 each: held, it can't look, so the field's moves feel the way (a move blocked says what by, and it's
 carried back to where it was). Over the top it's let go, on its legs, and walks on. It cuts the
-trunk from the ground, as far as it reaches: the log in front, then, standing where that was, the
-one over its head. Then it comes home exactly the way it went, walked and carried, and is set down
+trunk from the ground: the log in front, then, standing where that was, the one over its head. A
+tier 2 flies on up the trunk, a log at a time, cutting each over its head, and lands back on its
+legs; a tier 1 leaves the logs it can't reach. Then it comes home exactly the way it went, walked and carried, and is set down
 where it started.
 
 Home, it leaves everything ready to run again: the axe back in the chest's first slot, the wood and

@@ -29,8 +29,8 @@ import net.minecraft.world.phys.Vec3;
  * The user's big test: a bot golem running mcos, its manual's program (docs/examples/golem-tree.lua)
  * as a service started at boot: it takes an axe from the chest behind it (from whatever slot), walks
  * forward looking for a tree, is carried up the cliff in its own field (frozen there: the field's
- * moves feel the way), set down on the ledge, cuts the trunk from the ground (no tools in the air,
- * nor in a field), comes home the way it went, and leaves things ready to run again: the axe in the
+ * moves feel the way), set down on the ledge, cuts the trunk from the ground and flies up it for the rest (no tools in
+ * a field; on its thrusters, a tier 2's, as a player off the ground), lands on its legs, comes home the way it went, and leaves things ready to run again: the axe in the
  * chest's first slot, the wood in the chest, its hands and storage empty. When something's wrong
  * (no axe, a cliff too high) it comes home all the same, tidy, and says why.
  */
@@ -40,10 +40,13 @@ public class TreeJobGameTest {
 	private static final BlockPos CHEST = START.west();
 	/** The axe's slot in the chest: not the first (it finds it wherever it is). */
 	private static final int AXE_SLOT = 4;
-	/** The tree: on a ledge this many blocks ahead, its lowest log this far up; two logs, leaves over them. */
+	/**
+	 * The tree: on a ledge this many blocks ahead, its lowest log this far up; three logs (the third
+	 * cut from the air: the most the test's space holds with leaves over them), leaves over them.
+	 */
 	private static final int FORWARD = 3;
 	private static final int UP = 2;
-	private static final int LOGS = 2;
+	private static final int LOGS = 3;
 	private static final BlockPos TRUNK = START.east(FORWARD).above(UP);
 	/** The cliff's face, a block before the trunk: the ledge runs from there on, the tree on it. */
 	private static final int CLIFF = FORWARD - 1;

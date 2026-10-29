@@ -7,8 +7,9 @@
 -- time, trying forward at each height: held, its robotics are frozen (it can't look, nor use its
 -- hands), so the field's moves feel the way (a move blocked says what by, and it's carried back to
 -- where it was). Over the top, the field lets it go, and it stands there on its legs and walks on.
--- At the tree it cuts the trunk from the ground, as far as it reaches (it uses no tools in a
--- field): the log in front, then, standing where that was, the one over its head. It
+-- At the tree it cuts the trunk from the ground (it uses no tools in a field): the log in front,
+-- then, standing where that was, the one over its head; with thrusters (a tier 2) it flies on up
+-- the trunk, cutting each log over its head, and lands back on its legs. It
 -- comes home the way it went (walked back, carried down), and is set down where it started. Each
 -- command waits for the one before (a device does one at a time), and its end says how it went.
 -- Home, it leaves things ready to run again: the axe in the chest's first slot, the wood and
@@ -228,8 +229,24 @@ local function findTree()
   say("found a tree " .. ahead .. " blocks ahead" .. (climbed > 0 and ", " .. climbed .. " up" or ""))
 end
 
--- 3. The trunk, as far as it reaches from the ground: the log in front, then, standing where that
--- was, the one over its head.
+local aloft = false -- (up the trunk on its thrusters: it lands before it goes home)
+
+-- Back down onto its legs after a flight up the trunk: true, or false and why.
+local function landBack()
+  if not aloft then
+    return true
+  end
+  local ok, why = robot.land()
+  if ok then
+    ok, why = ended(robot, "land")
+  end
+  aloft = not ok
+  return ok, why
+end
+
+-- 3. The trunk: the log in front, then, standing where that was, the one over its head; with
+-- thrusters, up a log at a time, cutting each over its head (a tier 1 has none: it stops there).
+-- How many logs it cut.
 local function cutTrunk()
   chop("front", "the trunk")
   local logs = 1
@@ -237,9 +254,20 @@ local function cutTrunk()
   if not ok then
     problem("stepping into the trunk's place, I got blocked: " .. tostring(why))
   end
-  if is("up", LOG) then
+  while is("up", LOG) do
     chop("up", "the trunk over my head")
     logs = logs + 1
+    if not robot.fly(0, 0, 1) then
+      break -- (no thrusters: as high as it reaches)
+    end
+    aloft = true
+    if not ended(robot, "fly") then
+      break -- (blocked going up: as high as it gets)
+    end
+  end
+  ok, why = landBack()
+  if not ok then
+    problem("coming down onto my legs, I couldn't: " .. tostring(why))
   end
   return logs
 end
@@ -277,6 +305,7 @@ if not ok then
   local text = type(err) == "table" and err.problem or tostring(err)
   say(text .. ", so I came home")
 end
+landBack() -- (a problem up the trunk: down onto its legs first)
 local home = comeHome()
 if home then
   -- 5. Ready to run again: the axe in the chest's first slot, the rest in the chest too.
