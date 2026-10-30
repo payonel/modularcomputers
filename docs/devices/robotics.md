@@ -78,8 +78,8 @@ gives where its last command left it; `get` gives where it really is, and its dr
 A fall it didn't ask for, on its legs (a block gone from under it, a trapdoor it opened, a piston
 off a ledge), isn't a drift: it says so as it begins (a `falling` notice), and while it falls it's
 busy (`falling`), its commands waiting, but for its flights: a tier 2 catches itself on its
-thrusters (`fly()`, back to where its last command left it), its legs dropped to fall on without
-it. Not caught, once down it goes on from where it landed, and it says so (a `fell` notice, and
+thrusters, its legs dropped to fall on without it, `stop(true)` holding it where it is, `fly()`
+taking it back to where its last command left it. Not caught, once down it goes on from where it landed, and it says so (a `fell` notice, and
 how far), so a robot digging down goes on from there.
 
 `stop` stops it at once, where it is: no centering, no squaring up. The command running ends
@@ -130,6 +130,7 @@ given while one runs waits for it, the writing thread only; a `stop` never waits
 | `use face` | Uses what it holds on the space at a face |
 | `swing face` | Swings what it holds at a face: hits a mob, or breaks the block |
 | `stop` | Stops at once, where it is |
+| `stop force` | The same, and falling, a tier 2 catches itself where it is |
 | `position [forward [right [up [heading]]]]` | Says where it is, its origin moved to make it so (none: its origin here) |
 | `pathfinding on`, `pathfinding off` | Whether its moves find their way round things |
 
@@ -193,12 +194,14 @@ already, it doesn't turn, and its event comes all the same).
 Its event: `turn`. It fails with `not a way: ` and what it was given: its heading is always a right
 angle from its origin's.
 
-### stop() → {forward, right, up, heading}
+### stop([force]) → {forward, right, up, heading}
 
 Stops what it's doing at once, where it is, with no centering (flying, it hovers there; a block it
 was breaking is left as it is): the command running ends,
-`stopped`, and in mcos so does every thread's wait to give it a command (`ECANCELED`). Never waits.
-Answers where it really stopped, from its origin. Its next command goes on from exactly there (its
+`stopped`, and in mcos so does every thread's wait to give it a command (`ECANCELED`). A fall isn't
+something it's doing, so `stop()` lets a fall go on; `stop(true)` stops that too: falling, a tier 2
+catches itself where it is on its thrusters, its legs dropped, and hovers there (a tier 1 can't:
+it falls on). Never waits. Answers where it really stopped, from its origin. Its next command goes on from exactly there (its
 heading the nearest right angle): no squaring first.
 
 ### position() → {forward, right, up, heading}

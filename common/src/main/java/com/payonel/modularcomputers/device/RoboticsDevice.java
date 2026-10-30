@@ -114,6 +114,11 @@ public final class RoboticsDevice implements Device, Buffered {
 		/** Stops at once, where it is, no centering (a block it was breaking left as it is). */
 		void stop();
 
+		/** Falling, catches itself on its thrusters where it is, its legs dropped: whether it did (it has none, or isn't falling). */
+		default boolean catchFall() {
+			return false;
+		}
+
 		/** What's in the space at {@code face} (one of {@link #FACES}), or in all six by face (null). */
 		default Result scan(String face) {
 			return Result.fail("no body");
@@ -491,10 +496,15 @@ public final class RoboticsDevice implements Device, Buffered {
 		return started;
 	}
 
-	@Method(doc = "stop(): stops what it's doing at once, where it is, no centering (flying, it hovers there; a block it was breaking is left as it is): the command running ends, stopped. Its next command goes on from exactly where it stopped, on its legs as in the air (its heading the nearest right angle): no squaring first. Never waits; answers where it really stopped, {forward, right, up, heading} from its origin")
+	@Method(doc = "stop([force]): stops what it's doing at once, where it is, no centering (flying, it hovers there; a block it was breaking is left as it is): the command running ends, stopped. With force, falling, a tier 2 stops its fall too, catching itself on its thrusters where it is, its legs dropped (without force, or with no thrusters, a fall goes on). Its next command goes on from exactly where it stopped, on its legs as in the air (its heading the nearest right angle): no squaring first. Never waits; answers where it really stopped, {forward, right, up, heading} from its origin")
 	public Result stop(Arguments args) {
-		body.stop();
+		if (!body.falling()) {
+			body.stop(); // (falling, nothing of its own moves: gravity's fall goes on, its speed kept)
+		}
 		end(false, STOPPED, null);
+		if (args.count() > 0 && args.get(0) != null && args.checkBoolean(0) && body.catchFall()) {
+			body.replanHere(); // (caught where it is: its next command goes on from there, as after any stop)
+		}
 		Result at = body.position();
 		return at.failed() ? Result.ok(true) : Result.ok(at.first());
 	}
@@ -686,7 +696,10 @@ public final class RoboticsDevice implements Device, Buffered {
 				rest.add(action.get("face"));
 				yield action.get("action").equals("use") ? use(new Arguments(rest)) : swing(new Arguments(rest));
 			}
-			case "stop" -> stop(new Arguments(rest));
+			case "stop" -> {
+				rest.add(Boolean.TRUE.equals(action.get("force")));
+				yield stop(new Arguments(rest));
+			}
 			default -> Result.fail("not an action: " + action.get("action"));
 		};
 	}

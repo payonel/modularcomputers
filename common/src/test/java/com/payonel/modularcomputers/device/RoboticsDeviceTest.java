@@ -270,6 +270,16 @@ class RoboticsDeviceTest {
 		}
 
 		@Override
+		public boolean catchFall() {
+			if (!falling) {
+				return false;
+			}
+			asked.add("catch");
+			falling = false;
+			return true;
+		}
+
+		@Override
 		public boolean frozen() {
 			return frozen;
 		}
@@ -326,6 +336,21 @@ class RoboticsDeviceTest {
 		robot.pull(args());
 		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "stuck", "why", "blocked: minecraft:piston_head back"));
 		assertThat(body.asked).as("held there, nothing replanned").containsExactly("return", "hold here");
+	}
+
+	/** stop(true) stops a fall too (the user's): falling, it catches itself where it is, and goes on from there; stop() lets a fall go on. */
+	@Test
+	void stopWithForceCatchesAFallWhereItIs() {
+		Drifting body = new Drifting();
+		RoboticsDevice robot = with(body);
+		body.falling = true;
+		robot.stop(args());
+		assertThat(body.asked).as("a plain stop: nothing of its own moves, the fall goes on").isEmpty();
+		robot.stop(args(true));
+		assertThat(body.asked).as("caught, and it goes on from there").containsExactly("catch", "replan here");
+		body.asked.clear();
+		robot.stop(args(true));
+		assertThat(body.asked).as("not falling: a plain stop").containsExactly("stop");
 	}
 
 	/** A positional command given off its plan, with no way back, is refused with why (it can't run where it should). */

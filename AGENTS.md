@@ -376,7 +376,8 @@ in the world, and the swing's end says whether it kept it all.
   block triggers, and can be shoved; `land` comes down onto its legs below it and refuses with none
   there, but `land(true)` (the user's, 2026-10-29: a crash's landing, safely) comes straight down
   without them, still running; a fall on its legs is a `falling` notice as it begins, and a tier
-  2's flights are taken mid-fall (it catches itself, its legs dropped). Or carried in **a field**, its own too, legs and all (10 blocks a second): stasis, as for
+  2's flights are taken mid-fall (it catches itself, its legs dropped), and `stop(true)` catches it
+  where it is (a plain `stop()` lets a fall go on: it isn't something the robot does). Or carried in **a field**, its own too, legs and all (10 blocks a second): stasis, as for
   any creature (the user's, 2026-10-27): its robotics freezes (commands refused `held`, mcos waiting;
   a swing under way ends; no tools, no looking), and only its robotics (the user's, 2026-10-29: its
   body is held, and robotics is its one device acting in the world), so its other devices go on (a
@@ -894,6 +895,11 @@ Lessons from mistakes, each with its test:
   where its next command goes from, so a robot stuck after a shove went on from where it was stuck
   (`walk()` went nowhere). A way back that fails holds, the last good point kept.
   (`aWayBackBlockedPartwayHoldsAndKeepsItsLastGoodPoint`, `aPistonShovesItOnItsLegsAndItSaysSo`)
+- **A robot body's `stop` is its board's reset too:** power-on stops it (`accepting(false)`), while a
+  golem just placed is still settling, so a stop that kept a fall's speed let it sink into the
+  floor, the game pushed it out sideways, and its first command met a shove. What a program's
+  stop means goes in the device's `stop`, never the body's. (`stopWithForceStopsAFallWhereItIs`;
+  the hands tests' first commands)
 - **A block's state isn't the block:** leaves change state as their log goes, crops as they grow;
   what's tied to a block (a golem's breaking) compares the block, not its state.
   (`aBlockWhoseStateChangesWhileItsBrokenStillBreaks`)

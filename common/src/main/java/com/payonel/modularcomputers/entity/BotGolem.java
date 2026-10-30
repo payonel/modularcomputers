@@ -412,6 +412,17 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 
 		@Override
+		public boolean catchFall() {
+			if (!falling() || noThrusters() != null) {
+				return false;
+			}
+			begin(); // (it holds again, a command's way)
+			takeOff(); // (its legs dropped, the fall it was owed forgotten)
+			setDeltaMovement(Vec3.ZERO);
+			return true;
+		}
+
+		@Override
 		public double toward(com.payonel.modularcomputers.device.Face way) {
 			return Mth.wrapDegrees(Direction.valueOf(way.name()).toYRot() - planYaw()); // (from its plan's heading)
 		}

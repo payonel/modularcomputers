@@ -229,7 +229,7 @@ public class GolemHandsGameTest {
 		BotGolem golem = start(helper, answers, call("contents", "front"), call("take", "front"), call("store", "front", 2L));
 		helper.succeedWhen(() -> {
 			List<Object> got = copy(answers);
-			helper.assertTrue(got.size() >= 3, "its answers: " + got);
+			helper.assertTrue(got.size() >= 3 && got.get(0) instanceof List<?>, "its answers: " + got);
 			List<?> contents = (List<?>) got.get(0);
 			same(helper, ((Number) ((Map<?, ?>) contents.getFirst()).get("slot")).intValue(), 5, "the apples' slot, from 1");
 			same(helper, ((Number) got.get(1)).intValue(), 5, "took all 5");

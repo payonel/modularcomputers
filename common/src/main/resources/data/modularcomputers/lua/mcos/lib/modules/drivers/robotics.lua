@@ -17,6 +17,7 @@
 --   use FACE                    (front, back, left, right, up or down: its own)
 --   swing FACE
 --   stop
+--   stop force                  (falling, a tier 2 catches itself where it is, its legs dropped)
 --   position [forward [right [up [heading]]]]  (says where it is, its origin moved to make it so; none: its origin here)
 --   pathfinding on|off
 -- How an action that runs over time went comes as an event named after it (poll's PRI; the pull
@@ -62,6 +63,8 @@ return {
       return {action = "turn", way = words[2]}
     elseif (action == "use" or action == "swing") and #words == 2 then
       return {action = action, face = words[2]}
+    elseif action == "stop" and #words == 2 and words[2] == "force" then
+      return {action = "stop", force = true} -- (falling, a tier 2 catches itself where it is)
     elseif action == "land" and #words == 2 and words[2] == "force" then
       return {action = "land", force = true} -- (straight down, without its legs)
     elseif (action == "stop" or action == "land") and #words == 1 then

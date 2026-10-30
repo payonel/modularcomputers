@@ -372,6 +372,37 @@ public class GolemWalkGameTest {
 			.thenSucceed();
 	}
 
+	/**
+	 * Sand giving way under it (the user's: any fall, whatever took its footing): it says so as it
+	 * begins, and falls past its sand (a falling block falls at half a creature's pull) to the floor,
+	 * where it says how far.
+	 */
+	@GameTest(maxTicks = 200)
+	public void sandGivingWayUnderItIsAFallItSays(GameTestHelper helper) {
+		BlockPos sand = AT.east(2).above();
+		helper.setBlock(AT.east(), Blocks.STONE); // (a step up, then the sand on a stone, a step higher)
+		helper.setBlock(AT.east(2), Blocks.STONE);
+		helper.setBlock(sand, Blocks.SAND);
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(1L, 0L, 1L)))
+			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "up a step"))
+			.thenExecute(() -> {
+				events.clear();
+				golem.robotics().walk(args(1L, 0L, 1L));
+			})
+			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "up onto the sand"))
+			.thenExecute(() -> {
+				events.clear();
+				helper.setBlock(AT.east(2), Blocks.AIR); // (the sand's footing gone: it falls, and the golem on it)
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(Map.of("event", "notice", "what", "falling")), "it says it's falling: " + events))
+			.thenWaitUntil(() -> same(helper, last(events), Map.of("event", "notice", "what", "fell", "by", 2L), "down, past its sand"))
+			.thenExecute(() -> same(helper, position(golem), at(2, 0, 0L), "on the floor, where it fell to"))
+			.thenSucceed();
+	}
+
 	/** A block gone from under it: it falls, its plan follows it down, it says so, and its next walk is from there. */
 	@GameTest(maxTicks = 200)
 	public void aFallItDidntAskForMovesItsPlanDownAndItSaysSo(GameTestHelper helper) {
