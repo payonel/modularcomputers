@@ -55,9 +55,8 @@ card's own work, and the card is busy until it's crafted (its next command waits
 robot is free to walk and act. A field holding the robot holds its robotics only: a craft under way is the
 card's, and goes on, but the robot is what works the card (a case has none), so every command the
 card is given waits until the robot is let go. Its `pull`, `list`, `get` (its
-own slots) and `stop` never wait. At the board a command refused because its robot is busy names
-the robot (`false, "busy", "id:..."`): its news ends the wait; one refused while the card crafts is
-`false, "busy"`, the card's own news ending it.
+own slots) and `stop` never wait. At the board a refusal names the device whose news ends the wait:
+the robot while it's busy (`false, "busy", "id:<the robot>"`), the card itself while it crafts.
 
 ## In mcos
 

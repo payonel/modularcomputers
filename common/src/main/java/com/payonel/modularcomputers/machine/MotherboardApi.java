@@ -141,12 +141,13 @@ final class MotherboardApi implements Board {
 			&& DeviceMethods.of(device.get()).containsKey(method)) {
 			String refused = buffered.refusal(method);
 			if (refused != null) {
-				// A command while another runs: nothing done (mcos waits, its thread only), and when another
-				// device's news ends the wait (a card's robot), which: false, why, its id.
+				// A command while another runs: nothing done (mcos waits, its thread only), and always the
+				// device whose news ends the wait, by its id: its own, or another's (a card's robot). One
+				// shape (the user's): false, why, the id to wait on.
 				Object blocker = buffered.blocker(method);
-				String waitOn = blocker == null ? null : board.bus().addressOf(blocker)
-					.map(at -> java.util.Objects.requireNonNullElse(board.bus().id(at), at)).orElse(null);
-				return waitOn == null ? Result.fail(refused) : Result.fail(refused, waitOn);
+				String waitOn = board.bus().addressOf(blocker != null ? blocker : device.get())
+					.map(at -> java.util.Objects.requireNonNullElse(board.bus().id(at), at)).orElse(address);
+				return Result.fail(refused, waitOn);
 			}
 		}
 		try {

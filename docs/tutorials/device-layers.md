@@ -64,7 +64,7 @@ Your OS is the only code running, so it does everything a driver would.
    line up, so the next wait returns at once. Nothing is lost.)
 4. **Act.** `board.invoke(card, "set", {east = {powered = 15}})` lights the lamp. Its end
    comes as an event too (`{event = "set", ok = true, ...}`, no side); the program
-   ignores any event but the lever's face. (A second `set` before the first's end answers `false, "busy"`:
+   ignores any event but the lever's face. (A second `set` before the first's end answers `false, "busy"` and the card's id:
    the card takes one command at a time.)
 
 ## Layer 2: `sys`, step by step
@@ -115,7 +115,8 @@ method's description, its arguments first (from `/sys/class/redstone/redstone0/m
 A [bot golem](/hardware/bot-golem/)'s robotics device works the same way: start a move, then take its
 event (`walk`: `ok`, or not and why). Its moves answer at once; how they went is the event. It does
 [one command at a time](/concepts/interrupts/#one-command-at-a-time): at layer 1 a move given while
-one runs answers `false, "busy"` (wait for its end, then give it again); at layers 2 and 3 it waits,
+one runs answers `false, "busy"` and the id of the device to wait on (wait for its end, then give
+it again); at layers 2 and 3 it waits,
 its thread only, so moves given in a row happen in order.
 
 ```lua

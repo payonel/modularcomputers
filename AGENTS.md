@@ -645,9 +645,10 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   never has to know which. No queue, no tags, no fault state: a failure ends its own command only
   (the user's: a robot stuck on its first failure looks broken). A tags-and-queues design came first
   and was set aside as too error-prone.
-  - **A device busy for another's sake names it** (`Buffered.blocker`): the board's refusal is
-    `false, "busy", "<its id>"` (a crafting card waiting for its robot's moves: the robot's busy
-    state, the card's interrupt line), and mcos listens on both. `busy` and `held` mean "wait":
+  - **A refusal always names the device whose news ends the wait** (the user's: one shape):
+    `false, "busy", "<id>"`, its own id, or another's when it's busy for that one's sake
+    (`Buffered.blocker`: a crafting card waiting for its robot's moves, the robot's busy state, the
+    card's interrupt line), and mcos listens on both. `busy` and `held` mean "wait":
     no device method fails with them (a field's target in another field is `captured`).
   - **mcos asks a waiting command again at most once a tick** unless one of its devices raised its
     interrupt (the board's state moves a tick at a time); news its retry takes into other files

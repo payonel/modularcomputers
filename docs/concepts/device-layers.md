@@ -38,7 +38,7 @@ every program complete.
 - **A device's methods never wait at the board.** A call answers at once with what the device has
   now: a redstone card's `pull` with no change gives `nil`, a robot's `walk` answers `true` as it
   starts, and a [buffered device](/concepts/interrupts/#one-command-at-a-time) given a command
-  while it runs one answers `false, "busy"`. Under mcos (layers 2 and 3) that command waits
+  while it runs one answers `false, "busy", id` (the device to wait on). Under mcos (layers 2 and 3) that command waits
   instead, its thread only, until the device can take it. See
   [Interrupts](/concepts/interrupts/#device-calls-never-wait).
 - **News is an event, and an interrupt says it's there.** A device keeps its events until they're

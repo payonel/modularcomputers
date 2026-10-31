@@ -73,10 +73,10 @@ a [redstone card](/devices/redstone-card/), a
 over time ends in an event named after its method, `{event = "walk", ok = true}` (or `ok = false`
 and why), which raises its interrupt: the device's "idle again".
 
-- **At the board**, a command given while another runs is refused at once, `false, "busy"`, doing
-  nothing: the call still never waits. Wait for the running command's end (its interrupt), then
-  give it again. When another device's news ends the wait, the refusal names it too, by its id
-  (`false, "busy", "id:..."`): a crafting card waiting for its robot's walk. Every such device has
+- **At the board**, a command given while another runs is refused at once, `false, "busy", id`,
+  doing nothing: the call still never waits. The id is the device whose news ends the wait, always:
+  its own, or another's (a crafting card waiting for its robot's walk names the robot). Wait on that
+  id's interrupt (`board.waitForInterrupt(nil, id)`), take its news, then give the command again. Every such device has
   `sync`, which never waits either: `true` when its queue is empty (no command of its own under
   way), else `false`, its interrupt saying when.
 - **Under mcos**, the kernel does that for you: a command to a busy device blocks the thread that

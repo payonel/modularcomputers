@@ -98,7 +98,8 @@ as an event. To wait for a device, use `board.waitForInterrupt`, then call it. S
 [Interrupts](/concepts/interrupts/#device-calls-never-wait). A device that acts over time (a robot, a
 field card, a redstone card, a robotic piston) runs [one command at a
 time](/concepts/interrupts/#one-command-at-a-time): given one while another runs, it answers
-`false, "busy"`; its running command's end event says when to give it again.
+`false, "busy", id`, the id of the device whose news ends the wait (its own, or another's); that
+device's event says when to give it again.
 
 A call never stops the machine. If a device is gone, or an argument is wrong, `board.invoke`
 returns `false` and a message such as `bad argument #1 (string expected, got nil)`. This manual

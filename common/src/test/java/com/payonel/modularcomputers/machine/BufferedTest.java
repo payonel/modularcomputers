@@ -46,6 +46,21 @@ class BufferedTest {
 			Map.of("event", "work", "ok", true), 1L);
 	}
 
+	/** A refusal always names the device whose news ends the wait (the user's: one shape), its own too: false, why, its id. */
+	@Test
+	void aRefusalAlwaysNamesTheDeviceToWaitOnItsOwnToo() {
+		List<Object> seen = new ArrayList<>();
+		run(board -> {
+			board.invoke("id:slow", "work", 3L);
+			var refused = board.invoke("id:slow", "work", 1L);
+			seen.add(refused.error());
+			seen.add(refused.first() instanceof String);
+			seen.add(!board.waitForInterrupt(10, String.valueOf(refused.first())).isEmpty()); // (its work's end comes on it)
+			Program.park(board);
+		});
+		assertThat(seen).containsExactly("busy", true, true);
+	}
+
 	/** Every buffered device's sync, free: whether its queue is empty, false while a command runs; it takes no events. */
 	@Test
 	void syncSaysWhetherItsQueueIsEmptyAndTakesNoEvents() {
