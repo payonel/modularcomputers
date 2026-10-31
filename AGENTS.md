@@ -345,7 +345,7 @@ from unchanged, with no retries), as a hovering drone holds its place; a shove o
 own step left it, once a push episode). A positional command (`RoboticsDevice.POSITIONAL`: turns,
 scans, its hand's) goes back first; a move goes straight to its target, measured from where its
 last command left it. **What no program asked for is one event** (the user's, 2026-10-29),
-`{event = "notice", what}`: shoved, returned, stuck, fell, frozen, thawed; every other event is a
+`{event = "notice", what}`: shoved, returned, stuck, falling, landed (a fall's end; the user's: `landed`, not `fell`), frozen, thawed; every other event is a
 command's end, named after its method. `position` is where the last left it
 (a command, so it waits its turn); `get` is live (where it really is, its drift). `stop` is free and
 at once, where it is (no centering), answering where; the next command goes on from exactly there,

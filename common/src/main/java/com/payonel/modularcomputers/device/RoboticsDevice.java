@@ -31,7 +31,7 @@ import java.util.Map;
  * (it flies back, raising {@code shoved}), and a positional command given while it's off its plan (a
  * shove, a stop mid-walk) sends it back first ({@code return}'s event), refused busy until it's
  * there; falling on its legs (a block gone from under it) it's busy till it lands, its plan following
- * it down ({@code fell}). Held in a field (any field) its robotics freezes ({@code frozen}, {@code thawed}): what it
+ * it down ({@code landed}). Held in a field (any field) its robotics freezes ({@code frozen}, {@code thawed}): what it
  * was doing pauses, commands are refused {@code held}, and the field's carry moves its origin with
  * it. {@code get}, {@code pull}, {@code stop} and {@code set} are free ({@code set} refuses its own
  * actions, but a stop, while it's busy).
@@ -70,7 +70,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	/** A notice's {@code what}: its way back didn't get it there, and why; it holds where it is. */
 	public static final String STUCK = "stuck";
 	/** A notice's {@code what}: it came down on its legs from a fall nothing asked for ({@code by}, blocks); as it began, {@link #FALLING}. */
-	public static final String FELL = "fell";
+	public static final String LANDED = "landed";
 	/** Its commands taken while it falls (the user's): a tier 2 catches itself on its thrusters, its legs dropped. */
 	private static final java.util.Set<String> CATCHES = java.util.Set.of("fly", "flyTo");
 	/** A notice's {@code what}: a field took hold of it, or let it go. */
@@ -708,7 +708,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return value == null ? 0L : value;
 	}
 
-	@Method(doc = "pull(): its oldest event, or nil: a command's end, {event = method, ok, why, result} (walk, walkTo, fly, flyTo, turn, land, swing), or a notice of what happened to it that no program asked for, {event = \"notice\", what, ...}: shoved (drift), returned, stuck (why), fell (by), frozen, thawed")
+	@Method(doc = "pull(): its oldest event, or nil: a command's end, {event = method, ok, why, result} (walk, walkTo, fly, flyTo, turn, land, swing), or a notice of what happened to it that no program asked for, {event = \"notice\", what, ...}: shoved (drift), returned, stuck (why), falling, landed (by), frozen, thawed")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -814,7 +814,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		}
 		waitedOnFall = false;
 		double kept = Math.rint(blocks * FALL_GRAIN) / FALL_GRAIN;
-		notice(FELL, Map.of("by", kept == Math.rint(kept) ? (Object) (long) kept : kept));
+		notice(LANDED, Map.of("by", kept == Math.rint(kept) ? (Object) (long) kept : kept));
 	}
 
 	/** The least fall it says, in blocks (a settling as it's set down isn't one). */

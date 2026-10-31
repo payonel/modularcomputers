@@ -391,9 +391,9 @@ class RoboticsDeviceTest {
 		assertThat(robot.state()).isEqualTo(RoboticsDevice.FALLING);
 		body.falling = false;
 		robot.fell(0.01);
-		assertThat(robot.pull(args()).first()).as("a command waited: its news").isEqualTo(Map.of("event", "notice", "what", "fell", "by", 0.01));
+		assertThat(robot.pull(args()).first()).as("a command waited: its news").isEqualTo(Map.of("event", "notice", "what", "landed", "by", 0.01));
 		robot.fell(1.0);
-		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "fell", "by", 1L));
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "landed", "by", 1L));
 	}
 
 	/**

@@ -79,7 +79,7 @@ A fall it didn't ask for, on its legs (a block gone from under it, a trapdoor it
 off a ledge), isn't a drift: it says so as it begins (a `falling` notice), and while it falls it's
 busy (`falling`), its commands waiting, but for its flights: a tier 2 catches itself on its
 thrusters, its legs dropped to fall on without it, `stop(true)` holding it where it is, `fly()`
-taking it back to where its last command left it. Not caught, once down it goes on from where it landed, and it says so (a `fell` notice, and
+taking it back to where its last command left it. Not caught, once down it goes on from where it landed, and it says so (a `landed` notice, and
 how far), so a robot digging down goes on from there.
 
 `stop` stops it at once, where it is: no centering, no squaring up. The command running ends
@@ -414,7 +414,7 @@ round things too.
 | `returned` | | its way back (after a shove, or before a positional command) got it there |
 | `stuck` | `why` | its way back didn't (`no path`, `blocked: ...`): it holds where it is |
 | `falling` | | a fall it didn't ask for began, on its legs: a tier 2 can catch itself (`fly`) |
-| `fell` | `by` (blocks) | it came down on its legs from a fall it didn't ask for: it goes on from where it landed |
+| `landed` | `by` (blocks) | it came down on its legs from a fall it didn't ask for (not caught): it goes on from where it landed |
 | `frozen` | | a field took hold of it: its robotics paused |
 | `thawed` | | the field let go and it's down: its robotics back, its origin carried |
 

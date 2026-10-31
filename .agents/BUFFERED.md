@@ -81,7 +81,7 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
   its legs, from the block it was nearest. A command `interrupted` by a load goes on the same way.
 - A fall on its legs it didn't ask for (a block gone from under it) isn't drift: a `falling`
   notice as it begins (the user's, 2026-10-29), its flights taken meanwhile (a tier 2 catches
-  itself, its legs dropped; `stop(true)` catches it where it is), else it's busy while it falls, its plan follows it down, and a `fell` notice (how far) ends a wait: a build decision from the
+  itself, its legs dropped; `stop(true)` catches it where it is), else it's busy while it falls, its plan follows it down, and a `landed` notice (how far) ends a wait: a build decision from the
   review (digging down broke every positional command after it).
 - Its own way back (after a shove, before a positional command) is a command of its own (others
   wait for it), said by notices: a build decision, so a failed way back is said. A failed one
@@ -89,7 +89,7 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
   back (the user's, 2026-10-29).
 - What no program asked for is one event, a notice (the user's, 2026-10-29): `{event = "notice",
   what}`, `shoved` (with the drift: `{forward, right, up}`; on the way back too), `returned`,
-  `stuck` (why), `fell` (by), `frozen`, `thawed`. (The build had them as events of their own, the
+  `stuck` (why), `falling`, `landed` (by), `frozen`, `thawed`. (The build had them as events of their own, the
   way back's as `return`, `ok` or why.)
 - Held in a field (any field, its own too): its robotics freezes, and only its robotics (the user's,
   2026-10-29: a crafting card's craft under way goes on; the card's commands wait, the robot being their actor): the active command pauses, new
