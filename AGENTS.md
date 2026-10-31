@@ -633,7 +633,7 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   a device that acts over time (`Buffered`: robotics, the crafting card, the field card, the
   redstone card, the robotic piston; the sound and internet cards stay direct, streams with their
   own flow control) runs one command at a time; a command while one runs is refused `busy`
-  at the board (layer 0, which can't wait: a board call freezes the whole program), and mcos blocks
+  at the board (the manual's layer 1, which can't wait: a board call freezes the whole program), and mcos blocks
   the calling thread only until the device is free (devfs's `command`, asked again as each command's
   end event comes), so more work in flight means threads. Its live state, its events and `stop` are
   free (`Buffered.free`); a `stop` also ends the threads waiting on it (`ECANCELED`). Every one has
