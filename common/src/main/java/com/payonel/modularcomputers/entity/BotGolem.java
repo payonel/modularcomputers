@@ -193,7 +193,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private GolemLegs landing;
 	/** Where it's coming down to without its legs (land with force, none there), or null. */
 	private Vec3 groundLanding;
-	/** A landing with force begun over no ground in reach: its end, blocked by the air below, at its next tick. */
+	/** A landing with force begun over nothing, down to the world's bottom: its end, blocked by the air below, at its next tick. */
 	private boolean groundless;
 	/** Where a flight is going (null: none). */
 	private Vec3 flyTo;
@@ -583,8 +583,10 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			if (legs()) {
 				return "on legs";
 			}
-			// Its legs below it: within reach to its side, at its height or under it.
-			GolemLegs below = level().getEntitiesOfClass(GolemLegs.class, getBoundingBox().inflate(LEGS_REACH, RoboticsDevice.MAX_FLIGHT, LEGS_REACH), GolemLegs::isAlive)
+			// Its legs below it: within reach to its side, at its height or under it, however far down (the
+			// user's: a landing comes straight down, so no limit on how far; a flight's is its own).
+			net.minecraft.world.phys.AABB under = getBoundingBox().inflate(LEGS_REACH, 0, LEGS_REACH).setMinY(level().getMinY());
+			GolemLegs below = level().getEntitiesOfClass(GolemLegs.class, under.setMaxY(getBoundingBox().maxY + ON_LEGS), GolemLegs::isAlive)
 				.stream().filter(legs -> legs.getY() <= getY() + ON_LEGS && legs.position().subtract(BotGolem.this.position()).horizontalDistance() <= LEGS_REACH)
 				.min(java.util.Comparator.comparingDouble(legs -> legs.position().distanceTo(BotGolem.this.position()))).orElse(null);
 			Vec3 ground = below == null && force ? groundBelow() : null;
@@ -1352,11 +1354,10 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		robotics.landed();
 	}
 
-	/** Where its torso comes down to straight below it, on what it would rest on (null: nothing within a flight's reach). */
+	/** Where its torso comes down to straight below it, on what it would rest on, however far down (null: nothing, down to the world's bottom). */
 	private Vec3 groundBelow() {
 		BlockPos at = blockPosition();
-		for (int down = 0; down <= RoboticsDevice.MAX_FLIGHT; down++) {
-			BlockPos pos = at.below(down);
+		for (BlockPos pos = at; pos.getY() >= level().getMinY(); pos = pos.below()) { // (the user's: however far down; none only over a hole through the world)
 			var shape = level().getBlockState(pos).getCollisionShape(level(), pos, net.minecraft.world.phys.shapes.CollisionContext.of(this));
 			if (!shape.isEmpty()) {
 				double top = pos.getY() + shape.max(Direction.Axis.Y);

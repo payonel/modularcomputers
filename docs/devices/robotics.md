@@ -313,12 +313,14 @@ Its event: `flyTo`. Fails with `not an integer: ` and the number.
 
 ### land([force]) → true
 
-Comes down onto its legs, standing below it (within three blocks to its side), and onto them. With
+Comes down onto its legs, standing below it however far down (within three blocks to its side),
+and onto them. With
 `force` (`land(true)`) and no legs there, it comes straight down onto the ground beneath it without
 them, and stays running, its thrusters off. That's what a crash does, but safely and still on.
 Legless, it walks nowhere; it flies again to fetch its legs and lands onto them. Its event, `land`:
 `ok`, or not and why (`blocked`; `no legs below` when they've gone: it hovers there). With
-`force` and no ground in its reach, its event says so at once, blocked by the air below
+`force` it comes down onto whatever ground is beneath it, however far; with nothing under it down
+to the world's bottom (the End's void, a hole through the world), its event says so at once, blocked by the air below
 (`block = "minecraft:air", face = "down"`), and it goes on hovering. Fails with `no legs below`
 (without `force`: it goes on hovering), or `on legs`. A right click pops legs up
 into an inventory, its own `use` too.

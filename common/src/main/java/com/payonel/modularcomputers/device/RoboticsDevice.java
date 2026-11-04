@@ -612,7 +612,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return move.why() != null ? Result.fail(move.why()) : start("fly", body.fly(move.by()[0], move.by()[1], move.by()[2]));
 	}
 
-	@Method(doc = "land([force]): (a tier 2 golem's) comes down onto its legs, standing below it (within three blocks to the side), and onto them; force, with none there, comes straight down onto the ground beneath it without them, still running (its thrusters off; it walks nowhere, and flies again to fetch them), as safely as a crash would, but on. A command: true at once (its event: land, ok, or not and why: blocked, by air down, at once, when force finds no ground in reach), or false and why (no legs below, without force: it goes on hovering)")
+	@Method(doc = "land([force]): (a tier 2 golem's) comes down onto its legs, standing below it however far down (within three blocks to the side), and onto them; force, with none there, comes straight down onto the ground beneath it without them, still running (its thrusters off; it walks nowhere, and flies again to fetch them), as safely as a crash would, but on. A command: true at once (its event: land, ok, or not and why: blocked, by air down, at once, when force finds nothing under it, down to the world's bottom), or false and why (no legs below, without force: it goes on hovering)")
 	public Result land(Arguments args) {
 		return start("land", body.land(args.count() > 0 && args.get(0) != null && args.checkBoolean(0)));
 	}

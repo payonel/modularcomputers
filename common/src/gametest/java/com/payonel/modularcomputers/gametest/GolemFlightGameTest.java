@@ -242,11 +242,74 @@ public class GolemFlightGameTest {
 	}
 
 	/**
-	 * land(true) with no ground in its reach is blocked by the air below (the user's): the call true,
-	 * its land event blocked at once, minecraft:air on its down face, and it goes on hovering.
+	 * A landing comes straight down however far (the user's): over a pit down to the world's bottom,
+	 * more than a flight's reach deep, land() finds its legs at the bottom, and land(true) the ground.
+	 * (Down, not up: a test's structure is boxed in by barriers.)
+	 */
+	@GameTest(maxTicks = 2400)
+	public void aLandingComesDownHoweverFarBelowItsLegsOrTheGroundAre(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
+		int[] bottom = new int[1];
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().fly(args()))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "off its legs: " + events))
+			.thenExecute(() -> {
+				events.clear();
+				bottom[0] = pit(helper, golem);
+				helper.assertTrue(golem.getY() - bottom[0] > RoboticsDevice.MAX_FLIGHT, "deeper than a flight's reach");
+				GolemLegs legs = legs(helper).getFirst();
+				legs.setPos(legs.getX(), bottom[0], legs.getZ()); // (its legs at the bottom)
+				helper.assertTrue(Boolean.TRUE.equals(golem.robotics().land(args()).first()), "land(): its legs found, far below");
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("land")), "down onto its legs: " + events))
+			.thenExecute(() -> {
+				helper.assertTrue(golem.legs(), "on its legs");
+				events.clear();
+				golem.robotics().fly(args(0.0, 0.0, RoboticsDevice.MAX_FLIGHT));
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "up a flight's reach: " + events))
+			.thenExecute(() -> {
+				events.clear();
+				golem.robotics().fly(args(0.0, 0.0, 2.0));
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "and two more: " + events))
+			.thenExecute(() -> {
+				events.clear();
+				for (GolemLegs legs : helper.getLevel().getEntitiesOfClass(GolemLegs.class, golem.getBoundingBox().inflate(BotGolem.LEGS_REACH, 2 * RoboticsDevice.MAX_FLIGHT, BotGolem.LEGS_REACH))) {
+					legs.discard(); // (no legs, at the bottom where it left them: it lands on the ground)
+				}
+				helper.assertTrue(golem.getY() - bottom[0] > RoboticsDevice.MAX_FLIGHT, "past a flight's reach above the ground");
+				helper.assertTrue(Boolean.TRUE.equals(golem.robotics().land(args(true)).first()), "land(true): the ground found, far below");
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("land")), "down onto the ground: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(golem.onGround() && !golem.legs() && golem.getY() - bottom[0] < 1,
+				"on the ground at the bottom, legless: " + golem.onGround() + " " + golem.legs() + " " + (golem.getY() - bottom[0])))
+			.thenSucceed();
+	}
+
+	/** A pit under the golem, open down to the world's bottom, stone there: its floor's height. */
+	private static int pit(GameTestHelper helper, BotGolem golem) {
+		var level = helper.getLevel();
+		BlockPos under = golem.blockPosition();
+		int floor = level.getMinY() + 1;
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				for (int y = under.getY(); y >= level.getMinY(); y--) {
+					level.setBlock(new BlockPos(under.getX() + dx, y, under.getZ() + dz), (y == level.getMinY() ? Blocks.STONE : Blocks.AIR).defaultBlockState(), 2);
+				}
+			}
+		}
+		return floor;
+	}
+
+	/**
+	 * land(true) over a hole through the world, nothing under it down to the world's bottom, is
+	 * blocked by the air below (the user's): the call true, its land event blocked at once,
+	 * minecraft:air on its down face, and it goes on hovering.
 	 */
 	@GameTest(maxTicks = 200)
-	public void landingWithForceOverNoGroundIsBlockedByAir(GameTestHelper helper) {
+	public void landingWithForceOverAHoleThroughTheWorldIsBlockedByAir(GameTestHelper helper) {
 		BotGolem golem = golem(helper, false);
 		List<Object> events = events(helper, golem);
 		helper.startSequence()
@@ -254,7 +317,18 @@ public class GolemFlightGameTest {
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "off: " + events))
 			.thenExecute(() -> {
 				events.clear();
-				golem.setPos(golem.getX(), golem.getY() + 3 * RoboticsDevice.MAX_FLIGHT, golem.getZ()); // (out of every reach, legs and ground, whatever the test world holds under it)
+				var level = helper.getLevel();
+				BlockPos under = golem.blockPosition();
+				for (int dx = -1; dx <= 1; dx++) {
+					for (int dz = -1; dz <= 1; dz++) {
+						for (int y = under.getY(); y >= level.getMinY(); y--) { // (bedrock too: a hole through the world)
+							level.setBlock(new BlockPos(under.getX() + dx, y, under.getZ() + dz), Blocks.AIR.defaultBlockState(), 2);
+						}
+					}
+				}
+				for (net.minecraft.world.entity.Entity legs : legs(helper)) {
+					legs.discard(); // (its legs gone too: nothing below it at all)
+				}
 				helper.assertTrue(Boolean.TRUE.equals(golem.robotics().land(args(true)).first()), "a command: true");
 			})
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "land", "ok", false, "why", "blocked", "block", "minecraft:air", "face", "down")),
