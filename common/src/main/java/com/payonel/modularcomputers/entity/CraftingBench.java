@@ -119,7 +119,7 @@ public final class CraftingBench implements CraftingCard.Bench {
 		}
 		for (ItemStack stack : toStorage) {
 			if (!insert(after, stack).isEmpty()) {
-				return Result.fail(Buffered.OUTPUT);
+				return Result.fail(Buffered.OUTPUT, net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(result.getItem()).toString()); // (what it would have made: its name)
 			}
 		}
 		apply(after);

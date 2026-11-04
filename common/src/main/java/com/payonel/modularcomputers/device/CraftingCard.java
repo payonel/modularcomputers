@@ -46,7 +46,7 @@ public final class CraftingCard extends Card implements Buffered {
 		/** What its slots hold: those with something in, each an item's table and its slot. */
 		Result list();
 
-		/** Crafts once from its grid, what it makes into its storage: {name, count}, or false and why. */
+		/** Crafts once from its grid, what it makes into its storage: {name, count}, or false and why (output: and what it would have made, its name). */
 		Result craft();
 
 		/** Moves up to {@code count} from one of its slots to another: how many went. */
@@ -180,6 +180,9 @@ public final class CraftingCard extends Card implements Buffered {
 		}
 		Result made = bench.craft();
 		if (made.failed()) {
+			if (made.first() instanceof String making) {
+				craftedName = making; // (output: what it would have made, no room for it)
+			}
 			finish("failed", made.error());
 			return;
 		}
@@ -210,9 +213,9 @@ public final class CraftingCard extends Card implements Buffered {
 		if (STOPPED.equals(why)) {
 			events.stopped("craft", call);
 		} else if (INPUT.equals(why)) {
-			events.input("craft", call);
+			events.input("craft", String.valueOf(result.getOrDefault("name", "")), call);
 		} else if (OUTPUT.equals(why)) {
-			events.output("craft", call);
+			events.output("craft", String.valueOf(result.getOrDefault("name", "")), call);
 		} else {
 			events.ended("craft", "crafted".equals(name), why, result);
 		}
@@ -270,7 +273,7 @@ public final class CraftingCard extends Card implements Buffered {
 		return no != null ? no : bench.list();
 	}
 
-	@Method(doc = "craft([count]): crafts what its grid makes, count times (1), what it makes going to its storage. A command: once its robot's moves end it starts, true at once, its robot free and the card busy until its event (craft, ok, result {name, count}: what it made, or not and why, with its call {args, progress: the crafts done}: input, its grid makes nothing (empty, or no recipe matches), output, no room for what it makes, stopped), or false and why")
+	@Method(doc = "craft([count]): crafts what its grid makes, count times (1), what it makes going to its storage. A command: once its robot's moves end it starts, true at once, its robot free and the card busy until its event (craft, ok, result {name, count}: what it made, or not and why, with its call {args, progress: the crafts done}: input, its grid makes nothing (empty, or no recipe matches), name what its crafts made (\"\": none), output, no room for what it makes, name that, stopped), or false and why")
 	public Result craft(Arguments args) {
 		Result no = needsRobotics();
 		if (no != null) {

@@ -96,14 +96,29 @@ public final class EventQueue {
 		add(withCall(event, Buffered.STOPPED, call));
 	}
 
-	/** What its input makes nothing (the user's: one shape, a craft's grid empty or matching no recipe): {@code {event, ok = false, why = "input", call}}. */
-	public void input(String event, Map<String, Object> call) {
-		add(withCall(event, Buffered.INPUT, call));
+	/**
+	 * What its input makes nothing (the user's: one shape, a craft's grid empty or matching no recipe):
+	 * {@code {event, ok = false, why = "input", name, call}}, {@code name} what it was making (its
+	 * last craft's, "" when none was made).
+	 */
+	public void input(String event, String name, Map<String, Object> call) {
+		add(named(withCall(event, Buffered.INPUT, call), name));
 	}
 
-	/** No room for its output (the user's: one shape, a craft's storage full): {@code {event, ok = false, why = "output", call}}. */
-	public void output(String event, Map<String, Object> call) {
-		add(withCall(event, Buffered.OUTPUT, call));
+	/**
+	 * No room for its output (the user's: one shape, a craft's storage full): {@code {event, ok =
+	 * false, why = "output", name, call}}, {@code name} what it would have made.
+	 */
+	public void output(String event, String name, Map<String, Object> call) {
+		add(named(withCall(event, Buffered.OUTPUT, call), name));
+	}
+
+	/** An end with a thing's name ("" for none, never nil), before its call. */
+	private static Map<String, Object> named(Map<String, Object> ended, String name) {
+		Object call = ended.remove("call");
+		ended.put("name", name == null ? "" : name);
+		ended.put("call", call);
+		return ended;
 	}
 
 	/** A command's end that says only its why and its call. */

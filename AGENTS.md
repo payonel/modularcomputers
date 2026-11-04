@@ -679,7 +679,8 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   the game won't let what a swing acted on be broken (bedrock, a protected place's refused break),
   said by its end, never its call: a call fails only when it can't be given (`EventQueue.unbreakable`).
   **A craft's `input` and `output`** (the user's, 2026-11-04): its grid makes nothing (empty, no
-  recipe) or no room for what it makes, each `{why, call}` (`EventQueue.input`, `output`), its
+  recipe) or no room for what it makes, each `{why, name, call}` (`EventQueue.input`, `output`):
+  `name` what it was making (its last craft's, `""` none; output's, what found no room), its
   progress the crafts done. **A thing's `name` is its registry id, its `id` its own UUID**, everywhere
   (the user's): a block has none, so `id = ""`; `blocked`'s block is a `name` too. **A swing breaks a
   place**, as the game's own player does (`MultiPlayerGameMode`): another block pushed in, the break
