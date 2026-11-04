@@ -3,7 +3,8 @@
 -- flying, hovering, landing, returning, falling or held), then where it really is: "position
 -- forward right up heading" (from its origin), where its last command left it ("planned ...") and,
 -- when it's away from there, "drift forward right up".
--- A line written is an action; the device does one at a time, so a line given while one runs
+-- A line written calls the method it names (walkto: walkTo, position: setPosition, pathfinding:
+-- setPathfinding); the device does one at a time, so a line given while one runs
 -- waits for it (the writing thread only), but a stop, which never waits:
 --   walk [forward [right [up]]] (from where its last command left it, in its own frame, ending
 --                                squared; none: back there)
@@ -52,36 +53,30 @@ return {
     end
     local action = words[1]
     if (action == "walk" or action == "fly") and #words == 1 then
-      return {action = action, forward = 0, right = 0, up = 0} -- (back to where its last command left it; fly: off where it stands)
+      return action -- (back to where its last command left it; fly: off where it stands)
     elseif MOVES[action] and number(words[2]) and #words <= 4 then
       local right, up = number(words[3]), number(words[4])
       if (words[3] and not right) or (words[4] and not up) then
         return nil
       end
-      return {action = MOVES[action], forward = number(words[2]), right = right or 0, up = up or 0}
-    elseif action == "turn" and #words == 2 then
-      return {action = "turn", way = words[2]}
-    elseif (action == "use" or action == "swing") and #words == 2 then
-      return {action = action, face = words[2]}
-    elseif action == "stop" and #words == 2 and words[2] == "force" then
-      return {action = "stop", force = true} -- (falling, a tier 2 catches itself where it is)
-    elseif action == "land" and #words == 2 and words[2] == "force" then
-      return {action = "land", force = true} -- (straight down, without its legs)
+      return MOVES[action], number(words[2]), right or 0, up or 0
+    elseif (action == "turn" or action == "use" or action == "swing") and #words == 2 then
+      return action, words[2]
+    elseif (action == "stop" or action == "land") and #words == 2 and words[2] == "force" then
+      return action, true -- (stop: falling, a tier 2 catches itself where it is; land: straight down, without its legs)
     elseif (action == "stop" or action == "land") and #words == 1 then
-      return {action = action}
+      return action
     elseif action == "position" and #words <= 5 then
-      local at = {action = "setPosition"}
-      for i, field in ipairs({"forward", "right", "up", "heading"}) do
-        if words[i + 1] then
-          at[field] = number(words[i + 1])
-          if not at[field] then
-            return nil
-          end
+      local at = {}
+      for i = 2, #words do
+        at[i - 1] = number(words[i])
+        if not at[i - 1] then
+          return nil
         end
       end
-      return at
+      return "setPosition", table.unpack(at, 1, #words - 1)
     elseif action == "pathfinding" and (words[2] == "on" or words[2] == "off") and #words == 2 then
-      return {action = "pathfinding", on = words[2] == "on"}
+      return "setPathfinding", words[2] == "on"
     end
   end,
 }

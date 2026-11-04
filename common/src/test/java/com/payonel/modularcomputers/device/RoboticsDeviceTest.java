@@ -158,13 +158,12 @@ class RoboticsDeviceTest {
 	}
 
 	@Test
-	void aCommandWhileOneRunsIsRefusedBusyButGetPullStopAndSetsStopAreFree() {
+	void aCommandWhileOneRunsIsRefusedBusyButGetPullAndStopAreFree() {
 		device.walk(args(2L));
 		assertThat(device.refusal("turn")).isEqualTo(Buffered.BUSY);
 		assertThat(device.refusal("position")).as("a read waits its turn too").isEqualTo(Buffered.BUSY);
-		assertThat(device.free()).contains("get", "pull", "stop", "set");
-		assertThat(device.set(args(Map.of("action", "turn", "way", "right"))).error()).as("set refuses its own actions while busy").isEqualTo(Buffered.BUSY);
-		assertThat(device.set(args(Map.of("action", "stop"))).failed()).as("but a stop goes through").isFalse();
+		assertThat(device.free()).containsExactlyInAnyOrder("get", "pull", "stop");
+		assertThat(device.stop(args()).failed()).as("a stop goes through").isFalse();
 		assertThat(device.refusal("turn")).isNull();
 	}
 
@@ -173,16 +172,6 @@ class RoboticsDeviceTest {
 		device.walk(args(2L));
 		device.blocked("stuck");
 		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "stuck"));
-	}
-
-	@Test
-	void setTakesAnActionTable() {
-		device.set(args(Map.of("action", "walk", "forward", 4L)));
-		device.arrived(); // (one command at a time: the walk ends before the turn)
-		device.set(args(Map.of("action", "turn", "way", "right")));
-		device.set(args(Map.of("action", "stop")));
-		assertThat(asked).containsExactly("walk 4.0 0.0 0.0", "turn 90.0", "stop");
-		assertThat(device.set(args(Map.of("action", "jump"))).error()).startsWith("not an action");
 	}
 
 	@Test

@@ -3,8 +3,9 @@
 -- kernel's name for it (eeprom, storage0, internet0). What a device's file reads and writes is its
 -- data: a disk's bytes (as a block device's: read, written and sought by byte offset; a disk with a
 -- filesystem, hfs, refuses them: EMEDIUMTYPE), a sound card's samples (OSS's dsp, its ioctls the
--- format), a sensor's events (a line each), or what its get returns (taken at the first read) and
--- what's written going to its set (a line at a time through its driver, else all at close); a
+-- format), a sensor's events (a line each), or what its get returns (taken at the first read; a
+-- driver may name other methods) and what's written (a line at a time through its driver, each
+-- calling the method it names, else all of it going to its set at close); a
 -- device with none of those reads as what it is. Every device file's ioctls are its device's
 -- methods, by name (its own API, as a Linux device's ioctls are), and it's ready for poll (PRI)
 -- while its device has news. An open file holds the device's id: it reaches that device or fails
@@ -134,9 +135,12 @@ end
 
 -- Drivers, by device type: a device whose data is a table, not text, has one on the boot disk
 -- (k.driver), which makes it text, as Linux's interfaces are (lines, words), never Lua's syntax:
--- get(value) is what a read gives (an event's line, or the state); line(text), if it has one, is
--- what to set for a line written (nil: not a line it takes), each taking effect as it's written, as
--- a sysfs attribute's write does. It's looked for the first time a file of that type is opened, and
+-- get(...) is what a read gives (an event's line, or the state), from the answers of the methods
+-- its reads names (get alone when it names none); line(text), if it has one, is the device's
+-- method a line written calls and its arguments (nil: not a line it takes), each taking effect as
+-- it's written, as a sysfs attribute's write does, the device's own method and no other door (the
+-- user's); failed(answer), if it has one, is why a call that answered meant it failed (nil: it
+-- didn't). It's looked for the first time a file of that type is opened, and
 -- remembered (false: none), so a type costs nothing until it's used, and a type without one costs
 -- one look.
 local drivers = {}
@@ -272,9 +276,9 @@ local function cancelled(request)
   return false
 end
 
--- Whether a call is a stop: stop, or set's {action = "stop"} (a line "stop" written).
-local function isstop(method, arg)
-  return method == "stop" or method == "set" and type(arg) == "table" and arg.action == "stop"
+-- Whether a call is a stop (a line "stop" written calls it too).
+local function isstop(method)
+  return method == "stop"
 end
 
 local function command(id, method, ...)
@@ -322,7 +326,7 @@ local function command(id, method, ...)
     end
     answer = table.pack(board.invoke(id, method, ...)) -- (what came may be the end it waited for)
   end
-  if answer[1] and isstop(method, ...) then
+  if answer[1] and isstop(method) then
     stopped[id] = (stopped[id] or 0) + 1
   end
   return table.unpack(answer, 1, answer.n)
@@ -569,22 +573,25 @@ end
 local function devicefile(device, mode)
   local plus = mode:find("+", 1, true)
   local reads, writes = mode:sub(1, 1) == "r" or plus, mode:sub(1, 1) ~= "r" or plus
-  local events = device.pull and not device.get
-  if not (device.get or device.set or events) then
+  local driver = driverof(device)
+  local reads = driver and driver.reads or {"get"} -- (the methods a read gives the answers of: its driver knows its type's)
+  local readable = (driver and driver.reads or device.get) ~= nil
+  local lines = driver and driver.line
+  local writable = (lines or device.set) ~= nil -- (lines is false with no driver: never "~= nil" alone)
+  local events = device.pull and not readable
+  if not (readable or writable or events) then
     if writes then
       return fail("EACCES")
     end
     return aboutfile(device)
   end
-  if (reads and not (device.get or events)) or (writes and not device.set) then
+  if (reads and not (readable or events)) or (writes and not writable) then
     return fail("EACCES")
   end
   local id = device.id
-  local driver = driverof(device)
   if events then
     return eventfile(id, driver)
   end
-  local lines = driver and driver.line
   local data, at = nil, 0
   local written = nil -- what's been written: all of it (kept for close), or a line not yet ended
   local absorbing, before = nil, nil -- the write whose bytes are in 'written', while it waits; what was there before it
@@ -604,17 +611,20 @@ local function devicefile(device, mode)
       any = true
     end
   end
-  -- A line written, set at once (its driver's).
+  -- A line written: the method it calls, at once (its driver's).
   local function set(text)
-    local value = lines(text)
-    if value == nil then
+    local call = table.pack(lines(text))
+    if call[1] == nil then
       return fail("EINVAL")
     end
-    local ok, why, errno = command(id, "set", value)
+    local ok, why, errno = command(id, table.unpack(call, 1, call.n))
     if ok == k.BLOCK then
       return k.BLOCK
     elseif not ok then
       return failed(why, errno or "EINVAL")
+    end
+    if driver.failed and driver.failed(why) then
+      return fail("EINVAL") -- (its answer meant it failed: an operator's command that didn't succeed)
     end
     return true
   end
@@ -633,7 +643,7 @@ local function devicefile(device, mode)
       if device.pull then
         pri = changed
       end
-      return {IN = true, PRI = pri, OUT = device.set ~= nil}
+      return {IN = true, PRI = pri, OUT = writable}
     end,
     -- A change a poll took, for a pull ioctl; the last one pulled is the change looked at (PRI off).
     held = function(self)
@@ -664,13 +674,17 @@ local function devicefile(device, mode)
     end,
     read = function(self, n)
       if data == nil then
-        local ok, got, errno = command(id, "get")
-        if ok == k.BLOCK then
-          return k.BLOCK -- (a buffered device's get waits its turn)
-        elseif not ok then
-          return failed(got, errno)
+        local answers = {}
+        for i, method in ipairs(reads) do
+          local ok, got, errno = command(id, method)
+          if ok == k.BLOCK then
+            return k.BLOCK -- (a buffered device's get waits its turn)
+          elseif not ok then
+            return failed(got, errno)
+          end
+          answers[i] = got
         end
-        data = driver and driver.get(got) or tostring(got or "")
+        data = driver and driver.get(table.unpack(answers, 1, #reads)) or tostring(answers[1] or "")
       end
       local chunk = data:sub(at + 1, at + n)
       at = at + #chunk

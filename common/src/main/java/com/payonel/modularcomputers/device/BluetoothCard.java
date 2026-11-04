@@ -59,26 +59,6 @@ public final class BluetoothCard extends Card {
 		return Result.ok();
 	}
 
-	@Method(doc = "get(): {link = the board it links to (nil: none), board = the board it's in}")
-	public Result get(Arguments args) {
-		java.util.Map<String, Object> state = new java.util.LinkedHashMap<>();
-		UUID linked = link.get();
-		if (linked != null) {
-			state.put("link", linked.toString());
-		}
-		UUID in = board.get();
-		if (in != null) {
-			state.put("board", in.toString());
-		}
-		return Result.ok(state);
-	}
-
-	@Method(doc = "set({link = id}): links it to that board ({link = false}: to none), as setLink")
-	public Result set(Arguments args) {
-		Object linked = args.checkTable(0).get("link");
-		return setLink(new Arguments(java.util.Collections.singletonList(Boolean.FALSE.equals(linked) ? null : linked)));
-	}
-
 	@Method(doc = "getBoard(): the id of the board it's in (its computer's): what another card links to, to reach it")
 	public Result getBoard(Arguments args) {
 		UUID id = board.get();

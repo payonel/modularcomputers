@@ -2,7 +2,7 @@
 -- effect at once). A read gives what it's doing, what it holds and where, in its computer's frame:
 --   holding minecraft:pig 0.0 0.0 3.0   (forward right up)
 --   idle
--- A line written is an action:
+-- A line written calls the method it names:
 --   capture self | capture ID | capture forward [right [up]]
 --   move forward [right [up]]
 --   release
@@ -40,18 +40,18 @@ return {
     end
     local action = words[1]
     if action == "release" and #words == 1 then
-      return {action = "release"}
+      return "release"
     elseif action == "capture" and #words == 2 and not number(words[2]) then
-      return {action = "capture", target = words[2]}
+      return "capture", words[2]
     elseif (action == "capture" or action == "move") and #words >= 2 and #words <= 4 then
       local at = point(words, 2)
       if not at then
         return nil
       end
       if action == "move" then
-        return {action = "move", forward = at[1], right = at[2], up = at[3]}
+        return "move", at[1], at[2], at[3]
       end
-      return {action = "capture", target = at}
+      return "capture", at
     end
   end,
 }

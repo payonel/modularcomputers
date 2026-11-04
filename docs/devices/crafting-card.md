@@ -54,8 +54,8 @@ shoved away from where its last command left it goes back there first. A craft c
 card's own work, and the card is busy until it's crafted (its next command waits for it) while the
 robot is free to walk and act. A field holding the robot holds its robotics only: a craft under way is the
 card's, and goes on, but the robot is what works the card (a case has none), so every command the
-card is given waits until the robot is let go. Its `pull`, `list`, `get` (its
-own slots) and `stop` never wait. At the board a refusal names the device whose news ends the wait:
+card is given waits until the robot is let go. Its `pull`, `list` (its own
+slots) and `stop` never wait. At the board a refusal names the device whose news ends the wait:
 the robot while it's busy (`false, "busy", "id:<the robot>"`), the card itself while it crafts.
 
 ## In mcos
@@ -137,14 +137,6 @@ how many are left (the container is full). Fails with `no container there`.
 Takes items from the container at a face (in front, when none is given): from its slot `from`, or the
 first it can; all, or `count`; into the card's slot `to` (its grid's too, to lay out a recipe), or
 where they fit in its storage. How many came.
-
-### get() → list
-
-What `list` gives: its file's read.
-
-### set([face]) → true
-
-Drops everything in its storage at a face (below): its file's write.
 
 ### sync() → boolean
 

@@ -43,9 +43,8 @@ over time (a walk, a flight, a turn, a landing, a block breaking) ends in an eve
 say), and its events say how each went. A failure ends that command only: the next one runs as any
 would.
 
-Five methods never wait: `get` (what it's doing now, and where it really is), `pull` (its events),
-`stop` (it stops at once), `sync` (whether its queue is empty: mcos's sync waits on it), and `set` (it does an action as its method would, waiting as it would,
-but a stop at once). Under the board's own calls, a command while another runs is refused at once
+Four methods never wait: `get` (what it's doing now, and where it really is), `pull` (its events),
+`stop` (it stops at once), and `sync` (whether its queue is empty: mcos's sync waits on it). Under the board's own calls, a command while another runs is refused at once
 with `busy`, doing nothing (mcos turns that into the wait). A [crafting
 card](/devices/crafting-card/)'s commands wait for the robot's moves too, but its craft is the
 card's own: the robot is free while it crafts.
@@ -329,15 +328,6 @@ finds its way round things, where it really is and where its last command left i
 as `position` gives it), and how far it's away from there (`{forward, right, up}`; none when it's
 there). It answers while a field
 holds it too: a program can follow the carry.
-
-### set(action) → true
-
-An action as a table: `{action = "walk"}` (or `"walkTo"`, `"fly"`, `"flyTo"`, with `forward`,
-`right`, `up`), `{action = "turn", way}`, `{action = "use", face}`, `{action = "swing", face}`,
-`{action = "land"}`, `{action = "stop"}`, `{action = "pathfinding", on}`, or
-`{action = "setPosition", forward, right, up, heading}` (the file's lines are these). It does what
-the method does, waiting as it would; a stop never waits. Fails with `not a table` or
-`not an action: ` and what it was.
 
 ### sync() → boolean
 

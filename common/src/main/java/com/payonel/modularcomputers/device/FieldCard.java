@@ -22,7 +22,7 @@ import java.util.Map;
  * It's buffered ({@link Buffered}): {@code capture} and {@code move} are commands; a move runs
  * until it's arrived or blocked, its end its event ({@code move}). {@code scan}, {@code get},
  * {@code pull} and {@code release} are free: a program can always let go, and a move under way then
- * ends, stopped. {@code set} is free and refuses its own actions but a release, as they would be.
+ * ends, stopped.
  */
 public final class FieldCard extends Card implements Buffered {
 	/** How far from its computer it reaches, in blocks: what it finds, holds, and moves to. */
@@ -86,7 +86,7 @@ public final class FieldCard extends Card implements Buffered {
 
 	@Override
 	public java.util.Set<String> free() {
-		return java.util.Set.of("scan", "get", "pull", "release", "set");
+		return java.util.Set.of("scan", "get", "pull", "release");
 	}
 
 	@Override
@@ -149,7 +149,7 @@ public final class FieldCard extends Card implements Buffered {
 		if (args.get(0) instanceof String id) {
 			held = projector.capture(id, null);
 		} else if (args.get(0) instanceof java.util.List<?> point) {
-			// (a point as a list: what set's capture takes)
+			// (a point as a list: forward, right, up)
 			return capture(new Arguments(new java.util.ArrayList<>(point)));
 		} else {
 			double[] at = {args.checkNumber(0), args.count() > 1 ? args.checkNumber(1) : 0, args.count() > 2 ? args.checkNumber(2) : 0};
@@ -201,32 +201,6 @@ public final class FieldCard extends Card implements Buffered {
 			}
 		}
 		return Result.ok(now);
-	}
-
-	@Method(doc = "set(action): does an action, as a table: {action = \"capture\", target}, {action = \"move\", forward, right, up}, or {action = \"release\"} (its file's lines are these)")
-	public Result set(Arguments args) {
-		if (!(args.get(0) instanceof Map<?, ?> action)) {
-			return Result.fail("not a table");
-		}
-		java.util.List<Object> rest = new java.util.ArrayList<>();
-		String name = String.valueOf(action.get("action"));
-		if (!name.equals("release") && refusal(name) != null) {
-			return Result.fail(refusal(name)); // (set is free, so a release goes through; its other actions are commands)
-		}
-		return switch (name) {
-			case "capture" -> {
-				rest.add(action.get("target"));
-				yield capture(new Arguments(rest));
-			}
-			case "move" -> {
-				for (String key : new String[] {"forward", "right", "up"}) {
-					rest.add(action.get(key) == null ? 0L : action.get(key));
-				}
-				yield move(new Arguments(rest));
-			}
-			case "release" -> release(new Arguments(rest));
-			default -> Result.fail("not an action: " + action.get("action"));
-		};
 	}
 
 	@Method(doc = "pull(): its oldest event, or nil: a move's end, {event = \"move\", ok, why}, or {event = \"lost\", why} (what it held is gone, out of reach, or its power is)")

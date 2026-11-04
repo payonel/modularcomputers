@@ -60,12 +60,6 @@ only an empty command fails the call, with `no command`. A card not in a world a
 
 What the last command said (its `output`), or `""` before the first.
 
-### set({command = text}) → {success, result, output}
-
-Runs a command, as `command` does: what a line written to the file does. A command that fails makes
-this call fail, with what it said (`failed` when it said nothing). A table without a `command`
-string fails with `no command`.
-
 ## Events
 
 None.
@@ -84,8 +78,8 @@ A file of commands run through the `command` ioctl, each logged, stopping at the
 {% include operator-script.lua %}
 ```
 
-A greeter at the door: a redstone card hears a pressure plate, `set` runs a `title` command, and `get`
-says who it was shown to:
+A greeter at the door: a redstone card hears a pressure plate, `command` runs a `title` command, and its
+`output` says who it was shown to:
 
 ```lua
 {% include operator-greeter.lua %}

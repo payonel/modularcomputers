@@ -7,6 +7,12 @@ return {
   end,
   line = function(text)
     local command = text:match("^%s*(.-)%s*$")
-    return command ~= "" and {command = command} or nil
+    if command ~= "" then
+      return "command", command
+    end
+  end,
+  -- (a command that didn't succeed fails the write)
+  failed = function(answer)
+    return type(answer) == "table" and answer.success == false
   end,
 }

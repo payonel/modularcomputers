@@ -199,7 +199,7 @@ public final class CraftingCard extends Card implements Buffered {
 	/** Its events, what its slots hold and its stop are free (they're the card's own); each other method is a command. */
 	@Override
 	public java.util.Set<String> free() {
-		return java.util.Set.of("pull", "list", "get", "stop");
+		return java.util.Set.of("pull", "list", "stop");
 	}
 
 	/**
@@ -218,7 +218,7 @@ public final class CraftingCard extends Card implements Buffered {
 		if (toCraft > 0) {
 			return BUSY;
 		}
-		return robot.refusal("set".equals(method) ? "drop" : method); // (its line's set drops where the robot is)
+		return robot.refusal(method);
 	}
 
 	/** Refused for its robot's sake (its moves), the robot's news ends the wait; refused while it crafts, its own. */
@@ -347,18 +347,6 @@ public final class CraftingCard extends Card implements Buffered {
 			given(args, at + 2) ? slot(args, at + 2) : 0);
 	}
 
-	@Method(doc = "set([face]): drops everything in its storage at a face (below), as drop(face) does: what its file's lines do")
-	public Result set(Arguments args) {
-		Result no = needsRobotics();
-		if (no != null) {
-			return no;
-		}
-		String face = given(args, 0) ? face(args, 0) : DROP_FACE;
-		power.charge(MOVE_COST);
-		Result dropped = bench.drop(face, 0, Integer.MAX_VALUE);
-		return dropped.failed() ? dropped : Result.ok(true);
-	}
-
 	/** Whether its first argument is a face (a name: slots and counts are numbers). */
 	private static boolean faceGiven(Arguments args) {
 		return args.count() > 0 && args.get(0) instanceof String;
@@ -366,12 +354,6 @@ public final class CraftingCard extends Card implements Buffered {
 
 	private static boolean given(Arguments args, int n) {
 		return args.count() > n && args.get(n) != null;
-	}
-
-	@Method(doc = "get(): what its slots hold, as list's: its file's read")
-	public Result get(Arguments args) {
-		Result no = needsRobotics();
-		return no != null ? no : bench.list();
 	}
 
 	@Method(doc = "pull(): its oldest event, a craft's end ({event = \"craft\", ok, why, result = {name, count}}), or nil")

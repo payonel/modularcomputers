@@ -74,14 +74,6 @@ none. The board need not be there now. An id that is not a UUID, or not a string
 The id of the board it is in: its computer's, what another card links to, to reach it. Nil if it
 has none.
 
-### get() → {link, board}
-
-Both, as a table. A missing one is left out.
-
-### set({link = id}) → nothing
-
-Links it to that board; `{link = false}` (or no `link`) links it to none. Otherwise as `setLink`.
-
 ## Events
 
 None.

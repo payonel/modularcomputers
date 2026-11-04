@@ -107,11 +107,6 @@ left, and `/home` is never written over. The target must be hfs (a raw one fails
 The state of the slots. A disk is `{tier, mode, used, capacity, label}`; `label` is left out when
 the disk has none, and an empty slot is left out of the table.
 
-### set({action = name}) → nothing
-
-Does an action by its name: `format`, `wipe`, `clone`, `install` or `update`. Any other name fails
-with `not an action: ` and what it was.
-
 ## Events
 
 None. Changes to the disks are reported by the disks themselves

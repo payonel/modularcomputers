@@ -44,8 +44,8 @@ A move that meets a block stops there: its event says what was in the way.
 
 The card is a [buffered device](/mcos/devices-library/#buffered-devices): it does one command at a
 time. A `capture` or `move` given while a move runs waits (in mcos, its thread only) until the move
-ends, and so does a `set` doing one. `scan`, `get`, `pull` and `release` never wait, nor does a
-`set` (or a line) letting go: a program can always let go.
+ends, and so does a line written doing one. `scan`, `get`, `pull` and `release` never wait, nor
+does a line letting go: a program can always let go.
 
 ## In mcos
 
@@ -103,12 +103,6 @@ Lets what it holds go: it falls from where it is. It never waits: a move under w
 ### get() → {state, name, forward, right, up}
 
 What it's doing (`idle`, `holding` or `moving`), and what it holds and where.
-
-### set(action) → true
-
-An action as a table: `{action = "capture", target}`, `{action = "move", forward, right, up}`,
-`{action = "release"}` (the file's lines are these). It never waits itself: a capture or a move in it
-waits as the method would, a release never.
 
 ### sync() → boolean
 

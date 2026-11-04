@@ -29,12 +29,12 @@ while true do
   sys.poll(watch)  -- block until the redstone card changes
   local now = pressed()
   if now and not was then
-    local done, why = sys.ioctl(card, "set", {command = GREETING})
+    local answer, why = sys.ioctl(card, "command", GREETING)
     local log = assert(io.open(LOG, "a"))
-    if done then
-      log:write(os.date("%c"), " visitor: ", (sys.ioctl(card, "get"):gsub("\n$", "")), "\n")
+    if answer and answer.success then
+      log:write(os.date("%c"), " visitor: ", (answer.output:gsub("\n$", "")), "\n")
     else
-      log:write(os.date("%c"), " greeting failed: ", tostring(why), "\n")
+      log:write(os.date("%c"), " greeting failed: ", tostring(answer and answer.output or why), "\n")
     end
     log:close()
   end

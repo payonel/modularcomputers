@@ -33,8 +33,7 @@ import java.util.Map;
  * there; falling on its legs (a block gone from under it) it's busy till it lands, its plan following
  * it down ({@code landed}). Held in a field (any field) its robotics freezes ({@code frozen}, {@code thawed}): what it
  * was doing pauses, commands are refused {@code held}, and the field's carry moves its origin with
- * it. {@code get}, {@code pull}, {@code stop} and {@code set} are free ({@code set} refuses its own
- * actions, but a stop, while it's busy).
+ * it. {@code get}, {@code pull} and {@code stop} are free.
  */
 public final class RoboticsDevice implements Device, Buffered {
 	/** What walking a block costs: a running CPU's tick. */
@@ -645,69 +644,6 @@ public final class RoboticsDevice implements Device, Buffered {
 		return Result.ok(now);
 	}
 
-	@Method(doc = "set(action): does an action, as a table (its file's lines are these): {action = \"walk\", \"walkTo\", \"fly\" or \"flyTo\", forward, right, up}, {action = \"turn\", way}, {action = \"use\", face}, {action = \"swing\", face}, {action = \"pathfinding\", on}, {action = \"land\"}, {action = \"stop\"}, {action = \"setPosition\", forward, right, up, heading}; as the method does, waiting as it would (a stop never waits)")
-	public Result set(Arguments args) {
-		Object value = args.get(0);
-		if (!(value instanceof Map<?, ?> action)) {
-			return Result.fail("not a table");
-		}
-		String name = String.valueOf(action.get("action"));
-		String method = name.equals("pathfinding") ? "setPathfinding" : name;
-		if (!method.equals("stop")) {
-			String refused = refusal(method); // (set is free, so a stop goes through; its other actions are commands)
-			if (refused != null) {
-				return Result.fail(refused);
-			}
-		}
-		java.util.List<Object> rest = new java.util.ArrayList<>();
-		return switch (name) {
-			case "walk", "fly", "walkTo", "flyTo" -> {
-				rest.add(number(action.get("forward")));
-				rest.add(number(action.get("right")));
-				rest.add(number(action.get("up")));
-				Arguments to = new Arguments(rest);
-				yield switch (String.valueOf(action.get("action"))) {
-					case "walk" -> walk(to);
-					case "fly" -> fly(to);
-					case "walkTo" -> walkTo(to);
-					default -> flyTo(to);
-				};
-			}
-			case "setPosition" -> {
-				rest.add(number(action.get("forward")));
-				rest.add(number(action.get("right")));
-				rest.add(number(action.get("up")));
-				rest.add(number(action.get("heading")));
-				yield setPosition(new Arguments(rest));
-			}
-			case "pathfinding" -> {
-				rest.add(Boolean.TRUE.equals(action.get("on")));
-				yield setPathfinding(new Arguments(rest));
-			}
-			case "land" -> {
-				rest.add(Boolean.TRUE.equals(action.get("force")));
-				yield land(new Arguments(rest));
-			}
-			case "turn" -> {
-				rest.add(action.get("way"));
-				yield turn(new Arguments(rest));
-			}
-			case "use", "swing" -> {
-				rest.add(action.get("face"));
-				yield action.get("action").equals("use") ? use(new Arguments(rest)) : swing(new Arguments(rest));
-			}
-			case "stop" -> {
-				rest.add(Boolean.TRUE.equals(action.get("force")));
-				yield stop(new Arguments(rest));
-			}
-			default -> Result.fail("not an action: " + action.get("action"));
-		};
-	}
-
-	private static Object number(Object value) {
-		return value == null ? 0L : value;
-	}
-
 	@Method(doc = "pull(): its oldest event, or nil: a command's end, {event = method, ok, why, result} (walk, walkTo, fly, flyTo, turn, land, swing), or a notice of what happened to it that no program asked for, {event = \"notice\", what, ...}: shoved (drift), returned, stuck (why), falling, landed (by), frozen, thawed")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
@@ -845,7 +781,7 @@ public final class RoboticsDevice implements Device, Buffered {
 
 	@Override
 	public java.util.Set<String> free() {
-		return java.util.Set.of("get", "pull", "stop", "set");
+		return java.util.Set.of("get", "pull", "stop");
 	}
 
 	/**

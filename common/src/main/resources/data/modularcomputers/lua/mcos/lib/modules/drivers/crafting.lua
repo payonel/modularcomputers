@@ -2,13 +2,14 @@
 -- slots hold, a line each, its item and how many, e.g.
 --   minecraft:oak_log 12
 --   minecraft:stick 4
--- A line written drops everything in its storage (not its grid) at a face of the robot, a
+-- A line written drops (its drop method, given only a face) everything in its storage (not its grid) at a face of the robot, a
 -- container there filled first, the rest into the world: an empty line at its front, or a face's
 -- name (front, back, left, right, up, down): echo down > /dev/crafting0. Its crafting, its moves and
 -- its events (poll's PRI; the pull ioctl: crafted, failed) are ioctls.
 local FACES = {front = true, back = true, left = true, right = true, up = true, down = true}
 
 return {
+  reads = {"list"},
   get = function(slots)
     local lines = {}
     for i, item in ipairs(slots) do
@@ -19,8 +20,10 @@ return {
   line = function(text)
     local face = text:match("^%s*(%a*)%s*$")
     if face == "" then
-      return "front"
+      return "drop", "front"
     end
-    return FACES[face] and face or nil
+    if FACES[face] then
+      return "drop", face
+    end
   end,
 }

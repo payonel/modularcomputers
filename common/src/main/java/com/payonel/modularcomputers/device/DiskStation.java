@@ -16,8 +16,8 @@ import java.util.Map;
  * A Disk Station on the bus (user design): a dock for disks, to format, wipe, clone and install
  * them without crafting a disk alone, as a drive duplicator does. Its target disk is the one it works
  * on; its source, optional, is only read (a write blocker's role, as forensic docks have), for
- * cloning. Both are on the bus too, beside it. Every action is a method and a line written to its
- * file ({@code set}), the same as its GUI's buttons; each costs power, the bus's or its battery's.
+ * cloning. Both are on the bus too, beside it. Every action is a method (a line written to its
+ * file calls it), the same as its GUI's buttons; each costs power, the bus's or its battery's.
  * Disks go in and come out by hand, in its GUI.
  */
 public final class DiskStation implements Device {
@@ -32,7 +32,7 @@ public final class DiskStation implements Device {
 	public static final String NO_POWER = "no power";
 	/** The image a disk gets when it's installed or updated: mcos. */
 	public static final String IMAGE = "mcos";
-	/** The actions, as {@code set} takes them (and the GUI's buttons are). */
+	/** The actions, its methods (and the GUI's buttons). */
 	public static final List<String> ACTIONS = List.of("format", "wipe", "clone", "install", "update");
 
 	/** What its block does for it: its slots, its power, the world. */
@@ -132,16 +132,7 @@ public final class DiskStation implements Device {
 		return Result.ok(state);
 	}
 
-	@Method(doc = "set(action): {action = format | wipe | clone | install | update}: does it, as its method does")
-	public Result set(Arguments args) {
-		Object action = args.checkTable(0).get("action");
-		if (!(action instanceof String name) || !ACTIONS.contains(name)) {
-			return Result.fail("not an action: " + action);
-		}
-		return act(name);
-	}
-
-	/** An action by its name (a GUI button's, or set's). */
+	/** An action by its name (a GUI button's). */
 	public Result act(String action) {
 		Arguments none = none();
 		return switch (action) {

@@ -57,16 +57,4 @@ public final class OperatorCard extends Card {
 		return Result.ok(last);
 	}
 
-	@Method(doc = "set({command = text}): runs a command, as command does (a line written to its file)")
-	public Result set(Arguments args) {
-		Object command = args.checkTable(0).get("command");
-		if (!(command instanceof String text)) {
-			return Result.fail("no command");
-		}
-		Result result = command(new Arguments(java.util.List.of(text)));
-		if (!result.failed() && result.first() instanceof Map<?, ?> answer && Boolean.FALSE.equals(answer.get("success"))) {
-			return Result.fail(last.isEmpty() ? "failed" : last.strip()); // (a write that failed says why: the command's own words)
-		}
-		return result;
-	}
 }

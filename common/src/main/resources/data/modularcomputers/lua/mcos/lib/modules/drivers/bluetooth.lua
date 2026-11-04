@@ -6,14 +6,17 @@
 local ID = "^%s*link%s+([%x%-]+)%s*$"
 
 return {
-  get = function(state)
-    return "link " .. (state.link or "-") .. "\nboard " .. (state.board or "-") .. "\n"
+  reads = {"getLink", "getBoard"},
+  get = function(link, board)
+    return "link " .. (link or "-") .. "\nboard " .. (board or "-") .. "\n"
   end,
   line = function(text)
     local id = text:match(ID)
     if id == "-" then
-      return {link = false}
+      return "setLink", nil
     end
-    return id and {link = id} or nil
+    if id then
+      return "setLink", id
+    end
   end,
 }

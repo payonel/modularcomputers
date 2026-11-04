@@ -275,8 +275,8 @@ its address, and how far the datagram came, in blocks), as `recvmsg`'s `IP_PKTIN
 
 ### sys.devices() → list
 The devices on the [bus](/concepts/bus/) as the kernel knows them, in bus order: `{name, id, path, type,
-label, get, set}` each. `name` is `storage0`, `path` the slot (nil if not in one), `get` and `set` whether
-it has data to read and write. The kernel's list can be a moment behind a hot-plug.
+label, get, set}` each. `name` is `storage0`, `path` the slot (nil if not in one), `get`, `set` and `pull`
+whether it has those methods. The kernel's list can be a moment behind a hot-plug.
 
 A device's label is set with its file's `setLabel` ioctl (`sys.ioctl(fd, "setLabel", "backups")`;
 `""` or `nil` clears it), kept on the device's item. `EINVAL` for one that can't be (more than 32

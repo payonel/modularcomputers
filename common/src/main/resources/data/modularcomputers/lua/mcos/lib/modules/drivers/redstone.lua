@@ -17,6 +17,8 @@ return {
   end,
   line = function(text)
     local face, powered = text:match("^%s*(%a+)%s+(%d+)%s*$")
-    return face and {[face] = {powered = math.tointeger(tonumber(powered))}} or nil
+    if face then
+      return "set", {[face] = {powered = math.tointeger(tonumber(powered))}}
+    end
   end,
 }

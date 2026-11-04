@@ -434,7 +434,7 @@ block's front and right as `Face` names them; a robot's heading and its own righ
 16 blocks from its computer, except a robot holding itself, which carries the card. It lets go
 without power or a running program (it's ticked powered or not, so it knows), never because the
 process that captured ends. A robot it holds is in stasis too (its robotics frozen, its origin
-carried: the bot golem's). Its `capture`, `move` and `set` are commands (buffered); `release` is
+carried: the bot golem's). Its `capture` and `move` are commands (buffered); `release` is
 free, so a program can always let go.
 
 ### The charging pad
@@ -607,8 +607,13 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   takes nothing:** an event a poll found is the file's to give the next `pull` ioctl (or read), so a
   program waits with `sys.poll` and takes with either. Reading gives the
   device's data: `get`'s answer (the EEPROM too: convenient, the user's call), what's written going
-  to `set` at close, the device deciding what `set` means; a device with nothing to read says what
-  it is (type, id, label, methods). A disk's node
+  to `set` at close, the device deciding what `set` means; with a driver, its read is the answers
+  of the methods it names (`reads`), and a line written calls the method the line names (the
+  driver's `line`: `walk 3` is `walk(3)`); a device with nothing to read says what
+  it is (type, id, label, methods). **One door a command** (the user's, 2026-11-03): no device
+  method stands for others (a `set` taking an action table, a `get` repeating another's answer),
+  so an event's name is literally the method called, always; events no method caused have their
+  own names (robotics' `notice`). A disk's node
   (`storage0`) is its bytes, as a block device's: read, written and sought by byte offset (its raw
   methods); an hfs disk's refuses (`EMEDIUMTYPE`, the user's call: Linux would let a mounted disk's
   bytes be read). A device with events and
@@ -901,6 +906,11 @@ Lessons from mistakes, each with its test:
   floor, the game pushed it out sideways, and its first command met a shove. What a program's
   stop means goes in the device's `stop`, never the body's. (`stopWithForceStopsAFallWhereItIs`;
   the hands tests' first commands)
+- **An API shape nobody asked for is a spec departure:** a `set(action)` dispatcher was put on
+  robotics so its driver had one method to write to, then copied to the field, crafting, Bluetooth,
+  operator and Disk Station cards: a second door into every command, and end events named after an
+  action, not the method called. A `/dev` file's text is its driver's to map onto the methods;
+  a device's API grows only by what's asked for. (`OneDoorTest`)
 - **A block's state isn't the block:** leaves change state as their log goes, crops as they grow;
   what's tied to a block (a golem's breaking) compares the block, not its state.
   (`aBlockWhoseStateChangesWhileItsBrokenStillBreaks`)

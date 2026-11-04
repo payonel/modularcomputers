@@ -107,7 +107,7 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
 
 ### The others
 
-- **Energy field card:** `capture`, `move`, `set` are commands; `move` ends once arrived or blocked
+- **Energy field card:** `capture`, `move` are commands; `move` ends once arrived or blocked
   (`blocked: minecraft:stone`); `scan`, `get`, `pull` and `release` are free (a program can always
   let go: a move under way ends `stopped`). A capture outlives the process that made it.
 - **Redstone card:** `set` is a command, ending once applied in the world (at its next tick: at most

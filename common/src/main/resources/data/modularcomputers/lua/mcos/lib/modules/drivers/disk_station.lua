@@ -2,7 +2,7 @@
 -- taking effect at once). A read gives a line a slot:
 --   target 2 hfs 40960 4194304 backups   (its disk: tier, mode, bytes used, capacity, label)
 --   source -                             (an empty slot)
--- A line written is an action, as its GUI's buttons and its methods: format, wipe, clone, install,
+-- A line written calls the method it names, as its GUI's buttons do: format, wipe, clone, install,
 -- update.
 local ACTIONS = {format = true, wipe = true, clone = true, install = true, update = true}
 
@@ -19,6 +19,8 @@ return {
   end,
   line = function(text)
     local word = text:match("^%s*(%S+)%s*$")
-    return ACTIONS[word] and {action = word} or nil
+    if ACTIONS[word] then
+      return word
+    end
   end,
 }

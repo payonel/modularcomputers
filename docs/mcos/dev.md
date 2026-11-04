@@ -103,7 +103,9 @@ A program waits for a device with a watch on `/dev`, or with `devices.wait`: see
 
 Reading gives what the device's `get` returns, taken at the first read. What you write goes to the
 device's `set`, all of it in one call, when the file is closed; the device decides what that
-means (replace, append...). A device with nothing to read gives what it is: its type, id, label
+means (replace, append...). A device whose data is a table has a driver that makes its file text:
+its read is a line or a few, from the methods that say its state, and each line written calls the
+device's method it names (`walk 3` is `walk(3)`), the method and nothing standing in for it. A device with nothing to read gives what it is: its type, id, label
 and methods, a line each. A write to a device that can't be set, or a read from one that can't
 be read, fails with `EACCES`. The kernel does not let a read-only open write, or the other way round.
 
