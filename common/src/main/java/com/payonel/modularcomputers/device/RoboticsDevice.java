@@ -26,7 +26,7 @@ import java.util.Map;
  * <p>
  * It's buffered ({@link Buffered}): one command at a time. A command that runs over time (a walk,
  * a turn, a flight, a landing, a block's breaking) ends in its event, named after its method:
- * {@code {event = "walk", ok = false, why = "blocked", block = "minecraft:oak_log", face = "front"}}. Its commands run
+ * {@code {event = "walk", ok = false, why = "blocked", name = "minecraft:oak_log", face = "front"}}. Its commands run
  * from its <b>plan</b>, where the last one left it: a golem shoved off it in the air holds its plan
  * (it flies back, raising {@code shoved}), and a positional command given while it's off its plan (a
  * shove, a stop mid-walk) sends it back first ({@code return}'s event), refused busy until it's
@@ -483,7 +483,7 @@ public final class RoboticsDevice implements Device, Buffered {
 			return;
 		}
 		Map<String, Object> call = STOPPED.equals(why) && stopCall != null ? stopCall
-			: STOPPED.equals(why) || BLOCKED.equals(why) || INTERRUPTED.equals(why) ? call() : null; // (before its plan moves)
+			: STOPPED.equals(why) || BLOCKED.equals(why) || INTERRUPTED.equals(why) || LOST.equals(why) ? call() : null; // (before its plan moves)
 		stopCall = null;
 		active = null;
 		if (STOPPED.equals(why) || INTERRUPTED.equals(why)) {
@@ -496,6 +496,8 @@ public final class RoboticsDevice implements Device, Buffered {
 			events.stopped(method, call);
 		} else if (INTERRUPTED.equals(why)) {
 			events.interrupted(method, call);
+		} else if (LOST.equals(why)) {
+			events.lost(method, lostName, lostId, lostAt, call);
 		} else if (BLOCKED.equals(why)) {
 			events.blocked(method, block, face, call);
 		} else {
@@ -612,7 +614,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return result;
 	}
 
-	@Method(doc = "swing(face): swings what it holds at a face, as a player's left click: a mob there is hit (\"attacked\", as hard as a player's swing: full strength once the weapon has recovered); else the block there starts breaking, as a player breaks it (its tool matters: a pickaxe for stone, an axe for wood): \"breaking\", a command running till it's broken (its event: swing, ok and result {block, kept, dropped}: the block's name and whether it kept all it dropped, its storage first, else its off hand; or not and why); or false and why")
+	@Method(doc = "swing(face): swings what it holds at a face, as a player's left click: a mob there is hit (\"attacked\", as hard as a player's swing: full strength once the weapon has recovered); else the block there starts breaking, as a player breaks it (its tool matters: a pickaxe for stone, an axe for wood): \"breaking\", a command running till it's broken, a break of the place as a player's is (another block pushed in, it goes on into it; another item in its hand, it starts again; held in a field, it pauses) (its event: swing, ok and result {name, kept, dropped}: the block's name and whether it kept all it dropped, its storage first, else its off hand; or not and why: lost, air there now, its name, id \"\" and where it was, or not broken); or false and why")
 	public Result swing(Arguments args) {
 		String face = face(args, 0);
 		if (body.offSpot()) {
@@ -756,7 +758,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	 */
 	public void broke(String block, int dropped) {
 		Map<String, Object> result = new LinkedHashMap<>();
-		result.put("block", block);
+		result.put("name", block); // (a thing's name: its registry id, the user's)
 		result.put("kept", dropped == 0);
 		if (dropped > 0) {
 			result.put("dropped", (long) dropped);
@@ -764,7 +766,32 @@ public final class RoboticsDevice implements Device, Buffered {
 		end(true, null, result);
 	}
 
-	/** The body couldn't go on ({@code why}: the block it broke changed, the tool went). */
+	/**
+	 * What a command was acting on is gone (the user's: lost): {@code name} what it was (its registry
+	 * id), {@code id} its own id ("" for a block: blocks have none), {@code at} where it last was,
+	 * {forward, right, up} in its own frame from where its last command left it.
+	 */
+	public void lost(String name, String id, Map<String, Object> at) {
+		lostName = name;
+		lostId = id;
+		lostAt = at;
+		end(false, LOST, null);
+	}
+
+	/** A lost end's what, its id and where (for its event). */
+	private String lostName;
+	private String lostId;
+	private Map<String, Object> lostAt;
+
+	/** A face as where its block is, {forward, right, up} in its own frame (a block from its spot). */
+	public static Map<String, Object> toward(String face) {
+		long forward = "front".equals(face) ? 1 : "back".equals(face) ? -1 : 0;
+		long right = "right".equals(face) ? 1 : "left".equals(face) ? -1 : 0;
+		long up = "up".equals(face) ? 1 : "down".equals(face) ? -1 : 0;
+		return Map.of("forward", forward, "right", right, "up", up);
+	}
+
+	/** The body couldn't go on ({@code why}: the game refused a break done). */
 	public void failed(String why) {
 		end(false, why, null);
 	}

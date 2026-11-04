@@ -61,6 +61,11 @@ public final class FieldCard extends Card implements Buffered {
 		/** Stops a move under way, holding what it holds where it is. */
 		void stop();
 
+		/** What it holds, last known: {name, id, at = {forward, right, up}} in its computer's frame (null: nothing held). */
+		default Map<String, Object> lastKnown() {
+			return null;
+		}
+
 		/** What it holds isn't loaded now (its hold kept, nothing met): the face a move this way is blocked on; null: it's loaded, or nothing's held. */
 		default String unloadedFace(double forward, double right, double up) {
 			return null;
@@ -257,16 +262,26 @@ public final class FieldCard extends Card implements Buffered {
 			return;
 		}
 		boolean wasMoving = state.equals(MOVING);
+		Map<String, Object> last = projector != null ? projector.lastKnown() : null; // (before it lets go: what it held, and where)
+		Map<String, Object> call = wasMoving ? call() : null;
 		if (projector != null) {
 			projector.release();
 		}
 		state(IDLE);
-		if (wasMoving) {
-			if (INTERRUPTED.equals(why)) {
-				events.interrupted("move", call()); // (the move it was making ends with it)
-			} else {
-				events.ended("move", false, why, null); // (the move it was making ends with it)
+		if (LOST.equals(why)) {
+			// What it held is gone (the user's: lost): what it was, its id, where it last was.
+			String name = last == null ? "" : String.valueOf(last.get("name"));
+			String id = last == null ? "" : String.valueOf(last.get("id"));
+			@SuppressWarnings("unchecked")
+			Map<String, Object> at = last == null ? Map.of("forward", 0L, "right", 0L, "up", 0L) : (Map<String, Object>) last.get("at");
+			if (wasMoving) {
+				events.lost("move", name, id, at, call); // (the move it was making ends with it)
 			}
+			events.lostNotice(name, id, at);
+			return;
+		}
+		if (wasMoving) {
+			events.ended("move", false, why, null); // (the move it was making ends with it)
 		}
 		event("lost", why);
 	}

@@ -45,7 +45,7 @@ every program complete.
   taken, and its interrupt stays up while one waits (it's level-triggered), so a program never misses
   one by being busy: it waits, then takes them all.
 - **Events are the device's own tables**, the same at every layer: `{event = "walk", ok = true}`,
-  `{event = "walk", ok = false, why = "blocked", block = "minecraft:air", face = "front"}`, `{side = "west", level = 15, powered = 0}`.
+  `{event = "walk", ok = false, why = "blocked", name = "minecraft:air", face = "front"}`, `{side = "west", level = 15, powered = 0}`.
   Each device's page lists its events.
 
 ## Layer 1: the board

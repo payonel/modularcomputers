@@ -14,11 +14,11 @@ local robot = assert(devices.open("robotics0"))
 
 local walked = 0 -- sides walked so far (the walker counts, the main thread reads)
 
--- What a failed end says: its why, and a blocked one's block (- when none is named: its block is "") and the face
+-- What a failed end says: its why, and a blocked one's block's name (- when none is named: its name is "") and the face
 -- that met it.
 local function reason(event)
   if event.why == "blocked" then
-    return "blocked " .. (event.block ~= "" and event.block or "-") .. " " .. event.face
+    return "blocked " .. (event.name ~= "" and event.name or "-") .. " " .. event.face
   end
   return event.why
 end

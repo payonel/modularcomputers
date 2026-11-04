@@ -70,7 +70,7 @@ no front it knows, or `left` and `right` when its front is up or down.
 ### push(side) → true
 
 Pushes on that side. The arm goes out and comes back on its own; its event, `push`, once it's back.
-When something will not move, its event says so at once: `ok = false`, `why = "blocked"`, `block`
+When something will not move, its event says so at once: `ok = false`, `why = "blocked"`, `name`
 the first block down its line that won't move (obsidian, bedrock, a block entity), `""` when no
 one block is to blame (more than a piston moves, the world's edge, a chunk not loaded), and `face`
 the side. Its cable port's side has no arm: it's blocked there too, by what's on that side (its
@@ -103,7 +103,7 @@ Its oldest event, or `nil`.
 ## Events
 
 A move's end: `{event = "push", ok = true}` (or `extend`, `retract`), or blocked:
-`{event = "push", ok = false, why = "blocked", block = "minecraft:obsidian", face = "east", call = {args = {"east"}, progress = 0}}`
+`{event = "push", ok = false, why = "blocked", name = "minecraft:obsidian", face = "east", call = {args = {"east"}, progress = 0}}`
 (its `call`: the arguments as given, and nothing moved). Its
 file reads them as lines, `push ok`, `push failed blocked minecraft:obsidian east`.
 

@@ -129,7 +129,7 @@ public class FieldCardGameTest {
 				card.capture(args(pig.getStringUUID()));
 				card.move(args(5.0)); // forward: out of the case's front (+Z), through the wall
 			})
-			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : GameTests.withoutCall(events.getLast()), Map.of("event", "move", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "front"),
+			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : GameTests.withoutCall(events.getLast()), Map.of("event", "move", "ok", false, "why", "blocked", "name", "minecraft:stone", "face", "front"),
 				"its event: what's in the way, met on the front of what it holds (the case's frame)"))
 			.thenExecute(() -> helper.assertTrue(pig.getZ() < helper.absolutePos(new BlockPos(1, 1, 5)).getZ(), "the pig's this side of the wall"))
 			.thenSucceed();
@@ -151,7 +151,7 @@ public class FieldCardGameTest {
 				card.capture(args(zombie.getStringUUID()));
 				card.move(args(0.0, 0.0, 5.0)); // (up, through the ceiling)
 			})
-			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : GameTests.withoutCall(events.getLast()), Map.of("event", "move", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "up"),
+			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : GameTests.withoutCall(events.getLast()), Map.of("event", "move", "ok", false, "why", "blocked", "name", "minecraft:stone", "face", "up"),
 				"its event: the ceiling, met on top"))
 			.thenSucceed();
 	}
@@ -175,6 +175,26 @@ public class FieldCardGameTest {
 				helper.assertTrue(met.side() == Direction.EAST, "its east met the wall: " + met);
 				helper.assertTrue("minecraft:stone".equals(met.block()), "the wall's stone: " + met);
 			})
+			.thenSucceed();
+	}
+
+	/** What a field holds gone (a pig killed), its card says it's lost (the user's): a notice, what it was, its id, where it last was. */
+	@GameTest(maxTicks = 200)
+	public void whatItHoldsGoneIsSaidLostWithItsNameItsIdAndWhere(GameTestHelper helper) {
+		FieldCard card = fieldCase(helper);
+		Pig pig = helper.spawn(EntityTypes.PIG, PIG);
+		List<Object> events = events(helper, card);
+		String[] id = new String[1];
+		helper.startSequence()
+			.thenExecuteAfter(2, () -> {
+				helper.assertTrue(!card.capture(args(pig.getStringUUID())).failed(), "held");
+				id[0] = pig.getStringUUID();
+			})
+			.thenExecuteAfter(3, () -> pig.discard()) // (gone)
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(e -> e instanceof Map<?, ?> m && "notice".equals(m.get("event"))
+				&& "lost".equals(m.get("why")) && "minecraft:pig".equals(m.get("name")) && id[0].equals(m.get("id")) && m.get("at") instanceof Map<?, ?>),
+				"lost, said: " + events))
+			.thenExecute(() -> same(helper, card.state(), FieldCard.IDLE, "it holds nothing"))
 			.thenSucceed();
 	}
 
@@ -208,7 +228,7 @@ public class FieldCardGameTest {
 				helper.assertTrue(!card.move(args(0.0, 0.0, 2.0)).failed(), "a move: a command");
 			})
 			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : GameTests.withoutCall(events.getLast()),
-				Map.of("event", "move", "ok", false, "why", "blocked", "block", "", "face", "up"), "what it holds isn't loaded: blocked, no one block"))
+				Map.of("event", "move", "ok", false, "why", "blocked", "name", "", "face", "up"), "what it holds isn't loaded: blocked, no one block"))
 			.thenExecute(() -> helper.getLevel().addFreshEntity(loaded[0])) // (its chunk loaded again)
 			.thenWaitUntil(() -> helper.assertTrue(EnergyField.held(pig), "held again"))
 			.thenExecute(() -> same(helper, card.state(), FieldCard.HOLDING, "and its card holds it"))

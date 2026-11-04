@@ -660,7 +660,7 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   over time always ends in its event, even when done at once (an extend already out), so a program
   never has to know which. No queue, no tags, no fault state: a failure ends its own command only
   (the user's: a robot stuck on its first failure looks broken). **`blocked` is one shape** (the
-  user's, 2026-11-03): `why = "blocked"` exactly, with named fields `block` (the block's id, `""`
+  user's, 2026-11-03): `why = "blocked"` exactly, with named fields `name` (the block's registry id, `""`
   when no one block is to blame, never nil: a piston's 13 blocks, the world's edge) and `face` (the side of
   what moved that met it, the side that was hit, never the move's main way: `Obstruction`, from the
   game's collision; a robot's own face, a field's holder's frame, a piston's the world's names),
@@ -672,10 +672,15 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   blocked or drifted end carries **`call = {args, progress}`** (the user's, 2026-11-03): the
   command's arguments as the program gave them (the board records them as the command starts:
   `Buffered.called`), and how far it got, in their terms (a walk's `{forward, right, up}` done, a
-  craft's crafts done). Every way a walk can't go is blocked (the user's): a step up it can't take (by the step's
+  craft's crafts done). **`lost`, one shape** (the user's, 2026-11-04): what a command acted on is
+  gone, `{why = "lost", name, id, at, call}` (`EventQueue.lost`; a field's own loss of what it held,
+  a notice: `lostNotice`). **A thing's `name` is its registry id, its `id` its own UUID**, everywhere
+  (the user's): a block has none, so `id = ""`; `blocked`'s block is a `name` too. **A swing breaks a
+  place**, as the game's own player does (`MultiPlayerGameMode`): another block pushed in, the break
+  goes on into it at its pace; another item in hand, it starts again; air there, it's `lost`. Every way a walk can't go is blocked (the user's): a step up it can't take (by the step's
   block), a drop (by air), an elevation it couldn't reach (the block under it, `down`; the air over
   it, `up`), a landing with force over no ground (air, `down`), and with pathfinding no way there
-or a way run out short (`block = ""`, its face toward where it was going; a flight's at once,
+or a way run out short (`name = ""`, its face toward where it was going; a flight's at once,
 before it takes off). A move already done (an arm out
   extended, in retracted) is no failure: `true`, its end `ok` (the user's: a lit lamp lit again).
   A tags-and-queues design came first
@@ -704,7 +709,7 @@ before it takes off). A move already done (an arm out
     holds loads too) and lets go when it isn't; every way its card ends (a release, taken out, its
     computer gone, out of reach or power) deletes the record, loaded or not. Its card unloaded, the
     field acts on nothing (it heard from it a tick ago at most: `Hold.seen`), frozen in time;
-    what it holds unloaded, its card still holds, a move ending `blocked` with `block = ""`.
+    what it holds unloaded, its card still holds, a move ending `blocked` with `name = ""`.
 - **A device's events go to every file open on it** (the user's): devfs takes them (`deliver`) and
   gives each file its own copy, bounded, so a program and a `cat` each see them all; a file's
   readiness counts what it holds (a poll that took the events itself would otherwise wait for a

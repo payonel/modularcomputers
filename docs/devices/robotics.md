@@ -39,7 +39,7 @@ gives its moves in order and they happen in order, and more work at once means
 A command answers as soon as it has started: `true` (a read answers what it read). One that runs
 over time (a walk, a flight, a turn, a landing, a block breaking) ends in an event named after it,
 `{event = "walk", ok = true}`, or `ok = false` and why
-(`{event = "walk", ok = false, why = "blocked", block = "minecraft:stone", face = "front"}`).
+(`{event = "walk", ok = false, why = "blocked", name = "minecraft:stone", face = "front"}`).
 [`devices.sync`](/mcos/devices-library/) waits until nothing is pending (before a field picks it up,
 say), and its events say how each went. A failure ends that command only: the next one runs as any
 would.
@@ -276,10 +276,13 @@ place against` or `nothing there`.
 
 Swings what it holds at a face, as a player's left click (in the air, as a player off the ground). A mob there is hit:
 `"attacked"`. Else the block there starts breaking: `"breaking"`, a command running till it's
-broken. Its event, `swing`: `ok`, and its `result`, `{block, kept, dropped}` (the block's name;
-`kept`: true when it caught all the block dropped, else false and how many it `dropped` into the
-world), or not and why (`block changed`, `hand changed`, `not broken`; `held` when a field took hold
-of it). It fails with `nothing there` or `unbreakable`.
+broken. It breaks a place, as a player's swing does: another block pushed into it, the break goes
+on into that block at its own pace; another item put in its hand, the break starts again with it;
+held in a field, it pauses, and goes on once let go. Its event, `swing`: `ok`, and its `result`,
+`{name, kept, dropped}` (the block's name; `kept`: true when it caught all the block dropped, else
+false and how many it `dropped` into the world), or not and why: `lost` (air there now: what it
+was breaking gone, `{why = "lost", name, id = "", at}`, its name, no id as a block has none, and
+where it was, `{forward, right, up}` from where its last command left it), `not broken`. It fails with `nothing there` or `unbreakable`.
 
 ### contents([face]) → list, or nil and why
 
@@ -315,7 +318,7 @@ the air, it flies back to where its last command left it. On its thrusters it wa
 legs`), presses no pressure plates, and can be shoved (a `shove` notice; it stays where it was put); everything else it does as
 on its legs, as a player off the ground does it (its tools, a block breaking more slowly), and its
 other cards work. Its event, `fly`: `ok` (then it holds
-there), or not and why (`blocked`, a block over it: `block = "minecraft:stone", face = "up"`). Its thrusters cost five running CPUs' power a
+there), or not and why (`blocked`, a block over it: `name = "minecraft:stone", face = "up"`). Its thrusters cost five running CPUs' power a
 tick. Fails with `not an integer: ` and where it would end, or `too far: 64`.
 
 If its program ends while its thrusters hold it up, or its power runs out, it falls and powers off:
@@ -334,10 +337,10 @@ it really is. With
 `force` (`land(true)`) and no legs there, it comes straight down onto the ground beneath it without
 them, and stays running, its thrusters off. That's what a crash does, but safely and still on.
 Legless, it walks nowhere; it flies again to fetch its legs and lands onto them. Its event, `land`:
-`ok`, or not and why (`blocked`: with no legs below, or its legs gone as it came down, `face = "down"` and `block` what it found below instead of its legs; it hovers there). With
+`ok`, or not and why (`blocked`: with no legs below, or its legs gone as it came down, `face = "down"` and `name` what it found below instead of its legs; it hovers there). With
 `force` it comes down onto whatever ground is beneath it, however far; with nothing under it down
 to the world's bottom (the End's void, a hole through the world), its event says so at once, blocked by the air below
-(`block = "minecraft:air", face = "down"`), and it goes on hovering. Fails with `on legs`. A right click pops legs up
+(`name = "minecraft:air", face = "down"`), and it goes on hovering. Fails with `on legs`. A right click pops legs up
 into an inventory, its own `use` too.
 
 ### get() → {state, legs, pathfinding, position, planned, drift}
@@ -413,7 +416,7 @@ It ends at exactly the elevation `up` asked, or its walk ends not `ok`, `blocked
 **With pathfinding** it finds its way, as a mob does: round walls, up stairs and slabs, jumping a
 block and dropping up to 3, turning as it goes. It still ends on the asked block's middle, at the
 asked elevation, facing as it began, or it's `blocked`: with no way there, or its way running out
-short of it, `block = ""` (no one block to name) and `face` its face toward where it was going; a
+short of it, `name = ""` (no one block to name) and `face` its face toward where it was going; a
 flight with no way there is blocked at once, before it takes off. A flight with pathfinding flies
 round things too.
 
@@ -426,12 +429,12 @@ three fields beside it, the same for every one:
 
 | Field | What it is |
 |---|---|
-| `block` | the id of the block in its way (`minecraft:stone`, `minecraft:lava`); `""` when no one block can be named (never `nil`) |
+| `name` | the block in its way, its name (its registry id: `minecraft:stone`, `minecraft:lava`); `""` when no one block can be named (never `nil`) |
 | `face` | the face of the robot that met it, its own: `front`, `back`, `left`, `right`, `up` or `down`. It's the side that was hit, not the way the move was mostly going: a flight sliding along a wall on its right met it on its `right` |
 | `call` | the command cut short: see below |
 
 ```lua
-local event = {event = "walk", ok = false, why = "blocked", block = "minecraft:lava", face = "front",
+local event = {event = "walk", ok = false, why = "blocked", name = "minecraft:lava", face = "front",
   call = {args = {3}, progress = {1, 0, 0}}}
 ```
 
@@ -467,7 +470,7 @@ was going.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `walk`, `walkTo`, `fly`, `flyTo`, `turn`, `land`, `swing` | `ok`, `why` (`blocked`: and `block`, `face`; `drifted`: and `drift`; with those, `stopped` and `interrupted`, `call`), `result` | that command ended: `ok`, or not and why (`stopped` when a `stop` cut it short; `interrupted` when a world's save cut it short and it couldn't go on after the load); a swing's `result` is `{block, kept, dropped}` |
+| `walk`, `walkTo`, `fly`, `flyTo`, `turn`, `land`, `swing` | `ok`, `why` (`blocked`: and `name`, `face`; `lost`: and `name`, `id`, `at`; `drifted`: and `drift`; with those, `stopped` and `interrupted`, `call`), `result` | that command ended: `ok`, or not and why (`stopped` when a `stop` cut it short; `interrupted` when a world's save cut it short and it couldn't go on after the load); a swing's `result` is `{block, kept, dropped}` |
 | `notice` | `why` (or `what`), and its fields | something happened to it that no program asked for (below) |
 
 | Notice | Other fields | When |

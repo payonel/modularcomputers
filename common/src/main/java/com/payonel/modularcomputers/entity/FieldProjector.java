@@ -255,6 +255,24 @@ public final class FieldProjector implements FieldCard.Projector {
 	}
 
 	@Override
+	public Map<String, Object> lastKnown() {
+		FieldHolds.Hold record = FieldHolds.of(level.get()).get(card.hold());
+		if (record != null) {
+			EnergyField field = field();
+			Vec3 at = field != null && field.holding() != null ? field.center() : record.at();
+			Map<String, Object> last = new LinkedHashMap<>();
+			last.put("name", record.name());
+			last.put("id", record.held().toString());
+			last.put("at", frame.get().local(at));
+			lastKnown = last;
+		}
+		return lastKnown;
+	}
+
+	/** What it held, last seen (its record gone with it: a loss says it from here). */
+	private Map<String, Object> lastKnown;
+
+	@Override
 	public Map<String, Object> where() {
 		FieldHolds.Hold record = record();
 		if (record == null) {
@@ -274,9 +292,10 @@ public final class FieldProjector implements FieldCard.Projector {
 		}
 		FieldHolds.Hold record = record();
 		if (record == null) {
-			return "gone"; // (its hold ended where it was: what it held went, its field said so while this card wasn't here to hear)
+			return FieldCard.LOST; // (its hold ended where it was: what it held went, its field said so while this card wasn't here to hear)
 		}
 		FieldHolds.of(level.get()).seen(card.hold(), level.get().getGameTime()); // (it's loaded: its field may act on its word)
+		lastKnown(); // (what it holds and where, kept for a loss to say)
 		EnergyField field = field();
 		boolean itself = field != null && field.holding() == self.get();
 		Vec3 at = field != null && field.holding() != null ? field.center() : record.at(); // (not loaded: where its field was, kept)

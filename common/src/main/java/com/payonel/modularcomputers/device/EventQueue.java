@@ -71,7 +71,7 @@ public final class EventQueue {
 	 * result]}}, or {@code {event = method, ok = false, why}} when it failed (or was stopped). News.
 	 */
 	public void ended(String method, boolean ok, String why, Object result) {
-		if (Buffered.STOPPED.equals(why) || Buffered.BLOCKED.equals(why) || Buffered.DRIFTED.equals(why) || Buffered.INTERRUPTED.equals(why)) {
+		if (Buffered.STOPPED.equals(why) || Buffered.BLOCKED.equals(why) || Buffered.DRIFTED.equals(why) || Buffered.INTERRUPTED.equals(why) || Buffered.LOST.equals(why)) {
 			// (one shape each, the user's: only their own methods build them)
 			throw new IllegalArgumentException(why + " is built by its own method, not ended");
 		}
@@ -102,7 +102,7 @@ public final class EventQueue {
 
 	/**
 	 * A move a block stopped (the user's: one shape, wherever it's said): {@code {event = event, ok =
-	 * false, why = "blocked", block, face}}, {@code block} the block's id ({@code ""} when no one
+	 * false, why = "blocked", name, face}}, {@code name} the block's (its registry id; {@code ""} when no one
 	 * block can be named: null given), {@code face} the side of what moved that met it, in the
 	 * device's own terms; and its call.
 	 */
@@ -111,7 +111,7 @@ public final class EventQueue {
 		blocked.put("event", event);
 		blocked.put("ok", false);
 		blocked.put("why", Buffered.BLOCKED);
-		blocked.put("block", block == null ? "" : block);
+		blocked.put("name", block == null ? "" : block); // (a thing's name: its registry id, the user's)
 		blocked.put("face", face);
 		blocked.put("call", call);
 		add(blocked);
@@ -129,6 +129,34 @@ public final class EventQueue {
 		interrupted.put("why", Buffered.INTERRUPTED);
 		interrupted.put("call", call);
 		add(interrupted);
+	}
+
+	/**
+	 * What a command was acting on is gone (the user's: one shape): {@code {event, ok = false, why =
+	 * "lost", name, id, at, call}}: its name (registry id), its own id ("" for a block), where it last
+	 * was ({forward, right, up}, the device's frame).
+	 */
+	public void lost(String event, String name, String id, Map<String, Object> at, Map<String, Object> call) {
+		Map<String, Object> lost = new java.util.LinkedHashMap<>();
+		lost.put("event", event);
+		lost.put("ok", false);
+		lost.put("why", Buffered.LOST);
+		lost.put("name", name == null ? "" : name);
+		lost.put("id", id == null ? "" : id);
+		lost.put("at", at);
+		lost.put("call", call);
+		add(lost);
+	}
+
+	/** Its own loss, no program's command (a field's: what it held is gone), a notice: {@code {event = "notice", why = "lost", name, id, at}}. */
+	public void lostNotice(String name, String id, Map<String, Object> at) {
+		Map<String, Object> lost = new java.util.LinkedHashMap<>();
+		lost.put("event", "notice");
+		lost.put("why", Buffered.LOST);
+		lost.put("name", name == null ? "" : name);
+		lost.put("id", id == null ? "" : id);
+		lost.put("at", at);
+		add(lost);
 	}
 
 	/**

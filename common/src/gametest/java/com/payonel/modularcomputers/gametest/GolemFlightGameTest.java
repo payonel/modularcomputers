@@ -214,7 +214,7 @@ public class GolemFlightGameTest {
 	/** Whether a landing ended blocked, down, by a block below instead of its legs (not "": what it found there). */
 	private static boolean blockedBelow(List<Object> events) {
 		return events.stream().anyMatch(e -> e instanceof java.util.Map<?, ?> m && "land".equals(m.get("event")) && "blocked".equals(m.get("why"))
-			&& "down".equals(m.get("face")) && m.get("block") instanceof String block && !block.isEmpty());
+			&& "down".equals(m.get("face")) && m.get("name") instanceof String block && !block.isEmpty());
 	}
 
 	/** How many notices of {@code why} (shove, fall) are among {@code events}. */
@@ -327,7 +327,7 @@ public class GolemFlightGameTest {
 				}
 				helper.assertTrue(Boolean.TRUE.equals(golem.robotics().land(args(true)).first()), "a command: true");
 			})
-			.thenWaitUntil(() -> helper.assertTrue(events.stream().map(GameTests::withoutCall).anyMatch(java.util.Map.of("event", "land", "ok", false, "why", "blocked", "block", "minecraft:air", "face", "down")::equals),
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().map(GameTests::withoutCall).anyMatch(java.util.Map.of("event", "land", "ok", false, "why", "blocked", "name", "minecraft:air", "face", "down")::equals),
 				"blocked by the air below: " + events))
 			.thenExecute(() -> helper.assertTrue(golem.thrusting(), "still hovering"))
 			.thenSucceed();
@@ -586,6 +586,46 @@ public class GolemFlightGameTest {
 		helper.succeed();
 	}
 
+	/** A swing's events, as they come. */
+	private static boolean swingEnded(List<Object> events, java.util.function.Predicate<java.util.Map<?, ?>> how) {
+		return events.stream().anyMatch(e -> e instanceof java.util.Map<?, ?> m && "swing".equals(m.get("event")) && how.test(m));
+	}
+
+	/**
+	 * A swing breaks a place, as a player's does (the game's own): another block pushed into its spot,
+	 * the break goes on into that block, and breaks it.
+	 */
+	@GameTest(maxTicks = 400)
+	public void aBlockPushedIntoItsSpotIsBrokenAsThePlayersBreakGoesOn(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		helper.setBlock(FRONT, Blocks.OAK_LOG);
+		golem.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WOODEN_AXE));
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> same(helper, golem.robotics().swing(args("front")).first(), "breaking", "it starts breaking"))
+			.thenExecuteAfter(5, () -> helper.setBlock(FRONT, Blocks.OAK_PLANKS)) // (another block in its spot)
+			.thenWaitUntil(() -> helper.assertTrue(swingEnded(events, m -> Boolean.TRUE.equals(m.get("ok"))
+				&& m.get("result") instanceof java.util.Map<?, ?> r && "minecraft:oak_planks".equals(r.get("name"))), "the planks broken: " + events))
+			.thenExecute(() -> helper.assertBlockPresent(Blocks.AIR, FRONT))
+			.thenSucceed();
+	}
+
+	/** Its spot turned to air mid-break, the swing has lost what it was breaking (the user's): lost, its name, no id (a block's), and where it was. */
+	@GameTest(maxTicks = 400)
+	public void aBlockGoneMidBreakIsLostWithItsNameAndWhereItWas(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		helper.setBlock(FRONT, Blocks.OAK_LOG);
+		golem.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WOODEN_AXE));
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> same(helper, golem.robotics().swing(args("front")).first(), "breaking", "it starts breaking"))
+			.thenExecuteAfter(5, () -> helper.setBlock(FRONT, Blocks.AIR)) // (gone from its spot)
+			.thenWaitUntil(() -> helper.assertTrue(swingEnded(events, m -> java.util.Objects.equals(GameTests.withoutCall(m),
+				java.util.Map.of("event", "swing", "ok", false, "why", "lost", "name", "minecraft:oak_log", "id", "",
+					"at", java.util.Map.of("forward", 1L, "right", 0L, "up", 0L)))), "lost: " + events))
+			.thenSucceed();
+	}
+
 	/** Held by a field mid-swing, its break pauses (the user's: as a move does), and let go, it goes on: the log broken, its swing ok. */
 	@GameTest(maxTicks = 400)
 	public void heldMidSwingItsBreakPausesAndGoesOnOnceLetGo(GameTestHelper helper) {
@@ -641,7 +681,7 @@ public class GolemFlightGameTest {
 				same(helper, golem.robotics().fly(args(0.0, 0.0, 3.0)).first(), true, "a command");
 			})
 			.thenWaitUntil(() -> helper.assertTrue(events.stream().map(GameTests::withoutCall)
-				.anyMatch(java.util.Map.of("event", "fly", "ok", false, "why", "blocked", "block", "", "face", "up")::equals), "blocked, no way there: " + events))
+				.anyMatch(java.util.Map.of("event", "fly", "ok", false, "why", "blocked", "name", "", "face", "up")::equals), "blocked, no way there: " + events))
 			.thenExecute(() -> helper.assertTrue(golem.legs() && !golem.thrusting(), "on its legs still, its thrusters off"))
 			.thenSucceed();
 	}

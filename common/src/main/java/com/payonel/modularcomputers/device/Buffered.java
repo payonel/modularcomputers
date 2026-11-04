@@ -41,6 +41,12 @@ public interface Buffered {
 	String INTERRUPTED = "interrupted";
 
 	/**
+	 * Why a command ended: what it was acting on is gone (the user's, one shape: {@link
+	 * EventQueue#lost}), its name (registry id), its own id ("" for a block) and where it last was.
+	 */
+	String LOST = "lost";
+
+	/**
 	 * The board gives a command (a method not free) with these arguments, as the program gave them,
 	 * before calling it: a stopped, blocked or drifted end says them in its call.
 	 */

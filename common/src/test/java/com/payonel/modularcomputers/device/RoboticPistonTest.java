@@ -54,7 +54,7 @@ class RoboticPistonTest {
 		piston.blockedBy(side -> null, side -> "modularcomputers:cable");
 		assertThat(piston.push(new Arguments(List.of("down"))).first()).isEqualTo(true);
 		assertThat(piston.pull(new Arguments(List.of())).first())
-			.isEqualTo(Map.of("event", "push", "ok", false, "why", "blocked", "block", "modularcomputers:cable", "face", "down",
+			.isEqualTo(Map.of("event", "push", "ok", false, "why", "blocked", "name", "modularcomputers:cable", "face", "down",
 				"call", Map.of("args", List.of(), "progress", 0L)));
 	}
 
@@ -66,11 +66,11 @@ class RoboticPistonTest {
 		piston.blockedBy(side -> "minecraft:obsidian", side -> "modularcomputers:cable");
 		piston.extend(new Arguments(List.of("up")));
 		assertThat(piston.pull(new Arguments(List.of())).first())
-			.isEqualTo(Map.of("event", "extend", "ok", false, "why", "blocked", "block", "minecraft:obsidian", "face", "up",
+			.isEqualTo(Map.of("event", "extend", "ok", false, "why", "blocked", "name", "minecraft:obsidian", "face", "up",
 				"call", Map.of("args", List.of(), "progress", 0L)));
 		piston.blockedBy(side -> null, side -> "modularcomputers:cable"); // (more than it moves: no one block)
 		piston.push(new Arguments(List.of("north")));
-		assertThat(piston.pull(new Arguments(List.of())).first()).isEqualTo(Map.of("event", "push", "ok", false, "why", "blocked", "block", "", "face", "north",
+		assertThat(piston.pull(new Arguments(List.of())).first()).isEqualTo(Map.of("event", "push", "ok", false, "why", "blocked", "name", "", "face", "north",
 			"call", Map.of("args", List.of(), "progress", 0L)));
 	}
 }

@@ -40,7 +40,7 @@ public class RoboticPistonGameTest {
 
 	/** A blocked end (the user's: one shape): the block that won't move (null: none to name), its face the world's way. */
 	private static Map<String, Object> blocked(String method, String block, String face) {
-		return Map.of("event", method, "ok", false, "why", "blocked", "block", block == null ? "" : block, "face", face);
+		return Map.of("event", method, "ok", false, "why", "blocked", "name", block == null ? "" : block, "face", face);
 	}
 
 	@GameTest(maxTicks = 60)

@@ -179,10 +179,10 @@ class RoboticsDeviceTest {
 	void blockedIsTheWordWithTheBlockAndItsFace() {
 		device.walk(args(2L));
 		device.blocked("minecraft:stone", "front");
-		assertThat(withoutCall(device.pull(args()).first())).isEqualTo(Map.of("event", "walk", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "front"));
+		assertThat(withoutCall(device.pull(args()).first())).isEqualTo(Map.of("event", "walk", "ok", false, "why", "blocked", "name", "minecraft:stone", "face", "front"));
 		device.walk(args(2L));
 		device.blocked(null, "up");
-		assertThat(withoutCall(device.pull(args()).first())).as("no block named: \"\", never nil").isEqualTo(Map.of("event", "walk", "ok", false, "why", "blocked", "block", "", "face", "up"));
+		assertThat(withoutCall(device.pull(args()).first())).as("no block named: \"\", never nil").isEqualTo(Map.of("event", "walk", "ok", false, "why", "blocked", "name", "", "face", "up"));
 	}
 
 	@Test
@@ -299,6 +299,16 @@ class RoboticsDeviceTest {
 		Map<Object, Object> rest = new java.util.LinkedHashMap<>(map);
 		rest.remove("call");
 		return rest;
+	}
+
+	/** Lost is one shape (the user's): what was lost (its name), its own id ("" for a block), where it last was, and the call. */
+	@Test
+	void lostIsTheWordWithItsNameIdAndWhere() {
+		device.called("walk", List.of(2L));
+		device.walk(args(2L));
+		device.lost("minecraft:oak_log", "", RoboticsDevice.toward("up"));
+		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "lost", "name", "minecraft:oak_log", "id", "",
+			"at", Map.of("forward", 0L, "right", 0L, "up", 1L), "call", Map.of("args", List.of(2L), "progress", 0L)));
 	}
 
 	/** A shove is said, and nothing more (the user's: no way back of its own; the program corrects it). */

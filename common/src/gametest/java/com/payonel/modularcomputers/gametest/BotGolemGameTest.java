@@ -144,7 +144,7 @@ public class BotGolemGameTest {
 		helper.succeedWhen(() -> {
 			synchronized (heard) {
 				helper.assertTrue(!heard.isEmpty() && java.util.Objects.equals(GameTests.withoutCall(heard.get(heard.size() - 1)),
-					Map.of("event", "walk", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "front")), "blocked by the wall, on its front: " + heard);
+					Map.of("event", "walk", "ok", false, "why", "blocked", "name", "minecraft:stone", "face", "front")), "blocked by the wall, on its front: " + heard);
 			}
 			helper.assertTrue(at(helper, golem).getX() < 3, "on its side of the wall");
 		});

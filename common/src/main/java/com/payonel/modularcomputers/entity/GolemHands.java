@@ -365,16 +365,19 @@ final class GolemHands {
 			return;
 		}
 		BlockState state = level().getBlockState(breaking);
-		// Another block there ends it; the same block with its state changed doesn't (leaves losing
-		// their log, a crop growing), as a player's breaking goes on.
-		if (!state.is(breakingState.getBlock())) {
-			fail("block changed");
+		// A player's break, the game's own (its MultiPlayerGameMode): it breaks a place, not a block.
+		// Air there, it's lost what it was breaking; another block pushed in, the break goes on into it,
+		// at that block's pace; another item in its hand, it starts again from nothing with it.
+		if (state.isAir()) {
+			lose();
 			return;
 		}
-		if (!ItemStack.isSameItem(golem.getMainHandItem(), breakingWith)) {
-			fail("hand changed");
-			return;
+		if (!ItemStack.isSameItemSameComponents(golem.getMainHandItem(), breakingWith)) {
+			breakingWith = golem.getMainHandItem().copy();
+			progress = 0;
+			level().destroyBlockProgress(golem.getId(), breaking, NO_CRACKS);
 		}
+		breakingState = state;
 		ServerPlayer player = hand(breakingFace);
 		try {
 			progress += state.getDestroyProgress(player, level(), breaking);
@@ -409,16 +412,19 @@ final class GolemHands {
 		}
 	}
 
-	private void fail(String why) {
+	/** What it was breaking went (air there now): it says what and where it last was (the user's: lost). */
+	private void lose() {
+		String name = BuiltInRegistries.BLOCK.getKey(breakingState.getBlock()).toString();
+		String face = breakingFace;
 		stopBreaking();
-		golem.robotics().failed(why);
+		golem.robotics().lost(name, "", RoboticsDevice.toward(face)); // (a block has no id of its own: "")
 	}
 
 	/** Stops breaking, its cracks gone. */
 	/**
 	 * Let go by a field, set down where the carry left it: a break under way goes on at its face
-	 * there (the user's: it paused, as a move does); the block there another (carried away), it's
-	 * that block's break from its start, the same kind or the break ends, block changed.
+	 * there (the user's: it paused, as a move does); set down elsewhere, it's the break of what's at
+	 * its face there, from its start (a break is of a place, as a player's).
 	 */
 	void afterHold() {
 		if (breaking == null) {

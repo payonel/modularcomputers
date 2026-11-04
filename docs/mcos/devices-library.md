@@ -132,7 +132,7 @@ methods never wait (a robot's `get`, `pull` and `stop`; a field card's `stop`). 
 thread waiting to give that device a command: their calls fail with `stopped` (`ECANCELED`). Each
 command that runs over time (a walk, a move) ends in an event named after its method, `ok` and, when
 it failed, why (one done at once answers in its call):
-`{event = "walk", ok = false, why = "blocked", block = "minecraft:oak_log", face = "front"}`. `devices.sync` waits until
+`{event = "walk", ok = false, why = "blocked", name = "minecraft:oak_log", face = "front"}`. `devices.sync` waits until
 nothing is pending (before a field picks the robot up, say: its walk done).
 
 ## Events

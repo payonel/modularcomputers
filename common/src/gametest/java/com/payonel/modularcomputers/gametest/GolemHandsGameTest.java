@@ -136,7 +136,7 @@ public class GolemHandsGameTest {
 		golem.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_AXE));
 		helper.succeedWhen(() -> {
 			List<Object> got = copy(answers);
-			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "swing", "ok", true, "result", Map.of("block", "minecraft:oak_log", "kept", true)), "its event: " + got);
+			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "swing", "ok", true, "result", Map.of("name", "minecraft:oak_log", "kept", true)), "its event: " + got);
 			helper.assertBlockPresent(Blocks.AIR, FRONT);
 			helper.assertTrue(golem.getMainHandItem().getDamageValue() == 1, "the axe wore");
 			// No storage: its off hand caught the log, in the background.
@@ -155,7 +155,7 @@ public class GolemHandsGameTest {
 		golem.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.APPLE));
 		helper.succeedWhen(() -> {
 			List<Object> got = copy(answers);
-			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "swing", "ok", true, "result", Map.of("block", "minecraft:oak_log", "kept", false, "dropped", 1L)),
+			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "swing", "ok", true, "result", Map.of("name", "minecraft:oak_log", "kept", false, "dropped", 1L)),
 				"its event: " + got);
 			helper.assertTrue(golem.getOffhandItem().is(Items.APPLE), "its off hand kept its apple");
 			helper.assertTrue(!helper.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(helper.absolutePos(FRONT)).inflate(1),

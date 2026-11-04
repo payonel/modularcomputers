@@ -26,7 +26,7 @@ local function go(forward, up)
   local moved = event()
   if not moved.ok then
     if moved.why == "blocked" then -- (the block in the way, - when none is named, and the face of what it holds that met it)
-      print("blocked " .. (moved.block ~= "" and moved.block or "-") .. " " .. moved.face)
+      print("blocked " .. (moved.name ~= "" and moved.name or "-") .. " " .. moved.face)
     else
       print(tostring(moved.why))
     end

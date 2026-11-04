@@ -79,7 +79,7 @@ public class GolemWalkGameTest {
 
 	/** A walk's end, blocked (the user's: one shape): by what (air too), met on which of its own faces. */
 	private static Map<String, Object> blocked(String block, String face) {
-		return Map.of("event", "walk", "ok", false, "why", "blocked", "block", block, "face", face);
+		return Map.of("event", "walk", "ok", false, "why", "blocked", "name", block, "face", face);
 	}
 
 	private static final Map<String, Object> ARRIVED = Map.of("event", "walk", "ok", true);

@@ -29,7 +29,7 @@ the spec the build follows and its checklist, items marked done as they land.
 - A command that runs over time ends in an event (news, as any device's), named after its method
   (one done at once, a read or a `capture`, answers in its call: no event, so the stream isn't
   noise for programs waiting on real ends; a build decision, 2026-10-28):
-  `{event = "walk", ok = true}`, or `{event = "walk", ok = false, why = "blocked", block = "minecraft:oak_log", face = "front"}`; one cut short by `stop` ends `ok = false, why = "stopped"`. It's also the device's "idle
+  `{event = "walk", ok = true}`, or `{event = "walk", ok = false, why = "blocked", name = "minecraft:oak_log", face = "front"}`; one cut short by `stop` ends `ok = false, why = "stopped"`. It's also the device's "idle
   again", its interrupt pending until the event is taken.
 - No queue, no tags, no fault state: a command's failure ends that command only, and the next runs
   as any would.
@@ -62,7 +62,7 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
 
 Being made one shape (the user's, 2026-11-03): a why is one word, exactly, and what it's about
 comes in named fields beside it, the same fields wherever it's said. Done so far: `blocked`
-(`block`, the block's id, `""` when no one block can be named, never nil; `face`, the side of what moved
+(`name`, the block's registry id, `""` when no one block can be named, never nil; `face`, the side of what moved
 that met it, in the device's terms: a robot's own, a field holder's frame, a piston's the world's),
 said only in an event (a piston's too: its push ends in its event; its cable port's side is
 blocked by its cable), with `call = {args, progress}`; `stopped` likewise (always a method's end,
@@ -121,7 +121,7 @@ given again as it was (the user's, 2026-11-04); `interrupted` is the fallback.
 ### The others
 
 - **Energy field card:** `capture`, `move` and `release` are commands; `move` ends once arrived or
-  blocked (`blocked`, its `block` and `face`); `scan`, `get`, `pull` and `stop` are free (a stop ends
+  blocked (`blocked`, its `name` and `face`); `scan`, `get`, `pull` and `stop` are free (a stop ends
   a move under way, `stopped`, holding on: to let go at once, stop, then release). A capture outlives the process that made it.
 - **Redstone card:** `set` is a command, ending once applied in the world (at its next tick: at most
   one change a tick), its event carrying every face (`result`); `get` is a command (it sees a `set`

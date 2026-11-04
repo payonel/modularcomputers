@@ -34,10 +34,10 @@ local function ended(fd, method)
   end
 end
 
--- What a failed end says: its why, and a blocked one's block (- for none: its block is "") and face.
+-- What a failed end says: its why, and a blocked one's block's name (- for none: its name is "") and face.
 local function said(got)
   if got.why == "blocked" then
-    return "blocked " .. (got.block ~= "" and got.block or "-") .. " " .. got.face
+    return "blocked " .. (got.name ~= "" and got.name or "-") .. " " .. got.face
   end
   return tostring(got.why)
 end

@@ -216,7 +216,7 @@ public final class EnergyField extends Entity {
 			}
 		}
 		if (!held.isAlive() || held.level() != level()) {
-			lose("gone");
+			lose(com.payonel.modularcomputers.device.Buffered.LOST); // (what it held is gone: dead, picked up, through a portal)
 			return;
 		}
 		boolean cardHere = listener != null && record.seen() >= level().getGameTime() - CARD_HERE;
