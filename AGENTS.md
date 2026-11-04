@@ -388,7 +388,7 @@ in the world, and the swing's end says whether it kept it all.
   catches it where it is (the user's, 2026-11-03: no `stop(true)`, no hover; a `stop()` lets a fall
   go on, as it isn't something the robot does, but takes where it is). Or carried in **a field**, its own too, legs and all (10 blocks a second): stasis, as for
   any creature (the user's, 2026-10-27): its robotics freezes (commands refused `held`, mcos waiting;
-  a swing under way ends; no tools, no looking), and only its robotics (the user's, 2026-10-29: its
+  a swing under way pauses, its break going on once let go, the user's, as a move's does; no tools, no looking), and only its robotics (the user's, 2026-10-29: its
   body is held, and robotics is its one device acting in the world), so its other devices go on (a
   crafting card's craft under way goes on); what a held robot would do waits, judged by the actor
   (the user's): every crafting card command, its start of a craft and its moves between its own

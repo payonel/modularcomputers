@@ -415,6 +415,23 @@ final class GolemHands {
 	}
 
 	/** Stops breaking, its cracks gone. */
+	/**
+	 * Let go by a field, set down where the carry left it: a break under way goes on at its face
+	 * there (the user's: it paused, as a move does); the block there another (carried away), it's
+	 * that block's break from its start, the same kind or the break ends, block changed.
+	 */
+	void afterHold() {
+		if (breaking == null) {
+			return;
+		}
+		BlockPos now = at(breakingFace);
+		if (!now.equals(breaking)) {
+			level().destroyBlockProgress(golem.getId(), breaking, NO_CRACKS);
+			breaking = now;
+			progress = 0;
+		}
+	}
+
 	void stopBreaking() {
 		if (breaking != null) {
 			level().destroyBlockProgress(golem.getId(), breaking, NO_CRACKS);

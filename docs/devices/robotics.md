@@ -111,7 +111,7 @@ had got). Only one that can't go on (its legs gone meanwhile, say) ends
 
 Held in an [energy field](/devices/energy-field-card/), any field, its own too, a robot is in
 stasis, as any creature is: its robotics freezes. What it was doing pauses (a block it was breaking
-is left: no tools in a field), new commands wait (`held`, under the board's calls) until the field
+too: no tools in a field, and the break goes on, from as far as it got, once it's let go), new commands wait (`held`, under the board's calls) until the field
 lets it go and it's down, and `stop` still works. It says so: `frozen`, then `thawed` notices. Only its
 robotics is held: the robot's body can't act, but its other devices go on (its computer runs, its
 sensors sense, a [crafting card](/devices/crafting-card/)'s craft under way finishes); a command

@@ -790,7 +790,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			thrust();
 			fall();
 			shovedOnItsLegs();
-			hands.tick();
+			if (!frozen) {
+				hands.tick(); // (held, its hand pauses: a break goes on once it's let go)
+			}
 			board.tick();
 		}
 	}
@@ -807,13 +809,13 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			frozen = true;
 			frozenAt = position();
 			setNoGravity(thrusting()); // (a straight walk's steps hold it up: let go, it comes down, and thaws)
-			hands.stopBreaking();
-			robotics.frozen(); // (a swing under way ends, held; its news)
+			robotics.frozen(); // (a swing under way pauses, its break as far as it got: the user's, as a move pauses)
 		} else if (!held && frozen && (!legs() || onGround() || thrusting())) {
 			frozen = false;
 			Vec3 by = position().subtract(frozenAt);
 			origins.put(dimension(), origin().carried(by));
 			carry(by);
+			hands.afterHold(); // (its break goes on, at its face where it's been set down)
 			pathed = false; // (a pathfinding walk finds its way again, from where it was set down)
 			if (steps != null || stepTo != null) {
 				setNoGravity(true); // (its straight walk goes on, step by step)

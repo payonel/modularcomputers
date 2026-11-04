@@ -780,12 +780,9 @@ public final class RoboticsDevice implements Device, Buffered {
 		events.add(event);
 	}
 
-	/** A field took hold of it: a block it was breaking is left (no tools in a field), and it says so. */
+	/** A field took hold of it: it says so, and what it was doing pauses (a break too: no tools in a field, its break going on once it's let go). */
 	public void frozen() {
-		if ("swing".equals(active)) {
-			end(false, HELD, null);
-		}
-		notice(FROZEN, null);
+		notice(FROZEN, null); // (a command under way pauses, a swing too: the user's)
 	}
 
 	/**

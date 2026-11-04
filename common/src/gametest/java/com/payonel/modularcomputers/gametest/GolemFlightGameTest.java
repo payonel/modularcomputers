@@ -586,6 +586,27 @@ public class GolemFlightGameTest {
 		helper.succeed();
 	}
 
+	/** Held by a field mid-swing, its break pauses (the user's: as a move does), and let go, it goes on: the log broken, its swing ok. */
+	@GameTest(maxTicks = 400)
+	public void heldMidSwingItsBreakPausesAndGoesOnOnceLetGo(GameTestHelper helper) {
+		BotGolem golem = golem(helper, true);
+		helper.setBlock(FRONT, Blocks.OAK_LOG);
+		golem.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WOODEN_AXE));
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> same(helper, golem.robotics().swing(args("front")).first(), "breaking", "it starts breaking"))
+			.thenExecuteAfter(3, () -> helper.assertTrue(!field(golem).capture(args(FieldCard.SELF)).failed(), "held mid-swing"))
+			.thenExecuteAfter(40, () -> {
+				helper.assertBlockPresent(Blocks.OAK_LOG, FRONT); // (paused: not broken while held)
+				helper.assertTrue(events.stream().noneMatch(e -> e instanceof java.util.Map<?, ?> m && "swing".equals(m.get("event"))), "no end while held: " + events);
+				field(golem).release(args());
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(e -> e instanceof java.util.Map<?, ?> m && "swing".equals(m.get("event")) && Boolean.TRUE.equals(m.get("ok"))),
+				"let go, its break went on: " + events))
+			.thenExecute(() -> helper.assertBlockPresent(Blocks.AIR, FRONT))
+			.thenSucceed();
+	}
+
 	/** Held by a field mid-walk (its steps holding it up), let go: it comes down, thaws, and its walk goes on to its end. */
 	@GameTest(maxTicks = 300)
 	public void heldMidWalkAndLetGoItThawsAndItsWalkEnds(GameTestHelper helper) {
