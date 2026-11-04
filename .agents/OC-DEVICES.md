@@ -445,7 +445,7 @@ mcos's threads) are on the `openos` branch only.
 ### crafting (UpgradeCrafting.scala)
 **modcomp:** CraftingCard (device/CraftingCard.java; worked by entity/CraftingBench.java)
 **Signals:**
-- none in OC; modcomp adds `crafted` (`{name, count}`) and `failed` (`why`: no recipe, no room) through `pull()`.
+- none in OC; modcomp adds `crafted` (`{name, count}`) and `failed` (`why`: input, output) through `pull()`.
 **API:**
 - `craft([count]): number`: CraftingCard `craft([count])`: from its own 3x3 grid (slots 1-9), not the robot's top-left; `true` at once (or `false, why`), the result an event; half a second a craft; into storage, all or nothing.
 **Deliberate (AGENTS.md / PLAN.md):** crafting takes time, each card on its own (more cards, more throughput); needs robotics; players craft in its tab; its `/dev` file reads its items, a line written dumps its storage.

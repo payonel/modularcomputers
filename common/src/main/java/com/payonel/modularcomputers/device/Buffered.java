@@ -53,6 +53,18 @@ public interface Buffered {
 	String UNBREAKABLE = "unbreakable";
 
 	/**
+	 * Why a craft ended: what's in its grid makes nothing (the user's, one shape: {@link
+	 * EventQueue#input}): an empty grid, or no recipe its pattern matches; and its call.
+	 */
+	String INPUT = "input";
+
+	/**
+	 * Why a craft ended: there's no room for what it makes (the user's, one shape: {@link
+	 * EventQueue#output}): its storage can't take it, or a leftover its grid can't take back; and its call.
+	 */
+	String OUTPUT = "output";
+
+	/**
 	 * The board gives a command (a method not free) with these arguments, as the program gave them,
 	 * before calling it: a stopped, blocked or drifted end says them in its call.
 	 */

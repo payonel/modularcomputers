@@ -2,7 +2,8 @@
 -- crafting grid's first slot, craft once a log (four planks each, into the card's storage), and
 -- put everything in its storage back into the chest. Each craft is the card's own work (its robot
 -- free meanwhile); the card's event, craft, says when they're all done (ok, and what it
--- made), or why it stopped (no room, no recipe). A store would wait for the craft anyway (the card
+-- made), or why it stopped and after how many crafts (output: no room for what it makes; input:
+-- its grid makes nothing). A store would wait for the craft anyway (the card
 -- does one thing at a time), but its event says how it went.
 local sys = require("sys")
 
@@ -31,7 +32,7 @@ end
 assert(sys.ioctl(card, "craft", logs))
 local done = crafted()
 if not done.ok then
-  print("stopped after " .. done.result.count .. ": " .. done.why)
+  print("stopped after " .. done.call.progress .. " crafts: " .. done.why)
   os.exit(1)
 end
 

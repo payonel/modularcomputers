@@ -96,11 +96,18 @@ device's `held`: `damage`, `maxDamage`, `label` where they apply).
 Crafts what its grid makes, `count` times (1), what it makes going into
 its storage. A command: once the robot's moves end it answers at once, and the card is busy until
 it's done, its robot free (`devices.sync` waits for it). Its event,
-`craft`: `ok` and its `result`, `{name, count}` (how many it made), or not and why (`no recipe`,
-`empty grid`, `no room`: its storage can't take what it made, so the craft isn't made and
-the grid is as it was), its `result` saying how many it made before it failed. Stopped, it ends
-`{event = "craft", ok = false, why = "stopped", call = {args = {20}, progress = 10}}`: the
-count it was given, and the crafts it had done.
+`craft`: `ok` and its `result`, `{name, count}` (how many it made), or not and why, with its
+`call`, `{args, progress}`: the count it was given, and the crafts it had done (crafts, not items).
+Each craft of the count is checked as it comes, so one can fail partway:
+
+| why | when |
+|---|---|
+| `input` | its grid makes nothing: it's empty (used up partway, too), or no recipe matches it |
+| `output` | no room for what it makes: its storage can't take it (or a leftover its grid can't take back, a milk bucket's bucket), so that craft isn't made and the grid is as it was |
+| `stopped` | its `stop()` |
+
+`{event = "craft", ok = false, why = "input", call = {args = {20}, progress = 10}}`: ten crafts
+done, then its grid made nothing.
 
 A craft under way when its world is saved goes on after the load, as it was.
 

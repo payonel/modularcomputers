@@ -136,8 +136,9 @@ public final class CraftingCard extends Card implements Buffered {
 			return Result.fail("no bench");
 		}
 	};
-	/** Crafts still to make, of those asked for, and those made so far. */
+	/** Crafts still to make, of those asked for; the crafts done so far (its call's progress), and the items they made. */
 	private int toCraft;
+	private int crafts;
 	private int crafted;
 	/** The last command the board gave it and its arguments (the board's {@link #called}), and the craft under way's. */
 	private String calledMethod;
@@ -186,6 +187,7 @@ public final class CraftingCard extends Card implements Buffered {
 		Map<?, ?> item = (Map<?, ?>) made.first();
 		craftedName = String.valueOf(item.get("name"));
 		crafted += ((Number) item.get("count")).intValue();
+		crafts++;
 		if (--toCraft > 0) {
 			ticksLeft = CRAFT_TICKS;
 		} else {
@@ -199,13 +201,18 @@ public final class CraftingCard extends Card implements Buffered {
 			result.put("name", craftedName);
 		}
 		result.put("count", (long) crafted);
-		Map<String, Object> call = EventQueue.call(craftArgs, (long) crafted); // (its call: its count asked, the crafts done)
+		Map<String, Object> call = EventQueue.call(craftArgs, (long) crafts); // (its call: its count asked, the crafts done)
 		toCraft = 0;
+		crafts = 0;
 		crafted = 0;
 		craftedName = null;
 		changed();
 		if (STOPPED.equals(why)) {
 			events.stopped("craft", call);
+		} else if (INPUT.equals(why)) {
+			events.input("craft", call);
+		} else if (OUTPUT.equals(why)) {
+			events.output("craft", call);
 		} else {
 			events.ended("craft", "crafted".equals(name), why, result);
 		}
@@ -263,7 +270,7 @@ public final class CraftingCard extends Card implements Buffered {
 		return no != null ? no : bench.list();
 	}
 
-	@Method(doc = "craft([count]): crafts what its grid makes, count times (1), what it makes going to its storage. A command: once its robot's moves end it starts, true at once, its robot free and the card busy until its event (craft, ok, result {name, count}, or not and why: no recipe, empty grid, no room, stopped), or false and why")
+	@Method(doc = "craft([count]): crafts what its grid makes, count times (1), what it makes going to its storage. A command: once its robot's moves end it starts, true at once, its robot free and the card busy until its event (craft, ok, result {name, count}: what it made, or not and why, with its call {args, progress: the crafts done}: input, its grid makes nothing (empty, or no recipe matches), output, no room for what it makes, stopped), or false and why")
 	public Result craft(Arguments args) {
 		Result no = needsRobotics();
 		if (no != null) {
@@ -276,6 +283,7 @@ public final class CraftingCard extends Card implements Buffered {
 		}
 		toCraft = count;
 		craftArgs = "craft".equals(calledMethod) ? calledArgs : java.util.List.of();
+		crafts = 0;
 		crafted = 0;
 		ticksLeft = CRAFT_TICKS;
 		changed();
@@ -427,6 +435,7 @@ public final class CraftingCard extends Card implements Buffered {
 	protected void dropData() {
 		if (events.clear()) { // (a fresh start: an old program's craft isn't the next one's; a load's goes on)
 			toCraft = 0;
+			crafts = 0;
 			crafted = 0;
 			craftedName = null;
 		}
@@ -444,6 +453,7 @@ public final class CraftingCard extends Card implements Buffered {
 		events.save(saved);
 		if (toCraft > 0) {
 			saved.put("toCraft", (long) toCraft);
+			saved.put("crafts", (long) crafts);
 			saved.put("crafted", (long) crafted);
 			if (craftedName != null) {
 				saved.put("name", craftedName);
@@ -457,6 +467,7 @@ public final class CraftingCard extends Card implements Buffered {
 	public void restore(Map<String, Object> saved) {
 		events.restore(saved);
 		toCraft = saved.get("toCraft") instanceof Number n ? n.intValue() : 0;
+		crafts = saved.get("crafts") instanceof Number n ? n.intValue() : 0;
 		crafted = saved.get("crafted") instanceof Number n ? n.intValue() : 0;
 		craftedName = saved.get("name") instanceof String name ? name : null;
 		craftArgs = saved.get("args") instanceof java.util.List<?> args ? java.util.List.copyOf(new java.util.ArrayList<Object>(args)) : java.util.List.of();

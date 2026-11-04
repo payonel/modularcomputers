@@ -166,9 +166,50 @@ public class CraftingCardGameTest {
 			}
 		});
 		helper.succeedWhen(() -> {
-			same(helper, events.isEmpty() ? null : events.getFirst(), Map.of("event", "craft", "ok", false, "why", "no room", "result", Map.of("count", 0L)), "its event");
+			same(helper, events.isEmpty() ? null : events.getFirst(), Map.of("event", "craft", "ok", false, "why", "output", "call", Map.of("args", List.of(), "progress", 0L)), "its event");
 			helper.assertTrue(slot(golem, LANE, 0).is(Items.OAK_PLANKS) && slot(golem, LANE, 3).is(Items.OAK_PLANKS), "its grid as it was");
 		});
+	}
+
+	/** A craft's end, its first event, on a card holding these (the board's call recorded: its args). */
+	private static void craftsAndEnds(GameTestHelper helper, Map<Integer, ItemStack> slots, List<Object> args, Map<String, Object> expected) {
+		BotGolem golem = golem(helper, Map.of(LANE, card(slots)));
+		List<Object> events = new ArrayList<>();
+		helper.runAfterDelay(3, () -> {
+			CraftingCard card = crafting(golem, LANE);
+			card.called("craft", args);
+			card.craft(new Arguments(args));
+		});
+		helper.onEachTick(() -> {
+			if (crafting(golem, LANE) instanceof CraftingCard card) {
+				Object event = card.pull(args()).first();
+				if (event != null) {
+					events.add(event);
+				}
+			}
+		});
+		helper.succeedWhen(() -> same(helper, events.isEmpty() ? null : events.getFirst(), expected, "its event"));
+	}
+
+	/** An empty grid makes nothing: input (the user's, empty grid and no recipe one why), with its call. */
+	@GameTest(maxTicks = 100)
+	public void anEmptyGridsCraftEndsInput(GameTestHelper helper) {
+		craftsAndEnds(helper, Map.of(), List.of(),
+			Map.of("event", "craft", "ok", false, "why", "input", "call", Map.of("args", List.of(), "progress", 0L)));
+	}
+
+	/** A grid no recipe matches makes nothing: input too. */
+	@GameTest(maxTicks = 100)
+	public void aGridNoRecipeMatchesEndsInput(GameTestHelper helper) {
+		craftsAndEnds(helper, Map.of(0, new ItemStack(Items.DIRT)), List.of(2L),
+			Map.of("event", "craft", "ok", false, "why", "input", "call", Map.of("args", List.of(2L), "progress", 0L)));
+	}
+
+	/** Its grid used up partway, its end says the crafts done, not the items made (two crafts, 8 sticks: progress 2). */
+	@GameTest(maxTicks = 200)
+	public void aGridUsedUpPartwayEndsInputWithTheCraftsDone(GameTestHelper helper) {
+		craftsAndEnds(helper, sticks(2), List.of(5L),
+			Map.of("event", "craft", "ok", false, "why", "input", "call", Map.of("args", List.of(5L), "progress", 2L)));
 	}
 
 	@GameTest(maxTicks = 200)

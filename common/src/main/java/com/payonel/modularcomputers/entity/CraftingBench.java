@@ -1,5 +1,6 @@
 package com.payonel.modularcomputers.entity;
 
+import com.payonel.modularcomputers.device.Buffered;
 import com.payonel.modularcomputers.device.CraftingCard;
 import com.payonel.modularcomputers.menu.CraftingStorage;
 import com.payonel.modularcomputers.runtime.Result;
@@ -76,16 +77,16 @@ public final class CraftingBench implements CraftingCard.Bench {
 		CraftingInput.Positioned positioned = slots.grid().asPositionedCraftInput();
 		CraftingInput input = positioned.input();
 		if (input.isEmpty()) {
-			return Result.fail("empty grid");
+			return Result.fail(Buffered.INPUT); // (an empty grid makes nothing)
 		}
 		ServerLevel world = level.get();
 		Optional<RecipeHolder<CraftingRecipe>> recipe = world.recipeAccess().getRecipeFor(RecipeType.CRAFTING, input, world);
 		if (recipe.isEmpty()) {
-			return Result.fail("no recipe");
+			return Result.fail(Buffered.INPUT);
 		}
 		ItemStack result = recipe.get().value().assemble(input);
 		if (result.isEmpty() || !result.isItemEnabled(world.enabledFeatures())) {
-			return Result.fail("no recipe");
+			return Result.fail(Buffered.INPUT);
 		}
 		NonNullList<ItemStack> remaining = recipe.get().value().getRemainingItems(input);
 		// Worked out on copies first: the grid as it'll be, and its storage with what it made (and what
@@ -118,7 +119,7 @@ public final class CraftingBench implements CraftingCard.Bench {
 		}
 		for (ItemStack stack : toStorage) {
 			if (!insert(after, stack).isEmpty()) {
-				return Result.fail("no room");
+				return Result.fail(Buffered.OUTPUT);
 			}
 		}
 		apply(after);

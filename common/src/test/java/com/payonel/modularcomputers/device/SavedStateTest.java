@@ -126,11 +126,14 @@ class SavedStateTest {
 	@Test
 	void aCraftUnderWayAtASaveGoesOnAfterTheLoad() {
 		CraftingCard loaded = new CraftingCard();
-		loaded.restore(Map.of("events", List.of(), "lost", 0L, "toCraft", 3L, "crafted", 2L, "name", "minecraft:stick", "args", List.of(5L)));
+		loaded.restore(Map.of("events", List.of(), "lost", 0L, "toCraft", 3L, "crafts", 2L, "crafted", 8L, "name", "minecraft:stick", "args", List.of(5L)));
 		loaded.accepting(false); // (the first reset after a load keeps what the load brought)
 		loaded.accepting(true);
 		assertThat(loaded.busy()).as("still crafting").isTrue();
 		assertThat(loaded.pull(args()).first()).as("no end yet").isNull();
+		loaded.stop(args());
+		assertThat(loaded.pull(args()).first()).as("its crafts done kept, its call's").isEqualTo(
+			Map.of("event", "craft", "ok", false, "why", "stopped", "call", Map.of("args", List.of(5L), "progress", 2L)));
 	}
 
 	/** A field holding at a save holds on after the load (the user's): its hold is the world's record, and its card goes on with it, a move under way too. */

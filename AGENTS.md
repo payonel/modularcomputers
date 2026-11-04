@@ -673,12 +673,14 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   blocked or drifted end carries **`call = {args, progress}`** (the user's, 2026-11-03): the
   command's arguments as the program gave them (the board records them as the command starts:
   `Buffered.called`), and how far it got, in their terms (a walk's `{forward, right, up}` done, a
-  craft's crafts done). **`lost`, one shape** (the user's, 2026-11-04): what a command acted on is
+  craft's crafts done, never its items). **`lost`, one shape** (the user's, 2026-11-04): what a command acted on is
   gone, `{why = "lost", name, id, at, call}` (`EventQueue.lost`; a field's own loss of what it held,
   a notice: `lostNotice`). **`unbreakable`, one shape, `lost`'s fields** (the user's, 2026-11-04):
   the game won't let what a swing acted on be broken (bedrock, a protected place's refused break),
   said by its end, never its call: a call fails only when it can't be given (`EventQueue.unbreakable`).
-  **A thing's `name` is its registry id, its `id` its own UUID**, everywhere
+  **A craft's `input` and `output`** (the user's, 2026-11-04): its grid makes nothing (empty, no
+  recipe) or no room for what it makes, each `{why, call}` (`EventQueue.input`, `output`), its
+  progress the crafts done. **A thing's `name` is its registry id, its `id` its own UUID**, everywhere
   (the user's): a block has none, so `id = ""`; `blocked`'s block is a `name` too. **A swing breaks a
   place**, as the game's own player does (`MultiPlayerGameMode`): another block pushed in, the break
   goes on into it at its pace; another item in hand, it starts again; air there, it's `lost`. Every way a walk can't go is blocked (the user's): a step up it can't take (by the step's

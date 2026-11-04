@@ -194,7 +194,7 @@ class BufferedWaitsMcosTest extends McosHarness {
 			local ended = devices.event(card)
 			local ok, why, call = ended.ok, ended.why, ended.call -- (its call: the count asked, the crafts done)
 			local out = io.open("/out", "w")
-			out:write(tostring(ok), " ", why, " ", tostring(call.args[1]), " ", tostring(call.progress >= 20), "\\n")
+			out:write(tostring(ok), " ", why, " ", tostring(call.args[1]), " ", tostring(call.progress > 0), "\\n") -- (crafts done while it walked)
 			out:close()
 			""");
 		boot();

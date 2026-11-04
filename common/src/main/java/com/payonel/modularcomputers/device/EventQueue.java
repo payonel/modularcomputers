@@ -71,7 +71,8 @@ public final class EventQueue {
 	 * result]}}, or {@code {event = method, ok = false, why}} when it failed (or was stopped). News.
 	 */
 	public void ended(String method, boolean ok, String why, Object result) {
-		if (Buffered.STOPPED.equals(why) || Buffered.BLOCKED.equals(why) || Buffered.DRIFTED.equals(why) || Buffered.INTERRUPTED.equals(why) || Buffered.LOST.equals(why) || Buffered.UNBREAKABLE.equals(why)) {
+		if (Buffered.STOPPED.equals(why) || Buffered.BLOCKED.equals(why) || Buffered.DRIFTED.equals(why) || Buffered.INTERRUPTED.equals(why) || Buffered.LOST.equals(why) || Buffered.UNBREAKABLE.equals(why)
+			|| Buffered.INPUT.equals(why) || Buffered.OUTPUT.equals(why)) {
 			// (one shape each, the user's: only their own methods build them)
 			throw new IllegalArgumentException(why + " is built by its own method, not ended");
 		}
@@ -92,12 +93,27 @@ public final class EventQueue {
 	 * it's said, always a method's end): {@code {event = method, ok = false, why = "stopped", call}}.
 	 */
 	public void stopped(String event, Map<String, Object> call) {
-		Map<String, Object> stopped = new java.util.LinkedHashMap<>();
-		stopped.put("event", event);
-		stopped.put("ok", false);
-		stopped.put("why", Buffered.STOPPED);
-		stopped.put("call", call);
-		add(stopped);
+		add(withCall(event, Buffered.STOPPED, call));
+	}
+
+	/** What its input makes nothing (the user's: one shape, a craft's grid empty or matching no recipe): {@code {event, ok = false, why = "input", call}}. */
+	public void input(String event, Map<String, Object> call) {
+		add(withCall(event, Buffered.INPUT, call));
+	}
+
+	/** No room for its output (the user's: one shape, a craft's storage full): {@code {event, ok = false, why = "output", call}}. */
+	public void output(String event, Map<String, Object> call) {
+		add(withCall(event, Buffered.OUTPUT, call));
+	}
+
+	/** A command's end that says only its why and its call. */
+	private static Map<String, Object> withCall(String event, String why, Map<String, Object> call) {
+		Map<String, Object> ended = new java.util.LinkedHashMap<>();
+		ended.put("event", event);
+		ended.put("ok", false);
+		ended.put("why", why);
+		ended.put("call", call);
+		return ended;
 	}
 
 	/**
