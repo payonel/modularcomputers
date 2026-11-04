@@ -425,11 +425,11 @@ public final class CraftingCard extends Card implements Buffered {
 	/** It stopped taking data: its events go, and a craft under way stops. */
 	@Override
 	protected void dropData() {
-		if (events.clear()) {
-			interrupted = false; // (a fresh start: an old program's end isn't the next one's)
+		if (events.clear()) { // (a fresh start: an old program's craft isn't the next one's; a load's goes on)
+			toCraft = 0;
+			crafted = 0;
+			craftedName = null;
 		}
-		toCraft = 0;
-		crafted = 0;
 	}
 
 	@Override
@@ -437,31 +437,31 @@ public final class CraftingCard extends Card implements Buffered {
 		dropData();
 	}
 
-	/** Its events waiting (a craft under way doesn't go on after a load: its event says so). */
+	/** Its events waiting, and a craft under way: how many are left, done and of what, and its call (it goes on after a load, the user's). */
 	@Override
 	public Map<String, Object> saved() {
 		Map<String, Object> saved = new LinkedHashMap<>();
 		events.save(saved);
-		saved.put("crafting", toCraft > 0);
+		if (toCraft > 0) {
+			saved.put("toCraft", (long) toCraft);
+			saved.put("crafted", (long) crafted);
+			if (craftedName != null) {
+				saved.put("name", craftedName);
+			}
+			saved.put("args", new java.util.ArrayList<>(craftArgs));
+		}
 		return saved;
 	}
-
-	/** Why a craft under way at a save ended at the load. */
-	public static final String INTERRUPTED = "interrupted";
-	private boolean interrupted;
 
 	@Override
 	public void restore(Map<String, Object> saved) {
 		events.restore(saved);
-		interrupted = Boolean.TRUE.equals(saved.get("crafting"));
-	}
-
-	@Override
-	public void accepting(boolean accepting) {
-		super.accepting(accepting);
-		if (accepting && interrupted) {
-			interrupted = false;
-			finish("failed", INTERRUPTED);
+		toCraft = saved.get("toCraft") instanceof Number n ? n.intValue() : 0;
+		crafted = saved.get("crafted") instanceof Number n ? n.intValue() : 0;
+		craftedName = saved.get("name") instanceof String name ? name : null;
+		craftArgs = saved.get("args") instanceof java.util.List<?> args ? java.util.List.copyOf(new java.util.ArrayList<Object>(args)) : java.util.List.of();
+		if (toCraft > 0) {
+			ticksLeft = CRAFT_TICKS; // (its next craft a tick on, as it was going)
 		}
 	}
 }

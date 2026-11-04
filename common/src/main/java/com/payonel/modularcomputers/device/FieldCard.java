@@ -61,6 +61,11 @@ public final class FieldCard extends Card implements Buffered {
 		/** Stops a move under way, holding what it holds where it is. */
 		void stop();
 
+		/** What it holds isn't loaded now (its hold kept, nothing met): the face a move this way is blocked on; null: it's loaded, or nothing's held. */
+		default String unloadedFace(double forward, double right, double up) {
+			return null;
+		}
+
 		/** What it holds and where, {name, forward, right, up}, or null while it holds nothing. */
 		Map<String, Object> where();
 
@@ -175,11 +180,18 @@ public final class FieldCard extends Card implements Buffered {
 		if (state.equals(IDLE)) {
 			return Result.fail("not holding");
 		}
-		Result started = projector.move(args.checkNumber(0), args.count() > 1 ? args.checkNumber(1) : 0, args.count() > 2 ? args.checkNumber(2) : 0);
+		double forward = args.checkNumber(0);
+		double right = args.count() > 1 ? args.checkNumber(1) : 0;
+		double up = args.count() > 2 ? args.checkNumber(2) : 0;
+		Result started = projector.move(forward, right, up);
 		if (!started.failed()) {
 			moveArgs = "move".equals(calledMethod) ? calledArgs : List.of();
 			movedFrom = projector.where();
 			state(MOVING);
+			String unloaded = projector.unloadedFace(forward, right, up);
+			if (unloaded != null) {
+				blocked(null, unloaded); // (what it holds isn't loaded: no one block to name, the user's)
+			}
 		}
 		return started;
 	}
@@ -250,7 +262,11 @@ public final class FieldCard extends Card implements Buffered {
 		}
 		state(IDLE);
 		if (wasMoving) {
-			events.ended("move", false, why, null); // (the move it was making ends with it)
+			if (INTERRUPTED.equals(why)) {
+				events.interrupted("move", call()); // (the move it was making ends with it)
+			} else {
+				events.ended("move", false, why, null); // (the move it was making ends with it)
+			}
 		}
 		event("lost", why);
 	}
@@ -324,12 +340,11 @@ public final class FieldCard extends Card implements Buffered {
 		return line;
 	}
 
-	/** No program runs on its computer: it lets go, and its events go (but those a load brought, at its first reset). */
+	/** No program runs on its computer: it lets go, and its events go (but what a load brought, its hold too, at its first reset). */
 	@Override
 	protected void dropData() {
-		if (events.clear()) {
-			interrupted = false;
-			interruptedMove = false;
+		if (!events.clear()) {
+			return; // (a load's: its program goes on)
 		}
 		if (projector != null && !state.equals(IDLE)) {
 			projector.release();
@@ -342,38 +357,40 @@ public final class FieldCard extends Card implements Buffered {
 		dropData();
 	}
 
-	/** Its events waiting (a field isn't saved: one held at a save is gone at the load, and its event says so). */
+	/** Its events waiting, and its hold (its record's id: the hold itself is the world's, {@code FieldHolds}) and a move under way: they go on after a load (the user's). */
 	@Override
 	public Map<String, Object> saved() {
 		Map<String, Object> saved = new LinkedHashMap<>();
 		events.save(saved);
-		saved.put("holding", !state.equals(IDLE));
-		saved.put("moving", state.equals(MOVING));
+		saved.put("state", state);
+		if (hold != null) {
+			saved.put("hold", hold.toString());
+		}
+		if (state.equals(MOVING)) {
+			saved.put("args", new java.util.ArrayList<>(moveArgs));
+		}
 		return saved;
 	}
-
-	/** Why a field held at a save is gone at the load (and a move it was making ended). */
-	public static final String INTERRUPTED = "interrupted";
-	private boolean interrupted;
-	private boolean interruptedMove;
 
 	@Override
 	public void restore(Map<String, Object> saved) {
 		events.restore(saved);
-		interrupted = Boolean.TRUE.equals(saved.get("holding"));
-		interruptedMove = Boolean.TRUE.equals(saved.get("moving"));
+		state = saved.get("state") instanceof String was ? was : IDLE;
+		hold = saved.get("hold") instanceof String id ? java.util.UUID.fromString(id) : null;
+		moveArgs = saved.get("args") instanceof List<?> args ? List.copyOf(new java.util.ArrayList<Object>(args)) : List.of();
+		if (hold == null) {
+			state = IDLE;
+		}
 	}
 
-	@Override
-	public void accepting(boolean accepting) {
-		super.accepting(accepting);
-		if (accepting && interrupted) {
-			interrupted = false;
-			if (interruptedMove) { // (the move it was making ends first, as a live loss's does)
-				interruptedMove = false;
-				events.ended("move", false, INTERRUPTED, null);
-			}
-			event("lost", INTERRUPTED);
-		}
+	/** Its hold: its record's id in the world's {@code FieldHolds} (null: it holds nothing). */
+	private java.util.UUID hold;
+
+	public java.util.UUID hold() {
+		return hold;
+	}
+
+	public void hold(java.util.UUID hold) {
+		this.hold = hold;
 	}
 }

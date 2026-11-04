@@ -23,8 +23,11 @@ import net.minecraft.world.phys.Vec3;
  * or an item, made by an energy field card, holding it where it is. What it holds falls in place and
  * can't act (no AI: it doesn't move, attack or react; a creeper doesn't blow; a player can't attack
  * or use anything, {@link #held}); the field moves, and what it holds with it, never through blocks.
- * The field is the card's while it runs: it isn't saved (a world saved with one loads without it,
- * what it held falling). It moves what it holds; it's drawn round it, wherever it is.
+ * Its hold has one home, {@link FieldHolds} (the user's, 2026-11-04): the field is saved with its
+ * chunk, and loaded, it takes hold of what it held again (as soon as that's loaded too) while its
+ * hold is there, and lets go when it isn't (its card ended it, loaded or not). It acts on its card's
+ * word only while its card is loaded (it ticked a moment ago): else it holds, frozen in time. It
+ * moves what it holds; it's drawn round it, wherever it is.
  */
 public final class EnergyField extends Entity {
 
@@ -44,6 +47,10 @@ public final class EnergyField extends Entity {
 
 	/** What fields hold, server side: each held thing, its field. */
 	private static final Map<Entity, EnergyField> HOLDING = Collections.synchronizedMap(new WeakHashMap<>());
+	/** The fields loaded, by their hold. */
+	private static final Map<java.util.UUID, EnergyField> LIVE = Collections.synchronizedMap(new java.util.HashMap<>());
+	/** A card's word counts while it ticked this long ago at most, in ticks (this one, or the last: ticks come in no set order). */
+	private static final long CARD_HERE = 1;
 
 	/** Told how a field's moves go, and when it loses what it held. */
 	public interface Listener {
@@ -65,6 +72,9 @@ public final class EnergyField extends Entity {
 	private boolean humming;
 
 	private Entity held;
+	/** Its hold, and what it holds by its id (what it takes hold of again after a load). */
+	private java.util.UUID hold;
+	private java.util.UUID heldId;
 	/** Where what it holds is held (its feet), and where a move is taking it (null: none). */
 	private Vec3 anchor;
 	private Vec3 target;
@@ -80,27 +90,46 @@ public final class EnergyField extends Entity {
 		return HOLDING.containsKey(entity);
 	}
 
+	/** The field loaded for a hold, or null (not loaded: its chunk isn't, or it's gone). */
+	public static EnergyField live(java.util.UUID hold) {
+		return hold == null ? null : LIVE.get(hold);
+	}
+
+	/** Its card's listener, its card loaded again (a field's card is whichever object holds its hold now). */
+	public void attach(Listener listener) {
+		this.listener = listener;
+	}
+
 	/** The field holding {@code entity}, or null. */
 	public static EnergyField fieldOf(Entity entity) {
 		return HOLDING.get(entity);
 	}
 
-	/** Holds {@code entity}, telling {@code listener} how it goes; false when a field holds it already. */
-	public boolean hold(Entity entity, Listener listener) {
+	/** Holds {@code entity} for {@code hold} (its record made), telling {@code listener} how it goes; false when a field holds it already. */
+	public boolean hold(Entity entity, Listener listener, java.util.UUID hold, String name) {
 		if (HOLDING.putIfAbsent(entity, this) != null) {
 			return false;
 		}
-		held = entity;
+		this.hold = hold;
+		heldId = entity.getUUID();
+		LIVE.put(hold, this);
 		this.listener = listener;
 		anchor = entity.position();
+		FieldHolds.of((ServerLevel) level()).put(hold, heldId, name, entity.getBoundingBox().getCenter(), level().getGameTime());
+		grip(entity);
+		level().playSound(null, entity.getX(), entity.getY(), entity.getZ(), com.payonel.modularcomputers.sound.ModSounds.FIELD_ON,
+			net.minecraft.sounds.SoundSource.NEUTRAL, 1, 1);
+		return true;
+	}
+
+	/** It has what it holds (at its capture, or again after a load). */
+	private void grip(Entity entity) {
+		held = entity;
 		entityData.set(HELD, entity.getId());
 		double width = entity.getBbWidth();
 		double height = entity.getBbHeight();
 		entityData.set(RADIUS, (float) (Math.sqrt(2 * width * width + height * height) / 2 + MARGIN)); // (its box's half diagonal)
 		follow();
-		level().playSound(null, entity.getX(), entity.getY(), entity.getZ(), com.payonel.modularcomputers.sound.ModSounds.FIELD_ON,
-			net.minecraft.sounds.SoundSource.NEUTRAL, 1, 1);
-		return true;
 	}
 
 	/** What it holds. */
@@ -144,6 +173,9 @@ public final class EnergyField extends Entity {
 		}
 		held = null;
 		listener = null;
+		if (level() instanceof ServerLevel server) {
+			FieldHolds.of(server).remove(hold); // (its hold ends: its one home)
+		}
 		discard();
 	}
 
@@ -157,15 +189,38 @@ public final class EnergyField extends Entity {
 			}
 			return;
 		}
-		if (held == null) {
-			discard(); // (held nothing: a field loaded from a save, or let go)
+		if (hold != null && LIVE.get(hold) != this) {
+			LIVE.put(hold, this); // (in the world, ticking: loaded, its card finds it; not while it's only being read in)
+		}
+		FieldHolds.Hold record = FieldHolds.of((ServerLevel) level()).get(hold);
+		if (record == null) {
+			if (held != null) {
+				release(); // (its hold ended while it wasn't loaded, or its card ended it: it lets go)
+			} else {
+				discard();
+			}
 			return;
+		}
+		if (held == null) {
+			Entity found = heldId == null ? null : ((ServerLevel) level()).getEntity(heldId);
+			if (found == null || !found.isAlive()) {
+				return; // (loaded before what it holds: it waits for it, its hold kept)
+			}
+			if (HOLDING.putIfAbsent(found, this) != null) {
+				release(); // (another field took it meanwhile)
+				return;
+			}
+			grip(found); // (loaded again: it holds it, where it held it)
+			if (anchor == null) {
+				anchor = found.position();
+			}
 		}
 		if (!held.isAlive() || held.level() != level()) {
 			lose("gone");
 			return;
 		}
-		if (target != null) {
+		boolean cardHere = listener != null && record.seen() >= level().getGameTime() - CARD_HERE;
+		if (target != null && cardHere) { // (its card unloaded: frozen in time, its move waiting)
 			Vec3 left = target.subtract(anchor);
 			double distance = left.length();
 			if (distance < THERE) {
@@ -189,6 +244,7 @@ public final class EnergyField extends Entity {
 		}
 		place(anchor);
 		follow();
+		FieldHolds.of((ServerLevel) level()).moved(hold, held.getBoundingBox().getCenter());
 	}
 
 	/** Puts what it holds at {@code at} (its feet), still: no fall, no motion of its own. */
@@ -249,17 +305,28 @@ public final class EnergyField extends Entity {
 
 	@Override
 	protected void readAdditionalSaveData(ValueInput input) {
+		hold = input.read("hold", net.minecraft.core.UUIDUtil.CODEC).orElse(null);
+		heldId = input.read("held", net.minecraft.core.UUIDUtil.CODEC).orElse(null);
+		anchor = input.read("anchor", Vec3.CODEC).orElse(null);
+		target = input.read("target", Vec3.CODEC).orElse(null);
 	}
 
 	@Override
 	protected void addAdditionalSaveData(ValueOutput output) {
+		output.storeNullable("hold", net.minecraft.core.UUIDUtil.CODEC, hold);
+		output.storeNullable("held", net.minecraft.core.UUIDUtil.CODEC, heldId);
+		output.storeNullable("anchor", Vec3.CODEC, anchor);
+		output.storeNullable("target", Vec3.CODEC, target);
 	}
 
 	@Override
 	public void onRemoval(RemovalReason reason) {
 		super.onRemoval(reason);
 		if (held != null) {
-			HOLDING.remove(held, this); // (its chunk unloaded, or its world stopped: what it held is let go)
+			HOLDING.remove(held, this); // (its chunk unloaded, or its world stopped: what it held goes with it, its hold kept)
+		}
+		if (hold != null) {
+			LIVE.remove(hold, this);
 		}
 	}
 }

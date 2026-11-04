@@ -38,7 +38,7 @@ public final class ModEntities {
 	private static final int FIELD_TRACKING = 10;
 
 	public static final EntityType<EnergyField> ENERGY_FIELD = register("energy_field",
-		EntityType.Builder.<EnergyField>of(EnergyField::new, MobCategory.MISC).sized(FIELD_SIZE, FIELD_SIZE).noSave().clientTrackingRange(FIELD_TRACKING)
+		EntityType.Builder.<EnergyField>of(EnergyField::new, MobCategory.MISC).sized(FIELD_SIZE, FIELD_SIZE).clientTrackingRange(FIELD_TRACKING)
 			.updateInterval(1));
 
 	/** A golem's legs: as wide as they stand, three pixels high. */

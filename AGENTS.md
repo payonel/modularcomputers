@@ -433,8 +433,9 @@ panel), the same list in the screen view; a new card's tab is a registration, no
 
 ### The energy field card
 
-It suspends one creature or item in a field (user design, 2026-10-24): an `EnergyField` entity, not
-saved (the card's while it runs), holding what it holds in place each tick and moving it with the
+It suspends one creature or item in a field (user design, 2026-10-24): an `EnergyField` entity, saved
+with its chunk, its hold the world's record (`FieldHolds`: the user's, 2026-11-04, under buffered
+devices), holding what it holds in place each tick and moving it with the
 game's collisions (never through blocks, never moving blocks), drawn as a sphere round it. What a
 field holds can't act, enforced by mixins asking `EnergyField.held`: a mob's AI doesn't run, a
 creeper's fuse dies and it can't blow, a player can't attack, use or break (their client's position
@@ -688,9 +689,20 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
     counts as the pass's progress (`k.delivered`), so their waiters are served before an idle.
   - **What a load brought is its program's:** a device restored from a save keeps its events and a
     command under way through the first reset after the load (`EventQueue.clear` answering false: a
-    hub's card joining after the program went on), and a restored command's end comes once its
-    program takes data (a redstone set waits to apply, a field's move and a robot's command end
-    `interrupted`, a piston's move goes on); any later reset clears (a fresh boot's).
+    hub's card joining after the program went on), and **a command under way goes on** (the user's,
+    2026-11-04): a robot's is given again as it was (its arguments saved: from where its last
+    command left it, it ends where it would have, a break from as far as it had got), a craft goes
+    on (what's left, done and of what saved), a redstone set waits to apply, a piston's move goes
+    on, a field's hold and move go on (below); `interrupted`, one shape (`EventQueue.interrupted`,
+    with its `call`), is only the fallback for one that can't. Any later reset clears (a fresh
+    boot's).
+  - **A field's hold has one home** (the user's, 2026-11-04): a world-saved record
+    (`FieldHolds`), read by its card and its field (the field entity saved with its chunk, by the
+    hold's id). A field loading takes hold again while its record is there (as soon as what it
+    holds loads too) and lets go when it isn't; every way its card ends (a release, taken out, its
+    computer gone, out of reach or power) deletes the record, loaded or not. Its card unloaded, the
+    field acts on nothing (it heard from it a tick ago at most: `Hold.seen`), frozen in time;
+    what it holds unloaded, its card still holds, a move ending `blocked` with `block = ""`.
 - **A device's events go to every file open on it** (the user's): devfs takes them (`deliver`) and
   gives each file its own copy, bounded, so a program and a `cat` each see them all; a file's
   readiness counts what it holds (a poll that took the events itself would otherwise wait for a
@@ -950,6 +962,9 @@ Lessons from mistakes, each with its test:
 - Mouse buttons are SDL-numbered (left 1, right 3): use the constants. SDL sends typed characters
   only while text input is on: a screen that takes typing turns it on.
 - `.gitignore` patterns without a leading `/` match at any depth: anchor root-only rules.
+- **Fabric's client tests use common code too:** `:common`'s compile doesn't build them, so a
+  signature changed in common (a field's listener, its `hold`) broke only the full run, twice. After
+  changing a common method's signature, compile `:fabric:compileGametestJava` before `testAll`.
 - **A gate reads the gated command's own exit:** `./gradlew testAll ...; echo "exit $?"` run in the
   background reports the echo's status, always 0, so two commits went in on a failing `testAll` (a
   listener's signature changed under a Fabric client test). Run it with nothing after it, and read

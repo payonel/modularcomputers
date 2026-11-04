@@ -195,15 +195,37 @@ class RoboticsDeviceTest {
 		assertThat(state()).isEqualTo("idle");
 	}
 
+	/** A walk under way at a save goes on after the load (the user's): given again as it was, from where its last command left it. */
 	@Test
-	void aWalkUnderWayAtASaveEndsBlockedAsTheProgramGoesOn() {
+	void aWalkUnderWayAtASaveGoesOnAfterTheLoad() {
+		device.called("walk", List.of(2L));
 		device.walk(args(2L));
 		var saved = device.saved();
+		Drifting body = new Drifting();
 		RoboticsDevice loaded = new RoboticsDevice();
+		loaded.moveWith(body);
 		loaded.restore(saved);
-		assertThat(loaded.interruptPending()).as("not until a program takes data").isFalse();
 		loaded.accepting(true);
-		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", RoboticsDevice.INTERRUPTED));
+		assertThat(body.asked).as("it walks on").containsExactly("walk");
+		assertThat(loaded.busy()).isTrue();
+		assertThat(loaded.pull(args()).first()).as("no end: it goes on").isNull();
+	}
+
+	/** One that can't go on (its body won't walk now) ends interrupted, the fallback, its call as given. */
+	@Test
+	void aCommandThatCantGoOnAfterALoadEndsInterruptedWithItsCall() {
+		RoboticsDevice loaded = new RoboticsDevice();
+		loaded.moveWith(new Drifting() {
+			@Override
+			public String walk(double forward, double right, double up) {
+				return "no legs";
+			}
+		});
+		loaded.restore(Map.of("active", "walk", "args", List.of(2L)));
+		loaded.accepting(true);
+		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "interrupted",
+			"call", Map.of("args", List.of(2L), "progress", 0L)));
+		assertThat(loaded.busy()).isFalse();
 	}
 
 	@Test
@@ -214,7 +236,7 @@ class RoboticsDeviceTest {
 	}
 
 	/** A body that can drift, be off its spot, fall, and says what it was asked to plan. */
-	private static final class Drifting implements RoboticsDevice.Body {
+	private static class Drifting implements RoboticsDevice.Body {
 		final List<String> asked = new ArrayList<>();
 		Map<String, Object> drift;
 		boolean off;
@@ -350,7 +372,7 @@ class RoboticsDeviceTest {
 		return robot;
 	}
 
-	/** A fresh boot (its devices reset first) isn't given an old program's interrupted end; a program going on after a load is. */
+	/** A fresh boot (its devices reset first) doesn't go on with an old program's command; a program going on after a load does. */
 	@Test
 	void anInterruptedEndGoesToTheProgramGoingOnNotToAFreshBoot() {
 		RoboticsDevice loaded = new RoboticsDevice();
@@ -363,7 +385,7 @@ class RoboticsDeviceTest {
 		resumed.moveWith(new Drifting());
 		resumed.restore(Map.of("active", "walk"));
 		resumed.accepting(true); // (its program goes on)
-		assertThat(resumed.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", RoboticsDevice.INTERRUPTED));
+		assertThat(resumed.busy()).as("its walk goes on").isTrue();
 	}
 
 	/** A stop's plan is where it stopped (the body plans it: on its legs the block it's nearest), not where the stopped command began. */

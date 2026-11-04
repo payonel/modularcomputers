@@ -38,8 +38,15 @@ right is its own (as every face is named), as a robot's is. So a
 program written for one computer works however the computer is turned.
 
 The field holds one thing at a time. It lets go when told to, when what it holds is gone (it dies,
-it's picked up), when it's moved out of reach, when its computer has no power or stops its
-program, and when its world is saved and loaded (a field isn't saved). What it held then falls.
+it's picked up), when it's moved out of reach, or when its computer has no power or stops its
+program. What it held then falls.
+
+A field outlasts its chunk: saved and loaded with the world, or unloaded and loaded again, it holds
+on, and a move under way goes on. Loaded before what it holds, it takes hold of it as soon as that
+loads too. Meanwhile its card still holds; a move it's given then ends `blocked` (with `block = ""`:
+no one block to name, and the face it was to move toward). Its card's `release` always works, its
+field loaded or not: loaded later, the field lets go. While its card's chunk isn't loaded, the field
+holds what it holds where it is, a move waiting, till its card's back.
 A move that meets a block stops there: its event says what was in the way.
 
 The card is a [buffered device](/mcos/devices-library/#buffered-devices): it does one command at a
@@ -135,7 +142,7 @@ Its oldest event, or nil.
 | `event` | Other fields | When |
 |---|---|---|
 | `move` | `ok`, `why` (and `block`, `face` when it's `blocked`; `call` when it's `blocked` or `stopped`) | a move ended: `ok` true when it got there; else why (`blocked`, `stopped`, or a `lost` reason: it let go of what it moved) |
-| `lost` | `why` | it let go on its own: `gone`, `too far: 16`, `no power`, `landing` (its robot landing onto its legs), `interrupted` (its world saved and loaded: a move it was making ends first) |
+| `lost` | `why` | it let go on its own: `gone`, `too far: 16`, `no power`, `landing` (its robot landing onto its legs) |
 
 ## Example
 

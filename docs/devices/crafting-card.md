@@ -102,6 +102,8 @@ the grid is as it was), its `result` saying how many it made before it failed. S
 `{event = "craft", ok = false, why = "stopped", call = {args = {20}, progress = 10}}`: the
 count it was given, and the crafts it had done.
 
+A craft under way when its world is saved goes on after the load, as it was.
+
 ### stop() → true
 
 Ends a craft under way at once: its event says `stopped`, with its `call` (the count asked, the
@@ -156,7 +158,7 @@ Its oldest event, or nil.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `craft` | `ok`, `why`, `result` (`{name, count}`), or for `stopped`, `call` (`{args, progress}`) | a craft ended: the crafts asked for are made, or one couldn't be (why, and how many were made before it); `stopped` by its `stop`; `interrupted` when its world was saved during it |
+| `craft` | `ok`, `why`, `result` (`{name, count}`), or for `stopped`, `call` (`{args, progress}`) | a craft ended: the crafts asked for are made, or one couldn't be (why, and how many were made before it); `stopped` by its `stop`; `interrupted` only when a world's save cut it short and it couldn't go on after the load (with its `call`) |
 
 ## Example
 

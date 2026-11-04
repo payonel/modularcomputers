@@ -122,14 +122,28 @@ class SavedStateTest {
 		assertThat(loaded.pull(args()).first()).as("cleared now").isNull();
 	}
 
-	/** A field moving at a save: at the load its move ends, interrupted, then it says what it held is lost. */
+	/** A craft under way at a save goes on after the load (the user's): how many are left, done and of what, kept. */
 	@Test
-	void aFieldMovingAtASaveEndsItsMoveAtTheLoad() {
-		FieldCard loaded = new FieldCard();
-		loaded.restore(Map.of("events", List.of(), "lost", 0L, "holding", true, "moving", true));
+	void aCraftUnderWayAtASaveGoesOnAfterTheLoad() {
+		CraftingCard loaded = new CraftingCard();
+		loaded.restore(Map.of("events", List.of(), "lost", 0L, "toCraft", 3L, "crafted", 2L, "name", "minecraft:stick", "args", List.of(5L)));
+		loaded.accepting(false); // (the first reset after a load keeps what the load brought)
 		loaded.accepting(true);
-		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("event", "move", "ok", false, "why", FieldCard.INTERRUPTED));
-		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("event", "lost", "why", FieldCard.INTERRUPTED));
+		assertThat(loaded.busy()).as("still crafting").isTrue();
+		assertThat(loaded.pull(args()).first()).as("no end yet").isNull();
+	}
+
+	/** A field holding at a save holds on after the load (the user's): its hold is the world's record, and its card goes on with it, a move under way too. */
+	@Test
+	void aFieldHoldingAtASaveHoldsOnAfterTheLoad() {
+		FieldCard loaded = new FieldCard();
+		java.util.UUID hold = java.util.UUID.randomUUID();
+		loaded.restore(Map.of("events", List.of(), "lost", 0L, "state", FieldCard.MOVING, "hold", hold.toString(), "args", List.of(0L, 0L, 3L)));
+		loaded.accepting(false); // (the first reset after a load keeps what the load brought)
+		loaded.accepting(true);
+		assertThat(loaded.state()).as("still moving").isEqualTo(FieldCard.MOVING);
+		assertThat(loaded.hold()).isEqualTo(hold);
+		assertThat(loaded.pull(args()).first()).as("no end: it goes on").isNull();
 	}
 
 	/** A piston's move under way at a save ends after the load, its program hearing (a save isn't a power cut). */

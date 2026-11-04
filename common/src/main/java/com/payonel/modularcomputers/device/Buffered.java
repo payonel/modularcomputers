@@ -35,6 +35,12 @@ public interface Buffered {
 	String DRIFTED = "drifted";
 
 	/**
+	 * Why a command under way at a save ended at the load: it couldn't go on (the user's: a fallback;
+	 * a command goes on after a load when it can). One shape ({@link EventQueue#interrupted}).
+	 */
+	String INTERRUPTED = "interrupted";
+
+	/**
 	 * The board gives a command (a method not free) with these arguments, as the program gave them,
 	 * before calling it: a stopped, blocked or drifted end says them in its call.
 	 */

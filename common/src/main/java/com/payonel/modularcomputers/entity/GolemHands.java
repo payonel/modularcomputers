@@ -67,6 +67,13 @@ final class GolemHands {
 		return breaking == null ? 0 : Math.min(1, progress / BROKEN);
 	}
 
+	/** A break given again after a load goes on from as far as it had got (0 to 1). */
+	void resumeBreaking(double done) {
+		if (breaking != null) {
+			progress = (float) (Math.max(0, Math.min(1, done)) * BROKEN);
+		}
+	}
+
 	GolemHands(BotGolem golem) {
 		this.golem = golem;
 	}

@@ -88,7 +88,8 @@ counts gone, in the `/dev` text as words,
   a stop squares nothing; every move must end squared, within a 4096th, else `not an integer:`, so
   the rest of a stopped move does). Before the code review (2026-10-28) it went on from where the
   stopped command began, so a scan after stopping a walk walked it all the way back; after it, on
-  its legs, from the block it was nearest. A command `interrupted` by a load goes on the same way.
+  its legs, from the block it was nearest. A command under way at a save goes on after the load,
+given again as it was (the user's, 2026-11-04); `interrupted` is the fallback.
 - A fall on its legs it didn't ask for (a block gone from under it) isn't drift: a `falling`
   notice as it begins (the user's, 2026-10-29), its flights taken meanwhile (a tier 2 catches
   itself, its legs dropped; `stop()` then `fly()` catches it where it is), else it's busy while it

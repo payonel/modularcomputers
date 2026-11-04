@@ -100,8 +100,12 @@ command running or not: the only thing that moves that point but a command. Its 
 on its legs as in the air (in the air it hovers there), its heading the nearest right angle. Where
 that is depends on when the stop came, so a move from there must still end squared: stopped at
 forward 0.6, `walk(4.4)` reaches 5, and `walk(4)` is refused. `walkTo` and `flyTo` go to an exact
-place from its origin whatever the stop did. A command cut short by a world's save and load
-(`interrupted`) goes on the same way.
+place from its origin whatever the stop did.
+
+A command under way when its world is saved goes on after the load: given again as it was, from
+where its last command left it, it ends where it would have (a break going on from as far as it
+had got). Only one that can't go on (its legs gone meanwhile, say) ends
+`{event = <method>, ok = false, why = "interrupted", call}`.
 
 ## Held in a field
 
@@ -462,7 +466,7 @@ was going.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `walk`, `walkTo`, `fly`, `flyTo`, `turn`, `land`, `swing` | `ok`, `why` (`blocked`: and `block`, `face`; `drifted`: and `drift`; with those and `stopped`, `call`), `result` | that command ended: `ok`, or not and why (`stopped` when a `stop` cut it short; `interrupted` when its world was saved during it); a swing's `result` is `{block, kept, dropped}` |
+| `walk`, `walkTo`, `fly`, `flyTo`, `turn`, `land`, `swing` | `ok`, `why` (`blocked`: and `block`, `face`; `drifted`: and `drift`; with those, `stopped` and `interrupted`, `call`), `result` | that command ended: `ok`, or not and why (`stopped` when a `stop` cut it short; `interrupted` when a world's save cut it short and it couldn't go on after the load); a swing's `result` is `{block, kept, dropped}` |
 | `notice` | `why` (or `what`), and its fields | something happened to it that no program asked for (below) |
 
 | Notice | Other fields | When |

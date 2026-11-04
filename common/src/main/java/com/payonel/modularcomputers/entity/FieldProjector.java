@@ -89,13 +89,48 @@ public final class FieldProjector implements FieldCard.Projector {
 	private final Supplier<Frame> frame;
 	/** The robot it's in (null: a block's card): what "self" holds, and what carries the card. */
 	private final Supplier<Entity> self;
-	private EnergyField field;
+	/** Its card's ear on its field (its field, loaded again, is given this one: whichever object holds its card now). */
+	private final EnergyField.Listener listener = new EnergyField.Listener() {
+		@Override
+		public void arrived() {
+			card.arrived();
+		}
+
+		@Override
+		public void blocked(String block, Direction side) {
+			card.blocked(block, frame.get().face(side)); // (its face in its computer's frame, as its positions are)
+		}
+
+		@Override
+		public void moved(double blocks) {
+			card.movedBy(blocks);
+		}
+
+		@Override
+		public void lost(String why) {
+			card.lost(why);
+		}
+	};
 
 	public FieldProjector(FieldCard card, Supplier<ServerLevel> level, Supplier<Frame> frame, Supplier<Entity> self) {
 		this.card = card;
 		this.level = level;
 		this.frame = frame;
 		this.self = self;
+	}
+
+	/** Its hold's field, loaded (null: its chunk isn't, or none), its ear given it. */
+	private EnergyField field() {
+		EnergyField field = EnergyField.live(card.hold());
+		if (field != null) {
+			field.attach(listener);
+		}
+		return field;
+	}
+
+	/** Its hold's record (null: none, or it ended). */
+	private FieldHolds.Hold record() {
+		return card.hold() == null ? null : FieldHolds.of(level.get()).get(card.hold());
 	}
 
 	/** What a field can hold: creatures (players too) and items, not blocks, nor other fields. */
@@ -162,51 +197,47 @@ public final class FieldProjector implements FieldCard.Projector {
 			return Result.fail("too far: " + (int) FieldCard.RANGE);
 		}
 		EnergyField made = ModEntities.ENERGY_FIELD.create(level.get(), EntitySpawnReason.TRIGGERED);
-		if (!made.hold(target, new EnergyField.Listener() {
-			@Override
-			public void arrived() {
-				card.arrived();
-			}
-
-			@Override
-			public void blocked(String block, Direction side) {
-				card.blocked(block, frame.get().face(side)); // (its face in its computer's frame, as its positions are)
-			}
-
-			@Override
-			public void moved(double blocks) {
-				card.movedBy(blocks);
-			}
-
-			@Override
-			public void lost(String why) {
-				field = null;
-				card.lost(why);
-			}
-		})) {
+		UUID hold = UUID.randomUUID();
+		if (!made.hold(target, listener, hold, name(target))) {
 			return Result.fail("captured"); // (another field holds it: not "held", the robot's wait)
 		}
+		card.hold(hold);
 		level.get().addFreshEntity(made);
-		field = made;
 		return Result.ok(name(target));
 	}
 
 	@Override
 	public Result move(double forward, double right, double up) {
-		if (field == null) {
+		FieldHolds.Hold record = record();
+		if (record == null) {
 			return Result.fail("not holding");
 		}
 		Frame at = frame.get();
 		Vec3 by = at.offset(forward, right, up);
-		if (field.holding() != self.get() && field.center().add(by).distanceTo(at.origin()) > FieldCard.RANGE) {
+		EnergyField field = field();
+		boolean itself = field != null && field.holding() == self.get();
+		if (!itself && (field != null ? field.center() : record.at()).add(by).distanceTo(at.origin()) > FieldCard.RANGE) {
 			return Result.fail("too far: " + (int) FieldCard.RANGE);
 		}
-		field.moveBy(by);
+		if (field != null) {
+			field.moveBy(by);
+		}
 		return Result.ok(true);
 	}
 
 	@Override
+	public String unloadedFace(double forward, double right, double up) {
+		if (record() == null || field() != null) {
+			return null;
+		}
+		Frame at = frame.get();
+		Vec3 by = at.offset(forward, right, up);
+		return at.face(Direction.getApproximateNearest(by.x, by.y, by.z)); // (the way it was to go: nothing met, what it holds isn't loaded)
+	}
+
+	@Override
 	public void stop() {
+		EnergyField field = field();
 		if (field != null) {
 			field.stop();
 		}
@@ -214,34 +245,42 @@ public final class FieldProjector implements FieldCard.Projector {
 
 	@Override
 	public void release() {
+		EnergyField field = field();
 		if (field != null) {
-			EnergyField was = field;
-			field = null;
-			was.release();
+			field.release(); // (its record goes with it)
+		} else if (card.hold() != null) {
+			FieldHolds.of(level.get()).remove(card.hold()); // (not loaded: its hold ends all the same, and loaded, its field lets go)
 		}
+		card.hold(null);
 	}
 
 	@Override
 	public Map<String, Object> where() {
-		if (field == null) {
+		FieldHolds.Hold record = record();
+		if (record == null) {
 			return null;
 		}
+		EnergyField field = field();
 		Map<String, Object> where = new LinkedHashMap<>();
-		where.put("name", name(field.holding()));
-		where.putAll(frame.get().local(field.center()));
+		where.put("name", record.name());
+		where.putAll(frame.get().local(field != null && field.holding() != null ? field.center() : record.at()));
 		return where;
 	}
 
 	@Override
 	public String check() {
-		if (field == null) {
+		if (card.hold() == null) {
 			return null;
 		}
-		if (field.isRemoved()) {
-			field = null;
-			return FieldCard.INTERRUPTED; // (its chunk unloaded, its world stopped)
+		FieldHolds.Hold record = record();
+		if (record == null) {
+			return "gone"; // (its hold ended where it was: what it held went, its field said so while this card wasn't here to hear)
 		}
-		if (field.holding() != self.get() && field.center().distanceTo(frame.get().origin()) > FieldCard.RANGE + FieldCard.REACH) {
+		FieldHolds.of(level.get()).seen(card.hold(), level.get().getGameTime()); // (it's loaded: its field may act on its word)
+		EnergyField field = field();
+		boolean itself = field != null && field.holding() == self.get();
+		Vec3 at = field != null && field.holding() != null ? field.center() : record.at(); // (not loaded: where its field was, kept)
+		if (!itself && at.distanceTo(frame.get().origin()) > FieldCard.RANGE + FieldCard.REACH) {
 			return "too far: " + (int) FieldCard.RANGE;
 		}
 		return null;

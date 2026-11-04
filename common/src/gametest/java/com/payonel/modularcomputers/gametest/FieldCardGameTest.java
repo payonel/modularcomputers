@@ -178,6 +178,64 @@ public class FieldCardGameTest {
 			.thenSucceed();
 	}
 
+	/** A field unloaded (its chunk's) as a chunk unloads it, saved: a copy of it, loaded again into the world. */
+	private static EnergyField unloadAndLoad(GameTestHelper helper, EnergyField field) {
+		var output = net.minecraft.world.level.storage.TagValueOutput.createWithContext(net.minecraft.util.ProblemReporter.DISCARDING, helper.getLevel().registryAccess());
+		field.saveWithoutId(output);
+		field.remove(net.minecraft.world.entity.Entity.RemovalReason.UNLOADED_TO_CHUNK); // (its chunk unloaded: its hold kept)
+		EnergyField loaded = com.payonel.modularcomputers.entity.ModEntities.ENERGY_FIELD.create(helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.LOAD);
+		loaded.load(net.minecraft.world.level.storage.TagValueInput.create(net.minecraft.util.ProblemReporter.DISCARDING, helper.getLevel().registryAccess(), output.buildResult()));
+		return loaded;
+	}
+
+	/**
+	 * A field's chunk unloaded and loaded again holds what it held (the user's: its hold is the
+	 * world's record): its card still holding meanwhile, and a move while what it holds isn't loaded
+	 * is blocked (no one block to name), then once it's back, it holds it again.
+	 */
+	@GameTest(maxTicks = 200)
+	public void aFieldUnloadedAndLoadedAgainHoldsWhatItHeld(GameTestHelper helper) {
+		FieldCard card = fieldCase(helper);
+		Pig pig = helper.spawn(EntityTypes.PIG, PIG);
+		List<Object> events = events(helper, card);
+		EnergyField[] loaded = new EnergyField[1];
+		helper.startSequence()
+			.thenExecuteAfter(2, () -> helper.assertTrue(!card.capture(args(pig.getStringUUID())).failed(), "held"))
+			.thenExecute(() -> {
+				loaded[0] = unloadAndLoad(helper, EnergyField.fieldOf(pig));
+				helper.assertTrue(!EnergyField.held(pig), "its field unloaded: nothing grips it now");
+				same(helper, card.state(), FieldCard.HOLDING, "its card still holds");
+				helper.assertTrue(!card.move(args(0.0, 0.0, 2.0)).failed(), "a move: a command");
+			})
+			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : GameTests.withoutCall(events.getLast()),
+				Map.of("event", "move", "ok", false, "why", "blocked", "block", "", "face", "up"), "what it holds isn't loaded: blocked, no one block"))
+			.thenExecute(() -> helper.getLevel().addFreshEntity(loaded[0])) // (its chunk loaded again)
+			.thenWaitUntil(() -> helper.assertTrue(EnergyField.held(pig), "held again"))
+			.thenExecute(() -> same(helper, card.state(), FieldCard.HOLDING, "and its card holds it"))
+			.thenSucceed();
+	}
+
+	/** A release while its field isn't loaded ends its hold all the same (the user's): loaded again, its field lets go. */
+	@GameTest(maxTicks = 200)
+	public void aReleaseWhileItsFieldIsntLoadedLetsGoWhenItLoads(GameTestHelper helper) {
+		FieldCard card = fieldCase(helper);
+		Pig pig = helper.spawn(EntityTypes.PIG, PIG);
+		EnergyField[] loaded = new EnergyField[1];
+		helper.startSequence()
+			.thenExecuteAfter(2, () -> helper.assertTrue(!card.capture(args(pig.getStringUUID())).failed(), "held"))
+			.thenExecute(() -> {
+				loaded[0] = unloadAndLoad(helper, EnergyField.fieldOf(pig));
+				helper.assertTrue(!card.release(args()).failed(), "a release works, its field unloaded");
+				same(helper, card.state(), FieldCard.IDLE, "it holds nothing");
+				helper.getLevel().addFreshEntity(loaded[0]); // (its chunk loaded again)
+			})
+			.thenExecuteAfter(5, () -> {
+				helper.assertTrue(!EnergyField.held(pig), "its field let go: its hold was gone");
+				helper.assertTrue(loaded[0].isRemoved(), "and it went");
+			})
+			.thenSucceed();
+	}
+
 	/** Something another field holds can't be captured: captured (not held, which means a robot's wait). */
 	@GameTest(maxTicks = 200)
 	public void whatAnotherFieldHoldsCantBeCapturedAndSaysSo(GameTestHelper helper) {

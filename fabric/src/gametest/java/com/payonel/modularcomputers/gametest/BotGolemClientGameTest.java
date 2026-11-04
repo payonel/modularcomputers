@@ -177,7 +177,7 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 					@Override
 					public void lost(String why) {
 					}
-				});
+				}, java.util.UUID.randomUUID(), "minecraft:pig");
 				server.overworld().addFreshEntity(field);
 			});
 			context.waitTicks(10);

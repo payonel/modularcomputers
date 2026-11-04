@@ -71,7 +71,7 @@ public final class EventQueue {
 	 * result]}}, or {@code {event = method, ok = false, why}} when it failed (or was stopped). News.
 	 */
 	public void ended(String method, boolean ok, String why, Object result) {
-		if (Buffered.STOPPED.equals(why) || Buffered.BLOCKED.equals(why) || Buffered.DRIFTED.equals(why)) {
+		if (Buffered.STOPPED.equals(why) || Buffered.BLOCKED.equals(why) || Buffered.DRIFTED.equals(why) || Buffered.INTERRUPTED.equals(why)) {
 			// (one shape each, the user's: only their own methods build them)
 			throw new IllegalArgumentException(why + " is built by its own method, not ended");
 		}
@@ -115,6 +115,20 @@ public final class EventQueue {
 		blocked.put("face", face);
 		blocked.put("call", call);
 		add(blocked);
+	}
+
+	/**
+	 * A command under way at a save that couldn't go on after the load (the user's: one shape, a
+	 * fallback: a command goes on after a load when it can): {@code {event = method, ok = false, why =
+	 * "interrupted", call}}.
+	 */
+	public void interrupted(String event, Map<String, Object> call) {
+		Map<String, Object> interrupted = new java.util.LinkedHashMap<>();
+		interrupted.put("event", event);
+		interrupted.put("ok", false);
+		interrupted.put("why", Buffered.INTERRUPTED);
+		interrupted.put("call", call);
+		add(interrupted);
 	}
 
 	/**

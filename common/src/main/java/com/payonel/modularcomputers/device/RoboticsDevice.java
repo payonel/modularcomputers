@@ -188,6 +188,10 @@ public final class RoboticsDevice implements Device, Buffered {
 			return 0;
 		}
 
+		/** A break given again after a load goes on from as far as it had got (0 to 1). */
+		default void resumeBreaking(double progress) {
+		}
+
 		/** Whether a field holds it: its robotics frozen. */
 		default boolean frozen() {
 			return false;
@@ -295,8 +299,10 @@ public final class RoboticsDevice implements Device, Buffered {
 	/** A stop's call, taken before its body stopped. */
 	private Map<String, Object> stopCall;
 	private boolean accepting;
-	/** The command under way at the save it was loaded from (its end is due: interrupted), or null. */
-	private String interrupted;
+	/** The command under way at the save it was loaded from, to go on with once its program takes data (null: none), its arguments, and how far a break had got. */
+	private String resume;
+	private java.util.List<Object> resumeArgs = java.util.List.of();
+	private double resumeBreaking;
 	private Runnable onChange = () -> {
 	};
 
@@ -476,7 +482,8 @@ public final class RoboticsDevice implements Device, Buffered {
 		if (method == null) {
 			return;
 		}
-		Map<String, Object> call = STOPPED.equals(why) && stopCall != null ? stopCall : STOPPED.equals(why) || BLOCKED.equals(why) ? call() : null; // (before its plan moves)
+		Map<String, Object> call = STOPPED.equals(why) && stopCall != null ? stopCall
+			: STOPPED.equals(why) || BLOCKED.equals(why) || INTERRUPTED.equals(why) ? call() : null; // (before its plan moves)
 		stopCall = null;
 		active = null;
 		if (STOPPED.equals(why) || INTERRUPTED.equals(why)) {
@@ -487,6 +494,8 @@ public final class RoboticsDevice implements Device, Buffered {
 		changed();
 		if (STOPPED.equals(why)) {
 			events.stopped(method, call);
+		} else if (INTERRUPTED.equals(why)) {
+			events.interrupted(method, call);
 		} else if (BLOCKED.equals(why)) {
 			events.blocked(method, block, face, call);
 		} else {
@@ -933,14 +942,12 @@ public final class RoboticsDevice implements Device, Buffered {
 	@Override
 	public void accepting(boolean accepting) {
 		this.accepting = accepting;
-		if (accepting && interrupted != null) {
-			active = interrupted;
-			interrupted = null;
-			failed(INTERRUPTED);
+		if (accepting && resume != null) {
+			resume(); // (the command under way at the save goes on, the user's)
 		}
 		if (!accepting) {
 			events.clear();
-			interrupted = null; // (a fresh start: an old program's end isn't the next one's)
+			resume = null; // (a fresh start: an old program's command isn't the next one's)
 			body.stop();
 			body.release(); // (its thrusters stop with its program: what they held up falls)
 			active = null;
@@ -954,8 +961,9 @@ public final class RoboticsDevice implements Device, Buffered {
 	}
 
 	/**
-	 * Its events waiting, and the command it was running: one under way doesn't go on after a load
-	 * (the game keeps no path), so it ends then, interrupted, and a program waiting on it hears.
+	 * Its events waiting, and the command it was running, with its arguments (and a break's
+	 * progress): it goes on after the load (the user's), given again as it was, from where its last
+	 * command left it, so it ends where it would have; one that can't ends interrupted.
 	 */
 	@Override
 	public Map<String, Object> saved() {
@@ -963,17 +971,47 @@ public final class RoboticsDevice implements Device, Buffered {
 		events.save(saved);
 		if (active != null) {
 			saved.put("active", active);
+			saved.put("args", new java.util.ArrayList<>(activeArgs));
+			if ("swing".equals(active)) {
+				saved.put("breaking", body.breaking());
+			}
 		}
 		return saved;
 	}
 
-	/** Why a walk or turn under way at a save ended at the load. */
-	public static final String INTERRUPTED = "interrupted";
+	/** The command under way at the save, given again (its call as it was): else, it can't go on, interrupted. */
+	private void resume() {
+		String method = resume;
+		java.util.List<Object> args = resumeArgs;
+		resume = null;
+		calledMethod = method;
+		calledArgs = args;
+		Result again;
+		try {
+			again = com.payonel.modularcomputers.runtime.DeviceMethods.invoke(this, method, new Arguments(new java.util.ArrayList<>(args)));
+		} catch (RuntimeException e) {
+			again = Result.fail(String.valueOf(e.getMessage()));
+		}
+		if (!again.failed() && method.equals(active)) {
+			if ("swing".equals(method)) {
+				body.resumeBreaking(resumeBreaking); // (its break as far as it had got)
+			}
+			return;
+		}
+		begin(method);
+		Map<String, Object> call = call();
+		active = null;
+		changed();
+		events.interrupted(method, call);
+	}
+
 
 	@Override
 	public void restore(Map<String, Object> saved) {
 		events.restore(saved);
-		// (its event comes as the program goes on: it takes data then)
-		interrupted = saved.get("active") instanceof String was ? was : null;
+		// (it goes on as the program goes on: it takes data then)
+		resume = saved.get("active") instanceof String was ? was : null;
+		resumeArgs = saved.get("args") instanceof java.util.List<?> args ? java.util.List.copyOf(new java.util.ArrayList<Object>(args)) : java.util.List.of();
+		resumeBreaking = saved.get("breaking") instanceof Number n ? n.doubleValue() : 0;
 	}
 }

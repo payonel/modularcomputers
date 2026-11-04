@@ -534,6 +534,11 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 
 		@Override
+		public void resumeBreaking(double progress) {
+			hands.resumeBreaking(progress);
+		}
+
+		@Override
 		public boolean frozen() {
 			return frozen;
 		}
