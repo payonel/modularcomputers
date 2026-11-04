@@ -355,6 +355,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			if (EnergyField.held(BotGolem.this)) {
 				return RoboticsDevice.HELD;
 			}
+			if (Math.abs(forward) > RoboticsDevice.MAX_WALK || Math.abs(right) > RoboticsDevice.MAX_WALK || Math.abs(up) > RoboticsDevice.MAX_WALK) {
+				return blockedSoon(planPoint().add(inFrame(forward, right, 0)).add(0, up, 0)); // (too far: blocked at once, the user's, nothing to name)
+			}
 			begin();
 			Vec3 plan = planPoint();
 			Vec3 start = new Vec3(plan.x, getY(), plan.z); // (from its plan: where it is, even after a stop)
@@ -406,10 +409,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			double ahead = Math.rint(d.dot(inFrame(1, 0, 0)) * FRAME_GRAIN) / FRAME_GRAIN; // (from where it is: after a stop, between blocks)
 			double aside = Math.rint(d.dot(inFrame(0, 1, 0)) * FRAME_GRAIN) / FRAME_GRAIN;
 			double rise = GolemSteps.elevation(to.y) - GolemSteps.elevation(plan.y);
-			if (Math.abs(ahead) > RoboticsDevice.MAX_WALK || Math.abs(aside) > RoboticsDevice.MAX_WALK || Math.abs(rise) > RoboticsDevice.MAX_WALK) {
-				return RoboticsDevice.TOO_FAR + (int) RoboticsDevice.MAX_WALK;
-			}
-			return walk(ahead, aside, rise);
+			return walk(ahead, aside, rise); // (too far: its walk's blocked)
 		}
 
 		@Override
@@ -455,6 +455,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			}
 			Vec3 plan = planPoint().add(0, LEG_HEIGHT, 0); // (from its plan: its torso's height over its feet's point)
 			Vec3 to = plan.add(inFrame(planYaw(), forward, right, up));
+			if (Math.abs(forward) > RoboticsDevice.MAX_FLIGHT || Math.abs(right) > RoboticsDevice.MAX_FLIGHT || Math.abs(up) > RoboticsDevice.MAX_FLIGHT) {
+				return blockedSoon(to); // (too far: blocked at once, the user's, nothing to name)
+			}
 			if (noWay(to)) {
 				return blockedSoon(to); // (no way there: blocked at once, before it does anything, its legs left on)
 			}
@@ -473,7 +476,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			}
 			Vec3 to = fromOrigin(forward, right, up).add(0, LEG_HEIGHT, 0); // (its torso's height, its feet there)
 			if (to.distanceTo(BotGolem.this.position()) > RoboticsDevice.MAX_FLIGHT * Math.sqrt(3)) {
-				return RoboticsDevice.TOO_FAR + (int) RoboticsDevice.MAX_FLIGHT;
+				return blockedSoon(to); // (too far: blocked at once, the user's, nothing to name)
 			}
 			if (noWay(to)) {
 				return blockedSoon(to); // (no way there: blocked at once, before it does anything, its legs left on)

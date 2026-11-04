@@ -695,4 +695,34 @@ public class GolemFlightGameTest {
 			.thenExecute(() -> helper.assertTrue(golem.legs() && !golem.thrusting(), "on its legs still, its thrusters off"))
 			.thenSucceed();
 	}
+
+	/** A walk past its limit is blocked (the user's: too far is just blocked), at once, nothing to name, its face toward where it was going: it stays. */
+	@GameTest(maxTicks = 100)
+	public void aWalkTooFarIsBlockedAtOnceAndGoesNowhere(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
+		net.minecraft.world.phys.Vec3[] was = new net.minecraft.world.phys.Vec3[1];
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> {
+				was[0] = golem.position();
+				same(helper, golem.robotics().walk(args(RoboticsDevice.MAX_WALK + 1)).first(), true, "a command");
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().map(GameTests::withoutCall)
+				.anyMatch(java.util.Map.of("event", "walk", "ok", false, "why", "blocked", "name", "", "face", "front")::equals), "blocked, too far: " + events))
+			.thenExecute(() -> helper.assertTrue(golem.position().distanceTo(was[0]) < 0.1, "it went nowhere"))
+			.thenSucceed();
+	}
+
+	/** A flight past its limit is blocked too, before it takes off: its legs stay on. */
+	@GameTest(maxTicks = 100)
+	public void aFlightTooFarIsBlockedBeforeItTakesOff(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> same(helper, golem.robotics().fly(args(0.0, 0.0, RoboticsDevice.MAX_FLIGHT + 1)).first(), true, "a command"))
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().map(GameTests::withoutCall)
+				.anyMatch(java.util.Map.of("event", "fly", "ok", false, "why", "blocked", "name", "", "face", "up")::equals), "blocked, too far: " + events))
+			.thenExecute(() -> helper.assertTrue(golem.legs() && !golem.thrusting(), "on its legs still, its thrusters off"))
+			.thenSucceed();
+	}
 }

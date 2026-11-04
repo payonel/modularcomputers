@@ -100,12 +100,6 @@ class RoboticsDeviceTest {
 	}
 
 	@Test
-	void aWalkTooFarIsRefusedBeforeTheBodyHearsOfIt() {
-		assertThat(device.walk(args(RoboticsDevice.MAX_WALK + 1)).error()).startsWith("too far");
-		assertThat(asked).isEmpty();
-	}
-
-	@Test
 	void turnsRightAnglesOnly() {
 		device.turn(args("left"));
 		device.turn(args("around"));

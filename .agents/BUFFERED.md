@@ -57,7 +57,7 @@ the spec the build follows and its checklist, items marked done as they land.
 ### Failure strings
 
 Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, numbers):
-`too far: 64`, `held`, `busy`, `no legs`, `no legs below`,
+`held`, `busy`, `no legs`, `no legs below`,
 `on legs`, `no thrusters`, `stopped`. For every device.
 
 Being made one shape (the user's, 2026-11-03): a why is one word, exactly, and what it's about

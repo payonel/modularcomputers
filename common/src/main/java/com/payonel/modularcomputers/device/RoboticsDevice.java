@@ -40,7 +40,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	public static final int WALK_COST = PowerUnits.CPU;
 	/** What a turn costs, however far: a running CPU's tick. */
 	public static final int TURN_COST = PowerUnits.CPU;
-	/** The farthest a walk may go, in blocks each way (the game's pathfinding range, about). */
+	/** The farthest a walk may go, in blocks each way (the game's pathfinding range, about): farther, it's blocked at once (the user's: too far is blocked). */
 	public static final double MAX_WALK = 64;
 	public static final String IDLE = "idle";
 	public static final String WALKING = "walking";
@@ -80,7 +80,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	private static final java.util.Set<String> POSITIONAL_OVER_TIME = java.util.Set.of("turn", "swing");
 	/** What its thrusters cost, each tick they fire (flying or hovering): five running CPUs' ticks. */
 	public static final int THRUST_COST = 5 * PowerUnits.CPU;
-	/** The farthest a flight may go, in blocks each way. */
+	/** The farthest a flight may go, in blocks each way: farther, it's blocked at once (the user's: too far is blocked). */
 	public static final double MAX_FLIGHT = 64;
 	/** What an action with its hand costs (a use, a swing, a move to or from a container): a running CPU's tick. */
 	public static final int ACTION_COST = PowerUnits.CPU;
@@ -322,10 +322,7 @@ public final class RoboticsDevice implements Device, Buffered {
 
 	@Method(doc = "walk(forward[, right[, up]]): walks that far from where its last command left it, in its own frame (forward the way it faces, right to its right, up its elevation's change, whole blocks), facing as it was. It must end on a block's middle, whole blocks from its origin (within a 4096th), else it's refused (not an integer: forward 4.4): from a block's middle whole numbers do, and after a stop the rest of the way. Without pathfinding (the default) it goes straight, forward then right, without turning (it walks backwards, or sideways), stepping freely within its elevation (onto a slab, over carpet), up a block at a time (a jump) only while up is above, down at most 3 at a time only while up is below, never into lava, fire or deep water; with pathfinding it finds its way. With none, it goes back to where its last command left it. A command: true at once (its event: walk, ok, or not and why, on the last block's middle it reached: blocked, with block, what stopped it, air too, a drop it can't take or an elevation it couldn't reach, and face, its own that met it), or false and why it can't start")
 	public Result walk(Arguments args) {
-		double[] by = numbers(args);
-		if (Math.abs(by[0]) > MAX_WALK || Math.abs(by[1]) > MAX_WALK || Math.abs(by[2]) > MAX_WALK) {
-			return Result.fail(TOO_FAR + (int) MAX_WALK);
-		}
+		double[] by = numbers(args); // (too far: blocked, its body's, the user's)
 		Move move = args.count() == 0 ? new Move(by, null) : squared(by, false); // (none: back to where its last command left it)
 		if (move.why() != null) {
 			return Result.fail(move.why());
@@ -412,8 +409,6 @@ public final class RoboticsDevice implements Device, Buffered {
 	private static String said(double value) {
 		return java.math.BigDecimal.valueOf(value).setScale(FAILURE_DECIMALS, java.math.RoundingMode.HALF_EVEN).stripTrailingZeros().toPlainString();
 	}
-	/** Why a walk or a flight is too far, and how far it may go. */
-	public static final String TOO_FAR = "too far: ";
 
 	/** A command that runs over time started (null: it did; else why not, refused): true, and it's busy till it ends. */
 	private Result start(String method, String why) {
@@ -730,10 +725,7 @@ public final class RoboticsDevice implements Device, Buffered {
 
 	@Method(doc = "fly(forward[, right[, up]]): (a tier 2 golem's) flies on its thrusters that far from where its last command left it, in its own frame, without turning, straight there (never through blocks; with pathfinding, round them); its legs, if it stands on them, are left standing where it was, and its thrusters fire beams from their sockets. In the air it walks nowhere, uses what it holds as a player off the ground does, and can be shoved (it flies back to where its last command left it). It must end on a squared point, whole blocks from its origin, its feet's height too (within a 4096th), else it's refused (not an integer: up 1.5). With no arguments, it takes off where it stands and holds there, or goes back to where its last command left it. A command: true at once (its event: fly, ok, or not and why), or false and why")
 	public Result fly(Arguments args) {
-		double[] by = numbers(args);
-		if (Math.abs(by[0]) > MAX_FLIGHT || Math.abs(by[1]) > MAX_FLIGHT || Math.abs(by[2]) > MAX_FLIGHT) {
-			return Result.fail(TOO_FAR + (int) MAX_FLIGHT);
-		}
+		double[] by = numbers(args); // (too far: blocked, its body's, the user's)
 		Move move = args.count() == 0 ? new Move(by, null) : squared(by, true); // (none: off where it stands, or back to where its last command left it)
 		if (move.why() != null) {
 			return Result.fail(move.why());
