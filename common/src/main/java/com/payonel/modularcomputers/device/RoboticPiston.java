@@ -148,7 +148,7 @@ public final class RoboticPiston implements Device, Buffered {
 				yield Result.ok(true);
 			}
 			case ALREADY -> {
-				events.ended(method, true, null, null); // (out already, or in: done as it starts)
+				events.ended(method, null); // (out already, or in: done as it starts)
 				yield Result.ok(true);
 			}
 			case CANNOT_PUSH -> {
@@ -185,7 +185,7 @@ public final class RoboticPiston implements Device, Buffered {
 		if (moving != null && --left <= 0) {
 			String method = moving;
 			moving = null;
-			events.ended(method, true, null, null);
+			events.ended(method, null);
 		}
 	}
 

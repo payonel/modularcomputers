@@ -168,7 +168,8 @@ public class GolemFlightGameTest {
 			})
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "up: " + events))
 			.thenExecute(() -> {
-				same(helper, golem.robotics().walk(args(1.0)).error(), "no legs", "it walks nowhere");
+				var walked = golem.robotics().walk(args(1.0));
+				same(helper, java.util.List.of(walked.error(), walked.first()), java.util.List.of("system_failure", "legs"), "it walks nowhere: its legs missing");
 				same(helper, golem.robotics().swing(args("front")).first(), "breaking", "its axe works on its thrusters");
 				ticks[2] = helper.getTick();
 			})

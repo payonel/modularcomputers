@@ -377,7 +377,7 @@ moves them. What a broken block drops (or its hand is given) is caught: its stor
 off hand (a background catch, the user's: atypical, so storage is always preferred), else it stays
 in the world, and the swing's end says whether it kept it all.
 - **It flies two ways, each with its price** (the user's design, 2026-10-25), never with its legs
-  on and its tools as on the ground: on its **thrusters**, built into a tier 2 (a tier 1's thruster calls fail: `no thrusters`), no card (`fly`, `land`;
+  on and its tools as on the ground: on its **thrusters**, built into a tier 2 (a tier 1's thruster calls fail: `system_failure`, `thrusters` missing), no card (`fly`, `land`;
   `fly()` takes off where it stands), its legs left standing where it took off (`GolemLegs`, a boat's kind of object), red
   beams from their sockets, 25 blocks a second, five CPUs' power a tick; legless it walks nowhere,
   works as a player off the ground does (its hand's fake player off the ground: the game's rules,
@@ -420,7 +420,7 @@ Storage and a 3x3 grid on a card (user design, 2026-10-24): its slots live on it
 vanilla contents component, read and written by `CraftingStorage`, its one home), so they go where
 the card goes. Any computer takes it, and its view gets a tab a card (right of the buttons) where a
 player crafts by hand, as at a crafting table (the game's result slot). Its methods need robotics:
-in a case they fail (`no robotics`), in a robot `CraftingBench` works them (the game's recipes;
+in a case they fail (`system_failure`, `robotics` missing), in a robot `CraftingBench` works them (the game's recipes;
 what's made into storage, all or nothing: no room, no craft). Its commands (all but `pull`, `list`,
 `get` and `stop`) come after its robot's: robotics is how a robot handles things, its hands at a
 grid too (the user's, 2026-10-27 and -28), so each waits for the robot's moves to end. A craft's
@@ -681,9 +681,14 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   **A craft's `missing_inputs` and `no_space`** (the user's, 2026-11-04): its grid makes nothing
   (empty, no recipe) or no room for what it makes, each `{why, name, call}`
   (`EventQueue.missingInputs`, `noSpace`): `name` what it was making (its last craft's, `""` none;
-  no_space's, what found no room), its progress the crafts done. **`powerout`** (the user's): power
-  ran out, a command's end with its call (`EventQueue.powerout`) or a notice (a field letting go),
-  and a Disk Station's refusal. **Past a field's reach is `blocked`** (the user's: too far is just
+  no_space's, what found no room), its progress the crafts done. **`system_failure`** (the user's,
+  2026-11-04): what a device needs to do it is missing, `missing` saying what (`legs`, `thrusters`,
+  `power`, `bench`, `robotics`): a call refused so answers `false, "system_failure", missing`
+  (`Buffered.missing`), and a command given again once its robot's let go and refused becomes its
+  end in the same shape (`EventQueue.refused`, `systemFailure`), so an answer at once and the event
+  it becomes agree; a field losing power lets go, a notice (`systemFailureNotice`). **No why is
+  built another way:** `EventQueue.add` refuses an event with one, `ended` is a success's only, and
+  every failure has its own method. A landing on its legs already is landed: `true`, ended `ok`. **Past a field's reach is `blocked`** (the user's: too far is just
   blocked), `name = ""`, `face` the side of what it holds past the edge: a move there ends at once,
   nothing moved; what it holds out of reach, it lets go, a `blocked` notice (`blockedNotice`). A
   robot's walk or flight past its limit (64 blocks each way) is blocked too, at once, nothing moved,
@@ -973,6 +978,12 @@ Lessons from mistakes, each with its test:
   operator and Disk Station cards: a second door into every command, and end events named after an
   action, not the method called. A `/dev` file's text is its driver's to map onto the methods;
   a device's API grows only by what's asked for. (`OneDoorTest`)
+- **An answer at once can become an event:** a command taken while its robot was held is given
+  again once let go, and its refusal then was put in its end as a free-form why (`no legs`), and
+  one that ended as it was given (a turn off its spot, drifted) got a second end. A refusal that
+  can be given again has its event's shape (`system_failure`, `EventQueue.refused`), and no why is
+  built but by its own method (`EventQueue.add` refuses one, `ended` is a success's).
+  (`whatItNeedsMissingIsASystemFailure...`, `aTurnTakenWhileHeld...EndsDriftedOnce`)
 - **A block's state isn't the block:** leaves change state as their log goes, crops as they grow;
   what's tied to a block (a golem's breaking) compares the block, not its state.
   (`aBlockWhoseStateChangesWhileItsBrokenStillBreaks`)

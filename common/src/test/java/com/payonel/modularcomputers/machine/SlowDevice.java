@@ -140,7 +140,7 @@ public final class SlowDevice implements com.payonel.modularcomputers.bus.Device
 		}
 		if (left > 0 && --left == 0) {
 			done++;
-			events.ended("work", true, null, null);
+			events.ended("work", null);
 		}
 	}
 

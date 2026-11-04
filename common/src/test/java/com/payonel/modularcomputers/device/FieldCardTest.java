@@ -119,16 +119,16 @@ class FieldCardTest {
 		assertThat(holding).as("let go").isFalse();
 	}
 
-	/** Its power gone, it lets go: powerout (the user's), a move under way's end with its call, and a notice. */
+	/** Its power gone, it lets go: a system failure, power missing (the user's), a move under way's end with its call, and a notice. */
 	@Test
-	void withoutPowerItLetsGoPowerout() {
+	void withoutPowerItLetsGoASystemFailurePowerMissing() {
 		card.capture(args("pig"));
 		card.called("move", List.of(3L));
 		card.move(args(3L));
 		card.tick(false);
-		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "move", "ok", false, "why", "powerout",
+		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "move", "ok", false, "why", "system_failure", "missing", "power",
 			"call", Map.of("args", List.of(3L), "progress", List.of(0L, 0L, 0L))));
-		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "notice", "why", "powerout"));
+		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "notice", "why", "system_failure", "missing", "power"));
 		assertThat(holding).as("let go").isFalse();
 	}
 }

@@ -105,7 +105,7 @@ Fails with `holding` (it holds something already), `no entity` (nothing near the
 
 Moves the field by that much, never through blocks. It answers at once; its
 event, `move`, says how it went: `ok`, or not and why (`blocked`; `stopped`; or why it let go, as
-its notice says: `lost`, `blocked`, `powerout`). Blocked, two fields say by what: `name`, the block
+its notice says: `lost`, `blocked`, `system_failure`). Blocked, two fields say by what: `name`, the block
 in its way, its registry id (`""` when no one block can be named: past its reach, or what it holds
 not loaded), and `face`, the side of what it holds that met it, in its
 computer's frame (`front`, `back`, `left`, `right`, `up` or `down`; a case's front, or a robot's
@@ -149,7 +149,7 @@ Its oldest event, or nil.
 | `move` | `ok`, `why` (and `name`, `face` when it's `blocked`; `name`, `id`, `at` when it's `lost`; `call` unless it's `ok`) | a move ended: `ok` true when it got there; else why (`blocked`, `stopped`, or why it let go of what it moved, as its notice says: `lost`, `blocked`, `powerout`) |
 | `notice` | `why = "lost"`, `name`, `id`, `at` | what it held is gone (it died, it was picked up, it went through a portal): what it was, its own id, where it last was in its computer's frame; a move under way ends `lost` first |
 | `notice` | `why = "blocked"`, `name = ""`, `face` | what it held went past its reach, and it let go: the side of it past the edge; a move under way ends `blocked` first |
-| `notice` | `why = "powerout"` | its power ran out, and it let go; a move under way ends `powerout` first |
+| `notice` | `why = "system_failure"`, `missing = "power"` | its power ran out, and it let go; a move under way ends `system_failure` first, `missing = "power"` and its `call` |
 
 ## Example
 

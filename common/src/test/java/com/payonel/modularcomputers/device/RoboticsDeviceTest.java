@@ -229,11 +229,20 @@ class RoboticsDeviceTest {
 		boolean off;
 		boolean falling;
 		boolean frozen;
+		/** Why its walk is refused (null: it walks), and its landing's (null: it lands). */
+		String walkRefused;
+		String landRefused;
 
 		@Override
 		public String walk(double forward, double right, double up) {
 			asked.add("walk");
-			return null;
+			return walkRefused;
+		}
+
+		@Override
+		public String land(boolean force) {
+			asked.add("land");
+			return landRefused;
 		}
 
 		@Override
@@ -306,8 +315,61 @@ class RoboticsDeviceTest {
 		device.unbreakable("minecraft:bedrock", "", RoboticsDevice.toward("front"));
 		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "unbreakable", "name", "minecraft:bedrock", "id", "",
 			"at", Map.of("forward", 1L, "right", 0L, "up", 0L), "call", Map.of("args", List.of(2L), "progress", 0L)));
-		org.assertj.core.api.Assertions.assertThatThrownBy(() -> new EventQueue(null, () -> {}, () -> true).ended("swing", false, Buffered.UNBREAKABLE, null))
-			.isInstanceOf(IllegalArgumentException.class);
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> new EventQueue(null, () -> {}, () -> true).add(Map.of("event", "swing", "why", "unbreakable")))
+			.as("no why built but by its own method").isInstanceOf(IllegalArgumentException.class);
+	}
+
+	/**
+	 * What it needs missing is one shape (the user's): a call refused answers false, system_failure
+	 * and what's missing; a command taken while held and refused once let go ends in that shape, with
+	 * its call, so the answer and the event it becomes agree.
+	 */
+	@Test
+	void whatItNeedsMissingIsASystemFailureAtItsCallAndInTheEndItBecomes() {
+		refuse = RoboticsDevice.NO_LEGS;
+		Result refused = device.walk(args(2L));
+		assertThat(refused.error()).isEqualTo(Buffered.SYSTEM_FAILURE);
+		assertThat(refused.first()).as("what's missing").isEqualTo(Buffered.MISSING_LEGS);
+
+		Drifting body = new Drifting();
+		body.frozen = true;
+		RoboticsDevice robot = with(body);
+		robot.called("walk", List.of(2L));
+		assertThat(robot.walk(args(2L)).first()).as("held: taken, it waits").isEqualTo(true);
+		body.walkRefused = RoboticsDevice.NO_LEGS; // (let go legless)
+		body.frozen = false;
+		robot.thawed();
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "why", "held", "id", ""));
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "system_failure", "missing", "legs",
+			"call", Map.of("args", List.of(2L), "progress", 0L)));
+		assertThat(robot.busy()).isFalse();
+	}
+
+	/** A turn taken while held, let go off its spot, ends drifted, once (it ended as it was given again: no second end). */
+	@Test
+	void aTurnTakenWhileHeldAndLetGoOffItsSpotEndsDriftedOnce() {
+		Drifting body = new Drifting();
+		body.frozen = true;
+		RoboticsDevice robot = with(body);
+		robot.turn(args("right"));
+		body.off = true;
+		body.drift = Map.of("forward", 2L, "right", 0L, "up", 0L);
+		body.frozen = false;
+		robot.thawed();
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "why", "held", "id", ""));
+		assertThat(withoutCall(robot.pull(args()).first())).isEqualTo(Map.of("event", "turn", "ok", false, "why", "drifted", "drift", body.drift));
+		assertThat(robot.pull(args()).first()).as("its only end").isNull();
+	}
+
+	/** A landing on its legs already has landed (the user's: a move already done is no failure): true, its end ok at once. */
+	@Test
+	void aLandingOnItsLegsAlreadyIsDone() {
+		Drifting body = new Drifting();
+		body.landRefused = RoboticsDevice.ON_LEGS;
+		RoboticsDevice robot = with(body);
+		assertThat(robot.land(args()).first()).isEqualTo(true);
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "land", "ok", true));
+		assertThat(robot.busy()).isFalse();
 	}
 
 	/**

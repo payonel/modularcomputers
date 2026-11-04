@@ -109,7 +109,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	/** Its leg sockets, each this far to its side of its middle, in blocks: where its legs' tops are (BotGolemModel's, 2 pixels), and its beams come from. */
 	public static final float SOCKET_SIDE = 2 / 16f;
 	/** What a tier 1 golem says to a flight on thrusters: it has none (it walks; a field can still carry it). */
-	public static final String NO_THRUSTERS = "no thrusters";
+	public static final String NO_THRUSTERS = RoboticsDevice.NO_THRUSTERS;
 	/** Its beams: red, as its sockets' redstone (scripts/art/bot_golem_textures.py's clamps), and how many motes a socket a tick. */
 	private static final int BEAM_COLOR = 0xE8281E;
 	private static final float BEAM_SIZE = 0.9f;
@@ -350,7 +350,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		@Override
 		public String walk(double forward, double right, double up) {
 			if (!legs()) {
-				return "no legs";
+				return RoboticsDevice.NO_LEGS;
 			}
 			if (EnergyField.held(BotGolem.this)) {
 				return RoboticsDevice.HELD;
@@ -400,7 +400,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		@Override
 		public String walkTo(double forward, double right, double up) {
 			if (!legs()) {
-				return "no legs"; // (refused before it turns)
+				return RoboticsDevice.NO_LEGS; // (refused before it turns)
 			}
 			Vec3 to = fromOrigin(forward, right, up);
 			Vec3 plan = planPoint();
@@ -571,7 +571,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				return noThrusters();
 			}
 			if (legs()) {
-				return "on legs";
+				return RoboticsDevice.ON_LEGS; // (landed already: done, the user's)
 			}
 			// A move, so from where its last command left it (the user's): its legs below that spot, within
 			// reach to its side, however far down (a landing comes straight down: no limit; a flight's is

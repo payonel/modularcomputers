@@ -32,7 +32,18 @@ public final class EventQueue {
 		this.accepting = accepting;
 	}
 
+	/**
+	 * An event without a why (a sensor's, a frame): a why is only ever built by its own method here
+	 * (the user's: one shape each, no deviating), so an event that has one is refused.
+	 */
 	public void add(Map<String, Object> event) {
+		if (event.containsKey("why")) {
+			throw new IllegalArgumentException("a why is built by its own method, not added: " + event.get("why"));
+		}
+		put(event);
+	}
+
+	private void put(Map<String, Object> event) {
 		if (!accepting.getAsBoolean()) {
 			return; // its card takes no data now
 		}
@@ -67,25 +78,79 @@ public final class EventQueue {
 	}
 
 	/**
-	 * A buffered device's command ended ({@link Buffered}): {@code {event = method, ok = true[,
-	 * result]}}, or {@code {event = method, ok = false, why}} when it failed (or was stopped). News.
+	 * A buffered device's command done ({@link Buffered}): {@code {event = method, ok = true[,
+	 * result]}}. A command that didn't do it ends by its why's own method (stopped, blocked...), so
+	 * no why is ever built another way (the user's). News.
 	 */
-	public void ended(String method, boolean ok, String why, Object result) {
-		if (Buffered.STOPPED.equals(why) || Buffered.BLOCKED.equals(why) || Buffered.DRIFTED.equals(why) || Buffered.INTERRUPTED.equals(why) || Buffered.LOST.equals(why) || Buffered.UNBREAKABLE.equals(why)
-			|| Buffered.MISSING_INPUTS.equals(why) || Buffered.NO_SPACE.equals(why) || Buffered.POWEROUT.equals(why)) {
-			// (one shape each, the user's: only their own methods build them)
-			throw new IllegalArgumentException(why + " is built by its own method, not ended");
-		}
+	public void ended(String method, Object result) {
 		Map<String, Object> event = new java.util.LinkedHashMap<>();
 		event.put("event", method);
-		event.put("ok", ok);
-		if (!ok) {
-			event.put("why", why);
-		}
+		event.put("ok", true);
 		if (result != null) {
 			event.put("result", com.payonel.modularcomputers.runtime.Values.normalize(result));
 		}
-		add(event);
+		put(event);
+	}
+
+	/**
+	 * A command refused as it was given again (taken while its robot was held, given once let go):
+	 * its end says why in its why's shape, as the call's answer would have (the user's: an answer at
+	 * once and the event it becomes are one shape). Only a refusal with an event's shape can be.
+	 */
+	public void refused(String event, com.payonel.modularcomputers.runtime.Result refusal, Map<String, Object> call) {
+		if (Buffered.SYSTEM_FAILURE.equals(refusal.error())) {
+			systemFailure(event, String.valueOf(refusal.first()), call);
+			return;
+		}
+		throw new IllegalArgumentException("no event shape for the refusal " + refusal.error());
+	}
+
+	/**
+	 * What it needs to do it is missing (the user's: one shape): {@code {event, ok = false, why =
+	 * "system_failure", missing, call}}, {@code missing} what ({@link Buffered#MISSING_LEGS}...).
+	 */
+	public void systemFailure(String event, String missing, Map<String, Object> call) {
+		Map<String, Object> failed = withCall(event, Buffered.SYSTEM_FAILURE, call);
+		failed.remove("call");
+		failed.put("missing", missing);
+		failed.put("call", call);
+		put(failed);
+	}
+
+	/** What it needs is missing, no program's command (a field letting go, its power gone), a notice: {@code {event = "notice", why = "system_failure", missing}}. */
+	public void systemFailureNotice(String missing) {
+		Map<String, Object> notice = notice(Buffered.SYSTEM_FAILURE);
+		notice.put("missing", missing);
+		put(notice);
+	}
+
+	/** A robot shoved off where its last command left it, a notice: {@code {event = "notice", why = "shove", drift}}. */
+	public void shove(Map<String, Object> drift) {
+		Map<String, Object> notice = notice(Buffered.SHOVE);
+		notice.put("drift", drift);
+		put(notice);
+	}
+
+	/** A robot's fall, as it begins and as it lands, a notice: {@code {event = "notice", why = "fall", drift, below}}. */
+	public void fall(Map<String, Object> drift, String below) {
+		Map<String, Object> notice = notice(Buffered.FALL);
+		notice.put("drift", drift);
+		notice.put("below", below);
+		put(notice);
+	}
+
+	/** A field taking hold of a robot ({@code id} the field's own) or letting go ({@code ""}), a notice: {@code {event = "notice", why = "held", id}}. */
+	public void heldNotice(String id) {
+		Map<String, Object> notice = notice(Buffered.HELD);
+		notice.put("id", id == null ? "" : id);
+		put(notice);
+	}
+
+	private static Map<String, Object> notice(String why) {
+		Map<String, Object> notice = new java.util.LinkedHashMap<>();
+		notice.put("event", "notice");
+		notice.put("why", why);
+		return notice;
 	}
 
 	/**
@@ -93,7 +158,7 @@ public final class EventQueue {
 	 * it's said, always a method's end): {@code {event = method, ok = false, why = "stopped", call}}.
 	 */
 	public void stopped(String event, Map<String, Object> call) {
-		add(withCall(event, Buffered.STOPPED, call));
+		put(withCall(event, Buffered.STOPPED, call));
 	}
 
 	/**
@@ -102,7 +167,7 @@ public final class EventQueue {
 	 * last craft's, "" when none was made).
 	 */
 	public void missingInputs(String event, String name, Map<String, Object> call) {
-		add(named(withCall(event, Buffered.MISSING_INPUTS, call), name));
+		put(named(withCall(event, Buffered.MISSING_INPUTS, call), name));
 	}
 
 	/**
@@ -110,20 +175,7 @@ public final class EventQueue {
 	 * false, why = "no_space", name, call}}, {@code name} what it would have made.
 	 */
 	public void noSpace(String event, String name, Map<String, Object> call) {
-		add(named(withCall(event, Buffered.NO_SPACE, call), name));
-	}
-
-	/** Its power ran out (the user's: one shape): {@code {event, ok = false, why = "powerout", call}}. */
-	public void powerout(String event, Map<String, Object> call) {
-		add(withCall(event, Buffered.POWEROUT, call));
-	}
-
-	/** Its power ran out, no program's command (a field let go of what it held), a notice: {@code {event = "notice", why = "powerout"}}. */
-	public void poweroutNotice() {
-		Map<String, Object> notice = new java.util.LinkedHashMap<>();
-		notice.put("event", "notice");
-		notice.put("why", Buffered.POWEROUT);
-		add(notice);
+		put(named(withCall(event, Buffered.NO_SPACE, call), name));
 	}
 
 	/**
@@ -131,12 +183,10 @@ public final class EventQueue {
 	 * {@code {event = "notice", why = "blocked", name, face}}, as {@link #blocked}'s.
 	 */
 	public void blockedNotice(String block, String face) {
-		Map<String, Object> notice = new java.util.LinkedHashMap<>();
-		notice.put("event", "notice");
-		notice.put("why", Buffered.BLOCKED);
+		Map<String, Object> notice = notice(Buffered.BLOCKED);
 		notice.put("name", block == null ? "" : block);
 		notice.put("face", face);
-		add(notice);
+		put(notice);
 	}
 
 	/** An end with a thing's name ("" for none, never nil), before its call. */
@@ -171,7 +221,7 @@ public final class EventQueue {
 		blocked.put("name", block == null ? "" : block); // (a thing's name: its registry id, the user's)
 		blocked.put("face", face);
 		blocked.put("call", call);
-		add(blocked);
+		put(blocked);
 	}
 
 	/**
@@ -185,7 +235,7 @@ public final class EventQueue {
 		interrupted.put("ok", false);
 		interrupted.put("why", Buffered.INTERRUPTED);
 		interrupted.put("call", call);
-		add(interrupted);
+		put(interrupted);
 	}
 
 	/**
@@ -194,7 +244,7 @@ public final class EventQueue {
 	 * was ({forward, right, up}, the device's frame).
 	 */
 	public void lost(String event, String name, String id, Map<String, Object> at, Map<String, Object> call) {
-		add(thing(event, Buffered.LOST, name, id, at, call));
+		put(thing(event, Buffered.LOST, name, id, at, call));
 	}
 
 	/**
@@ -202,7 +252,7 @@ public final class EventQueue {
 	 * {@link #lost}'s): {@code {event, ok = false, why = "unbreakable", name, id, at, call}}.
 	 */
 	public void unbreakable(String event, String name, String id, Map<String, Object> at, Map<String, Object> call) {
-		add(thing(event, Buffered.UNBREAKABLE, name, id, at, call));
+		put(thing(event, Buffered.UNBREAKABLE, name, id, at, call));
 	}
 
 	/** A command's end over a thing: its why, what (its name, its id) and where, and the call. */
@@ -226,7 +276,7 @@ public final class EventQueue {
 		lost.put("name", name == null ? "" : name);
 		lost.put("id", id == null ? "" : id);
 		lost.put("at", at);
-		add(lost);
+		put(lost);
 	}
 
 	/**
@@ -240,7 +290,7 @@ public final class EventQueue {
 		drifted.put("why", Buffered.DRIFTED);
 		drifted.put("drift", drift);
 		drifted.put("call", call);
-		add(drifted);
+		put(drifted);
 	}
 
 	/**

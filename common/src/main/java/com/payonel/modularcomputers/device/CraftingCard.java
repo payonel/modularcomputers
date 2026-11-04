@@ -34,7 +34,7 @@ public final class CraftingCard extends Card implements Buffered {
 	/** What moving items costs (a move, a pick up, a drop, a container's): a running CPU's tick. */
 	public static final int MOVE_COST = PowerUnits.CPU;
 	/** Why its methods fail in a computer that isn't a robot. */
-	public static final String NO_ROBOTICS = "no robotics";
+	public static final String NO_ROBOTICS = SYSTEM_FAILURE; // (and what's missing: robotics, the user's)
 	public static final String IDLE = "idle";
 	public static final String CRAFTING = "crafting";
 
@@ -133,7 +133,7 @@ public final class CraftingCard extends Card implements Buffered {
 		}
 
 		private Result none() {
-			return Result.fail("no bench");
+			return Buffered.missing(MISSING_BENCH);
 		}
 	};
 	/** Crafts still to make, of those asked for; the crafts done so far (its call's progress), and the items they made. */
@@ -180,10 +180,8 @@ public final class CraftingCard extends Card implements Buffered {
 		}
 		Result made = bench.craft();
 		if (made.failed()) {
-			if (made.first() instanceof String making) {
-				craftedName = making; // (no_space: what it would have made, no room for it)
-			}
-			finish("failed", made.error());
+			// (no_space: what it would have made, no room for it; system_failure: what's missing)
+			finish(made.error(), made.first() instanceof String about ? about : null);
 			return;
 		}
 		power.charge(CRAFT_COST);
@@ -194,11 +192,12 @@ public final class CraftingCard extends Card implements Buffered {
 		if (--toCraft > 0) {
 			ticksLeft = CRAFT_TICKS;
 		} else {
-			finish("crafted", null);
+			finish(null, null);
 		}
 	}
 
-	private void finish(String name, String why) {
+	/** The craft under way ended: done (no why), or why not, {@code about} what it says (no_space's item, system_failure's missing). */
+	private void finish(String why, String about) {
 		Map<String, Object> result = new LinkedHashMap<>();
 		if (craftedName != null) {
 			result.put("name", craftedName);
@@ -215,9 +214,13 @@ public final class CraftingCard extends Card implements Buffered {
 		} else if (MISSING_INPUTS.equals(why)) {
 			events.missingInputs("craft", String.valueOf(result.getOrDefault("name", "")), call);
 		} else if (NO_SPACE.equals(why)) {
-			events.noSpace("craft", String.valueOf(result.getOrDefault("name", "")), call);
+			events.noSpace("craft", about, call);
+		} else if (SYSTEM_FAILURE.equals(why)) {
+			events.systemFailure("craft", about, call);
+		} else if (why == null) {
+			events.ended("craft", result);
 		} else {
-			events.ended("craft", "crafted".equals(name), why, result);
+			throw new IllegalArgumentException("a craft's end has no shape for " + why); // (each why its own method, the user's)
 		}
 	}
 
@@ -264,7 +267,7 @@ public final class CraftingCard extends Card implements Buffered {
 	}
 
 	private Result needsRobotics() {
-		return bench.robotics() ? null : Result.fail(NO_ROBOTICS);
+		return bench.robotics() ? null : Buffered.missing(MISSING_ROBOTICS);
 	}
 
 	@Method(doc = "list(): what its slots hold: a list of those with something in, each {slot, name, count, ...} (1 to 9 its crafting grid, 10 to 25 its storage)")
@@ -296,7 +299,7 @@ public final class CraftingCard extends Card implements Buffered {
 	@Method(doc = "stop(): ends a craft under way at once (its event: craft, not ok, stopped, with how many it made); never waits: true")
 	public Result stop(Arguments args) {
 		if (toCraft > 0) {
-			finish("failed", STOPPED);
+			finish(STOPPED, null);
 		}
 		return Result.ok(true);
 	}

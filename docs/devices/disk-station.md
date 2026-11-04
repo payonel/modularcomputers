@@ -51,7 +51,7 @@ The station's file is text, as a sysfs attribute is.
   as they were when it was first read; seek back to the start to read them afresh.
 - **Write**: each line written is an action, done at once: `format`, `wipe`, `clone`, `install` or
   `update`. Any other line fails the write with `EINVAL`, and so does an action the station refuses
-  (no disk, powerout, too big). Through `io`, a write is buffered: the line goes when the
+  (no disk, system_failure, too big). Through `io`, a write is buffered: the line goes when the
   file is flushed or closed, and that call reports the failure.
 - For `sys.poll`, the file is always ready to read and to write, and never has `PRI` (the station has
   no interrupt).
@@ -64,7 +64,7 @@ echo install > /dev/diskstation0
 ### Its ioctls are its methods
 
 The file's ioctls are the methods below, by name, in any open mode. They say why an action was
-refused, as a write cannot: the ioctl gives `nil`, the station's message (`powerout`, `doesn't
+refused, as a write cannot: the ioctl gives `nil`, the station's message (`system_failure`, and `power` missing, `doesn't
 fit: ...`) and `EINVAL`. An action that worked gives `true`.
 
 <!-- lua-fragment -->
@@ -74,7 +74,7 @@ local ok, why = sys.ioctl(sys.fileno(io.open("/dev/diskstation0")), "install")
 
 ## Methods
 
-Every action fails with `no disk` when the target slot is empty, and with `powerout` when neither
+Every action fails with `no disk` when the target slot is empty, and with `system_failure` (and `"power"`, what's missing) when neither
 the bus nor the battery can pay for it.
 
 ### format() → nothing

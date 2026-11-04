@@ -197,7 +197,7 @@ public final class RedstoneCard extends Card implements Buffered {
 			}
 			report();
 		}
-		events.ended("set", true, null, sides(allSides()));
+		events.ended("set", sides(allSides()));
 	}
 
 	@Method(doc = "pull(): its oldest event, or nil: a face the world changed, {name, side, level, powered} (the face as it is now), or a command's end, {event, ok, why, result}")

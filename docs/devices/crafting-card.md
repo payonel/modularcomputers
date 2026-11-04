@@ -43,8 +43,8 @@ A golem with a crafting card carries a tiny chest on its back.
 ## Robotics needed
 
 Programs work the card only in a robot: crafting, moving its items and its file need a robot's
-robotics to do the work. In a case every method fails with `no robotics` (the card's details, with
-Shift held, say so); its tab still works by hand.
+robotics to do the work. In a case every method fails with `system_failure`, `"robotics"` missing (the card's
+details, with Shift held, say so); its tab still works by hand.
 
 Its methods are [commands](/devices/robotics/#one-command-at-a-time) that come after the robot's:
 each waits while the robot is doing something else (a walk, a swing), and a robot held in a field

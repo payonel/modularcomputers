@@ -65,10 +65,40 @@ public interface Buffered {
 	String NO_SPACE = "no_space";
 
 	/**
-	 * Why a command ended, or a notice: its power ran out (the user's, one shape: {@link
-	 * EventQueue#powerout}, its call; a field letting go of what it held, {@link EventQueue#poweroutNotice}).
+	 * Why a command ended, a call was refused, or a notice: what it needs to do it is missing (the
+	 * user's, one shape, {@link EventQueue#systemFailure}): {@code missing} says what, one of the
+	 * {@code MISSING_} words. A call refused so answers {@code false, "system_failure", missing}.
 	 */
-	String POWEROUT = "powerout";
+	String SYSTEM_FAILURE = "system_failure";
+	/** What's missing: a robot's legs (it's on its thrusters, or they're gone). */
+	String MISSING_LEGS = "legs";
+	/** What's missing: a robot's thrusters (a tier 1 has none). */
+	String MISSING_THRUSTERS = "thrusters";
+	/** What's missing: power. */
+	String MISSING_POWER = "power";
+	/** What's missing: what works a crafting card's items (it's in nothing that does). */
+	String MISSING_BENCH = "bench";
+	/** What's missing: a robot's robotics, to work a crafting card (in a case there's none). */
+	String MISSING_ROBOTICS = "robotics";
+
+	/** A refusal: what it needs is missing ({@link #SYSTEM_FAILURE}, and what). */
+	static com.payonel.modularcomputers.runtime.Result missing(String what) {
+		return com.payonel.modularcomputers.runtime.Result.fail(SYSTEM_FAILURE, what);
+	}
+
+	/** A notice's why: a robot shoved off where its last command left it ({@code drift}), once the shove's over. */
+	String SHOVE = "shove";
+	/**
+	 * A notice's why: a robot's fall nothing asked for, said as it begins and as it lands (the user's,
+	 * 2026-11-04): {@code drift}, how far it is off where its last command left it, and {@code below},
+	 * the block under it then.
+	 */
+	String FALL = "fall";
+	/**
+	 * A refusal (wait: a field holds it), and a notice's why: a field taking hold of a robot, and
+	 * letting go ({@code id}: the field's, or "").
+	 */
+	String HELD = "held";
 
 	/**
 	 * The board gives a command (a method not free) with these arguments, as the program gave them,

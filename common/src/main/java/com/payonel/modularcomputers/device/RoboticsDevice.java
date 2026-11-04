@@ -49,8 +49,6 @@ public final class RoboticsDevice implements Device, Buffered {
 	public static final String FLYING = "flying";
 	public static final String HOVERING = "hovering";
 	public static final String LANDING = "landing";
-	/** What it's doing while a field holds it: its robotics frozen. */
-	public static final String HELD = "held";
 	/** What it's doing while it falls on its legs (nothing it was asked: a block gone under it). */
 	public static final String FALLING = "falling";
 	/**
@@ -58,14 +56,6 @@ public final class RoboticsDevice implements Device, Buffered {
 	 * type, so a program tells at once what it asked for from what came to it), {@code what} saying it.
 	 */
 	public static final String NOTICE = "notice";
-	/** A notice's {@code why}: shoved off where its last command left it (and how far: {@code drift}), once the shove's over. */
-	public static final String SHOVE = "shove";
-	/**
-	 * A notice's {@code why}: a fall nothing asked for, said as it begins and as it lands (the user's,
-	 * 2026-11-04): {@code drift}, how far it is off where its last command left it, and {@code below},
-	 * the block under it then, as it is.
-	 */
-	public static final String FALL = "fall";
 	/** Its commands taken while it falls (the user's): a tier 2 catches itself on its thrusters, its legs dropped. */
 	private static final java.util.Set<String> CATCHES = java.util.Set.of("fly", "flyTo");
 	/**
@@ -127,7 +117,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		 * null when it started, else why not.
 		 */
 		default String fly(double forward, double right, double up) {
-			return "no thrusters";
+			return NO_THRUSTERS;
 		}
 
 		/** Starts walking to the point {@code forward}, {@code right}, {@code up} from its origin, in the origin's frame: null, or why not. */
@@ -223,7 +213,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		 * {@code force}, with none there, straight down onto the ground, legless, still running.
 		 */
 		default String land(boolean force) {
-			return "no thrusters";
+			return NO_THRUSTERS;
 		}
 
 		/** Its thrusters stop: what they held up falls (the program that flew it ended). */
@@ -410,10 +400,34 @@ public final class RoboticsDevice implements Device, Buffered {
 		return java.math.BigDecimal.valueOf(value).setScale(FAILURE_DECIMALS, java.math.RoundingMode.HALF_EVEN).stripTrailingZeros().toPlainString();
 	}
 
+	/**
+	 * What its body says it can't start without, as its body says it ({@link #NO_LEGS},
+	 * {@link #NO_THRUSTERS}): never a program's word; it answers {@code false, "system_failure",
+	 * missing} (the user's), the shape of the end it becomes when it's given again once let go.
+	 */
+	public static final String NO_LEGS = "no legs";
+	public static final String NO_THRUSTERS = "no thrusters";
+	/** Its body's word for a landing on its legs already: done (no failure, the user's). */
+	public static final String ON_LEGS = "on legs";
+
+	/** Its body's refusal as a program's answer: what's missing in its shape, else as said. */
+	private static Result answer(String why) {
+		return switch (why) {
+			case NO_LEGS -> Buffered.missing(MISSING_LEGS);
+			case NO_THRUSTERS -> Buffered.missing(MISSING_THRUSTERS);
+			default -> Result.fail(why);
+		};
+	}
+
 	/** A command that runs over time started (null: it did; else why not, refused): true, and it's busy till it ends. */
 	private Result start(String method, String why) {
+		if (ON_LEGS.equals(why)) { // (a landing on its legs already: done as it starts, the user's, an arm out extended)
+			begin(method);
+			end(true, null, null);
+			return Result.ok(true);
+		}
 		if (why != null) {
-			return Result.fail(why);
+			return answer(why);
 		}
 		begin(method);
 		return Result.ok(true);
@@ -449,7 +463,7 @@ public final class RoboticsDevice implements Device, Buffered {
 
 	/** The field let it go, and it's down: it says so (held, id ""), and a command taken while held goes now. */
 	public void thawed() {
-		said(HELD, Map.of("id", "")); // (nothing holds it now: the same notice, its id "", the user's)
+		events.heldNotice(""); // (nothing holds it now: the same notice, its id "", the user's)
 		if (waitingHeld) {
 			waitingHeld = false;
 			active = null;
@@ -538,8 +552,10 @@ public final class RoboticsDevice implements Device, Buffered {
 			events.unbreakable(method, lostName, lostId, lostAt, call);
 		} else if (BLOCKED.equals(why)) {
 			events.blocked(method, block, face, call);
+		} else if (ok && why == null) {
+			events.ended(method, result);
 		} else {
-			events.ended(method, ok, why, result);
+			throw new IllegalArgumentException(method + "'s end has no shape for " + why); // (each why its own method, the user's)
 		}
 	}
 
@@ -581,7 +597,7 @@ public final class RoboticsDevice implements Device, Buffered {
 			return Result.fail("not a right angle: " + args.get(3));
 		}
 		String why = body.setPosition(at[0], at[1], at[2], (int) Math.floorMod((long) heading, 360));
-		return why == null ? Result.ok() : Result.fail(why);
+		return why == null ? Result.ok() : answer(why);
 	}
 
 	@Method(doc = "setPathfinding(on): whether walk, fly, walkTo and flyTo find their way round things (the game's pathfinder: it turns as it goes, jumps and drops as it finds, and turns back as it arrives) or go straight (the default). Kept through reboots; off again when it's picked up")
@@ -734,7 +750,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return waits != null ? waits : start("fly", body.fly(move.by()[0], move.by()[1], move.by()[2]));
 	}
 
-	@Method(doc = "land([force]): (a tier 2 golem's) a move, from where its last command left it: comes down onto its legs, standing below there however far down (within three blocks to the side), and onto them; force, with none there, comes straight down onto the ground beneath it without them, still running (its thrusters off; it walks nowhere, and flies again to fetch them), as safely as a crash would, but on. A command: true at once (its event: land, ok, or not and why: blocked, down, at once, without force finding no legs below by what it found there instead, with force finding nothing under it down to the world's bottom by air; it goes on hovering), or false and why (on legs)")
+	@Method(doc = "land([force]): (a tier 2 golem's) a move, from where its last command left it: comes down onto its legs, standing below there however far down (within three blocks to the side), and onto them; force, with none there, comes straight down onto the ground beneath it without them, still running (its thrusters off; it walks nowhere, and flies again to fetch them), as safely as a crash would, but on. A command: true at once (its event: land, ok, or not and why: blocked, down, at once, without force finding no legs below by what it found there instead, with force finding nothing under it down to the world's bottom by air; it goes on hovering), on its legs already, done: true, its event ok; or false and why")
 	public Result land(Arguments args) {
 		boolean force = args.count() > 0 && args.get(0) != null && args.checkBoolean(0);
 		Result waits = waitsHeld("land", args);
@@ -863,7 +879,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	 * its break going on once it's let go). Let go, the same notice says {@code id = ""}: nothing holds it.
 	 */
 	public void frozen(String field) {
-		said(HELD, Map.of("id", field == null ? "" : field)); // (a command under way pauses, a swing too: the user's)
+		events.heldNotice(field); // (a command under way pauses, a swing too: the user's)
 	}
 
 	/**
@@ -875,7 +891,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		if (active != null) {
 			return;
 		}
-		said(SHOVE, Map.of("drift", drift));
+		events.shove(drift);
 	}
 
 	/** A positional command over time given off its spot: it starts and ends at once, drifted, its drift and its call. */
@@ -911,10 +927,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	}
 
 	private void sayFall(Map<String, Object> drift, String below) {
-		Map<String, Object> fields = new LinkedHashMap<>();
-		fields.put("drift", drift);
-		fields.put("below", below);
-		said(FALL, fields);
+		events.fall(drift, below);
 	}
 
 	/** A fall's start was said, its landing to come (a caught fall's never does: the next fall's start clears it). */
@@ -923,15 +936,6 @@ public final class RoboticsDevice implements Device, Buffered {
 	/** A fall it caught itself (a flight taken mid-fall): no landing to say, its flight's end says it. */
 	public void caught() {
 		fallSaid = false;
-	}
-
-	/** A notice whose kind is its why (the shape notices are being made: shove, fall). */
-	private void said(String why, Map<String, Object> fields) {
-		Map<String, Object> event = new LinkedHashMap<>();
-		event.put("event", NOTICE);
-		event.put("why", why);
-		event.putAll(fields);
-		events.add(event);
 	}
 
 	/** How finely a measure is said: to a thousandth of a block (or a degree). */
@@ -1071,8 +1075,8 @@ public final class RoboticsDevice implements Device, Buffered {
 		} catch (RuntimeException e) {
 			again = Result.fail(String.valueOf(e.getMessage()));
 		}
-		if (!again.failed() && method.equals(active)) {
-			if ("swing".equals(method)) {
+		if (!again.failed()) { // (going, or ended as it started: drifted, a landing on its legs)
+			if ("swing".equals(method) && method.equals(active)) {
 				body.resumeBreaking(resumeBreaking); // (its break as far as it had got)
 			}
 			return;
@@ -1084,7 +1088,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		if (afterLoad) {
 			events.interrupted(method, call); // (the fallback: it couldn't go on after the load)
 		} else {
-			events.ended(method, false, again.error(), null); // (let go, it couldn't start: why, as its call would have answered)
+			events.refused(method, again, call); // (let go, it couldn't start: its call's answer, in its end's shape)
 		}
 	}
 

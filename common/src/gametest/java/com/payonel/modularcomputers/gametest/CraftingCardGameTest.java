@@ -264,8 +264,10 @@ public class CraftingCardGameTest {
 		CaseBlockEntity computer = helper.getBlockEntity(pos, CaseBlockEntity.class);
 		computer.parts().setItem(CaseMenu.EXP_SLOTS + LANE, card(sticks(1)));
 		CraftingCard card = crafting(computer.board(), LANE);
-		same(helper, card.list(args()).error(), CraftingCard.NO_ROBOTICS, "a program's call");
-		same(helper, card.craft(args()).error(), CraftingCard.NO_ROBOTICS, "a program's craft");
+		Result listed = card.list(args());
+		Result crafted = card.craft(args());
+		same(helper, List.of(listed.error(), listed.first()), List.of("system_failure", "robotics"), "a program's call: robotics missing");
+		same(helper, List.of(crafted.error(), crafted.first()), List.of("system_failure", "robotics"), "a program's craft");
 		var player = GameTests.serverPlayer(helper);
 		CaseMenu menu = (CaseMenu) computer.createMenu(1, player.getInventory(), player);
 		int lane = CaseMenu.CRAFT_SLOTS + LANE * CaseMenu.CRAFT_LANE_SLOTS;

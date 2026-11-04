@@ -57,8 +57,8 @@ the spec the build follows and its checklist, items marked done as they land.
 ### Failure strings
 
 Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, numbers):
-`held`, `busy`, `no legs`, `no legs below`,
-`on legs`, `no thrusters`, `stopped`. For every device.
+`held`, `busy`, `system_failure` (and what's missing: `legs`, `thrusters`, `power`, `bench`,
+`robotics`), `stopped`. For every device.
 
 Being made one shape (the user's, 2026-11-03): a why is one word, exactly, and what it's about
 comes in named fields beside it, the same fields wherever it's said. Done so far: `blocked`

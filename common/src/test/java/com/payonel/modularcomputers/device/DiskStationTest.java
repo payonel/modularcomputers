@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.device;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.payonel.modularcomputers.runtime.Arguments;
+import com.payonel.modularcomputers.runtime.Result;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -84,7 +85,9 @@ class DiskStationTest {
 		bay.disks.put(DiskStation.TARGET, disk);
 		assertThat(station.clone(args()).error()).isEqualTo(DiskStation.NO_SOURCE);
 		bay.powered = false;
-		assertThat(station.format(args()).error()).isEqualTo(DiskStation.NO_POWER);
+		Result unpowered = station.format(args());
+		assertThat(unpowered.error()).isEqualTo("system_failure");
+		assertThat(unpowered.first()).as("what's missing").isEqualTo("power");
 		assertThat(world.resolve("p/home")).as("nothing done").exists();
 		disk.retire();
 	}

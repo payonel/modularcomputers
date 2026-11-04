@@ -133,7 +133,7 @@ public final class FieldCard extends Card implements Buffered {
 			return;
 		}
 		if (!powered) {
-			lost(POWEROUT);
+			lost(SYSTEM_FAILURE); // (its power gone: what it needs is missing, power)
 			return;
 		}
 		String why = projector != null ? projector.check() : null;
@@ -188,7 +188,7 @@ public final class FieldCard extends Card implements Buffered {
 		return held;
 	}
 
-	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, never through blocks. A command: true at once (its event: move, ok, or not and why: blocked, with name, the block in the way (\"\" for none: past its reach, or what it holds not loaded), and face, the side of what it holds that met it, in its computer's frame; lost; powerout; stopped; each with its call), or false and why it can't start (not holding)")
+	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, never through blocks. A command: true at once (its event: move, ok, or not and why: blocked, with name, the block in the way (\"\" for none: past its reach, or what it holds not loaded), and face, the side of what it holds that met it, in its computer's frame; lost; system_failure, missing power; stopped; each with its call), or false and why it can't start (not holding)")
 	public Result move(Arguments args) {
 		Result no = noProjector();
 		if (no != null) {
@@ -248,7 +248,7 @@ public final class FieldCard extends Card implements Buffered {
 		return Result.ok(now);
 	}
 
-	@Method(doc = "pull(): its oldest event, or nil: a move's end, {event = \"move\", ok, why}, or a notice of its letting go on its own: {event = \"notice\", why = \"lost\", name, id, at} (what it held is gone), {event = \"notice\", why = \"blocked\", name = \"\", face} (out of its reach: the side of what it held past the edge), {event = \"notice\", why = \"powerout\"}")
+	@Method(doc = "pull(): its oldest event, or nil: a move's end, {event = \"move\", ok, why}, or a notice of its letting go on its own: {event = \"notice\", why = \"lost\", name, id, at} (what it held is gone), {event = \"notice\", why = \"blocked\", name = \"\", face} (out of its reach: the side of what it held past the edge), {event = \"notice\", why = \"system_failure\", missing = \"power\"}")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -257,7 +257,7 @@ public final class FieldCard extends Card implements Buffered {
 	public void arrived() {
 		if (state.equals(MOVING)) {
 			state(HOLDING);
-			events.ended("move", true, null, null);
+			events.ended("move", null);
 		}
 	}
 
@@ -302,11 +302,11 @@ public final class FieldCard extends Card implements Buffered {
 			events.blockedNotice(null, face);
 			return;
 		}
-		// Its power gone (the user's: powerout).
+		// Its power gone (the user's: a system failure, power missing).
 		if (wasMoving) {
-			events.powerout("move", call); // (the move it was making ends with it)
+			events.systemFailure("move", MISSING_POWER, call); // (the move it was making ends with it)
 		}
-		events.poweroutNotice();
+		events.systemFailureNotice(MISSING_POWER);
 	}
 
 	/** The last command the board gave it and its arguments (the board's {@link #called}); the move under way's, and where what it holds was as it began. */
