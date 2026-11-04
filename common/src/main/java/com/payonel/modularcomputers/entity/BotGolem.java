@@ -455,9 +455,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			}
 			Vec3 plan = planPoint().add(0, LEG_HEIGHT, 0); // (from its plan: its torso's height over its feet's point)
 			Vec3 to = plan.add(inFrame(planYaw(), forward, right, up));
-			String why = noWay(to);
-			if (why != null) {
-				return why; // (refused before it does anything: its legs stay on)
+			if (noWay(to)) {
+				return blockedSoon(to); // (no way there: blocked at once, before it does anything, its legs left on)
 			}
 			begin();
 			takeOff();
@@ -476,9 +475,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			if (to.distanceTo(BotGolem.this.position()) > RoboticsDevice.MAX_FLIGHT * Math.sqrt(3)) {
 				return RoboticsDevice.TOO_FAR + (int) RoboticsDevice.MAX_FLIGHT;
 			}
-			String why = noWay(to);
-			if (why != null) {
-				return why;
+			if (noWay(to)) {
+				return blockedSoon(to); // (no way there: blocked at once, before it does anything, its legs left on)
 			}
 			begin();
 			takeOff();
@@ -578,7 +576,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				.min(java.util.Comparator.comparingDouble(legs -> legs.position().distanceTo(spot))).orElse(null);
 			Vec3 ground = below == null && force ? groundBelow(spot) : null;
 			if (below == null && !force) {
-				return "no legs below";
+				blockedNext = "down"; // (no legs below: blocked, down, by what it found there instead, at once; it goes on hovering)
+				blockedNextBlock = foundBelow(spot);
+				return null;
 			} else if (below == null && ground == null) {
 				// (no ground within reach: its landing begins and ends at once, blocked by the air below)
 				flyTo = null;
@@ -779,6 +779,11 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			}
 			origin(); // (its first tick here, or a dimension it's new to: its origin, where it is)
 			stasis();
+			if (blockedNext != null && !frozen) {
+				String face = blockedNext;
+				blockedNext = null;
+				robotics.blocked(blockedNextBlock, face);
+			}
 			if (!frozen) {
 				move();
 			}
@@ -1239,14 +1244,36 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	}
 
 	/** Starts flying to a point: straight, or with pathfinding by the game's way for fliers (a bee's), round what's in the way; null, or why not. */
-	/** Why a flight to {@code to} can't start (with pathfinding: no way there), or null. */
-	private String noWay(Vec3 to) {
+	/** Whether a flight to {@code to} has no way there (with pathfinding: the game's for fliers finds none). */
+	private boolean noWay(Vec3 to) {
 		if (!pathfinding) {
-			return null;
+			return false;
 		}
 		var navigation = new net.minecraft.world.entity.ai.navigation.FlyingPathNavigation(this, level());
 		Path path = navigation.createPath(BlockPos.containing(to), 0);
-		return path == null || !path.canReach() ? "no path" : null;
+		return path == null || !path.canReach();
+	}
+
+	/**
+	 * A move with no way there (pathfinding finds none): it starts, and at its next tick ends
+	 * blocked (the user's: one word for every way a move can't go), no one block to name, met on its
+	 * face toward where it was going; null, its command started.
+	 */
+	private String blockedSoon(Vec3 toward) {
+		blockedNext = faceOf(toward.subtract(position()));
+		blockedNextBlock = "";
+		return null;
+	}
+
+	/** A move's end due, blocked, at its next tick: the face (null: none due), and the block (its id; "": none to name). */
+	private String blockedNext;
+	private String blockedNextBlock = "";
+
+	/** What's below {@code torso} where its legs should be: the block it would land on, or air with nothing down to the world's bottom. */
+	private String foundBelow(Vec3 torso) {
+		Vec3 ground = groundBelow(torso);
+		return ground == null ? blockName(BlockPos.containing(torso.x, torso.y - getBbHeight(), torso.z))
+			: blockName(BlockPos.containing(ground.x, ground.y - HAIR, ground.z));
 	}
 
 	private String flyToward(Vec3 to) {
@@ -1255,7 +1282,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			var navigation = new net.minecraft.world.entity.ai.navigation.FlyingPathNavigation(this, level());
 			Path path = navigation.createPath(BlockPos.containing(to), 0);
 			if (path == null || !path.canReach()) {
-				return "no path";
+				return blockedSoon(to);
 			}
 			flightPath = new java.util.ArrayDeque<>();
 			for (int i = 1; i < path.getNodeCount(); i++) {
@@ -1344,7 +1371,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private void landStep() {
 		if (!landing.isAlive()) {
 			landing = null;
-			robotics.failed("no legs below");
+			robotics.blocked(foundBelow(position()), "down"); // (its legs went as it came down: what's there instead)
 			robotics.hovering();
 			return;
 		}
@@ -1447,8 +1474,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			}
 			Path path = getNavigation().createPath(target.x, target.y, target.z, 0);
 			if (path == null) {
+				String face = faceOf(target.subtract(position()));
 				endWalk();
-				robotics.failed("no path");
+				robotics.blocked("", face); // (no way there: blocked, no one block to name)
 				return;
 			}
 			getNavigation().moveTo(path, 1.0);
@@ -1474,7 +1502,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 					if (there) {
 						blockedAtHeight(off);
 					} else {
-						robotics.failed("no path");
+						robotics.blocked("", faceOf(to.subtract(position()))); // (its way ran out short: blocked, no one block to name)
 					}
 				}
 			}

@@ -170,8 +170,8 @@ class RoboticsDeviceTest {
 	@Test
 	void aFailureSaysWhy() {
 		device.walk(args(2L));
-		device.failed("no path");
-		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "no path"));
+		device.failed("not broken");
+		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "not broken"));
 	}
 
 	/** Blocked is one word, its block and face named fields beside it (the user's: one shape), the block "" when none is named. */

@@ -211,6 +211,12 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
+	/** Whether a landing ended blocked, down, by a block below instead of its legs (not "": what it found there). */
+	private static boolean blockedBelow(List<Object> events) {
+		return events.stream().anyMatch(e -> e instanceof java.util.Map<?, ?> m && "land".equals(m.get("event")) && "blocked".equals(m.get("why"))
+			&& "down".equals(m.get("face")) && m.get("block") instanceof String block && !block.isEmpty());
+	}
+
 	/** How many notices of {@code why} (shove, fall) are among {@code events}. */
 	private static long notices(List<Object> events, String why) {
 		return events.stream().filter(e -> e instanceof java.util.Map<?, ?> m && "notice".equals(m.get("event")) && why.equals(m.get("why"))).count();
@@ -370,7 +376,12 @@ public class GolemFlightGameTest {
 			})
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("flyTo")), "away from its legs: " + events))
 			.thenExecute(() -> {
-				same(helper, golem.robotics().land(args()).error(), "no legs below", "land() wants its legs");
+				events.clear();
+				same(helper, golem.robotics().land(args()).first(), true, "land(): a command");
+			})
+			.thenWaitUntil(() -> helper.assertTrue(blockedBelow(events), "no legs below: blocked, down, by what's there instead: " + events))
+			.thenExecute(() -> {
+				events.clear();
 				helper.assertTrue(!golem.robotics().land(args(true)).failed(), "land(true) comes down without them");
 			})
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("land")), "down: " + events))
@@ -467,9 +478,11 @@ public class GolemFlightGameTest {
 			.thenExecuteAfter(3, () -> golem.robotics().fly(args(5.0, 0.0, 1.0)))
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "away: " + events))
 			.thenExecute(() -> {
-				same(helper, golem.robotics().land(args()).error(), "no legs below", "refused");
-				helper.assertTrue(golem.thrusting() && golem.machine().isPowered(), "hovering on");
+				events.clear();
+				same(helper, golem.robotics().land(args()).first(), true, "a command");
 			})
+			.thenWaitUntil(() -> helper.assertTrue(blockedBelow(events), "blocked, down, by what's below instead of its legs: " + events))
+			.thenExecute(() -> helper.assertTrue(golem.thrusting() && golem.machine().isPowered(), "hovering on"))
 			.thenSucceed();
 	}
 
@@ -587,10 +600,14 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
-	/** A flight with no way there (pathfinding) is refused before it does anything: its legs stay on. */
+	/**
+	 * A flight with no way there (pathfinding) is blocked (the user's: one word for every way a move
+	 * can't go), no one block to name, before it does anything: its legs stay on.
+	 */
 	@GameTest(maxTicks = 100)
-	public void aFlightWithNoWayThereIsRefusedBeforeItTakesOff(GameTestHelper helper) {
+	public void aFlightWithNoWayThereIsBlockedBeforeItTakesOff(GameTestHelper helper) {
 		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
 		for (int x = 0; x < 3; x++) {
 			for (int z = 0; z < 3; z++) {
 				helper.setBlock(AT.offset(x - 1, 3, z - 1), Blocks.STONE);
@@ -600,9 +617,11 @@ public class GolemFlightGameTest {
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> {
 				golem.robotics().setPathfinding(args(true));
-				same(helper, golem.robotics().fly(args(0.0, 0.0, 3.0)).error(), "no path", "refused");
-				helper.assertTrue(golem.legs() && !golem.thrusting(), "on its legs still, its thrusters off");
+				same(helper, golem.robotics().fly(args(0.0, 0.0, 3.0)).first(), true, "a command");
 			})
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().map(GameTests::withoutCall)
+				.anyMatch(java.util.Map.of("event", "fly", "ok", false, "why", "blocked", "block", "", "face", "up")::equals), "blocked, no way there: " + events))
+			.thenExecute(() -> helper.assertTrue(golem.legs() && !golem.thrusting(), "on its legs still, its thrusters off"))
 			.thenSucceed();
 	}
 }

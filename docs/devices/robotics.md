@@ -334,11 +334,10 @@ it really is. With
 `force` (`land(true)`) and no legs there, it comes straight down onto the ground beneath it without
 them, and stays running, its thrusters off. That's what a crash does, but safely and still on.
 Legless, it walks nowhere; it flies again to fetch its legs and lands onto them. Its event, `land`:
-`ok`, or not and why (`blocked`; `no legs below` when they've gone: it hovers there). With
+`ok`, or not and why (`blocked`: with no legs below, or its legs gone as it came down, `face = "down"` and `block` what it found below instead of its legs; it hovers there). With
 `force` it comes down onto whatever ground is beneath it, however far; with nothing under it down
 to the world's bottom (the End's void, a hole through the world), its event says so at once, blocked by the air below
-(`block = "minecraft:air", face = "down"`), and it goes on hovering. Fails with `no legs below`
-(without `force`: it goes on hovering), or `on legs`. A right click pops legs up
+(`block = "minecraft:air", face = "down"`), and it goes on hovering. Fails with `on legs`. A right click pops legs up
 into an inventory, its own `use` too.
 
 ### get() → {state, legs, pathfinding, position, planned, drift}
@@ -413,7 +412,9 @@ It ends at exactly the elevation `up` asked, or its walk ends not `ok`, `blocked
 
 **With pathfinding** it finds its way, as a mob does: round walls, up stairs and slabs, jumping a
 block and dropping up to 3, turning as it goes. It still ends on the asked block's middle, at the
-asked elevation, facing as it began, or it's not `ok` (`no path`). A flight with pathfinding flies
+asked elevation, facing as it began, or it's `blocked`: with no way there, or its way running out
+short of it, `block = ""` (no one block to name) and `face` its face toward where it was going; a
+flight with no way there is blocked at once, before it takes off. A flight with pathfinding flies
 round things too.
 
 ## Events

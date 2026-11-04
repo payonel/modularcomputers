@@ -674,7 +674,9 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   `Buffered.called`), and how far it got, in their terms (a walk's `{forward, right, up}` done, a
   craft's crafts done). Every way a walk can't go is blocked (the user's): a step up it can't take (by the step's
   block), a drop (by air), an elevation it couldn't reach (the block under it, `down`; the air over
-  it, `up`), a landing with force over no ground (air, `down`). A move already done (an arm out
+  it, `up`), a landing with force over no ground (air, `down`), and with pathfinding no way there
+or a way run out short (`block = ""`, its face toward where it was going; a flight's at once,
+before it takes off). A move already done (an arm out
   extended, in retracted) is no failure: `true`, its end `ok` (the user's: a lit lamp lit again).
   A tags-and-queues design came first
   and was set aside as too error-prone.
