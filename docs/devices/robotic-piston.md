@@ -71,7 +71,7 @@ no front it knows, or `left` and `right` when its front is up or down.
 
 Pushes on that side. The arm goes out and comes back on its own; its event, `push`, once it's back.
 When something will not move, its event says so at once: `ok = false`, `why = "blocked"`, `block`
-the first block down its line that won't move (obsidian, bedrock, a block entity), left out when no
+the first block down its line that won't move (obsidian, bedrock, a block entity), `""` when no
 one block is to blame (more than a piston moves, the world's edge, a chunk not loaded), and `face`
 the side. With its arm out there already, nothing moves, and its event is `ok`. Fails at once with
 `cable: <side>` on its cable port's side.

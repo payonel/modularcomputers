@@ -174,7 +174,7 @@ class RoboticsDeviceTest {
 		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "no path"));
 	}
 
-	/** Blocked is one word, its block and face named fields beside it (the user's: one shape), the block left out when none is named. */
+	/** Blocked is one word, its block and face named fields beside it (the user's: one shape), the block "" when none is named. */
 	@Test
 	void blockedIsTheWordWithTheBlockAndItsFace() {
 		device.walk(args(2L));
@@ -182,7 +182,7 @@ class RoboticsDeviceTest {
 		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "front"));
 		device.walk(args(2L));
 		device.blocked(null, "up");
-		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "blocked", "face", "up"));
+		assertThat(device.pull(args()).first()).as("no block named: \"\", never nil").isEqualTo(Map.of("event", "walk", "ok", false, "why", "blocked", "block", "", "face", "up"));
 	}
 
 	@Test

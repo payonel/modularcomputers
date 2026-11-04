@@ -401,7 +401,7 @@ ends with `why = "blocked"`, and two fields beside it, the same for every one:
 
 | Field | What it is |
 |---|---|
-| `block` | the id of the block in its way (`minecraft:stone`, `minecraft:lava`); left out when no one block can be named |
+| `block` | the id of the block in its way (`minecraft:stone`, `minecraft:lava`); `""` when no one block can be named (never `nil`) |
 | `face` | the face of the robot that met it, its own: `front`, `back`, `left`, `right`, `up` or `down`. It's the side that was hit, not the way the move was mostly going: a flight sliding along a wall on its right met it on its `right` |
 
 ```lua

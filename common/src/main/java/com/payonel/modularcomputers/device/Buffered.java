@@ -18,18 +18,16 @@ public interface Buffered {
 
 	/**
 	 * Why a move ended: a block in its way (the user's: one shape, wherever it's said). Its event
-	 * says which block ({@code block}, the block's id; absent when no one block can be named) and
+	 * says which block ({@code block}, the block's id; "" when no one block can be named, never nil) and
 	 * which face of what moved met it ({@code face}, in the device's own terms), as {@link #blocked}
 	 * gives them.
 	 */
 	String BLOCKED = "blocked";
 
-	/** A {@link #BLOCKED} end's fields: {@code block} (null: none to name, left out) and {@code face}. */
+	/** A {@link #BLOCKED} end's fields: {@code block} (null: none to name, said "", the user's: always there) and {@code face}. */
 	static java.util.Map<String, Object> blocked(String block, String face) {
 		java.util.Map<String, Object> fields = new java.util.LinkedHashMap<>();
-		if (block != null) {
-			fields.put("block", block);
-		}
+		fields.put("block", block == null ? "" : block);
 		fields.put("face", face);
 		return fields;
 	}

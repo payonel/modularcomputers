@@ -93,7 +93,7 @@ Fails with `holding` (it holds something already), `no entity` (nothing near the
 
 Moves the field by that much, never through blocks. It answers at once; its
 event, `move`, says how it went: `ok`, or not and why (`blocked`; `stopped`; or why it let go, as
-`lost` says). Blocked, two fields say by what: `block`, the id of the block in its way (left out
+`lost` says). Blocked, two fields say by what: `block`, the id of the block in its way (`""`
 when no one block can be named), and `face`, the side of what it holds that met it, in its
 computer's frame (`front`, `back`, `left`, `right`, `up` or `down`; a case's front, or a robot's
 heading), the side that was hit, not the way the move was mostly going:

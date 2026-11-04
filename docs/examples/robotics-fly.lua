@@ -8,11 +8,11 @@ local HEIGHT = tonumber(arg[1] or "5")
 
 local robot = assert(devices.open("robotics0"))
 
--- What a failed end says: its why, and a blocked one's block (- when none is named) and the face
+-- What a failed end says: its why, and a blocked one's block (- when none is named: its block is "") and the face
 -- that met it.
 local function reason(event)
   if event.why == "blocked" then
-    return "blocked " .. (event.block or "-") .. " " .. event.face
+    return "blocked " .. (event.block ~= "" and event.block or "-") .. " " .. event.face
   end
   return event.why
 end

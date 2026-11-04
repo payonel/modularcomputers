@@ -40,11 +40,7 @@ public class RoboticPistonGameTest {
 
 	/** A blocked end (the user's: one shape): the block that won't move (null: none to name), its face the world's way. */
 	private static Map<String, Object> blocked(String method, String block, String face) {
-		Map<String, Object> end = new java.util.LinkedHashMap<>(Map.of("event", method, "ok", false, "why", "blocked", "face", face));
-		if (block != null) {
-			end.put("block", block);
-		}
-		return end;
+		return Map.of("event", method, "ok", false, "why", "blocked", "block", block == null ? "" : block, "face", face);
 	}
 
 	@GameTest(maxTicks = 60)
