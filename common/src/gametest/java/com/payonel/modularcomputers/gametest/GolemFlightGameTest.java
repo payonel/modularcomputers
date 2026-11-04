@@ -181,37 +181,33 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
-	@GameTest(maxTicks = 160)
-	public void shovedInTheAirItHoldsItsPlanAndSaysSo(GameTestHelper helper) {
+	/**
+	 * Shoved in the air, it says so once the shove's over and stays where it was put (the user's: no
+	 * way back of its own); a positional command there fails, drifted; fly() takes it back.
+	 */
+	@GameTest(maxTicks = 200)
+	public void shovedInTheAirItSaysSoAndStaysWhereItWasPut(GameTestHelper helper) {
 		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
 		double[] at = new double[1];
-		double[] most = {0};
-		List<Object> events = new java.util.ArrayList<>();
-		helper.onEachTick(() -> {
-			Object event;
-			while ((event = golem.robotics().pull(args()).first()) != null) {
-				events.add(event);
-			}
-			most[0] = Math.max(most[0], golem.getX() - at[0]);
-		});
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> helper.assertTrue(!golem.robotics().fly(args()).failed(), "it takes off where it stands: fly() with nothing to go to"))
 			.thenWaitUntil(() -> helper.assertTrue(golem.robotics().state().equals(RoboticsDevice.HOVERING), "holding there: " + golem.robotics().state()))
 			.thenExecute(() -> {
 				at[0] = golem.getX();
-				most[0] = 0;
+				events.clear();
 				golem.push(1.0, 0, 0); // (a shove: as a player's walk into it, a blast)
 			})
 			.thenWaitUntil(() -> helper.assertTrue(notices(events, "shoved") == 1, "it says it was shoved: " + events))
-			.thenWaitUntil(() -> {
-				helper.assertTrue(most[0] > SHOVED, "shoved off: " + most[0]);
-				helper.assertTrue(Math.abs(golem.getX() - at[0]) < 0.06 && golem.robotics().state().equals(RoboticsDevice.HOVERING),
-					"back on its plan, holding it as a drone does: " + (golem.getX() - at[0]) + " " + golem.robotics().state());
+			.thenExecuteAfter(20, () -> {
+				helper.assertTrue(golem.getX() - at[0] > SHOVED, "still where it was put: " + (golem.getX() - at[0]));
+				helper.assertTrue(notices(events, "shoved") == 1, "said once: " + events);
+				same(helper, golem.robotics().refusal("scan"), com.payonel.modularcomputers.device.Buffered.DRIFTED, "off its spot: a positional command fails");
+				events.clear();
+				helper.assertTrue(!golem.robotics().fly(args()).failed(), "fly(): back to where its last command left it");
 			})
-			.thenExecute(() -> {
-				helper.assertTrue(golem.thrusting() && !golem.onGround(), "still in the air");
-				helper.assertTrue(notices(events, "returned") == 1, "it says it's back: " + events);
-			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")) && Math.abs(golem.getX() - at[0]) < 0.06, "back: " + (golem.getX() - at[0]) + " " + events))
+			.thenExecute(() -> same(helper, golem.robotics().refusal("scan"), null, "on its spot: it scans"))
 			.thenSucceed();
 	}
 
@@ -220,24 +216,18 @@ public class GolemFlightGameTest {
 		return events.stream().filter(e -> e instanceof java.util.Map<?, ?> m && "notice".equals(m.get("event")) && what.equals(m.get("what"))).count();
 	}
 
-	/** Shoved again on its way back, it says so again (the user's: each shove its notice), and still gets back. */
+	/** Shoved twice, it says each shove (the user's: each its notice), from where each put it. */
 	@GameTest(maxTicks = 200)
-	public void shovedAgainOnItsWayBackItSaysSoAgainAndGetsBack(GameTestHelper helper) {
+	public void shovedTwiceItSaysEachShove(GameTestHelper helper) {
 		BotGolem golem = golem(helper, false);
 		List<Object> events = events(helper, golem);
-		double[] at = new double[1];
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> golem.robotics().fly(args()))
 			.thenWaitUntil(() -> helper.assertTrue(golem.robotics().state().equals(RoboticsDevice.HOVERING), "holding there: " + golem.robotics().state()))
-			.thenExecute(() -> {
-				at[0] = golem.getX();
-				golem.push(1.0, 0, 0);
-			})
-			.thenWaitUntil(() -> helper.assertTrue(golem.robotics().state().equals(RoboticsDevice.RETURNING), "on its way back: " + golem.robotics().state()))
-			.thenExecuteAfter(2, () -> golem.push(1.0, 0, 0)) // (again, on its way: farther off than its own step left it)
-			.thenWaitUntil(() -> helper.assertTrue(notices(events, "shoved") == 2, "each shove said: " + events))
-			.thenWaitUntil(() -> helper.assertTrue(notices(events, "returned") >= 1 && golem.robotics().state().equals(RoboticsDevice.HOVERING)
-				&& Math.abs(golem.getX() - at[0]) < 0.06, "back, holding it: " + (golem.getX() - at[0]) + " " + events))
+			.thenExecute(() -> golem.push(1.0, 0, 0))
+			.thenWaitUntil(() -> helper.assertTrue(notices(events, "shoved") == 1, "the first: " + events))
+			.thenExecute(() -> golem.push(1.0, 0, 0))
+			.thenWaitUntil(() -> helper.assertTrue(notices(events, "shoved") == 2, "and the second: " + events))
 			.thenSucceed();
 	}
 
@@ -331,7 +321,7 @@ public class GolemFlightGameTest {
 				}
 				helper.assertTrue(Boolean.TRUE.equals(golem.robotics().land(args(true)).first()), "a command: true");
 			})
-			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "land", "ok", false, "why", "blocked", "block", "minecraft:air", "face", "down")),
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().map(GameTests::withoutCall).anyMatch(java.util.Map.of("event", "land", "ok", false, "why", "blocked", "block", "minecraft:air", "face", "down")::equals),
 				"blocked by the air below: " + events))
 			.thenExecute(() -> helper.assertTrue(golem.thrusting(), "still hovering"))
 			.thenSucceed();
@@ -406,9 +396,13 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
-	/** stop(true) stops a fall where it is (the user's): a tier 2 catches itself mid-fall and hovers there, its legs dropped; stop() lets the fall go on. */
+	/**
+	 * stop() then fly() catches a fall where it is (the user's: no stop(true), no hover): a stop lets
+	 * the fall go on but takes where it is as where its last command left it, and fly() goes there,
+	 * catching itself, its legs dropped.
+	 */
 	@GameTest(maxTicks = 300)
-	public void stopWithForceStopsAFallWhereItIs(GameTestHelper helper) {
+	public void aStopThenAFlightCatchesAFallWhereItIs(GameTestHelper helper) {
 		helper.setBlock(FRONT, Blocks.STONE); // (two steps up)
 		helper.setBlock(FRONT.east(), Blocks.STONE);
 		helper.setBlock(FRONT.east().above(), Blocks.STONE);
@@ -431,14 +425,16 @@ public class GolemFlightGameTest {
 			.thenWaitUntil(() -> helper.assertTrue(notices(events, "falling") == 1, "it says it's falling: " + events))
 			.thenExecute(() -> {
 				golem.robotics().stop(args());
-				same(helper, golem.robotics().state(), RoboticsDevice.FALLING, "a plain stop: the fall goes on");
-				golem.robotics().stop(args(true));
 				caught[0] = golem.getY();
-				helper.assertTrue(!golem.legs() && golem.thrusting(), "caught where it is, its legs dropped");
+				same(helper, golem.robotics().state(), RoboticsDevice.FALLING, "a stop: the fall goes on");
+				helper.assertTrue(!golem.robotics().fly(args()).failed(), "fly(): taken mid-fall");
 			})
-			.thenExecuteAfter(5, () -> {
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "caught, there: " + events))
+			.thenExecute(() -> {
 				same(helper, golem.robotics().state(), RoboticsDevice.HOVERING, "hovering there");
-				helper.assertTrue(Math.abs(golem.getY() - caught[0]) < NEAR, "where it stopped: " + (golem.getY() - caught[0]));
+				helper.assertTrue(Math.abs(golem.getY() - BotGolem.LEG_HEIGHT - caught[0]) < 0.06,
+					"where it stopped (its torso its legs' height over its feet's point): " + (golem.getY() - BotGolem.LEG_HEIGHT - caught[0]));
+				helper.assertTrue(!golem.legs(), "its legs dropped");
 				helper.assertTrue(notices(events, "landed") == 0, "no fall to say: " + events);
 			})
 			.thenWaitUntil(() -> helper.assertTrue(legs(helper).size() == 1 && legs(helper).getFirst().onGround(), "its legs down below"))

@@ -7,6 +7,7 @@ import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -176,6 +177,8 @@ public final class FieldCard extends Card implements Buffered {
 		}
 		Result started = projector.move(args.checkNumber(0), args.count() > 1 ? args.checkNumber(1) : 0, args.count() > 2 ? args.checkNumber(2) : 0);
 		if (!started.failed()) {
+			moveArgs = "move".equals(calledMethod) ? calledArgs : List.of();
+			movedFrom = projector.where();
 			state(MOVING);
 		}
 		return started;
@@ -197,7 +200,7 @@ public final class FieldCard extends Card implements Buffered {
 				projector.stop();
 			}
 			state(HOLDING);
-			events.ended("move", false, RoboticsDevice.STOPPED, null);
+			events.stopped("move", call());
 		}
 		return Result.ok();
 	}
@@ -232,7 +235,7 @@ public final class FieldCard extends Card implements Buffered {
 	public void blocked(String block, String face) {
 		if (state.equals(MOVING)) {
 			state(HOLDING);
-			events.ended("move", false, BLOCKED, Buffered.blocked(block, face), null);
+			events.blocked("move", block, face, call());
 		}
 	}
 
@@ -250,6 +253,34 @@ public final class FieldCard extends Card implements Buffered {
 			events.ended("move", false, why, null); // (the move it was making ends with it)
 		}
 		event("lost", why);
+	}
+
+	/** The last command the board gave it and its arguments (the board's {@link #called}); the move under way's, and where what it holds was as it began. */
+	private String calledMethod;
+	private List<Object> calledArgs = List.of();
+	private List<Object> moveArgs = List.of();
+	private Map<String, Object> movedFrom;
+
+	@Override
+	public void called(String method, List<Object> args) {
+		calledMethod = method;
+		calledArgs = EventQueue.given(args);
+	}
+
+	/** The move under way's call: its arguments as given, and {forward, right, up} it moved, in its computer's frame. */
+	private Map<String, Object> call() {
+		Object progress = List.of(0L, 0L, 0L);
+		Map<String, Object> now = projector == null ? null : projector.where();
+		if (movedFrom != null && now != null) {
+			progress = List.of(moved(now, "forward"), moved(now, "right"), moved(now, "up"));
+		}
+		return EventQueue.call(moveArgs, progress);
+	}
+
+	private Object moved(Map<String, Object> now, String axis) {
+		double by = ((Number) now.get(axis)).doubleValue() - ((Number) movedFrom.get(axis)).doubleValue();
+		double kept = Math.rint(by * 10) / 10; // (to a tenth, as its positions are)
+		return kept == Math.rint(kept) ? (Object) (long) kept : kept;
 	}
 
 	/** What it's doing now. */

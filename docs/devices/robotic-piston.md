@@ -103,7 +103,8 @@ Its oldest event, or `nil`.
 ## Events
 
 A move's end: `{event = "push", ok = true}` (or `extend`, `retract`), or blocked:
-`{event = "push", ok = false, why = "blocked", block = "minecraft:obsidian", face = "east"}`. Its
+`{event = "push", ok = false, why = "blocked", block = "minecraft:obsidian", face = "east", call = {args = {"east"}, progress = 0}}`
+(its `call`: the arguments as given, and nothing moved). Its
 file reads them as lines, `push ok`, `push failed blocked minecraft:obsidian east`.
 
 ## Examples

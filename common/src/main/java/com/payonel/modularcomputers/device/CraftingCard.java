@@ -139,6 +139,16 @@ public final class CraftingCard extends Card implements Buffered {
 	/** Crafts still to make, of those asked for, and those made so far. */
 	private int toCraft;
 	private int crafted;
+	/** The last command the board gave it and its arguments (the board's {@link #called}), and the craft under way's. */
+	private String calledMethod;
+	private java.util.List<Object> calledArgs = java.util.List.of();
+	private java.util.List<Object> craftArgs = java.util.List.of();
+
+	@Override
+	public void called(String method, java.util.List<Object> args) {
+		calledMethod = method;
+		calledArgs = EventQueue.given(args);
+	}
 	private String craftedName;
 	/** Ticks until the craft under way is done. */
 	private int ticksLeft;
@@ -189,11 +199,16 @@ public final class CraftingCard extends Card implements Buffered {
 			result.put("name", craftedName);
 		}
 		result.put("count", (long) crafted);
+		Map<String, Object> call = EventQueue.call(craftArgs, (long) crafted); // (its call: its count asked, the crafts done)
 		toCraft = 0;
 		crafted = 0;
 		craftedName = null;
 		changed();
-		events.ended("craft", "crafted".equals(name), why, result);
+		if (STOPPED.equals(why)) {
+			events.stopped("craft", call);
+		} else {
+			events.ended("craft", "crafted".equals(name), why, result);
+		}
 	}
 
 	/** Its events, what its slots hold and its stop are free (they're the card's own); each other method is a command. */
@@ -260,6 +275,7 @@ public final class CraftingCard extends Card implements Buffered {
 			return Result.fail(refused);
 		}
 		toCraft = count;
+		craftArgs = "craft".equals(calledMethod) ? calledArgs : java.util.List.of();
 		crafted = 0;
 		ticksLeft = CRAFT_TICKS;
 		changed();
@@ -269,7 +285,7 @@ public final class CraftingCard extends Card implements Buffered {
 	@Method(doc = "stop(): ends a craft under way at once (its event: craft, not ok, stopped, with how many it made); never waits: true")
 	public Result stop(Arguments args) {
 		if (toCraft > 0) {
-			finish("failed", RoboticsDevice.STOPPED);
+			finish("failed", STOPPED);
 		}
 		return Result.ok(true);
 	}

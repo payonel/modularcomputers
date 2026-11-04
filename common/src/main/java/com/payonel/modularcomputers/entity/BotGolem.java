@@ -119,7 +119,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private static final String HOVERING_SAVED = "hovering";
 	private static final String PATHFINDING_SAVED = "pathfinding";
 	/** Whether it holds its plan in the air (off after a way back it couldn't make). */
-	private static final String HOLDING_SAVED = "holding";
 	private static final String ORIGINS_SAVED = "origins";
 	private static final com.mojang.serialization.Codec<Origin> ORIGIN_CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.create(origin -> origin.group(
 		Vec3.CODEC.fieldOf("at").forGetter(Origin::at),
@@ -201,8 +200,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private boolean hovering;
 	/** Something held it up last tick (its thrusters, a field): when nothing does, legless, it falls and powers off. */
 	private boolean airborne;
-	/** It holds its plan in the air (flies back after a shove): off after a stop, until its next command. */
-	private boolean holding = true;
+	/** Where it was when its last shove was said (null: none since its last command or stop): a shove is said once, till it's moved again. */
+	private Vec3 shovedTo;
 	/** A field holds it, or let it go and it's still coming down onto its feet: its robotics frozen. */
 	private boolean frozen;
 	/** Where a field took hold of it: what the field's carry moved it by is from here. */
@@ -414,17 +413,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 
 		@Override
-		public boolean catchFall() {
-			if (!falling() || noThrusters() != null) {
-				return false;
-			}
-			begin(); // (it holds again, a command's way)
-			takeOff(); // (its legs dropped, the fall it was owed forgotten)
-			setDeltaMovement(Vec3.ZERO);
-			return true;
-		}
-
-		@Override
 		public double toward(com.payonel.modularcomputers.device.Face way) {
 			return Mth.wrapDegrees(Direction.valueOf(way.name()).toYRot() - planYaw()); // (from its plan's heading)
 		}
@@ -434,7 +422,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			getNavigation().stop();
 			hands.stopBreaking();
 			target = null;
-			holding = true;
 			turnTo = Mth.wrapDegrees(planYaw() + (float) degrees); // (from its plan's heading)
 			return null;
 		}
@@ -537,21 +524,13 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 
 		@Override
-		public String returnToPlan() {
-			if (frozen) {
-				return RoboticsDevice.HELD;
-			}
-			holding = true;
-			if (!legs()) { // (in the air: it flies back)
-				begin();
-				return flyToward(planPoint().add(0, LEG_HEIGHT, 0));
-			}
-			return walk(0, 0, 0); // (steps back onto its plan, its heading its plan's)
+		public boolean offSpot() {
+			return BotGolem.this.offSpot();
 		}
 
 		@Override
-		public void holdHere() {
-			holding = false; // (until its next command: it stays where it stopped)
+		public double breaking() {
+			return hands.breaking();
 		}
 
 		@Override
@@ -583,13 +562,16 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			if (legs()) {
 				return "on legs";
 			}
-			// Its legs below it: within reach to its side, at its height or under it, however far down (the
-			// user's: a landing comes straight down, so no limit on how far; a flight's is its own).
-			net.minecraft.world.phys.AABB under = getBoundingBox().inflate(LEGS_REACH, 0, LEGS_REACH).setMinY(level().getMinY());
-			GolemLegs below = level().getEntitiesOfClass(GolemLegs.class, under.setMaxY(getBoundingBox().maxY + ON_LEGS), GolemLegs::isAlive)
-				.stream().filter(legs -> legs.getY() <= getY() + ON_LEGS && legs.position().subtract(BotGolem.this.position()).horizontalDistance() <= LEGS_REACH)
-				.min(java.util.Comparator.comparingDouble(legs -> legs.position().distanceTo(BotGolem.this.position()))).orElse(null);
-			Vec3 ground = below == null && force ? groundBelow() : null;
+			// A move, so from where its last command left it (the user's): its legs below that spot, within
+			// reach to its side, however far down (a landing comes straight down: no limit; a flight's is
+			// its own), and it comes to them from wherever it is.
+			Vec3 spot = planPoint().add(0, LEG_HEIGHT, 0); // (its torso there, legless)
+			net.minecraft.world.phys.AABB under = new net.minecraft.world.phys.AABB(spot.x - LEGS_REACH, level().getMinY(), spot.z - LEGS_REACH,
+				spot.x + LEGS_REACH, spot.y + ON_LEGS + 1, spot.z + LEGS_REACH);
+			GolemLegs below = level().getEntitiesOfClass(GolemLegs.class, under, GolemLegs::isAlive)
+				.stream().filter(legs -> legs.getY() <= spot.y + ON_LEGS && legs.position().subtract(spot).horizontalDistance() <= LEGS_REACH)
+				.min(java.util.Comparator.comparingDouble(legs -> legs.position().distanceTo(spot))).orElse(null);
+			Vec3 ground = below == null && force ? groundBelow(spot) : null;
 			if (below == null && !force) {
 				return "no legs below";
 			} else if (below == null && ground == null) {
@@ -771,7 +753,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	@Override
 	public void push(double x, double y, double z) {
 		if (!standing()) {
-			pushedOnTheWay |= robotics.returning();
 			super.push(x, y, z);
 		}
 	}
@@ -779,48 +760,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	@Override
 	public void knockback(double strength, double x, double z, DamageSource source, float amount, boolean onGround) {
 		if (!standing()) {
-			pushedOnTheWay |= robotics.returning();
 			super.knockback(strength, x, z, source, amount, onGround);
 		}
-	}
-
-	/** Something pushed it on its way back, since its last look: a shove of its own if it took it farther off. */
-	private boolean pushedOnTheWay;
-	/** How far it had left to go back after its own last step (NaN: not on its way back). */
-	private double wayLeft = Double.NaN;
-	/** A shove on this way back said, until a tick comes with no push (a mob leaning on it: one shove, not a push a tick). */
-	private boolean shoveSaid;
-
-	/**
-	 * Each tick of a flight, before its step: on its way back, a push that took it farther off than
-	 * its own last step left it is a new shove (the user's: each its notice), said once until a tick
-	 * comes with no push.
-	 */
-	private void watchTheWayBack() {
-		if (!robotics.returning() || Double.isNaN(wayLeft)) {
-			pushedOnTheWay = false;
-			return;
-		}
-		if (!pushedOnTheWay) {
-			shoveSaid = false;
-		} else if (!shoveSaid && wayBack() > wayLeft + OFF_PLAN) {
-			robotics.shovedOnTheWay(offPlan());
-			shoveSaid = true;
-		}
-		pushedOnTheWay = false;
-	}
-
-	/** Each tick of a flight, after its step: how far it has left to go back (NaN: not on its way back). */
-	private void steppedOnTheWay() {
-		wayLeft = robotics.returning() ? wayBack() : Double.NaN;
-		if (Double.isNaN(wayLeft)) {
-			shoveSaid = false;
-		}
-	}
-
-	/** How far its torso is from where its last command left it. */
-	private double wayBack() {
-		return position().distanceTo(planPoint().add(0, LEG_HEIGHT, 0));
 	}
 
 	@Override
@@ -900,14 +841,38 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		Vec3 now = position();
 		boolean settled = stoodAt != null && now.distanceTo(stoodAt) <= DRIFT; // (a shove is judged once it's over: a piston moves it over ticks)
 		stoodAt = now;
-		if (!settled || !legs() || thrusting() || frozen || !holding || !standing() || falling() || !Double.isNaN(fallFrom) || robotics.busy()) {
+		if (!settled || !legs() || thrusting() || frozen || !standing() || falling() || !Double.isNaN(fallFrom) || robotics.busy()) {
 			return;
 		}
+		shoved();
+	}
+
+	/**
+	 * Off where its last command left it, its shove over: it says so, once a shove (the user's: no way
+	 * back of its own; a program corrects it, or takes where it is with a stop).
+	 */
+	private void shoved() {
 		Map<String, Object> off = drift();
-		if (off != null) {
+		if (off != null && (shovedTo == null || position().distanceTo(shovedTo) > DRIFT)) {
+			shovedTo = position();
 			robotics.drifted(off);
 		}
 	}
+
+	/**
+	 * Whether it's off where its last command left it, so a positional command could act otherwise
+	 * (the user's): its middle out of that block's (half a block either way, up and down too, is on
+	 * it: its feet's height, a hovering one's, sits on a block's floor), or facing another right angle.
+	 */
+	private boolean offSpot() {
+		Vec3 plan = planPoint();
+		BlockPos spot = BlockPos.containing(plan.x, plan.y + HALF_BLOCK, plan.z);
+		BlockPos here = BlockPos.containing(getX(), feet() + HALF_BLOCK, getZ());
+		return !spot.equals(here) || Mth.wrapDegrees(rightAngle(getYRot()) - rightAngle(planYaw())) != 0;
+	}
+
+	/** Half a block: a spot's middle above its feet. */
+	private static final double HALF_BLOCK = 0.5;
 
 	/** Where it stood at its last tick, on its legs: a shove's over once it stays put. */
 	private Vec3 stoodAt;
@@ -925,12 +890,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 		double by = fallFrom - feet();
 		fallFrom = Double.NaN;
-		if (!robotics.busy()) {
-			Origin origin = origin();
-			double up = ((Number) positionFromOrigin().get("up")).doubleValue();
-			origins.put(dimension(), origin.planned(new Vec3(origin.plan().x, origin.plan().y, up), origin.heading()));
-		}
-		robotics.fell(by);
+		shovedTo = position(); // (where it fell to is off its spot, but a fall isn't a shove: it's said, landed)
+		robotics.fell(by); // (where its last command left it stays: a fall moves it nowhere, only a stop does, the user's)
 	}
 
 	/** What its moves under way were going to is moved by {@code by} (its frame was carried). */
@@ -1143,7 +1104,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		target = null;
 		steps = null;
 		stepFrom = stepTo = null;
-		holding = true; // (a command: it holds its plan again)
+		shovedTo = null; // (a command: a shove from here on is a new one)
 		face(planYaw()); // (from its plan: its heading too)
 		heading = getYRot();
 	}
@@ -1219,7 +1180,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		if (firing) {
 			robotics.thrusted();
 			beams();
-			watchTheWayBack();
 			if (frozen) {
 				// (a field holds it: its flight pauses)
 			} else if (landing != null) {
@@ -1238,14 +1198,10 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 					move(net.minecraft.world.entity.MoverType.SELF, drift);
 				}
 				setDeltaMovement(drift.lengthSqr() > DRIFT * DRIFT ? drift.scale(HOVER_DRAG) : Vec3.ZERO);
-				if (holding && drift.lengthSqr() <= DRIFT * DRIFT) {
-					Map<String, Object> off = drift();
-					if (off != null) {
-						robotics.drifted(off); // (shoved off its plan: it holds it, as a drone does, flying back)
-					}
+				if (drift.lengthSqr() <= DRIFT * DRIFT && !robotics.busy()) {
+					shoved(); // (a shove over: it says so, and stays where it was put)
 				}
 			}
-			steppedOnTheWay();
 		}
 		boolean up = entityData.get(THRUSTING) || EnergyField.held(this);
 		if (airborne && !up && !legs() && machine().isPowered()) {
@@ -1355,14 +1311,14 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	}
 
 	/** Where its torso comes down to straight below it, on what it would rest on, however far down (null: nothing, down to the world's bottom). */
-	private Vec3 groundBelow() {
-		BlockPos at = blockPosition();
+	private Vec3 groundBelow(Vec3 torso) {
+		BlockPos at = BlockPos.containing(torso);
 		for (BlockPos pos = at; pos.getY() >= level().getMinY(); pos = pos.below()) { // (the user's: however far down; none only over a hole through the world)
 			var shape = level().getBlockState(pos).getCollisionShape(level(), pos, net.minecraft.world.phys.shapes.CollisionContext.of(this));
 			if (!shape.isEmpty()) {
 				double top = pos.getY() + shape.max(Direction.Axis.Y);
-				if (top <= getY() + HAIR) {
-					return new Vec3(getX(), top, getZ());
+				if (top <= torso.y + HAIR) {
+					return new Vec3(torso.x, top, torso.z);
 				}
 			}
 		}
@@ -1839,7 +1795,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		output.putBoolean(LEGS_SAVED, legs());
 		output.putBoolean(HOVERING_SAVED, hovering); // (a save isn't a power cut: it hovers on)
 		output.putBoolean(PATHFINDING_SAVED, pathfinding);
-		output.putBoolean(HOLDING_SAVED, holding);
 		output.store(ORIGINS_SAVED, ORIGINS_CODEC, Map.copyOf(origins));
 		board.save(output, false);
 	}
@@ -1850,7 +1805,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		legs(input.getBooleanOr(LEGS_SAVED, true));
 		hovering = input.getBooleanOr(HOVERING_SAVED, false);
 		pathfinding = input.getBooleanOr(PATHFINDING_SAVED, false);
-		holding = input.getBooleanOr(HOLDING_SAVED, true);
 		setNoGravity(hovering); // (a walk under way at the save doesn't go on: its steps' hold on gravity neither)
 		origins.clear();
 		input.read(ORIGINS_SAVED, ORIGINS_CODEC).ifPresent(origins::putAll);

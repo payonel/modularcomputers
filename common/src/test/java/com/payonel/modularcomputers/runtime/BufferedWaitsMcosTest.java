@@ -192,14 +192,14 @@ class BufferedWaitsMcosTest extends McosHarness {
 			assert(devices.sync(robot))
 			card.stop()
 			local ended = devices.event(card)
-			local ok, why, made = ended.ok, ended.why, ended.result
+			local ok, why, call = ended.ok, ended.why, ended.call -- (its call: the count asked, the crafts done)
 			local out = io.open("/out", "w")
-			out:write(tostring(ok), " ", why, " ", tostring(made.count >= 20), "\\n")
+			out:write(tostring(ok), " ", why, " ", tostring(call.args[1]), " ", tostring(call.progress >= 20), "\\n")
 			out:close()
 			""");
 		boot();
 		type("lua /stopcraft.lua\r");
-		untilFile(root().resolve("out"), "false stopped true\n");
+		untilFile(root().resolve("out"), "false stopped 50 true\n");
 		assertThat(card.state()).as("its craft's over").isEqualTo(CraftingCard.IDLE);
 	}
 

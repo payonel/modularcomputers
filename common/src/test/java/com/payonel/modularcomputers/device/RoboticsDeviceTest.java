@@ -153,7 +153,7 @@ class RoboticsDeviceTest {
 		assertThat(device.interruptPending()).as("nothing was under way").isFalse();
 		device.walk(args(2L));
 		device.stop(args());
-		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", RoboticsDevice.STOPPED));
+		assertThat(withoutCall(device.pull(args()).first())).isEqualTo(Map.of("event", "walk", "ok", false, "why", RoboticsDevice.STOPPED));
 		assertThat(device.refusal("walk")).as("free again at once").isNull();
 	}
 
@@ -179,10 +179,10 @@ class RoboticsDeviceTest {
 	void blockedIsTheWordWithTheBlockAndItsFace() {
 		device.walk(args(2L));
 		device.blocked("minecraft:stone", "front");
-		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "front"));
+		assertThat(withoutCall(device.pull(args()).first())).isEqualTo(Map.of("event", "walk", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "front"));
 		device.walk(args(2L));
 		device.blocked(null, "up");
-		assertThat(device.pull(args()).first()).as("no block named: \"\", never nil").isEqualTo(Map.of("event", "walk", "ok", false, "why", "blocked", "block", "", "face", "up"));
+		assertThat(withoutCall(device.pull(args()).first())).as("no block named: \"\", never nil").isEqualTo(Map.of("event", "walk", "ok", false, "why", "blocked", "block", "", "face", "up"));
 	}
 
 	@Test
@@ -213,11 +213,11 @@ class RoboticsDeviceTest {
 		assertThat(device.power().collect(0)).isEqualTo((long) Math.ceil(2.5 * RoboticsDevice.WALK_COST)); // (by the distance, a part of a block too)
 	}
 
-	/** A body that can drift, fail its way back, fall, and says what it was asked to plan. */
+	/** A body that can drift, be off its spot, fall, and says what it was asked to plan. */
 	private static final class Drifting implements RoboticsDevice.Body {
 		final List<String> asked = new ArrayList<>();
 		Map<String, Object> drift;
-		String noWayBack;
+		boolean off;
 		boolean falling;
 		boolean frozen;
 
@@ -244,14 +244,8 @@ class RoboticsDeviceTest {
 		}
 
 		@Override
-		public String returnToPlan() {
-			asked.add("return");
-			return noWayBack;
-		}
-
-		@Override
-		public void holdHere() {
-			asked.add("hold here");
+		public boolean offSpot() {
+			return off;
 		}
 
 		@Override
@@ -270,19 +264,83 @@ class RoboticsDeviceTest {
 		}
 
 		@Override
-		public boolean catchFall() {
-			if (!falling) {
-				return false;
-			}
-			asked.add("catch");
-			falling = false;
-			return true;
-		}
-
-		@Override
 		public boolean frozen() {
 			return frozen;
 		}
+	}
+
+	/** An event without its call (a test about something else). */
+	static Object withoutCall(Object event) {
+		if (!(event instanceof Map<?, ?> map)) {
+			return event;
+		}
+		Map<Object, Object> rest = new java.util.LinkedHashMap<>(map);
+		rest.remove("call");
+		return rest;
+	}
+
+	/** A shove is said, and nothing more (the user's: no way back of its own; the program corrects it). */
+	@Test
+	void aShoveIsSaidAndNothingMore() {
+		Drifting body = new Drifting();
+		RoboticsDevice robot = with(body);
+		robot.drifted(Map.of("forward", 1.5, "right", 0L, "up", 0L));
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "shoved", "drift", Map.of("forward", 1.5, "right", 0L, "up", 0L)));
+		assertThat(robot.pull(args()).first()).as("nothing more").isNull();
+		assertThat(body.asked).as("no way back").isEmpty();
+		assertThat(robot.busy()).isFalse();
+	}
+
+	/**
+	 * Positional, always (the user's): off its spot, a command answering at once fails drifted, doing
+	 * nothing; one over time without moving it (turn, swing) starts and ends at once, drifted, its
+	 * drift and its call; a move goes on from its spot as ever.
+	 */
+	@Test
+	void aPositionalCommandOffItsSpotFailsDrifted() {
+		Drifting body = new Drifting();
+		body.off = true;
+		body.drift = Map.of("forward", 0.6, "right", 0L, "up", 0L);
+		RoboticsDevice robot = with(body);
+		assertThat(robot.refusal("scan")).isEqualTo(Buffered.DRIFTED);
+		assertThat(robot.refusal("take")).isEqualTo(Buffered.DRIFTED);
+		assertThat(robot.refusal("walk")).as("a move: from its spot, as ever").isNull();
+		assertThat(robot.refusal("land")).as("a landing is a move").isNull();
+		robot.called("turn", List.of("left"));
+		assertThat(robot.turn(args("left")).first()).isEqualTo(true);
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "turn", "ok", false, "why", "drifted",
+			"drift", Map.of("forward", 0.6, "right", 0L, "up", 0L), "call", Map.of("args", List.of("left"), "progress", 0L)));
+		assertThat(body.asked).as("it didn't turn").isEmpty();
+		assertThat(robot.busy()).isFalse();
+		CraftingCard card = cardIn(robot);
+		assertThat(card.refusal("take")).as("its crafting card's too").isEqualTo(Buffered.DRIFTED);
+		assertThat(card.refusal("craft")).as("a craft isn't where the robot is").isNull();
+	}
+
+	/** stop() always makes where it is where its last command left it, a command running or not, falling too (the user's). */
+	@Test
+	void aStopAlwaysTakesWhereItIs() {
+		Drifting body = new Drifting();
+		RoboticsDevice robot = with(body);
+		robot.stop(args());
+		assertThat(body.asked).as("nothing running: still where it is").containsExactly("stop", "replan here");
+		assertThat(robot.pull(args()).first()).as("and no event").isNull();
+		body.asked.clear();
+		body.falling = true;
+		robot.stop(args());
+		assertThat(body.asked).as("falling: its fall goes on, and where it is is taken").containsExactly("replan here");
+	}
+
+	/** A stopped command's end says its call (the user's): its arguments as the board gave them, and how far it got. */
+	@Test
+	void aStoppedCommandSaysItsCall() {
+		Drifting body = new Drifting();
+		RoboticsDevice robot = with(body);
+		robot.called("walk", java.util.Arrays.asList(20L, null));
+		robot.walk(args(20L));
+		robot.stop(args());
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "stopped",
+			"call", Map.of("args", List.of(20L), "progress", 0L)));
 	}
 
 	private static RoboticsDevice with(Drifting body) {
@@ -308,65 +366,6 @@ class RoboticsDeviceTest {
 		assertThat(resumed.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", RoboticsDevice.INTERRUPTED));
 	}
 
-	/** Shoved where it can't get back from (no path), it says so once and holds where it is: no stream of shoves. */
-	@Test
-	void aWayBackItCantMakeIsSaidOnceAndItHoldsWhereItIs() {
-		Drifting body = new Drifting();
-		body.noWayBack = "no path";
-		RoboticsDevice robot = with(body);
-		robot.drifted(Map.of("forward", 1.5, "right", 0L, "up", 0L));
-		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "shoved", "drift", Map.of("forward", 1.5, "right", 0L, "up", 0L)));
-		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "stuck", "why", "no path"));
-		assertThat(body.asked).containsExactly("return", "hold here");
-		assertThat(robot.busy()).isFalse();
-	}
-
-	/**
-	 * A way back blocked partway says so (stuck, why) and holds where it is, where it goes on from left
-	 * the last good point: no program asked for the way back, so its end moves nothing (a blocked walk's
-	 * does). A walk() then takes it back.
-	 */
-	@Test
-	void aWayBackBlockedPartwayHoldsAndKeepsItsLastGoodPoint() {
-		Drifting body = new Drifting();
-		RoboticsDevice robot = with(body);
-		robot.drifted(Map.of("forward", 0.9, "right", 0L, "up", 0L));
-		assertThat(robot.state()).isEqualTo(RoboticsDevice.RETURNING);
-		robot.blocked("minecraft:piston_head", "back");
-		robot.pull(args());
-		assertThat(robot.pull(args()).first()).as("its notice says blocked as a command's end does")
-			.isEqualTo(Map.of("event", "notice", "what", "stuck", "why", "blocked", "block", "minecraft:piston_head", "face", "back"));
-		assertThat(body.asked).as("held there, nothing replanned").containsExactly("return", "hold here");
-	}
-
-	/** stop(true) stops a fall too (the user's): falling, it catches itself where it is, and goes on from there; stop() lets a fall go on. */
-	@Test
-	void stopWithForceCatchesAFallWhereItIs() {
-		Drifting body = new Drifting();
-		RoboticsDevice robot = with(body);
-		body.falling = true;
-		robot.stop(args());
-		assertThat(body.asked).as("a plain stop: nothing of its own moves, the fall goes on").isEmpty();
-		robot.stop(args(true));
-		assertThat(body.asked).as("caught, and it goes on from there").containsExactly("catch", "replan here");
-		body.asked.clear();
-		robot.stop(args(true));
-		assertThat(body.asked).as("not falling: a plain stop").containsExactly("stop");
-	}
-
-	/** A positional command given off its plan, with no way back, is refused with why (it can't run where it should). */
-	@Test
-	void aPositionalCommandWithNoWayBackIsRefusedWithWhy() {
-		Drifting body = new Drifting();
-		body.drift = Map.of("forward", 0.5, "right", 0L, "up", 0L);
-		body.noWayBack = "no path";
-		RoboticsDevice robot = with(body);
-		assertThat(robot.refusal("scan")).isEqualTo("no path");
-		body.noWayBack = null;
-		assertThat(robot.refusal("scan")).as("with a way back: it goes, the command waiting").isEqualTo(Buffered.BUSY);
-		assertThat(robot.state()).isEqualTo(RoboticsDevice.RETURNING);
-	}
-
 	/** A stop's plan is where it stopped (the body plans it: on its legs the block it's nearest), not where the stopped command began. */
 	@Test
 	void aStopPlansWhereItStopped() {
@@ -374,8 +373,8 @@ class RoboticsDeviceTest {
 		RoboticsDevice robot = with(body);
 		robot.walk(args(5L));
 		robot.stop(args());
-		assertThat(body.asked).containsExactly("walk", "stop", "replan here");
-		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "stopped"));
+		assertThat(body.asked).containsExactly("walk", "stop", "replan here", "replan here"); // (its end's, and the stop's own: always)
+		assertThat(withoutCall(robot.pull(args()).first())).isEqualTo(Map.of("event", "walk", "ok", false, "why", "stopped"));
 	}
 
 	/** Falling, it's busy; landed, its news (fell) ends the wait, said even for a short fall when a command waited. */
@@ -458,28 +457,6 @@ class RoboticsDeviceTest {
 		});
 		card.accepting(true);
 		return card;
-	}
-
-	/**
-	 * The card's commands are its robot's to wait for (the robot decides, the card asks it): a take
-	 * off the robot's plan waits for it to go back (the robot's return, its news the wait's end), and
-	 * a craft waits for that move too, without starting one.
-	 */
-	@Test
-	void aCardsTakeOffItsRobotsPlanWaitsForItToGoBackFirst() {
-		Drifting body = new Drifting();
-		body.drift = Map.of("forward", 0.5, "right", 0L, "up", 0L);
-		RoboticsDevice robot = with(body);
-		CraftingCard card = cardIn(robot);
-		assertThat(card.refusal("craft")).as("a craft isn't where the robot is: no way back for it").isNull();
-		assertThat(card.refusal("take")).as("a take is: it waits").isEqualTo(Buffered.BUSY);
-		assertThat(robot.state()).as("the robot goes back").isEqualTo(RoboticsDevice.RETURNING);
-		assertThat(card.blocker("take")).as("the robot's news ends the wait").isSameAs(robot);
-		assertThat(card.refusal("craft")).as("a craft waits for that move too").isEqualTo(Buffered.BUSY);
-		body.drift = null;
-		robot.arrived(); // (back on its plan)
-		assertThat(card.refusal("take")).as("in position: it takes").isNull();
-		assertThat(body.asked).containsExactly("return", "replan");
 	}
 
 	@Test

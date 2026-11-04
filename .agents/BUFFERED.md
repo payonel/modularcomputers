@@ -65,7 +65,8 @@ comes in named fields beside it, the same fields wherever it's said. Done so far
 (`block`, the block's id, `""` when no one block can be named, never nil; `face`, the side of what moved
 that met it, in the device's terms: a robot's own, a field holder's frame, a piston's the world's),
 said only in an event (a piston's too: its push ends in its event; its cable port's side is
-blocked by its cable); a walk's step up or drop it can't take, and an elevation it couldn't reach,
+blocked by its cable), with `call = {args, progress}`; `stopped` likewise (always a method's end,
+with its `call`), and `drifted` (a positional command off its spot, with its `drift` and `call`); a walk's step up or drop it can't take, and an elevation it couldn't reach,
 are blocked too (by the step's block, by air, by the block under it or the air over it), their
 counts gone, in the `/dev` text as words,
 `-` for a missing one. The rest of the reasons follow.
@@ -90,15 +91,16 @@ counts gone, in the `/dev` text as words,
   its legs, from the block it was nearest. A command `interrupted` by a load goes on the same way.
 - A fall on its legs it didn't ask for (a block gone from under it) isn't drift: a `falling`
   notice as it begins (the user's, 2026-10-29), its flights taken meanwhile (a tier 2 catches
-  itself, its legs dropped; `stop(true)` catches it where it is), else it's busy while it falls, its plan follows it down, and a `landed` notice (how far) ends a wait: a build decision from the
-  review (digging down broke every positional command after it).
-- Its own way back (after a shove, before a positional command) is a command of its own (others
-  wait for it), said by notices: a build decision, so a failed way back is said. A failed one
-  holds, where it goes on from kept (no retries). A piston shoves it on its legs too, and it walks
-  back (the user's, 2026-10-29).
+  itself, its legs dropped; `stop()` then `fly()` catches it where it is), else it's busy while it
+  falls, and a `landed` notice (how far) ends a wait. Where its last command left it stays (the
+  user's, 2026-11-03: only a stop moves it; a robot digging down calls `stop()` where it lands).
+- No way back of its own (the user's, 2026-11-03): shoved (a piston shoves it on its legs too, the
+  user's, 2026-10-29), it says so and stays where it was put; a program corrects it (`walk()`,
+  `fly()`) or takes where it is (`stop()`). Positional commands act where its last command left
+  it, always: off that spot, one answering at once fails `drifted`, one over time ends `drifted`.
 - What no program asked for is one event, a notice (the user's, 2026-10-29): `{event = "notice",
-  what}`, `shoved` (with the drift: `{forward, right, up}`; on the way back too), `returned`,
-  `stuck` (why), `falling`, `landed` (by), `frozen`, `thawed`. (The build had them as events of their own, the
+  what}`, `shoved` (with the drift: `{forward, right, up}`), `falling`, `landed` (by), `frozen`,
+  `thawed`. (The build had them as events of their own, the
   way back's as `return`, `ok` or why.)
 - Held in a field (any field, its own too): its robotics freezes, and only its robotics (the user's,
   2026-10-29: a crafting card's craft under way goes on; the card's commands wait, the robot being their actor): the active command pauses, new

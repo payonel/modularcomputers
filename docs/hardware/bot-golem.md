@@ -42,7 +42,7 @@ that item (a golem's or a torso's), crouch and right-click, in the air or at a b
 parts right there: change its parts, what it holds and its crafting cards' slots without setting it
 down (it's off while it's an item: no bus till it's set down). Nothing else harms it. It's solid: you walk into it, not through it, and can stand on it. While it
 stands on its legs it's hard to shove: not a player walking into it, a mob, or a blast. A piston
-does shove it, and it walks back.
+does shove it: it says so, and stays where it was put, for its program to take back.
 
 Its parts view is a case's, seen through its iron chest: the same board, the same slots, those its
 size has. Its gold slot takes only a [tier 1 screen](/hardware/screen/), which is its face. Its

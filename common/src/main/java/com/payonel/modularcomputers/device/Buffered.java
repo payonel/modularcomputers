@@ -19,17 +19,26 @@ public interface Buffered {
 	/**
 	 * Why a move ended: a block in its way (the user's: one shape, wherever it's said). Its event
 	 * says which block ({@code block}, the block's id; "" when no one block can be named, never nil) and
-	 * which face of what moved met it ({@code face}, in the device's own terms), as {@link #blocked}
-	 * gives them.
+	 * which face of what moved met it ({@code face}, in the device's own terms), as {@link EventQueue#blocked}
+	 * gives them ({@link EventQueue#blocked}, the one way it's built).
 	 */
 	String BLOCKED = "blocked";
 
-	/** A {@link #BLOCKED} end's fields: {@code block} (null: none to name, said "", the user's: always there) and {@code face}. */
-	static java.util.Map<String, Object> blocked(String block, String face) {
-		java.util.Map<String, Object> fields = new java.util.LinkedHashMap<>();
-		fields.put("block", block == null ? "" : block);
-		fields.put("face", face);
-		return fields;
+	/** Why something ended: a program called its device's stop (the user's: one shape, {@link EventQueue#stopped}). */
+	String STOPPED = "stopped";
+
+	/**
+	 * Why a positional command can't act (the user's: positional, always): its device is off where
+	 * its last command left it (a shove, a fall). Answering at once, it fails so; over time, its
+	 * event ends so ({@link EventQueue#drifted}).
+	 */
+	String DRIFTED = "drifted";
+
+	/**
+	 * The board gives a command (a method not free) with these arguments, as the program gave them,
+	 * before calling it: a stopped, blocked or drifted end says them in its call.
+	 */
+	default void called(String method, java.util.List<Object> args) {
 	}
 
 	/** Its methods that answer at once, always: not commands (and {@link #SYNC}, every one's). */

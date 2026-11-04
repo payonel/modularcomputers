@@ -62,6 +62,11 @@ final class GolemHands {
 	/** The game time of its last swing at a mob: how strong the next is. */
 	private long lastAttack = Long.MIN_VALUE / 2;
 
+	/** How far the block it's breaking has got, 0 to 1 (0: none being broken). */
+	double breaking() {
+		return breaking == null ? 0 : Math.min(1, progress / BROKEN);
+	}
+
 	GolemHands(BotGolem golem) {
 		this.golem = golem;
 	}

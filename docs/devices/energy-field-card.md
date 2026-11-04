@@ -100,7 +100,9 @@ event, `move`, says how it went: `ok`, or not and why (`blocked`; `stopped`; or 
 when no one block can be named), and `face`, the side of what it holds that met it, in its
 computer's frame (`front`, `back`, `left`, `right`, `up` or `down`; a case's front, or a robot's
 heading), the side that was hit, not the way the move was mostly going:
-`{event = "move", ok = false, why = "blocked", block = "minecraft:stone", face = "up"}`. Fails at once
+`{event = "move", ok = false, why = "blocked", block = "minecraft:stone", face = "up", call = {args = {0, 0, 5}, progress = {0, 0, 2}}}`:
+its `call` the move's arguments as given and `{forward, right, up}` it moved, as a stopped move's
+has. Fails at once
 with `not holding`, or `too far: 16` (out of its reach, unless it holds its own robot).
 
 ### release() → true
@@ -111,7 +113,8 @@ for the move to end. To let go at once, `stop` first.
 ### stop() → true
 
 Ends a move under way at once, where the field is: its event, `move`, ends `ok = false`,
-`why = "stopped"`. The field holds on to what it holds. It never waits.
+`why = "stopped"`, with its `call` (`{args, progress}`: the move's arguments as given, and how far
+it moved). The field holds on to what it holds. It never waits.
 
 ### get() → {state, name, forward, right, up}
 
@@ -131,7 +134,7 @@ Its oldest event, or nil.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `move` | `ok`, `why` (and `block`, `face` when it's `blocked`) | a move ended: `ok` true when it got there; else why (`blocked`, `stopped`, or a `lost` reason: it let go of what it moved) |
+| `move` | `ok`, `why` (and `block`, `face` when it's `blocked`; `call` when it's `blocked` or `stopped`) | a move ended: `ok` true when it got there; else why (`blocked`, `stopped`, or a `lost` reason: it let go of what it moved) |
 | `lost` | `why` | it let go on its own: `gone`, `too far: 16`, `no power`, `landing` (its robot landing onto its legs), `interrupted` (its world saved and loaded: a move it was making ends first) |
 
 ## Example

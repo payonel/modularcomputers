@@ -88,6 +88,21 @@ public final class RoboticPiston implements Device, Buffered {
 		return power;
 	}
 
+	/** The last command the board gave it and its arguments (the board's {@link #called}). */
+	private String calledMethod;
+	private java.util.List<Object> calledArgs = java.util.List.of();
+
+	@Override
+	public void called(String method, java.util.List<Object> args) {
+		calledMethod = method;
+		calledArgs = EventQueue.given(args);
+	}
+
+	/** A move's call that moved nothing: its arguments as given, progress 0. */
+	private java.util.Map<String, Object> call(String method) {
+		return EventQueue.call(method.equals(calledMethod) ? calledArgs : java.util.List.of(), 0L);
+	}
+
 	/** How its arms move, in the world (its block). */
 	public void moveWith(Arms arms) {
 		this.arms = arms;
@@ -138,12 +153,12 @@ public final class RoboticPiston implements Device, Buffered {
 			}
 			case CANNOT_PUSH -> {
 				// (its end at once, as every command's: blocked, the block, its face the world's way)
-				events.ended(method, false, BLOCKED, Buffered.blocked(blocker.apply(side), side), null);
+				events.blocked(method, blocker.apply(side), side, call(method)); // (nothing moved: progress 0)
 				yield Result.ok(true);
 			}
 			case CABLE -> {
 				// (its cable port's side: no arm there, blocked by what's on it, its cable, or air with Bluetooth)
-				events.ended(method, false, BLOCKED, Buffered.blocked(neighbor.apply(side), side), null);
+				events.blocked(method, neighbor.apply(side), side, call(method));
 				yield Result.ok(true);
 			}
 		};

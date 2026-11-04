@@ -49,14 +49,10 @@ public final class RoboticsDevice implements Device, Buffered {
 	public static final String FLYING = "flying";
 	public static final String HOVERING = "hovering";
 	public static final String LANDING = "landing";
-	/** What it's doing while it goes back to its plan (a shove, a stop off it). */
-	public static final String RETURNING = "returning";
 	/** What it's doing while a field holds it: its robotics frozen. */
 	public static final String HELD = "held";
 	/** What it's doing while it falls on its legs (nothing it was asked: a block gone under it). */
 	public static final String FALLING = "falling";
-	/** Its own way back to where its last command left it, as the command running (not a method). */
-	public static final String RETURN = "return";
 	/**
 	 * The event of whatever happened to it that no program asked for (the user's, 2026-10-29: one
 	 * type, so a program tells at once what it asked for from what came to it), {@code what} saying it.
@@ -64,10 +60,6 @@ public final class RoboticsDevice implements Device, Buffered {
 	public static final String NOTICE = "notice";
 	/** A notice's {@code what}: shoved off where its last command left it, in the air (and how far: {@code drift}). */
 	public static final String SHOVED = "shoved";
-	/** A notice's {@code what}: its way back (after a shove, or before a positional command) got it there. */
-	public static final String RETURNED = "returned";
-	/** A notice's {@code what}: its way back didn't get it there, and why; it holds where it is. */
-	public static final String STUCK = "stuck";
 	/** A notice's {@code what}: it came down on its legs from a fall nothing asked for ({@code by}, blocks); as it began, {@link #FALLING}. */
 	public static final String LANDED = "landed";
 	/** Its commands taken while it falls (the user's): a tier 2 catches itself on its thrusters, its legs dropped. */
@@ -75,11 +67,14 @@ public final class RoboticsDevice implements Device, Buffered {
 	/** A notice's {@code what}: a field took hold of it, or let it go. */
 	public static final String FROZEN = "frozen";
 	public static final String THAWED = "thawed";
-	/** Why a command ended when a stop cut it short. */
-	public static final String STOPPED = "stopped";
-	/** The commands that act where it is: given while it's off its plan, it goes back first. */
-	private static final java.util.Set<String> POSITIONAL = java.util.Set.of("turn", "land", "use", "swing", "scan", "contents", "store", "take",
-		"drop", "pickup"); // (the last two a crafting card's in it: they act where it is too)
+	/**
+	 * The commands that act where its last command left it and answer at once (the user's: positional,
+	 * always): given off its spot ({@link Body#offSpot}), each fails, {@link Buffered#DRIFTED}, doing
+	 * nothing; never a way back (the last two a crafting card's in it: they act where it is too).
+	 */
+	private static final java.util.Set<String> POSITIONAL = java.util.Set.of("use", "scan", "contents", "store", "take", "drop", "pickup");
+	/** The commands that act there over time without moving it: given off its spot, each starts and ends at once, drifted. */
+	private static final java.util.Set<String> POSITIONAL_OVER_TIME = java.util.Set.of("turn", "swing");
 	/** What its thrusters cost, each tick they fire (flying or hovering): five running CPUs' ticks. */
 	public static final int THRUST_COST = 5 * PowerUnits.CPU;
 	/** The farthest a flight may go, in blocks each way. */
@@ -112,11 +107,6 @@ public final class RoboticsDevice implements Device, Buffered {
 
 		/** Stops at once, where it is, no centering (a block it was breaking left as it is). */
 		void stop();
-
-		/** Falling, catches itself on its thrusters where it is, its legs dropped: whether it did (it has none, or isn't falling). */
-		default boolean catchFall() {
-			return false;
-		}
 
 		/** What's in the space at {@code face} (one of {@link #FACES}), or in all six by face (null). */
 		default Result scan(String face) {
@@ -180,13 +170,18 @@ public final class RoboticsDevice implements Device, Buffered {
 			return false;
 		}
 
-		/** Starts going back to its plan (walking, or in the air flying): null, or why not (its event: return). */
-		default String returnToPlan() {
-			return "no position";
+		/**
+		 * Whether it's off where its last command left it, so a positional command there could act
+		 * otherwise (the user's): out of that block (its middle's, so half a block either way, up and
+		 * down too, is still on it), or facing another right angle.
+		 */
+		default boolean offSpot() {
+			return false;
 		}
 
-		/** A stop: it holds where it stopped (in the air: no flying back to its plan) until its next command. */
-		default void holdHere() {
+		/** How far a block it's breaking has got, 0 to 1 (0: none). */
+		default double breaking() {
+			return 0;
 		}
 
 		/** Whether a field holds it: its robotics frozen. */
@@ -285,8 +280,16 @@ public final class RoboticsDevice implements Device, Buffered {
 		public void stop() {
 		}
 	};
-	/** The command running (its method's name, or {@link #RETURN}; null: none). */
+	/** The command running (its method's name; null: none). */
 	private String active;
+	/** The last command the board gave it and its arguments, as given (the board's {@link #called}). */
+	private String calledMethod;
+	private java.util.List<Object> calledArgs = java.util.List.of();
+	/** The command running's arguments, and where its last command left it as it started (its progress is from there). */
+	private java.util.List<Object> activeArgs = java.util.List.of();
+	private Map<?, ?> startedAt;
+	/** A stop's call, taken before its body stopped. */
+	private Map<String, Object> stopCall;
 	private boolean accepting;
 	/** The command under way at the save it was loaded from (its end is due: interrupted), or null. */
 	private String interrupted;
@@ -399,9 +402,60 @@ public final class RoboticsDevice implements Device, Buffered {
 		if (why != null) {
 			return Result.fail(why);
 		}
-		active = method;
-		changed();
+		begin(method);
 		return Result.ok(true);
+	}
+
+	/** A command begins: its arguments (as the board gave them) and where it starts from are kept, for its call. */
+	private void begin(String method) {
+		active = method;
+		activeArgs = method.equals(calledMethod) ? calledArgs : java.util.List.of();
+		Result planned = body.planned();
+		startedAt = planned.failed() ? null : (Map<?, ?>) planned.first();
+		changed();
+	}
+
+	@Override
+	public void called(String method, java.util.List<Object> args) {
+		calledMethod = method;
+		calledArgs = EventQueue.given(args);
+	}
+
+	/**
+	 * The command running's call: {args, progress}, its arguments as given and how far it got, in
+	 * their terms (the user's): a walk's or a flight's {forward, right, up} done, in its own frame
+	 * as it began; a walkTo's or flyTo's where it is, from its origin; a turn's degrees turned; a
+	 * landing's blocks come down; a swing's break so far, 0 to 1.
+	 */
+	private Map<String, Object> call() {
+		Object progress = 0L;
+		Result now = body.position();
+		if (startedAt != null && !now.failed() && now.first() instanceof Map<?, ?> at) {
+			double df = number(at.get("forward")) - number(startedAt.get("forward"));
+			double dr = number(at.get("right")) - number(startedAt.get("right"));
+			double du = number(at.get("up")) - number(startedAt.get("up"));
+			double heading = Math.toRadians(number(startedAt.get("heading")));
+			progress = switch (String.valueOf(active)) {
+				case "walk", "fly" -> java.util.List.of(tidy(df * Math.cos(heading) + dr * Math.sin(heading)),
+					tidy(-df * Math.sin(heading) + dr * Math.cos(heading)), tidy(du));
+				case "walkTo", "flyTo" -> java.util.List.of(tidy(number(at.get("forward"))), tidy(number(at.get("right"))), tidy(number(at.get("up"))));
+				case "turn" -> tidy(net.minecraft.util.Mth.wrapDegrees(number(at.get("heading")) - number(startedAt.get("heading"))));
+				case "land" -> tidy(-du);
+				case "swing" -> tidy(body.breaking());
+				default -> 0L;
+			};
+		}
+		return EventQueue.call(activeArgs, progress);
+	}
+
+	private static double number(Object value) {
+		return value instanceof Number n ? n.doubleValue() : 0;
+	}
+
+	/** A measure as said: a whole number as one, else to a thousandth. */
+	private static Object tidy(double value) {
+		double kept = Math.rint(value * FALL_GRAIN) / FALL_GRAIN;
+		return kept == Math.rint(kept) ? (Object) (long) kept : kept;
 	}
 
 	/**
@@ -409,32 +463,30 @@ public final class RoboticsDevice implements Device, Buffered {
 	 * where it is, its heading squared), and its event says how it went.
 	 */
 	private void end(boolean ok, String why, Object result) {
-		end(ok, why, null, result);
+		end(ok, why, null, null, result);
 	}
 
-	private void end(boolean ok, String why, Map<String, Object> fields, Object result) {
+	/** A command's end, its way back's too ({@code block}, {@code face}: a {@link #BLOCKED}'s). */
+	private void end(boolean ok, String why, String block, String face, Object result) {
 		String method = active;
 		if (method == null) {
 			return;
 		}
+		Map<String, Object> call = STOPPED.equals(why) && stopCall != null ? stopCall : STOPPED.equals(why) || BLOCKED.equals(why) ? call() : null; // (before its plan moves)
+		stopCall = null;
 		active = null;
 		if (STOPPED.equals(why) || INTERRUPTED.equals(why)) {
 			body.replanHere();
-		} else if (RETURN.equals(method) && !ok) {
-			body.holdHere(); // (its way back failed: where it goes on from stays the last good point, and it holds where it is)
 		} else {
 			body.replan();
 		}
 		changed();
-		if (RETURN.equals(method)) {
-			Map<String, Object> stuck = new LinkedHashMap<>();
-			stuck.put("why", why);
-			if (fields != null) {
-				stuck.putAll(fields); // (blocked's block and face, as a command's end has them)
-			}
-			notice(ok ? RETURNED : STUCK, ok ? null : stuck); // (nobody asked for it: no command's end)
+		if (STOPPED.equals(why)) {
+			events.stopped(method, call);
+		} else if (BLOCKED.equals(why)) {
+			events.blocked(method, block, face, call);
 		} else {
-			events.ended(method, ok, why, fields, result);
+			events.ended(method, ok, why, result);
 		}
 	}
 
@@ -497,6 +549,9 @@ public final class RoboticsDevice implements Device, Buffered {
 		if (Double.isNaN(degrees)) {
 			return Result.fail("not a way: " + way);
 		}
+		if (body.offSpot()) {
+			return drifted("turn");
+		}
 		Result started = start("turn", body.turn(degrees));
 		if (!started.failed()) {
 			power.charge(TURN_COST);
@@ -504,15 +559,14 @@ public final class RoboticsDevice implements Device, Buffered {
 		return started;
 	}
 
-	@Method(doc = "stop([force]): stops what it's doing at once, where it is, no centering (flying, it hovers there; a block it was breaking is left as it is): the command running ends, stopped. With force, falling, a tier 2 stops its fall too, catching itself on its thrusters where it is, its legs dropped (without force, or with no thrusters, a fall goes on). Its next command goes on from exactly where it stopped, on its legs as in the air (its heading the nearest right angle): no squaring first. Never waits; answers where it really stopped, {forward, right, up, heading} from its origin")
+	@Method(doc = "stop(): stops what it's doing at once, where it is, no centering (flying, it hovers there; a block it was breaking is left as it is; falling, its fall goes on): the command running ends, stopped. Where its last command left it becomes where it is now, a command running or not (the only thing that moves it there: a shove or a fall doesn't): its next command goes on from exactly there, on its legs as in the air (its heading the nearest right angle), no squaring first. Falling, a fly() then catches it there. Never waits; answers where it really stopped, {forward, right, up, heading} from its origin")
 	public Result stop(Arguments args) {
+		stopCall = active == null ? null : call(); // (how far it got, before its body stops: a break's progress goes with it)
 		if (!body.falling()) {
 			body.stop(); // (falling, nothing of its own moves: gravity's fall goes on, its speed kept)
 		}
 		end(false, STOPPED, null);
-		if (args.count() > 0 && args.get(0) != null && args.checkBoolean(0) && body.catchFall()) {
-			body.replanHere(); // (caught where it is: its next command goes on from there, as after any stop)
-		}
+		body.replanHere(); // (where it is: its next command goes on from here, a command cut short or none)
 		Result at = body.position();
 		return at.failed() ? Result.ok(true) : Result.ok(at.first());
 	}
@@ -548,12 +602,14 @@ public final class RoboticsDevice implements Device, Buffered {
 	@Method(doc = "swing(face): swings what it holds at a face, as a player's left click: a mob there is hit (\"attacked\", as hard as a player's swing: full strength once the weapon has recovered); else the block there starts breaking, as a player breaks it (its tool matters: a pickaxe for stone, an axe for wood): \"breaking\", a command running till it's broken (its event: swing, ok and result {block, kept, dropped}: the block's name and whether it kept all it dropped, its storage first, else its off hand; or not and why); or false and why")
 	public Result swing(Arguments args) {
 		String face = face(args, 0);
+		if (body.offSpot()) {
+			return drifted("swing");
+		}
 		Result result = body.swing(face);
 		if (!result.failed()) {
 			power.charge(ACTION_COST);
 			if (BREAKING.equals(result.first())) {
-				active = "swing";
-				changed();
+				begin("swing");
 			}
 		}
 		return result;
@@ -612,7 +668,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return move.why() != null ? Result.fail(move.why()) : start("fly", body.fly(move.by()[0], move.by()[1], move.by()[2]));
 	}
 
-	@Method(doc = "land([force]): (a tier 2 golem's) comes down onto its legs, standing below it however far down (within three blocks to the side), and onto them; force, with none there, comes straight down onto the ground beneath it without them, still running (its thrusters off; it walks nowhere, and flies again to fetch them), as safely as a crash would, but on. A command: true at once (its event: land, ok, or not and why: blocked, by air down, at once, when force finds nothing under it, down to the world's bottom), or false and why (no legs below, without force: it goes on hovering)")
+	@Method(doc = "land([force]): (a tier 2 golem's) a move, from where its last command left it: comes down onto its legs, standing below there however far down (within three blocks to the side), and onto them; force, with none there, comes straight down onto the ground beneath it without them, still running (its thrusters off; it walks nowhere, and flies again to fetch them), as safely as a crash would, but on. A command: true at once (its event: land, ok, or not and why: blocked, by air down, at once, when force finds nothing under it, down to the world's bottom), or false and why (no legs below, without force: it goes on hovering)")
 	public Result land(Arguments args) {
 		return start("land", body.land(args.count() > 0 && args.get(0) != null && args.checkBoolean(0)));
 	}
@@ -673,7 +729,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	 * face that met it, its own: front, back, left, right, up or down).
 	 */
 	public void blocked(String block, String face) {
-		end(false, BLOCKED, Buffered.blocked(block, face), null);
+		end(false, BLOCKED, block, face, null);
 	}
 
 	/** The body finished turning. */
@@ -719,35 +775,27 @@ public final class RoboticsDevice implements Device, Buffered {
 		notice(FROZEN, null);
 	}
 
-	/** Shoved off where its last command left it (its body found it so: hovering, or standing idle on its legs): it says so, and goes back. */
+	/**
+	 * Shoved off where its last command left it (its body found it so, once it's over: hovering, or
+	 * standing idle on its legs): it says so, and nothing more (the user's: no way back of its own; a
+	 * program corrects it, walk() or fly(), or takes where it is, stop()).
+	 */
 	public void drifted(Map<String, Object> drift) {
 		if (active != null) {
 			return;
 		}
 		notice(SHOVED, Map.of("drift", drift));
-		String why = body.returnToPlan();
-		if (why == null) {
-			active = RETURN;
-			changed();
-		} else {
-			notice(STUCK, Map.of("why", why)); // (it can't get back: it says so once, and holds where it is)
-			body.holdHere();
-		}
 	}
 
-	/**
-	 * Shoved again on its way back (its body found the push took it farther off): it says so, as a
-	 * shove of its own (the user's: each shove its notice), and goes on back from where it is.
-	 */
-	public void shovedOnTheWay(Map<String, Object> drift) {
-		if (RETURN.equals(active) && drift != null) {
-			notice(SHOVED, Map.of("drift", drift));
-		}
-	}
-
-	/** Whether it's on its own way back (after a shove, or before a positional command). */
-	public boolean returning() {
-		return RETURN.equals(active);
+	/** A positional command over time given off its spot: it starts and ends at once, drifted, its drift and its call. */
+	private Result drifted(String method) {
+		Map<?, ?> drift = body.drift(); // (before it begins: running, it has none)
+		begin(method);
+		Map<String, Object> call = call();
+		active = null;
+		changed();
+		events.drifted(method, drift == null ? Map.of("forward", 0L, "right", 0L, "up", 0L) : drift, call);
+		return Result.ok(true);
 	}
 
 	/**
@@ -786,7 +834,6 @@ public final class RoboticsDevice implements Device, Buffered {
 			case "turn" -> TURNING;
 			case "land" -> LANDING;
 			case "swing" -> BREAKING;
-			case RETURN -> RETURNING;
 			default -> active; // (no other runs over time)
 		};
 	}
@@ -797,8 +844,8 @@ public final class RoboticsDevice implements Device, Buffered {
 	}
 
 	/**
-	 * Why it can't take {@code method} now: held (a field holds it), busy (a command runs), or busy
-	 * while it goes back to its plan, which a positional command given off it starts.
+	 * Why it can't take {@code method} now: held (a field holds it), busy (a command runs, or it's
+	 * falling), or drifted (a positional command answering at once, given off its spot).
 	 */
 	@Override
 	public String refusal(String method) {
@@ -812,19 +859,13 @@ public final class RoboticsDevice implements Device, Buffered {
 			waitedOnFall = true;
 			return BUSY; // (its landing's news ends the wait)
 		}
-		if (POSITIONAL.contains(method) && body.drift() != null) {
-			String why = body.returnToPlan();
-			if (why != null) {
-				return why; // (it can't get back to its plan: the command can't run where it should)
-			}
-			active = RETURN; // (its way back first: the command waits for it)
-			changed();
-			return BUSY;
+		if (POSITIONAL.contains(method) && body.offSpot()) {
+			return DRIFTED; // (positional, always: off its spot it can't act where it should, and never goes back by itself)
 		}
 		return null;
 	}
 
-	/** Whether it's running a command now, its way back to its plan too (its body's ticks ask: a stop, a freeze). */
+	/** Whether it's running a command now (its body's ticks ask: a stop, a freeze). */
 	@Override
 	public boolean busy() {
 		return active != null;

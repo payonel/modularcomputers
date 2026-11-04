@@ -49,8 +49,9 @@ Shift held, say so); its tab still works by hand.
 Its methods are [commands](/devices/robotics/#one-command-at-a-time) that come after the robot's:
 each waits while the robot is doing something else (a walk, a swing), and a robot held in a field
 waits until it's let go, so what a program does at a chest comes after its walk there. Its face
-actions (`drop`, `store`, `take`, `pickup`, a line written) are where the robot is, so a robot
-shoved away from where its last command left it goes back there first. A craft costs the robot nothing: once started it's the
+actions (`drop`, `store`, `take`, `pickup`, a line written) act where its last command left the
+robot (positional, always): off that spot, after a shove or a fall, they fail at once, `drifted`,
+doing nothing, and the program takes it back (`walk()`, `fly()`) or takes where it is (`stop()`). A craft costs the robot nothing: once started it's the
 card's own work, and the card is busy until it's crafted (its next command waits for it) while the
 robot is free to walk and act. A field holding the robot holds its robotics only: a craft under way is the
 card's, and goes on, but the robot is what works the card (a case has none), so every command the
@@ -97,12 +98,14 @@ its storage. A command: once the robot's moves end it answers at once, and the c
 it's done, its robot free (`devices.sync` waits for it). Its event,
 `craft`: `ok` and its `result`, `{name, count}` (how many it made), or not and why (`no recipe`,
 `empty grid`, `no room`: its storage can't take what it made, so the craft isn't made and
-the grid is as it was; `stopped`, its `stop`), its `result` saying how many it made before it
-stopped.
+the grid is as it was), its `result` saying how many it made before it failed. Stopped, it ends
+`{event = "craft", ok = false, why = "stopped", call = {args = {20}, progress = 10}}`: the
+count it was given, and the crafts it had done.
 
 ### stop() → true
 
-Ends a craft under way at once: its event says `stopped`, with how many it made. Never waits; in
+Ends a craft under way at once: its event says `stopped`, with its `call` (the count asked, the
+crafts done). Never waits; in
 mcos it also ends every thread's wait to give the card a command (`ECANCELED`). The robot's own
 `stop` leaves the card's craft alone.
 
@@ -153,7 +156,7 @@ Its oldest event, or nil.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `craft` | `ok`, `why`, `result` (`{name, count}`) | a craft ended: the crafts asked for are made, or one couldn't be (why, and how many were made before it); `stopped` by its `stop`; `interrupted` when its world was saved during it |
+| `craft` | `ok`, `why`, `result` (`{name, count}`), or for `stopped`, `call` (`{args, progress}`) | a craft ended: the crafts asked for are made, or one couldn't be (why, and how many were made before it); `stopped` by its `stop`; `interrupted` when its world was saved during it |
 
 ## Example
 

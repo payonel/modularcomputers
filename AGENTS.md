@@ -339,13 +339,18 @@ A move faces as it began (it squares its heading up, and gives it back), or ends
 last middle reached; turns are right angles. **Each command goes from where the last left it**
 (the user's design, 2026-10-27; "plan" in the code): its robotics is buffered (one command at a
 time); a shove away from there (in the air, or a piston's standing on its legs: the user's, as
-flight's) is drift, said as a `shoved` notice once the shove's over, and it goes back, flying or
-walking (a `returned` notice; `stuck` and why when it can't, holding where it is, where it goes on
-from unchanged, with no retries), as a hovering drone holds its place; a shove on the way back is said too (a push that takes it farther off than its
-own step left it, once a push episode). A positional command (`RoboticsDevice.POSITIONAL`: turns,
-scans, its hand's) goes back first; a move goes straight to its target, measured from where its
-last command left it. **What no program asked for is one event** (the user's, 2026-10-29),
-`{event = "notice", what}`: shoved, returned, stuck, falling, landed (a fall's end; the user's: `landed`, not `fell`), frozen, thawed; every other event is a
+flight's) is drift, said as a `shoved` notice once the shove's over (once a shove), and it stays
+where it was put: **no way back of its own** (the user's, 2026-11-03: the program corrects it,
+`walk()` or `fly()`, or takes where it is, `stop()`); a fall moves that point nowhere either, only a
+stop does (`stop()` always takes where it is, a command running or not). A move goes straight to
+its target, measured from where its last command left it (a landing too), so a series of commands
+ends the same however it was shoved. **Positional commands are positional, always** (the user's,
+2026-11-03): they act where its last command left it, never take it back there; off that spot
+(out of its block, its middle's: half a block either way; or facing another right angle:
+`Body.offSpot`), one answering at once (`POSITIONAL`: scans, its hand's, a crafting card's) fails
+`drifted`, and one over time without moving it (`POSITIONAL_OVER_TIME`: turn, swing) ends at once,
+`drifted` with its `drift` (`EventQueue.drifted`). **What no program asked for is one event** (the user's, 2026-10-29),
+`{event = "notice", what}`: shoved, falling, landed (a fall's end; the user's: `landed`, not `fell`), frozen, thawed; every other event is a
 command's end, named after its method. `position` is where the last left it
 (a command, so it waits its turn); `get` is live (where it really is, its drift). `stop` is free and
 at once, where it is (no centering), answering where; the next command goes on from exactly there,
@@ -376,8 +381,9 @@ in the world, and the swing's end says whether it kept it all.
   block triggers, and can be shoved; `land` comes down onto its legs below it and refuses with none
   there, but `land(true)` (the user's, 2026-10-29: a crash's landing, safely) comes straight down
   without them, still running; a fall on its legs is a `falling` notice as it begins, and a tier
-  2's flights are taken mid-fall (it catches itself, its legs dropped), and `stop(true)` catches it
-  where it is (a plain `stop()` lets a fall go on: it isn't something the robot does). Or carried in **a field**, its own too, legs and all (10 blocks a second): stasis, as for
+  2's flights are taken mid-fall (it catches itself, its legs dropped); `stop()` then `fly()`
+  catches it where it is (the user's, 2026-11-03: no `stop(true)`, no hover; a `stop()` lets a fall
+  go on, as it isn't something the robot does, but takes where it is). Or carried in **a field**, its own too, legs and all (10 blocks a second): stasis, as for
   any creature (the user's, 2026-10-27): its robotics freezes (commands refused `held`, mcos waiting;
   a swing under way ends; no tools, no looking), and only its robotics (the user's, 2026-10-29: its
   body is held, and robotics is its one device acting in the world), so its other devices go on (a
@@ -654,9 +660,15 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   when no one block is to blame, never nil: a piston's 13 blocks, the world's edge) and `face` (the side of
   what moved that met it, the side that was hit, never the move's main way: `Obstruction`, from the
   game's collision; a robot's own face, a field's holder's frame, a piston's the world's names),
-  wherever it's said, and only in an event: a robot's moves and its `stuck` notice, a field's
+  wherever it's said, and only in an event: a robot's moves, a field's
   `move`, a piston's `push` and `extend` (its end at once, its cable port's side blocked by its
-  cable). Every way a walk can't go is blocked (the user's): a step up it can't take (by the step's
+  cable). **`stopped` is one shape too** (the user's): always a method's end, a program's `stop()` on
+  that device, never a notice. Each is built by one Java method (`EventQueue.blocked`, `stopped`,
+  `drifted`), and `ended` refuses them, so no device can build them another way. A stopped,
+  blocked or drifted end carries **`call = {args, progress}`** (the user's, 2026-11-03): the
+  command's arguments as the program gave them (the board records them as the command starts:
+  `Buffered.called`), and how far it got, in their terms (a walk's `{forward, right, up}` done, a
+  craft's crafts done). Every way a walk can't go is blocked (the user's): a step up it can't take (by the step's
   block), a drop (by air), an elevation it couldn't reach (the block under it, `down`; the air over
   it, `up`), a landing with force over no ground (air, `down`). A move already done (an arm out
   extended, in retracted) is no failure: `true`, its end `ok` (the user's: a lit lamp lit again).
@@ -666,7 +678,8 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
     `false, "busy", "<id>"`, its own id, or another's when it's busy for that one's sake
     (`Buffered.blocker`: a crafting card waiting for its robot's moves, the robot's busy state, the
     card's interrupt line), and mcos listens on both. `busy` and `held` mean "wait":
-    no device method fails with them (a field's target in another field is `captured`).
+    no device method fails with them (a field's target in another field is `captured`); any other
+    refusal (`drifted`) is a failure, and names no device.
   - **mcos asks a waiting command again at most once a tick** unless one of its devices raised its
     interrupt (the board's state moves a tick at a time); news its retry takes into other files
     counts as the pass's progress (`k.delivered`), so their waiters are served before an idle.
@@ -907,12 +920,12 @@ Lessons from mistakes, each with its test:
   with the descriptor still open. (`aClosesLastLineWaitsForABusyRobotAndGoes`)
 - **A golem resting on its own legs is on the ground:** `fly()` takes off where it stands, its torso
   on its legs (solid), so `onGround()` stayed true and a hovering golem took no shove. Whether it
-  stands asks `standing()` (on the ground, thrusters off). (`shovedInTheAirItHoldsItsPlanAndSaysSo`)
-- **What no program asked for moves nothing a program's commands go from:** a robot's way back
-  after a shove ended, when blocked partway, as a blocked walk does, where it was stopped becoming
-  where its next command goes from, so a robot stuck after a shove went on from where it was stuck
-  (`walk()` went nowhere). A way back that fails holds, the last good point kept.
-  (`aWayBackBlockedPartwayHoldsAndKeepsItsLastGoodPoint`, `aPistonShovesItOnItsLegsAndItSaysSo`)
+  stands asks `standing()` (on the ground, thrusters off). (`shovedInTheAirItSaysSoAndStaysWhereItWasPut`)
+- **What no program asked for moves nothing a program's commands go from:** only a command's end or
+  a stop moves where its next command goes from. A fall now leaves that point where it was, so the
+  robot landed off its spot, and the shove watch took that as a shove: a fall's end marks its drift
+  said (`landed` says it). And a drifted command reads its drift before it begins (a command
+  running has none). (`aFallLeavesWhereItsLastCommandLeftItTillAStop`)
 - **A robot body's `stop` is its board's reset too:** power-on stops it (`accepting(false)`), while a
   golem just placed is still settling, so a stop that kept a fall's speed let it sink into the
   floor, the game pushed it out sideways, and its first command met a shove. What a program's

@@ -1,6 +1,6 @@
 -- The robotics device's driver, for its /dev file (as a sysfs attribute: text, a write taking
 -- effect as it can). A read gives what it's doing now, a word (idle, walking, turning, breaking,
--- flying, hovering, landing, returning, falling or held), then where it really is: "position
+-- flying, hovering, landing, falling or held), then where it really is: "position
 -- forward right up heading" (from its origin), where its last command left it ("planned ...") and,
 -- when it's away from there, "drift forward right up".
 -- A line written calls the method it names (walkto: walkTo, position: setPosition, pathfinding:
@@ -17,13 +17,13 @@
 --   turn left|right|around|north|south|east|west
 --   use FACE                    (front, back, left, right, up or down: its own)
 --   swing FACE
---   stop
---   stop force                  (falling, a tier 2 catches itself where it is, its legs dropped)
+--   stop                        (where it is becomes where its last command left it; falling, a fly
+--                                then catches it there)
 --   position [forward [right [up [heading]]]]  (says where it is, its origin moved to make it so; none: its origin here)
 --   pathfinding on|off
 -- How an action that runs over time went comes as an event named after it (poll's PRI; the pull
--- ioctl: {event = "walk", ok, why}), and notices of what no program asked for ({event = "notice", what = "shoved"}: shoved, returned,
--- stuck, falling, landed, frozen, thawed). Its scan, its hand and
+-- ioctl: {event = "walk", ok, why}), and notices of what no program asked for ({event = "notice", what = "shoved"}: shoved,
+-- falling, landed, frozen, thawed). Its scan, its hand and
 -- containers are ioctls (scan, held, take...).
 local function number(word)
   return word and tonumber(word)
@@ -62,8 +62,8 @@ return {
       return MOVES[action], number(words[2]), right or 0, up or 0
     elseif (action == "turn" or action == "use" or action == "swing") and #words == 2 then
       return action, words[2]
-    elseif (action == "stop" or action == "land") and #words == 2 and words[2] == "force" then
-      return action, true -- (stop: falling, a tier 2 catches itself where it is; land: straight down, without its legs)
+    elseif action == "land" and #words == 2 and words[2] == "force" then
+      return action, true -- (straight down, without its legs)
     elseif (action == "stop" or action == "land") and #words == 1 then
       return action
     elseif action == "position" and #words <= 5 then

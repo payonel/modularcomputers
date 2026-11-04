@@ -71,24 +71,84 @@ public final class EventQueue {
 	 * result]}}, or {@code {event = method, ok = false, why}} when it failed (or was stopped). News.
 	 */
 	public void ended(String method, boolean ok, String why, Object result) {
-		ended(method, ok, why, null, result);
-	}
-
-	/** A command's end whose why says more ({@code fields}, beside why: a {@link Buffered#BLOCKED}'s block and face). */
-	public void ended(String method, boolean ok, String why, Map<String, Object> fields, Object result) {
+		if (Buffered.STOPPED.equals(why) || Buffered.BLOCKED.equals(why) || Buffered.DRIFTED.equals(why)) {
+			// (one shape each, the user's: only their own methods build them)
+			throw new IllegalArgumentException(why + " is built by its own method, not ended");
+		}
 		Map<String, Object> event = new java.util.LinkedHashMap<>();
 		event.put("event", method);
 		event.put("ok", ok);
 		if (!ok) {
 			event.put("why", why);
 		}
-		if (fields != null) {
-			event.putAll(fields);
-		}
 		if (result != null) {
 			event.put("result", com.payonel.modularcomputers.runtime.Values.normalize(result));
 		}
 		add(event);
+	}
+
+	/**
+	 * Something ended because a program called its device's stop (the user's: one shape, wherever
+	 * it's said, always a method's end): {@code {event = method, ok = false, why = "stopped", call}}.
+	 */
+	public void stopped(String event, Map<String, Object> call) {
+		Map<String, Object> stopped = new java.util.LinkedHashMap<>();
+		stopped.put("event", event);
+		stopped.put("ok", false);
+		stopped.put("why", Buffered.STOPPED);
+		stopped.put("call", call);
+		add(stopped);
+	}
+
+	/**
+	 * A move a block stopped (the user's: one shape, wherever it's said): {@code {event = event, ok =
+	 * false, why = "blocked", block, face}}, {@code block} the block's id ({@code ""} when no one
+	 * block can be named: null given), {@code face} the side of what moved that met it, in the
+	 * device's own terms; and its call.
+	 */
+	public void blocked(String event, String block, String face, Map<String, Object> call) {
+		Map<String, Object> blocked = new java.util.LinkedHashMap<>();
+		blocked.put("event", event);
+		blocked.put("ok", false);
+		blocked.put("why", Buffered.BLOCKED);
+		blocked.put("block", block == null ? "" : block);
+		blocked.put("face", face);
+		blocked.put("call", call);
+		add(blocked);
+	}
+
+	/**
+	 * A positional command over time given off where its last command left it (the user's: one
+	 * shape): {@code {event, ok = false, why = "drifted", drift = {forward, right, up}, call}}.
+	 */
+	public void drifted(String event, Map<?, ?> drift, Map<String, Object> call) {
+		Map<String, Object> drifted = new java.util.LinkedHashMap<>();
+		drifted.put("event", event);
+		drifted.put("ok", false);
+		drifted.put("why", Buffered.DRIFTED);
+		drifted.put("drift", drift);
+		drifted.put("call", call);
+		add(drifted);
+	}
+
+	/**
+	 * A cut-short command's call (the user's): {@code {args, progress}}, its arguments as the program
+	 * gave them (a list) and how far it got, in their terms.
+	 */
+	/** A call's arguments as kept: as given, its trailing nils dropped (a Lua call's count). */
+	public static java.util.List<Object> given(java.util.List<Object> args) {
+		int n = args.size();
+		while (n > 0 && args.get(n - 1) == null) {
+			n--;
+		}
+		return java.util.Collections.unmodifiableList(new java.util.ArrayList<>(args.subList(0, n)));
+	}
+
+	public static Map<String, Object> call(java.util.List<Object> args, Object progress) {
+		Map<String, Object> call = new java.util.LinkedHashMap<>();
+		call.put("args", args);
+		call.put("progress", progress);
+		return call;
 	}
 
 	public Map<String, Object> pull() {

@@ -66,6 +66,17 @@ public final class SlowDevice implements com.payonel.modularcomputers.bus.Device
 		return Set.of("get", "pull", "stop");
 	}
 
+	/** The work asked for, and its arguments as the board gave them (a stopped work's call). */
+	private long asked;
+	private java.util.List<Object> workArgs = java.util.List.of();
+
+	@Override
+	public void called(String method, java.util.List<Object> args) {
+		if ("work".equals(method)) {
+			workArgs = com.payonel.modularcomputers.device.EventQueue.given(args);
+		}
+	}
+
 	@Override
 	public boolean busy() {
 		return left > 0;
@@ -94,6 +105,7 @@ public final class SlowDevice implements com.payonel.modularcomputers.bus.Device
 			return Result.fail("ticks: " + ticks);
 		}
 		left = ticks;
+		asked = ticks;
 		return Result.ok(true);
 	}
 
@@ -110,8 +122,8 @@ public final class SlowDevice implements com.payonel.modularcomputers.bus.Device
 	@Method(doc = "stop(): stops its work (its event: work, stopped)")
 	public Result stop(Arguments args) {
 		if (left > 0) {
+			events.stopped("work", com.payonel.modularcomputers.device.EventQueue.call(workArgs, (long) (asked - left)));
 			left = 0;
-			events.ended("work", false, "stopped", null);
 		}
 		return Result.ok();
 	}

@@ -144,11 +144,15 @@ final class MotherboardApi implements Board {
 				// A command while another runs: nothing done (mcos waits, its thread only), and always the
 				// device whose news ends the wait, by its id: its own, or another's (a card's robot). One
 				// shape (the user's): false, why, the id to wait on.
+				if (!refused.equals(com.payonel.modularcomputers.device.Buffered.BUSY) && !refused.equals("held")) {
+					return Result.fail(refused); // (not a wait: no device to wait on)
+				}
 				Object blocker = buffered.blocker(method);
 				String waitOn = board.bus().addressOf(blocker != null ? blocker : device.get())
 					.map(at -> java.util.Objects.requireNonNullElse(board.bus().id(at), at)).orElse(address);
 				return Result.fail(refused, waitOn);
 			}
+			buffered.called(method, Arrays.asList(args)); // (its arguments as given: a cut-short end's call says them)
 		}
 		try {
 			return DeviceMethods.invoke(device.get(), method, new Arguments(Arrays.asList(args), account.get()));

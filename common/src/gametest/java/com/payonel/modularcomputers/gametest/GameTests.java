@@ -68,6 +68,16 @@ public final class GameTests {
 	}
 
 	/** A stand-in server player in the test's level, whose client takes every packet (menus open for it). */
+	/** An event without its call (a cut-short end's: a test about something else; its progress is the world's). */
+	public static Object withoutCall(Object event) {
+		if (!(event instanceof java.util.Map<?, ?> map) || !map.containsKey("call")) {
+			return event;
+		}
+		java.util.Map<Object, Object> rest = new java.util.LinkedHashMap<>(map);
+		rest.remove("call");
+		return rest;
+	}
+
 	public static ServerPlayer serverPlayer(GameTestHelper helper) {
 		ServerPlayer player = helper.makeMockServerPlayerInLevel();
 		mockConnection.accept(player);

@@ -35,7 +35,7 @@ public class RoboticPistonGameTest {
 
 	/** Its next end, taken (null: none yet). */
 	private static Object next(RoboticPistonBlockEntity piston) {
-		return piston.device().pull(new Arguments(List.of())).first();
+		return GameTests.withoutCall(piston.device().pull(new Arguments(List.of())).first());
 	}
 
 	/** A blocked end (the user's: one shape): the block that won't move (null: none to name), its face the world's way. */

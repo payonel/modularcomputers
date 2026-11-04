@@ -63,7 +63,7 @@ public class GolemWalkGameTest {
 
 	/** Its last event, once it has one more than {@code before}. */
 	private static Object last(List<Object> events) {
-		return events.isEmpty() ? null : events.getLast();
+		return events.isEmpty() ? null : GameTests.withoutCall(events.getLast()); // (a cut-short end's call: its progress is the world's)
 	}
 
 	/** A walk's end, blocked (the user's: one shape): by what (air too), met on which of its own faces. */
@@ -340,8 +340,8 @@ public class GolemWalkGameTest {
 
 	/**
 	 * A piston shoves it, on its legs too (the user's): it's moved a block and says so, once the push
-	 * is over; its way back is in the piston's arm, so it's stuck there and says why, and holds (no
-	 * retries); the arm gone, a walk() takes it back.
+	 * is over, and stays where it was put (no way back of its own); the arm gone, a walk() takes it
+	 * back.
 	 */
 	@GameTest(maxTicks = 100)
 	public void aPistonShovesItOnItsLegsAndItSaysSo(GameTestHelper helper) {
@@ -360,8 +360,7 @@ public class GolemWalkGameTest {
 			.thenWaitUntil(() -> helper.assertTrue(golem.getX() - from[0] > 0.9, "shoved a block: " + (golem.getX() - from[0])))
 			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(e -> e instanceof Map<?, ?> m && "notice".equals(m.get("event")) && "shoved".equals(m.get("what"))),
 				"it says so: " + events))
-			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(e -> e instanceof Map<?, ?> m && "notice".equals(m.get("event")) && "stuck".equals(m.get("what"))),
-				"stuck, its way back in the arm: " + events))
+			.thenExecuteAfter(10, () -> helper.assertTrue(golem.getX() - from[0] > 0.9, "and it stays where it was put (no way back of its own)"))
 			.thenExecute(() -> {
 				helper.assertTrue(events.stream().noneMatch(e -> e instanceof Map<?, ?> m && m.get("drift") instanceof Map<?, ?> d && ((Number) d.get("forward")).doubleValue() < 0.9),
 					"said once the push was over: " + events);
@@ -400,13 +399,17 @@ public class GolemWalkGameTest {
 			})
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(Map.of("event", "notice", "what", "falling")), "it says it's falling: " + events))
 			.thenWaitUntil(() -> same(helper, last(events), Map.of("event", "notice", "what", "landed", "by", 2L), "down, past its sand"))
-			.thenExecute(() -> same(helper, position(golem), at(2, 0, 0L), "on the floor, where it fell to"))
+			.thenExecute(() -> same(helper, position(golem), at(2, 0, 2L), "where its last command left it: a fall moves it nowhere"))
 			.thenSucceed();
 	}
 
-	/** A block gone from under it: it falls, its plan follows it down, it says so, and its next walk is from there. */
-	@GameTest(maxTicks = 200)
-	public void aFallItDidntAskForMovesItsPlanDownAndItSaysSo(GameTestHelper helper) {
+	/**
+	 * A fall moves nowhere where its last command left it (the user's: only a stop does): fallen
+	 * from a ledge, it's off its spot, so a turn there fails, drifted; a stop takes where it is, and
+	 * then it turns.
+	 */
+	@GameTest(maxTicks = 300)
+	public void aFallLeavesWhereItsLastCommandLeftItTillAStop(GameTestHelper helper) {
 		BlockPos ledge = AT.east();
 		helper.setBlock(ledge, Blocks.STONE);
 		BotGolem golem = GolemFlightGameTest.golem(helper, false);
@@ -421,11 +424,19 @@ public class GolemWalkGameTest {
 			})
 			.thenWaitUntil(() -> same(helper, last(events), Map.of("event", "notice", "what", "landed", "by", 1L), "it says it fell"))
 			.thenExecute(() -> {
-				same(helper, position(golem), at(1, 0, 0L), "its plan came down with it");
-				golem.robotics().walk(args(1L));
+				same(helper, position(golem), at(1, 0, 1L), "where its last command left it: still up there");
+				events.clear();
+				helper.assertTrue(Boolean.TRUE.equals(golem.robotics().turn(args("right")).first()), "a turn: a command");
 			})
-			.thenWaitUntil(() -> same(helper, last(events), ARRIVED, "its next walk, from where it fell to"))
-			.thenExecute(() -> same(helper, position(golem), at(2, 0, 0L), "one on"))
+			.thenWaitUntil(() -> helper.assertTrue(last(events) instanceof Map<?, ?> m && "turn".equals(m.get("event")) && "drifted".equals(m.get("why")),
+				"off its spot, a block below it: drifted: " + events))
+			.thenExecute(() -> {
+				golem.robotics().stop(args());
+				same(helper, position(golem), at(1, 0, 0L), "a stop takes where it is");
+				events.clear();
+				golem.robotics().turn(args("right"));
+			})
+			.thenWaitUntil(() -> same(helper, last(events), Map.of("event", "turn", "ok", true), "on its spot: it turns"))
 			.thenSucceed();
 	}
 

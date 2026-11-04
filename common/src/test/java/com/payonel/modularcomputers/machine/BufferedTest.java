@@ -90,7 +90,7 @@ class BufferedTest {
 			Program.park(board);
 		});
 		assertThat(seen).containsExactly("ticks: 0", 0L, true, false,
-			Map.of("event", "work", "ok", false, "why", "stopped"), 0L);
+			Map.of("event", "work", "ok", false, "why", "stopped", "call", Map.of("args", java.util.List.of(50L), "progress", 0L)), 0L);
 		assertThat(slow.working()).isFalse();
 	}
 }

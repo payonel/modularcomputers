@@ -129,7 +129,7 @@ public class FieldCardGameTest {
 				card.capture(args(pig.getStringUUID()));
 				card.move(args(5.0)); // forward: out of the case's front (+Z), through the wall
 			})
-			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : events.getLast(), Map.of("event", "move", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "front"),
+			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : GameTests.withoutCall(events.getLast()), Map.of("event", "move", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "front"),
 				"its event: what's in the way, met on the front of what it holds (the case's frame)"))
 			.thenExecute(() -> helper.assertTrue(pig.getZ() < helper.absolutePos(new BlockPos(1, 1, 5)).getZ(), "the pig's this side of the wall"))
 			.thenSucceed();
@@ -151,7 +151,7 @@ public class FieldCardGameTest {
 				card.capture(args(zombie.getStringUUID()));
 				card.move(args(0.0, 0.0, 5.0)); // (up, through the ceiling)
 			})
-			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : events.getLast(), Map.of("event", "move", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "up"),
+			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : GameTests.withoutCall(events.getLast()), Map.of("event", "move", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "up"),
 				"its event: the ceiling, met on top"))
 			.thenSucceed();
 	}

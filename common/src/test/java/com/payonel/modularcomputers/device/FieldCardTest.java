@@ -70,7 +70,8 @@ class FieldCardTest {
 		assertThat(card.stop(args()).failed()).isFalse();
 		assertThat(moving).as("its move stopped where it is").isFalse();
 		assertThat(holding).as("holding on").isTrue();
-		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "move", "ok", false, "why", "stopped"));
+		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "move", "ok", false, "why", "stopped",
+			"call", Map.of("args", List.of(), "progress", List.of(0L, 0L, 0L))));
 		assertThat(card.refusal("release")).as("then free to let go").isNull();
 		card.release(args());
 		assertThat(holding).isFalse();
