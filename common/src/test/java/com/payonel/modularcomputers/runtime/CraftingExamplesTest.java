@@ -21,7 +21,7 @@ class CraftingExamplesTest extends McosHarness {
 	private int logs = 5;
 	private int room = Integer.MAX_VALUE;
 	private int planks;
-	/** Crafts its storage has room for (then output). */
+	/** Crafts its storage has room for (then no_space). */
 	private int craftsRoomFor = Integer.MAX_VALUE;
 
 	CraftingExamplesTest() {
@@ -39,7 +39,7 @@ class CraftingExamplesTest extends McosHarness {
 			@Override
 			public Result craft() {
 				if (craftsRoomFor-- == 0) {
-					return Result.fail(com.payonel.modularcomputers.device.Buffered.OUTPUT);
+					return Result.fail(com.payonel.modularcomputers.device.Buffered.NO_SPACE);
 				}
 				planks += 4;
 				return Result.ok(Map.of("name", "minecraft:oak_planks", "count", 4));
@@ -106,7 +106,7 @@ class CraftingExamplesTest extends McosHarness {
 		assertThat(read(root().resolve("out"))).isEqualTo("made 20 minecraft:oak_planks, 8 left: the chest is full\n");
 	}
 
-	/** Its storage full partway, the craft ends output, its call saying the crafts done (the user's). */
+	/** Its storage full partway, the craft ends no_space, its call saying the crafts done (the user's). */
 	@Test
 	void thePlanksProgramSaysWhenItsStorageFillsAndAfterHowManyCrafts() {
 		craftsRoomFor = 2;
@@ -114,7 +114,7 @@ class CraftingExamplesTest extends McosHarness {
 		file("planks.lua", example("crafting-planks"));
 		type("lua /planks.lua > /out; echo $? > /status\r");
 		untilFile(root().resolve("status"), "1\n");
-		assertThat(read(root().resolve("out"))).isEqualTo("stopped after 2 crafts: output\n");
+		assertThat(read(root().resolve("out"))).isEqualTo("stopped after 2 crafts: no_space\n");
 	}
 
 	@Test

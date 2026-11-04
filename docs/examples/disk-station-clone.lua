@@ -28,7 +28,7 @@ print("target: " .. describe(slots.target) .. " (everything on it will be gone)"
 
 local ok, why = sys.ioctl(fd, "clone")
 if not ok then
-  io.stderr:write("disk-station-clone: ", why, "\n") -- (too big: and how many bytes, no power...)
+  io.stderr:write("disk-station-clone: ", why, "\n") -- (too big: and how many bytes, powerout...)
   os.exit(1)
 end
 slots = assert(sys.ioctl(fd, "get"))

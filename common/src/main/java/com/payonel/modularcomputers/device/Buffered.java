@@ -54,15 +54,21 @@ public interface Buffered {
 
 	/**
 	 * Why a craft ended: what's in its grid makes nothing (the user's, one shape: {@link
-	 * EventQueue#input}): an empty grid, or no recipe its pattern matches; and its call.
+	 * EventQueue#missingInputs}): an empty grid, or no recipe its pattern matches; and its call.
 	 */
-	String INPUT = "input";
+	String MISSING_INPUTS = "missing_inputs";
 
 	/**
 	 * Why a craft ended: there's no room for what it makes (the user's, one shape: {@link
-	 * EventQueue#output}): its storage can't take it, or a leftover its grid can't take back; and its call.
+	 * EventQueue#noSpace}): its storage can't take it, or a leftover its grid can't take back; and its call.
 	 */
-	String OUTPUT = "output";
+	String NO_SPACE = "no_space";
+
+	/**
+	 * Why a command ended, or a notice: its power ran out (the user's, one shape: {@link
+	 * EventQueue#powerout}, its call; a field letting go of what it held, {@link EventQueue#poweroutNotice}).
+	 */
+	String POWEROUT = "powerout";
 
 	/**
 	 * The board gives a command (a method not free) with these arguments, as the program gave them,

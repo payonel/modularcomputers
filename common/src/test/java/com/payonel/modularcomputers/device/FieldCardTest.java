@@ -8,11 +8,15 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/** The energy field card's stop and release (the user's: one door, a stop is a stop). */
+/** The energy field card's stop and release (the user's: one door, a stop is a stop), and its ends past its reach and without power. */
 class FieldCardTest {
 	private final FieldCard card = new FieldCard();
 	private boolean holding;
 	private boolean moving;
+	/** What its projector says: a move's end past its reach (its face), what it holds past it now (its face), and why it lost it. */
+	private String beyond;
+	private String outOfReach;
+	private String lost;
 
 	FieldCardTest() {
 		card.projectorIn(new FieldCard.Projector() {
@@ -49,8 +53,18 @@ class FieldCardTest {
 			}
 
 			@Override
+			public String beyondReach(double forward, double right, double up) {
+				return beyond;
+			}
+
+			@Override
+			public String outOfReach() {
+				return outOfReach;
+			}
+
+			@Override
 			public String check() {
-				return null;
+				return lost;
 			}
 		});
 		card.accepting(true);
@@ -75,5 +89,46 @@ class FieldCardTest {
 		assertThat(card.refusal("release")).as("then free to let go").isNull();
 		card.release(args());
 		assertThat(holding).isFalse();
+	}
+
+	/** A move past its reach is blocked (the user's: too far is just blocked): its end at once, nothing moved, no block to name, the side of what it holds that meets the edge. */
+	@Test
+	void aMovePastItsReachEndsBlockedAtOnceAndMovesNothing() {
+		card.capture(args("pig"));
+		beyond = "up";
+		card.called("move", List.of(0L, 0L, 17L));
+		assertThat(card.move(args(0L, 0L, 17L)).first()).as("a command: true, its end says how it went").isEqualTo(true);
+		assertThat(moving).as("nothing moved").isFalse();
+		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "move", "ok", false, "why", "blocked", "name", "", "face", "up",
+			"call", Map.of("args", List.of(0L, 0L, 17L), "progress", List.of(0L, 0L, 0L))));
+		assertThat(holding).as("holding on").isTrue();
+	}
+
+	/** What it holds past its reach, it lets go: blocked, a move under way's end and a notice (the user's), the side past the edge. */
+	@Test
+	void outOfItsReachItLetsGoBlockedItsMoveAndANotice() {
+		card.capture(args("pig"));
+		card.called("move", List.of(3L));
+		card.move(args(3L));
+		outOfReach = "front";
+		lost = Buffered.BLOCKED;
+		card.tick(true);
+		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "move", "ok", false, "why", "blocked", "name", "", "face", "front",
+			"call", Map.of("args", List.of(3L), "progress", List.of(0L, 0L, 0L))));
+		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "notice", "why", "blocked", "name", "", "face", "front"));
+		assertThat(holding).as("let go").isFalse();
+	}
+
+	/** Its power gone, it lets go: powerout (the user's), a move under way's end with its call, and a notice. */
+	@Test
+	void withoutPowerItLetsGoPowerout() {
+		card.capture(args("pig"));
+		card.called("move", List.of(3L));
+		card.move(args(3L));
+		card.tick(false);
+		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "move", "ok", false, "why", "powerout",
+			"call", Map.of("args", List.of(3L), "progress", List.of(0L, 0L, 0L))));
+		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "notice", "why", "powerout"));
+		assertThat(holding).as("let go").isFalse();
 	}
 }

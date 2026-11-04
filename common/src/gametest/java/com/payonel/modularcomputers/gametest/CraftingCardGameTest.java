@@ -29,7 +29,7 @@ import net.minecraft.world.phys.AABB;
 
 /**
  * The crafting card (user design, 2026-10-24): in a robot, a program crafts from its grid into its
- * storage, a craft taking time, two cards crafting at once, their robot free meanwhile; a craft with no room fails, its grid
+ * storage, a craft taking time, two cards crafting at once, their robot free meanwhile; a craft with no room fails no_space, its grid
  * left as it was; what the robot breaks goes to its storage; drop fills a container there and
  * drops the rest; store answers true only when nothing's left. In a case its methods need
  * robotics, but a player crafts with it by hand in the case's view.
@@ -166,7 +166,7 @@ public class CraftingCardGameTest {
 			}
 		});
 		helper.succeedWhen(() -> {
-			same(helper, events.isEmpty() ? null : events.getFirst(), Map.of("event", "craft", "ok", false, "why", "output", "name", "minecraft:stick", "call", Map.of("args", List.of(), "progress", 0L)), "its event");
+			same(helper, events.isEmpty() ? null : events.getFirst(), Map.of("event", "craft", "ok", false, "why", "no_space", "name", "minecraft:stick", "call", Map.of("args", List.of(), "progress", 0L)), "its event");
 			helper.assertTrue(slot(golem, LANE, 0).is(Items.OAK_PLANKS) && slot(golem, LANE, 3).is(Items.OAK_PLANKS), "its grid as it was");
 		});
 	}
@@ -191,25 +191,25 @@ public class CraftingCardGameTest {
 		helper.succeedWhen(() -> same(helper, events.isEmpty() ? null : events.getFirst(), expected, "its event"));
 	}
 
-	/** An empty grid makes nothing: input (the user's, empty grid and no recipe one why), its name "" (nothing made), with its call. */
+	/** An empty grid makes nothing: missing_inputs (the user's, empty grid and no recipe one why), its name "" (nothing made), with its call. */
 	@GameTest(maxTicks = 100)
-	public void anEmptyGridsCraftEndsInput(GameTestHelper helper) {
+	public void anEmptyGridsCraftEndsMissingInputs(GameTestHelper helper) {
 		craftsAndEnds(helper, Map.of(), List.of(),
-			Map.of("event", "craft", "ok", false, "why", "input", "name", "", "call", Map.of("args", List.of(), "progress", 0L)));
+			Map.of("event", "craft", "ok", false, "why", "missing_inputs", "name", "", "call", Map.of("args", List.of(), "progress", 0L)));
 	}
 
-	/** A grid no recipe matches makes nothing: input too. */
+	/** A grid no recipe matches makes nothing: missing_inputs too. */
 	@GameTest(maxTicks = 100)
-	public void aGridNoRecipeMatchesEndsInput(GameTestHelper helper) {
+	public void aGridNoRecipeMatchesEndsMissingInputs(GameTestHelper helper) {
 		craftsAndEnds(helper, Map.of(0, new ItemStack(Items.DIRT)), List.of(2L),
-			Map.of("event", "craft", "ok", false, "why", "input", "name", "", "call", Map.of("args", List.of(2L), "progress", 0L)));
+			Map.of("event", "craft", "ok", false, "why", "missing_inputs", "name", "", "call", Map.of("args", List.of(2L), "progress", 0L)));
 	}
 
 	/** Its grid used up partway, its end says what it was making and the crafts done, not the items made (two crafts, 8 sticks: progress 2). */
 	@GameTest(maxTicks = 200)
-	public void aGridUsedUpPartwayEndsInputWithTheCraftsDone(GameTestHelper helper) {
+	public void aGridUsedUpPartwayEndsMissingInputsWithTheCraftsDone(GameTestHelper helper) {
 		craftsAndEnds(helper, sticks(2), List.of(5L),
-			Map.of("event", "craft", "ok", false, "why", "input", "name", "minecraft:stick", "call", Map.of("args", List.of(5L), "progress", 2L)));
+			Map.of("event", "craft", "ok", false, "why", "missing_inputs", "name", "minecraft:stick", "call", Map.of("args", List.of(5L), "progress", 2L)));
 	}
 
 	@GameTest(maxTicks = 200)

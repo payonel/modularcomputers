@@ -2,7 +2,7 @@
 -- crafting grid's first slot, craft once a log (four planks each, into the card's storage), and
 -- put everything in its storage back into the chest. Each craft is the card's own work (its robot
 -- free meanwhile); the card's event, craft, says when they're all done (ok, and what it
--- made), or why it stopped and after how many crafts (output: no room for what it makes; input:
+-- made), or why it stopped and after how many crafts (no_space: no room for what it makes; missing_inputs:
 -- its grid makes nothing). A store would wait for the craft anyway (the card
 -- does one thing at a time), but its event says how it went.
 local sys = require("sys")

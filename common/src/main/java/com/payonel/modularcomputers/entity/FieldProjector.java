@@ -212,17 +212,47 @@ public final class FieldProjector implements FieldCard.Projector {
 		if (record == null) {
 			return Result.fail("not holding");
 		}
-		Frame at = frame.get();
-		Vec3 by = at.offset(forward, right, up);
+		Vec3 by = frame.get().offset(forward, right, up);
 		EnergyField field = field();
-		boolean itself = field != null && field.holding() == self.get();
-		if (!itself && (field != null ? field.center() : record.at()).add(by).distanceTo(at.origin()) > FieldCard.RANGE) {
-			return Result.fail("too far: " + (int) FieldCard.RANGE);
-		}
 		if (field != null) {
 			field.moveBy(by);
 		}
 		return Result.ok(true);
+	}
+
+	@Override
+	public String beyondReach(double forward, double right, double up) {
+		FieldHolds.Hold record = record();
+		if (record == null) {
+			return null;
+		}
+		Frame at = frame.get();
+		EnergyField field = field();
+		Vec3 to = (field != null ? field.center() : record.at()).add(at.offset(forward, right, up));
+		return itself(field) || to.distanceTo(at.origin()) <= FieldCard.RANGE ? null : outward(at, to);
+	}
+
+	@Override
+	public String outOfReach() {
+		FieldHolds.Hold record = record();
+		if (record == null) {
+			return null;
+		}
+		Frame at = frame.get();
+		EnergyField field = field();
+		Vec3 now = field != null && field.holding() != null ? field.center() : record.at(); // (not loaded: where its field was, kept)
+		return itself(field) || now.distanceTo(at.origin()) <= FieldCard.RANGE + FieldCard.REACH ? null : outward(at, now);
+	}
+
+	/** Whether it holds its own robot (which carries the card: never out of its reach). */
+	private boolean itself(EnergyField field) {
+		return field != null && field.holding() == self.get();
+	}
+
+	/** The face of what it holds at a point past its reach that meets its reach's edge: the way out from its computer there, in the frame. */
+	private static String outward(Frame at, Vec3 point) {
+		Vec3 out = point.subtract(at.origin());
+		return at.face(Direction.getApproximateNearest(out.x, out.y, out.z));
 	}
 
 	@Override
@@ -296,12 +326,6 @@ public final class FieldProjector implements FieldCard.Projector {
 		}
 		FieldHolds.of(level.get()).seen(card.hold(), level.get().getGameTime()); // (it's loaded: its field may act on its word)
 		lastKnown(); // (what it holds and where, kept for a loss to say)
-		EnergyField field = field();
-		boolean itself = field != null && field.holding() == self.get();
-		Vec3 at = field != null && field.holding() != null ? field.center() : record.at(); // (not loaded: where its field was, kept)
-		if (!itself && at.distanceTo(frame.get().origin()) > FieldCard.RANGE + FieldCard.REACH) {
-			return "too far: " + (int) FieldCard.RANGE;
-		}
-		return null;
+		return outOfReach() != null ? FieldCard.BLOCKED : null; // (out of its reach: blocked, the user's)
 	}
 }

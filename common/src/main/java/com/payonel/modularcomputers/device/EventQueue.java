@@ -72,7 +72,7 @@ public final class EventQueue {
 	 */
 	public void ended(String method, boolean ok, String why, Object result) {
 		if (Buffered.STOPPED.equals(why) || Buffered.BLOCKED.equals(why) || Buffered.DRIFTED.equals(why) || Buffered.INTERRUPTED.equals(why) || Buffered.LOST.equals(why) || Buffered.UNBREAKABLE.equals(why)
-			|| Buffered.INPUT.equals(why) || Buffered.OUTPUT.equals(why)) {
+			|| Buffered.MISSING_INPUTS.equals(why) || Buffered.NO_SPACE.equals(why) || Buffered.POWEROUT.equals(why)) {
 			// (one shape each, the user's: only their own methods build them)
 			throw new IllegalArgumentException(why + " is built by its own method, not ended");
 		}
@@ -98,19 +98,45 @@ public final class EventQueue {
 
 	/**
 	 * What its input makes nothing (the user's: one shape, a craft's grid empty or matching no recipe):
-	 * {@code {event, ok = false, why = "input", name, call}}, {@code name} what it was making (its
+	 * {@code {event, ok = false, why = "missing_inputs", name, call}}, {@code name} what it was making (its
 	 * last craft's, "" when none was made).
 	 */
-	public void input(String event, String name, Map<String, Object> call) {
-		add(named(withCall(event, Buffered.INPUT, call), name));
+	public void missingInputs(String event, String name, Map<String, Object> call) {
+		add(named(withCall(event, Buffered.MISSING_INPUTS, call), name));
 	}
 
 	/**
 	 * No room for its output (the user's: one shape, a craft's storage full): {@code {event, ok =
-	 * false, why = "output", name, call}}, {@code name} what it would have made.
+	 * false, why = "no_space", name, call}}, {@code name} what it would have made.
 	 */
-	public void output(String event, String name, Map<String, Object> call) {
-		add(named(withCall(event, Buffered.OUTPUT, call), name));
+	public void noSpace(String event, String name, Map<String, Object> call) {
+		add(named(withCall(event, Buffered.NO_SPACE, call), name));
+	}
+
+	/** Its power ran out (the user's: one shape): {@code {event, ok = false, why = "powerout", call}}. */
+	public void powerout(String event, Map<String, Object> call) {
+		add(withCall(event, Buffered.POWEROUT, call));
+	}
+
+	/** Its power ran out, no program's command (a field let go of what it held), a notice: {@code {event = "notice", why = "powerout"}}. */
+	public void poweroutNotice() {
+		Map<String, Object> notice = new java.util.LinkedHashMap<>();
+		notice.put("event", "notice");
+		notice.put("why", Buffered.POWEROUT);
+		add(notice);
+	}
+
+	/**
+	 * Blocked, no program's command (a field let go of what it held, out of its reach), a notice:
+	 * {@code {event = "notice", why = "blocked", name, face}}, as {@link #blocked}'s.
+	 */
+	public void blockedNotice(String block, String face) {
+		Map<String, Object> notice = new java.util.LinkedHashMap<>();
+		notice.put("event", "notice");
+		notice.put("why", Buffered.BLOCKED);
+		notice.put("name", block == null ? "" : block);
+		notice.put("face", face);
+		add(notice);
 	}
 
 	/** An end with a thing's name ("" for none, never nil), before its call. */

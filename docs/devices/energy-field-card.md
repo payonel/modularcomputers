@@ -105,14 +105,17 @@ Fails with `holding` (it holds something already), `no entity` (nothing near the
 
 Moves the field by that much, never through blocks. It answers at once; its
 event, `move`, says how it went: `ok`, or not and why (`blocked`; `stopped`; or why it let go, as
-`lost` says). Blocked, two fields say by what: `name`, the block in its way, its registry id (`""`
-when no one block can be named), and `face`, the side of what it holds that met it, in its
+its notice says: `lost`, `blocked`, `powerout`). Blocked, two fields say by what: `name`, the block
+in its way, its registry id (`""` when no one block can be named: past its reach, or what it holds
+not loaded), and `face`, the side of what it holds that met it, in its
 computer's frame (`front`, `back`, `left`, `right`, `up` or `down`; a case's front, or a robot's
 heading), the side that was hit, not the way the move was mostly going:
 `{event = "move", ok = false, why = "blocked", name = "minecraft:stone", face = "up", call = {args = {0, 0, 5}, progress = {0, 0, 2}}}`:
 its `call` the move's arguments as given and `{forward, right, up}` it moved, as a stopped move's
-has. Fails at once
-with `not holding`, or `too far: 16` (out of its reach, unless it holds its own robot).
+has. A move that would take what it holds past its reach (16 blocks from its computer, unless it
+holds its own robot) is blocked at once, nothing moved, `name = ""` and `face` the side of what it
+holds that meets the reach's edge (the way out from its computer there). Fails at once with `not
+holding`.
 
 ### release() → true
 
@@ -143,9 +146,10 @@ Its oldest event, or nil.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `move` | `ok`, `why` (and `name`, `face` when it's `blocked`; `name`, `id`, `at` when it's `lost`; `call` with those and `stopped`) | a move ended: `ok` true when it got there; else why (`blocked`, `stopped`, or a `lost` reason: it let go of what it moved) |
-| `lost` | `why` | it let go on its own: `too far: 16`, `no power` |
+| `move` | `ok`, `why` (and `name`, `face` when it's `blocked`; `name`, `id`, `at` when it's `lost`; `call` unless it's `ok`) | a move ended: `ok` true when it got there; else why (`blocked`, `stopped`, or why it let go of what it moved, as its notice says: `lost`, `blocked`, `powerout`) |
 | `notice` | `why = "lost"`, `name`, `id`, `at` | what it held is gone (it died, it was picked up, it went through a portal): what it was, its own id, where it last was in its computer's frame; a move under way ends `lost` first |
+| `notice` | `why = "blocked"`, `name = ""`, `face` | what it held went past its reach, and it let go: the side of it past the edge; a move under way ends `blocked` first |
+| `notice` | `why = "powerout"` | its power ran out, and it let go; a move under way ends `powerout` first |
 
 ## Example
 

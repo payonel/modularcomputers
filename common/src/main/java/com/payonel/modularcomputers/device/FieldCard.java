@@ -52,8 +52,18 @@ public final class FieldCard extends Card implements Buffered {
 		 */
 		Result capture(String id, double[] at);
 
-		/** Moves the field by this much, in the computer's frame: true, or false and why (too far). */
+		/** Moves the field by this much, in the computer's frame (within its reach: {@link #beyondReach}): true, or false and why. */
 		Result move(double forward, double right, double up);
+
+		/** Whether a move this much would take what it holds past its reach: the face of it that meets its edge, or null (within it). */
+		default String beyondReach(double forward, double right, double up) {
+			return null;
+		}
+
+		/** Whether what it holds is past its reach now: the face of it past the edge, or null (within it, or nothing held). */
+		default String outOfReach() {
+			return null;
+		}
 
 		/** Lets what it holds go. */
 		void release();
@@ -74,7 +84,7 @@ public final class FieldCard extends Card implements Buffered {
 		/** What it holds and where, {name, forward, right, up}, or null while it holds nothing. */
 		Map<String, Object> where();
 
-		/** Why it's lost what it held (its field gone, out of reach), or null: asked each tick while it holds. */
+		/** Why it's lost what it held (its field gone: lost; out of reach: blocked), or null: asked each tick while it holds. */
 		String check();
 	}
 
@@ -121,7 +131,7 @@ public final class FieldCard extends Card implements Buffered {
 			return;
 		}
 		if (!powered) {
-			lost("no power");
+			lost(POWEROUT);
 			return;
 		}
 		String why = projector != null ? projector.check() : null;
@@ -176,7 +186,7 @@ public final class FieldCard extends Card implements Buffered {
 		return held;
 	}
 
-	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, never through blocks. A command: true at once (its event: move, ok, or not and why: blocked, with block, the block in the way, and face, the side of what it holds that met it, in its computer's frame), or false and why it can't start (not holding, too far)")
+	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, never through blocks. A command: true at once (its event: move, ok, or not and why: blocked, with name, the block in the way (\"\" for none: past its reach, or what it holds not loaded), and face, the side of what it holds that met it, in its computer's frame; lost; powerout; stopped; each with its call), or false and why it can't start (not holding)")
 	public Result move(Arguments args) {
 		Result no = noProjector();
 		if (no != null) {
@@ -188,14 +198,15 @@ public final class FieldCard extends Card implements Buffered {
 		double forward = args.checkNumber(0);
 		double right = args.count() > 1 ? args.checkNumber(1) : 0;
 		double up = args.count() > 2 ? args.checkNumber(2) : 0;
-		Result started = projector.move(forward, right, up);
+		String beyond = projector.beyondReach(forward, right, up); // (past its reach: blocked at once, not moved, the user's; no block to name)
+		Result started = beyond != null ? Result.ok(true) : projector.move(forward, right, up);
 		if (!started.failed()) {
 			moveArgs = "move".equals(calledMethod) ? calledArgs : List.of();
 			movedFrom = projector.where();
 			state(MOVING);
-			String unloaded = projector.unloadedFace(forward, right, up);
+			String unloaded = beyond != null ? beyond : projector.unloadedFace(forward, right, up);
 			if (unloaded != null) {
-				blocked(null, unloaded); // (what it holds isn't loaded: no one block to name, the user's)
+				blocked(null, unloaded); // (past its reach, or what it holds isn't loaded: no one block to name, the user's)
 			}
 		}
 		return started;
@@ -235,7 +246,7 @@ public final class FieldCard extends Card implements Buffered {
 		return Result.ok(now);
 	}
 
-	@Method(doc = "pull(): its oldest event, or nil: a move's end, {event = \"move\", ok, why}, or {event = \"lost\", why} (what it held is gone, out of reach, or its power is)")
+	@Method(doc = "pull(): its oldest event, or nil: a move's end, {event = \"move\", ok, why}, or a notice of its letting go on its own: {event = \"notice\", why = \"lost\", name, id, at} (what it held is gone), {event = \"notice\", why = \"blocked\", name = \"\", face} (out of its reach: the side of what it held past the edge), {event = \"notice\", why = \"powerout\"}")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -264,6 +275,7 @@ public final class FieldCard extends Card implements Buffered {
 		boolean wasMoving = state.equals(MOVING);
 		Map<String, Object> last = projector != null ? projector.lastKnown() : null; // (before it lets go: what it held, and where)
 		Map<String, Object> call = wasMoving ? call() : null;
+		String face = BLOCKED.equals(why) && projector != null ? projector.outOfReach() : null; // (before it lets go: the side of it past its reach)
 		if (projector != null) {
 			projector.release();
 		}
@@ -280,10 +292,19 @@ public final class FieldCard extends Card implements Buffered {
 			events.lostNotice(name, id, at);
 			return;
 		}
-		if (wasMoving) {
-			events.ended("move", false, why, null); // (the move it was making ends with it)
+		if (BLOCKED.equals(why)) {
+			// Out of its reach (the user's: blocked): no block to name, the side of what it held past the edge.
+			if (wasMoving) {
+				events.blocked("move", null, face, call); // (the move it was making ends with it)
+			}
+			events.blockedNotice(null, face);
+			return;
 		}
-		event("lost", why);
+		// Its power gone (the user's: powerout).
+		if (wasMoving) {
+			events.powerout("move", call); // (the move it was making ends with it)
+		}
+		events.poweroutNotice();
 	}
 
 	/** The last command the board gave it and its arguments (the board's {@link #called}); the move under way's, and where what it holds was as it began. */
@@ -317,15 +338,6 @@ public final class FieldCard extends Card implements Buffered {
 	/** What it's doing now. */
 	public String state() {
 		return state;
-	}
-
-	private void event(String name, String why) {
-		Map<String, Object> event = new LinkedHashMap<>();
-		event.put("event", name);
-		if (why != null) {
-			event.put("why", why);
-		}
-		events.add(event);
 	}
 
 	private void state(String now) {

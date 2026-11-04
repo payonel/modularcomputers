@@ -678,10 +678,14 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   a notice: `lostNotice`). **`unbreakable`, one shape, `lost`'s fields** (the user's, 2026-11-04):
   the game won't let what a swing acted on be broken (bedrock, a protected place's refused break),
   said by its end, never its call: a call fails only when it can't be given (`EventQueue.unbreakable`).
-  **A craft's `input` and `output`** (the user's, 2026-11-04): its grid makes nothing (empty, no
-  recipe) or no room for what it makes, each `{why, name, call}` (`EventQueue.input`, `output`):
-  `name` what it was making (its last craft's, `""` none; output's, what found no room), its
-  progress the crafts done. **A thing's `name` is its registry id, its `id` its own UUID**, everywhere
+  **A craft's `missing_inputs` and `no_space`** (the user's, 2026-11-04): its grid makes nothing
+  (empty, no recipe) or no room for what it makes, each `{why, name, call}`
+  (`EventQueue.missingInputs`, `noSpace`): `name` what it was making (its last craft's, `""` none;
+  no_space's, what found no room), its progress the crafts done. **`powerout`** (the user's): power
+  ran out, a command's end with its call (`EventQueue.powerout`) or a notice (a field letting go),
+  and a Disk Station's refusal. **Past a field's reach is `blocked`** (the user's: too far is just
+  blocked), `name = ""`, `face` the side of what it holds past the edge: a move there ends at once,
+  nothing moved; what it holds out of reach, it lets go, a `blocked` notice (`blockedNotice`). **A thing's `name` is its registry id, its `id` its own UUID**, everywhere
   (the user's): a block has none, so `id = ""`; `blocked`'s block is a `name` too. **A swing breaks a
   place**, as the game's own player does (`MultiPlayerGameMode`): another block pushed in, the break
   goes on into it at its pace; another item in hand, it starts again; air there, it's `lost`. Every way a walk can't go is blocked (the user's): a step up it can't take (by the step's

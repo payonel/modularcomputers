@@ -102,11 +102,11 @@ Each craft of the count is checked as it comes, so one can fail partway:
 
 | why | when |
 |---|---|
-| `input` | its grid makes nothing: it's empty (used up partway, too), or no recipe matches it; `name` what its crafts made, `""` when none was made |
-| `output` | no room for what it makes: its storage can't take it (or a leftover its grid can't take back, a milk bucket's bucket), so that craft isn't made and the grid is as it was; `name` what it would have made |
+| `missing_inputs` | its grid makes nothing: it's empty (used up partway, too), or no recipe matches it; `name` what its crafts made, `""` when none was made |
+| `no_space` | no room for what it makes: its storage can't take it (or a leftover its grid can't take back, a milk bucket's bucket), so that craft isn't made and the grid is as it was; `name` what it would have made |
 | `stopped` | its `stop()` |
 
-`{event = "craft", ok = false, why = "input", name = "minecraft:stick", call = {args = {20},
+`{event = "craft", ok = false, why = "missing_inputs", name = "minecraft:stick", call = {args = {20},
 progress = 10}}`: ten crafts of sticks done, then its grid made nothing.
 
 A craft under way when its world is saved goes on after the load, as it was.

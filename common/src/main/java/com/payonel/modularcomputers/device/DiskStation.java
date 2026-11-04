@@ -29,7 +29,7 @@ public final class DiskStation implements Device {
 	public static final String SOURCE = "source";
 	public static final String NO_DISK = "no disk";
 	public static final String NO_SOURCE = "no source disk";
-	public static final String NO_POWER = "no power";
+	public static final String NO_POWER = Buffered.POWEROUT; // (the user's word: powerout)
 	/** The image a disk gets when it's installed or updated: mcos. */
 	public static final String IMAGE = "mcos";
 	/** The actions, its methods (and the GUI's buttons). */
