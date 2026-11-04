@@ -54,6 +54,29 @@ public final class RoboticPistonBlock extends DirectionalBlock implements Entity
 	}
 
 	/**
+	 * The block that keeps a push on {@code side} from moving (the user's): the game's own rules, down
+	 * its line from the piston, the first that won't move (obsidian, bedrock, a block entity), within
+	 * as many as a piston moves. Null when no one block is to blame: more than it moves, the world's
+	 * edge or its height's, a chunk not loaded, or a sticky block's pull off the line.
+	 */
+	public static String blocker(Level level, BlockPos pos, Direction side) {
+		for (int i = 1; i <= PistonStructureResolver.MAX_PUSH_DEPTH + 1; i++) {
+			BlockPos at = pos.relative(side, i);
+			if (level.isOutsideBuildHeight(at) || !level.getWorldBorder().isWithinBounds(at) || !level.isLoaded(at)) {
+				return null;
+			}
+			BlockState state = level.getBlockState(at);
+			if (state.isAir() || state.getPistonPushReaction() == net.minecraft.world.level.material.PushReaction.POPPED) {
+				return null; // (the line ends here: what stopped it is off it)
+			}
+			if (!net.minecraft.world.level.block.piston.PistonBaseBlock.isPushable(state, level, at, side, false, side)) {
+				return net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+			}
+		}
+		return null; // (more than a piston moves)
+	}
+
+	/**
 	 * Pushes on {@code side}, as a piston extending: false on its cable's side, when its arm is out
 	 * there already, or when what's in front won't move (obsidian, too many blocks, the world's edge).
 	 */

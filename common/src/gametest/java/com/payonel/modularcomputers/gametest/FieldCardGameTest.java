@@ -129,8 +129,8 @@ public class FieldCardGameTest {
 				card.capture(args(pig.getStringUUID()));
 				card.move(args(5.0)); // forward: out of the case's front (+Z), through the wall
 			})
-			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : events.getLast(), Map.of("event", "move", "ok", false, "why", "blocked: minecraft:stone"),
-				"its event: what's in the way"))
+			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : events.getLast(), Map.of("event", "move", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "front"),
+				"its event: what's in the way, met on the front of what it holds (the case's frame)"))
 			.thenExecute(() -> helper.assertTrue(pig.getZ() < helper.absolutePos(new BlockPos(1, 1, 5)).getZ(), "the pig's this side of the wall"))
 			.thenSucceed();
 	}
@@ -151,8 +151,30 @@ public class FieldCardGameTest {
 				card.capture(args(zombie.getStringUUID()));
 				card.move(args(0.0, 0.0, 5.0)); // (up, through the ceiling)
 			})
-			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : events.getLast(), Map.of("event", "move", "ok", false, "why", "blocked: minecraft:stone"),
-				"its event: the ceiling"))
+			.thenWaitUntil(() -> same(helper, events.isEmpty() ? null : events.getLast(), Map.of("event", "move", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "up"),
+				"its event: the ceiling, met on top"))
+			.thenSucceed();
+	}
+
+	/**
+	 * What stopped a move is the side that met the block (the user's), not the move's main way: a pig
+	 * against a wall on its east, moved mostly south and a little east, met it on its east.
+	 */
+	@GameTest(maxTicks = 100)
+	public void theSideThatMetTheBlockIsTheOneSaidNotTheMovesMainWay(GameTestHelper helper) {
+		Pig pig = helper.spawn(EntityTypes.PIG, PIG);
+		pig.setNoAi(true);
+		helper.setBlock(PIG.east(), Blocks.STONE);
+		helper.setBlock(PIG.east().above(), Blocks.STONE);
+		helper.startSequence()
+			.thenExecuteAfter(5, () -> {
+				net.minecraft.world.phys.Vec3 step = new net.minecraft.world.phys.Vec3(0.3, 0, 0.5);
+				net.minecraft.world.phys.Vec3 from = pig.position();
+				pig.move(net.minecraft.world.entity.MoverType.SELF, step);
+				var met = com.payonel.modularcomputers.entity.Obstruction.of(pig, step, pig.position().subtract(from));
+				helper.assertTrue(met.side() == Direction.EAST, "its east met the wall: " + met);
+				helper.assertTrue("minecraft:stone".equals(met.block()), "the wall's stone: " + met);
+			})
 			.thenSucceed();
 	}
 

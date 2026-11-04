@@ -28,6 +28,15 @@ local robot = assert(devices.open("robotics0"), "no robotics device: run it on a
 local storage = assert(devices.open("crafting0"), "no crafting card in the golem (its storage)")
 local field = assert(devices.open("field0"), "no energy field card in the golem (its lift)")
 
+-- What a failed end says: its why, and a blocked one's block (- when none is named) and the face
+-- that met it.
+local function reason(event)
+  if event.why == "blocked" then
+    return "blocked " .. (event.block or "-") .. " " .. event.face
+  end
+  return event.why
+end
+
 -- How its last command went, once it's done: sync waits until the device's queue is empty, and the
 -- command's end is among its events (ok, or false and why).
 local function ended(device, method)
@@ -35,7 +44,7 @@ local function ended(device, method)
   local ok, why = true, nil
   for event in function() return devices.event(device, 0) end do
     if event.event == method and event.ok ~= nil then
-      ok, why = event.ok, event.why
+      ok, why = event.ok, reason(event)
     end
   end
   return ok, why

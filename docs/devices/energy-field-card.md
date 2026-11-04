@@ -92,8 +92,12 @@ Fails with `holding` (it holds something already), `no entity` (nothing near the
 ### move(forward[, right[, up]]) → true, or nil and why
 
 Moves the field by that much, never through blocks. It answers at once; its
-event, `move`, says how it went: `ok`, or not and why (`blocked: minecraft:stone`, the block over or
-under it too when it moves up or down; `stopped`; or why it let go, as `lost` says). Fails at once
+event, `move`, says how it went: `ok`, or not and why (`blocked`; `stopped`; or why it let go, as
+`lost` says). Blocked, two fields say by what: `block`, the id of the block in its way (left out
+when no one block can be named), and `face`, the side of what it holds that met it, in its
+computer's frame (`front`, `back`, `left`, `right`, `up` or `down`; a case's front, or a robot's
+heading), the side that was hit, not the way the move was mostly going:
+`{event = "move", ok = false, why = "blocked", block = "minecraft:stone", face = "up"}`. Fails at once
 with `not holding`, or `too far: 16` (out of its reach, unless it holds its own robot).
 
 ### release() → true
@@ -118,7 +122,7 @@ Its oldest event, or nil.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `move` | `ok`, `why` | a move ended: `ok` true when it got there; else why (`blocked: minecraft:stone`, `stopped`, or a `lost` reason: it let go of what it moved) |
+| `move` | `ok`, `why` (and `block`, `face` when it's `blocked`) | a move ended: `ok` true when it got there; else why (`blocked`, `stopped`, or a `lost` reason: it let go of what it moved) |
 | `lost` | `why` | it let go on its own: `gone`, `too far: 16`, `no power`, `landing` (its robot landing onto its legs), `interrupted` (its world saved and loaded: a move it was making ends first) |
 
 ## Example

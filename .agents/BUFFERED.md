@@ -29,8 +29,7 @@ the spec the build follows and its checklist, items marked done as they land.
 - A command that runs over time ends in an event (news, as any device's), named after its method
   (one done at once, a read or a `capture`, answers in its call: no event, so the stream isn't
   noise for programs waiting on real ends; a build decision, 2026-10-28):
-  `{event = "walk", ok = true}`, or `{event = "walk", ok = false, why = "blocked: minecraft:oak_log
-  front"}`; one cut short by `stop` ends `ok = false, why = "stopped"`. It's also the device's "idle
+  `{event = "walk", ok = true}`, or `{event = "walk", ok = false, why = "blocked", block = "minecraft:oak_log", face = "front"}`; one cut short by `stop` ends `ok = false, why = "stopped"`. It's also the device's "idle
   again", its interrupt pending until the event is taken.
 - No queue, no tags, no fault state: a command's failure ends that command only, and the next runs
   as any would.
@@ -58,8 +57,15 @@ the spec the build follows and its checklist, items marked done as they land.
 ### Failure strings
 
 Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, numbers):
-`blocked: minecraft:oak_log front`, `too high: 2`, `too low: 4`, `too far: 64`, `no path`, `held`,
-`busy`, `no legs`, `no legs below`, `on legs`, `no thrusters`, `stopped`. For every device.
+`too high: 2`, `too low: 4`, `too far: 64`, `no path`, `held`, `busy`, `no legs`, `no legs below`,
+`on legs`, `no thrusters`, `stopped`. For every device.
+
+Being made one shape (the user's, 2026-11-03): a why is one word, exactly, and what it's about
+comes in named fields beside it, the same fields wherever it's said. Done so far: `blocked`
+(`block`, the block's id, left out when no one block can be named; `face`, the side of what moved
+that met it, in the device's terms: a robot's own, a field holder's frame, a piston's the world's),
+said only in an event (a piston's too: its push ends in its event), in the `/dev` text as words,
+`-` for a missing one. The rest of the reasons follow.
 
 ### Robotics
 
@@ -108,7 +114,7 @@ Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, nu
 ### The others
 
 - **Energy field card:** `capture`, `move` are commands; `move` ends once arrived or blocked
-  (`blocked: minecraft:stone`); `scan`, `get`, `pull` and `release` are free (a program can always
+  (`blocked`, its `block` and `face`); `scan`, `get`, `pull` and `release` are free (a program can always
   let go: a move under way ends `stopped`). A capture outlives the process that made it.
 - **Redstone card:** `set` is a command, ending once applied in the world (at its next tick: at most
   one change a tick), its event carrying every face (`result`); `get` is a command (it sees a `set`

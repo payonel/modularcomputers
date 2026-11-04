@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.payonel.modularcomputers.runtime.Arguments;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /** Every move costs a push's power, moved or not; extending an arm that's out already is free (user, 2026-10-13). */
@@ -21,9 +22,18 @@ class RoboticPistonTest {
 
 	@Test
 	void extendingAnArmThatsOutIsFree() {
-		piston.moveWith((side, motion) -> RoboticPiston.Moved.ALREADY_OUT);
+		piston.moveWith((side, motion) -> RoboticPiston.Moved.ALREADY);
 		assertThat(piston.extend(new Arguments(List.of("up"))).first()).isEqualTo(true);
 		assertThat(owed()).isZero();
+	}
+
+	/** An arm already where it's asked to be is no failure (the user's: a lit lamp lit again): true, and its end ok. */
+	@Test
+	void retractingAnArmThatsInIsDoneAtOnceNotAFailure() {
+		piston.accepting(true);
+		piston.moveWith((side, motion) -> RoboticPiston.Moved.ALREADY);
+		assertThat(piston.retract(new Arguments(List.of("up"))).first()).isEqualTo(true);
+		assertThat(piston.pull(new Arguments(List.of())).first()).isEqualTo(Map.of("event", "retract", "ok", true));
 	}
 
 	@Test
@@ -32,7 +42,21 @@ class RoboticPistonTest {
 		piston.extend(new Arguments(List.of("up")));
 		assertThat(owed()).isEqualTo(RoboticPiston.PUSH_COST);
 		piston.moveWith((side, motion) -> RoboticPiston.Moved.CANNOT_PUSH);
-		assertThat(piston.push(new Arguments(List.of("up"))).error()).isEqualTo(RoboticPiston.CANNOT_PUSH + ": up");
+		assertThat(piston.push(new Arguments(List.of("up"))).first()).as("a command: true, its end says how").isEqualTo(true);
 		assertThat(owed()).isEqualTo(RoboticPiston.PUSH_COST);
+	}
+
+	/** A push that can't move is its end, blocked (the user's: one shape): the block that won't move, and its face, the world's way. */
+	@Test
+	void aBlockedPushEndsBlockedWithTheBlockAndItsFace() {
+		piston.accepting(true);
+		piston.moveWith((side, motion) -> RoboticPiston.Moved.CANNOT_PUSH);
+		piston.blockedBy(side -> "minecraft:obsidian");
+		piston.extend(new Arguments(List.of("up")));
+		assertThat(piston.pull(new Arguments(List.of())).first())
+			.isEqualTo(Map.of("event", "extend", "ok", false, "why", "blocked", "block", "minecraft:obsidian", "face", "up"));
+		piston.blockedBy(side -> null); // (more than it moves: no one block)
+		piston.push(new Arguments(List.of("north")));
+		assertThat(piston.pull(new Arguments(List.of())).first()).isEqualTo(Map.of("event", "push", "ok", false, "why", "blocked", "face", "north"));
 	}
 }

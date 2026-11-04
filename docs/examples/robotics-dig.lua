@@ -9,12 +9,21 @@ local LENGTH = tonumber(arg[1] or "8")
 
 local robot = assert(sys.open("/dev/robotics0"))
 
+-- What a failed end says: its why, and a blocked one's block (- when none is named) and the face
+-- that met it.
+local function reason(event)
+  if event.why == "blocked" then
+    return "blocked " .. (event.block or "-") .. " " .. event.face
+  end
+  return event.why
+end
+
 -- Waits for the next end of one of the device's 'method' commands: ok, or false and why.
 local function ended(method)
   while true do
     local got = sys.ioctl(robot, "pull")
     if got and got.event == method then
-      return got.ok, got.why
+      return got.ok, reason(got)
     elseif not got then
       sys.poll({[robot] = {PRI = true}})
     end

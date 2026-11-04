@@ -176,7 +176,7 @@ public class GolemWalkGameTest {
 	@GameTest(maxTicks = 200)
 	public void itWontWalkIntoLava(GameTestHelper helper) {
 		helper.setBlock(AT.east(2), Blocks.LAVA);
-		walks(helper, new Object[] {3L}, blocked("blocked: minecraft:lava front"), at(1, 0, 0L));
+		walks(helper, new Object[] {3L}, Map.of("event", "walk", "ok", false, "why", "blocked", "block", "minecraft:lava", "face", "front"), at(1, 0, 0L));
 	}
 
 	@GameTest(maxTicks = 300)

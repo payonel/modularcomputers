@@ -25,7 +25,11 @@ local function go(forward, up)
   assert(sys.ioctl(card, "move", forward, 0, up))
   local moved = event()
   if not moved.ok then
-    print(tostring(moved.why))
+    if moved.why == "blocked" then -- (the block in the way, - when none is named, and the face of what it holds that met it)
+      print("blocked " .. (moved.block or "-") .. " " .. moved.face)
+    else
+      print(tostring(moved.why))
+    end
     sys.ioctl(card, "release")
     os.exit(1)
   end

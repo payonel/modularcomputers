@@ -161,7 +161,7 @@ public final class FieldCard extends Card implements Buffered {
 		return held;
 	}
 
-	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, never through blocks. A command: true at once (its event: move, ok, or not and why: blocked: the block), or false and why it can't start (not holding, too far)")
+	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, never through blocks. A command: true at once (its event: move, ok, or not and why: blocked, with block, the block in the way, and face, the side of what it holds that met it, in its computer's frame), or false and why it can't start (not holding, too far)")
 	public Result move(Arguments args) {
 		Result no = noProjector();
 		if (no != null) {
@@ -216,11 +216,11 @@ public final class FieldCard extends Card implements Buffered {
 		}
 	}
 
-	/** Its field's move was stopped. */
-	public void blocked(String why) {
+	/** Its field's move was stopped by a block ({@code block}: its id, null when none can be named; {@code face}: the face of what it holds that met it, in its computer's frame). */
+	public void blocked(String block, String face) {
 		if (state.equals(MOVING)) {
 			state(HOLDING);
-			events.ended("move", false, why, null);
+			events.ended("move", false, BLOCKED, Buffered.blocked(block, face), null);
 		}
 	}
 

@@ -284,8 +284,8 @@ class DeviceExamplesTest extends McosHarness {
 			moves.add(new Move(name, side, motion));
 			return switch (motion) {
 				case PUSH -> RoboticPiston.Moved.DONE;
-				case EXTEND -> out.add(side) ? RoboticPiston.Moved.DONE : RoboticPiston.Moved.ALREADY_OUT;
-				case RETRACT -> out.remove(side) ? RoboticPiston.Moved.DONE : RoboticPiston.Moved.NOT_EXTENDED;
+				case EXTEND -> out.add(side) ? RoboticPiston.Moved.DONE : RoboticPiston.Moved.ALREADY;
+				case RETRACT -> out.remove(side) ? RoboticPiston.Moved.DONE : RoboticPiston.Moved.ALREADY;
 			};
 		});
 		devices.put("id:" + name, piston);
@@ -329,7 +329,7 @@ class DeviceExamplesTest extends McosHarness {
 		assertThat(moves.getFirst()).as("its front is east").isEqualTo(new Move("pusher", "east", RoboticPiston.Motion.PUSH));
 		server.add(() -> blocked[0] = true);
 		java.nio.file.Path log = root().resolve("home/pusher.log");
-		settle(() -> Files.isRegularFile(log) && read(log).contains("blocked: east\n"));
+		settle(() -> Files.isRegularFile(log) && read(log).contains("blocked - east\n"));
 		int now = moves.size();
 		settle(() -> moves.size() >= now + 2); // (it tries again)
 		server.add(() -> blocked[0] = false);

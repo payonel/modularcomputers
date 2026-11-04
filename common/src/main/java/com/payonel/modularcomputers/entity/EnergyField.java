@@ -27,8 +27,6 @@ import net.minecraft.world.phys.Vec3;
  * what it held falling). It moves what it holds; it's drawn round it, wherever it is.
  */
 public final class EnergyField extends Entity {
-	/** How far beyond what it holds it looks for what stopped it, in blocks. */
-	private static final double BLOCKED_PROBE = 0.5;
 
 	/** How fast it moves what it holds, in blocks a tick: ten a second (a golem walks four). */
 	public static final double SPEED = 0.5;
@@ -51,7 +49,8 @@ public final class EnergyField extends Entity {
 	public interface Listener {
 		void arrived();
 
-		void blocked(String why);
+		/** A block stopped its move: the block's id (null: none to name), and the side of what it holds that met it, the world's way. */
+		void blocked(String block, net.minecraft.core.Direction side);
 
 		/** What it holds moved {@code blocks} (what it costs). */
 		default void moved(double blocks) {
@@ -183,13 +182,8 @@ public final class EnergyField extends Entity {
 				listener.moved(moved.length());
 				if (moved.length() < step.length() * STOPPED) {
 					target = null;
-					// What's in the way: the block a little beyond its box's face, the way it was going (its
-					// height's half up or down, its width's half across).
-					Vec3 way = step.normalize();
-					double extent = held.getBbWidth() / 2 * (Math.abs(way.x) + Math.abs(way.z)) + held.getBbHeight() / 2 * Math.abs(way.y);
-					net.minecraft.core.BlockPos ahead = net.minecraft.core.BlockPos.containing(held.position()
-						.add(0, held.getBbHeight() / 2, 0).add(way.scale(extent + BLOCKED_PROBE)));
-					listener.blocked("blocked: " + net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level().getBlockState(ahead).getBlock()));
+					Obstruction met = Obstruction.of(held, step, moved); // (the side of what it holds that met a block, and the block)
+					listener.blocked(met.block(), met.side());
 				}
 			}
 		}

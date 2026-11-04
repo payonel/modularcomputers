@@ -50,6 +50,21 @@ public final class FieldProjector implements FieldCard.Projector {
 			return where;
 		}
 
+		/** A side, the world's way, as a face in the frame: front, back, left, right, up or down. */
+		public String face(Direction side) {
+			Vec3 way = Vec3.atLowerCornerOf(side.getUnitVec3i());
+			double f = way.dot(forward);
+			double r = way.dot(right);
+			double u = way.y;
+			if (Math.abs(u) >= Math.abs(f) && Math.abs(u) >= Math.abs(r)) {
+				return u >= 0 ? "up" : "down";
+			}
+			if (Math.abs(f) >= Math.abs(r)) {
+				return f >= 0 ? "front" : "back";
+			}
+			return r >= 0 ? "right" : "left";
+		}
+
 		/** A block's frame: its center, its front, its own right (as every face is). */
 		public static Frame of(Vec3 center, Direction front) {
 			Direction right = Direction.valueOf(Face.named("right", Face.of(front.getName())).name());
@@ -154,8 +169,8 @@ public final class FieldProjector implements FieldCard.Projector {
 			}
 
 			@Override
-			public void blocked(String why) {
-				card.blocked(why);
+			public void blocked(String block, Direction side) {
+				card.blocked(block, frame.get().face(side)); // (its face in its computer's frame, as its positions are)
 			}
 
 			@Override

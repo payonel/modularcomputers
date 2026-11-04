@@ -27,11 +27,13 @@ public final class RoboticPistonBlockEntity extends CardHolderBlockEntity {
 		super(ModBlocks.ROBOTIC_PISTON_ENTITY, pos, state, 1);
 		// Its front is opposite its cable port (its block's facing).
 		device.frontFrom(() -> com.payonel.modularcomputers.device.Face.of(getBlockState().getValue(RoboticPistonBlock.FACING).getOpposite().getName()));
+		device.blockedBy(side -> level == null || net.minecraft.core.Direction.byName(side) == null ? null
+			: RoboticPistonBlock.blocker(level, worldPosition, net.minecraft.core.Direction.byName(side)));
 		// Device calls come on the server thread: its arms move in the world right then.
 		device.moveWith((side, motion) -> {
 			net.minecraft.core.Direction direction = net.minecraft.core.Direction.byName(side);
 			boolean retracting = motion == RoboticPiston.Motion.RETRACT;
-			RoboticPiston.Moved failed = retracting ? RoboticPiston.Moved.NOT_EXTENDED : RoboticPiston.Moved.CANNOT_PUSH;
+			RoboticPiston.Moved failed = retracting ? RoboticPiston.Moved.ALREADY : RoboticPiston.Moved.CANNOT_PUSH;
 			if (level == null || level.isClientSide() || direction == null) {
 				return failed;
 			}
@@ -50,11 +52,11 @@ public final class RoboticPistonBlockEntity extends CardHolderBlockEntity {
 			}
 			if (out) {
 				if (motion != RoboticPiston.Motion.EXTEND) {
-					return failed; // a push needs its arm in
+					return RoboticPiston.Moved.ALREADY; // (a push with its arm out: it's out, nothing to do)
 				}
 				armsOut.put(direction, HELD); // out already: now it stays
 				setChanged();
-				return RoboticPiston.Moved.ALREADY_OUT;
+				return RoboticPiston.Moved.ALREADY;
 			}
 			if (!RoboticPistonBlock.push(level, worldPosition, direction)) {
 				return failed;

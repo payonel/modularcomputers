@@ -1043,9 +1043,31 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		return drift;
 	}
 
-	/** Why something stopped it, dry: blocked, the block in the way, its face in its own frame. */
-	private String blockedBy(BlockPos at, Vec3 toward) {
-		return "blocked: " + net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level().getBlockState(at).getBlock()) + " " + faceOf(toward);
+	/** Why a step can't be taken: a reason, or blocked (the block in the way, and its own face that met it). */
+	private record Stop(String why, String block, String face) {
+		static Stop because(String why) {
+			return new Stop(why, null, null);
+		}
+
+		void tell(RoboticsDevice robotics) {
+			if (com.payonel.modularcomputers.device.Buffered.BLOCKED.equals(why)) {
+				robotics.blocked(block, face);
+			} else {
+				robotics.failed(why);
+			}
+		}
+	}
+
+	/** A step its walk judged: the block at {@code at} in its way, met on its face toward it (its walk's steps are along its own axes). */
+	private Stop blockedBy(BlockPos at, Vec3 toward) {
+		return new Stop(com.payonel.modularcomputers.device.Buffered.BLOCKED,
+			net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level().getBlockState(at).getBlock()).toString(), faceOf(toward));
+	}
+
+	/** A move the game's collisions cut short ({@code step}, from {@code from}): the side that met a block, in its own frame, and the block. */
+	private void blockedMoving(Vec3 from, Vec3 step) {
+		Obstruction met = Obstruction.of(this, step, position().subtract(from));
+		robotics.blocked(met.block(), faceOf(Vec3.atLowerCornerOf(met.side().getUnitVec3i())));
 	}
 
 	/** The face of its own a direction is nearest: front, back, left, right, up or down. */
@@ -1062,16 +1084,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 		return right >= 0 ? "right" : "left";
 	}
-
-	/** The block a little beyond it, the way it was going: what stopped it. */
-	private BlockPos ahead(Vec3 toward) {
-		Vec3 way = toward.normalize(); // (beyond its box's face that way: its height's half up or down, its width's half across)
-		double extent = getBbWidth() / 2 * (Math.abs(way.x) + Math.abs(way.z)) + getBbHeight() / 2 * Math.abs(way.y);
-		return BlockPos.containing(position().add(0, getBbHeight() / 2, 0).add(way.scale(extent + PROBE)));
-	}
-
-	/** How far beyond itself it looks for what stopped it, in blocks. */
-	private static final double PROBE = 0.5;
 
 	/** Where it is from its origin, in the origin's frame: {forward, right, up, heading} (the robotics device's position). */
 	public Map<String, Object> positionFromOrigin() {
@@ -1287,7 +1299,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			flyTo = null;
 			flightPath = null;
 			restoreHeading();
-			robotics.blocked(blockedBy(ahead(step), step));
+			blockedMoving(from, step);
 			robotics.hovering();
 		}
 	}
@@ -1338,7 +1350,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private void landStep() {
 		if (!landing.isAlive()) {
 			landing = null;
-			robotics.blocked("no legs below");
+			robotics.failed("no legs below");
 			robotics.hovering();
 			return;
 		}
@@ -1352,7 +1364,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				move(net.minecraft.world.entity.MoverType.SELF, step);
 				if (position().distanceTo(from) < step.length() * BLOCKED_SHARE) {
 					landing = null;
-					robotics.blocked(blockedBy(ahead(step), step));
+					blockedMoving(from, step);
 					robotics.hovering();
 				}
 			} else {
@@ -1442,7 +1454,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			Path path = getNavigation().createPath(target.x, target.y, target.z, 0);
 			if (path == null) {
 				endWalk();
-				robotics.blocked("no path");
+				robotics.failed("no path");
 				return;
 			}
 			getNavigation().moveTo(path, 1.0);
@@ -1465,7 +1477,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				if (there && off == 0) {
 					robotics.arrived();
 				} else {
-					robotics.blocked(there ? "height: " + off : "no path");
+					robotics.failed(there ? "height: " + off : "no path");
 				}
 			}
 		}
@@ -1497,14 +1509,14 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				if (off == 0) {
 					robotics.arrived();
 				} else {
-					robotics.blocked("height: " + off);
+					robotics.failed("height: " + off);
 				}
 				return;
 			}
-			String why = stepOnto(next);
-			if (why != null) {
+			Stop stop = stepOnto(next);
+			if (stop != null) {
 				endWalk();
-				robotics.blocked(why);
+				stop.tell(robotics);
 				return;
 			}
 			steps.poll();
@@ -1530,13 +1542,13 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	}
 
 	/** Starts a step onto the block whose middle is {@code next}: null, or why it can't (the walk's blocked there). */
-	private String stepOnto(Vec3 next) {
+	private Stop stepOnto(Vec3 next) {
 		double here = getY();
 		double floor = floorAt(next.x, next.z, here);
 		Vec3 toward = next.subtract(position());
 		if (Double.isNaN(floor)) {
 			if (fits(next.x, here, next.z)) {
-				return "too low"; // (no floor within its drop)
+				return Stop.because("too low"); // (no floor within its drop)
 			}
 			BlockPos wall = BlockPos.containing(next.x, here + HAIR, next.z);
 			return blockedBy(level().getBlockState(wall).isAir() ? wall.above() : wall, toward);
@@ -1549,7 +1561,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 		String why = GolemSteps.step(here, floor, goal);
 		if (why != null) {
-			return why;
+			return Stop.because(why);
 		}
 		if (floor > here && !fits(getX(), floor, getZ())) {
 			return blockedBy(BlockPos.containing(getX(), here + getBbHeight() + HAIR, getZ()), new Vec3(0, 1, 0)); // (a ceiling over it)

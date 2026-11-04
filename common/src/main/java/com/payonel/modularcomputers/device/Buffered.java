@@ -16,6 +16,24 @@ public interface Buffered {
 	/** Why a command is refused while another is running. */
 	String BUSY = "busy";
 
+	/**
+	 * Why a move ended: a block in its way (the user's: one shape, wherever it's said). Its event
+	 * says which block ({@code block}, the block's id; absent when no one block can be named) and
+	 * which face of what moved met it ({@code face}, in the device's own terms), as {@link #blocked}
+	 * gives them.
+	 */
+	String BLOCKED = "blocked";
+
+	/** A {@link #BLOCKED} end's fields: {@code block} (null: none to name, left out) and {@code face}. */
+	static java.util.Map<String, Object> blocked(String block, String face) {
+		java.util.Map<String, Object> fields = new java.util.LinkedHashMap<>();
+		if (block != null) {
+			fields.put("block", block);
+		}
+		fields.put("face", face);
+		return fields;
+	}
+
 	/** Its methods that answer at once, always: not commands (and {@link #SYNC}, every one's). */
 	Set<String> free();
 

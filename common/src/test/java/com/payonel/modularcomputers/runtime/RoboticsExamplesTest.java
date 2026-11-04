@@ -45,7 +45,7 @@ class RoboticsExamplesTest extends McosHarness {
 				at = new long[] {at[0] + (long) forward, at[1] + (long) right};
 				boolean wall = wallAfter == 0;
 				wallAfter--;
-				server.add(wall ? () -> robotics.blocked("blocked: minecraft:stone front") : robotics::arrived);
+				server.add(wall ? () -> robotics.blocked("minecraft:stone", "front") : robotics::arrived);
 				return null;
 			}
 
@@ -130,7 +130,7 @@ class RoboticsExamplesTest extends McosHarness {
 		file("goto.lua", example("robotics-goto"));
 		type("lua /goto.lua 5 > /out; echo $? > /status\r");
 		untilFile(root().resolve("status"), "1\n");
-		assertThat(read(root().resolve("out"))).isEqualTo("blocked: minecraft:stone front\n");
+		assertThat(read(root().resolve("out"))).isEqualTo("blocked minecraft:stone front\n");
 	}
 
 	@Test
@@ -172,7 +172,7 @@ class RoboticsExamplesTest extends McosHarness {
 		untilFile(root().resolve("status"), "1\n");
 		assertThat(asked).hasSize(5).last().isEqualTo("walk 4 0 0");
 		assertThat(Files.exists(root().resolve("out"))).isTrue();
-		assertThat(read(root().resolve("out"))).isEqualTo("side 3: blocked: minecraft:stone front\n");
+		assertThat(read(root().resolve("out"))).isEqualTo("side 3: blocked minecraft:stone front\n");
 	}
 
 	@Test
@@ -223,6 +223,6 @@ class RoboticsExamplesTest extends McosHarness {
 		file("threads.lua", example("threads-robot"));
 		type("lua /threads.lua > /out; echo $? > /status\r");
 		untilFile(root().resolve("status"), "0\n");
-		assertThat(read(root().resolve("out"))).endsWith("stopped: blocked: minecraft:stone front\n");
+		assertThat(read(root().resolve("out"))).endsWith("stopped: blocked minecraft:stone front\n");
 	}
 }

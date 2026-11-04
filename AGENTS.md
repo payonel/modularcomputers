@@ -648,7 +648,15 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   end is an event named after its method, `ok`, why (`EventQueue.ended`); a method that can run
   over time always ends in its event, even when done at once (an extend already out), so a program
   never has to know which. No queue, no tags, no fault state: a failure ends its own command only
-  (the user's: a robot stuck on its first failure looks broken). A tags-and-queues design came first
+  (the user's: a robot stuck on its first failure looks broken). **`blocked` is one shape** (the
+  user's, 2026-11-03): `why = "blocked"` exactly, with named fields `block` (the block's id, left
+  out when no one block is to blame: a piston's 13 blocks, the world's edge) and `face` (the side of
+  what moved that met it, the side that was hit, never the move's main way: `Obstruction`, from the
+  game's collision; a robot's own face, a field's holder's frame, a piston's the world's names),
+  wherever it's said, and only in an event: a robot's moves and its `stuck` notice, a field's
+  `move`, a piston's `push` and `extend` (its end at once). A move already done (an arm out
+  extended, in retracted) is no failure: `true`, its end `ok` (the user's: a lit lamp lit again).
+  A tags-and-queues design came first
   and was set aside as too error-prone.
   - **A refusal always names the device whose news ends the wait** (the user's: one shape):
     `false, "busy", "<id>"`, its own id, or another's when it's busy for that one's sake

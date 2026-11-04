@@ -168,10 +168,21 @@ class RoboticsDeviceTest {
 	}
 
 	@Test
-	void blockedSaysWhy() {
+	void aFailureSaysWhy() {
 		device.walk(args(2L));
-		device.blocked("stuck");
-		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "stuck"));
+		device.failed("no path");
+		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "no path"));
+	}
+
+	/** Blocked is one word, its block and face named fields beside it (the user's: one shape), the block left out when none is named. */
+	@Test
+	void blockedIsTheWordWithTheBlockAndItsFace() {
+		device.walk(args(2L));
+		device.blocked("minecraft:stone", "front");
+		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "blocked", "block", "minecraft:stone", "face", "front"));
+		device.walk(args(2L));
+		device.blocked(null, "up");
+		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "blocked", "face", "up"));
 	}
 
 	@Test
@@ -321,9 +332,10 @@ class RoboticsDeviceTest {
 		RoboticsDevice robot = with(body);
 		robot.drifted(Map.of("forward", 0.9, "right", 0L, "up", 0L));
 		assertThat(robot.state()).isEqualTo(RoboticsDevice.RETURNING);
-		robot.blocked("blocked: minecraft:piston_head back");
+		robot.blocked("minecraft:piston_head", "back");
 		robot.pull(args());
-		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "stuck", "why", "blocked: minecraft:piston_head back"));
+		assertThat(robot.pull(args()).first()).as("its notice says blocked as a command's end does")
+			.isEqualTo(Map.of("event", "notice", "what", "stuck", "why", "blocked", "block", "minecraft:piston_head", "face", "back"));
 		assertThat(body.asked).as("held there, nothing replanned").containsExactly("return", "hold here");
 	}
 

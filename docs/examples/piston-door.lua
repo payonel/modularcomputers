@@ -23,15 +23,8 @@ end
 
 while true do
   local open = lever()
-  local done, why
-  if open then
-    done, why = sys.ioctl(piston, "retract", SIDE)
-    if not done and why:match("^not extended") then
-      done = true  -- (open already)
-    end
-  else
-    done, why = sys.ioctl(piston, "extend", SIDE)  -- (closed already: true, and free)
-  end
+  -- (open or closed already: true, and nothing moves)
+  local done, why = sys.ioctl(piston, open and "retract" or "extend", SIDE)
   if not done then
     io.stderr:write("door: ", open and "open" or "close", ": ", tostring(why), "\n")
   end

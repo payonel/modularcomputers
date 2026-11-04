@@ -34,20 +34,22 @@ A piston has a **front**: the side opposite its cable port. A program can name a
 names or relative to that front, so `front` is the side away from the cable. See
 [Faces](/concepts/faces/). It can take a Bluetooth card in its card slot instead of a cable.
 
-Every move costs power, whether or not it moved anything. Extending an arm that is already out is
-free.
+Every move costs power, whether or not it moved anything. An arm already where it's asked to be
+(extended, or pushed, when it's out; retracted when it's in) is no failure: nothing moves, it's
+free, and its end is `ok`, as a lamp switched on that's already on.
 
 ## In mcos
 
 Its file is `/dev/actuator0` (`actuator1` for the next; its type is `actuator`, as
 [`lsdev`](/programs/lsdev/) names it).
 
-- **Read:** its events, a move's end a line (`push ok`, `extend ok`), as they come; a read with none
-  waiting waits for one.
+- **Read:** its events, a move's end a line (`push ok`, `extend ok`, or `push failed blocked
+  minecraft:obsidian east`: the block, `-` when none is named, and the side), as they come; a read
+  with none waiting waits for one.
 - **Write:** refused: opening it to write fails with `EACCES`.
 - **Poll:** ready for `IN` and `PRI` while a move's end is waiting to be read.
 - **ioctls:** its methods below, by name, with the side as their argument. A move that can't start is
-  `nil`, its message (`blocked: north`, `not extended: north`, `no such face: ...`) and `EINVAL`; a
+  `nil`, its message (`cable: down`, `no such face: ...`) and `EINVAL`; a
   piston that has left the bus (its cable cut, say) is `ENODEV`. `setLabel` sets its label, as on
   every device file.
 
@@ -68,20 +70,23 @@ no front it knows, or `left` and `right` when its front is up or down.
 ### push(side) → true
 
 Pushes on that side. The arm goes out and comes back on its own; its event, `push`, once it's back.
-Fails at once with `cable: <side>` on its cable port's side, and with `blocked: <side>` when an arm
-is out there already, or when something in front will not move.
+When something will not move, its event says so at once: `ok = false`, `why = "blocked"`, `block`
+the first block down its line that won't move (obsidian, bedrock, a block entity), left out when no
+one block is to blame (more than a piston moves, the world's edge, a chunk not loaded), and `face`
+the side. With its arm out there already, nothing moves, and its event is `ok`. Fails at once with
+`cable: <side>` on its cable port's side.
 
 ### extend(side) → true
 
 Pushes and leaves the arm out until `retract`; its event, `extend`, once it's out. Gives `true` also
 when the arm is out already (and then it stays out, free, its event at once: every extend ends in its
-event, so a program waiting for one never has to know which it was). Fails at once with
-`blocked: <side>` otherwise, as `push` does.
+event, so a program waiting for one never has to know which it was). Blocked, its event says so,
+as `push`'s does. Fails at once with `cable: <side>`.
 
 ### retract(side) → true
 
 Takes the arm on that side back in; a sticky piston pulls what is in front of it. Its event,
-`retract`, once it's in. Fails at once with `not extended: <side>` when there is no arm out there.
+`retract`, once it's in. With no arm out there, nothing moves, and its event is `ok` at once.
 
 ### sync() → boolean
 
@@ -95,8 +100,9 @@ Its oldest event, or `nil`.
 
 ## Events
 
-A move's end: `{event = "push", ok = true}` (or `extend`, `retract`). Its file reads them as lines,
-`push ok`.
+A move's end: `{event = "push", ok = true}` (or `extend`, `retract`), or blocked:
+`{event = "push", ok = false, why = "blocked", block = "minecraft:obsidian", face = "east"}`. Its
+file reads them as lines, `push ok`, `push failed blocked minecraft:obsidian east`.
 
 ## Examples
 

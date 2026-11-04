@@ -71,11 +71,19 @@ public final class EventQueue {
 	 * result]}}, or {@code {event = method, ok = false, why}} when it failed (or was stopped). News.
 	 */
 	public void ended(String method, boolean ok, String why, Object result) {
+		ended(method, ok, why, null, result);
+	}
+
+	/** A command's end whose why says more ({@code fields}, beside why: a {@link Buffered#BLOCKED}'s block and face). */
+	public void ended(String method, boolean ok, String why, Map<String, Object> fields, Object result) {
 		Map<String, Object> event = new java.util.LinkedHashMap<>();
 		event.put("event", method);
 		event.put("ok", ok);
 		if (!ok) {
 			event.put("why", why);
+		}
+		if (fields != null) {
+			event.putAll(fields);
 		}
 		if (result != null) {
 			event.put("result", com.payonel.modularcomputers.runtime.Values.normalize(result));

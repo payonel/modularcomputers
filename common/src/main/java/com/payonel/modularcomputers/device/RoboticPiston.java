@@ -32,12 +32,8 @@ public final class RoboticPiston implements Device, Buffered {
 	}
 	/** What a push costs, moved or not: five ticks of a running CPU. */
 	public static final int PUSH_COST = 5 * PowerUnits.CPU;
-	/** Why a push or an extend can't start, and the side: an arm out there, or what won't move. */
-	public static final String CANNOT_PUSH = "blocked";
 	/** Why a move can't start on its cable port's side, and the side: no arm there. */
 	public static final String CABLE = "cable";
-	/** Why a retract can't start, and the side: no arm out there. */
-	public static final String NOT_EXTENDED = "not extended";
 	/** A vanilla piston's move, in ticks: an extend's or a retract's time. */
 	public static final int MOVE_TICKS = 2;
 	/** A push's time: out, and back (its block's arm time). */
@@ -65,14 +61,12 @@ public final class RoboticPiston implements Device, Buffered {
 	public enum Moved {
 		/** It moved. */
 		DONE,
-		/** Extend: the arm was out already (nothing moved, nothing to pay). */
-		ALREADY_OUT,
-		/** It couldn't push (an arm out there, what won't move). */
+		/** Extend or push: the arm was out already; retract: it was in (nothing moved, nothing to pay: not a failure, as a lit lamp lit again). */
+		ALREADY,
+		/** It couldn't push: what's in front won't move. */
 		CANNOT_PUSH,
 		/** The side is its cable port's: no arm there. */
-		CABLE,
-		/** Retract: no arm out there. */
-		NOT_EXTENDED
+		CABLE
 	}
 
 	/** Moves an arm in the world. */
@@ -80,7 +74,9 @@ public final class RoboticPiston implements Device, Buffered {
 		Moved move(String side, Motion motion);
 	}
 
-	private Arms arms = (side, motion) -> motion == Motion.RETRACT ? Moved.NOT_EXTENDED : Moved.CANNOT_PUSH;
+	private Arms arms = (side, motion) -> motion == Motion.RETRACT ? Moved.ALREADY : Moved.CANNOT_PUSH;
+	/** The block keeping a push on a side from moving (null: none to name), in the world (its block). */
+	private java.util.function.UnaryOperator<String> blocker = side -> null;
 
 	@Override
 	public DeviceType type() {
@@ -97,17 +93,22 @@ public final class RoboticPiston implements Device, Buffered {
 		this.arms = arms;
 	}
 
-	@Method(doc = "push(side): pushes as a piston does on that side (north, south, east, west, up or down; or front, back, left, right: its front is opposite its cable), and the arm comes back on its own. A command: true at once (its event: push, once the arm is back), or false and why it can't (cable: the side, its cable port's; blocked: the side, an arm out there, or something that won't move)")
+	/** What keeps a push on a side from moving, in the world (its block): a block's id, or null. */
+	public void blockedBy(java.util.function.UnaryOperator<String> blocker) {
+		this.blocker = blocker;
+	}
+
+	@Method(doc = "push(side): pushes as a piston does on that side (north, south, east, west, up or down; or front, back, left, right: its front is opposite its cable), and the arm comes back on its own. A command: true at once (its event: push, once the arm is back; at once when its arm is out already, ok: nothing to do; or not ok, blocked: block, the first down its line that won't move, left out when no one block is to blame, and face, the side), or false and why it can't start (cable: the side, its cable port's)")
 	public Result push(Arguments args) {
 		return move(args, Motion.PUSH);
 	}
 
-	@Method(doc = "extend(side): pushes on that side and leaves the arm out until retract(side). A command: true at once (its event: extend, once it's out; at once when it's out already: free), or false and why (blocked: the side)")
+	@Method(doc = "extend(side): pushes on that side and leaves the arm out until retract(side). A command: true at once (its event: extend, once it's out; at once when it's out already, ok and free; or not ok, blocked, as push's), or false and why it can't start (cable: the side)")
 	public Result extend(Arguments args) {
 		return move(args, Motion.EXTEND);
 	}
 
-	@Method(doc = "retract(side): takes the arm on that side back in (a sticky piston pulls what's in front of it). A command: true at once (its event: retract, once it's in), or false and why (not extended: the side)")
+	@Method(doc = "retract(side): takes the arm on that side back in (a sticky piston pulls what's in front of it). A command: true at once (its event: retract, once it's in; at once when no arm is out there, ok: nothing to do), or false and why it can't start (cable: the side)")
 	public Result retract(Arguments args) {
 		return move(args, Motion.RETRACT);
 	}
@@ -120,7 +121,7 @@ public final class RoboticPiston implements Device, Buffered {
 			return Result.fail(e.getMessage());
 		}
 		Moved moved = arms.move(side, motion);
-		if (moved != Moved.ALREADY_OUT) {
+		if (moved != Moved.ALREADY) {
 			power.charge(PUSH_COST);
 		}
 		String method = motion.name().toLowerCase(java.util.Locale.ROOT);
@@ -130,13 +131,16 @@ public final class RoboticPiston implements Device, Buffered {
 				left = motion == Motion.PUSH ? PUSH_TICKS : MOVE_TICKS;
 				yield Result.ok(true);
 			}
-			case ALREADY_OUT -> {
-				events.ended(method, true, null, null); // (out already: done as it starts)
+			case ALREADY -> {
+				events.ended(method, true, null, null); // (out already, or in: done as it starts)
 				yield Result.ok(true);
 			}
-			case CANNOT_PUSH -> Result.fail(CANNOT_PUSH + ": " + side);
+			case CANNOT_PUSH -> {
+				// (its end at once, as every command's: blocked, the block, its face the world's way)
+				events.ended(method, false, BLOCKED, Buffered.blocked(blocker.apply(side), side), null);
+				yield Result.ok(true);
+			}
 			case CABLE -> Result.fail(CABLE + ": " + side);
-			case NOT_EXTENDED -> Result.fail(NOT_EXTENDED + ": " + side);
 		};
 	}
 

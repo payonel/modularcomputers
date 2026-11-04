@@ -26,7 +26,7 @@ import java.util.Map;
  * <p>
  * It's buffered ({@link Buffered}): one command at a time. A command that runs over time (a walk,
  * a turn, a flight, a landing, a block's breaking) ends in its event, named after its method:
- * {@code {event = "walk", ok = false, why = "blocked: minecraft:oak_log front"}}. Its commands run
+ * {@code {event = "walk", ok = false, why = "blocked", block = "minecraft:oak_log", face = "front"}}. Its commands run
  * from its <b>plan</b>, where the last one left it: a golem shoved off it in the air holds its plan
  * (it flies back, raising {@code shoved}), and a positional command given while it's off its plan (a
  * shove, a stop mid-walk) sends it back first ({@code return}'s event), refused busy until it's
@@ -409,6 +409,10 @@ public final class RoboticsDevice implements Device, Buffered {
 	 * where it is, its heading squared), and its event says how it went.
 	 */
 	private void end(boolean ok, String why, Object result) {
+		end(ok, why, null, result);
+	}
+
+	private void end(boolean ok, String why, Map<String, Object> fields, Object result) {
 		String method = active;
 		if (method == null) {
 			return;
@@ -423,9 +427,14 @@ public final class RoboticsDevice implements Device, Buffered {
 		}
 		changed();
 		if (RETURN.equals(method)) {
-			notice(ok ? RETURNED : STUCK, ok ? null : Map.of("why", why)); // (nobody asked for it: no command's end)
+			Map<String, Object> stuck = new LinkedHashMap<>();
+			stuck.put("why", why);
+			if (fields != null) {
+				stuck.putAll(fields); // (blocked's block and face, as a command's end has them)
+			}
+			notice(ok ? RETURNED : STUCK, ok ? null : stuck); // (nobody asked for it: no command's end)
 		} else {
-			events.ended(method, ok, why, result);
+			events.ended(method, ok, why, fields, result);
 		}
 	}
 
@@ -659,9 +668,12 @@ public final class RoboticsDevice implements Device, Buffered {
 		end(true, null, null);
 	}
 
-	/** The body can't go on ({@code why}, dry: blocked: minecraft:oak_log front, no path). */
-	public void blocked(String why) {
-		end(false, why, null);
+	/**
+	 * A block stopped the body ({@code block}: its id, null when none can be named; {@code face}: its
+	 * face that met it, its own: front, back, left, right, up or down).
+	 */
+	public void blocked(String block, String face) {
+		end(false, BLOCKED, Buffered.blocked(block, face), null);
 	}
 
 	/** The body finished turning. */
@@ -683,7 +695,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		end(true, null, result);
 	}
 
-	/** The body couldn't go on breaking ({@code why}: the block changed, the tool went). */
+	/** The body couldn't go on ({@code why}: no path, the block it broke changed, the tool went). */
 	public void failed(String why) {
 		end(false, why, null);
 	}
@@ -854,7 +866,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		if (accepting && interrupted != null) {
 			active = interrupted;
 			interrupted = null;
-			blocked(INTERRUPTED);
+			failed(INTERRUPTED);
 		}
 		if (!accepting) {
 			events.clear();
