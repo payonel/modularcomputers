@@ -47,6 +47,12 @@ public interface Buffered {
 	String LOST = "lost";
 
 	/**
+	 * Why a command ended: the game won't let what it acted on be broken (the user's, one shape: {@link
+	 * EventQueue#unbreakable}): its name, its id ("" for a block) and where it is, as {@link #LOST}'s.
+	 */
+	String UNBREAKABLE = "unbreakable";
+
+	/**
 	 * The board gives a command (a method not free) with these arguments, as the program gave them,
 	 * before calling it: a stopped, blocked or drifted end says them in its call.
 	 */

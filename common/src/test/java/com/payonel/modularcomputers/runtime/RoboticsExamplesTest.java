@@ -106,7 +106,7 @@ class RoboticsExamplesTest extends McosHarness {
 				asked.add("swing " + face);
 				boolean stuck = bedrockAfter == 0;
 				bedrockAfter--;
-				server.add(stuck ? () -> robotics.failed("unbreakable") : () -> robotics.broke("minecraft:stone", 0));
+				server.add(stuck ? () -> robotics.unbreakable("minecraft:bedrock", "", RoboticsDevice.toward(face)) : () -> robotics.broke("minecraft:stone", 0));
 				return Result.ok(RoboticsDevice.BREAKING);
 			}
 		});

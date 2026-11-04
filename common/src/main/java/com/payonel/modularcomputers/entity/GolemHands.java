@@ -339,10 +339,7 @@ final class GolemHands {
 		if (state.isAir() || !state.getFluidState().isEmpty() && state.canBeReplaced()) {
 			return Result.fail("nothing there");
 		}
-		if (state.getDestroySpeed(level(), pos) < 0) {
-			return Result.fail("unbreakable");
-		}
-		stopBreaking();
+		stopBreaking(); // (unbreakable is its end's, a tick on: a call fails only when it can't be given, the user's)
 		breaking = pos.immutable();
 		breakingFace = face;
 		breakingState = state;
@@ -382,6 +379,10 @@ final class GolemHands {
 			lose();
 			return;
 		}
+		if (state.getDestroySpeed(level(), breaking) < 0) { // (bedrock, a command block: no player breaks it)
+			refuse(state);
+			return;
+		}
 		if (!ItemStack.isSameItemSameComponents(golem.getMainHandItem(), breakingWith)) {
 			breakingWith = golem.getMainHandItem().copy();
 			progress = 0;
@@ -397,14 +398,15 @@ final class GolemHands {
 			}
 			BlockPos pos = breaking;
 			String name = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
-			stopBreaking();
+			level().destroyBlockProgress(golem.getId(), pos, NO_CRACKS);
 			// What it drops is caught as it falls, and kept (the items that weren't there before).
 			AABB around = new AABB(pos).inflate(1);
 			Set<Integer> before = level().getEntitiesOfClass(ItemEntity.class, around, entity -> true).stream().map(Entity::getId).collect(Collectors.toSet());
-			if (!player.gameMode.destroyBlock(pos)) {
-				golem.robotics().failed("not broken");
+			if (!player.gameMode.destroyBlock(pos)) { // (the game's refusal: a protected place, an item that breaks nothing)
+				refuse(state);
 				return;
 			}
+			breaking = null;
 			level().levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, pos, net.minecraft.world.level.block.Block.getId(state));
 			int dropped = 0;
 			for (ItemEntity drop : level().getEntitiesOfClass(ItemEntity.class, around, entity -> !before.contains(entity.getId()))) {
@@ -422,12 +424,18 @@ final class GolemHands {
 		}
 	}
 
-	/** What it was breaking went (air there now): it says what and where it last was (the user's: lost). */
+	/** The game won't let the block there be broken: it says what and where (the user's: unbreakable), its call as far as it got. */
+	private void refuse(BlockState state) {
+		String name = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+		golem.robotics().unbreakable(name, "", RoboticsDevice.toward(breakingFace)); // (a block has no id of its own: "")
+		stopBreaking();
+	}
+
+	/** What it was breaking went (air there now): it says what and where it last was (the user's: lost), its call as far as it got. */
 	private void lose() {
 		String name = BuiltInRegistries.BLOCK.getKey(breakingState.getBlock()).toString();
-		String face = breakingFace;
+		golem.robotics().lost(name, "", RoboticsDevice.toward(breakingFace)); // (a block has no id of its own: "")
 		stopBreaking();
-		golem.robotics().lost(name, "", RoboticsDevice.toward(face)); // (a block has no id of its own: "")
 	}
 
 	/** Stops breaking, its cracks gone. */

@@ -176,6 +176,40 @@ public class GolemHandsGameTest {
 		});
 	}
 
+	/** What no player breaks (bedrock) isn't refused at the call (the user's: a call fails only when it can't be given): its end says unbreakable, at once. */
+	@GameTest(maxTicks = 200)
+	public void bedrockIsUnbreakableAndItsSwingsEndSaysSo(GameTestHelper helper) {
+		helper.setBlock(FRONT, Blocks.BEDROCK);
+		List<Object> answers = new ArrayList<>();
+		BotGolem golem = start(helper, answers, call("swing", "front"));
+		golem.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.DIAMOND_PICKAXE));
+		helper.succeedWhen(() -> {
+			List<Object> got = copy(answers);
+			same(helper, got.isEmpty() ? null : got.getFirst(), "breaking", "its answer: " + got);
+			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "swing", "ok", false, "why", "unbreakable", "name", "minecraft:bedrock", "id", "",
+				"at", Map.of("forward", 1L, "right", 0L, "up", 0L), "call", Map.of("args", List.of("front"), "progress", 0L)), "its event: " + got);
+			helper.assertBlockPresent(Blocks.BEDROCK, FRONT);
+		});
+	}
+
+	/**
+	 * The game refusing a break done (as a protected place does a player's: the cracks finish and the
+	 * block stays) is unbreakable too, its call's progress the whole break: a debug stick breaks nothing.
+	 */
+	@GameTest(maxTicks = 400)
+	public void aBreakTheGameRefusesAtItsEndIsUnbreakable(GameTestHelper helper) {
+		helper.setBlock(FRONT, Blocks.OAK_LOG);
+		List<Object> answers = new ArrayList<>();
+		BotGolem golem = start(helper, answers, call("swing", "front"));
+		golem.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.DEBUG_STICK));
+		helper.succeedWhen(() -> {
+			List<Object> got = copy(answers);
+			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "swing", "ok", false, "why", "unbreakable", "name", "minecraft:oak_log", "id", "",
+				"at", Map.of("forward", 1L, "right", 0L, "up", 0L), "call", Map.of("args", List.of("front"), "progress", 1L)), "its event: " + got);
+			helper.assertBlockPresent(Blocks.OAK_LOG, FRONT);
+		});
+	}
+
 	@GameTest(maxTicks = 200)
 	public void breakingStoneWithAPickaxeTakesAPlayersTime(GameTestHelper helper) {
 		helper.setBlock(FRONT, Blocks.STONE);

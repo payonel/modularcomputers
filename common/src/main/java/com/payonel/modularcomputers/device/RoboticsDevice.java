@@ -524,7 +524,7 @@ public final class RoboticsDevice implements Device, Buffered {
 			resume = null;
 		}
 		Map<String, Object> call = STOPPED.equals(why) && stopCall != null ? stopCall
-			: STOPPED.equals(why) || BLOCKED.equals(why) || INTERRUPTED.equals(why) || LOST.equals(why) ? call() : null; // (before its plan moves)
+			: STOPPED.equals(why) || BLOCKED.equals(why) || INTERRUPTED.equals(why) || LOST.equals(why) || UNBREAKABLE.equals(why) ? call() : null; // (before its plan moves)
 		stopCall = null;
 		active = null;
 		if (STOPPED.equals(why) || INTERRUPTED.equals(why)) {
@@ -539,6 +539,8 @@ public final class RoboticsDevice implements Device, Buffered {
 			events.interrupted(method, call);
 		} else if (LOST.equals(why)) {
 			events.lost(method, lostName, lostId, lostAt, call);
+		} else if (UNBREAKABLE.equals(why)) {
+			events.unbreakable(method, lostName, lostId, lostAt, call);
 		} else if (BLOCKED.equals(why)) {
 			events.blocked(method, block, face, call);
 		} else {
@@ -667,7 +669,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return result;
 	}
 
-	@Method(doc = "swing(face): swings what it holds at a face, as a player's left click: a mob there is hit (\"attacked\", as hard as a player's swing: full strength once the weapon has recovered); else the block there starts breaking, as a player breaks it (its tool matters: a pickaxe for stone, an axe for wood): \"breaking\", a command running till it's broken, a break of the place as a player's is (another block pushed in, it goes on into it; another item in its hand, it starts again; held in a field, it pauses) (its event: swing, ok and result {name, kept, dropped}: the block's name and whether it kept all it dropped, its storage first, else its off hand; or not and why: lost, air there now, its name, id \"\" and where it was, or not broken); or false and why")
+	@Method(doc = "swing(face): swings what it holds at a face, as a player's left click: a mob there is hit (\"attacked\", as hard as a player's swing: full strength once the weapon has recovered); else the block there starts breaking, as a player breaks it (its tool matters: a pickaxe for stone, an axe for wood): \"breaking\", a command running till it's broken, a break of the place as a player's is (another block pushed in, it goes on into it; another item in its hand, it starts again; held in a field, it pauses) (its event: swing, ok and result {name, kept, dropped}: the block's name and whether it kept all it dropped, its storage first, else its off hand; or not and why: lost, air there now, or unbreakable, the game won't let it be broken (bedrock, a protected place), each with its name, id \"\" and where it is, and its call); or false and why")
 	public Result swing(Arguments args) {
 		String face = face(args, 0);
 		if (body.offSpot()) {
@@ -831,13 +833,26 @@ public final class RoboticsDevice implements Device, Buffered {
 	 * {forward, right, up} in its own frame from where its last command left it.
 	 */
 	public void lost(String name, String id, Map<String, Object> at) {
+		thing(LOST, name, id, at);
+	}
+
+	/**
+	 * The game won't let what a command acted on be broken (the user's: unbreakable): what it is,
+	 * its own id ("" for a block) and where, as {@link #lost}'s. Said by its end, never at its call:
+	 * a call fails only when it can't be given (the user's).
+	 */
+	public void unbreakable(String name, String id, Map<String, Object> at) {
+		thing(UNBREAKABLE, name, id, at);
+	}
+
+	private void thing(String why, String name, String id, Map<String, Object> at) {
 		lostName = name;
 		lostId = id;
 		lostAt = at;
-		end(false, LOST, null);
+		end(false, why, null);
 	}
 
-	/** A lost end's what, its id and where (for its event). */
+	/** A lost or unbreakable end's what, its id and where (for its event). */
 	private String lostName;
 	private String lostId;
 	private Map<String, Object> lostAt;
@@ -848,11 +863,6 @@ public final class RoboticsDevice implements Device, Buffered {
 		long right = "right".equals(face) ? 1 : "left".equals(face) ? -1 : 0;
 		long up = "up".equals(face) ? 1 : "down".equals(face) ? -1 : 0;
 		return Map.of("forward", forward, "right", right, "up", up);
-	}
-
-	/** The body couldn't go on ({@code why}: the game refused a break done). */
-	public void failed(String why) {
-		end(false, why, null);
 	}
 
 	/**

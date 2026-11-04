@@ -71,7 +71,7 @@ public final class EventQueue {
 	 * result]}}, or {@code {event = method, ok = false, why}} when it failed (or was stopped). News.
 	 */
 	public void ended(String method, boolean ok, String why, Object result) {
-		if (Buffered.STOPPED.equals(why) || Buffered.BLOCKED.equals(why) || Buffered.DRIFTED.equals(why) || Buffered.INTERRUPTED.equals(why) || Buffered.LOST.equals(why)) {
+		if (Buffered.STOPPED.equals(why) || Buffered.BLOCKED.equals(why) || Buffered.DRIFTED.equals(why) || Buffered.INTERRUPTED.equals(why) || Buffered.LOST.equals(why) || Buffered.UNBREAKABLE.equals(why)) {
 			// (one shape each, the user's: only their own methods build them)
 			throw new IllegalArgumentException(why + " is built by its own method, not ended");
 		}
@@ -137,15 +137,28 @@ public final class EventQueue {
 	 * was ({forward, right, up}, the device's frame).
 	 */
 	public void lost(String event, String name, String id, Map<String, Object> at, Map<String, Object> call) {
-		Map<String, Object> lost = new java.util.LinkedHashMap<>();
-		lost.put("event", event);
-		lost.put("ok", false);
-		lost.put("why", Buffered.LOST);
-		lost.put("name", name == null ? "" : name);
-		lost.put("id", id == null ? "" : id);
-		lost.put("at", at);
-		lost.put("call", call);
-		add(lost);
+		add(thing(event, Buffered.LOST, name, id, at, call));
+	}
+
+	/**
+	 * The game won't let what a command acted on be broken (the user's: one shape, the same fields as
+	 * {@link #lost}'s): {@code {event, ok = false, why = "unbreakable", name, id, at, call}}.
+	 */
+	public void unbreakable(String event, String name, String id, Map<String, Object> at, Map<String, Object> call) {
+		add(thing(event, Buffered.UNBREAKABLE, name, id, at, call));
+	}
+
+	/** A command's end over a thing: its why, what (its name, its id) and where, and the call. */
+	private static Map<String, Object> thing(String event, String why, String name, String id, Map<String, Object> at, Map<String, Object> call) {
+		Map<String, Object> thing = new java.util.LinkedHashMap<>();
+		thing.put("event", event);
+		thing.put("ok", false);
+		thing.put("why", why);
+		thing.put("name", name == null ? "" : name);
+		thing.put("id", id == null ? "" : id);
+		thing.put("at", at);
+		thing.put("call", call);
+		return thing;
 	}
 
 	/** Its own loss, no program's command (a field's: what it held is gone), a notice: {@code {event = "notice", why = "lost", name, id, at}}. */

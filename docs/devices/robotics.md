@@ -299,7 +299,11 @@ held in a field, it pauses, and goes on once let go. Its event, `swing`: `ok`, a
 `{name, kept, dropped}` (the block's name; `kept`: true when it caught all the block dropped, else
 false and how many it `dropped` into the world), or not and why: `lost` (air there now: what it
 was breaking gone, `{why = "lost", name, id = "", at}`, its name, no id as a block has none, and
-where it was, `{forward, right, up}` from where its last command left it), `not broken`. It fails with `nothing there` or `unbreakable`.
+where it was, `{forward, right, up}` from where its last command left it), or `unbreakable` (the
+game won't let it be broken: bedrock, or a place protected from breaking, as a player's break
+there finishes its cracks and the block stays; the same fields, `{why = "unbreakable", name, id =
+"", at}`); each with its `call`, its `progress` the break so far, 0 to 1. It fails with `nothing
+there`.
 
 ### contents([face]) → list, or nil and why
 

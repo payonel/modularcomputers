@@ -619,7 +619,7 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
-	/** Its spot turned to air mid-break, the swing has lost what it was breaking (the user's): lost, its name, no id (a block's), and where it was. */
+	/** Its spot turned to air mid-break, the swing has lost what it was breaking (the user's): lost, its name, no id (a block's), where it was, and its call as far as it got. */
 	@GameTest(maxTicks = 400)
 	public void aBlockGoneMidBreakIsLostWithItsNameAndWhereItWas(GameTestHelper helper) {
 		BotGolem golem = golem(helper, false);
@@ -631,7 +631,8 @@ public class GolemFlightGameTest {
 			.thenExecuteAfter(5, () -> helper.setBlock(FRONT, Blocks.AIR)) // (gone from its spot)
 			.thenWaitUntil(() -> helper.assertTrue(swingEnded(events, m -> java.util.Objects.equals(GameTests.withoutCall(m),
 				java.util.Map.of("event", "swing", "ok", false, "why", "lost", "name", "minecraft:oak_log", "id", "",
-					"at", java.util.Map.of("forward", 1L, "right", 0L, "up", 0L)))), "lost: " + events))
+					"at", java.util.Map.of("forward", 1L, "right", 0L, "up", 0L)))
+				&& m.get("call") instanceof java.util.Map<?, ?> call && call.get("progress") instanceof Number done && done.doubleValue() > 0), "lost, its call as far as it got: " + events))
 			.thenSucceed();
 	}
 

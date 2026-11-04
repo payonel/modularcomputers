@@ -167,13 +167,6 @@ class RoboticsDeviceTest {
 		assertThat(device.refusal("turn")).isNull();
 	}
 
-	@Test
-	void aFailureSaysWhy() {
-		device.walk(args(2L));
-		device.failed("not broken");
-		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "not broken"));
-	}
-
 	/** Blocked is one word, its block and face named fields beside it (the user's: one shape), the block "" when none is named. */
 	@Test
 	void blockedIsTheWordWithTheBlockAndItsFace() {
@@ -309,6 +302,18 @@ class RoboticsDeviceTest {
 		device.lost("minecraft:oak_log", "", RoboticsDevice.toward("up"));
 		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "lost", "name", "minecraft:oak_log", "id", "",
 			"at", Map.of("forward", 0L, "right", 0L, "up", 1L), "call", Map.of("args", List.of(2L), "progress", 0L)));
+	}
+
+	/** Unbreakable is one shape (the user's), lost's fields: what it is (its name), its own id ("" for a block), where, and the call; only its own method builds it. */
+	@Test
+	void unbreakableIsTheWordWithItsNameIdWhereAndCall() {
+		device.called("walk", List.of(2L));
+		device.walk(args(2L));
+		device.unbreakable("minecraft:bedrock", "", RoboticsDevice.toward("front"));
+		assertThat(device.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "unbreakable", "name", "minecraft:bedrock", "id", "",
+			"at", Map.of("forward", 1L, "right", 0L, "up", 0L), "call", Map.of("args", List.of(2L), "progress", 0L)));
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> new EventQueue(null, () -> {}, () -> true).ended("swing", false, Buffered.UNBREAKABLE, null))
+			.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	/**
