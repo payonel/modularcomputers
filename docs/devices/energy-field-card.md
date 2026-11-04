@@ -99,7 +99,7 @@ a list of things in the same shape as a [robot's `scan`](/devices/robotics/) giv
 Holds a creature or an item: an `id` from `scan`, `"self"` (a robot holding itself, legs and all), or a point
 `forward[, right[, up]]` (the nearest thing within a block and a half of it). Answers its name.
 Fails with `holding` (it holds something already), `no entity` (nothing near the point),
-`no entity: <id>`, `too far: 16`, `captured` (another field holds it), or in a block, `not a robot`.
+`no entity: <id>`, `target capture too far` (out of its reach: 16 blocks), `captured` (another field holds it), or in a block, `not a robot`.
 
 ### move(forward[, right[, up]]) → true, or nil and why
 

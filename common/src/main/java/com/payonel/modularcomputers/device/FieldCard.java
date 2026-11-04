@@ -29,6 +29,8 @@ import java.util.Map;
 public final class FieldCard extends Card implements Buffered {
 	/** How far from its computer it reaches, in blocks: what it finds, holds, and moves to. */
 	public static final double RANGE = 16;
+	/** A capture's answer when its target is out of its reach (the user's words; no distance given). */
+	public static final String CAPTURE_TOO_FAR = "target capture too far";
 	/** How near a point given to capture something must be, in blocks. */
 	public static final double REACH = 1.5;
 	/** What holding costs, a tick: two running CPUs'. */

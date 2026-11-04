@@ -184,7 +184,7 @@ public final class FieldProjector implements FieldCard.Projector {
 		} else {
 			Vec3 there = at.world(point[0], point[1], point[2]);
 			if (there.distanceTo(at.origin()) > FieldCard.RANGE + FieldCard.REACH) {
-				return Result.fail("too far: " + (int) FieldCard.RANGE); // (it senses no farther than it reaches)
+				return Result.fail(FieldCard.CAPTURE_TOO_FAR); // (it senses no farther than it reaches)
 			}
 			target = level.get().getEntities((Entity) null, new AABB(there, there).inflate(FieldCard.REACH),
 					entity -> holdable(entity) && entity.getBoundingBox().getCenter().distanceTo(there) <= FieldCard.REACH)
@@ -194,7 +194,7 @@ public final class FieldProjector implements FieldCard.Projector {
 			}
 		}
 		if (target != self.get() && target.getBoundingBox().getCenter().distanceTo(at.origin()) > FieldCard.RANGE) {
-			return Result.fail("too far: " + (int) FieldCard.RANGE);
+			return Result.fail(FieldCard.CAPTURE_TOO_FAR);
 		}
 		EnergyField made = ModEntities.ENERGY_FIELD.create(level.get(), EntitySpawnReason.TRIGGERED);
 		UUID hold = UUID.randomUUID();

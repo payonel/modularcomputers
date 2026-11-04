@@ -293,7 +293,7 @@ public class FieldCardGameTest {
 		helper.startSequence()
 			.thenExecuteAfter(2, () -> {
 				same(helper, card.capture(args(0.0, 0.0, 4.0)).error(), "no entity", "a point with nothing near it");
-				helper.assertTrue(card.capture(args(30.0)).error().startsWith("too far"), "a point past its reach: it senses no farther"); // (whatever's there: a neighbour's)
+				same(helper, card.capture(args(30.0)).error(), "target capture too far", "a point past its reach: it senses no farther"); // (whatever's there: a neighbour's)
 				card.capture(args(pig.getStringUUID()));
 				Object pigAt = pig.position();
 				same(helper, card.move(args(0.0, 0.0, FieldCard.RANGE + 1)).first(), true, "a move out of its reach: a command, its end says");
