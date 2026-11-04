@@ -139,11 +139,11 @@ local function transmit(address, frame)
   end
   local busy = false
   for _, nic in ipairs(nics) do
-    local ok, took, why = board.invoke(nic.id, "send", address, frame)
-    if ok and took then
+    local ok, why = k.invoke(nic.id, "send", address, frame)
+    if ok then
       return true
     end
-    busy = busy or why == "busy"
+    busy = busy or why == "limit" -- (a card reached, its ring full: ENOBUFS)
   end
   return fail(busy and "ENOBUFS" or "EHOSTUNREACH")
 end

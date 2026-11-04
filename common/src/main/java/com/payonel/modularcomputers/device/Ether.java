@@ -60,7 +60,7 @@ public final class Ether {
 
 	/**
 	 * A frame from {@code from} to the card whose address is {@code to}: null when it took it, else
-	 * why not ({@link NetworkCard#BUSY}, {@link NetworkCard#UNREACHABLE}). Nothing tries again.
+	 * why not ({@link NetworkCard#FULL}, {@link NetworkCard#UNREACHABLE}). Nothing tries again.
 	 */
 	static String send(NetworkCard from, String to, String data) {
 		for (var entry : reached(from).entrySet()) {

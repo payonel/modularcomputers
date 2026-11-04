@@ -19,9 +19,10 @@ import net.minecraft.core.BlockPos;
  * {@code {from, data, distance, broadcast}}.
  * <p>
  * <b>Nothing is dropped</b> (user, 2026-10-22: a device's handshake, never a silent drop): a frame
- * sent to one card is taken, or the sender hears why not, at once: {@code "busy"} (its ring is full,
- * or no program takes data there now) or {@code "unreachable"} (no card at that address in reach, or
- * it's off). The card never tries again itself: that's the software's choice (mcos's TCP does), as
+ * sent to one card is taken, or the sender hears why not, at once: a limit, {@code {why = "limit",
+ * of = "frames", max}} (its ring is full, or no program takes data there now: not busy, the user's,
+ * as no news of the sender's device ends it) or the network's {@code unreachable} (no card at that
+ * address in reach, or it's off). The card never tries again itself: that's the software's choice (mcos's TCP does), as
  * lossless Ethernet's PAUSE frames tell a sender to hold off and leave the rest to it. A broadcast
  * is best effort: it says how many cards took it. In order, as frames go at once.
  * <p>
@@ -119,14 +120,14 @@ public final class NetworkCard extends Card {
 		return reach;
 	}
 
-	/** Why a frame wasn't taken: a ring that's full, or no program taking data. */
-	public static final String BUSY = "busy";
-	/** Why a frame wasn't taken: no card there, in reach and on. */
+	/** Why a frame wasn't taken: a ring that's full, or no program taking data (its failure: a limit of frames). */
+	public static final String FULL = "limit";
+	/** Why a frame wasn't taken: no card there, in reach and on (its failure: the network's, unreachable). */
 	public static final String UNREACHABLE = "unreachable";
 
 	/**
 	 * A frame came for it: it waits for the program while it has power and there's room (null:
-	 * taken), else {@link #BUSY}; while it has none, it's a wake if it holds the wake message (taken:
+	 * taken), else {@link #FULL}; while it has none, it's a wake if it holds the wake message (taken:
 	 * its radio listens for that), else {@link #UNREACHABLE}.
 	 */
 	String hear(String from, String data, double distance, boolean broadcast) {
@@ -138,7 +139,7 @@ public final class NetworkCard extends Card {
 			if (broadcast) {
 				frame.put("broadcast", true);
 			}
-			String refused = frames.offer(frame) ? null : BUSY;
+			String refused = frames.offer(frame) ? null : FULL;
 			logged("in", from, distance, data.length(), refused == null ? (broadcast ? "broadcast" : "taken") : refused);
 			return refused;
 		}
@@ -156,12 +157,15 @@ public final class NetworkCard extends Card {
 		return Result.ok(address());
 	}
 
-	@Method(doc = "send(address, data): a frame to the card at that address (bytes, at most 8192); true when it took it, else false and why: \"busy\" (its ring is full, or no program takes data there: try again) or \"unreachable\" (no card there in reach, or it's off). It never tries again itself")
+	@Method(doc = "send(address, data): a frame to the card at that address (bytes, at most 8192); true when it took it, else false and why: {why = \"limit\", of = \"frames\", max} (its ring is full, or no program takes data there: try again), or {why = \"network\", reason = \"unreachable\", message = \"\"} (no card there in reach, or it's off). It never tries again itself")
 	public Result send(Arguments args) {
 		String to = args.checkString(0);
 		String data = checked(args.checkString(1));
 		String refused = Ether.send(this, to.startsWith("id:") ? to.substring("id:".length()) : to, data);
-		return refused == null ? Result.ok(true) : Result.ok(false, refused);
+		if (refused == null) {
+			return Result.ok(true);
+		}
+		return Result.fail(FULL.equals(refused) ? com.payonel.modularcomputers.runtime.Failure.limit("frames", EventQueue.CAPACITY) : com.payonel.modularcomputers.runtime.Failure.network(UNREACHABLE, ""));
 	}
 
 	@Method(doc = "broadcast(data): a frame to every card it reaches (bytes, at most 8192), as best it can: how many took it")
@@ -189,7 +193,7 @@ public final class NetworkCard extends Card {
 		line.raise(); // (told once: its frames' interrupt isn't held up by a log nobody reads)
 	}
 
-	@Method(doc = "pull(): its traffic log's oldest frame: {direction (in, out), address, distance, bytes, outcome (taken, busy, unreachable, broadcast)}; or nil")
+	@Method(doc = "pull(): its traffic log's oldest frame: {direction (in, out), address, distance, bytes, outcome (taken, limit, unreachable, broadcast)}; or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(traffic.pollFirst());
 	}

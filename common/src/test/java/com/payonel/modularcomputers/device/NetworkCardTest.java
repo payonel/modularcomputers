@@ -52,8 +52,8 @@ class NetworkCardTest {
 		assertThat(received(b)).containsEntry("from", a.address()).containsEntry("data", "hello").containsEntry("distance", 5.0)
 			.doesNotContainKey("broadcast");
 		assertThat(c.interruptPending()).as("not for it").isFalse();
-		assertThat(a.send(args("id:" + far.address(), "x")).values()).as("out of range").containsExactly(false, NetworkCard.UNREACHABLE);
-		assertThat(a.send(args(UUID.randomUUID().toString(), "x")).values()).as("nobody there").containsExactly(false, NetworkCard.UNREACHABLE);
+		assertThat(a.send(args("id:" + far.address(), "x")).failure().table()).as("out of range").isEqualTo(Map.of("why", "network", "reason", "unreachable", "message", ""));
+		assertThat(a.send(args(UUID.randomUUID().toString(), "x")).failure().table()).as("nobody there").isEqualTo(Map.of("why", "network", "reason", "unreachable", "message", ""));
 		assertThat(a.broadcast(args("all")).first()).as("how many took it").isEqualTo(2L);
 		assertThat(received(b)).containsEntry("data", "all").containsEntry("broadcast", true);
 		assertThat(received(c)).containsEntry("data", "all");
@@ -83,8 +83,8 @@ class NetworkCardTest {
 		gone.place(world, BlockPos.ZERO, NOW - Ether.STALE_TICKS - 1);
 		NetworkCard elsewhere = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
 		elsewhere.place(new Object(), BlockPos.ZERO, NOW);
-		assertThat(a.send(args(gone.address(), "x")).first()).isEqualTo(false);
-		assertThat(a.send(args(elsewhere.address(), "x")).first()).isEqualTo(false);
+		assertThat(a.send(args(gone.address(), "x")).error()).isEqualTo("network");
+		assertThat(a.send(args(elsewhere.address(), "x")).error()).isEqualTo("network");
 	}
 
 	@Test
@@ -99,7 +99,7 @@ class NetworkCardTest {
 		assertThat(received(b)).containsEntry("data", "2");
 		assertThat(received(b)).isNull();
 		b.accepting(false); // no program: it takes nothing, and says so
-		assertThat(a.send(args(b.address(), "3")).values()).containsExactly(false, NetworkCard.BUSY);
+		assertThat(a.send(args(b.address(), "3")).failure().table()).as("not busy: a limit (no news of the sender's ends it)").isEqualTo(Map.of("why", "limit", "of", "frames", "max", (long) EventQueue.CAPACITY));
 		b.accepting(true);
 		assertThat(received(b)).isNull();
 	}
@@ -115,7 +115,7 @@ class NetworkCardTest {
 		machine.board().setCpu(new Cpu(CpuTier.TIER_1));
 		machine.board().setEeprom(new com.payonel.modularcomputers.machine.Eeprom(com.payonel.modularcomputers.machine.Program::park));
 		new com.payonel.modularcomputers.machine.TestBus(machine).card(card, id);
-		assertThat(sender.send(args(card.address(), "wake up")).first()).as("off, and not listening: nobody hears").isEqualTo(false);
+		assertThat(sender.send(args(card.address(), "wake up")).error()).as("off, and not listening: nobody hears").isEqualTo("network");
 		assertThat(card.setWake(args("wake")).first()).isNull();
 		assertThat(sender.send(args(card.address(), "no")).first()).as("listening for its wake").isEqualTo(true);
 		machine.tick();
@@ -132,10 +132,10 @@ class NetworkCardTest {
 		NetworkCard a = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
 		NetworkCard b = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
 		int sent = 0;
-		while (a.send(args(b.address(), "f" + sent)).first().equals(true)) {
+		while (!a.send(args(b.address(), "f" + sent)).failed()) {
 			sent++;
 		}
-		assertThat(a.send(args(b.address(), "more")).values()).as("full: refused, not dropped").containsExactly(false, NetworkCard.BUSY);
+		assertThat(a.send(args(b.address(), "more")).failure().table()).as("full: refused, not dropped").isEqualTo(Map.of("why", "limit", "of", "frames", "max", (long) EventQueue.CAPACITY));
 		assertThat(a.broadcast(args("all")).first()).as("a broadcast it can't take: missed, counted").isEqualTo(0L);
 		assertThat(received(b)).as("the oldest is still there").containsEntry("data", "f0");
 		assertThat(a.send(args(b.address(), "more")).first()).as("room again").isEqualTo(true);

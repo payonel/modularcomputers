@@ -40,8 +40,8 @@ up to the tier's:
 A card tells the world where it is as its block ticks. A card that has stopped
 (its chunk unloaded, its block broken, the card taken out) is not on the network.
 
-Everything else (addresses, `send`, `broadcast`, `receive`, the `"busy"` and `"unreachable"`
-answers, nothing being dropped, the traffic log, and wake-on-LAN) works as it does for a wired card;
+Everything else (addresses, `send`, `broadcast`, `receive`, the `limit` and `unreachable`
+failures, nothing being dropped, the traffic log, and wake-on-LAN) works as it does for a wired card;
 read [Network Card](/devices/network-card/) for it.
 
 ## In mcos

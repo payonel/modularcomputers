@@ -40,8 +40,10 @@ cable are two hosts on it. Two cards in one block are on the same wire, 0 meters
 A frame sent to one card is taken, or the sender hears why not at once. The card never tries again;
 that is software's job (mcos's TCP does).
 
-- `"busy"`: the other card's queue is full, or no program on its computer is taking data.
-- `"unreachable"`: no card at that address in reach, or it is off.
+- `{why = "limit", of = "frames", max = 32}`: the other card's queue is full, or no program on its
+  computer is taking data.
+- `{why = "network", reason = "unreachable", message = ""}`: no card at that address in reach, or it
+  is off.
 
 A broadcast is best effort: it says how many cards took it.
 
@@ -99,7 +101,8 @@ The card's address: its id, which other cards send to.
 ### send(address, data) → true, or false and why
 
 Sends a frame of at most 8192 bytes to the card with that address (with or without `id:`). Gives
-`true` when it was taken, else `false` and `"busy"` or `"unreachable"`. A longer frame fails with
+`true` when it was taken, else it fails with one of the two above (through its file, `nil`, the
+why, `EINVAL` and the failure). A longer frame fails with
 `too long: 8192`. Sending costs power. The card never tries again itself.
 
 ### broadcast(data) → count
@@ -128,7 +131,7 @@ The traffic log's oldest entry, or nil: what the card's file reads as a line.
 | `address` | the other card's, or `"broadcast"` |
 | `distance` | meters; missing for a broadcast sent |
 | `bytes` | the frame's size |
-| `outcome` | `"taken"`, `"busy"`, `"unreachable"`, `"broadcast"`, or `"N took it"` |
+| `outcome` | `"taken"`, `"limit"`, `"unreachable"`, `"broadcast"`, or `"N took it"` |
 
 ### getWake() → string or nil
 
@@ -148,14 +151,14 @@ A WLAN card's signal strength (see [WLAN Cards](/devices/wlan-card/)). On a wire
 
 Each frame that arrives is an event, taken with `receive`, and raises the card's interrupt; it stays
 raised while frames wait. At most 32 wait, which is the card's ring; a frame that finds it full is
-refused as `"busy"`, not dropped. Frames wait only while the card has power and a program runs on
+refused as a `limit`, not dropped. Frames wait only while the card has power and a program runs on
 its computer; they are dropped when it stops. Each frame in or out also adds a line to the traffic
 log (`pull`).
 
 **Wake-on-LAN.** With a wake message set, a card listens while its computer is off. A frame holding
 the message anywhere in its data presses the computer's power button, so a UDP datagram carrying it
 does. The card takes such a frame (the sender hears `true`) whether it holds the message or not;
-without a message set, an off computer's card is `"unreachable"`. The setting is kept across power
+without a message set, an off computer's card is unreachable. The setting is kept across power
 off and saves. This is the mod's own wake message, not a real magic packet.
 
 ## Examples

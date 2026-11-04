@@ -252,7 +252,7 @@ mcos's threads) are on the `openos` branch only.
 - `open(port)`, `close([port])`, `isOpen(port)`: **missing** on the card (mcos's `bind(socket, port)`, 0 any free, EADDRINUSE when taken; closing a socket frees its port; no "close all", no way to ask whether a port is open; no "too many open ports" limit).
 - `isWireless(): boolean`: no method (its `info()`'s `wireless`, in the board's device info).
 - `isWired(): boolean`: **missing** (a WLAN card is never wired; OC's tier 2 wireless card sent over cables too).
-- `send(address, port, data...): true`: `send(address, data)`: one string of 8192 bytes at most, no port; `true`, or `false, "busy"|"unreachable"` (OC always true); `id:` prefix allowed. mcos: `sendto(data, address, port)`.
+- `send(address, port, data...): true`: `send(address, data)`: one string of 8192 bytes at most, no port; `true`, or `false, {why = "limit", of = "frames", max}` / `{why = "network", reason = "unreachable", message}` (OC always true); `id:` prefix allowed. mcos: `sendto(data, address, port)`.
 - `broadcast(port, data...): true`: `broadcast(data)`: one string, no port; how many cards took it.
 - `getStrength(): number`: `getStrength()` (whole blocks; fails on a wired card).
 - `setStrength(strength): number`: `setStrength(blocks)`: an integer clamped to 0..16 or 0..400 by tier, answers what's set; fails on a wired card. A send costs `strength * WIRELESS_SEND_COST_PER_BLOCK` (`power.charge`; OC errors "not enough energy").

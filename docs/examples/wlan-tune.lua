@@ -3,8 +3,8 @@
 --
 -- It works through the card's methods, ioctls on its file: setStrength sets how far the signal
 -- reaches (clamped to the card's tier, so asking for a huge one gives the tier's most), and send
--- puts a frame to one card and says whether it took it. A card that answers "busy" was reached
--- too: it just had no room. The strength is found by halving the range each try, so a tier 2
+-- puts a frame to one card and says whether it took it. A card refused as a limit (its ring full)
+-- was reached too: it just had no room. The strength is found by halving the range each try, so a tier 2
 -- card's 400 blocks take nine.
 --
 -- usage: lua wlan-tune.lua ADDRESS
@@ -21,10 +21,14 @@ local card = assert(sys.open(CARD))
 local function reaches(blocks)
   assert(sys.ioctl(card, "setStrength", blocks))
   local taken, why = sys.ioctl(card, "send", address, PROBE)
-  if taken == nil then
-    error(why) -- not a WLAN card, or it's gone
+  if taken then
+    return true
+  elseif why == "limit" then
+    return true -- reached: its ring is full
+  elseif why == "network" then
+    return false -- unreachable
   end
-  return taken or why == "busy"
+  error(why) -- not a WLAN card, or it's gone
 end
 
 local most = assert(sys.ioctl(card, "setStrength", HUGE))

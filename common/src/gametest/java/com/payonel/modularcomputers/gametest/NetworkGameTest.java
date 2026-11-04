@@ -73,7 +73,7 @@ public class NetworkGameTest {
 			cable(helper, new BlockPos(x, 1, 2));
 		}
 		helper.startSequence()
-			.thenWaitUntil(() -> helper.assertValueEqual(left.send(args(right.address(), "hello")).first(), true, "acknowledged over the cable"))
+			.thenWaitUntil(() -> helper.assertTrue(Boolean.TRUE.equals(left.send(args(right.address(), "hello")).first()), "acknowledged over the cable"))
 			.thenExecute(() -> {
 				helper.assertValueEqual(received(right).get("data"), "hello", "the frame came");
 				left.broadcast(args("all"));
@@ -81,7 +81,7 @@ public class NetworkGameTest {
 				helper.assertTrue(!wireless.interruptPending(), "a WLAN card isn't on the wire");
 				helper.setBlock(new BlockPos(3, 1, 2), net.minecraft.world.level.block.Blocks.AIR);
 			})
-			.thenWaitUntil(() -> helper.assertValueEqual(left.send(args(right.address(), "x")).first(), false, "the cable cut: not acknowledged"))
+			.thenWaitUntil(() -> helper.assertTrue("network".equals(left.send(args(right.address(), "x")).error()), "the cable cut: unreachable"))
 			.thenSucceed();
 	}
 
@@ -90,7 +90,7 @@ public class NetworkGameTest {
 		NetworkCard left = computer(helper, LEFT, ModItems.TIER2_WLAN_CARD, true);
 		NetworkCard right = computer(helper, RIGHT, ModItems.TIER2_WLAN_CARD, true);
 		helper.startSequence()
-			.thenWaitUntil(() -> helper.assertValueEqual(left.send(args(right.address(), "hello")).first(), true, "acknowledged through the air"))
+			.thenWaitUntil(() -> helper.assertTrue(Boolean.TRUE.equals(left.send(args(right.address(), "hello")).first()), "acknowledged through the air"))
 			.thenExecute(() -> {
 				Map<String, Object> frame = received(right);
 				helper.assertValueEqual(frame.get("from"), left.address(), "from its sender");
@@ -106,7 +106,7 @@ public class NetworkGameTest {
 		right.setWake(args("wake"));
 		CaseBlockEntity sleeper = helper.getBlockEntity(RIGHT, CaseBlockEntity.class);
 		helper.startSequence()
-			.thenWaitUntil(() -> helper.assertValueEqual(left.send(args(right.address(), "please wake up")).first(), true,
+			.thenWaitUntil(() -> helper.assertTrue(Boolean.TRUE.equals(left.send(args(right.address(), "please wake up")).first()),
 				"its card listens while it's off"))
 			.thenWaitUntil(() -> helper.assertBlockProperty(RIGHT, CaseBlock.POWERED, true))
 			.thenExecute(() -> helper.assertTrue(sleeper.machine().isPowered(), "on"))
