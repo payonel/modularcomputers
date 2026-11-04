@@ -59,11 +59,13 @@ A move that wouldn't is refused, saying where it would end: from a block's middl
 fails with `not an integer: forward 4.4`.
 
 What happens to it that no program asked for comes as one kind of event, a **notice**
-(`{event = "notice", what = ...}`), so a program tells at once what it asked for (a command's end,
+(`{event = "notice", why = ...}` for a shove or a fall, `{event = "notice", what = ...}` for a
+field's hold), so a program tells at once what it asked for (a command's end,
 named after its method) from what came to it.
 
 If something knocks it away from where its last command left it (a shove in the air, or a piston
-on its legs), it **drifts**: it says so (a `shoved` notice, with how far), once the shove is over.
+on its legs), it **drifts**: it says so (`{event = "notice", why = "shove", drift}`, how far), once
+the shove is over.
 It doesn't go back by itself: it stays where it was put, and a program decides. `walk()` or
 `fly()` takes it back to where its last command left it; `stop()` takes where it is as that point.
 Its moves still measure from where its last command left it, never from where a shove put it, so a
@@ -80,13 +82,16 @@ facing the same right angle: a shove that keeps it there changes nothing a posit
 `setPosition()` makes where it is its new origin, there and then.
 
 A fall it didn't ask for, on its legs (a block gone from under it, a trapdoor it opened, a piston
-off a ledge), isn't a drift: it says so as it begins (a `falling` notice), and while it falls it's
+off a ledge), isn't a drift: it says so as it begins and as it lands, one notice each time,
+`{event = "notice", why = "fall", drift, below}` (how far it is off where its last command left
+it, and the block under it then, as it is), and while it falls it's
 busy (`falling`), its commands waiting, but for its flights: a tier 2 catches itself on its
 thrusters, its legs dropped to fall on without it, `fly()` taking it back to where its last command
 left it. To catch it where it is, `stop()`, then `fly()`: the stop takes where it is as that point
-(it goes on falling), and the flight holds it there. Not caught, it says so once down (a `landed`
-notice, and how far). A fall moves where its last command left it nowhere: to go on from where it
-landed, a robot digging down calls `stop()` there.
+(it goes on falling), and the flight holds it there. A caught fall has no landing to say: its
+flight's end says it. Landed, its `drift` is the drop (`{forward = 0, right = 0, up = -5}`, five
+down). A fall moves where its last command left it nowhere: to go on from where it landed, a robot
+digging down calls `stop()` there.
 
 `stop` stops it at once, where it is: no centering, no squaring up. The command running ends
 `stopped`, and every thread waiting to give it a command is told so (`ECANCELED`): a stop stops
@@ -303,7 +308,7 @@ there and never through blocks. It must end squared, as a walk does, its feet's 
 from its origin too (from a slab, `fly(0, 0, 1.5)`). If it stands on its legs, they're left standing where it was: the thrusters fire red beams from
 their sockets. With no arguments, on its legs, it takes off where it stands and holds there; in
 the air, it flies back to where its last command left it. On its thrusters it walks nowhere (`no
-legs`), presses no pressure plates, and can be shoved (a `shoved` notice; it stays where it was put); everything else it does as
+legs`), presses no pressure plates, and can be shoved (a `shove` notice; it stays where it was put); everything else it does as
 on its legs, as a player off the ground does it (its tools, a block breaking more slowly), and its
 other cards work. Its event, `fly`: `ok` (then it holds
 there), or not and why (`blocked`, a block over it: `block = "minecraft:stone", face = "up"`). Its thrusters cost five running CPUs' power a
@@ -458,15 +463,14 @@ was going.
 | `event` | Other fields | When |
 |---|---|---|
 | `walk`, `walkTo`, `fly`, `flyTo`, `turn`, `land`, `swing` | `ok`, `why` (`blocked`: and `block`, `face`; `drifted`: and `drift`; with those and `stopped`, `call`), `result` | that command ended: `ok`, or not and why (`stopped` when a `stop` cut it short; `interrupted` when its world was saved during it); a swing's `result` is `{block, kept, dropped}` |
-| `notice` | `what`, and its fields | something happened to it that no program asked for: `what` says which (below) |
+| `notice` | `why` (or `what`), and its fields | something happened to it that no program asked for (below) |
 
-| `what` | Other fields | When |
+| Notice | Other fields | When |
 |---|---|---|
-| `shoved` | `drift` (`{forward, right, up}`) | something knocked it away from where its last command left it, once the shove's over: it stays where it was put |
-| `falling` | | a fall it didn't ask for began, on its legs: a tier 2 can catch itself (`fly`) |
-| `landed` | `by` (blocks) | it came down on its legs from a fall it didn't ask for (not caught); where its last command left it stays (a `stop()` takes where it landed) |
-| `frozen` | | a field took hold of it: its robotics paused |
-| `thawed` | | the field let go and it's down: its robotics back, its origin carried |
+| `why = "shove"` | `drift` (`{forward, right, up}`) | something knocked it away from where its last command left it, once the shove's over: it stays where it was put |
+| `why = "fall"` | `drift`, `below` (a block's id) | a fall it didn't ask for, on its legs, as it begins and as it lands (a caught fall: its flight's end says it); its `drift` then, and the block under it then, as it is |
+| `what = "frozen"` | | a field took hold of it: its robotics paused |
+| `what = "thawed"` | | the field let go and it's down: its robotics back, its origin carried |
 
 Its interrupt is raised when an event comes, and stays raised while one waits. With no program
 running on its board it takes no data: its events go, and it stops.

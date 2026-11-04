@@ -881,17 +881,27 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		if (falling()) {
 			if (Double.isNaN(fallFrom)) {
 				fallFrom = feet();
-				robotics.notice(RoboticsDevice.FALLING, null); // (as it begins: a tier 2 can catch itself)
+				robotics.fallBegins(driftNow(), blockBelow()); // (as it begins: a tier 2 can catch itself)
 			}
 			return;
 		}
 		if (Double.isNaN(fallFrom) || !standing()) {
 			return;
 		}
-		double by = fallFrom - feet();
 		fallFrom = Double.NaN;
-		shovedTo = position(); // (where it fell to is off its spot, but a fall isn't a shove: it's said, landed)
-		robotics.fell(by); // (where its last command left it stays: a fall moves it nowhere, only a stop does, the user's)
+		shovedTo = position(); // (where it fell to is off its spot, but a fall isn't a shove: its landing says it)
+		robotics.fallEnds(driftNow(), blockBelow()); // (where its last command left it stays: a fall moves it nowhere, only a stop does, the user's)
+	}
+
+	/** How far it's off where its last command left it now, {forward, right, up} in its origin's frame ({0, 0, 0}: there). */
+	private Map<String, Object> driftNow() {
+		Map<String, Object> off = offPlan();
+		return off != null ? off : Map.of("forward", 0L, "right", 0L, "up", 0L);
+	}
+
+	/** The block under its feet, as it is (its down face's). */
+	private String blockBelow() {
+		return blockName(BlockPos.containing(getX(), feet() - HAIR, getZ()));
 	}
 
 	/** What its moves under way were going to is moved by {@code by} (its frame was carried). */
@@ -1156,7 +1166,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		landing = null;
 		groundLanding = null;
 		groundless = false;
-		fallFrom = Double.NaN; // (caught mid-fall: no fall to say)
+		fallFrom = Double.NaN; // (caught mid-fall: no landing to say)
+		robotics.caught();
 		if (legs() && level() instanceof ServerLevel server) {
 			GolemLegs legs = ModEntities.GOLEM_LEGS.create(server, net.minecraft.world.entity.EntitySpawnReason.TRIGGERED);
 			legs.snapTo(getX(), getY(), getZ(), getYRot(), 0);

@@ -339,7 +339,7 @@ A move faces as it began (it squares its heading up, and gives it back), or ends
 last middle reached; turns are right angles. **Each command goes from where the last left it**
 (the user's design, 2026-10-27; "plan" in the code): its robotics is buffered (one command at a
 time); a shove away from there (in the air, or a piston's standing on its legs: the user's, as
-flight's) is drift, said as a `shoved` notice once the shove's over (once a shove), and it stays
+flight's) is drift, said as a notice, `why = "shove"` and its `drift`, once the shove's over (once a shove), and it stays
 where it was put: **no way back of its own** (the user's, 2026-11-03: the program corrects it,
 `walk()` or `fly()`, or takes where it is, `stop()`); a fall moves that point nowhere either, only a
 stop does (`stop()` always takes where it is, a command running or not). A move goes straight to
@@ -350,7 +350,10 @@ ends the same however it was shoved. **Positional commands are positional, alway
 `Body.offSpot`), one answering at once (`POSITIONAL`: scans, its hand's, a crafting card's) fails
 `drifted`, and one over time without moving it (`POSITIONAL_OVER_TIME`: turn, swing) ends at once,
 `drifted` with its `drift` (`EventQueue.drifted`). **What no program asked for is one event** (the user's, 2026-10-29),
-`{event = "notice", what}`: shoved, falling, landed (a fall's end; the user's: `landed`, not `fell`), frozen, thawed; every other event is a
+`{event = "notice", ...}`: a shove (`why = "shove"`, `drift`), a fall (`why = "fall"`, `drift`,
+`below`: the user's, 2026-11-04, one notice as it begins and as it lands, in pairs, a caught fall's
+end its flight's; `landed` gone), and a field's hold (`what`: frozen, thawed, not yet in the new
+shape); every other event is a
 command's end, named after its method. `position` is where the last left it
 (a command, so it waits its turn); `get` is live (where it really is, its drift). `stop` is free and
 at once, where it is (no centering), answering where; the next command goes on from exactly there,
@@ -380,7 +383,7 @@ in the world, and the swing's end says whether it kept it all.
   a break slower), ignores
   block triggers, and can be shoved; `land` comes down onto its legs below it and refuses with none
   there, but `land(true)` (the user's, 2026-10-29: a crash's landing, safely) comes straight down
-  without them, still running; a fall on its legs is a `falling` notice as it begins, and a tier
+  without them, still running; a fall on its legs is a `fall` notice as it begins, and a tier
   2's flights are taken mid-fall (it catches itself, its legs dropped); `stop()` then `fly()`
   catches it where it is (the user's, 2026-11-03: no `stop(true)`, no hover; a `stop()` lets a fall
   go on, as it isn't something the robot does, but takes where it is). Or carried in **a field**, its own too, legs and all (10 blocks a second): stasis, as for
@@ -924,7 +927,9 @@ Lessons from mistakes, each with its test:
 - **What no program asked for moves nothing a program's commands go from:** only a command's end or
   a stop moves where its next command goes from. A fall now leaves that point where it was, so the
   robot landed off its spot, and the shove watch took that as a shove: a fall's end marks its drift
-  said (`landed` says it). And a drifted command reads its drift before it begins (a command
+  said (its landing's notice says it). A fall's landing is said only for a fall whose start was
+  said (one golem set down settles before its program runs: a start dropped, its landing looked
+  like a new fall). (`aFallIsSaidAsItBeginsAndAsItLandsAndWhileItFallsItsBusy`) And a drifted command reads its drift before it begins (a command
   running has none). (`aFallLeavesWhereItsLastCommandLeftItTillAStop`)
 - **A robot body's `stop` is its board's reset too:** power-on stops it (`accepting(false)`), while a
   golem just placed is still settling, so a stop that kept a fall's speed let it sink into the

@@ -62,6 +62,17 @@ public class GolemWalkGameTest {
 	}
 
 	/** Its last event, once it has one more than {@code before}. */
+	/** How many fall notices are among {@code events}. */
+	private static long fallNotices(List<Object> events) {
+		return events.stream().filter(e -> e instanceof Map<?, ?> m && "notice".equals(m.get("event")) && "fall".equals(m.get("why"))).count();
+	}
+
+	/** Whether {@code event} is a fall's landing (the user's: its drift the drop, {@code up} blocks; the block below it something, not air). */
+	private static boolean landedBy(Object event, long up) {
+		return event instanceof Map<?, ?> m && "fall".equals(m.get("why")) && m.get("drift") instanceof Map<?, ?> d
+			&& java.util.Objects.equals(d.get("up"), up) && !"minecraft:air".equals(m.get("below"));
+	}
+
 	private static Object last(List<Object> events) {
 		return events.isEmpty() ? null : GameTests.withoutCall(events.getLast()); // (a cut-short end's call: its progress is the world's)
 	}
@@ -358,7 +369,7 @@ public class GolemWalkGameTest {
 				helper.assertTrue(!arm.device().push(args("east")).failed(), "it pushes");
 			})
 			.thenWaitUntil(() -> helper.assertTrue(golem.getX() - from[0] > 0.9, "shoved a block: " + (golem.getX() - from[0])))
-			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(e -> e instanceof Map<?, ?> m && "notice".equals(m.get("event")) && "shoved".equals(m.get("what"))),
+			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(e -> e instanceof Map<?, ?> m && "notice".equals(m.get("event")) && "shove".equals(m.get("why"))),
 				"it says so: " + events))
 			.thenExecuteAfter(10, () -> helper.assertTrue(golem.getX() - from[0] > 0.9, "and it stays where it was put (no way back of its own)"))
 			.thenExecute(() -> {
@@ -397,8 +408,8 @@ public class GolemWalkGameTest {
 				events.clear();
 				helper.setBlock(AT.east(2), Blocks.AIR); // (the sand's footing gone: it falls, and the golem on it)
 			})
-			.thenWaitUntil(() -> helper.assertTrue(events.contains(Map.of("event", "notice", "what", "falling")), "it says it's falling: " + events))
-			.thenWaitUntil(() -> same(helper, last(events), Map.of("event", "notice", "what", "landed", "by", 2L), "down, past its sand"))
+			.thenWaitUntil(() -> helper.assertTrue(fallNotices(events) >= 1, "it says it's falling: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(landedBy(last(events), -2), "down, past its sand: " + events))
 			.thenExecute(() -> same(helper, position(golem), at(2, 0, 2L), "where its last command left it: a fall moves it nowhere"))
 			.thenSucceed();
 	}
@@ -422,7 +433,7 @@ public class GolemWalkGameTest {
 				events.clear();
 				helper.setBlock(ledge, Blocks.AIR); // (gone from under it)
 			})
-			.thenWaitUntil(() -> same(helper, last(events), Map.of("event", "notice", "what", "landed", "by", 1L), "it says it fell"))
+			.thenWaitUntil(() -> helper.assertTrue(landedBy(last(events), -1), "it says it fell: " + events))
 			.thenExecute(() -> {
 				same(helper, position(golem), at(1, 0, 1L), "where its last command left it: still up there");
 				events.clear();

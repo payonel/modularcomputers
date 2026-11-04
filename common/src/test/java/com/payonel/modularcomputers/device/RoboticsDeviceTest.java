@@ -285,7 +285,7 @@ class RoboticsDeviceTest {
 		Drifting body = new Drifting();
 		RoboticsDevice robot = with(body);
 		robot.drifted(Map.of("forward", 1.5, "right", 0L, "up", 0L));
-		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "shoved", "drift", Map.of("forward", 1.5, "right", 0L, "up", 0L)));
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "why", "shove", "drift", Map.of("forward", 1.5, "right", 0L, "up", 0L)));
 		assertThat(robot.pull(args()).first()).as("nothing more").isNull();
 		assertThat(body.asked).as("no way back").isEmpty();
 		assertThat(robot.busy()).isFalse();
@@ -377,23 +377,28 @@ class RoboticsDeviceTest {
 		assertThat(withoutCall(robot.pull(args()).first())).isEqualTo(Map.of("event", "walk", "ok", false, "why", "stopped"));
 	}
 
-	/** Falling, it's busy; landed, its news (fell) ends the wait, said even for a short fall when a command waited. */
+	/**
+	 * A fall is one notice, said as it begins and as it lands (the user's): why fall, its drift and
+	 * the block below; falling, it's busy but for its flights.
+	 */
 	@Test
-	void fallingItsBusyAndItsLandingIsNewsWhenSomethingWaited() {
+	void aFallIsSaidAsItBeginsAndAsItLandsAndWhileItFallsItsBusy() {
 		Drifting body = new Drifting();
 		RoboticsDevice robot = with(body);
-		robot.fell(0.01);
-		assertThat(robot.pull(args()).first()).as("a settling: nothing to say").isNull();
+		robot.fallEnds(Map.of("forward", 0L, "right", 0L, "up", -1L), "minecraft:stone");
+		assertThat(robot.pull(args()).first()).as("no landing for a fall whose start wasn't said").isNull();
+		robot.fallBegins(Map.of("forward", 0L, "right", 0L, "up", 0L), "minecraft:air");
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "why", "fall",
+			"drift", Map.of("forward", 0L, "right", 0L, "up", 0L), "below", "minecraft:air"));
 		body.falling = true;
 		assertThat(robot.refusal("walk")).isEqualTo(Buffered.BUSY);
 		assertThat(robot.refusal("fly")).as("a tier 2 catches itself on its thrusters (the user's)").isNull();
 		assertThat(robot.refusal("flyTo")).isNull();
 		assertThat(robot.state()).isEqualTo(RoboticsDevice.FALLING);
 		body.falling = false;
-		robot.fell(0.01);
-		assertThat(robot.pull(args()).first()).as("a command waited: its news").isEqualTo(Map.of("event", "notice", "what", "landed", "by", 0.01));
-		robot.fell(1.0);
-		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "landed", "by", 1L));
+		robot.fallEnds(Map.of("forward", 0L, "right", 0L, "up", -5L), "minecraft:stone");
+		assertThat(robot.pull(args()).first()).as("landed: its drift the drop").isEqualTo(Map.of("event", "notice", "why", "fall",
+			"drift", Map.of("forward", 0L, "right", 0L, "up", -5L), "below", "minecraft:stone"));
 	}
 
 	/**

@@ -198,10 +198,10 @@ public class GolemFlightGameTest {
 				events.clear();
 				golem.push(1.0, 0, 0); // (a shove: as a player's walk into it, a blast)
 			})
-			.thenWaitUntil(() -> helper.assertTrue(notices(events, "shoved") == 1, "it says it was shoved: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(notices(events, "shove") == 1, "it says it was shoved: " + events))
 			.thenExecuteAfter(20, () -> {
 				helper.assertTrue(golem.getX() - at[0] > SHOVED, "still where it was put: " + (golem.getX() - at[0]));
-				helper.assertTrue(notices(events, "shoved") == 1, "said once: " + events);
+				helper.assertTrue(notices(events, "shove") == 1, "said once: " + events);
 				same(helper, golem.robotics().refusal("scan"), com.payonel.modularcomputers.device.Buffered.DRIFTED, "off its spot: a positional command fails");
 				events.clear();
 				helper.assertTrue(!golem.robotics().fly(args()).failed(), "fly(): back to where its last command left it");
@@ -211,9 +211,9 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
-	/** How many notices of {@code what} (shoved, returned...) are among {@code events}. */
-	private static long notices(List<Object> events, String what) {
-		return events.stream().filter(e -> e instanceof java.util.Map<?, ?> m && "notice".equals(m.get("event")) && what.equals(m.get("what"))).count();
+	/** How many notices of {@code why} (shove, fall) are among {@code events}. */
+	private static long notices(List<Object> events, String why) {
+		return events.stream().filter(e -> e instanceof java.util.Map<?, ?> m && "notice".equals(m.get("event")) && why.equals(m.get("why"))).count();
 	}
 
 	/** Shoved twice, it says each shove (the user's: each its notice), from where each put it. */
@@ -225,9 +225,9 @@ public class GolemFlightGameTest {
 			.thenExecuteAfter(3, () -> golem.robotics().fly(args()))
 			.thenWaitUntil(() -> helper.assertTrue(golem.robotics().state().equals(RoboticsDevice.HOVERING), "holding there: " + golem.robotics().state()))
 			.thenExecute(() -> golem.push(1.0, 0, 0))
-			.thenWaitUntil(() -> helper.assertTrue(notices(events, "shoved") == 1, "the first: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(notices(events, "shove") == 1, "the first: " + events))
 			.thenExecute(() -> golem.push(1.0, 0, 0))
-			.thenWaitUntil(() -> helper.assertTrue(notices(events, "shoved") == 2, "and the second: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(notices(events, "shove") == 2, "and the second: " + events))
 			.thenSucceed();
 	}
 
@@ -352,7 +352,7 @@ public class GolemFlightGameTest {
 				helper.setBlock(FRONT.east().above(), Blocks.AIR); // (gone from under it, and the one under that)
 				helper.setBlock(FRONT.east(), Blocks.AIR);
 			})
-			.thenWaitUntil(() -> helper.assertTrue(notices(events, "falling") == 1, "it says it's falling: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(notices(events, "fall") == 1, "it says it's falling: " + events))
 			.thenExecute(() -> {
 				same(helper, golem.robotics().state(), RoboticsDevice.FALLING, "still falling");
 				helper.assertTrue(!golem.robotics().fly(args()).failed(), "fly() taken mid-fall");
@@ -361,7 +361,7 @@ public class GolemFlightGameTest {
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "back up: " + events))
 			.thenExecute(() -> {
 				same(helper, golem.robotics().position(args()).first(), java.util.Map.of("forward", 2L, "right", 0L, "up", 2L, "heading", 0L), "where its last command left it");
-				helper.assertTrue(notices(events, "landed") == 0, "caught: no fall to say: " + events);
+				helper.assertTrue(notices(events, "fall") == 1, "caught: no landing to say, its flight says it: " + events);
 			})
 			.thenWaitUntil(() -> helper.assertTrue(legs(helper).size() == 1 && legs(helper).getFirst().onGround(), "its legs down below"))
 			.thenExecute(() -> {
@@ -422,7 +422,7 @@ public class GolemFlightGameTest {
 				helper.setBlock(FRONT.east().above(), Blocks.AIR);
 				helper.setBlock(FRONT.east(), Blocks.AIR);
 			})
-			.thenWaitUntil(() -> helper.assertTrue(notices(events, "falling") == 1, "it says it's falling: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(notices(events, "fall") == 1, "it says it's falling: " + events))
 			.thenExecute(() -> {
 				golem.robotics().stop(args());
 				caught[0] = golem.getY();
@@ -435,7 +435,7 @@ public class GolemFlightGameTest {
 				helper.assertTrue(Math.abs(golem.getY() - BotGolem.LEG_HEIGHT - caught[0]) < 0.06,
 					"where it stopped (its torso its legs' height over its feet's point): " + (golem.getY() - BotGolem.LEG_HEIGHT - caught[0]));
 				helper.assertTrue(!golem.legs(), "its legs dropped");
-				helper.assertTrue(notices(events, "landed") == 0, "no fall to say: " + events);
+				helper.assertTrue(notices(events, "fall") == 1, "caught: no landing to say: " + events);
 			})
 			.thenWaitUntil(() -> helper.assertTrue(legs(helper).size() == 1 && legs(helper).getFirst().onGround(), "its legs down below"))
 			.thenSucceed();

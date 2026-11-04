@@ -58,10 +58,14 @@ public final class RoboticsDevice implements Device, Buffered {
 	 * type, so a program tells at once what it asked for from what came to it), {@code what} saying it.
 	 */
 	public static final String NOTICE = "notice";
-	/** A notice's {@code what}: shoved off where its last command left it, in the air (and how far: {@code drift}). */
-	public static final String SHOVED = "shoved";
-	/** A notice's {@code what}: it came down on its legs from a fall nothing asked for ({@code by}, blocks); as it began, {@link #FALLING}. */
-	public static final String LANDED = "landed";
+	/** A notice's {@code why}: shoved off where its last command left it (and how far: {@code drift}), once the shove's over. */
+	public static final String SHOVE = "shove";
+	/**
+	 * A notice's {@code why}: a fall nothing asked for, said as it begins and as it lands (the user's,
+	 * 2026-11-04): {@code drift}, how far it is off where its last command left it, and {@code below},
+	 * the block under it then, as it is.
+	 */
+	public static final String FALL = "fall";
 	/** Its commands taken while it falls (the user's): a tier 2 catches itself on its thrusters, its legs dropped. */
 	private static final java.util.Set<String> CATCHES = java.util.Set.of("fly", "flyTo");
 	/** A notice's {@code what}: a field took hold of it, or let it go. */
@@ -709,7 +713,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return Result.ok(now);
 	}
 
-	@Method(doc = "pull(): its oldest event, or nil: a command's end, {event = method, ok, why, result} (walk, walkTo, fly, flyTo, turn, land, swing), or a notice of what happened to it that no program asked for, {event = \"notice\", what, ...}: shoved (drift), returned, stuck (why), falling, landed (by), frozen, thawed")
+	@Method(doc = "pull(): its oldest event, or nil: a command's end, {event = method, ok, why, result} (walk, walkTo, fly, flyTo, turn, land, swing), or a notice of what happened to it that no program asked for: {event = \"notice\", why = \"shove\", drift} once a shove's over, {event = \"notice\", why = \"fall\", drift, below} as a fall begins and as it lands, or {event = \"notice\", what} for a field's hold (frozen, thawed)")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -756,7 +760,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		end(false, why, null);
 	}
 
-	/** What happened to it that no program asked for ({@code what}: {@link #SHOVED}...), as a {@link #NOTICE}. */
+	/** What happened to it that no program asked for ({@code what}: {@link #FROZEN}, {@link #THAWED}), as a {@link #NOTICE}. */
 	public void notice(String what, Map<String, Object> fields) {
 		Map<String, Object> event = new LinkedHashMap<>();
 		event.put("event", NOTICE);
@@ -784,7 +788,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		if (active != null) {
 			return;
 		}
-		notice(SHOVED, Map.of("drift", drift));
+		said(SHOVE, Map.of("drift", drift));
 	}
 
 	/** A positional command over time given off its spot: it starts and ends at once, drifted, its drift and its call. */
@@ -799,26 +803,52 @@ public final class RoboticsDevice implements Device, Buffered {
 	}
 
 	/**
-	 * It came down on its legs from a fall nothing asked for (a block gone from under it), by
-	 * {@code blocks}: its plan followed it down (its odometry felt it), and it says so, when it fell
-	 * far enough to tell ({@link #MIN_FALL}) or a command waited for it to land (its news ends that
-	 * wait).
+	 * A fall nothing asked for (a block gone from under it), as it begins and as it lands: it says so
+	 * each time, its drift then (in its origin's frame) and the block under it (its landing's news
+	 * ends a wait for it). A fall it caught itself (a flight) has no landing to say: that flight's
+	 * own end says it.
 	 */
-	public void fell(double blocks) {
-		if (Math.abs(blocks) < MIN_FALL && !waitedOnFall) {
-			return; // (a settling, as it's set down: nothing to say)
+	public void fallBegins(Map<String, Object> drift, String below) {
+		fallSaid = accepting; // (begun with no program to take it, a golem set down settling: its landing isn't said either)
+		if (fallSaid) {
+			sayFall(drift, below);
 		}
-		waitedOnFall = false;
-		double kept = Math.rint(blocks * FALL_GRAIN) / FALL_GRAIN;
-		notice(LANDED, Map.of("by", kept == Math.rint(kept) ? (Object) (long) kept : kept));
 	}
 
-	/** The least fall it says, in blocks (a settling as it's set down isn't one). */
-	public static final double MIN_FALL = 0.05;
-	/** How finely a fall's distance is said: to a thousandth of a block. */
+	/** The fall's landing: said only for a fall whose start was said (in pairs). */
+	public void fallEnds(Map<String, Object> drift, String below) {
+		if (fallSaid) {
+			fallSaid = false;
+			sayFall(drift, below);
+		}
+	}
+
+	private void sayFall(Map<String, Object> drift, String below) {
+		Map<String, Object> fields = new LinkedHashMap<>();
+		fields.put("drift", drift);
+		fields.put("below", below);
+		said(FALL, fields);
+	}
+
+	/** A fall's start was said, its landing to come (a caught fall's never does: the next fall's start clears it). */
+	private boolean fallSaid;
+
+	/** A fall it caught itself (a flight taken mid-fall): no landing to say, its flight's end says it. */
+	public void caught() {
+		fallSaid = false;
+	}
+
+	/** A notice whose kind is its why (the shape notices are being made: shove, fall). */
+	private void said(String why, Map<String, Object> fields) {
+		Map<String, Object> event = new LinkedHashMap<>();
+		event.put("event", NOTICE);
+		event.put("why", why);
+		event.putAll(fields);
+		events.add(event);
+	}
+
+	/** How finely a measure is said: to a thousandth of a block (or a degree). */
 	private static final double FALL_GRAIN = 1000;
-	/** A command was refused while it fell: its landing's news must come, however short the fall. */
-	private boolean waitedOnFall;
 
 	/** What it's doing now. */
 	public String state() {
@@ -856,7 +886,6 @@ public final class RoboticsDevice implements Device, Buffered {
 			return BUSY;
 		}
 		if (body.falling() && !CATCHES.contains(method)) {
-			waitedOnFall = true;
 			return BUSY; // (its landing's news ends the wait)
 		}
 		if (POSITIONAL.contains(method) && body.offSpot()) {
