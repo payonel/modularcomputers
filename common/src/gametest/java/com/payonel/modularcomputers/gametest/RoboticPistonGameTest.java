@@ -64,7 +64,9 @@ public class RoboticPistonGameTest {
 		RoboticPistonBlockEntity piston = piston(helper, ModBlocks.ROBOTIC_PISTON);
 		ends(piston);
 		helper.setBlock(PISTON.west(), Blocks.OBSIDIAN);
-		helper.assertValueEqual(push(piston, "down").error(), RoboticPiston.CABLE + ": down", "the cable's side");
+		helper.assertTrue(Boolean.TRUE.equals(push(piston, "down").first()), "the cable's side: a command too");
+		Object cable = next(piston);
+		helper.assertTrue(java.util.Objects.equals(cable, blocked("push", "minecraft:air", "down")), "blocked by what's on it (no cable here): " + cable);
 		helper.assertTrue(Boolean.TRUE.equals(push(piston, "west").first()), "a command: true, its end says how");
 		helper.assertTrue(java.util.Objects.equals(next(piston), blocked("push", "minecraft:obsidian", "west")), "blocked by the obsidian, west");
 		helper.assertBlockPresent(Blocks.OBSIDIAN, PISTON.west());

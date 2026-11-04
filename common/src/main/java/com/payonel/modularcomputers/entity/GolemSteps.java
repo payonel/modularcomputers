@@ -10,6 +10,12 @@ package com.payonel.modularcomputers.entity;
  * below, and never past it. Anything else blocks the walk there.
  */
 public final class GolemSteps {
+	/** Why a step can't be taken: the next floor is too high (a step it can't climb), or too low (air it can't drop through). */
+	public enum Stop {
+		HIGH,
+		LOW
+	}
+
 	/** The farthest it drops in a step, in blocks: a player's fall without damage. */
 	public static final int MAX_DROP = 3;
 	/** The highest it jumps in a step, in blocks. */
@@ -29,7 +35,7 @@ public final class GolemSteps {
 	 * Whether it may step from feet at {@code from} to feet at {@code to}, on a walk asked to end at
 	 * elevation {@code goal}: null, or why not.
 	 */
-	public static String step(double from, double to, int goal) {
+	public static Stop step(double from, double to, int goal) {
 		int now = elevation(from);
 		int next = elevation(to);
 		if (next == now) {
@@ -37,12 +43,12 @@ public final class GolemSteps {
 		}
 		if (next > now) {
 			if (goal <= now || next - now > 1 || to - from > MAX_JUMP + EPSILON || next > goal) {
-				return "too high: " + (next - now); // (a step up its walk wasn't to make, or more than a jump)
+				return Stop.HIGH; // (a step up its walk wasn't to make, or more than a jump)
 			}
 			return null;
 		}
 		if (goal >= now || from - to > MAX_DROP + EPSILON || next < goal) {
-			return "too low: " + (now - next); // (a drop its walk wasn't to make, or more than it takes)
+			return Stop.LOW; // (a drop its walk wasn't to make, or more than it takes)
 		}
 		return null;
 	}

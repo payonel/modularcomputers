@@ -49,7 +49,7 @@ Its file is `/dev/actuator0` (`actuator1` for the next; its type is `actuator`, 
 - **Write:** refused: opening it to write fails with `EACCES`.
 - **Poll:** ready for `IN` and `PRI` while a move's end is waiting to be read.
 - **ioctls:** its methods below, by name, with the side as their argument. A move that can't start is
-  `nil`, its message (`cable: down`, `no such face: ...`) and `EINVAL`; a
+  `nil`, its message (`no such face: ...`) and `EINVAL`; a
   piston that has left the bus (its cable cut, say) is `ENODEV`. `setLabel` sets its label, as on
   every device file.
 
@@ -73,20 +73,22 @@ Pushes on that side. The arm goes out and comes back on its own; its event, `pus
 When something will not move, its event says so at once: `ok = false`, `why = "blocked"`, `block`
 the first block down its line that won't move (obsidian, bedrock, a block entity), `""` when no
 one block is to blame (more than a piston moves, the world's edge, a chunk not loaded), and `face`
-the side. With its arm out there already, nothing moves, and its event is `ok`. Fails at once with
-`cable: <side>` on its cable port's side.
+the side. Its cable port's side has no arm: it's blocked there too, by what's on that side (its
+cable, `modularcomputers:cable`, or `minecraft:air` when it's linked by Bluetooth). With its arm out
+there already, nothing moves, and its event is `ok`.
 
 ### extend(side) → true
 
 Pushes and leaves the arm out until `retract`; its event, `extend`, once it's out. Gives `true` also
 when the arm is out already (and then it stays out, free, its event at once: every extend ends in its
 event, so a program waiting for one never has to know which it was). Blocked, its event says so,
-as `push`'s does. Fails at once with `cable: <side>`.
+as `push`'s does, its cable port's side too.
 
 ### retract(side) → true
 
 Takes the arm on that side back in; a sticky piston pulls what is in front of it. Its event,
-`retract`, once it's in. With no arm out there, nothing moves, and its event is `ok` at once.
+`retract`, once it's in. With no arm out there, nothing moves, and its event is `ok` at once. On its
+cable port's side it's blocked, as `push` is.
 
 ### sync() → boolean
 

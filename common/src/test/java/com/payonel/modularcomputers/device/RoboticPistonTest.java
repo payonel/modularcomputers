@@ -46,16 +46,27 @@ class RoboticPistonTest {
 		assertThat(owed()).isEqualTo(RoboticPiston.PUSH_COST);
 	}
 
+	/** Its cable port's side is blocked too (the user's): by what's on it, its cable; its end at once, the call true. */
+	@Test
+	void itsCableSideIsBlockedByItsCable() {
+		piston.accepting(true);
+		piston.moveWith((side, motion) -> RoboticPiston.Moved.CABLE);
+		piston.blockedBy(side -> null, side -> "modularcomputers:cable");
+		assertThat(piston.push(new Arguments(List.of("down"))).first()).isEqualTo(true);
+		assertThat(piston.pull(new Arguments(List.of())).first())
+			.isEqualTo(Map.of("event", "push", "ok", false, "why", "blocked", "block", "modularcomputers:cable", "face", "down"));
+	}
+
 	/** A push that can't move is its end, blocked (the user's: one shape): the block that won't move, and its face, the world's way. */
 	@Test
 	void aBlockedPushEndsBlockedWithTheBlockAndItsFace() {
 		piston.accepting(true);
 		piston.moveWith((side, motion) -> RoboticPiston.Moved.CANNOT_PUSH);
-		piston.blockedBy(side -> "minecraft:obsidian");
+		piston.blockedBy(side -> "minecraft:obsidian", side -> "modularcomputers:cable");
 		piston.extend(new Arguments(List.of("up")));
 		assertThat(piston.pull(new Arguments(List.of())).first())
 			.isEqualTo(Map.of("event", "extend", "ok", false, "why", "blocked", "block", "minecraft:obsidian", "face", "up"));
-		piston.blockedBy(side -> null); // (more than it moves: no one block)
+		piston.blockedBy(side -> null, side -> "modularcomputers:cable"); // (more than it moves: no one block)
 		piston.push(new Arguments(List.of("north")));
 		assertThat(piston.pull(new Arguments(List.of())).first()).isEqualTo(Map.of("event", "push", "ok", false, "why", "blocked", "block", "", "face", "north"));
 	}

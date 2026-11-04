@@ -317,8 +317,10 @@ Comes down onto its legs, standing below it (within three blocks to its side), a
 `force` (`land(true)`) and no legs there, it comes straight down onto the ground beneath it without
 them, and stays running, its thrusters off. That's what a crash does, but safely and still on.
 Legless, it walks nowhere; it flies again to fetch its legs and lands onto them. Its event, `land`:
-`ok`, or not and why (`blocked`, `no legs below` when they've gone: it hovers there). Fails
-with `no legs below` (without `force`: it goes on hovering), `no ground below`, or `on legs`. A right click pops legs up
+`ok`, or not and why (`blocked`; `no legs below` when they've gone: it hovers there). With
+`force` and no ground in its reach, its event says so at once, blocked by the air below
+(`block = "minecraft:air", face = "down"`), and it goes on hovering. Fails with `no legs below`
+(without `force`: it goes on hovering), or `on legs`. A right click pops legs up
 into an inventory, its own `use` too.
 
 ### get() → {state, legs, pathfinding, position, planned, drift}
@@ -372,20 +374,24 @@ a stair's lower half is the ground's elevation:
 - **Down** only while `up` is below: at most 3 blocks at a time, as far as a player falls unhurt.
 - **Never past `up`**, and never into lava, fire or deep water.
 
-It ends at exactly the elevation `up` asked, or its walk ends not `ok`, and why: `too high: ` (a
-step up it wasn't to make, or more than a jump: how many blocks), `too low: ` (a drop it wasn't to
-make, or more than 3: how many), `too low` (no floor within its drop), `blocked` (a wall, a
-ceiling, lava, fire, deep water: see [Blocked](#blocked)), or `height: ` and how far from the
-height asked it ended.
+It ends at exactly the elevation `up` asked, or its walk ends not `ok`, `blocked`
+(see [Blocked](#blocked)), by what stopped it:
+
+- **a step up** it wasn't to make, or more than a jump: the step's block, on the face it stepped toward;
+- **a drop** it wasn't to make, more than 3, or with no floor within its drop: the air it would step
+  into (`minecraft:air`), on that face;
+- **a wall, a ceiling, lava, fire, deep water**: that block, on the face that met it;
+- **there, but at another elevation**: above where `up` asked, the block under it, on its `down`;
+  below, the air over it it couldn't rise into, on its `up`.
 
 | From | To | `up = 0` | `up = 1` | `up = -3` |
 |---|---|---|---|---|
 | ground | a slab | walks | walks | walks |
-| a slab | the full block beside it | `too high: 1` | jumps | `too high: 1` |
-| ground | a block up | `too high: 1` | jumps | `too high: 1` |
-| ground | the flat beyond | walks; ends `height: -1` if `up` wasn't met | | |
-| ground | 3 down | `too low: 3` | `too low: 3` | drops |
-| ground | 4 down | `too low` | `too low` | `too low` |
+| a slab | the full block beside it | blocked, `front` | jumps | blocked, `front` |
+| ground | a block up | blocked, `front` | jumps | blocked, `front` |
+| ground | the flat beyond | walks; ends blocked, `minecraft:air` on its `up`, if `up` wasn't met | | |
+| ground | 3 down | blocked, `minecraft:air` | blocked, `minecraft:air` | drops |
+| ground | 4 down | blocked, `minecraft:air` | blocked, `minecraft:air` | blocked, `minecraft:air` |
 
 **With pathfinding** it finds its way, as a mob does: round walls, up stairs and slabs, jumping a
 block and dropping up to 3, turning as it goes. It still ends on the asked block's middle, at the

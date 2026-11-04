@@ -66,8 +66,9 @@ public class GolemWalkGameTest {
 		return events.isEmpty() ? null : events.getLast();
 	}
 
-	private static Map<String, Object> blocked(String why) {
-		return Map.of("event", "walk", "ok", false, "why", why);
+	/** A walk's end, blocked (the user's: one shape): by what (air too), met on which of its own faces. */
+	private static Map<String, Object> blocked(String block, String face) {
+		return Map.of("event", "walk", "ok", false, "why", "blocked", "block", block, "face", face);
 	}
 
 	private static final Map<String, Object> ARRIVED = Map.of("event", "walk", "ok", true);
@@ -119,7 +120,7 @@ public class GolemWalkGameTest {
 	public void aLevelWalkStepsOntoASlabButNotOnUpABlock(GameTestHelper helper) {
 		helper.setBlock(AT.east(), Blocks.STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM));
 		helper.setBlock(AT.east(2), Blocks.STONE);
-		walks(helper, new Object[] {3L}, blocked("too high: 1"), at(1, 0, 0.5));
+		walks(helper, new Object[] {3L}, blocked("minecraft:stone", "front") /* (the step it wasn't to climb) */, at(1, 0, 0.5));
 	}
 
 	@GameTest(maxTicks = 200)
@@ -131,7 +132,7 @@ public class GolemWalkGameTest {
 
 	@GameTest(maxTicks = 200)
 	public void upOneOnTheFlatEndsBlockedNotAtTheHeight(GameTestHelper helper) {
-		walks(helper, new Object[] {2L, 0L, 1L}, blocked("height: -1"), at(2, 0, 0L));
+		walks(helper, new Object[] {2L, 0L, 1L}, blocked("minecraft:air", "up") /* (it couldn't rise: blocked by the air over it) */, at(2, 0, 0L));
 	}
 
 	@GameTest(maxTicks = 200)
@@ -148,7 +149,7 @@ public class GolemWalkGameTest {
 				golem.robotics().setPosition(args()); // (its origin up there)
 				golem.robotics().walk(args(2L));
 			})
-			.thenWaitUntil(() -> same(helper, last(events), blocked("too low: 3"), "at the edge"))
+			.thenWaitUntil(() -> same(helper, last(events), blocked("minecraft:air", "front") /* (the drop it wasn't to take) */, "at the edge"))
 			.thenExecute(() -> {
 				same(helper, position(golem), at(0, 0, 0L), "still on its platform");
 				events.clear();
@@ -169,14 +170,14 @@ public class GolemWalkGameTest {
 		golem.setPos(golem.getX(), golem.getY() + 4, golem.getZ());
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> golem.robotics().walk(args(1L, 0L, -4L)))
-			.thenWaitUntil(() -> same(helper, last(events), blocked("too low"), "four is more than a player falls unhurt"))
+			.thenWaitUntil(() -> same(helper, last(events), blocked("minecraft:air", "front") /* (no floor within its drop) */, "four is more than a player falls unhurt"))
 			.thenSucceed();
 	}
 
 	@GameTest(maxTicks = 200)
 	public void itWontWalkIntoLava(GameTestHelper helper) {
 		helper.setBlock(AT.east(2), Blocks.LAVA);
-		walks(helper, new Object[] {3L}, Map.of("event", "walk", "ok", false, "why", "blocked", "block", "minecraft:lava", "face", "front"), at(1, 0, 0L));
+		walks(helper, new Object[] {3L}, blocked("minecraft:lava", "front"), at(1, 0, 0L));
 	}
 
 	@GameTest(maxTicks = 300)

@@ -242,6 +242,28 @@ public class GolemFlightGameTest {
 	}
 
 	/**
+	 * land(true) with no ground in its reach is blocked by the air below (the user's): the call true,
+	 * its land event blocked at once, minecraft:air on its down face, and it goes on hovering.
+	 */
+	@GameTest(maxTicks = 200)
+	public void landingWithForceOverNoGroundIsBlockedByAir(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().fly(args()))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "off: " + events))
+			.thenExecute(() -> {
+				events.clear();
+				golem.setPos(golem.getX(), golem.getY() + 3 * RoboticsDevice.MAX_FLIGHT, golem.getZ()); // (out of every reach, legs and ground, whatever the test world holds under it)
+				helper.assertTrue(Boolean.TRUE.equals(golem.robotics().land(args(true)).first()), "a command: true");
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "land", "ok", false, "why", "blocked", "block", "minecraft:air", "face", "down")),
+				"blocked by the air below: " + events))
+			.thenExecute(() -> helper.assertTrue(golem.thrusting(), "still hovering"))
+			.thenSucceed();
+	}
+
+	/**
 	 * Falling, it says so as it begins, and a tier 2 catches itself (the user's): fly() is taken
 	 * mid-fall, its legs drop, and it flies back to where its last command left it. Out of its legs'
 	 * reach, land() refuses, and land(true) sets it down on the ground without them, still running.

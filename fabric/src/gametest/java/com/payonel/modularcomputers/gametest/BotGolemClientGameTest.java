@@ -171,7 +171,7 @@ public class BotGolemClientGameTest implements FabricClientGameTest {
 					}
 
 					@Override
-					public void blocked(String why) {
+					public void blocked(String block, net.minecraft.core.Direction side) {
 					}
 
 					@Override

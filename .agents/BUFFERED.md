@@ -57,14 +57,17 @@ the spec the build follows and its checklist, items marked done as they land.
 ### Failure strings
 
 Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, numbers):
-`too high: 2`, `too low: 4`, `too far: 64`, `no path`, `held`, `busy`, `no legs`, `no legs below`,
+`too far: 64`, `no path`, `held`, `busy`, `no legs`, `no legs below`,
 `on legs`, `no thrusters`, `stopped`. For every device.
 
 Being made one shape (the user's, 2026-11-03): a why is one word, exactly, and what it's about
 comes in named fields beside it, the same fields wherever it's said. Done so far: `blocked`
 (`block`, the block's id, `""` when no one block can be named, never nil; `face`, the side of what moved
 that met it, in the device's terms: a robot's own, a field holder's frame, a piston's the world's),
-said only in an event (a piston's too: its push ends in its event), in the `/dev` text as words,
+said only in an event (a piston's too: its push ends in its event; its cable port's side is
+blocked by its cable); a walk's step up or drop it can't take, and an elevation it couldn't reach,
+are blocked too (by the step's block, by air, by the block under it or the air over it), their
+counts gone, in the `/dev` text as words,
 `-` for a missing one. The rest of the reasons follow.
 
 ### Robotics

@@ -193,6 +193,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private GolemLegs landing;
 	/** Where it's coming down to without its legs (land with force, none there), or null. */
 	private Vec3 groundLanding;
+	/** A landing with force begun over no ground in reach: its end, blocked by the air below, at its next tick. */
+	private boolean groundless;
 	/** Where a flight is going (null: none). */
 	private Vec3 flyTo;
 	/** Its thrusters hold it up (flying, or still: hovering), until it lands or they're let go. */
@@ -453,6 +455,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			flightPath = null;
 			landing = null;
 			groundLanding = null;
+			groundless = false;
 		}
 
 		@Override
@@ -588,7 +591,11 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			if (below == null && !force) {
 				return "no legs below";
 			} else if (below == null && ground == null) {
-				return "no ground below";
+				// (no ground within reach: its landing begins and ends at once, blocked by the air below)
+				flyTo = null;
+				hovering = true;
+				groundless = true;
+				return null;
 			}
 			EnergyField field = EnergyField.fieldOf(BotGolem.this);
 			if (field != null) {
@@ -606,6 +613,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			flyTo = null;
 			landing = null;
 			groundLanding = null;
+			groundless = false;
 			hovering = false;
 		}
 
@@ -1043,25 +1051,33 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		return drift;
 	}
 
-	/** Why a step can't be taken: a reason, or blocked (the block in the way, and its own face that met it). */
-	private record Stop(String why, String block, String face) {
-		static Stop because(String why) {
-			return new Stop(why, null, null);
-		}
-
+	/** Why a step can't be taken: blocked, by the block in the way (air too), met on its own face. */
+	private record Stop(String block, String face) {
 		void tell(RoboticsDevice robotics) {
-			if (com.payonel.modularcomputers.device.Buffered.BLOCKED.equals(why)) {
-				robotics.blocked(block, face);
-			} else {
-				robotics.failed(why);
-			}
+			robotics.blocked(block, face);
 		}
 	}
 
 	/** A step its walk judged: the block at {@code at} in its way, met on its face toward it (its walk's steps are along its own axes). */
 	private Stop blockedBy(BlockPos at, Vec3 toward) {
-		return new Stop(com.payonel.modularcomputers.device.Buffered.BLOCKED,
-			net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level().getBlockState(at).getBlock()).toString(), faceOf(toward));
+		return new Stop(blockName(at), faceOf(toward));
+	}
+
+	/**
+	 * A walk that got there at another elevation than asked ({@code off}: how far above it, below if
+	 * less than 0): blocked going on, the user's: above, by the block under it ({@code down}); below,
+	 * by the air over it it couldn't rise into ({@code up}).
+	 */
+	private void blockedAtHeight(int off) {
+		if (off > 0) {
+			robotics.blocked(blockName(BlockPos.containing(getX(), getY() - HAIR, getZ())), "down");
+		} else {
+			robotics.blocked(blockName(BlockPos.containing(getX(), getY() + getBbHeight() + HAIR, getZ())), "up");
+		}
+	}
+
+	private String blockName(BlockPos at) {
+		return net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level().getBlockState(at).getBlock()).toString();
 	}
 
 	/** A move the game's collisions cut short ({@code step}, from {@code from}): the side that met a block, in its own frame, and the block. */
@@ -1176,6 +1192,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		turnTo = Float.NaN;
 		landing = null;
 		groundLanding = null;
+		groundless = false;
 		fallFrom = Double.NaN; // (caught mid-fall: no fall to say)
 		if (legs() && level() instanceof ServerLevel server) {
 			GolemLegs legs = ModEntities.GOLEM_LEGS.create(server, net.minecraft.world.entity.EntitySpawnReason.TRIGGERED);
@@ -1207,6 +1224,10 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				landStep();
 			} else if (groundLanding != null) {
 				groundStep();
+			} else if (groundless) {
+				groundless = false;
+				robotics.blocked(blockName(BlockPos.containing(getX(), getY() - HAIR, getZ())), "down");
+				robotics.hovering();
 			} else if (flyTo != null) {
 				flyStep();
 			} else {
@@ -1477,7 +1498,11 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				if (there && off == 0) {
 					robotics.arrived();
 				} else {
-					robotics.failed(there ? "height: " + off : "no path");
+					if (there) {
+						blockedAtHeight(off);
+					} else {
+						robotics.failed("no path");
+					}
 				}
 			}
 		}
@@ -1509,7 +1534,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				if (off == 0) {
 					robotics.arrived();
 				} else {
-					robotics.failed("height: " + off);
+					blockedAtHeight(off);
 				}
 				return;
 			}
@@ -1548,7 +1573,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		Vec3 toward = next.subtract(position());
 		if (Double.isNaN(floor)) {
 			if (fits(next.x, here, next.z)) {
-				return Stop.because("too low"); // (no floor within its drop)
+				return blockedBy(BlockPos.containing(next.x, here + HAIR, next.z), toward); // (no floor within its drop: blocked by the air it'd step into)
 			}
 			BlockPos wall = BlockPos.containing(next.x, here + HAIR, next.z);
 			return blockedBy(level().getBlockState(wall).isAir() ? wall.above() : wall, toward);
@@ -1559,9 +1584,11 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			|| state.getFluidState().is(net.minecraft.tags.FluidTags.WATER) && level().getFluidState(feet.below()).is(net.minecraft.tags.FluidTags.WATER)) {
 			return blockedBy(feet, toward); // (lava, fire, deep water: never into them)
 		}
-		String why = GolemSteps.step(here, floor, goal);
-		if (why != null) {
-			return Stop.because(why);
+		GolemSteps.Stop stop = GolemSteps.step(here, floor, goal);
+		if (stop == GolemSteps.Stop.HIGH) {
+			return blockedBy(BlockPos.containing(next.x, floor - HAIR, next.z), toward); // (the step it can't climb)
+		} else if (stop == GolemSteps.Stop.LOW) {
+			return blockedBy(BlockPos.containing(next.x, here + HAIR, next.z), toward); // (the air it can't drop through)
 		}
 		if (floor > here && !fits(getX(), floor, getZ())) {
 			return blockedBy(BlockPos.containing(getX(), here + getBbHeight() + HAIR, getZ()), new Vec3(0, 1, 0)); // (a ceiling over it)

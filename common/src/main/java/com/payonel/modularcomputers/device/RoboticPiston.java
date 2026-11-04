@@ -32,8 +32,6 @@ public final class RoboticPiston implements Device, Buffered {
 	}
 	/** What a push costs, moved or not: five ticks of a running CPU. */
 	public static final int PUSH_COST = 5 * PowerUnits.CPU;
-	/** Why a move can't start on its cable port's side, and the side: no arm there. */
-	public static final String CABLE = "cable";
 	/** A vanilla piston's move, in ticks: an extend's or a retract's time. */
 	public static final int MOVE_TICKS = 2;
 	/** A push's time: out, and back (its block's arm time). */
@@ -65,7 +63,7 @@ public final class RoboticPiston implements Device, Buffered {
 		ALREADY,
 		/** It couldn't push: what's in front won't move. */
 		CANNOT_PUSH,
-		/** The side is its cable port's: no arm there. */
+		/** The side is its cable port's: no arm there, blocked by what's on it. */
 		CABLE
 	}
 
@@ -77,6 +75,8 @@ public final class RoboticPiston implements Device, Buffered {
 	private Arms arms = (side, motion) -> motion == Motion.RETRACT ? Moved.ALREADY : Moved.CANNOT_PUSH;
 	/** The block keeping a push on a side from moving (null: none to name), in the world (its block). */
 	private java.util.function.UnaryOperator<String> blocker = side -> null;
+	/** The block next to it on a side (its cable port's: what blocks a move there), in the world (its block). */
+	private java.util.function.UnaryOperator<String> neighbor = side -> null;
 
 	@Override
 	public DeviceType type() {
@@ -94,21 +94,22 @@ public final class RoboticPiston implements Device, Buffered {
 	}
 
 	/** What keeps a push on a side from moving, in the world (its block): a block's id, or null. */
-	public void blockedBy(java.util.function.UnaryOperator<String> blocker) {
+	public void blockedBy(java.util.function.UnaryOperator<String> blocker, java.util.function.UnaryOperator<String> neighbor) {
 		this.blocker = blocker;
+		this.neighbor = neighbor;
 	}
 
-	@Method(doc = "push(side): pushes as a piston does on that side (north, south, east, west, up or down; or front, back, left, right: its front is opposite its cable), and the arm comes back on its own. A command: true at once (its event: push, once the arm is back; at once when its arm is out already, ok: nothing to do; or not ok, blocked: block, the first down its line that won't move, left out when no one block is to blame, and face, the side), or false and why it can't start (cable: the side, its cable port's)")
+	@Method(doc = "push(side): pushes as a piston does on that side (north, south, east, west, up or down; or front, back, left, right: its front is opposite its cable), and the arm comes back on its own. A command: true at once (its event: push, once the arm is back; at once when its arm is out already, ok: nothing to do; or not ok, blocked: block, the first down its line that won't move, left out when no one block is to blame, and face, the side), or false and why it can't start (no such face); on its cable port's side its end is blocked at once, by its cable (air when it's linked by Bluetooth)")
 	public Result push(Arguments args) {
 		return move(args, Motion.PUSH);
 	}
 
-	@Method(doc = "extend(side): pushes on that side and leaves the arm out until retract(side). A command: true at once (its event: extend, once it's out; at once when it's out already, ok and free; or not ok, blocked, as push's), or false and why it can't start (cable: the side)")
+	@Method(doc = "extend(side): pushes on that side and leaves the arm out until retract(side). A command: true at once (its event: extend, once it's out; at once when it's out already, ok and free; or not ok, blocked, as push's), or false and why it can't start (no such face); on its cable port's side, blocked, as push's")
 	public Result extend(Arguments args) {
 		return move(args, Motion.EXTEND);
 	}
 
-	@Method(doc = "retract(side): takes the arm on that side back in (a sticky piston pulls what's in front of it). A command: true at once (its event: retract, once it's in; at once when no arm is out there, ok: nothing to do), or false and why it can't start (cable: the side)")
+	@Method(doc = "retract(side): takes the arm on that side back in (a sticky piston pulls what's in front of it). A command: true at once (its event: retract, once it's in; at once when no arm is out there, ok: nothing to do), or false and why it can't start (no such face); on its cable port's side, blocked, as push's")
 	public Result retract(Arguments args) {
 		return move(args, Motion.RETRACT);
 	}
@@ -140,7 +141,11 @@ public final class RoboticPiston implements Device, Buffered {
 				events.ended(method, false, BLOCKED, Buffered.blocked(blocker.apply(side), side), null);
 				yield Result.ok(true);
 			}
-			case CABLE -> Result.fail(CABLE + ": " + side);
+			case CABLE -> {
+				// (its cable port's side: no arm there, blocked by what's on it, its cable, or air with Bluetooth)
+				events.ended(method, false, BLOCKED, Buffered.blocked(neighbor.apply(side), side), null);
+				yield Result.ok(true);
+			}
 		};
 	}
 

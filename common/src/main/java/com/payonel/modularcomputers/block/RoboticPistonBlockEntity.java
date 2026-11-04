@@ -28,7 +28,9 @@ public final class RoboticPistonBlockEntity extends CardHolderBlockEntity {
 		// Its front is opposite its cable port (its block's facing).
 		device.frontFrom(() -> com.payonel.modularcomputers.device.Face.of(getBlockState().getValue(RoboticPistonBlock.FACING).getOpposite().getName()));
 		device.blockedBy(side -> level == null || net.minecraft.core.Direction.byName(side) == null ? null
-			: RoboticPistonBlock.blocker(level, worldPosition, net.minecraft.core.Direction.byName(side)));
+			: RoboticPistonBlock.blocker(level, worldPosition, net.minecraft.core.Direction.byName(side)),
+			side -> level == null || net.minecraft.core.Direction.byName(side) == null ? null
+				: net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(worldPosition.relative(net.minecraft.core.Direction.byName(side))).getBlock()).toString());
 		// Device calls come on the server thread: its arms move in the world right then.
 		device.moveWith((side, motion) -> {
 			net.minecraft.core.Direction direction = net.minecraft.core.Direction.byName(side);

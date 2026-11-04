@@ -654,7 +654,10 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   what moved that met it, the side that was hit, never the move's main way: `Obstruction`, from the
   game's collision; a robot's own face, a field's holder's frame, a piston's the world's names),
   wherever it's said, and only in an event: a robot's moves and its `stuck` notice, a field's
-  `move`, a piston's `push` and `extend` (its end at once). A move already done (an arm out
+  `move`, a piston's `push` and `extend` (its end at once, its cable port's side blocked by its
+  cable). Every way a walk can't go is blocked (the user's): a step up it can't take (by the step's
+  block), a drop (by air), an elevation it couldn't reach (the block under it, `down`; the air over
+  it, `up`), a landing with force over no ground (air, `down`). A move already done (an arm out
   extended, in retracted) is no failure: `true`, its end `ok` (the user's: a lit lamp lit again).
   A tags-and-queues design came first
   and was set aside as too error-prone.
@@ -928,6 +931,10 @@ Lessons from mistakes, each with its test:
 - Mouse buttons are SDL-numbered (left 1, right 3): use the constants. SDL sends typed characters
   only while text input is on: a screen that takes typing turns it on.
 - `.gitignore` patterns without a leading `/` match at any depth: anchor root-only rules.
+- **A gate reads the gated command's own exit:** `./gradlew testAll ...; echo "exit $?"` run in the
+  background reports the echo's status, always 0, so two commits went in on a failing `testAll` (a
+  listener's signature changed under a Fabric client test). Run it with nothing after it, and read
+  its own status.
 - **A game test's `maxTicks` is a deadline it isn't about:** one booting mcos off a disk (a board
   call a read, a tier 1's the slowest) took over 400 ticks on a loaded host now and then; such a
   test gets thousands (the tree job's 3000), as it waits for the state it needs anyway.
