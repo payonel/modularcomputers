@@ -101,14 +101,14 @@ given again as it was (the user's, 2026-11-04); `interrupted` is the fallback.
   it, always: off that spot, one answering at once fails `drifted`, one over time ends `drifted`.
 - What no program asked for is one event, a notice (the user's, 2026-10-29): `{event = "notice",
   ...}`: `why = "shove"` (its drift: `{forward, right, up}`), `why = "fall"` (its drift, the block
-  `below`; as it begins and as it lands), and a field's `what`: `frozen`,
-  `thawed`. (The build had them as events of their own, the
+  `below`; as it begins and as it lands), and `why = "held"` (its `id` the holding field's, `""` once
+  let go). (The build had them as events of their own, the
   way back's as `return`, `ok` or why.)
 - Held in a field (any field, its own too): its robotics freezes, and only its robotics (the user's,
   2026-10-29: a crafting card's craft under way goes on; the card's commands wait, the robot being their actor): the active command pauses, new
   commands over time are taken and wait in stasis till it's let go (the user's, 2026-11-04), ones
   at once are refused `held` (mcos: blocked until it's let go), `stop` still works (ends the
-  paused or waiting command); `frozen` and `thawed` notices. The field's carry moves its origin with it, so
+  paused or waiting command); a `held` notice as it's taken and as it's let go. The field's carry moves its origin with it, so
   `position()` reads the same after (the kidnapped robot: re-localize with a fix and
   `setPosition`). No tools in a field (in the air they work, as a player's off the ground: the user's,
   2026-10-29, lifting the legs' design's rule), so a job up a cliff carried in its field is set

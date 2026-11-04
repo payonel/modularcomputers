@@ -352,8 +352,9 @@ ends the same however it was shoved. **Positional commands are positional, alway
 `drifted` with its `drift` (`EventQueue.drifted`). **What no program asked for is one event** (the user's, 2026-10-29),
 `{event = "notice", ...}`: a shove (`why = "shove"`, `drift`), a fall (`why = "fall"`, `drift`,
 `below`: the user's, 2026-11-04, one notice as it begins and as it lands, in pairs, a caught fall's
-end its flight's; `landed` gone), and a field's hold (`what`: frozen, thawed, not yet in the new
-shape); every other event is a
+end its flight's; `landed` gone), and a field's hold (`why = "held"`, `id` the field's own as it
+takes hold, `""` once it's let go and down: the user's, 2026-11-04, `frozen` and `thawed` gone);
+every other event is a
 command's end, named after its method. `position` is where the last left it
 (a command, so it waits its turn); `get` is live (where it really is, its drift). `stop` is free and
 at once, where it is (no centering), answering where; the next command goes on from exactly there,
@@ -392,8 +393,8 @@ in the world, and the swing's end says whether it kept it all.
   body is held, and robotics is its one device acting in the world), so its other devices go on (a
   crafting card's craft under way goes on); what a held robot would do waits, judged by the actor
   (the user's): every crafting card command, its start of a craft and its moves between its own
-  slots too, as the robot is what works the card (in a case there's none); `frozen` and
-  `thawed` notices, and the carry moves its
+  slots too, as the robot is what works the card (in a case there's none); a `held`
+  notice as it's taken and as it's let go, and the carry moves its
   origin with it (its odometry never saw it: a kidnapped robot, told where it is by `setPosition`);
   nothing shoves it; it isn't flying. Legless with nothing holding it up (its program ended, its power gone, a field let go), it
   falls and powers off, a torso on the ground. Picked up legless it's a torso item; torso over legs

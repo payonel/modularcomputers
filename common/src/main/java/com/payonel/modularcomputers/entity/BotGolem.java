@@ -810,7 +810,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			frozen = true;
 			frozenAt = position();
 			setNoGravity(thrusting()); // (a straight walk's steps hold it up: let go, it comes down, and thaws)
-			robotics.frozen(); // (a swing under way pauses, its break as far as it got: the user's, as a move pauses)
+			EnergyField holder = EnergyField.fieldOf(this);
+			robotics.frozen(holder == null ? "" : holder.getStringUUID()); // (it says what holds it; a swing under way pauses, its break as far as it got: the user's, as a move pauses)
 		} else if (!held && frozen && (!legs() || onGround() || thrusting())) {
 			frozen = false;
 			Vec3 by = position().subtract(frozenAt);

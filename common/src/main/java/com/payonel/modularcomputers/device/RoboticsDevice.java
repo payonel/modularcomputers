@@ -68,9 +68,6 @@ public final class RoboticsDevice implements Device, Buffered {
 	public static final String FALL = "fall";
 	/** Its commands taken while it falls (the user's): a tier 2 catches itself on its thrusters, its legs dropped. */
 	private static final java.util.Set<String> CATCHES = java.util.Set.of("fly", "flyTo");
-	/** A notice's {@code what}: a field took hold of it, or let it go. */
-	public static final String FROZEN = "frozen";
-	public static final String THAWED = "thawed";
 	/**
 	 * The commands that act where its last command left it and answer at once (the user's: positional,
 	 * always): given off its spot ({@link Body#offSpot}), each fails, {@link Buffered#DRIFTED}, doing
@@ -455,9 +452,9 @@ public final class RoboticsDevice implements Device, Buffered {
 	/** A command taken while held, waiting to go when it's let go. */
 	private boolean waitingHeld;
 
-	/** The field let it go, and it's down: it says so, and a command taken while held goes now. */
+	/** The field let it go, and it's down: it says so (held, id ""), and a command taken while held goes now. */
 	public void thawed() {
-		notice(THAWED, null);
+		said(HELD, Map.of("id", "")); // (nothing holds it now: the same notice, its id "", the user's)
 		if (waitingHeld) {
 			waitingHeld = false;
 			active = null;
@@ -786,7 +783,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return Result.ok(now);
 	}
 
-	@Method(doc = "pull(): its oldest event, or nil: a command's end, {event = method, ok, why, result} (walk, walkTo, fly, flyTo, turn, land, swing), or a notice of what happened to it that no program asked for: {event = \"notice\", why = \"shove\", drift} once a shove's over, {event = \"notice\", why = \"fall\", drift, below} as a fall begins and as it lands, or {event = \"notice\", what} for a field's hold (frozen, thawed)")
+	@Method(doc = "pull(): its oldest event, or nil: a command's end, {event = method, ok, why, result} (walk, walkTo, fly, flyTo, turn, land, swing), or a notice of what happened to it that no program asked for: {event = \"notice\", why = \"shove\", drift} once a shove's over, {event = \"notice\", why = \"fall\", drift, below} as a fall begins and as it lands, or {event = \"notice\", why = \"held\", id} as a field takes hold (id: the field's own) and as it lets go (id \"\")")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -858,20 +855,13 @@ public final class RoboticsDevice implements Device, Buffered {
 		end(false, why, null);
 	}
 
-	/** What happened to it that no program asked for ({@code what}: {@link #FROZEN}, {@link #THAWED}), as a {@link #NOTICE}. */
-	public void notice(String what, Map<String, Object> fields) {
-		Map<String, Object> event = new LinkedHashMap<>();
-		event.put("event", NOTICE);
-		event.put("what", what);
-		if (fields != null) {
-			event.putAll(fields);
-		}
-		events.add(event);
-	}
-
-	/** A field took hold of it: it says so, and what it was doing pauses (a break too: no tools in a field, its break going on once it's let go). */
-	public void frozen() {
-		notice(FROZEN, null); // (a command under way pauses, a swing too: the user's)
+	/**
+	 * A field took hold of it ({@code field}: that field's own id): it says so, {@code {event =
+	 * "notice", why = "held", id}}, and what it was doing pauses (a break too: no tools in a field,
+	 * its break going on once it's let go). Let go, the same notice says {@code id = ""}: nothing holds it.
+	 */
+	public void frozen(String field) {
+		said(HELD, Map.of("id", field == null ? "" : field)); // (a command under way pauses, a swing too: the user's)
 	}
 
 	/**

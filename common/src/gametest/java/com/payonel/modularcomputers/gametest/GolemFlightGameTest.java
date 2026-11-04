@@ -530,7 +530,7 @@ public class GolemFlightGameTest {
 				same(helper, golem.robotics().refusal("swing"), RoboticsDevice.HELD, "no tools in a field");
 				same(helper, golem.robotics().refusal("scan"), RoboticsDevice.HELD, "a command at once can't act: held");
 				same(helper, golem.robotics().refusal("walk"), null, "a move is taken: it waits in stasis (the user's)");
-				helper.assertTrue(events.contains(java.util.Map.of("event", "notice", "what", "frozen")), "it said so: " + events);
+				helper.assertTrue(events.stream().anyMatch(e -> e instanceof java.util.Map<?, ?> m && "notice".equals(m.get("event")) && "held".equals(m.get("why")) && m.get("id") instanceof String id && !id.isEmpty()), "it said so: " + events);
 				same(helper, golem.robotics().turn(args("right")).first(), true, "a turn, taken while held");
 			})
 			.thenExecuteAfter(10, () -> {
@@ -538,7 +538,7 @@ public class GolemFlightGameTest {
 				same(helper, golem.robotics().refusal("walk"), Buffered.BUSY, "one at a time: the turn waits");
 				field(golem).release(args()); // (it comes down onto its legs, two ahead)
 			})
-			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "notice", "what", "thawed")), "down, and thawed: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "notice", "why", "held", "id", "")), "down, and thawed: " + events))
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("turn")), "let go, its turn went: " + events))
 			.thenExecute(() -> {
 				same(helper, golem.robotics().position(args()).first(), java.util.Map.of("forward", ((java.util.Map<?, ?>) before[0]).get("forward"),
@@ -665,7 +665,7 @@ public class GolemFlightGameTest {
 			.thenExecuteAfter(3, () -> golem.robotics().walk(args(3L)))
 			.thenExecuteAfter(4, () -> helper.assertTrue(!field(golem).capture(args(FieldCard.SELF)).failed(), "held mid-walk"))
 			.thenExecuteAfter(5, () -> field(golem).release(args()))
-			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "notice", "what", "thawed")), "down and thawed: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "notice", "why", "held", "id", "")), "down and thawed: " + events))
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "walk", "ok", true)), "its walk ended: " + events))
 			.thenSucceed();
 	}

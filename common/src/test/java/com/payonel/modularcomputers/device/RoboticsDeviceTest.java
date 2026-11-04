@@ -328,7 +328,7 @@ class RoboticsDeviceTest {
 		assertThat(robot.pull(args()).first()).as("nothing said").isNull();
 		body.frozen = false;
 		robot.thawed();
-		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "thawed"));
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "why", "held", "id", ""));
 		assertThat(body.asked).as("let go, it walks").containsExactly("walk");
 		robot.arrived();
 		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", true));

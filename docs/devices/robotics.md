@@ -114,8 +114,10 @@ stasis, as any creature is: its robotics freezes. What it was doing pauses (a bl
 too: no tools in a field, and the break goes on, from as far as it got, once it's let go), a new command
 that runs over time (a walk, a flight, a turn, a landing) is taken and waits in stasis, nothing
 said, then goes once the field lets it go and it's down; one that answers at once (a scan, its
-hand's actions, a swing) fails `held` (with the robot's id: its `thawed` notice ends the wait); and
-`stop` still works, ending a command waiting. It says so: `frozen`, then `thawed` notices. Only its
+hand's actions, a swing) fails `held` (with the robot's id: its notice as it's let go ends the
+wait); and `stop` still works, ending a command waiting. It says so, one notice each time:
+`{event = "notice", why = "held", id}`, `id` the field's own as it takes hold, and `""` once it's
+let go and down: nothing holds it. Only its
 robotics is held: the robot's body can't act, but its other devices go on (its computer runs, its
 sensors sense, a [crafting card](/devices/crafting-card/)'s craft under way finishes); a command
 whose actor is the robot waits, the crafting card's too, as the robot is what works it.
@@ -485,15 +487,14 @@ was going.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `walk`, `walkTo`, `fly`, `flyTo`, `turn`, `land`, `swing` | `ok`, `why` (`blocked`: and `name`, `face`; `lost`: and `name`, `id`, `at`; `drifted`: and `drift`; with those, `stopped` and `interrupted`, `call`), `result` | that command ended: `ok`, or not and why (`stopped` when a `stop` cut it short; `interrupted` when a world's save cut it short and it couldn't go on after the load); a swing's `result` is `{block, kept, dropped}` |
-| `notice` | `why` (or `what`), and its fields | something happened to it that no program asked for (below) |
+| `walk`, `walkTo`, `fly`, `flyTo`, `turn`, `land`, `swing` | `ok`, `why` (`blocked`: and `name`, `face`; `lost`: and `name`, `id`, `at`; `drifted`: and `drift`; with those, `stopped` and `interrupted`, `call`), `result` | that command ended: `ok`, or not and why (`stopped` when a `stop` cut it short; `interrupted` when a world's save cut it short and it couldn't go on after the load); a swing's `result` is `{name, kept, dropped}` |
+| `notice` | `why`, and its fields | something happened to it that no program asked for (below) |
 
 | Notice | Other fields | When |
 |---|---|---|
 | `why = "shove"` | `drift` (`{forward, right, up}`) | something knocked it away from where its last command left it, once the shove's over: it stays where it was put |
 | `why = "fall"` | `drift`, `below` (a block's id) | a fall it didn't ask for, on its legs, as it begins and as it lands (a caught fall: its flight's end says it); its `drift` then, and the block under it then, as it is |
-| `what = "frozen"` | | a field took hold of it: its robotics paused |
-| `what = "thawed"` | | the field let go and it's down: its robotics back, its origin carried |
+| `why = "held"` | `id` | a field took hold of it (`id`: that field's own; its robotics paused), and again once let go and down (`id = ""`: its robotics back, its origin carried) |
 
 Its interrupt is raised when an event comes, and stays raised while one waits. With no program
 running on its board it takes no data: its events go, and it stops.
