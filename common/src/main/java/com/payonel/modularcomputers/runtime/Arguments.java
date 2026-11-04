@@ -33,6 +33,11 @@ public final class Arguments {
 		return account;
 	}
 
+	/** Its values, as given. */
+	public List<Object> values() {
+		return values;
+	}
+
 	public int count() {
 		return values.size();
 	}

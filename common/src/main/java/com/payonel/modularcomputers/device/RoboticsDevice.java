@@ -77,6 +77,8 @@ public final class RoboticsDevice implements Device, Buffered {
 	 * nothing; never a way back (the last two a crafting card's in it: they act where it is too).
 	 */
 	private static final java.util.Set<String> POSITIONAL = java.util.Set.of("use", "scan", "contents", "store", "take", "drop", "pickup");
+	/** The commands over time, taken while held (they wait in stasis till it's let go); every other is refused held then. */
+	private static final java.util.Set<String> OVER_TIME = java.util.Set.of("walk", "walkTo", "fly", "flyTo", "turn", "land");
 	/** The commands that act there over time without moving it: given off its spot, each starts and ends at once, drifted. */
 	private static final java.util.Set<String> POSITIONAL_OVER_TIME = java.util.Set.of("turn", "swing");
 	/** What its thrusters cost, each tick they fire (flying or hovering): five running CPUs' ticks. */
@@ -195,6 +197,11 @@ public final class RoboticsDevice implements Device, Buffered {
 		/** Whether a field holds it: its robotics frozen. */
 		default boolean frozen() {
 			return false;
+		}
+
+		/** Whether a field holds it now, the moment it takes hold (its body notices at its tick: {@link #frozen}). */
+		default boolean held() {
+			return frozen();
 		}
 
 		/**
@@ -323,7 +330,11 @@ public final class RoboticsDevice implements Device, Buffered {
 			return Result.fail(TOO_FAR + (int) MAX_WALK);
 		}
 		Move move = args.count() == 0 ? new Move(by, null) : squared(by, false); // (none: back to where its last command left it)
-		return move.why() != null ? Result.fail(move.why()) : start("walk", body.walk(move.by()[0], move.by()[1], move.by()[2]));
+		if (move.why() != null) {
+			return Result.fail(move.why());
+		}
+		Result waits = waitsHeld("walk", args);
+		return waits != null ? waits : start("walk", body.walk(move.by()[0], move.by()[1], move.by()[2]));
 	}
 
 	/**
@@ -425,6 +436,35 @@ public final class RoboticsDevice implements Device, Buffered {
 		changed();
 	}
 
+	/**
+	 * A command over time given while a field holds it (the user's): it's taken, and waits in stasis,
+	 * its call kept, nothing said till it's let go, then it goes (a stop meanwhile ends it); null, it
+	 * isn't held.
+	 */
+	private Result waitsHeld(String method, Arguments args) {
+		if (!body.held()) {
+			return null;
+		}
+		begin(method);
+		resume = method;
+		resumeArgs = EventQueue.given(args.values());
+		waitingHeld = true;
+		return Result.ok(true);
+	}
+
+	/** A command taken while held, waiting to go when it's let go. */
+	private boolean waitingHeld;
+
+	/** The field let it go, and it's down: it says so, and a command taken while held goes now. */
+	public void thawed() {
+		notice(THAWED, null);
+		if (waitingHeld) {
+			waitingHeld = false;
+			active = null;
+			resume(false);
+		}
+	}
+
 	@Override
 	public void called(String method, java.util.List<Object> args) {
 		calledMethod = method;
@@ -482,6 +522,10 @@ public final class RoboticsDevice implements Device, Buffered {
 		if (method == null) {
 			return;
 		}
+		if (waitingHeld) { // (taken while held, ended before it went: a stop)
+			waitingHeld = false;
+			resume = null;
+		}
 		Map<String, Object> call = STOPPED.equals(why) && stopCall != null ? stopCall
 			: STOPPED.equals(why) || BLOCKED.equals(why) || INTERRUPTED.equals(why) || LOST.equals(why) ? call() : null; // (before its plan moves)
 		stopCall = null;
@@ -508,14 +552,22 @@ public final class RoboticsDevice implements Device, Buffered {
 	@Method(doc = "walkTo(forward[, right[, up]]): walks to the block that many whole blocks from its origin (not an integer: when one isn't), in the origin's frame (as position gives them), as walk does. A command: true at once (its event: walkTo, ok, or not and why), or false and why")
 	public Result walkTo(Arguments args) {
 		Move to = integers(args);
-		return to.why() != null ? Result.fail(to.why()) : start("walkTo", body.walkTo(to.by()[0], to.by()[1], to.by()[2]));
+		if (to.why() != null) {
+			return Result.fail(to.why());
+		}
+		Result waits = waitsHeld("walkTo", args);
+		return waits != null ? waits : start("walkTo", body.walkTo(to.by()[0], to.by()[1], to.by()[2]));
 	}
 
 	@Method(doc = "flyTo(forward[, right[, up]]): (a tier 2 golem's) flies to the point that many whole blocks from its origin (not an integer: when one isn't), in the origin's frame (as position gives them), as fly does. A command: true at once (its event: flyTo, ok, or not and why), or false and why")
 	public Result flyTo(Arguments args) {
 		args.checkNumber(0);
 		Move to = integers(args);
-		return to.why() != null ? Result.fail(to.why()) : start("flyTo", body.flyTo(to.by()[0], to.by()[1], to.by()[2]));
+		if (to.why() != null) {
+			return Result.fail(to.why());
+		}
+		Result waits = waitsHeld("flyTo", args);
+		return waits != null ? waits : start("flyTo", body.flyTo(to.by()[0], to.by()[1], to.by()[2]));
 	}
 
 	@Method(doc = "position(): where its last command left it (what its next command goes from), from its origin, in the origin's frame: {forward, right, up, heading} (blocks; heading in degrees to the origin's right: 0, 90, 180 or 270). A command: it waits behind the one running. (Where it really is, a shove away from there included: get.) The origin is set where it stands when it's first powered on, in each dimension it first comes to, and by setPosition; kept through reboots and shoves, each dimension's its own, carried with it by a field; lost only when it's picked up")
@@ -563,6 +615,10 @@ public final class RoboticsDevice implements Device, Buffered {
 		}
 		if (Double.isNaN(degrees)) {
 			return Result.fail("not a way: " + way);
+		}
+		Result waits = waitsHeld("turn", args);
+		if (waits != null) {
+			return waits;
 		}
 		if (body.offSpot()) {
 			return drifted("turn");
@@ -680,12 +736,18 @@ public final class RoboticsDevice implements Device, Buffered {
 			return Result.fail(TOO_FAR + (int) MAX_FLIGHT);
 		}
 		Move move = args.count() == 0 ? new Move(by, null) : squared(by, true); // (none: off where it stands, or back to where its last command left it)
-		return move.why() != null ? Result.fail(move.why()) : start("fly", body.fly(move.by()[0], move.by()[1], move.by()[2]));
+		if (move.why() != null) {
+			return Result.fail(move.why());
+		}
+		Result waits = waitsHeld("fly", args);
+		return waits != null ? waits : start("fly", body.fly(move.by()[0], move.by()[1], move.by()[2]));
 	}
 
 	@Method(doc = "land([force]): (a tier 2 golem's) a move, from where its last command left it: comes down onto its legs, standing below there however far down (within three blocks to the side), and onto them; force, with none there, comes straight down onto the ground beneath it without them, still running (its thrusters off; it walks nowhere, and flies again to fetch them), as safely as a crash would, but on. A command: true at once (its event: land, ok, or not and why: blocked, down, at once, without force finding no legs below by what it found there instead, with force finding nothing under it down to the world's bottom by air; it goes on hovering), or false and why (on legs)")
 	public Result land(Arguments args) {
-		return start("land", body.land(args.count() > 0 && args.get(0) != null && args.checkBoolean(0)));
+		boolean force = args.count() > 0 && args.get(0) != null && args.checkBoolean(0);
+		Result waits = waitsHeld("land", args);
+		return waits != null ? waits : start("land", body.land(force));
 	}
 
 	/** The body got down onto its legs. */
@@ -912,11 +974,11 @@ public final class RoboticsDevice implements Device, Buffered {
 	 */
 	@Override
 	public String refusal(String method) {
-		if (body.frozen()) {
-			return HELD;
-		}
 		if (active != null) {
-			return BUSY;
+			return BUSY; // (one at a time: one running, paused in a field or not)
+		}
+		if (body.held()) {
+			return OVER_TIME.contains(method) ? null : HELD; // (over time it's taken and waits in stasis; at once it can't act: held, the user's)
 		}
 		if (body.falling() && !CATCHES.contains(method)) {
 			return BUSY; // (its landing's news ends the wait)
@@ -966,12 +1028,13 @@ public final class RoboticsDevice implements Device, Buffered {
 	@Override
 	public void accepting(boolean accepting) {
 		this.accepting = accepting;
-		if (accepting && resume != null) {
-			resume(); // (the command under way at the save goes on, the user's)
+		if (accepting && resume != null && !waitingHeld) {
+			resume(true); // (the command under way at the save goes on, the user's)
 		}
 		if (!accepting) {
 			events.clear();
 			resume = null; // (a fresh start: an old program's command isn't the next one's)
+			waitingHeld = false;
 			body.stop();
 			body.release(); // (its thrusters stop with its program: what they held up falls)
 			active = null;
@@ -1004,7 +1067,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	}
 
 	/** The command under way at the save, given again (its call as it was): else, it can't go on, interrupted. */
-	private void resume() {
+	private void resume(boolean afterLoad) {
 		String method = resume;
 		java.util.List<Object> args = resumeArgs;
 		resume = null;
@@ -1026,7 +1089,11 @@ public final class RoboticsDevice implements Device, Buffered {
 		Map<String, Object> call = call();
 		active = null;
 		changed();
-		events.interrupted(method, call);
+		if (afterLoad) {
+			events.interrupted(method, call); // (the fallback: it couldn't go on after the load)
+		} else {
+			events.ended(method, false, again.error(), null); // (let go, it couldn't start: why, as its call would have answered)
+		}
 	}
 
 

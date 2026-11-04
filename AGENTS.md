@@ -387,7 +387,7 @@ in the world, and the swing's end says whether it kept it all.
   2's flights are taken mid-fall (it catches itself, its legs dropped); `stop()` then `fly()`
   catches it where it is (the user's, 2026-11-03: no `stop(true)`, no hover; a `stop()` lets a fall
   go on, as it isn't something the robot does, but takes where it is). Or carried in **a field**, its own too, legs and all (10 blocks a second): stasis, as for
-  any creature (the user's, 2026-10-27): its robotics freezes (commands refused `held`, mcos waiting;
+  any creature (the user's, 2026-10-27): its robotics freezes (a command over time given then is taken and waits in stasis till it's let go, the user's, 2026-11-04; one at once is refused `held`, mcos waiting; held from the moment a field takes hold, `Body.held`;
   a swing under way pauses, its break going on once let go, the user's, as a move's does; no tools, no looking), and only its robotics (the user's, 2026-10-29: its
   body is held, and robotics is its one device acting in the world), so its other devices go on (a
   crafting card's craft under way goes on); what a held robot would do waits, judged by the actor

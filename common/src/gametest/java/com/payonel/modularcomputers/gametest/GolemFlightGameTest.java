@@ -1,5 +1,6 @@
 package com.payonel.modularcomputers.gametest;
 
+import com.payonel.modularcomputers.device.Buffered;
 import com.payonel.modularcomputers.device.FieldCard;
 import com.payonel.modularcomputers.device.RoboticsDevice;
 import com.payonel.modularcomputers.entity.BotGolem;
@@ -527,15 +528,23 @@ public class GolemFlightGameTest {
 				helper.assertTrue(Math.abs(golem.getX() - x) < 1e-6, "not shoved");
 				same(helper, golem.robotics().state(), RoboticsDevice.HELD, "its robotics frozen");
 				same(helper, golem.robotics().refusal("swing"), RoboticsDevice.HELD, "no tools in a field");
-				same(helper, golem.robotics().refusal("walk"), RoboticsDevice.HELD, "no moves");
+				same(helper, golem.robotics().refusal("scan"), RoboticsDevice.HELD, "a command at once can't act: held");
+				same(helper, golem.robotics().refusal("walk"), null, "a move is taken: it waits in stasis (the user's)");
 				helper.assertTrue(events.contains(java.util.Map.of("event", "notice", "what", "frozen")), "it said so: " + events);
+				same(helper, golem.robotics().turn(args("right")).first(), true, "a turn, taken while held");
+			})
+			.thenExecuteAfter(10, () -> {
+				helper.assertTrue(events.stream().noneMatch(e -> e instanceof java.util.Map<?, ?> m && "turn".equals(m.get("event"))), "nothing said while it waits: " + events);
+				same(helper, golem.robotics().refusal("walk"), Buffered.BUSY, "one at a time: the turn waits");
 				field(golem).release(args()); // (it comes down onto its legs, two ahead)
 			})
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(java.util.Map.of("event", "notice", "what", "thawed")), "down, and thawed: " + events))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("turn")), "let go, its turn went: " + events))
 			.thenExecute(() -> {
-				same(helper, golem.robotics().position(args()).first(), before[0], "its position reads as before: the carry moved its origin");
+				same(helper, golem.robotics().position(args()).first(), java.util.Map.of("forward", ((java.util.Map<?, ?>) before[0]).get("forward"),
+					"right", ((java.util.Map<?, ?>) before[0]).get("right"), "up", ((java.util.Map<?, ?>) before[0]).get("up"), "heading", 90L),
+					"its position reads as before (the carry moved its origin), turned right");
 				helper.assertTrue(!golem.blockPosition().equals(from[0]), "though it's somewhere else: " + golem.blockPosition());
-				helper.assertTrue(golem.robotics().refusal("walk") == null, "its robotics back");
 			})
 			.thenSucceed();
 	}

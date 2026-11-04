@@ -542,6 +542,11 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 
 		@Override
+		public boolean held() {
+			return frozen || EnergyField.held(BotGolem.this); // (the moment a field takes hold, before its tick notices)
+		}
+
+		@Override
 		public String setPosition(long forward, long right, long up, int heading) {
 			BotGolem.this.setPosition(forward, right, up, heading);
 			return null;
@@ -585,10 +590,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				hovering = true;
 				groundless = true;
 				return null;
-			}
-			EnergyField field = EnergyField.fieldOf(BotGolem.this);
-			if (field != null) {
-				field.lose("landing"); // (it goes onto them itself)
 			}
 			flyTo = null;
 			hovering = true; // (its thrusters bring it down)
@@ -820,7 +821,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			if (steps != null || stepTo != null) {
 				setNoGravity(true); // (its straight walk goes on, step by step)
 			}
-			robotics.notice(com.payonel.modularcomputers.device.RoboticsDevice.THAWED, null);
+			robotics.thawed(); // (it says so, and a command taken while held goes now)
 		}
 	}
 

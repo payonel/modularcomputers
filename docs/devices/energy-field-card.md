@@ -144,7 +144,7 @@ Its oldest event, or nil.
 | `event` | Other fields | When |
 |---|---|---|
 | `move` | `ok`, `why` (and `name`, `face` when it's `blocked`; `name`, `id`, `at` when it's `lost`; `call` with those and `stopped`) | a move ended: `ok` true when it got there; else why (`blocked`, `stopped`, or a `lost` reason: it let go of what it moved) |
-| `lost` | `why` | it let go on its own: `too far: 16`, `no power`, `landing` (its robot landing onto its legs) |
+| `lost` | `why` | it let go on its own: `too far: 16`, `no power` |
 | `notice` | `why = "lost"`, `name`, `id`, `at` | what it held is gone (it died, it was picked up, it went through a portal): what it was, its own id, where it last was in its computer's frame; a move under way ends `lost` first |
 
 ## Example

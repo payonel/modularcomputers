@@ -311,6 +311,37 @@ class RoboticsDeviceTest {
 			"at", Map.of("forward", 0L, "right", 0L, "up", 1L), "call", Map.of("args", List.of(2L), "progress", 0L)));
 	}
 
+	/**
+	 * Held in a field (the user's): a command over time is taken and waits in stasis, nothing said,
+	 * and goes once let go; one at once fails held; a stop meanwhile ends the waiting one.
+	 */
+	@Test
+	void heldACommandOverTimeWaitsAndOneAtOnceIsRefused() {
+		Drifting body = new Drifting();
+		body.frozen = true;
+		RoboticsDevice robot = with(body);
+		assertThat(robot.refusal("scan")).isEqualTo(RoboticsDevice.HELD);
+		assertThat(robot.refusal("walk")).isNull();
+		assertThat(robot.walk(args(2L)).first()).isEqualTo(true);
+		assertThat(body.asked).as("it waits: nothing moves").isEmpty();
+		assertThat(robot.refusal("turn")).as("one at a time").isEqualTo(Buffered.BUSY);
+		assertThat(robot.pull(args()).first()).as("nothing said").isNull();
+		body.frozen = false;
+		robot.thawed();
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "what", "thawed"));
+		assertThat(body.asked).as("let go, it walks").containsExactly("walk");
+		robot.arrived();
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", true));
+		body.frozen = true;
+		robot.walk(args(1L));
+		robot.stop(args());
+		assertThat(withoutCall(robot.pull(args()).first())).as("a stop ends one waiting").isEqualTo(Map.of("event", "walk", "ok", false, "why", "stopped"));
+		body.frozen = false;
+		body.asked.clear();
+		robot.thawed();
+		assertThat(body.asked).as("and it doesn't go").doesNotContain("walk");
+	}
+
 	/** A shove is said, and nothing more (the user's: no way back of its own; the program corrects it). */
 	@Test
 	void aShoveIsSaidAndNothingMore() {
