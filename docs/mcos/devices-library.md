@@ -128,7 +128,7 @@ walker:join()
 
 Some reads are commands too (a robot's `position` and `scan`, a redstone card's `get`), so they
 wait their turn and answer once the command before has ended; each device's page says which of its
-methods never wait (a robot's `get`, `pull` and `stop`; a field card's `release`). A `stop` also ends every
+methods never wait (a robot's `get`, `pull` and `stop`; a field card's `stop`). A `stop` also ends every
 thread waiting to give that device a command: their calls fail with `stopped` (`ECANCELED`). Each
 command that runs over time (a walk, a move) ends in an event named after its method, `ok` and, when
 it failed, why (one done at once answers in its call):

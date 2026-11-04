@@ -378,11 +378,16 @@ class BufferedWaitsMcosTest extends McosHarness {
 		assertThat(asked).containsExactly("walk 3");
 	}
 
-	/** A field's release written as a line ("release": set's) never waits, even while a move runs: a program can always let go. */
+	/**
+	 * A field's stop never waits (the user's: a stop is a stop): written as a line while a move runs,
+	 * it ends the move, stopped, and the field holds on; a release after it lets go. (One door: a
+	 * release is a command, waiting for a move under way.)
+	 */
 	@Test
-	void aReleaseWrittenAsALineNeverWaitsForAMove() {
+	void aStopWrittenAsALineEndsAMoveAtOnceAndAReleaseThenLetsGo() {
 		com.payonel.modularcomputers.device.FieldCard field = new com.payonel.modularcomputers.device.FieldCard();
 		boolean[] holding = {false};
+		boolean[] stopped = {false};
 		field.projectorIn(new com.payonel.modularcomputers.device.FieldCard.Projector() {
 			@Override
 			public Result scan(double range) {
@@ -398,6 +403,11 @@ class BufferedWaitsMcosTest extends McosHarness {
 			@Override
 			public Result move(double forward, double right, double up) {
 				return Result.ok(true); // (it moves until it's told it arrived: never, here)
+			}
+
+			@Override
+			public void stop() {
+				stopped[0] = holding[0]; // (still holding as it stops)
 			}
 
 			@Override
@@ -422,7 +432,7 @@ class BufferedWaitsMcosTest extends McosHarness {
 			assert(field.capture("pig"))
 			assert(field.move(0, 0, 3)) -- (it never arrives)
 			local f = assert(io.open("/dev/field0", "w"))
-			f:write("release\\n")
+			f:write("stop\\nrelease\\n")
 			f:close()
 			local ended = devices.event(field)
 			while ended.event ~= "move" do
@@ -436,7 +446,8 @@ class BufferedWaitsMcosTest extends McosHarness {
 		boot();
 		type("lua /letgo.lua\r");
 		untilFile(root().resolve("out"), "false stopped\n");
-		assertThat(holding[0]).as("let go").isFalse();
+		assertThat(stopped[0]).as("stopped, still holding").isTrue();
+		assertThat(holding[0]).as("then let go").isFalse();
 	}
 
 	/** A redstone file read anew from its start (seek, the GPIO way) keeps a command's end for its pull: only the faces' changes are in the state. */

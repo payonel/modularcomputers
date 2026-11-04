@@ -19,10 +19,11 @@ import java.util.Map;
  * with it: in a golem it's how it flies. Holding costs power each tick, a move each block; without
  * power, or with no program running, it lets go. A {@link Projector} does the work in the world.
  * <p>
- * It's buffered ({@link Buffered}): {@code capture} and {@code move} are commands; a move runs
- * until it's arrived or blocked, its end its event ({@code move}). {@code scan}, {@code get},
- * {@code pull} and {@code release} are free: a program can always let go, and a move under way then
- * ends, stopped.
+ * It's buffered ({@link Buffered}): {@code capture}, {@code move} and {@code release} are commands
+ * (a release waits for a move under way, the user's: one door, a stop is a stop); a move runs until
+ * it's arrived or blocked, its end its event ({@code move}). {@code scan}, {@code get}, {@code pull}
+ * and {@code stop} are free: a stop ends a move under way at once, stopped, holding on; to let go at
+ * once, stop then release.
  */
 public final class FieldCard extends Card implements Buffered {
 	/** How far from its computer it reaches, in blocks: what it finds, holds, and moves to. */
@@ -56,6 +57,9 @@ public final class FieldCard extends Card implements Buffered {
 		/** Lets what it holds go. */
 		void release();
 
+		/** Stops a move under way, holding what it holds where it is. */
+		void stop();
+
 		/** What it holds and where, {name, forward, right, up}, or null while it holds nothing. */
 		Map<String, Object> where();
 
@@ -86,7 +90,7 @@ public final class FieldCard extends Card implements Buffered {
 
 	@Override
 	public java.util.Set<String> free() {
-		return java.util.Set.of("scan", "get", "pull", "release");
+		return java.util.Set.of("scan", "get", "pull", "stop");
 	}
 
 	@Override
@@ -177,15 +181,23 @@ public final class FieldCard extends Card implements Buffered {
 		return started;
 	}
 
-	@Method(doc = "release(): lets what it holds go (it falls from where it is); never waits: a move under way ends, stopped")
+	@Method(doc = "release(): lets what it holds go (it falls from where it is). A command: after a move under way (to let go at once, stop first); true")
 	public Result release(Arguments args) {
-		boolean wasMoving = state.equals(MOVING);
 		if (projector != null && !state.equals(IDLE)) {
 			projector.release();
 		}
 		state(IDLE);
-		if (wasMoving) {
-			events.ended("move", false, "stopped", null);
+		return Result.ok();
+	}
+
+	@Method(doc = "stop(): ends a move under way at once, where it is (its event: move, not ok, stopped), holding on to what it holds; never waits: true")
+	public Result stop(Arguments args) {
+		if (state.equals(MOVING)) {
+			if (projector != null) {
+				projector.stop();
+			}
+			state(HOLDING);
+			events.ended("move", false, RoboticsDevice.STOPPED, null);
 		}
 		return Result.ok();
 	}

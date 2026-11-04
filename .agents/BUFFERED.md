@@ -116,9 +116,9 @@ counts gone, in the `/dev` text as words,
 
 ### The others
 
-- **Energy field card:** `capture`, `move` are commands; `move` ends once arrived or blocked
-  (`blocked`, its `block` and `face`); `scan`, `get`, `pull` and `release` are free (a program can always
-  let go: a move under way ends `stopped`). A capture outlives the process that made it.
+- **Energy field card:** `capture`, `move` and `release` are commands; `move` ends once arrived or
+  blocked (`blocked`, its `block` and `face`); `scan`, `get`, `pull` and `stop` are free (a stop ends
+  a move under way, `stopped`, holding on: to let go at once, stop, then release). A capture outlives the process that made it.
 - **Redstone card:** `set` is a command, ending once applied in the world (at its next tick: at most
   one change a tick), its event carrying every face (`result`); `get` is a command (it sees a `set`
   before it). Its own changes raise no per-face news; the world's still do.

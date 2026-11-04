@@ -44,6 +44,10 @@ class FieldExamplesTest extends McosHarness {
 			}
 
 			@Override
+			public void stop() {
+			}
+
+			@Override
 			public void release() {
 				asked.add("release");
 			}

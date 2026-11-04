@@ -279,6 +279,10 @@ class DeviceInterruptsTest {
 		}
 
 		@Override
+		public void stop() {
+		}
+
+		@Override
 		public void release() {
 		}
 

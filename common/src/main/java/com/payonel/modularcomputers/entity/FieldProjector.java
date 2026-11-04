@@ -206,6 +206,13 @@ public final class FieldProjector implements FieldCard.Projector {
 	}
 
 	@Override
+	public void stop() {
+		if (field != null) {
+			field.stop();
+		}
+	}
+
+	@Override
 	public void release() {
 		if (field != null) {
 			EnergyField was = field;

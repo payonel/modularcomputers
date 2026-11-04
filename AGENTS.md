@@ -434,8 +434,9 @@ block's front and right as `Face` names them; a robot's heading and its own righ
 16 blocks from its computer, except a robot holding itself, which carries the card. It lets go
 without power or a running program (it's ticked powered or not, so it knows), never because the
 process that captured ends. A robot it holds is in stasis too (its robotics frozen, its origin
-carried: the bot golem's). Its `capture` and `move` are commands (buffered); `release` is
-free, so a program can always let go.
+carried: the bot golem's). Its `capture`, `move` and `release` are commands (buffered: a release
+waits for a move under way); `stop` is free, ending a move where it is and holding on (the user's,
+2026-11-03: one door, a stop is a stop; to let go at once, stop, then release).
 
 ### The charging pad
 

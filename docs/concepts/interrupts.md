@@ -83,7 +83,7 @@ and why), which raises its interrupt: the device's "idle again".
   gave it, and only that thread, until the device can take it, then starts it and returns. So a
   series of commands runs in order, and more work at once means more
   [threads](/mcos/threads/). Each device's page says which of its methods never wait (a robot's
-  `get`, `pull` and `stop`; a field card's `release`); the others are commands, reads too (a
+  `get`, `pull` and `stop`; a field card's `stop`); the others are commands, reads too (a
   robot's `position`, a redstone card's `get`), so they see the command before them done. A `stop`
   (a line `stop` too) also ends the threads waiting to give that device a command. Its `sync`
   waits until its queue is empty (`devices.sync`), saying nothing of how the commands went: their

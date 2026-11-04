@@ -6,7 +6,9 @@
 --   capture self | capture ID | capture forward [right [up]]
 --   move forward [right [up]]
 --   release
--- A move waits for the one before (a command); a release never waits. How a move went comes as
+--   stop
+-- A move and a release wait for the move before (commands); a stop never waits: it ends a move
+-- under way where it is, holding on (to let go at once: stop, then release). How a move went comes as
 -- an event (poll's PRI; the pull ioctl: {event = "move", ok, why}), and losing what it held as
 -- {event = "lost", why}.
 local function number(word)
@@ -39,8 +41,8 @@ return {
       words[#words + 1] = word
     end
     local action = words[1]
-    if action == "release" and #words == 1 then
-      return "release"
+    if (action == "release" or action == "stop") and #words == 1 then
+      return action
     elseif action == "capture" and #words == 2 and not number(words[2]) then
       return "capture", words[2]
     elseif (action == "capture" or action == "move") and #words >= 2 and #words <= 4 then

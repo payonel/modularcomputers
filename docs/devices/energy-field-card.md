@@ -43,9 +43,10 @@ program, and when its world is saved and loaded (a field isn't saved). What it h
 A move that meets a block stops there: its event says what was in the way.
 
 The card is a [buffered device](/mcos/devices-library/#buffered-devices): it does one command at a
-time. A `capture` or `move` given while a move runs waits (in mcos, its thread only) until the move
-ends, and so does a line written doing one. `scan`, `get`, `pull` and `release` never wait, nor
-does a line letting go: a program can always let go.
+time. A `capture`, `move` or `release` given while a move runs waits (in mcos, its thread only) until
+the move ends, and so does a line written doing one. `scan`, `get`, `pull` and `stop` never wait:
+a `stop` ends a move under way where it is, and the field holds on. To let go at once, `stop`, then
+`release`.
 
 ## In mcos
 
@@ -64,11 +65,13 @@ A line written is an action:
 | `capture ID` | Holds what has that id (from `scan`) |
 | `capture forward [right [up]]` | Holds what's nearest that point, within a block and a half |
 | `move forward [right [up]]` | Moves the field by that much |
-| `release` | Lets go |
+| `release` | Lets go (after a move under way) |
+| `stop` | Ends a move under way where it is, holding on |
 
 ```sh
 echo "capture 2" > /dev/field0
 echo "move 0 0 4" > /dev/field0
+echo stop > /dev/field0
 echo release > /dev/field0
 ```
 
@@ -102,7 +105,13 @@ with `not holding`, or `too far: 16` (out of its reach, unless it holds its own 
 
 ### release() → true
 
-Lets what it holds go: it falls from where it is. It never waits: a move under way ends, `stopped`.
+Lets what it holds go: it falls from where it is. It's a command: given during a move, it waits
+for the move to end. To let go at once, `stop` first.
+
+### stop() → true
+
+Ends a move under way at once, where the field is: its event, `move`, ends `ok = false`,
+`why = "stopped"`. The field holds on to what it holds. It never waits.
 
 ### get() → {state, name, forward, right, up}
 
