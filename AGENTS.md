@@ -366,7 +366,7 @@ most only toward it. With pathfinding (`setPathfinding`, kept like the origin) t
 walks it, the flying one flies it, ending exactly all the same. It names faces in its own frame only (`front`, `back`, `left`,
 `right`, `up`, `down`; its left its own, as it turns and walks, as `Face`'s is a block's), though
 it may know north (the user's, 2026-10-29: `turn` faces `north`, `south`, `east` or `west`); a block's direction it reads is turned into that frame. It
-scans all six spaces at once, and works with its hand (its main hand, one item: a slot in its view,
+scans all six spaces at once (a list of every thing in a space, its creatures and items then its block, air too, each `{kind, name, id, at}`: the user's, 2026-11-04, the field card's `scan` the same shape), and works with its hand (its main hand, one item: a slot in its view,
 kept on its item when picked up) as a player does, through the loader's fake player standing where
 it is (`Platform.fakePlayer`, `GolemHands`): the game's own interactions (placing, doors, buttons,
 buckets), breaking in a player's time with its tool (on its thrusters as a player off the ground: the

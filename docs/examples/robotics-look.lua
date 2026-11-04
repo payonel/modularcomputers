@@ -1,5 +1,6 @@
 -- Look round the robot: one scan of the six spaces round it, in its own frame, a line each: the
--- face, what kind of thing is there, and its name (a container says how many slots it has).
+-- face, then every thing there, its kind and its name (a space's creatures and items, then its block,
+-- air too; a container says how many slots it has).
 local sys = require("sys")
 
 local FACES = {"front", "back", "left", "right", "up", "down"}
@@ -8,13 +9,15 @@ local robot = assert(sys.open("/dev/robotics0"))
 local around = assert(sys.ioctl(robot, "scan"))
 
 for _, face in ipairs(FACES) do
-  local space = around[face]
-  local line = face .. ": " .. space.kind
-  if space.name then
-    line = line .. " " .. space.name
-  end
-  if space.container then
-    line = line .. " (" .. space.container .. " slots)"
+  local line = face .. ":"
+  for _, thing in ipairs(around[face]) do
+    line = line .. " " .. thing.kind
+    if thing.kind ~= "air" then
+      line = line .. " " .. thing.name
+    end
+    if thing.container then
+      line = line .. " (" .. thing.container .. " slots)"
+    end
   end
   print(line)
 end

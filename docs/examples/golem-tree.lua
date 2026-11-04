@@ -61,9 +61,10 @@ local function problem(text)
   error({problem = text}, 0)
 end
 
--- What's at a face: its name, or nil for air.
+-- What's at a face: the first thing's name there (a creature, else the block), or nil for air.
 local function at(face)
-  return robot.scan(face).name
+  local first = robot.scan(face)[1]
+  return first.kind ~= "air" and first.name or nil
 end
 
 local function is(face, pattern)

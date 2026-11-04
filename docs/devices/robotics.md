@@ -243,16 +243,28 @@ Whether its walks and flights find their way round things (the game's pathfinder
 goes, jumps and drops as it finds, and turns back as it arrives) or go straight, the default. It's
 kept through reboots, and off again when the golem is picked up. `get` says which.
 
-### scan([face]) → space, or {face = space, ...}
+### scan([face]) → things, or {face = things, ...}
 
-What's in the space at a face, or with none, in all six at once, by face. Each space is a table:
+Every thing in the space at a face, a list, or with none, the six spaces at once by face, a list
+each, the same shape as the [energy field card](/devices/energy-field-card/)'s `scan` gives. The
+space's creatures and items come first, then its own block, always one (air is one too). Every
+thing has a `kind`, its `name` (what it is: its registry id), its `id` (its own: `""` for a block,
+which has none) and `at` (where it is, `{forward, right, up}` in its own frame), and its kind's own
+fields:
 
-| `kind` | Other fields |
+| `kind` | Its own fields |
 |---|---|
-| `air` | |
-| `block` | `name` (`minecraft:oak_log`), `state` (its properties: `{axis = "y"}`, a door's `{facing = "back", open = false, ...}`, directions in its frame), `hardness` (-1: unbreakable), `solid` (it can't walk through it), `container` (its slots, when it's one), `fluid` (when waterlogged) |
-| `fluid` | `name` (`minecraft:water`), `amount` (1 to 8), `source` |
-| `entity` | `name` (the first's: `minecraft:pig`; an item's, its item's), `entities` (every one's name), `block` (the block there) |
+| `entity` | none more: `name` is a creature's (`minecraft:pig`) or an item's (its item's) |
+| `block` | `state` (its properties: `{axis = "y"}`, a door's `{facing = "back", open = false, ...}`, directions in its frame), `hardness` (-1: unbreakable), `solid` (it can't walk through it), `container` (its slots, when it's one), `fluid` (when waterlogged) |
+| `fluid` | `amount` (1 to 8), `source` (`name` the fluid's: `minecraft:water`) |
+| `air` | none more (`name = "minecraft:air"`) |
+
+```lua
+local things = {
+  {kind = "entity", name = "minecraft:bat", id = "5f0c…", at = {forward = 1, right = 0.2, up = 0.4}},
+  {kind = "air", name = "minecraft:air", id = "", at = {forward = 1, right = 0, up = 0}},
+}
+```
 
 ### held([hand]) → item or nil
 

@@ -23,12 +23,12 @@ class RoboticsExamplesTest extends McosHarness {
 	private int bedrockAfter = -1;
 
 	/** What the stand-in sees round it: stone ahead, a chest to its right, the floor below, air elsewhere. */
-	private static java.util.Map<String, Object> space(String face) {
-		return switch (face) {
-			case "front", "down" -> java.util.Map.of("kind", "block", "name", "minecraft:stone");
-			case "right" -> java.util.Map.of("kind", "block", "name", "minecraft:chest", "container", 27);
-			default -> java.util.Map.of("kind", "air");
-		};
+	private static java.util.List<Object> space(String face) {
+		return java.util.List.of(switch (face) {
+			case "front", "down" -> java.util.Map.of("kind", "block", "name", "minecraft:stone", "id", "");
+			case "right" -> java.util.Map.of("kind", "block", "name", "minecraft:chest", "id", "", "container", 27);
+			default -> java.util.Map.of("kind", "air", "name", "minecraft:air", "id", "");
+		});
 	}
 
 	/** Where the stand-in is from its origin: forward, right (its walks move it). */

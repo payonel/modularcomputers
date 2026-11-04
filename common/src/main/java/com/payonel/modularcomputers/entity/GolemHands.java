@@ -123,34 +123,43 @@ final class GolemHands {
 		return Result.ok(all);
 	}
 
-	/** What's in the space at a face: a mob or an item first, then a fluid or a block, or air. */
-	private Map<String, Object> space(String face) {
+	/**
+	 * What's in the space at a face, every thing there (the user's: one shape, the field card's scan's
+	 * too): the creatures and items first, each {kind = "entity", name, id, at}, then the space's own
+	 * block, always one (air is one), {kind = "block" | "fluid" | "air", name, id = "" (a block has
+	 * none), at} and its kind's fields; {@code at} where it is, {forward, right, up} in its frame.
+	 */
+	private List<Object> space(String face) {
 		BlockPos pos = at(face);
 		BlockState state = level().getBlockState(pos);
-		Map<String, Object> space = new LinkedHashMap<>();
-		List<Entity> entities = entitiesAt(pos);
-		if (!entities.isEmpty()) {
-			space.put("kind", "entity");
-			space.put("name", name(entities.getFirst()));
-			List<Object> names = new ArrayList<>();
-			for (Entity entity : entities) {
-				names.add(name(entity));
-			}
-			space.put("entities", names);
-			space.put("block", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
-			return space;
+		FieldProjector.Frame frame = FieldProjector.Frame.of(golem);
+		List<Object> things = new ArrayList<>();
+		for (Entity entity : entitiesAt(pos)) {
+			Map<String, Object> thing = new LinkedHashMap<>();
+			thing.put("kind", "entity");
+			thing.put("name", name(entity));
+			thing.put("id", entity.getStringUUID());
+			thing.put("at", frame.local(entity.getBoundingBox().getCenter()));
+			things.add(thing);
 		}
+		Map<String, Object> space = new LinkedHashMap<>();
 		FluidState fluid = state.getFluidState();
 		if (state.isAir()) {
 			space.put("kind", "air");
+			space.put("name", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
 		} else if (!fluid.isEmpty() && state.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock) {
 			space.put("kind", "fluid");
 			space.put("name", BuiltInRegistries.FLUID.getKey(fluid.getType()).toString());
-			space.put("amount", fluid.getAmount());
-			space.put("source", fluid.isSource());
 		} else {
 			space.put("kind", "block");
 			space.put("name", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
+		}
+		space.put("id", "");
+		space.put("at", frame.local(Vec3.atCenterOf(pos)));
+		if ("fluid".equals(space.get("kind"))) {
+			space.put("amount", fluid.getAmount());
+			space.put("source", fluid.isSource());
+		} else if ("block".equals(space.get("kind"))) {
 			Map<String, Object> properties = new LinkedHashMap<>();
 			for (Property<?> property : state.getProperties()) {
 				Object value = state.getValue(property);
@@ -168,7 +177,8 @@ final class GolemHands {
 				space.put("fluid", BuiltInRegistries.FLUID.getKey(fluid.getType()).toString()); // (waterlogged)
 			}
 		}
-		return space;
+		things.add(space);
+		return things;
 	}
 
 	@SuppressWarnings({"unchecked", "rawtypes"})

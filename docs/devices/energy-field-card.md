@@ -90,7 +90,9 @@ Its ioctls are its methods, by name. Its events come as `sys.poll`'s `PRI`, and 
 ### scan([range]) → list
 
 What's within `range` (16 at most) of its computer, nearest first: creatures (players too) and items,
-each `{id, name, forward, right, up, distance}`.
+a list of things in the same shape as a [robot's `scan`](/devices/robotics/) gives them, each
+`{kind = "entity", name, id, at}`: what it is (`name`, its registry id), its own `id` (for
+`capture`), and where it is (`at`, `{forward, right, up}` in its computer's frame).
 
 ### capture(target) → name, or nil and why
 

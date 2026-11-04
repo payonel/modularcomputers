@@ -43,8 +43,9 @@ local function go(method, ...)
 end
 
 go("fly", 0, 0, HEIGHT)
-for face, space in pairs(robot.scan()) do
-  print(face, space.kind, space.name or "")
+for face, things in pairs(robot.scan()) do
+  local block = things[#things] -- (the space's own block comes last)
+  print(face, block.kind, block.name)
 end
 go("land")
 print("back on its legs")

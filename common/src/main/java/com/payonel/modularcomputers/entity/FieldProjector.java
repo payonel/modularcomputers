@@ -153,11 +153,11 @@ public final class FieldProjector implements FieldCard.Projector {
 		found.sort(Comparator.comparingDouble(entity -> entity.getBoundingBox().getCenter().distanceTo(at.origin())));
 		List<Object> list = new ArrayList<>();
 		for (Entity entity : found) {
-			Map<String, Object> seen = new LinkedHashMap<>();
-			seen.put("id", entity.getStringUUID());
+			Map<String, Object> seen = new LinkedHashMap<>(); // (a thing, as a robot's scan gives it: the user's, one shape)
+			seen.put("kind", "entity");
 			seen.put("name", name(entity));
-			seen.putAll(at.local(entity.getBoundingBox().getCenter()));
-			seen.put("distance", tenth(entity.getBoundingBox().getCenter().distanceTo(at.origin())));
+			seen.put("id", entity.getStringUUID());
+			seen.put("at", at.local(entity.getBoundingBox().getCenter()));
 			list.add(seen);
 		}
 		return Result.ok(list);

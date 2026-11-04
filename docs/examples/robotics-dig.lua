@@ -34,7 +34,7 @@ local held = sys.ioctl(robot, "held")
 print("digging with " .. (held and held.name or "a bare hand"))
 
 for dug = 0, LENGTH - 1 do
-  local ahead = assert(sys.ioctl(robot, "scan", "front"))
+  local ahead = assert(sys.ioctl(robot, "scan", "front"))[1] -- (the first thing there: a creature, else its block)
   if ahead.kind == "block" then
     local swung, why = sys.ioctl(robot, "swing", "front")
     if swung == "breaking" then

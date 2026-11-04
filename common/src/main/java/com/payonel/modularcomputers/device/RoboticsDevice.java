@@ -586,7 +586,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return at.failed() ? Result.ok(true) : Result.ok(at.first());
 	}
 
-	@Method(doc = "scan([face]): what's in the space at a face (front, back, left, right, up or down: its own), or with none, in all six by face: {kind = \"air\"}, {kind = \"block\", name, state, hardness, solid, container}, {kind = \"fluid\", name, amount, source}, or {kind = \"entity\", name, entities, block}")
+	@Method(doc = "scan([face]): every thing in the space at a face (front, back, left, right, up or down: its own), a list, or with none, the six spaces by face, a list each: its creatures and items first, each {kind = \"entity\", name, id, at}, then the space's own block, always one (air too), {kind = \"block\", name, id = \"\", at, state, hardness, solid, container}, {kind = \"fluid\", name, id = \"\", at, amount, source} or {kind = \"air\", name, id = \"\", at}: name what it is (its registry id), id its own (a block has none), at where it is, {forward, right, up} in its frame; as the field card's scan gives things")
 	public Result scan(Arguments args) {
 		String face = args.count() > 0 && args.get(0) != null ? face(args, 0) : null;
 		return body.scan(face);

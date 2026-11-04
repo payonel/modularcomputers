@@ -141,7 +141,7 @@ public final class FieldCard extends Card implements Buffered {
 		}
 	}
 
-	@Method(doc = "scan([range]): what's within range (16 blocks at most) of its computer: a list, nearest first, each {id, name, forward, right, up, distance}: its id (for capture), what it is (minecraft:pig, an item's name), where it is in its computer's frame (forward out of its front, right, up)")
+	@Method(doc = "scan([range]): what's within range (16 blocks at most) of its computer, nearest first: a list of things, each {kind = \"entity\", name, id, at}: what it is (its registry id: minecraft:pig, an item's name), its own id (for capture), where it is, {forward, right, up} in its computer's frame (forward out of its front); as a robot's scan gives things")
 	public Result scan(Arguments args) {
 		Result no = noProjector();
 		if (no != null) {

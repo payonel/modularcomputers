@@ -84,6 +84,12 @@ public class GolemHandsGameTest {
 		}
 	}
 
+	/** A space's own block in a scan: its last thing (its creatures and items come first). */
+	private static Map<?, ?> block(Map<?, ?> scan, String face) {
+		List<?> things = (List<?>) scan.get(face);
+		return (Map<?, ?>) things.getLast();
+	}
+
 	@GameTest(maxTicks = 200)
 	public void aScanSeesTheSixSpacesRoundItAtOnceInItsOwnFrame(GameTestHelper helper) {
 		helper.setBlock(FRONT, Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.WEST)); // facing it
@@ -96,21 +102,28 @@ public class GolemHandsGameTest {
 			List<Object> got = copy(answers);
 			helper.assertTrue(!got.isEmpty() && got.getFirst() instanceof Map<?, ?>, "a scan: " + got);
 			Map<?, ?> scan = (Map<?, ?>) got.getFirst();
-			Map<?, ?> front = (Map<?, ?>) scan.get("front");
+			Map<?, ?> front = block(scan, "front");
 			same(helper, front.get("kind"), "block", "front");
 			same(helper, front.get("name"), "minecraft:chest", "front");
+			same(helper, front.get("id"), "", "a block has no id of its own");
+			same(helper, front.get("at"), Map.of("forward", 1.0, "right", 0.0, "up", 0.0), "where: its front, in its frame");
 			same(helper, ((Map<?, ?>) front.get("state")).get("facing"), "back", "the chest faces it: its facing in its frame");
 			same(helper, ((Number) front.get("container")).intValue(), 27, "a chest's slots");
-			Map<?, ?> left = (Map<?, ?>) scan.get("left");
+			Map<?, ?> left = block(scan, "left");
 			same(helper, left.get("kind"), "fluid", "left: " + left);
 			same(helper, left.get("name"), "minecraft:water", "left");
 			same(helper, left.get("source"), true, "left");
-			same(helper, ((Map<?, ?>) scan.get("right")).get("name"), "minecraft:oak_log", "right");
-			Map<?, ?> back = (Map<?, ?>) scan.get("back");
-			same(helper, back.get("kind"), "entity", "back: " + back);
-			same(helper, back.get("name"), "minecraft:pig", "back");
-			same(helper, ((Map<?, ?>) scan.get("up")).get("kind"), "air", "up");
-			same(helper, ((Map<?, ?>) scan.get("down")).get("name"), "minecraft:stone", "down: the floor");
+			same(helper, block(scan, "right").get("name"), "minecraft:oak_log", "right");
+			List<?> back = (List<?>) scan.get("back");
+			same(helper, back.size(), 2, "back: the pig, then the space's block: " + back);
+			Map<?, ?> pig = (Map<?, ?>) back.getFirst();
+			same(helper, pig.get("kind"), "entity", "back: " + back);
+			same(helper, pig.get("name"), "minecraft:pig", "back");
+			helper.assertTrue(pig.get("id") instanceof String id && !id.isEmpty(), "its own id: " + pig);
+			same(helper, block(scan, "back").get("kind"), "air", "and the air it stands in");
+			same(helper, block(scan, "up").get("kind"), "air", "up");
+			same(helper, block(scan, "up").get("name"), "minecraft:air", "air is a block: its name");
+			same(helper, block(scan, "down").get("name"), "minecraft:stone", "down: the floor");
 		});
 	}
 
