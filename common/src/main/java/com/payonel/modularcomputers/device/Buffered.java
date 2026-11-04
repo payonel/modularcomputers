@@ -56,20 +56,20 @@ public interface Buffered {
 	 * Why a craft ended: what's in its grid makes nothing (the user's, one shape: {@link
 	 * EventQueue#missingInputs}): an empty grid, or no recipe its pattern matches; and its call.
 	 */
-	String MISSING_INPUTS = "missing_inputs";
+	String MISSING_INPUTS = com.payonel.modularcomputers.runtime.Failure.MISSING_INPUTS;
 
 	/**
 	 * Why a craft ended: there's no room for what it makes (the user's, one shape: {@link
 	 * EventQueue#noSpace}): its storage can't take it, or a leftover its grid can't take back; and its call.
 	 */
-	String NO_SPACE = "no_space";
+	String NO_SPACE = com.payonel.modularcomputers.runtime.Failure.NO_SPACE;
 
 	/**
 	 * Why a command ended, a call was refused, or a notice: what it needs to do it is missing (the
 	 * user's, one shape, {@link EventQueue#systemFailure}): {@code missing} says what, one of the
-	 * {@code MISSING_} words. A call refused so answers {@code false, "system_failure", missing}.
+	 * {@code MISSING_} words. A call refused so answers {@code false, {why = "system_failure", missing}}.
 	 */
-	String SYSTEM_FAILURE = "system_failure";
+	String SYSTEM_FAILURE = com.payonel.modularcomputers.runtime.Failure.SYSTEM_FAILURE;
 	/** What's missing: a robot's legs (it's on its thrusters, or they're gone). */
 	String MISSING_LEGS = "legs";
 	/** What's missing: a robot's thrusters (a tier 1 has none). */
@@ -83,7 +83,12 @@ public interface Buffered {
 
 	/** A refusal: what it needs is missing ({@link #SYSTEM_FAILURE}, and what). */
 	static com.payonel.modularcomputers.runtime.Result missing(String what) {
-		return com.payonel.modularcomputers.runtime.Result.fail(SYSTEM_FAILURE, what);
+		return com.payonel.modularcomputers.runtime.Result.fail(com.payonel.modularcomputers.runtime.Failure.systemFailure(what));
+	}
+
+	/** How far it is off where its last command left it, {forward, right, up}, for a drifted refusal (a robot's; nothing else drifts). */
+	default java.util.Map<String, Object> drift() {
+		return java.util.Map.of("forward", 0L, "right", 0L, "up", 0L);
 	}
 
 	/** A notice's why: a robot shoved off where its last command left it ({@code drift}), once the shove's over. */

@@ -84,11 +84,12 @@ local function find(name)
   return name
 end
 
--- The boot disk's file at path, all of it; or nil and why.
+-- The boot disk's file at path, all of it; or nil and why (a failure's why: a board call's failure
+-- is a table, {why, ...}).
 local function readfile(path)
   local ok, file = board.invoke(disk, "open", path)
   if not ok then
-    return nil, file
+    return nil, file.why
   end
   local parts = {}
   while true do
@@ -106,12 +107,12 @@ end
 local function writefile(path, text)
   local ok, file = board.invoke(disk, "open", path, "w")
   if not ok then
-    return nil, file
+    return nil, file.why
   end
   board.invoke(file, "write", text)
   local closed, why = board.invoke(file, "close") -- (a disk keeps what's written at close)
   if not closed then
-    return nil, why
+    return nil, why.why
   end
   return true
 end
@@ -168,7 +169,7 @@ commands.call = function(words, rest)
   end
   local results = table.pack(board.invoke(address, method, chunk()))
   if not results[1] then
-    print("failed: " .. tostring(results[2]))
+    print("failed: " .. show(results[2])) -- (its failure: {why, ...}, its why and its fields)
     return
   end
   for i = 2, results.n do
@@ -197,7 +198,7 @@ end
 commands.ls = function(words)
   local ok, names = board.invoke(disk, "list", words[1] or "/")
   if not ok then
-    print(names)
+    print(names.why)
     return
   end
   for _, name in ipairs(names or {}) do

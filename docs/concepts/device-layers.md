@@ -38,7 +38,8 @@ every program complete.
 - **A device's methods never wait at the board.** A call answers at once with what the device has
   now: a redstone card's `pull` with no change gives `nil`, a robot's `walk` answers `true` as it
   starts, and a [buffered device](/concepts/interrupts/#one-command-at-a-time) given a command
-  while it runs one answers `false, "busy", id` (the device to wait on). Under mcos (layers 2 and 3) that command waits
+  while it runs one answers `false, {why = "busy", id}` (the device to wait on). Every failure is
+  such a table at the board, its why and its own fields, always the same for that why. Under mcos (layers 2 and 3) that command waits
   instead, its thread only, until the device can take it. See
   [Interrupts](/concepts/interrupts/#device-calls-never-wait).
 - **News is an event, and an interrupt says it's there.** A device keeps its events until they're
@@ -56,7 +57,7 @@ system under it calls. The [EEPROM](/devices/eeprom/)'s bootloader uses it, mcos
 
 At this layer your code is the only code: it finds a device in `board.list()`, sleeps on its interrupt
 with `board.waitForInterrupt`, and calls its methods with `board.invoke`, which answers `true` and the
-method's results, or `false` and why. Nothing is shared, nothing is buffered, nothing is in the way:
+method's results, or `false` and its failure (`{why, ...}`). Nothing is shared, nothing is buffered, nothing is in the way:
 it's as close to the hardware as a program gets, and it's what every layer above is made of.
 
 ```lua
@@ -72,7 +73,7 @@ decides who waits for what. A program uses a device's file as any file:
 
 - **`sys.open("/dev/robotics0")`** gives a file descriptor.
 - **Its ioctls are the device's methods**, by name: `sys.ioctl(fd, "walk", 3)`, answering as the method
-  does (nil and why when it fails). A command to a busy device blocks the calling thread until the
+  does (nil, its why, its errno and the failure's table when it fails). A command to a busy device blocks the calling thread until the
   device can take it.
 - **`sys.poll({[fd] = {PRI = true}}, seconds)`** sleeps until the device has news: `PRI` is its
   interrupt, as the kernel sees it. Then `sys.ioctl(fd, "pull")` takes an event.

@@ -42,7 +42,7 @@ end
 
 -- A device call: its values, or the failure as an errno.
 local function call(target, method, ...)
-  local result = table.pack(board.invoke(target, method, ...))
+  local result = table.pack(k.invoke(target, method, ...))
   if not result[1] then
     return failed(result[2])
   end
@@ -64,14 +64,14 @@ local function file(handle)
   return {
     type = "file",
     read = function(self, n)
-      local ok, data = board.invoke(handle, "read", math.min(n, k.READ_SIZE))
+      local ok, data = k.invoke(handle, "read", math.min(n, k.READ_SIZE))
       if not ok then
         return failed(data)
       end
       return data or ""
     end,
     write = function(self, data)
-      local ok, why = board.invoke(handle, "write", data)
+      local ok, why = k.invoke(handle, "write", data)
       if not ok then
         return failed(why)
       end

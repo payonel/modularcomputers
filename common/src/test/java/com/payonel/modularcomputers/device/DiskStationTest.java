@@ -87,7 +87,7 @@ class DiskStationTest {
 		bay.powered = false;
 		Result unpowered = station.format(args());
 		assertThat(unpowered.error()).isEqualTo("system_failure");
-		assertThat(unpowered.first()).as("what's missing").isEqualTo("power");
+		assertThat(unpowered.failure().get("missing")).as("what's missing").isEqualTo("power");
 		assertThat(world.resolve("p/home")).as("nothing done").exists();
 		disk.retire();
 	}

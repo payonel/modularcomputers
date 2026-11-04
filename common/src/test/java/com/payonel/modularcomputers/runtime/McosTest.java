@@ -636,6 +636,56 @@ class McosTest extends McosHarness {
 	}
 
 	/**
+	 * The internet card's failures are one shape each (the user's): an ioctl gives its why, its errno,
+	 * and the failure itself, {why, ...}, every field of its why there: a limit's of and max, a
+	 * denied address's reason and value, a bad handle's argument and what it takes; and its log's
+	 * entry carries the failure nested.
+	 */
+	@Test
+	@org.junit.jupiter.api.parallel.ResourceLock(INTERNET_POLICY)
+	void theInternetCardsFailuresComeInTheirWhysShapes() {
+		var card = new com.payonel.modularcomputers.device.InternetCard();
+		devices.put(Motherboard.exp(0), card);
+		ticks.add(card::tick); // (its block's tick)
+		file("fail.lua", """
+			local sys = require("sys")
+			local card = assert(sys.open("/dev/internet0"))
+			local url = "http://127.0.0.2:1/" -- (loopback: denied, once its thread judges it)
+			local handles = {}
+			for i = 1, %d do
+			  handles[i] = assert(sys.ioctl(card, "request", url))
+			end
+			local out = io.open("/out", "w")
+			local h, why, errno, f = sys.ioctl(card, "request", url)
+			out:write(tostring(h), " ", why, " ", errno, " ", f.why, " ", f.of, " ", f.max, "\\n")
+			local r, w, f2
+			repeat
+			  r, w, _, f2 = sys.ioctl(card, "response", handles[1])
+			  if r == false then
+			    sys.poll({[card] = {PRI = true}})
+			  end
+			until r ~= false
+			out:write(tostring(r), " ", w, " ", f2.reason, " ", f2.value, "\\n")
+			local _, w3, _, f3 = sys.ioctl(card, "response", 999)
+			out:write(w3, " ", f3.argument, " ", f3.value, " ", f3.expected, "\\n")
+			local entry = sys.ioctl(card, "pull")
+			out:write(entry.failure.why, " ", entry.failure.reason, " ", entry.failure.value, " ", tostring(entry.why), "\\n")
+			out:close()
+			""".formatted(com.payonel.modularcomputers.device.InternetCard.MAX_OPEN));
+		boot();
+		type("lua /fail.lua 2> /err; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		String err = read(root().resolve("err"));
+		assertThat(java.nio.file.Files.isRegularFile(root().resolve("out"))).as(err).isTrue();
+		assertThat(read(root().resolve("out"))).as(err).isEqualTo("""
+			nil limit EINVAL limit open_requests %d
+			nil denied loopback 127.0.0.2
+			bad_argument 1 999 handle
+			denied loopback 127.0.0.2 nil
+			""".formatted(com.payonel.modularcomputers.device.InternetCard.MAX_OPEN));
+	}
+
+	/**
 	 * A request a process leaves open is closed with its file (as a socket's connection is): a
 	 * response that never ends would otherwise hold one of the card's few requests for good.
 	 */

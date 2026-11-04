@@ -54,8 +54,8 @@ class BufferedTest {
 			board.invoke("id:slow", "work", 3L);
 			var refused = board.invoke("id:slow", "work", 1L);
 			seen.add(refused.error());
-			seen.add(refused.first() instanceof String);
-			seen.add(!board.waitForInterrupt(10, String.valueOf(refused.first())).isEmpty()); // (its work's end comes on it)
+			seen.add(refused.failure().get("id") instanceof String);
+			seen.add(!board.waitForInterrupt(10, String.valueOf(refused.failure().get("id"))).isEmpty()); // (its work's end comes on it)
 			Program.park(board);
 		});
 		assertThat(seen).containsExactly("busy", true, true);

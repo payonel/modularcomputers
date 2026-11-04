@@ -251,7 +251,7 @@ local COMMAND_TRIES = 4 -- times a command is asked again at once, news having c
 local function sync(id)
   local tries = 0
   while true do
-    local ok, empty = board.invoke(id, "sync")
+    local ok, empty = k.invoke(id, "sync")
     if not ok or empty then
       return ok, empty
     elseif not k.request then
@@ -293,14 +293,14 @@ local function command(id, method, ...)
     end
     return k.BLOCK
   end
-  local answer = table.pack(board.invoke(id, method, ...))
+  local answer = table.pack(k.invoke(id, method, ...))
   local tries = 0
   while not answer[1] and (answer[2] == "busy" or answer[2] == "held") do
     if not request then
-      return nil, answer[2], "EBUSY"
+      return nil, answer[2], "EBUSY", answer[3]
     end
-    -- The board names another device when its news ends the wait (a card's robot): hear both.
-    local blocker = answer[3]
+    -- The board names the device whose news ends the wait (its own, or a card's robot): hear both.
+    local blocker = answer[3].id
     request.blocker = blocker
     if not request.stops then
       request.stops = {[id] = stopped[id] or 0}
@@ -324,7 +324,7 @@ local function command(id, method, ...)
       request.waitedat = taken == 0 and board.uptime() or nil
       return k.BLOCK
     end
-    answer = table.pack(board.invoke(id, method, ...)) -- (what came may be the end it waited for)
+    answer = table.pack(k.invoke(id, method, ...)) -- (what came may be the end it waited for)
   end
   if answer[1] and isstop(method) then
     stopped[id] = (stopped[id] or 0) + 1
@@ -405,7 +405,7 @@ local function diskfile(device)
       return {IN = true, OUT = true}
     end,
     read = function(self, n)
-      local ok, data = board.invoke(id, "read", at, n)
+      local ok, data = k.invoke(id, "read", at, n)
       if not ok then
         return refused(data)
       end
@@ -414,7 +414,7 @@ local function diskfile(device)
       return data
     end,
     write = function(self, data)
-      local ok, count = board.invoke(id, "write", at, data)
+      local ok, count = k.invoke(id, "write", at, data)
       if not ok then
         return refused(count)
       elseif count == 0 and #data > 0 then
@@ -428,7 +428,7 @@ local function diskfile(device)
       if whence == "set" then
         base = 0
       elseif whence == "end" then
-        local ok, capacity = board.invoke(id, "getCapacity")
+        local ok, capacity = k.invoke(id, "getCapacity")
         if not ok then
           return failed(capacity)
         end
@@ -460,16 +460,16 @@ end
 -- methods, as any device file's ioctls (setFormat).
 local function dspfile(device)
   local id = device.id
-  local ok, why = board.invoke(id, "setFormat", {rate = 8000, encoding = "u8", channels = 1})
+  local ok, why = k.invoke(id, "setFormat", {rate = 8000, encoding = "u8", channels = 1})
   if not ok then
     return failed(why)
   end
   local function set(field, value, answer)
-    local done, err = board.invoke(id, "setFormat", {[field] = value})
+    local done, err = k.invoke(id, "setFormat", {[field] = value})
     if not done then
       return failed(err, "EINVAL")
     end
-    local got, format = board.invoke(id, "getFormat")
+    local got, format = k.invoke(id, "getFormat")
     if not got then
       return failed(format)
     end
@@ -489,21 +489,21 @@ local function dspfile(device)
       return set("channels", channels, function(format) return format.channels end)
     end,
     SNDCTL_DSP_GETODELAY = function()
-      local got, delay = board.invoke(id, "getDelay")
+      local got, delay = k.invoke(id, "getDelay")
       if not got then
         return failed(delay)
       end
       return delay
     end,
     SNDCTL_DSP_RESET = function()
-      local done, err = board.invoke(id, "reset")
+      local done, err = k.invoke(id, "reset")
       if not done then
         return failed(err)
       end
       return true
     end,
     SNDCTL_DSP_SYNC = function()
-      local done, drained = board.invoke(id, "sync")
+      local done, drained = k.invoke(id, "sync")
       if not done then
         return failed(drained)
       elseif not drained then
@@ -519,7 +519,7 @@ local function dspfile(device)
       return {OUT = true}
     end,
     write = function(self, data)
-      local done, count = board.invoke(id, "write", data)
+      local done, count = k.invoke(id, "write", data)
       if not done then
         return failed(count)
       elseif count == 0 and #data > 0 then
@@ -748,7 +748,7 @@ local function devicefile(device, mode)
       if lines then
         return value == nil or value == "" or set(value) -- (a last line with no end)
       elseif value then
-        local ok, why = board.invoke(id, "set", table.concat(value))
+        local ok, why = k.invoke(id, "set", table.concat(value))
         if not ok then
           return failed(why)
         end
@@ -763,7 +763,8 @@ end
 -- come first: OSS's on a sound card's), setLabel (the kernel's: the label on its item), and ready
 -- for poll (PRI) while its device has news (its interrupt came since the file last read or asked;
 -- a file with its own PRI, a GPIO-like one's, keeps its own). An ioctl's answer is the method's
--- (true for a method that answers nothing, as a Linux ioctl's 0); a failure is EINVAL with why
+-- (true for a method that answers nothing, as a Linux ioctl's 0); a failure is EINVAL with why (its
+-- word), then the failure itself, {why, ...} (its fields: the device's own shape for that why)
 -- (ENODEV: the device is gone).
 local function withmethods(d, device)
   local id, own, events, read = device.id, d.ioctl, d.events, d.read
@@ -782,7 +783,7 @@ local function withmethods(d, device)
       result, why, errno = close(self)
     end
     for handle, method in pairs(open) do
-      board.invoke(id, method, handle) -- (gone already, or the device is: nothing to do)
+      k.invoke(id, method, handle) -- (gone already, or the device is: nothing to do)
     end
     open = {}
     return result, why, errno
@@ -832,7 +833,7 @@ local function withmethods(d, device)
     if answer[1] == k.BLOCK then
       return k.BLOCK -- (a buffered device busy: this thread waits, only it)
     elseif answer[1] == nil and answer[3] then
-      return nil, answer[2], answer[3] -- (stopped while it waited)
+      return nil, answer[2], answer[3], answer[4] -- (stopped while it waited; busy with no thread to block)
     end
     if answer[1] and opens and opens[op] and answer[2] ~= nil then
       open[answer[2]] = opens[op] -- (its handle: open until its close, or the file's)
@@ -844,7 +845,7 @@ local function withmethods(d, device)
       if why:find("^no such device") then
         return failed(why)
       end
-      return nil, why, "EINVAL"
+      return nil, why, "EINVAL", answer[3] -- (its why, then the failure itself: {why, ...}, its fields)
     end
     if answer.n == 1 then
       return true -- (a method that answers nothing: done)

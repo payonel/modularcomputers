@@ -29,11 +29,11 @@ local failed = 0
 local function start()
   while queue[1] and #open < OPEN do
     local name = table.remove(queue, 1)
-    local handle, why = sys.ioctl(card, "request", base .. name)
+    local handle, why, _, failure = sys.ioctl(card, "request", base .. name)
     if handle then
       open[#open + 1] = {handle = handle, name = name}
     else
-      io.stderr:write(name, ": ", why, "\n")
+      io.stderr:write(name, ": ", why, " ", failure and (failure.reason or failure.of or failure.expected) or "", "\n")
       failed = failed + 1
     end
   end

@@ -85,7 +85,7 @@ kernel itself, can use a global `board`. It is the motherboard's API:
 | `board.info(address)` | a table about one device: `address`, `id`, `type`, `label` (if it has one) and what its kind adds; nil if there is no such device |
 | `board.methods(address)` | the names of the device's methods, in name order |
 | `board.doc(address, method)` | one line saying what a method does |
-| `board.invoke(address, method, ...)` | calls a method: `true` and its results, or `false` and a message (a busy device's refusal: `busy`, and the id of the device whose news ends the wait when it's another's) |
+| `board.invoke(address, method, ...)` | calls a method: `true` and its results, or `false` and its failure, `{why, ...}` (a busy device's refusal: `{why = "busy", id}`, the device whose news ends the wait) |
 | `board.waitForInterrupt(seconds, sources...)` | waits until a source has an interrupt pending, or the time passes; gives the sources that do |
 | `board.setLabel(address, label)` | gives a device a label (see below) |
 
@@ -98,12 +98,15 @@ as an event. To wait for a device, use `board.waitForInterrupt`, then call it. S
 [Interrupts](/concepts/interrupts/#device-calls-never-wait). A device that acts over time (a robot, a
 field card, a redstone card, a robotic piston) runs [one command at a
 time](/concepts/interrupts/#one-command-at-a-time): given one while another runs, it answers
-`false, "busy", id`, the id of the device whose news ends the wait (its own, or another's); that
+`false, {why = "busy", id}`, the id of the device whose news ends the wait (its own, or another's); that
 device's event says when to give it again.
 
 A call never stops the machine. If a device is gone, or an argument is wrong, `board.invoke`
-returns `false` and a message such as `bad argument #1 (string expected, got nil)`. This manual
-writes a method's results as the values after the leading `true`, and its failures as the message.
+returns `false` and its failure: a table, its `why` a word and its fields, the same for every
+failure with that why (`{why = "system_failure", missing = "legs"}`). Failures not named yet keep
+their old message as their why (`{why = "bad argument #1 (string expected, got nil)"}`). This
+manual writes a method's results as the values after the leading `true`, and its failures by their
+why.
 
 ```lua
 local ok, size = board.invoke("sata:0", "getCapacity")

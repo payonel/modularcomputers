@@ -468,7 +468,7 @@ nothing else: always a command's end, never a notice.
 
 ### System failure
 
-A command it can't do for want of a part of itself is refused `false, "system_failure", missing`:
+A command it can't do for want of a part of itself is refused `false, {why = "system_failure", missing}`:
 `missing` is `"legs"` (a walk on its thrusters) or `"thrusters"` (a tier 1's flight). One given
 while a field held it, and refused once it's let go, ends in the same shape instead:
 `{event = <method>, ok = false, why = "system_failure", missing = "legs", call}`.

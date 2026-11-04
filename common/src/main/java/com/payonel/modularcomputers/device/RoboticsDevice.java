@@ -402,8 +402,8 @@ public final class RoboticsDevice implements Device, Buffered {
 
 	/**
 	 * What its body says it can't start without, as its body says it ({@link #NO_LEGS},
-	 * {@link #NO_THRUSTERS}): never a program's word; it answers {@code false, "system_failure",
-	 * missing} (the user's), the shape of the end it becomes when it's given again once let go.
+	 * {@link #NO_THRUSTERS}): never a program's word; it answers {@code false, {why = "system_failure",
+	 * missing}} (the user's), the shape of the end it becomes when it's given again once let go.
 	 */
 	public static final String NO_LEGS = "no legs";
 	public static final String NO_THRUSTERS = "no thrusters";
@@ -968,6 +968,16 @@ public final class RoboticsDevice implements Device, Buffered {
 	 * Why it can't take {@code method} now: held (a field holds it), busy (a command runs, or it's
 	 * falling), or drifted (a positional command answering at once, given off its spot).
 	 */
+	@Override
+	public Map<String, Object> drift() {
+		Map<?, ?> drift = body.drift();
+		Map<String, Object> said = new LinkedHashMap<>();
+		if (drift != null) {
+			drift.forEach((axis, by) -> said.put(String.valueOf(axis), by));
+		}
+		return said.isEmpty() ? Buffered.super.drift() : said;
+	}
+
 	@Override
 	public String refusal(String method) {
 		if (active != null) {

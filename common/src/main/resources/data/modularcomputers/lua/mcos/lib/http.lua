@@ -4,7 +4,9 @@
 -- (each hop a new request, judged by the card again: a redirect can't lead it where a URL couldn't),
 -- up to MAX_REDIRECTS; it gives the response ({status, message, headers, url: where it came from})
 -- and its body ({read = function(n), close = function()}: read gives a piece, "" at the end, or nil
--- and why), or nil and why. options.device: the card's file (the first internet card's, else).
+-- and why), or nil and why: its failure as words, then the failure itself ({why, ...}: the card's,
+-- e.g. {why = "network", reason = "timed_out", message}; nil for http's own, too many redirects).
+-- options.device: the card's file (the first internet card's, else).
 local sys = require("sys")
 
 local http = {MAX_REDIRECTS = 20}
@@ -36,12 +38,33 @@ local function card()
   end
 end
 
--- Asks a method again, waiting for the card's news, until it answers (false: not yet) or fails.
+-- A failure's fields, in the order its why's shape gives them (the card's: bad_argument, denied, limit,
+-- network).
+local FIELDS = {"reason", "of", "max", "argument", "value", "expected", "message"}
+
+-- A call's failure as words: its why, then each field that says something (the card's failure, the
+-- ioctl's fourth answer); else as the call said it.
+local function said(why, failure)
+  if type(failure) ~= "table" then
+    return why
+  end
+  local words = {failure.why}
+  for _, field in ipairs(FIELDS) do
+    local value = failure[field]
+    if value ~= nil and value ~= "" then
+      words[#words + 1] = tostring(value)
+    end
+  end
+  return table.concat(words, " ")
+end
+
+-- Asks a method again, waiting for the card's news, until it answers (false: not yet) or fails: its
+-- answer, or nil, its failure as words and the failure.
 local function await(fd, method, handle, ...)
   while true do
-    local answer, why = sys.ioctl(fd, method, handle, ...)
+    local answer, why, _, failure = sys.ioctl(fd, method, handle, ...)
     if answer ~= false then
-      return answer, why
+      return answer, answer == nil and said(why, failure) or why, failure
     end
     sys.poll({[fd] = {PRI = true}})
   end
@@ -60,16 +83,16 @@ function http.request(url, options)
   local hops = 0
   local method, body = options.method, options.body
   while true do
-    local handle, err = sys.ioctl(fd, "request", url, method, options.headers, body)
+    local handle, err, _, failure = sys.ioctl(fd, "request", url, method, options.headers, body)
     if not handle then
       sys.close(fd)
-      return nil, err
+      return nil, said(err, failure), failure
     end
-    local response, failed = await(fd, "response", handle)
+    local response, failed, why = await(fd, "response", handle)
     if not response then
       sys.ioctl(fd, "close", handle)
       sys.close(fd)
-      return nil, failed
+      return nil, failed, why
     end
     response.url = url
     local location = response.headers.location

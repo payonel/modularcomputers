@@ -45,7 +45,7 @@ are listed in [Devices](/devices/#from-the-eeprom-the-board-api). The ones this 
 | Call | What it does |
 |---|---|
 | `board.list()` | the devices on the bus: a table each with `address`, `type` and `id` |
-| `board.invoke(address, method, ...)` | calls a device's method: `true` and its answers, or `false` and why it failed |
+| `board.invoke(address, method, ...)` | calls a device's method: `true` and its answers, or `false` and its failure, `{why, ...}` |
 | `board.waitForInterrupt(seconds, sources...)` | sleeps until one of the devices named has news (any device, when none are named), or the time is up; gives the ones that do |
 | `board.methods(address)`, `board.doc(address, method)` | what a device can do, and what one method does |
 | `board.uptime()` | how long the computer has been running, in game ticks (20 a second) |

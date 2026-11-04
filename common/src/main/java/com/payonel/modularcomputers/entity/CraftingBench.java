@@ -77,16 +77,16 @@ public final class CraftingBench implements CraftingCard.Bench {
 		CraftingInput.Positioned positioned = slots.grid().asPositionedCraftInput();
 		CraftingInput input = positioned.input();
 		if (input.isEmpty()) {
-			return Result.fail(Buffered.MISSING_INPUTS); // (an empty grid makes nothing)
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.missingInputs("")); // (an empty grid makes nothing; its card names what it was making)
 		}
 		ServerLevel world = level.get();
 		Optional<RecipeHolder<CraftingRecipe>> recipe = world.recipeAccess().getRecipeFor(RecipeType.CRAFTING, input, world);
 		if (recipe.isEmpty()) {
-			return Result.fail(Buffered.MISSING_INPUTS);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.missingInputs(""));
 		}
 		ItemStack result = recipe.get().value().assemble(input);
 		if (result.isEmpty() || !result.isItemEnabled(world.enabledFeatures())) {
-			return Result.fail(Buffered.MISSING_INPUTS);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.missingInputs(""));
 		}
 		NonNullList<ItemStack> remaining = recipe.get().value().getRemainingItems(input);
 		// Worked out on copies first: the grid as it'll be, and its storage with what it made (and what
@@ -119,7 +119,7 @@ public final class CraftingBench implements CraftingCard.Bench {
 		}
 		for (ItemStack stack : toStorage) {
 			if (!insert(after, stack).isEmpty()) {
-				return Result.fail(Buffered.NO_SPACE, net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(result.getItem()).toString()); // (what it would have made: its name)
+				return Result.fail(com.payonel.modularcomputers.runtime.Failure.noSpace(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(result.getItem()).toString())); // (what it would have made: its name)
 			}
 		}
 		apply(after);

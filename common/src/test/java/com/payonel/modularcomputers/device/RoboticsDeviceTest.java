@@ -329,7 +329,7 @@ class RoboticsDeviceTest {
 		refuse = RoboticsDevice.NO_LEGS;
 		Result refused = device.walk(args(2L));
 		assertThat(refused.error()).isEqualTo(Buffered.SYSTEM_FAILURE);
-		assertThat(refused.first()).as("what's missing").isEqualTo(Buffered.MISSING_LEGS);
+		assertThat(refused.failure().table()).as("what's missing").isEqualTo(Map.of("why", "system_failure", "missing", "legs"));
 
 		Drifting body = new Drifting();
 		body.frozen = true;

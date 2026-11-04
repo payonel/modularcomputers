@@ -181,7 +181,8 @@ public final class CraftingCard extends Card implements Buffered {
 		Result made = bench.craft();
 		if (made.failed()) {
 			// (no_space: what it would have made, no room for it; system_failure: what's missing)
-			finish(made.error(), made.first() instanceof String about ? about : null);
+			Object about = made.failure().get(Buffered.SYSTEM_FAILURE.equals(made.error()) ? "missing" : "name");
+			finish(made.error(), about == null ? null : String.valueOf(about));
 			return;
 		}
 		power.charge(CRAFT_COST);
@@ -237,6 +238,13 @@ public final class CraftingCard extends Card implements Buffered {
 	 * the robot holds every command the card is given; a craft under way is the card's, and goes on.
 	 * In a case, nothing here: its methods fail, no robotics.
 	 */
+	/** Its robot's drift: a refusal drifted is its robot's (the robot works its items). */
+	@Override
+	public Map<String, Object> drift() {
+		RoboticsDevice robot = bench.robot();
+		return robot != null ? robot.drift() : Buffered.super.drift();
+	}
+
 	@Override
 	public String refusal(String method) {
 		RoboticsDevice robot = bench.robot();

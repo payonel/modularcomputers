@@ -77,25 +77,25 @@ if body then
   end
 end
 
--- What a failure's why means, as curl's exit status.
-local function status(why)
-  why = tostring(why)
-  if why:find("unknown host") then
+-- What a failure means, as curl's exit status: the card's failure's reason, or http's own why.
+local function status(why, failure)
+  local reason = type(failure) == "table" and failure.reason
+  if reason == "unknown_host" then
     return 6
-  elseif why:find("timed out") then
+  elseif reason == "timed_out" then
     return 28
-  elseif why:find("too many redirects") then
+  elseif why == "too many redirects" then
     return 47
   end
   return 7
 end
 
-local response, reply = http.request(url, {method = method, headers = headers, body = body, follow = follow})
+local response, reply, failure = http.request(url, {method = method, headers = headers, body = body, follow = follow})
 if not response then
   if not silent then
     io.stderr:write("curl: ", tostring(reply), "\n")
   end
-  return status(reply)
+  return status(reply, failure)
 end
 if fail and response.status >= 400 then
   reply:close()

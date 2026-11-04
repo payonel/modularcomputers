@@ -159,11 +159,11 @@ class LuaRunnerTest {
 		boot("""
 			local ok, w, h = board.invoke("id:screen", "getSize")
 			local bad, why = board.invoke("id:nothing", "write", "x")
-			board.invoke("console", "write", tostring(ok) .. " " .. w .. "x" .. h .. " " .. tostring(bad) .. " " .. why)
+			board.invoke("console", "write", tostring(ok) .. " " .. w .. "x" .. h .. " " .. tostring(bad) .. " " .. type(why) .. " " .. why.why)
 			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		untilParked();
-		assertThat(row(0)).startsWith("true 50x16 false ");
+		assertThat(row(0)).as("a failure: false and a table, its why").startsWith("true 50x16 false table no such device");
 	}
 
 	@Test

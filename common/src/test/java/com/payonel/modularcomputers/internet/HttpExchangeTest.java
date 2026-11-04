@@ -62,7 +62,7 @@ class HttpExchangeTest {
 		final ByteArrayOutputStream body = new ByteArrayOutputStream();
 		final List<String> pieces = new ArrayList<>();
 		boolean ended;
-		String failed;
+		com.payonel.modularcomputers.runtime.Failure failed;
 
 		@Override
 		public void response(int status, String message, Map<String, String> headers) {
@@ -83,7 +83,7 @@ class HttpExchangeTest {
 		}
 
 		@Override
-		public void failed(String why) {
+		public void failed(com.payonel.modularcomputers.runtime.Failure why) {
 			failed = why;
 		}
 	}
@@ -122,10 +122,12 @@ class HttpExchangeTest {
 	@Test
 	void byDefaultTheServersOwnMachineIsRefusedBeforeAnythingIsSent() {
 		Heard heard = run(base + "/echo", null, Map.of(), null, InternetPolicy.DEFAULT, HttpExchange.SYSTEM);
-		assertThat(heard.failed).startsWith("refused:");
+		assertThat(heard.failed.table()).as("denied, its reason and the address judged")
+			.isEqualTo(Map.of("why", "denied", "reason", "loopback", "value", server.getAddress().getAddress().getHostAddress()));
 		assertThat(requests.get()).as("no connection made").isZero();
 		Heard named = run("http://localhost:" + server.getAddress().getPort() + "/echo", null, Map.of(), null, InternetPolicy.DEFAULT, HttpExchange.SYSTEM);
-		assertThat(named.failed).as("by its name too").startsWith("refused:");
+		assertThat(named.failed.why()).as("by its name too").isEqualTo("denied");
+		assertThat(named.failed.get("reason")).isEqualTo("loopback");
 		assertThat(requests.get()).isZero();
 	}
 
@@ -135,7 +137,7 @@ class HttpExchangeTest {
 		InetAddress open = InetAddress.getByName("93.184.216.34");
 		HttpExchange.Resolver rebinding = host -> List.of(open, loopback);
 		Heard heard = run("http://rebind.example:" + server.getAddress().getPort() + "/echo", null, Map.of(), null, InternetPolicy.DEFAULT, rebinding);
-		assertThat(heard.failed).startsWith("refused:");
+		assertThat(heard.failed.table()).as("the address that was refused").isEqualTo(Map.of("why", "denied", "reason", "loopback", "value", "127.0.0.1"));
 		assertThat(requests.get()).isZero();
 		// Allowed by name, its judged address is the one it connects to: no second lookup.
 		InternetPolicy allowed = new InternetPolicy(true, List.of("pinned.example"), List.of());
@@ -153,20 +155,48 @@ class HttpExchangeTest {
 		assertThat(pinned.status).isEqualTo(201);
 	}
 
+	/** What can't be a request is refused before it starts, each in its why's shape (the user's): which argument, as given, what it takes; or denied, or a limit. */
 	@Test
 	void whatCantBeARequestIsRefusedBeforeItStarts() {
-		for (String url : List.of("file:///etc/passwd", "ftp://example.com/", "gopher://example.com/", "http://user:pass@example.com/", "not a url",
-			"http:///nohost")) {
-			assertThatThrownBy(() -> HttpExchange.of(url, null, Map.of(), null, LOCAL, HttpExchange.SYSTEM, new Heard())).as(url)
-				.isInstanceOf(IllegalArgumentException.class);
+		Map<String, Map<String, Object>> urls = new LinkedHashMap<>();
+		urls.put("file:///etc/passwd", Map.of("why", "bad_argument", "argument", 1L, "value", "file:///etc/passwd", "expected", "http"));
+		urls.put("ftp://example.com/", Map.of("why", "bad_argument", "argument", 1L, "value", "ftp://example.com/", "expected", "http"));
+		urls.put("not a url", Map.of("why", "bad_argument", "argument", 1L, "value", "not a url", "expected", "url"));
+		urls.put("http:///nohost", Map.of("why", "bad_argument", "argument", 1L, "value", "http:///nohost", "expected", "host"));
+		urls.put("http://user:pass@example.com/", Map.of("why", "denied", "reason", "credentials", "value", "http://user:pass@example.com/"));
+		urls.forEach((url, shape) -> assertThat(refused(url, null, Map.of(), null)).as(url).isEqualTo(shape));
+		assertThat(refused(base + "/echo", null, Map.of("X-Bad", "a\r\nInjected: yes"), null))
+			.isEqualTo(Map.of("why", "bad_argument", "argument", 3L, "value", "X-Bad", "expected", "header"));
+		assertThat(refused(base + "/echo", null, Map.of("Bad Name", "x"), null))
+			.isEqualTo(Map.of("why", "bad_argument", "argument", 3L, "value", "Bad Name", "expected", "header"));
+		for (String own : List.of("Host", "Content-Length", "Transfer-Encoding", "Connection")) {
+			assertThat(refused(base + "/echo", null, Map.of(own, "x"), null)).as(own).isEqualTo(Map.of("why", "denied", "reason", "reserved_header", "value", own));
 		}
-		for (Map<String, String> headers : List.of(Map.of("X-Bad", "a\r\nInjected: yes"), Map.of("Bad Name", "x"), Map.of("Host", "elsewhere"),
-			Map.of("Content-Length", "0"), Map.of("Transfer-Encoding", "chunked"), Map.of("Connection", "keep-alive"))) {
-			assertThatThrownBy(() -> HttpExchange.of(base + "/echo", null, headers, null, LOCAL, HttpExchange.SYSTEM, new Heard())).as(headers.toString())
-				.isInstanceOf(IllegalArgumentException.class);
-		}
-		assertThatThrownBy(() -> HttpExchange.of(base + "/echo", "CONNECT", Map.of(), null, LOCAL, HttpExchange.SYSTEM, new Heard()))
-			.isInstanceOf(IllegalArgumentException.class);
+		assertThat(refused(base + "/echo", "CONNECT", Map.of(), null)).isEqualTo(Map.of("why", "bad_argument", "argument", 2L, "value", "CONNECT", "expected", "method"));
+		assertThat(refused(base + "/echo", "POST", Map.of(), new byte[HttpExchange.MAX_BODY + 1]))
+			.isEqualTo(Map.of("why", "limit", "of", "body", "max", (long) HttpExchange.MAX_BODY));
 		assertThat(requests.get()).isZero();
+	}
+
+	/** A request refused before it starts: its failure, as a program gets it. */
+	private Map<String, Object> refused(String url, String method, Map<String, String> headers, byte[] body) {
+		try {
+			HttpExchange.of(url, method, headers, body, LOCAL, HttpExchange.SYSTEM, new Heard());
+		} catch (HttpExchange.Refused e) {
+			return e.failure().table();
+		}
+		throw new AssertionError("not refused: " + url);
+	}
+
+	/** Failed in transit, one shape (the user's): network, its reason, and what was said of it, always there. */
+	@Test
+	void aNameThatDoesntResolveFailsInTransitItsReasonAndMessage() {
+		HttpExchange.Resolver none = host -> {
+			throw new java.net.UnknownHostException(host);
+		};
+		Heard heard = run("http://nowhere.invalid/", null, Map.of(), null, InternetPolicy.DEFAULT, none);
+		assertThat(heard.failed.table()).isEqualTo(Map.of("why", "network", "reason", "unknown_host", "message", "nowhere.invalid"));
+		Heard empty = run("http://nowhere.invalid/", null, Map.of(), null, InternetPolicy.DEFAULT, host -> List.of());
+		assertThat(empty.failed.table()).as("no address: nothing more said").isEqualTo(Map.of("why", "network", "reason", "unknown_host", "message", ""));
 	}
 }

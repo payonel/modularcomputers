@@ -78,7 +78,7 @@ public final class InternetCard extends Card {
 		final LinkedBlockingQueue<String> body = new LinkedBlockingQueue<>(BUFFERED);
 		volatile Map<String, Object> response;
 		volatile boolean ended;
-		volatile String error;
+		volatile com.payonel.modularcomputers.runtime.Failure error;
 		volatile long bytes;
 		/** What's left of a piece a read took only part of (the reader's, on the server thread: it reads first). */
 		String rest;
@@ -112,14 +112,14 @@ public final class InternetCard extends Card {
 		policy = settings;
 	}
 
-	@Method(doc = "request(url[, method[, headers[, body]]]): starts an HTTP or HTTPS request (GET, or POST with a body; headers a table); returns its handle")
+	@Method(doc = "request(url[, method[, headers[, body]]]): starts an HTTP or HTTPS request (GET, or POST with a body; headers a table); returns its handle, or false and why, {why, ...}: bad_argument, denied or limit")
 	public Result request(Arguments args) {
 		if (!policy.get().enabled()) {
-			return Result.fail("disabled");
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.denied("disabled", ""));
 		} else if (open.size() >= MAX_OPEN) {
-			return Result.fail("too many open: " + MAX_OPEN);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.limit("open_requests", MAX_OPEN));
 		} else if (RUNNING.get() >= MAX_RUNNING) {
-			return Result.fail("server busy");
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.limit("server_requests", MAX_RUNNING)); // (the server's, every card's: no device's news ends it, so not busy)
 		}
 		String url = args.checkString(0);
 		String method = args.get(1) instanceof String verb ? verb : null;
@@ -132,8 +132,8 @@ public final class InternetCard extends Card {
 		Request request = new Request(method != null ? method.toUpperCase(java.util.Locale.ROOT) : body == null ? "GET" : "POST", url);
 		try {
 			request.exchange = HttpExchange.of(url, method, headers, body, policy.get(), resolver, listener(handle, request));
-		} catch (IllegalArgumentException e) {
-			return Result.fail(e.getMessage());
+		} catch (com.payonel.modularcomputers.internet.HttpExchange.Refused e) {
+			return Result.fail(e.failure());
 		}
 		power.charge(REQUEST_COST);
 		open.put(handle, request);
@@ -182,7 +182,7 @@ public final class InternetCard extends Card {
 			}
 
 			@Override
-			public void failed(String why) {
+			public void failed(com.payonel.modularcomputers.runtime.Failure why) {
 				request.error = why;
 				logged(request);
 				request.told();
@@ -200,7 +200,7 @@ public final class InternetCard extends Card {
 		entry.put("millis", (System.nanoTime() - request.started) / 1_000_000);
 		entry.put("bytes", request.bytes);
 		if (request.error != null) {
-			entry.put("why", request.error);
+			entry.put("failure", request.error.table()); // (a record's failure, nested: its fields are the dictionary's, as the entry's are)
 		}
 		log.addLast(entry);
 		while (log.size() > LOG) {
@@ -210,29 +210,35 @@ public final class InternetCard extends Card {
 		news.set(true); // (its interrupt: a reader of its log hears)
 	}
 
-	/** The request a handle names, its news now looked at. */
+	/** The request a handle names, its news now looked at; null: none (its caller's refusal: {@link #noSuchRequest}). */
 	private Request handle(Arguments args) {
 		Request request = open.get(args.checkInteger(0));
 		if (request == null) {
-			throw new Arguments.ArgumentError("no such request: " + args.get(0));
+			return null;
 		}
 		request.fresh = false;
 		unseen = false; // (asked: its news is looked at)
 		return request;
 	}
 
-	@Method(doc = "response(handle): its {status, message, headers} once they've come (headers by name, in lower case); false: not yet; fails with why the request did")
+	@Method(doc = "response(handle): its {status, message, headers} once they've come (headers by name, in lower case); false: not yet; fails with why the request did, {why, ...}: network, denied")
 	public Result response(Arguments args) {
 		Request request = handle(args);
+		if (request == null) {
+			return noSuchRequest(args);
+		}
 		if (request.response != null) {
 			return Result.ok(request.response);
 		}
 		return request.error != null ? Result.fail(request.error) : Result.ok(false);
 	}
 
-	@Method(doc = "read(handle[, n]): the next piece of its body (at most n bytes); false: none yet; \"\": its end; fails with why the request did")
+	@Method(doc = "read(handle[, n]): the next piece of its body (at most n bytes); false: none yet; \"\": its end; fails with why the request did, {why, ...}: network, denied")
 	public Result read(Arguments args) {
 		Request request = handle(args);
+		if (request == null) {
+			return noSuchRequest(args);
+		}
 		long most = args.count() > 1 ? Math.max(1, args.checkInteger(1)) : Long.MAX_VALUE;
 		String piece = request.rest != null ? request.rest : request.body.poll();
 		request.rest = null;
@@ -250,6 +256,11 @@ public final class InternetCard extends Card {
 		return request.ended ? Result.ok("") : Result.ok(false);
 	}
 
+	/** A handle no request has (closed, or never made): the call can't use it. */
+	private static Result noSuchRequest(Arguments args) {
+		return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, args.get(0), "handle"));
+	}
+
 	@Method(doc = "close(handle): stops a request: its connection closes, and what it had waiting goes")
 	public Result close(Arguments args) {
 		Request request = open.remove(args.checkInteger(0));
@@ -259,7 +270,7 @@ public final class InternetCard extends Card {
 		return Result.ok();
 	}
 
-	@Method(doc = "pull(): its access log's oldest entry, a request as it ended: {method, url, status, millis, bytes, why (when it failed)}; or nil")
+	@Method(doc = "pull(): its access log's oldest entry, a request as it ended: {method, url, status, millis, bytes, failure (when it failed: {why, ...}, network or denied)}; or nil")
 	public Result pull(Arguments args) {
 		unseen = false;
 		return Result.ok(log.pollFirst());

@@ -21,23 +21,27 @@ public record InternetPolicy(boolean enabled, List<String> allow, List<String> d
 	/** The default: on, the public internet only. */
 	public static final InternetPolicy DEFAULT = new InternetPolicy(true, List.of(), List.of());
 
-	/** Why a host can't be reached at these addresses, or null: it can. */
-	public String refused(String host, List<InetAddress> addresses) {
+	/**
+	 * Why a host can't be reached at these addresses, or null: it can. Denied (the user's, one shape):
+	 * its reason ({@code disabled}, {@code admin}: an admin's deny, or what the address is), and the
+	 * address judged; a name with no address: the network's {@code unknown_host}.
+	 */
+	public com.payonel.modularcomputers.runtime.Failure refused(String host, List<InetAddress> addresses) {
 		if (!enabled) {
-			return "disabled";
+			return com.payonel.modularcomputers.runtime.Failure.denied("disabled", "");
 		}
 		if (addresses.isEmpty()) {
-			return "unknown host";
+			return com.payonel.modularcomputers.runtime.Failure.network("unknown_host", "");
 		}
 		for (InetAddress address : addresses) {
 			if (listed(deny, host, address)) {
-				return "denied";
+				return com.payonel.modularcomputers.runtime.Failure.denied("admin", address.getHostAddress());
 			}
 		}
 		for (InetAddress address : addresses) {
 			String why = forbidden(address);
 			if (why != null && !listed(allow, host, address)) {
-				return why;
+				return com.payonel.modularcomputers.runtime.Failure.denied(why, address.getHostAddress());
 			}
 		}
 		return null;
@@ -55,7 +59,7 @@ public record InternetPolicy(boolean enabled, List<String> allow, List<String> d
 			if (six.isLoopbackAddress() || six.isAnyLocalAddress()) {
 				return "loopback";
 			} else if (six.isLinkLocalAddress() || six.isSiteLocalAddress()) {
-				return "link-local";
+				return "link_local";
 			} else if ((first & 0xFE) == 0xFC) {
 				return "private";
 			} else if (six.isMulticastAddress()) {
@@ -77,7 +81,7 @@ public record InternetPolicy(boolean enabled, List<String> allow, List<String> d
 		} else if (a0 == 10 || a0 == 172 && a1 >= 16 && a1 <= 31 || a0 == 192 && a1 == 168) {
 			return "private"; // (the server's network)
 		} else if (a0 == 169 && a1 == 254) {
-			return "link-local"; // (a cloud's metadata lives here)
+			return "link_local"; // (a cloud's metadata lives here)
 		} else if (a0 == 100 && a1 >= 64 && a1 <= 127) {
 			return "shared"; // (carrier-grade NAT)
 		} else if (a0 == 192 && a1 == 0 && (b[2] & 0xFF) == 0) {

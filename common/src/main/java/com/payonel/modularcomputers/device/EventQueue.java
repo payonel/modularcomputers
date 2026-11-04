@@ -99,7 +99,7 @@ public final class EventQueue {
 	 */
 	public void refused(String event, com.payonel.modularcomputers.runtime.Result refusal, Map<String, Object> call) {
 		if (Buffered.SYSTEM_FAILURE.equals(refusal.error())) {
-			systemFailure(event, String.valueOf(refusal.first()), call);
+			systemFailure(event, (String) refusal.failure().get("missing"), call);
 			return;
 		}
 		throw new IllegalArgumentException("no event shape for the refusal " + refusal.error());

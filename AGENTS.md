@@ -277,6 +277,16 @@ device data), and user code, as a real CPU runs firmware under an OS.
   started, its outcome an event later; a buffered device given a command while one runs refuses
   it (`busy`) rather than wait (see buffered devices, under mcos). `board.waitForInterrupt` is the
   only wait; mcos's blocking reads and commands are the kernel waiting for a process.
+- **Every failure is one shape a why** (the user's, 2026-11-04): a call refused answers `false,
+  {why, ...}`, a table built only by that why's own builder (`runtime/Failure`: `busy`/`held`
+  `{id}`, `drifted {drift}`, `system_failure {missing}`, `bad_argument {argument, value,
+  expected}`, `denied {reason, value}`, `limit {of, max}`, `network {reason, message}`), each
+  taking every field (none missing: `""` when there's nothing to say), its fields' names the field
+  dictionary's (a `name` a registry id everywhere, an `id` a UUID, `at` an offset). A refusal not
+  yet named is `Failure.legacy`, its old text as its why and no fields, until it's named. mcos's
+  kernel reads a failure through `k.invoke` (its why as a word, then the table), and an ioctl
+  gives a program `nil, why, errno, failure`; a record holds one nested (`failure`, the internet
+  log's), an event flat (its why's fields beside `why`).
 - **Device failures are soft:** no device can stop the machine; only the program's own error or the
   board's supervision (CPU gone, power gone) ends a run. External devices are hot-plugged: one
   that isn't there isn't on the bus, and calls to it fail at once.
@@ -683,7 +693,7 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   (`EventQueue.missingInputs`, `noSpace`): `name` what it was making (its last craft's, `""` none;
   no_space's, what found no room), its progress the crafts done. **`system_failure`** (the user's,
   2026-11-04): what a device needs to do it is missing, `missing` saying what (`legs`, `thrusters`,
-  `power`, `bench`, `robotics`): a call refused so answers `false, "system_failure", missing`
+  `power`, `bench`, `robotics`): a call refused so answers `false, {why = "system_failure", missing}`
   (`Buffered.missing`), and a command given again once its robot's let go and refused becomes its
   end in the same shape (`EventQueue.refused`, `systemFailure`), so an answer at once and the event
   it becomes agree; a field losing power lets go, a notice (`systemFailureNotice`). **No why is
@@ -704,7 +714,7 @@ before it takes off). A move already done (an arm out
   A tags-and-queues design came first
   and was set aside as too error-prone.
   - **A refusal always names the device whose news ends the wait** (the user's: one shape):
-    `false, "busy", "<id>"`, its own id, or another's when it's busy for that one's sake
+    `false, {why = "busy", id = "<id>"}`, its own id, or another's when it's busy for that one's sake
     (`Buffered.blocker`: a crafting card waiting for its robot's moves, the robot's busy state, the
     card's interrupt line), and mcos listens on both. `busy` and `held` mean "wait":
     no device method fails with them (a field's target in another field is `captured`); any other
@@ -817,6 +827,9 @@ before it takes off). A move already done (an arm out
   in a loader's entry point calling a common hook. `common` can't see a loader's API.
 - **A new packet** goes in `ModNetwork`'s lists (a client handler in `ModNetworkClient`); **a new
   game test class** in `GameTests.CLASSES`. Nothing else registers them.
+- **A new failure is a why with its own builder** (`runtime/Failure` for a refusal, `EventQueue` for
+  an event), every field required; never `Result.fail(String)`, which is a not-yet-named one's
+  (`Failure.legacy`).
 - **A new cabled block's entity** holds `CablePorts`, and `Cabling` learns its ports and kind.
 - **A new device with an interrupt line** gets a stimulus in `DeviceInterruptsTest`; **a device whose
   `get`/`set` take tables** gets a driver (`lib/modules/drivers/<type>.lua`).

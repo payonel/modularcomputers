@@ -35,7 +35,7 @@ proxies, cookies or server details; it names itself `ModularComputers`.
 
 A server's operator can turn it off (`internet_enabled`) and allow or deny hosts and ranges
 (`internet_allow`, `internet_deny`). When it is off, `request` fails with
-`disabled`.
+`{why = "denied", reason = "disabled", value = ""}`.
 
 Timeouts: 10 seconds to connect, 30 with nothing read, 10 minutes in all. The status line and
 headers together are at most 64 KiB. The methods are `GET`, `HEAD`, `POST`, `PUT`, `DELETE`, `PATCH`
@@ -53,13 +53,13 @@ local handle = assert(sys.ioctl(card, "request", "https://example.com/"))
 ```
 
 Reading the file gives its **access log**, a line for each request as it ended, as a web server's:
-the method, the URL, the status (or `-` and why it failed), how long it took and the bytes it
-brought.
+the method, the URL, the status (or `-` and its failure: its why and its fields' values), how long it
+took and the bytes it brought.
 
 ```
 GET https://example.com/ 200 143ms 1256
 POST https://example.com/paste 201 310ms 42
-GET http://10.0.0.1/ - 2ms 0 refused: private
+GET http://10.0.0.1/ - 2ms 0 denied private 10.0.0.1
 ```
 
 - **Reading** gives the next line; with none waiting, a read waits for one. `cat /dev/internet0`
@@ -71,14 +71,32 @@ GET http://10.0.0.1/ - 2ms 0 refused: private
   file. A program waiting for a request polls for `PRI`, then asks again.
 
 An ioctl's answer is the method's (`true` for `close`, which answers nothing). A method's failure is
-`nil`, its message and `EINVAL`; a card that has gone is `ENODEV`.
+`nil`, its why, `EINVAL`, and the failure itself (below); a card that has gone is `ENODEV`.
+
+## Failures
+
+Every failure is a table, `{why, ...}`: a word, and its own fields, every one always there (`""`
+when it has nothing to say). A method answers `false, failure` at the board, and `nil, why, errno,
+failure` through its file. A log entry carries one as `failure`.
+
+| why | fields | when |
+|---|---|---|
+| `bad_argument` | `argument` (its position), `value` (as given), `expected`: `url`, `http`, `host`, `method`, `header` or `handle` | a request can't be made of it, or a handle names no open request |
+| `denied` | `reason`, `value` (what was refused) | not allowed: `disabled` (the card is off, `""`), `credentials` (the URL), `reserved_header` (the header), or the address judged (`"127.0.0.1"`): `admin` (the operator's deny list), `loopback`, `private`, `link_local`, `shared`, `reserved`, `multicast`, `unspecified`, `documentation`, `teredo` |
+| `limit` | `of`, `max` | `open_requests` (the card's 4), `body` (1048576 bytes), `server_requests` (64, every card on the server) |
+| `network` | `reason`, `message` (what was said of it, `""` for none) | `unknown_host`, `timed_out`, `connection_refused`, `tls`, `other`, or the answer was bad: `not_http`, `bad_content_length`, `bad_chunk`, `closed_early`, `headers_too_long` |
+
+```lua
+local full = {why = "limit", of = "open_requests", max = 4}
+local tls = {why = "network", reason = "tls", message = "PKIX path building failed"}
+```
 
 [`wget`](/programs/wget/) and [`curl`](/programs/curl/) are built on these methods, through the
 `http` library (`require("http")`, see [the sys library](/mcos/sys-api/)): `http.request(url,
 options)` makes a request (`options.method`, `headers`, `body`, `follow` to follow redirects, up to
 20, and `device` for a card's file other than the first), and gives the response
 `{status, message, headers, url}` and a reader for its body (`reader:read(n)`, `""` at its end;
-`reader:close()`), or `nil` and why.
+`reader:close()`), or `nil`, its failure as words (`network timed_out`) and the failure.
 
 ## Methods
 
@@ -86,19 +104,17 @@ options)` makes a request (`options.method`, `headers`, `body`, `follow` to foll
 
 Starts a request and gives its handle (a number) at once. The method defaults to `GET`, or `POST`
 when there is a body. `headers` is a table of names and values. The body is a string. The URL must be
-`http` or `https` with a host. It fails with a message when the request cannot be made:
-`not a URL: `, `not http: `, `no host: ` or `credentials: ` and the URL (credentials in a URL
-aren't sent), `not a method: `, `not a header: ` or `reserved header: ` (one the card writes
-itself) and what it was, `too long: 1048576` (a body over 1 MiB), `too many open: 4`, or
-`server busy`. Whether the address is allowed is judged as the request runs, and a refusal is the
-request's failure: `refused: ` and why (`loopback`, `private`, `link-local`, `shared`, `multicast`,
-`reserved`, `unspecified`, `documentation`, `teredo`, `denied`, `disabled`, `unknown host`). A request costs power.
+`http` or `https` with a host. It fails when the request cannot be made: `bad_argument` (a URL that
+isn't one, isn't `http`, or has no host; a method or a header that isn't one), `denied`
+(`disabled`; `credentials`: they're never sent; `reserved_header`: one the card writes itself), or
+`limit` (`body`, `open_requests`, `server_requests`). Whether the address is allowed is judged as
+the request runs, and a refusal is the request's failure, `denied` with the address. A request
+costs power.
 
 ### response(handle) → {status, message, headers} or false
 
 The status line and headers once they have come (`headers` by name, in lower case); `false` while
-they have not. It fails with why, when the request did (`refused: ...`, `timed out`, `closed early`, `not http`,
-`tls: ` and why).
+they have not. It fails with the request's failure, when it failed (`denied`, `network`).
 
 ### read(handle[, n]) → piece, "" or false
 
@@ -116,9 +132,9 @@ its connection.
 ### pull() → entry or nil
 
 The access log's oldest entry, what the file reads as a line: `{method, url, status, millis, bytes,
-why}` (`status` is 0 and `why` says why when it failed).
+failure}` (`status` is 0, and `failure` the request's, when it failed; no `failure` when it didn't).
 
-`response`, `read` and `close` fail with `no such request: N` for a handle that is not open.
+`response` and `read` fail with `bad_argument` (`expected = "handle"`) for a handle that is not open.
 
 ## Waiting
 

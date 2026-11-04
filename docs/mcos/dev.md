@@ -23,8 +23,11 @@ An open file holds the device's **id**, not its name: it reaches that device or 
 
 Every device file's ioctls are its device's [methods](/concepts/bus/), by name, with the
 method's arguments, in any open mode, as a Linux device's ioctls are its driver's API. The answer is
-the method's (`true` for a method that answers nothing); a method's failure is `EINVAL` with its
-message, and a device gone is `ENODEV`.
+the method's (`true` for a method that answers nothing); a method's failure is `nil`, its why (a
+word: `busy`, `system_failure`, `denied`...), `EINVAL`, and then the failure itself, a table of its
+why and its fields (`{why = "system_failure", missing = "legs"}`: each why always has the same
+fields); a device gone is `ENODEV`. Some devices' failures aren't named yet: their why is their old
+message, and their table has nothing else.
 
 ```lua
 local sys = require("sys")

@@ -73,7 +73,7 @@ a [redstone card](/devices/redstone-card/), a
 over time ends in an event named after its method, `{event = "walk", ok = true}` (or `ok = false`
 and why), which raises its interrupt: the device's "idle again".
 
-- **At the board**, a command given while another runs is refused at once, `false, "busy", id`,
+- **At the board**, a command given while another runs is refused at once, `false, {why = "busy", id}`,
   doing nothing: the call still never waits. The id is the device whose news ends the wait, always:
   its own, or another's (a crafting card waiting for its robot's walk names the robot). Wait on that
   id's interrupt (`board.waitForInterrupt(nil, id)`), take its news, then give the command again. Every such device has

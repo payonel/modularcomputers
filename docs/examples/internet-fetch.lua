@@ -20,21 +20,22 @@ end
 local card = assert(sys.open(CARD))
 
 -- Asks a method until it answers something other than "not yet" (false), waiting for the card's
--- news between asks. A failure is nil and why, as the method's.
+-- news between asks. A failure is nil, its why, and its reason (the failure's own field: network's
+-- unknown_host or timed_out, denied's loopback...).
 local function await(method, ...)
   while true do
-    local answer, why = sys.ioctl(card, method, ...)
+    local answer, why, _, failure = sys.ioctl(card, method, ...)
     if answer ~= false then
-      return answer, why
+      return answer, why, failure and failure.reason
     end
     sys.poll({[card] = {PRI = true}})
   end
 end
 
 local handle = assert(sys.ioctl(card, "request", url))
-local response, why = await("response", handle)
+local response, why, reason = await("response", handle)
 if not response then
-  io.stderr:write("internet-fetch: ", why, "\n") -- refused, an unknown host, timed out
+  io.stderr:write("internet-fetch: ", why, " ", reason, "\n") -- denied loopback, network timed_out
   os.exit(1)
 elseif response.status ~= 200 then
   io.stderr:write("internet-fetch: ", response.status, " ", response.message, "\n")

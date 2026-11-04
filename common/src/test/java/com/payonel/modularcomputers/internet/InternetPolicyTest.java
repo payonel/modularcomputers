@@ -32,9 +32,10 @@ class InternetPolicyTest {
 
 	@Test
 	void oneForbiddenAddressAmongAHostsRefusesIt() throws Exception {
-		assertThat(InternetPolicy.DEFAULT.refused("rebind.example", List.of(at("93.184.216.34"), at("127.0.0.1")))).isNotNull();
+		assertThat(InternetPolicy.DEFAULT.refused("rebind.example", List.of(at("93.184.216.34"), at("127.0.0.1"))).table())
+			.as("denied: its reason, and the address judged").isEqualTo(java.util.Map.of("why", "denied", "reason", "loopback", "value", "127.0.0.1"));
 		assertThat(InternetPolicy.DEFAULT.refused("example.com", List.of(at("93.184.216.34")))).isNull();
-		assertThat(InternetPolicy.DEFAULT.refused("nowhere", List.of())).isEqualTo("unknown host");
+		assertThat(InternetPolicy.DEFAULT.refused("nowhere", List.of()).table()).isEqualTo(java.util.Map.of("why", "network", "reason", "unknown_host", "message", ""));
 	}
 
 	@Test
@@ -45,8 +46,10 @@ class InternetPolicyTest {
 		assertThat(policy.refused("other", List.of(at("192.168.6.1")))).as("outside it").isNotNull();
 		assertThat(policy.refused("a.evil.example", List.of(at("8.8.8.8")))).as("a denied domain").isNotNull();
 		assertThat(policy.refused("evil.example", List.of(at("8.8.8.8")))).as("the domain itself").isNotNull();
-		assertThat(policy.refused("dns", List.of(at("1.1.1.1")))).as("a denied address").isNotNull();
+		assertThat(policy.refused("dns", List.of(at("1.1.1.1"))).table()).as("a denied address: the admin's")
+			.isEqualTo(java.util.Map.of("why", "denied", "reason", "admin", "value", "1.1.1.1"));
 		assertThat(policy.refused("x", List.of(at("192.168.5.9")))).as("a deny wins over an allow").isNotNull();
-		assertThat(new InternetPolicy(false, List.of(), List.of()).refused("example.com", List.of(at("93.184.216.34")))).as("off").isNotNull();
+		assertThat(new InternetPolicy(false, List.of(), List.of()).refused("example.com", List.of(at("93.184.216.34"))).table()).as("off")
+			.isEqualTo(java.util.Map.of("why", "denied", "reason", "disabled", "value", ""));
 	}
 }

@@ -98,8 +98,8 @@ answers are shown the same way, tables as `{key = value}`.
 failed: no such method: nope
 ```
 
-A call never stops the computer. When it fails, `board.invoke` answers `false` and why, and `call`
-shows `failed:` and the message.
+A call never stops the computer. When it fails, `board.invoke` answers `false` and its failure, a
+table of its why and its fields, and `call` shows `failed:` and the table.
 
 ### Files on the disk
 

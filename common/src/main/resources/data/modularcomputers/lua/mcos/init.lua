@@ -55,9 +55,20 @@ local k = {
   BLOCK = setmetatable({}, {__name = "BLOCK"}), -- a description's answer: try again when things change
 }
 
+-- A device call, as board.invoke answers it, its failure given as its why (the word) and then the
+-- failure itself ({why, ...}, its fields: a busy one's id, a network one's reason): so the kernel's
+-- parts match words, and a program can be given the fields. Every part of the kernel calls devices so.
+function k.invoke(id, method, ...)
+  local answer = table.pack(board.invoke(id, method, ...))
+  if not answer[1] and type(answer[2]) == "table" then
+    return false, answer[2].why, answer[2]
+  end
+  return table.unpack(answer, 1, answer.n)
+end
+
 -- A file of the kernel's, read off the boot disk itself (the VFS isn't up yet), run with its arguments.
 local function kload(path, ...)
-  local opened, file = board.invoke(root, "open", path)
+  local opened, file = k.invoke(root, "open", path)
   if not opened then
     error(path .. ": " .. tostring(file), 0)
   end
@@ -1559,14 +1570,14 @@ end
 -- The next piece of a device's stream ('method': its pull, receive, changes), as board.invoke
 -- answers (ok, value); none waiting, the kernel listens for it.
 function k.take(id, method)
-  local ok, value = board.invoke(id, method)
+  local ok, value, failure = k.invoke(id, method)
   if ok and value == nil then
     listening[id] = true
   elseif ok then
     local device = devices.byid[id]
     k.log(device and device.name or id, id, describe(value))
   end
-  return ok, value
+  return ok, value, failure
 end
 
 -- The kernel's log since entry 'after' (its seq; 0: all of it), oldest first, copies (syslog(2)'s

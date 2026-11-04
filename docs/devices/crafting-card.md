@@ -57,7 +57,7 @@ robot is free to walk and act. A field holding the robot holds its robotics only
 card's, and goes on, but the robot is what works the card (a case has none), so every command the
 card is given waits until the robot is let go. Its `pull`, `list` (its own
 slots) and `stop` never wait. At the board a refusal names the device whose news ends the wait:
-the robot while it's busy (`false, "busy", "id:<the robot>"`), the card itself while it crafts.
+the robot while it's busy (`false, {why = "busy", id = "id:<the robot>"}`), the card itself while it crafts.
 
 ## In mcos
 

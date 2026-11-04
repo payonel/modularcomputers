@@ -54,11 +54,12 @@ the spec the build follows and its checklist, items marked done as they land.
   waiting for one method's end; the user's design had a sync, and every buffered device has a free
   `sync` method now, as the sound card's.)
 
-### Failure strings
+### Failures
 
-Dry, never prose (the user's): a lowercase reason, a colon, data (ids, faces, numbers):
-`held`, `busy`, `system_failure` (and what's missing: `legs`, `thrusters`, `power`, `bench`,
-`robotics`), `stopped`. For every device.
+One shape a why (the user's, 2026-11-04): a word and its own named fields, every one always there,
+built by that why's builder only (`Failure` for a refusal, `false, {why, ...}`; `EventQueue` for an
+event, its fields flat). `held`, `busy` (`id`), `system_failure` (`missing`: `legs`, `thrusters`,
+`power`, `bench`, `robotics`), `stopped`... For every device.
 
 Being made one shape (the user's, 2026-11-03): a why is one word, exactly, and what it's about
 comes in named fields beside it, the same fields wherever it's said. Done so far: `blocked`

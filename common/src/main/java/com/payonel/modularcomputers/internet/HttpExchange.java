@@ -71,7 +71,31 @@ public final class HttpExchange implements Runnable {
 
 		void end();
 
-		void failed(String why);
+		void failed(com.payonel.modularcomputers.runtime.Failure why);
+	}
+
+	/** A request that can't be made, and why (its why's own shape): thrown before any thread starts. */
+	public static final class Refused extends IllegalArgumentException {
+		private final com.payonel.modularcomputers.runtime.Failure failure;
+
+		Refused(com.payonel.modularcomputers.runtime.Failure failure) {
+			super(failure.toString());
+			this.failure = failure;
+		}
+
+		public com.payonel.modularcomputers.runtime.Failure failure() {
+			return failure;
+		}
+	}
+
+	/** What the other end answered badly, by its reason (the network's: nothing more said of it). */
+	private static final class Bad extends IOException {
+		final String reason;
+
+		Bad(String reason) {
+			super(reason);
+			this.reason = reason;
+		}
 	}
 
 	/** How a host's name becomes addresses (the system's resolver; a test's). */
@@ -110,28 +134,28 @@ public final class HttpExchange implements Runnable {
 		try {
 			uri = new URI(url);
 		} catch (URISyntaxException e) {
-			throw new IllegalArgumentException("not a URL: " + url);
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.badArgument(1, url, "url"));
 		}
 		String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
 		if (!scheme.equals("http") && !scheme.equals("https")) {
-			throw new IllegalArgumentException("not http: " + url);
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.badArgument(1, url, "http"));
 		} else if (uri.getHost() == null || uri.getRawUserInfo() != null) {
-			throw new IllegalArgumentException(uri.getRawUserInfo() != null ? "credentials: " + url : "no host: " + url); // (credentials in a URL aren't sent)
+			throw new Refused(uri.getRawUserInfo() != null ? com.payonel.modularcomputers.runtime.Failure.denied("credentials", url) : com.payonel.modularcomputers.runtime.Failure.badArgument(1, url, "host")); // (credentials in a URL aren't sent)
 		}
 		String verb = method == null ? (body == null ? "GET" : "POST") : method.toUpperCase(Locale.ROOT);
 		if (!METHODS.contains(verb)) {
-			throw new IllegalArgumentException("not a method: " + method);
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.badArgument(2, method, "method"));
 		} else if (body != null && body.length > MAX_BODY) {
-			throw new IllegalArgumentException("too long: " + MAX_BODY);
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.limit("body", MAX_BODY));
 		}
 		Map<String, String> checked = new LinkedHashMap<>();
 		for (var header : headers.entrySet()) {
 			String name = header.getKey();
 			String value = header.getValue();
 			if (!name.matches("[!#$%&'*+.^_`|~0-9A-Za-z-]+") || value.chars().anyMatch(c -> c == '\r' || c == '\n' || c == 0)) {
-				throw new IllegalArgumentException("not a header: " + name);
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badArgument(3, name, "header"));
 			} else if (OWN.contains(name.toLowerCase(Locale.ROOT))) {
-				throw new IllegalArgumentException("reserved header: " + name); // (one the card writes itself)
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.denied("reserved_header", name)); // (one the card writes itself)
 			}
 			checked.put(name, value);
 		}
@@ -166,13 +190,16 @@ public final class HttpExchange implements Runnable {
 		}
 	}
 
-	private static String why(Exception e) {
+	/** Why it failed in transit (the network's, one shape): its reason, and what was said of it ("": nothing more). */
+	private static com.payonel.modularcomputers.runtime.Failure why(Exception e) {
+		String said = e.getMessage() == null ? "" : e.getMessage();
 		return switch (e) {
-			case java.net.UnknownHostException unknown -> "unknown host";
-			case java.net.SocketTimeoutException timeout -> "timed out";
-			case java.net.ConnectException refused -> "connection refused";
-			case javax.net.ssl.SSLException tls -> "tls: " + tls.getMessage();
-			default -> e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+			case Bad bad -> com.payonel.modularcomputers.runtime.Failure.network(bad.reason, "");
+			case java.net.UnknownHostException unknown -> com.payonel.modularcomputers.runtime.Failure.network("unknown_host", said);
+			case java.net.SocketTimeoutException timeout -> com.payonel.modularcomputers.runtime.Failure.network("timed_out", said);
+			case java.net.ConnectException refused -> com.payonel.modularcomputers.runtime.Failure.network("connection_refused", said);
+			case javax.net.ssl.SSLException tls -> com.payonel.modularcomputers.runtime.Failure.network("tls", said);
+			default -> com.payonel.modularcomputers.runtime.Failure.network("other", said.isEmpty() ? e.getClass().getSimpleName() : said);
 		};
 	}
 
@@ -187,9 +214,9 @@ public final class HttpExchange implements Runnable {
 		deadline = System.nanoTime() + TOTAL_MILLIS * 1_000_000;
 		String host = uri.getHost().startsWith("[") ? uri.getHost().substring(1, uri.getHost().length() - 1) : uri.getHost();
 		List<InetAddress> addresses = resolver.resolve(host);
-		String refused = policy.refused(host, addresses);
+		com.payonel.modularcomputers.runtime.Failure refused = policy.refused(host, addresses);
 		if (refused != null) {
-			listener.failed("refused: " + refused);
+			listener.failed(refused);
 			return;
 		}
 		boolean tls = uri.getScheme().equalsIgnoreCase("https");
@@ -258,12 +285,12 @@ public final class HttpExchange implements Runnable {
 			statusLine = line(in, budget);
 			String[] parts = statusLine.split(" ", 3);
 			if (parts.length < 2 || !parts[0].startsWith("HTTP/1.")) {
-				throw new IOException("not http");
+				throw new Bad("not_http");
 			}
 			try {
 				status = Integer.parseInt(parts[1]);
 			} catch (NumberFormatException e) {
-				throw new IOException("not http");
+				throw new Bad("not_http");
 			}
 			fields = headers(in, budget);
 		} while (status >= 100 && status < 200);
@@ -280,7 +307,7 @@ public final class HttpExchange implements Runnable {
 				try {
 					left = Long.parseLong(length.strip());
 				} catch (NumberFormatException e) {
-					throw new IOException("bad content-length");
+					throw new Bad("bad_content_length");
 				}
 				copy(in, left);
 			} else {
@@ -300,7 +327,7 @@ public final class HttpExchange implements Runnable {
 			int got = in.read(buffer, 0, left < 0 ? CHUNK : (int) Math.min(CHUNK, left));
 			if (got < 0) {
 				if (left > 0) {
-					throw new IOException("closed early");
+					throw new Bad("closed_early");
 				}
 				return;
 			}
@@ -322,7 +349,7 @@ public final class HttpExchange implements Runnable {
 			try {
 				length = Long.parseLong(size, 16);
 			} catch (NumberFormatException e) {
-				throw new IOException("bad chunk");
+				throw new Bad("bad_chunk");
 			}
 			if (length == 0) {
 				headers(in, budget); // (its trailer)
@@ -339,9 +366,9 @@ public final class HttpExchange implements Runnable {
 		while (true) {
 			int c = in.read();
 			if (c < 0) {
-				throw new IOException("closed early");
+				throw new Bad("closed_early");
 			} else if (--budget[0] < 0) {
-				throw new IOException("headers too long");
+				throw new Bad("headers_too_long");
 			} else if (c == '\n') {
 				String text = line.toString(StandardCharsets.ISO_8859_1);
 				return text.endsWith("\r") ? text.substring(0, text.length() - 1) : text;
