@@ -68,12 +68,13 @@ minecraft:stick 4
 ```
 
 A line written drops everything in its storage (not its grid) at a face of the robot: an empty
-line below it, or a face's name. A container there is filled first; the rest go into the world.
-So a golem back from mining empties itself into a hopper or a chest under it in one write:
+line in front of it, or a face's name. A container there is filled first; the rest go into the world.
+So a golem back from mining empties itself into a chest in front of it, or a hopper under it, in
+one write:
 
 ```sh
 echo > /dev/crafting0
-echo front > /dev/crafting0
+echo down > /dev/crafting0
 ```
 
 Its file's ioctls are its methods, by name. Its events come as `sys.poll`'s `PRI`, and the `pull`
