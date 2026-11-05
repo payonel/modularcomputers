@@ -39,7 +39,7 @@ class CraftingExamplesTest extends McosHarness {
 			@Override
 			public Result craft() {
 				if (craftsRoomFor-- == 0) {
-					return Result.fail(com.payonel.modularcomputers.device.Buffered.NO_SPACE);
+					return Result.fail(Failure.noSpace("minecraft:oak_planks")); // (what it would have made: no room)
 				}
 				planks += 4;
 				return Result.ok(Map.of("name", "minecraft:oak_planks", "count", 4));

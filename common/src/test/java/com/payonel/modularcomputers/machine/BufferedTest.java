@@ -89,7 +89,7 @@ class BufferedTest {
 			seen.add(board.invoke("id:slow", "peek").first()); // and it's idle at once
 			Program.park(board);
 		});
-		assertThat(seen).containsExactly("ticks: 0", 0L, true, false,
+		assertThat(seen).containsExactly("bad_argument", 0L, true, false,
 			Map.of("event", "work", "ok", false, "why", "stopped", "call", Map.of("args", java.util.List.of(50L), "progress", 0L)), 0L);
 		assertThat(slow.working()).isFalse();
 	}

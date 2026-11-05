@@ -109,8 +109,8 @@ class DiskTest {
 			seen.add(board.invoke("sata:0", "readlink", "/to").first());
 			seen.add(board.invoke("sata:0", "stat", "/to", true).first());
 			seen.add(board.invoke("sata:0", "list", "/", true).first());
-			seen.add(board.invoke("sata:0", "open", "/to/f", "w").error()); // on the way: the OS follows it
-			seen.add(board.invoke("sata:0", "stat", "/to").error()); // at the end, following
+			seen.add(board.invoke("sata:0", "open", "/to/f", "w").failure().table()); // on the way: the OS follows it
+			seen.add(board.invoke("sata:0", "stat", "/to").failure().table()); // at the end, following
 			seen.add(board.invoke("sata:0", "symlink", "x", "/to").failure().table());
 			seen.add(board.invoke("sata:0", "readlink", "/real").failure().table());
 			seen.add(board.invoke("sata:0", "rename", "/to", "/moved").failed());
@@ -123,8 +123,8 @@ class DiskTest {
 		assertThat(seen.get(2)).isEqualTo(Map.of("size", 5L, "directory", false, "link", "/real",
 			"modified", ((Map<?, ?>) seen.get(2)).get("modified")));
 		assertThat(seen.get(3)).isEqualTo(List.of(Map.of("name", "real", "type", "directory"), Map.of("name", "to", "type", "link")));
-		assertThat(seen.get(4)).isEqualTo(Disk.REPARSE + "/to\0/real");
-		assertThat(seen.get(5)).isEqualTo(Disk.REPARSE + "/to\0/real");
+		assertThat(seen.get(4)).isEqualTo(Map.of("why", "symbolic_link", "at", "/to", "target", "/real"));
+		assertThat(seen.get(5)).isEqualTo(Map.of("why", "symbolic_link", "at", "/to", "target", "/real"));
 		assertThat(seen.get(6)).isEqualTo(Map.of("why", "bad_state", "of", "path", "value", "/to", "expected", "absent"));
 		assertThat(seen.get(7)).isEqualTo(Map.of("why", "bad_state", "of", "path", "value", "/real", "expected", "link"));
 		assertThat(seen.subList(8, 11)).containsExactly(false, false, true);

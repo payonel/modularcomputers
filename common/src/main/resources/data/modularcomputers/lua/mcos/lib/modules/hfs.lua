@@ -16,18 +16,14 @@ local SHAPES = {
   fault = {"condition", {io_error = "EIO", internal_error = "EIO"}},
 }
 
-local REPARSE = "symbolic link\0" -- the disk met a link: its path, a NUL, its target
-
 local function failed(why, failure)
+  if type(failure) == "table" and failure.why == "symbolic_link" then
+    return nil, {at = failure.at, target = failure.target}, "REPARSE" -- (the VFS goes on from it)
+  end
   local shape = type(failure) == "table" and SHAPES[failure.why]
   if shape then
     local errno = shape[2] == true and shape[3] or shape[2][failure[shape[1]]]
     return fail(errno or "EIO")
-  end
-  why = tostring(why)
-  if why:sub(1, #REPARSE) == REPARSE then
-    local at, target = why:match("^([^%z]*)%z(.*)$", #REPARSE + 1)
-    return nil, {at = at, target = target}, "REPARSE"
   end
   return fail("EIO")
 end

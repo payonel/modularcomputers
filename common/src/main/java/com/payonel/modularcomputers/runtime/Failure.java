@@ -64,6 +64,12 @@ public final class Failure {
 	public static final String NETWORK = "network";
 	/** What it names isn't there: what kind of thing ({@code kind}), and as given ({@code value}). */
 	public static final String NOT_FOUND = "not_found";
+	/**
+	 * A path met a symbolic link (the user's, 2026-11-05; SMB2's STATUS_STOPPED_ON_SYMLINK): the disk
+	 * never follows one, so the call stops there, saying the link's path on the disk ({@code at}) and
+	 * its target ({@code target}), and the OS's VFS goes on from it.
+	 */
+	public static final String SYMBOLIC_LINK = "symbolic_link";
 	/** A craft's grid makes nothing ({@code name}: what it was making, "" none). */
 	public static final String MISSING_INPUTS = "missing_inputs";
 	/** No room for what it makes ({@code name}: what). */
@@ -157,6 +163,10 @@ public final class Failure {
 		return new Failure(NOT_FOUND, "kind", kind, "value", value == null ? "" : value);
 	}
 
+	public static Failure symbolicLink(String at, String target) {
+		return new Failure(SYMBOLIC_LINK, "at", at, "target", target);
+	}
+
 	public static Failure missingInputs(String name) {
 		return new Failure(MISSING_INPUTS, "name", name);
 	}
@@ -165,19 +175,11 @@ public final class Failure {
 		return new Failure(NO_SPACE, "name", name);
 	}
 
-	/**
-	 * A refusal not yet given a why of its own (the user's, 2026-11-04: every refusal a table now,
-	 * these named one by one later): its old text as its why, and no fields. Nothing new uses it.
-	 */
-	public static Failure legacy(String text) {
-		return new Failure(text == null ? "unknown error" : text);
-	}
-
 	public String why() {
 		return why;
 	}
 
-	/** Its fields, by name (none for a legacy one). */
+	/** Its fields, by name. */
 	public Map<String, Object> fields() {
 		return fields;
 	}

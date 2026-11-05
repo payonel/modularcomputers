@@ -49,8 +49,8 @@ import java.util.stream.Stream;
  * file of exactly {@link #LINK_SIZE} bytes, {@code XSym}, the target's length and MD5, then the
  * target ({@link #symlink}). The host never gets a real link (one could point out of the folder). The
  * disk never follows a link itself: a path that meets one (on its way, or at its end, for a call
- * that follows it) fails with {@link #REPARSE}, the link's path and its target, and the OS's VFS
- * goes on from there (as a Windows filesystem answers STATUS_REPARSE): a target can be anywhere in
+ * that follows it) fails {@code symbolic_link}, with the link's path and its target, and the OS's VFS
+ * goes on from there (as an SMB2 server answers STATUS_STOPPED_ON_SYMLINK): a target can be anywhere in
  * the OS's tree, on another disk too.
  */
 public final class Disk implements Device {
@@ -72,8 +72,6 @@ public final class Disk implements Device {
 	private static final int LINK_HEADER = LINK_MAGIC.length() + 5 + 33;
 	/** The longest target a link holds (the rest of its file, less the new line after it). */
 	public static final int LINK_MAX = LINK_SIZE - LINK_HEADER - 1;
-	/** How a call that met a link fails: this, the link's path on the disk, a NUL and its target ({@code "symbolic link\0/a/b\0../c"}). */
-	public static final String REPARSE = "symbolic link\0";
 	/** Live disks by id (their folder's name): a handle finds its disk by it, also after a restore. */
 	private static final Map<String, Disk> LIVE = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -388,7 +386,7 @@ public final class Disk implements Device {
 
 	/**
 	 * As {@link #resolve(String)}; a link met on the way, or at the end when {@code follow}, fails the
-	 * call with {@link #REPARSE} (the OS follows it).
+	 * call {@code symbolic_link} (the OS follows it).
 	 */
 	Path resolve(String path, boolean follow, int argument) {
 		Path root = root();
@@ -570,7 +568,7 @@ public final class Disk implements Device {
 		} catch (Refused e) {
 			return Result.fail(e.failure);
 		} catch (Reparse e) {
-			return Result.fail(REPARSE + e.at + "\0" + e.target); // (not a failure: to be its own answer, the user's, later)
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.symbolicLink(e.at, e.target)); // (the OS goes on from it)
 		} catch (NoSuchFileRuntime e) {
 			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("file", e.getMessage()));
 		} catch (UncheckedIOException e) {

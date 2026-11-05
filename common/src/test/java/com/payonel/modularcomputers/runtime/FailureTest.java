@@ -26,6 +26,8 @@ class FailureTest {
 		assertThat(Failure.denied("loopback", "127.0.0.1").table()).isEqualTo(Map.of("why", "denied", "reason", "loopback", "value", "127.0.0.1"));
 		assertThat(Failure.limit("open_requests", 4).table()).isEqualTo(Map.of("why", "limit", "of", "open_requests", "max", 4L));
 		assertThat(Failure.network("bad_chunk", "").table()).isEqualTo(Map.of("why", "network", "reason", "bad_chunk", "message", ""));
+		assertThat(Failure.symbolicLink("/to", "/real").table()).isEqualTo(Map.of("why", "symbolic_link", "at", "/to", "target", "/real"));
+		assertThat(Failure.badState("path", "/a", "absent").table()).isEqualTo(Map.of("why", "bad_state", "of", "path", "value", "/a", "expected", "absent"));
 		assertThat(Failure.missingInputs("").table()).isEqualTo(Map.of("why", "missing_inputs", "name", ""));
 		assertThat(Failure.noSpace("minecraft:stick").table()).isEqualTo(Map.of("why", "no_space", "name", "minecraft:stick"));
 	}
@@ -53,11 +55,5 @@ class FailureTest {
 		IllegalStateException host = new IllegalStateException("/home/someone/world/modularcomputers/disks/x");
 		assertThat(Failure.internalError("storage", host).toString()).doesNotContain("/home", "IllegalState");
 		assertThat(Failure.ioError("storage", new java.io.IOException(host.getMessage())).toString()).doesNotContain("/home");
-	}
-
-	/** A refusal not yet named keeps its old text as its why, no fields; a program still gets a table. */
-	@Test
-	void aRefusalNotYetNamedIsATableToo() {
-		assertThat(Result.fail("no entity: x").failure().table()).isEqualTo(Map.of("why", "no entity: x"));
 	}
 }

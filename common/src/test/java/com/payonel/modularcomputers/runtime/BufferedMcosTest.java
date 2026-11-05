@@ -202,6 +202,6 @@ class BufferedMcosTest extends McosHarness {
 			""");
 		boot();
 		type("lua /files.lua\r");
-		untilFile(root().resolve("out"), "work true work true false stopped ticks: 0 EINVAL\n");
+		untilFile(root().resolve("out"), "work true work true false stopped bad_argument EINVAL\n");
 	}
 }

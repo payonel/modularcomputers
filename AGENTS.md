@@ -288,8 +288,10 @@ device data), and user code, as a real CPU runs firmware under an OS.
   program decides by the other fields. **A fault is the machine's own** (the user's, 2026-11-04):
   a part it needs `missing` (its message a fixed one a part, `Failure.missing`), an `io_error`, an
   `internal_error` (anything the host threw); **no host error reaches a program** (its text could
-  tell of the server: paths, classes), only `i/o error` or `internal error`, the exception logged. A refusal not
-  yet named is `Failure.legacy`, its old text as its why and no fields, until it's named. mcos's
+  tell of the server: paths, classes), only `i/o error` or `internal error`, the exception logged. A disk's path
+  that meets a link stops there, `symbolic_link {at, target}` (SMB2's STOPPED_ON_SYMLINK: the disk
+  never follows one), and the VFS goes on. No refusal is a bare string (`Result.fail` takes only a
+  `Failure`). mcos's
   kernel reads a failure through `k.invoke` (its why as a word, then the table), and an ioctl
   gives a program `nil, why, errno, failure`; a record holds one nested (`failure`, the internet
   log's), an event flat (its why's fields beside `why`).
@@ -835,8 +837,7 @@ before it takes off). A move already done (an arm out
 - **A new packet** goes in `ModNetwork`'s lists (a client handler in `ModNetworkClient`); **a new
   game test class** in `GameTests.CLASSES`. Nothing else registers them.
 - **A new failure is a why with its own builder** (`runtime/Failure` for a refusal, `EventQueue` for
-  an event), every field required; never `Result.fail(String)`, which is a not-yet-named one's
-  (`Failure.legacy`).
+  an event), every field required (there's no other way: `Result.fail` takes only a `Failure`).
 - **A new cabled block's entity** holds `CablePorts`, and `Cabling` learns its ports and kind.
 - **A new device with an interrupt line** gets a stimulus in `DeviceInterruptsTest`; **a device whose
   `get`/`set` take tables** gets a driver (`lib/modules/drivers/<type>.lua`).

@@ -110,7 +110,7 @@ class CraftingCardTest {
 	@Test
 	void aWhyWithNoShapeCantEndACraft() {
 		card.craft(args());
-		crafts = Result.fail("something else");
+		crafts = Result.fail(com.payonel.modularcomputers.runtime.Failure.busy("x")); // (a why no craft can end with)
 		org.assertj.core.api.Assertions.assertThatThrownBy(this::craftsTillItEnds).isInstanceOf(IllegalArgumentException.class);
 	}
 }

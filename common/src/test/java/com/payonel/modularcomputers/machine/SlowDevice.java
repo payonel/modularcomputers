@@ -102,7 +102,7 @@ public final class SlowDevice implements com.payonel.modularcomputers.bus.Device
 	public Result work(Arguments args) {
 		long ticks = args.checkInteger(0);
 		if (ticks < 1) {
-			return Result.fail("ticks: " + ticks);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, ticks, "count"));
 		}
 		left = ticks;
 		asked = ticks;

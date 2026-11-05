@@ -14,11 +14,6 @@ public record Result(List<Object> values, Failure failure) {
 		return new Result(Arrays.stream(values).map(Values::normalize).toList(), null);
 	}
 
-	/** A refusal not yet given a why of its own: {@link Failure#legacy}. */
-	public static Result fail(String message) {
-		return new Result(List.of(), Failure.legacy(message));
-	}
-
 	public static Result fail(Failure failure) {
 		return new Result(List.of(), java.util.Objects.requireNonNull(failure));
 	}

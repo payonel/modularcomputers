@@ -54,7 +54,7 @@ class RoboticsDeviceTest {
 
 			@Override
 			public Result planned() {
-				return left == null ? Result.fail("no position") : Result.ok(left);
+				return left == null ? Buffered.missing("position") : Result.ok(left);
 			}
 
 			@Override

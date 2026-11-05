@@ -178,8 +178,11 @@ never does), at most 1023 bytes (`{why = "limit", of = "link", max = 1023}`). `p
 
 A link's target. Fails with `bad_state` (`expected = "link"`).
 
-A path that meets a link fails with the message `symbolic link`, a NUL, the link's path, a NUL and
-its target, as its why (not yet given a shape of its own): the operating system goes on from there.
+A path that meets a link on the way (or at its end, for a call that follows links) stops there:
+`{why = "symbolic_link", at, target}`, `at` the link's path on the disk and `target` its text. The
+disk never follows a link itself (its target can be anywhere in the operating system's tree, which
+the disk can't see): the operating system goes on from there, as an SMB2 server stops on a link and
+its client follows it.
 
 ## Methods, raw
 

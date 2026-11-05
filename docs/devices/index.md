@@ -116,14 +116,14 @@ failure with that why (`{why = "fault", condition = "missing", part = "legs", me
 | `fault` | `condition`, `part`, `message` | something wrong with the machine itself, not with how it was asked: a part it needs `missing` (`legs`, `thrusters`, `power`, `bench`, `robotics`, `body`, `position`, `projector`, `destination`, `source`), an `io_error` (its storage failed), or an `internal_error` (the mod failed: `part` the device's type, or `board`) |
 | `drifted` | `drift` | a robot off its spot |
 | `network` | `reason`, `message` | the internet card's and network card's: failed in transit |
+| `symbolic_link` | `at`, `target` | a disk's path met a link: the operating system goes on from it (see the [disk](/devices/disk/)) |
 
 A `message` is information for a person, never a string to parse: its words may change. A program
 decides by the why and the other fields (`condition`, `part`, `reason`), and shows the message. A
 fault never carries the server's own error: an `io_error` and an `internal_error` say only
 `i/o error` and `internal error`, and the details go to the server's log.
 
-A disk's path that meets a symbolic link answers in its own way for now (see the
-[disk](/devices/disk/)). This
+This
 manual writes a method's results as the values after the leading `true`, and its failures by their
 why.
 

@@ -26,8 +26,7 @@ method's arguments, in any open mode, as a Linux device's ioctls are its driver'
 the method's (`true` for a method that answers nothing); a method's failure is `nil`, its why (a
 word: `busy`, `fault`, `denied`...), `EINVAL`, and then the failure itself, a table of its
 why and its fields (`{why = "fault", condition = "missing", part = "legs", message = "legs required"}`: each why always
-has the same fields; a `message` is for a person to read, never to parse); a device gone is `ENODEV`. Some devices' failures aren't named yet: their why is their old
-message, and their table has nothing else.
+has the same fields; a `message` is for a person to read, never to parse); a device gone is `ENODEV`.
 
 ```lua
 local sys = require("sys")
