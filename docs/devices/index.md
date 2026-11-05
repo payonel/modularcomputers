@@ -110,6 +110,7 @@ failure with that why (`{why = "fault", condition = "missing", part = "legs", me
 | `busy`, `held` | `id` | wait: the device named has news when it's free (mcos waits for you) |
 | `bad_argument` | `argument` (its position, from 1), `value` (as given), `expected` (a word: `string`, `integer`, `face`, `count`...) | it can't use an argument |
 | `not_found` | `kind` (`device`, `method`, `entity`, `file`, `container`, `slot`, `block`, `boot_entry`, `offset`...), `value` (what was named) | what it names isn't there |
+| `bad_state` | `of` (`path`, `handle`, `hold`, `slot`, `entity`), `value` (which: as named, `""` none), `expected` (the state it needs: `absent`, `empty`, `file`, `open`, `free`...) | the call is fine, but what it acts on isn't in the state it needs |
 | `limit` | `of`, `max` | over a limit |
 | `denied` | `reason`, `value` (what was refused) | not allowed |
 | `fault` | `condition`, `part`, `message` | something wrong with the machine itself, not with how it was asked: a part it needs `missing` (`legs`, `thrusters`, `power`, `bench`, `robotics`, `body`, `position`, `projector`, `destination`, `source`), an `io_error` (its storage failed), or an `internal_error` (the mod failed: `part` the device's type, or `board`) |
@@ -121,8 +122,8 @@ decides by the why and the other fields (`condition`, `part`, `reason`), and sho
 fault never carries the server's own error: an `io_error` and an `internal_error` say only
 `i/o error` and `internal error`, and the details go to the server's log.
 
-A few aren't named yet and keep their old message as their why (a field's `holding`, a disk's
-`already exists: /a`). This
+A few aren't named yet and keep their old message as their why (a field's capture out of its
+reach, `target capture too far`). This
 manual writes a method's results as the values after the leading `true`, and its failures by their
 why.
 

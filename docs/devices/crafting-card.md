@@ -121,7 +121,7 @@ mcos it also ends every thread's wait to give the card a command (`ECANCELED`). 
 ### move(from, to[, count]) → number
 
 Moves items from one of its slots to another (all, or `count`): how many went. Fails with
-`slot taken: ` and the slot, when it holds something else, or
+`{why = "bad_state", of = "slot", value = to, expected = "empty"}` when it holds something else, or
 `{why = "not_found", kind = "slot", value = the slot}`.
 
 ### equip(slot) → true

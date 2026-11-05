@@ -46,10 +46,11 @@ A full disk fails a write with `{why = "limit", of = "disk", max = its capacity}
 
 Every failure is a table of its why and its fields (see [Devices](/devices/)); a path a method
 can't use is `bad_argument` (`expected = "path"` outside the disk), a path that isn't there
-`{why = "not_found", kind = "file", value = path}`. Some aren't named yet and keep their old
-message as their why: `already exists: path`, `is a directory: path`, `directory not empty: path`,
-`can't remove the root`, `can't move a directory into itself`, `not a link: path`, `closed handle`,
-`not open for reading` or `writing`, `can't seek before the start`.
+`{why = "not_found", kind = "file", value = path}`. A call that's fine but meets what's there in
+the wrong state is `bad_state`, `of = "path"`, `value` the path, and `expected` the state it needs:
+`absent` (it already exists), `empty` (a directory not empty), `file` (it's a directory), `link`
+(it isn't a link), `not_root` (the root can't be removed), `outside_source` (a directory can't move
+into itself). A handle's are `of = "handle"`: `open` (it's closed), `readable`, `writable`.
 
 ## In mcos
 
@@ -137,7 +138,7 @@ disk (a [Disk Station](/devices/disk-station/)'s source disk).
 Opens a file. `mode` is `r` (the default), `r+`, `w`, `w+`, `a` or `a+`, as C's `fopen` (a `b` is
 ignored). A new file is made at once, empty. At most 16 files are open at once on a disk
 (`{why = "limit", of = "open_files", max = 16}`). Fails with `not_found` (`kind = "file"`),
-`is a directory: path`, or `bad_argument` (`expected = "mode"`).
+`bad_state` (`expected = "file"`: a directory), or `bad_argument` (`expected = "mode"`).
 
 The handle has its own methods, below.
 
@@ -155,27 +156,27 @@ its target (and `size` its length).
 
 ### mkdir(path) → nothing
 
-Makes a directory. Its parent must exist. Fails with `already exists: path`.
+Makes a directory. Its parent must exist. Fails with `bad_state` (`expected = "absent"`).
 
 ### remove(path) → nothing
 
-Removes a file, a link (not what it points to), or an empty directory (`directory not empty`). The
-root cannot be removed.
+Removes a file, a link (not what it points to), or an empty directory (`bad_state`, `expected = "empty"`).
+The root cannot be removed (`expected = "not_root"`).
 
 ### rename(from, to) → nothing
 
-Moves a file or directory. `to` must not exist (`already exists`), and a directory cannot move into
-itself.
+Moves a file or directory. `to` must not exist (`bad_state`, `expected = "absent"`, `value` `to`), and a
+directory cannot move into itself (`expected = "outside_source"`).
 
 ### symlink(target, path) → nothing
 
 Makes a symbolic link at `path`. The target is any text (the operating system follows it, the disk
-never does), at most 1023 bytes (`{why = "limit", of = "link", max = 1023}`). `path` must not exist. A link is kept as a CIFS
+never does), at most 1023 bytes (`{why = "limit", of = "link", max = 1023}`). `path` must not exist (`bad_state`, `expected = "absent"`). A link is kept as a CIFS
 `XSym` file of 1067 bytes.
 
 ### readlink(path) → target
 
-A link's target. Fails with `not a link`.
+A link's target. Fails with `bad_state` (`expected = "link"`).
 
 A path that meets a link fails with the message `symbolic link`, a NUL, the link's path, a NUL and
 its target, as its why (not yet given a shape of its own): the operating system goes on from there.
@@ -204,19 +205,19 @@ Writes reserve space as they go and fail with `{why = "limit", of = "disk", max}
 
 ### handle.read(n) → string or nil
 
-Up to `n` bytes (at most 4096), nil at the end. Fails with `not open for reading`. A reader at the
+Up to `n` bytes (at most 4096), nil at the end. Fails with `bad_state` (`of = "handle"`, `expected = "readable"`). A reader at the
 end looks again for data another handle has added since.
 
 ### handle.write(data) → nothing
 
 Writes where the file is at (at the end, if opened to append). Takes effect at close. Fails with
-`not open for writing`, or `{why = "limit", of = "memory", max}` when the program's memory cannot
+`bad_state` (`of = "handle"`, `expected = "writable"`), or `{why = "limit", of = "memory", max}` when the program's memory cannot
 hold it (`max`: the RAM installed).
 
 ### handle.seek([whence[, offset]]) → position
 
 Moves to `offset` from `"set"` (the start), `"cur"` (the default) or `"end"`, and gives where it is.
-Fails with `bad_argument` (`expected = "whence"`) or `can't seek before the start`.
+Fails with `bad_argument`: `expected = "whence"`, or `argument = 2`, `expected = "offset"` before the start.
 
 ### handle.close() → nothing
 

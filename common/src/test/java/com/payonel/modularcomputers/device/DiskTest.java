@@ -71,6 +71,36 @@ class DiskTest {
 		disk.retire();
 	}
 
+	/** What a call acts on in the wrong state is one shape, bad_state {of, value, expected}: the call is fine, what's there isn't. */
+	@Test
+	void whatsThereInTheWrongStateIsABadState() {
+		run(DiskTier.TIER_1, board -> {
+			board.invoke("sata:0", "mkdir", "/d");
+			board.invoke("sata:0", "mkdir", "/d/e");
+			seen.add(board.invoke("sata:0", "mkdir", "/d").failure().table());
+			seen.add(board.invoke("sata:0", "remove", "/d").failure().table());
+			seen.add(board.invoke("sata:0", "open", "/d", "w").failure().table());
+			seen.add(board.invoke("sata:0", "remove", "/").failure().table());
+			seen.add(board.invoke("sata:0", "rename", "/d", "/d/e/f").failure().table());
+			Handle out = (Handle) board.invoke("sata:0", "open", "/f", "w").first();
+			seen.add(board.invoke(out, "read", 1).failure().table());
+			board.invoke(out, "close");
+			Handle in = (Handle) board.invoke("sata:0", "open", "/f").first();
+			seen.add(board.invoke(in, "write", "x").failure().table());
+			seen.add(board.invoke(in, "seek", "set", -1).failure().table());
+			com.payonel.modularcomputers.machine.Program.park(board);
+		});
+		assertThat(seen).containsExactly(
+			Map.of("why", "bad_state", "of", "path", "value", "/d", "expected", "absent"),
+			Map.of("why", "bad_state", "of", "path", "value", "/d", "expected", "empty"),
+			Map.of("why", "bad_state", "of", "path", "value", "/d", "expected", "file"),
+			Map.of("why", "bad_state", "of", "path", "value", "/", "expected", "not_root"),
+			Map.of("why", "bad_state", "of", "path", "value", "/d/e/f", "expected", "outside_source"),
+			Map.of("why", "bad_state", "of", "handle", "value", "", "expected", "readable"),
+			Map.of("why", "bad_state", "of", "handle", "value", "", "expected", "writable"),
+			Map.of("why", "bad_argument", "argument", 2L, "value", -1L, "expected", "offset"));
+	}
+
 	@Test
 	void aSymbolicLinkIsAFileOnTheDiskInCifssFormatAndCallsThatMeetOneReparse() throws Exception {
 		run(DiskTier.TIER_1, board -> {
@@ -81,8 +111,8 @@ class DiskTest {
 			seen.add(board.invoke("sata:0", "list", "/", true).first());
 			seen.add(board.invoke("sata:0", "open", "/to/f", "w").error()); // on the way: the OS follows it
 			seen.add(board.invoke("sata:0", "stat", "/to").error()); // at the end, following
-			seen.add(board.invoke("sata:0", "symlink", "x", "/to").error());
-			seen.add(board.invoke("sata:0", "readlink", "/real").error());
+			seen.add(board.invoke("sata:0", "symlink", "x", "/to").failure().table());
+			seen.add(board.invoke("sata:0", "readlink", "/real").failure().table());
 			seen.add(board.invoke("sata:0", "rename", "/to", "/moved").failed());
 			seen.add(board.invoke("sata:0", "remove", "/moved").failed()); // the link, not what it points to
 			seen.add(board.invoke("sata:0", "stat", "/real").first() != null);
@@ -95,8 +125,8 @@ class DiskTest {
 		assertThat(seen.get(3)).isEqualTo(List.of(Map.of("name", "real", "type", "directory"), Map.of("name", "to", "type", "link")));
 		assertThat(seen.get(4)).isEqualTo(Disk.REPARSE + "/to\0/real");
 		assertThat(seen.get(5)).isEqualTo(Disk.REPARSE + "/to\0/real");
-		assertThat((String) seen.get(6)).startsWith("already exists");
-		assertThat((String) seen.get(7)).startsWith("not a link");
+		assertThat(seen.get(6)).isEqualTo(Map.of("why", "bad_state", "of", "path", "value", "/to", "expected", "absent"));
+		assertThat(seen.get(7)).isEqualTo(Map.of("why", "bad_state", "of", "path", "value", "/real", "expected", "link"));
 		assertThat(seen.subList(8, 11)).containsExactly(false, false, true);
 		assertThat(Files.exists(storage().resolve("moved"))).isFalse();
 	}
@@ -128,7 +158,7 @@ class DiskTest {
 			seen.add(read(storage().resolve("notes/hello.txt")));
 			board.invoke(file, "write", "disk\n");
 			board.invoke(file, "close");
-			seen.add(board.invoke(file, "write", "more").error());
+			seen.add(board.invoke(file, "write", "more").failure().table());
 			Handle again = (Handle) board.invoke("sata:0", "open", "/notes/hello.txt").first();
 			seen.add(board.invoke(again, "read", 5).first());
 			seen.add(board.invoke(again, "seek", "set", 6).first());
@@ -139,7 +169,7 @@ class DiskTest {
 			seen.add(board.invoke("sata:0", "stat", "/notes/hello.txt").first());
 			com.payonel.modularcomputers.machine.Program.park(board);
 		});
-		assertThat(seen).containsExactly("hfs", false, false, true, "", "closed handle", "hello", 6L, "disk\n", null,
+		assertThat(seen).containsExactly("hfs", false, false, true, "", Map.of("why", "bad_state", "of", "handle", "value", "", "expected", "open"), "hello", 6L, "disk\n", null,
 			List.of("notes/"), List.of("hello.txt"), seen.get(12));
 		@SuppressWarnings("unchecked")
 		Map<String, Object> stat = (Map<String, Object>) seen.get(12);

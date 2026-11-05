@@ -194,7 +194,7 @@ public final class CraftingBench implements CraftingCard.Bench {
 			return Result.ok(0);
 		}
 		if (!target.isEmpty() && !ItemStack.isSameItemSameComponents(source, target)) {
-			return Result.fail("slot taken: " + to);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.badState("slot", (long) to, "empty")); // (another item there)
 		}
 		int room = target.isEmpty() ? source.getMaxStackSize() : target.getMaxStackSize() - target.getCount();
 		int moving = Math.min(count, Math.min(room, source.getCount()));

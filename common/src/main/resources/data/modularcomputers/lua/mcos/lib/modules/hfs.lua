@@ -5,24 +5,15 @@ local k, vfs = ...
 local fail = vfs.fail
 
 -- What the disk's failures mean, as errnos: by their shape, a why and the field that tells them apart
--- (field, then its values' errnos; true: any value) ...
+-- (field, then its values' errnos; true: any value).
 local SHAPES = {
   not_found = {"kind", {file = "ENOENT", device = "ENODEV"}},
   limit = {"of", {open_files = "EMFILE", disk = "ENOSPC", link = "ENAMETOOLONG", memory = "ENOMEM"}},
   bad_argument = {"argument", true, "EINVAL"},
+  bad_state = {"expected", {absent = "EEXIST", empty = "ENOTEMPTY", file = "EISDIR", not_root = "EBUSY",
+    link = "EINVAL", outside_source = "EINVAL", open = "EBADF", readable = "EBADF", writable = "EBADF"}},
   denied = {"reason", {raw_disk = "ENODEV", read_only = "EROFS"}},
   fault = {"condition", {io_error = "EIO", internal_error = "EIO"}},
-}
-
--- ... and those not yet named, by their words: pattern, errno, pattern...
-local FAILURES = {
-  "^already exists", "EEXIST",
-  "^directory not empty", "ENOTEMPTY",
-  "^is a directory", "EISDIR",
-  "^can't move a directory into itself", "EINVAL",
-  "^can't remove the root", "EBUSY",
-  "^closed handle", "EBADF",
-  "^not open for", "EBADF",
 }
 
 local REPARSE = "symbolic link\0" -- the disk met a link: its path, a NUL, its target
@@ -37,11 +28,6 @@ local function failed(why, failure)
   if why:sub(1, #REPARSE) == REPARSE then
     local at, target = why:match("^([^%z]*)%z(.*)$", #REPARSE + 1)
     return nil, {at = at, target = target}, "REPARSE"
-  end
-  for i = 1, #FAILURES, 2 do
-    if why:find(FAILURES[i]) then
-      return fail(FAILURES[i + 1])
-    end
   end
   return fail("EIO")
 end

@@ -168,7 +168,7 @@ final class MotherboardApi implements Board {
 	@Override
 	public Result invoke(com.payonel.modularcomputers.runtime.Handle handle, String method, Object... args) {
 		if (handle == null || !handle.isOpen()) {
-			return Result.fail("closed handle");
+			return Result.fail(com.payonel.modularcomputers.device.Disk.CLOSED);
 		}
 		try {
 			return DeviceMethods.invoke(handle, method, new Arguments(Arrays.asList(args), account.get()));

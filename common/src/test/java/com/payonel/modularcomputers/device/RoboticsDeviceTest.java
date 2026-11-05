@@ -91,11 +91,16 @@ class RoboticsDeviceTest {
 		assertThat(state()).isEqualTo("idle");
 	}
 
+	/**
+	 * A wait (held, busy) is the board's to say, with the id whose news ends it: one its body says
+	 * reaching a program would have no id to wait on (mcos would wait for ever), so it's the host's
+	 * bug, an internal error, never a held with no id.
+	 */
 	@Test
-	void aWalkItsBodyCantStartFailsWithWhy() {
-		refuse = "no way there";
+	void aWaitItsBodySaysIsAnInternalErrorNeverAWaitWithNoId() {
+		refuse = RoboticsDevice.HELD;
 		var result = device.walk(args(5L));
-		assertThat(result.error()).isEqualTo("no way there");
+		assertThat(result.failure().table()).isEqualTo(Map.of("why", "fault", "condition", "internal_error", "part", "robotics", "message", "internal error"));
 		assertThat(state()).isEqualTo("idle");
 	}
 

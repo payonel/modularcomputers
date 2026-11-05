@@ -8,17 +8,24 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-/** A crafting card's craft ends in its why's own shape (the user's), a system failure too. */
+/** A crafting card's craft ends in its why's own shape (the user's), a fault too. */
 class CraftingCardTest {
 	private final CraftingCard card = new CraftingCard();
 	/** What its bench's craft answers. */
 	private Result crafts = Result.ok(Map.of("name", "minecraft:stick", "count", 4L));
+	/** The robot that works it (none: a bench with robotics but no robot's moves to wait for). */
+	private RoboticsDevice robot;
 
 	CraftingCardTest() {
 		card.benchIn(new CraftingCard.Bench() {
 			@Override
 			public boolean robotics() {
 				return true;
+			}
+
+			@Override
+			public RoboticsDevice robot() {
+				return robot;
 			}
 
 			@Override
@@ -75,9 +82,9 @@ class CraftingCardTest {
 		}
 	}
 
-	/** What works its items gone mid-count: a system failure, the bench missing, its call the crafts done. */
+	/** What works its items gone mid-count: a fault, the bench missing, its call the crafts done. */
 	@Test
-	void itsBenchMissingMidCountEndsASystemFailure() {
+	void itsBenchMissingMidCountEndsAFault() {
 		card.called("craft", List.of(3L));
 		card.craft(args(3L));
 		card.tick(); // (no craft yet: it takes its time)
@@ -91,6 +98,15 @@ class CraftingCardTest {
 	}
 
 	/** A why with no shape of its own can't be an end (the user's: each why built by its own method). */
+	/** A craft given while one runs is the board's to refuse, busy with its id: given past it, the host's bug, never a busy with no id. */
+	@Test
+	void aCraftGivenPastTheBoardWhileOneRunsIsAnInternalError() {
+		robot = new RoboticsDevice();
+		card.craft(args(2L));
+		assertThat(card.craft(args()).failure().table())
+			.isEqualTo(Map.of("why", "fault", "condition", "internal_error", "part", "crafting", "message", "internal error"));
+	}
+
 	@Test
 	void aWhyWithNoShapeCantEndACraft() {
 		card.craft(args());

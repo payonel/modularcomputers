@@ -265,7 +265,7 @@ public class FieldCardGameTest {
 		helper.startSequence()
 			.thenExecuteAfter(2, () -> {
 				same(helper, one.capture(args(pig.getStringUUID())).first(), "minecraft:pig", "the first holds it");
-				same(helper, two.capture(args(pig.getStringUUID())).error(), "captured", "the second can't");
+				same(helper, two.capture(args(pig.getStringUUID())).failure().table(), java.util.Map.of("why", "bad_state", "of", "entity", "value", pig.getStringUUID(), "expected", "free"), "the second can't");
 			})
 			.thenSucceed();
 	}

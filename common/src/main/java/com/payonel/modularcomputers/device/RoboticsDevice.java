@@ -418,7 +418,9 @@ public final class RoboticsDevice implements Device, Buffered {
 			case NO_THRUSTERS -> Buffered.missing(MISSING_THRUSTERS);
 			case NO_BODY -> Buffered.missing("body");
 			case NO_POSITION -> Buffered.missing("position");
-			default -> Result.fail(why);
+			// (a wait, held or busy, is the board's to say, with whose news ends it: from its body, the host's bug)
+			default -> Result.fail(com.payonel.modularcomputers.runtime.Failure.internalError(DeviceType.ROBOTICS.name().toLowerCase(java.util.Locale.ROOT),
+				new IllegalStateException("its body refused " + why)));
 		};
 	}
 

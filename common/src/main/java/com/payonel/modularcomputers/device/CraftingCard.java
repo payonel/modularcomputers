@@ -288,8 +288,9 @@ public final class CraftingCard extends Card implements Buffered {
 		}
 		int count = args.count() > 0 ? count(args, 0) : 1;
 		String refused = refusal("craft"); // (after its robot's moves; its start costs the robot nothing, the user's)
-		if (refused != null) {
-			return Result.fail(refused);
+		if (refused != null) { // (the board refuses it first, naming whose news ends the wait: here it's the host's bug)
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.internalError(type().name().toLowerCase(java.util.Locale.ROOT),
+				new IllegalStateException("craft given while " + refused)));
 		}
 		toCraft = count;
 		craftArgs = "craft".equals(calledMethod) ? calledArgs : java.util.List.of();

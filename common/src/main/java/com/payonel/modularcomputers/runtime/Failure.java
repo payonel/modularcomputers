@@ -50,6 +50,12 @@ public final class Failure {
 	private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(com.payonel.modularcomputers.ModularComputers.MOD_ID);
 	/** An argument it can't use: which ({@code argument}), as given ({@code value}), what it takes ({@code expected}). */
 	public static final String BAD_ARGUMENT = "bad_argument";
+	/**
+	 * The call is fine, but what it acts on isn't in the state it needs (the user's, 2026-11-05: the
+	 * twin of a bad argument): what kind of thing ({@code of}), which one as named ({@code value}),
+	 * the state the call needs ({@code expected}, a word).
+	 */
+	public static final String BAD_STATE = "bad_state";
 	/** Not allowed ({@code reason}), and what was refused ({@code value}). */
 	public static final String DENIED = "denied";
 	/** Over a limit: of what ({@code of}), and its most ({@code max}). */
@@ -118,6 +124,16 @@ public final class Failure {
 
 	public static Failure badArgument(int argument, Object value, String expected) {
 		return new Failure(BAD_ARGUMENT, "argument", (long) argument, "value", value == null ? "" : value, "expected", expected);
+	}
+
+	/**
+	 * {@code of} (a word: {@code hold}, {@code path}, {@code slot}, {@code handle}, {@code entity}),
+	 * {@code value} (which: a path, a slot, an id; "" none), {@code expected} (a word: {@code empty},
+	 * {@code holding}, {@code absent}, {@code file}, {@code link}, {@code not_root}, {@code
+	 * outside_source}, {@code open}, {@code readable}, {@code writable}, {@code free}).
+	 */
+	public static Failure badState(String of, Object value, String expected) {
+		return new Failure(BAD_STATE, "of", of, "value", value == null ? "" : value, "expected", expected);
 	}
 
 	public static Failure denied(String reason, String value) {

@@ -331,10 +331,6 @@ public final class Disk implements Device {
 			this.failure = failure;
 		}
 
-		/** Not yet named: its text as its why (a state: exists, not empty, closed...). */
-		Refused(String text) {
-			this(com.payonel.modularcomputers.runtime.Failure.legacy(text));
-		}
 	}
 
 	/** What a write to a read-only disk answers. */
@@ -549,6 +545,13 @@ public final class Disk implements Device {
 		return new Refused(com.payonel.modularcomputers.runtime.Failure.internalError(PART, new IllegalStateException("a disk with no storage")));
 	}
 
+	/** What a disk's bad_state is of: a path, a handle; and what a path needs to be made there. */
+	private static final String PATH = "path";
+	private static final String HANDLE = "handle";
+	private static final String ABSENT = "absent";
+	/** A handle closed (or its disk gone): the disk's and the board's answer. */
+	public static final com.payonel.modularcomputers.runtime.Failure CLOSED = com.payonel.modularcomputers.runtime.Failure.badState(HANDLE, "", "open");
+
 	/** A disk's part, as its faults name it: its type's name ({@link com.payonel.modularcomputers.bus.DeviceType#STORAGE}). */
 	private static final String PART = "storage";
 
@@ -745,7 +748,7 @@ public final class Disk implements Device {
 			}
 			Path file = resolve(path);
 			if (Files.isDirectory(file)) {
-				throw new Refused("is a directory: " + path);
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badState(PATH, path, "file"));
 			}
 			if (handles.size() >= MAX_HANDLES) {
 				throw new Refused(com.payonel.modularcomputers.runtime.Failure.limit("open_files", MAX_HANDLES));
@@ -830,7 +833,7 @@ public final class Disk implements Device {
 			writable();
 			Path dir = resolve(path, false);
 			if (Files.exists(dir)) {
-				throw new Refused("already exists: " + path);
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badState(PATH, path, ABSENT));
 			}
 			try {
 				if (!Files.isDirectory(dir.getParent())) {
@@ -853,7 +856,7 @@ public final class Disk implements Device {
 			writable();
 			Path at = resolve(path, false);
 			if (at.equals(storage)) {
-				throw new Refused("can't remove the root");
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badState(PATH, path, "not_root"));
 			}
 			if (!Files.exists(at)) {
 				throw new NoSuchFileRuntime(path);
@@ -864,7 +867,7 @@ public final class Disk implements Device {
 				grow(-freed);
 				report("remove", named(at));
 			} catch (DirectoryNotEmptyException e) {
-				throw new Refused("directory not empty: " + path);
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badState(PATH, path, "empty"));
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
 			}
@@ -884,10 +887,10 @@ public final class Disk implements Device {
 				throw new NoSuchFileRuntime(from);
 			}
 			if (Files.exists(target)) {
-				throw new Refused("already exists: " + to);
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badState(PATH, to, ABSENT));
 			}
 			if (target.startsWith(source)) {
-				throw new Refused("can't move a directory into itself");
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badState(PATH, to, "outside_source"));
 			}
 			try {
 				Files.move(source, target);
@@ -915,7 +918,7 @@ public final class Disk implements Device {
 			}
 			Path at = resolve(path, false, 2);
 			if (Files.exists(at)) {
-				throw new Refused("already exists: " + path);
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badState(PATH, path, ABSENT));
 			}
 			if (!Files.isDirectory(at.getParent())) {
 				throw new NoSuchFileRuntime(path);
@@ -941,7 +944,7 @@ public final class Disk implements Device {
 			}
 			String target = linkTarget(at);
 			if (target == null) {
-				throw new Refused("not a link: " + path);
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badState(PATH, path, "link"));
 			}
 			return Result.ok(target);
 		});
@@ -1083,7 +1086,7 @@ public final class Disk implements Device {
 		private Disk disk() {
 			Disk disk = LIVE.get(diskId);
 			if (disk == null || !disk.handles.contains(this) && !adopt(disk)) {
-				throw new Refused("closed handle");
+				throw new Refused(CLOSED);
 			}
 			return disk;
 		}
@@ -1194,7 +1197,7 @@ public final class Disk implements Device {
 		@Method(doc = "read(n): up to n bytes (at most " + MAX_READ + "), or nil at the end")
 		public Result read(Arguments args) {
 			if (!readable()) {
-				return Result.fail("not open for reading"); // (a state: not named yet)
+				return Result.fail(com.payonel.modularcomputers.runtime.Failure.badState(HANDLE, "", "readable"));
 			}
 			int count = (int) Math.clamp(args.checkInteger(0), 0, MAX_READ);
 			try {
@@ -1218,7 +1221,7 @@ public final class Disk implements Device {
 		@Method(doc = "write(data): writes bytes where the file is at (at the end, opened to append); they take effect at close")
 		public Result write(Arguments args) {
 			if (!writable()) {
-				return Result.fail("not open for writing");
+				return Result.fail(com.payonel.modularcomputers.runtime.Failure.badState(HANDLE, "", "writable"));
 			}
 			byte[] data = args.checkString(0).getBytes(StandardCharsets.ISO_8859_1);
 			try {
@@ -1292,7 +1295,7 @@ public final class Disk implements Device {
 				return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, whence, "whence"));
 			}
 			if (from + offset < 0) {
-				return Result.fail("can't seek before the start");
+				return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(2, offset, "offset")); // (before the start)
 			}
 			try {
 				disk();

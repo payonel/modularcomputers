@@ -280,7 +280,8 @@ device data), and user code, as a real CPU runs firmware under an OS.
 - **Every failure is one shape a why** (the user's, 2026-11-04): a call refused answers `false,
   {why, ...}`, a table built only by that why's own builder (`runtime/Failure`: `busy`/`held`
   `{id}`, `drifted {drift}`, `fault {condition, part, message}`, `bad_argument {argument, value,
-  expected}`, `denied {reason, value}`, `limit {of, max}`, `network {reason, message}`,
+  expected}`, `bad_state {of, value, expected}` (the user's, 2026-11-05: the call fine, what it
+  acts on not in the state it needs), `denied {reason, value}`, `limit {of, max}`, `network {reason, message}`,
   `not_found {kind, value}`), each taking every field (none missing: `""` when there's nothing to
   say), its fields' names the field dictionary's (a `name` a registry id everywhere, an `id` a
   UUID, `at` an offset). A `message` is a person's words, never a string to parse (the user's): a
@@ -723,7 +724,7 @@ before it takes off). A move already done (an arm out
     `false, {why = "busy", id = "<id>"}`, its own id, or another's when it's busy for that one's sake
     (`Buffered.blocker`: a crafting card waiting for its robot's moves, the robot's busy state, the
     card's interrupt line), and mcos listens on both. `busy` and `held` mean "wait":
-    no device method fails with them (a field's target in another field is `captured`); any other
+    no device method fails with them (a field's target in another field is `bad_state`, `expected = "free"`); any other
     refusal (`drifted`) is a failure, and names no device.
   - **mcos asks a waiting command again at most once a tick** unless one of its devices raised its
     interrupt (the board's state moves a tick at a time); news its retry takes into other files
@@ -1012,6 +1013,11 @@ Lessons from mistakes, each with its test:
   to the program as its text. A failure names what the program knows (its path on the disk), and
   what the host threw is a fault that says only its condition, the exception logged.
   (`aFileTheHostFindsMissingIsNamedByItsPathOnTheDisk`, `aFaultNeverSaysTheHostsError`)
+- **A wait is the board's to say:** only the board knows the id whose news ends a wait, so a
+  device's own guard that gave its refusal word (a crafting card given a craft while one ran, a
+  robot's body saying held) made a `busy` or `held` with no id, one mcos would wait on for ever. A
+  device past the board's check that meets a wait is the host's bug: an `internal_error`.
+  (`aCraftGivenPastTheBoardWhileOneRunsIsAnInternalError`, `aWaitItsBodySaysIsAnInternalError...`)
 - **A block's state isn't the block:** leaves change state as their log goes, crops as they grow;
   what's tied to a block (a golem's breaking) compares the block, not its state.
   (`aBlockWhoseStateChangesWhileItsBrokenStillBreaks`)

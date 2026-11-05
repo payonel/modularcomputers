@@ -199,7 +199,7 @@ public final class FieldProjector implements FieldCard.Projector {
 		EnergyField made = ModEntities.ENERGY_FIELD.create(level.get(), EntitySpawnReason.TRIGGERED);
 		UUID hold = UUID.randomUUID();
 		if (!made.hold(target, listener, hold, name(target))) {
-			return Result.fail("captured"); // (another field holds it: not "held", the robot's wait)
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.badState("entity", target.getStringUUID(), "free")); // (another field holds it: not "held", the robot's wait)
 		}
 		card.hold(hold);
 		level.get().addFreshEntity(made);
@@ -210,7 +210,7 @@ public final class FieldProjector implements FieldCard.Projector {
 	public Result move(double forward, double right, double up) {
 		FieldHolds.Hold record = record();
 		if (record == null) {
-			return Result.fail("not holding");
+			return FieldCard.NOT_HOLDING;
 		}
 		Vec3 by = frame.get().offset(forward, right, up);
 		EnergyField field = field();

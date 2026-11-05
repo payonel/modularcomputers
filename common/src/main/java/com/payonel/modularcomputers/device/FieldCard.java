@@ -39,6 +39,11 @@ public final class FieldCard extends Card implements Buffered {
 	public static final int MOVE_COST = PowerUnits.CPU;
 	public static final String IDLE = "idle";
 	public static final String HOLDING = "holding";
+	/** What a field's bad_state is of: its hold, and what a capture needs it to be (one at a time). */
+	public static final String HOLD = "hold";
+	public static final String EMPTY = "empty";
+	/** A move or a release with nothing held: its hold isn't holding. */
+	public static final Result NOT_HOLDING = Result.fail(com.payonel.modularcomputers.runtime.Failure.badState(HOLD, "", HOLDING));
 	public static final String MOVING = "moving";
 	/** What capture takes to hold its own robot. */
 	public static final String SELF = "self";
@@ -170,7 +175,8 @@ public final class FieldCard extends Card implements Buffered {
 			return no;
 		}
 		if (!state.equals(IDLE)) {
-			return Result.fail("holding");
+			Map<String, Object> held = projector.lastKnown();
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.badState(HOLD, held == null ? "" : String.valueOf(held.get("id")), EMPTY)); // (one at a time: what it holds, by its id)
 		}
 		Result held;
 		if (args.get(0) instanceof String id) {
@@ -188,14 +194,14 @@ public final class FieldCard extends Card implements Buffered {
 		return held;
 	}
 
-	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, never through blocks. A command: true at once (its event: move, ok, or not and why: blocked, with name, the block in the way (\"\" for none: past its reach, or what it holds not loaded), and face, the side of what it holds that met it, in its computer's frame; lost; fault, condition missing, part power, and its message; stopped; each with its call), or false and why it can't start (not holding)")
+	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, never through blocks. A command: true at once (its event: move, ok, or not and why: blocked, with name, the block in the way (\"\" for none: past its reach, or what it holds not loaded), and face, the side of what it holds that met it, in its computer's frame; lost; fault, condition missing, part power, and its message; stopped; each with its call), or false and why it can't start (bad_state: nothing held)")
 	public Result move(Arguments args) {
 		Result no = noProjector();
 		if (no != null) {
 			return no;
 		}
 		if (state.equals(IDLE)) {
-			return Result.fail("not holding");
+			return NOT_HOLDING;
 		}
 		double forward = args.checkNumber(0);
 		double right = args.count() > 1 ? args.checkNumber(1) : 0;
