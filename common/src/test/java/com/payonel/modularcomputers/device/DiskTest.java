@@ -56,6 +56,21 @@ class DiskTest {
 		}
 	}
 
+	/**
+	 * A file the host found missing (gone under a call, between its checks) is named by its path on
+	 * the disk, never the host's: that path is the world save's place on the server.
+	 */
+	@Test
+	void aFileTheHostFindsMissingIsNamedByItsPathOnTheDisk() {
+		disk = new Disk(DiskTier.TIER_1, storage());
+		Path host = storage().resolve("a").resolve("b");
+		Result missing = disk.run(() -> {
+			throw new java.io.UncheckedIOException(new java.nio.file.NoSuchFileException(host.toString()));
+		});
+		assertThat(missing.failure().table()).isEqualTo(java.util.Map.of("why", "not_found", "kind", "file", "value", "/a/b"));
+		disk.retire();
+	}
+
 	@Test
 	void aSymbolicLinkIsAFileOnTheDiskInCifssFormatAndCallsThatMeetOneReparse() throws Exception {
 		run(DiskTier.TIER_1, board -> {

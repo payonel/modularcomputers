@@ -98,30 +98,38 @@ public final class EventQueue {
 	 * once and the event it becomes are one shape). Only a refusal with an event's shape can be.
 	 */
 	public void refused(String event, com.payonel.modularcomputers.runtime.Result refusal, Map<String, Object> call) {
-		if (Buffered.SYSTEM_FAILURE.equals(refusal.error())) {
-			systemFailure(event, (String) refusal.failure().get("missing"), call);
+		if (Buffered.FAULT.equals(refusal.error())) {
+			fault(event, refusal.failure(), call);
 			return;
 		}
 		throw new IllegalArgumentException("no event shape for the refusal " + refusal.error());
 	}
 
 	/**
-	 * What it needs to do it is missing (the user's: one shape): {@code {event, ok = false, why =
-	 * "system_failure", missing, call}}, {@code missing} what ({@link Buffered#MISSING_LEGS}...).
+	 * Something wrong with the machine itself (the user's: one shape): {@code {event, ok = false, why =
+	 * "fault", condition, part, message, call}}, the fault's own fields ({@link
+	 * com.payonel.modularcomputers.runtime.Failure#missing}...).
 	 */
-	public void systemFailure(String event, String missing, Map<String, Object> call) {
-		Map<String, Object> failed = withCall(event, Buffered.SYSTEM_FAILURE, call);
+	public void fault(String event, com.payonel.modularcomputers.runtime.Failure fault, Map<String, Object> call) {
+		Map<String, Object> failed = withCall(event, faultOf(fault), call);
 		failed.remove("call");
-		failed.put("missing", missing);
+		failed.putAll(fault.fields());
 		failed.put("call", call);
 		put(failed);
 	}
 
-	/** What it needs is missing, no program's command (a field letting go, its power gone), a notice: {@code {event = "notice", why = "system_failure", missing}}. */
-	public void systemFailureNotice(String missing) {
-		Map<String, Object> notice = notice(Buffered.SYSTEM_FAILURE);
-		notice.put("missing", missing);
+	/** A fault no program's command met (a field letting go, its power gone), a notice: {@code {event = "notice", why = "fault", condition, part, message}}. */
+	public void faultNotice(com.payonel.modularcomputers.runtime.Failure fault) {
+		Map<String, Object> notice = notice(faultOf(fault));
+		notice.putAll(fault.fields());
 		put(notice);
+	}
+
+	private static String faultOf(com.payonel.modularcomputers.runtime.Failure fault) {
+		if (!Buffered.FAULT.equals(fault.why())) {
+			throw new IllegalArgumentException("not a fault: " + fault.why());
+		}
+		return fault.why();
 	}
 
 	/** A robot shoved off where its last command left it, a notice: {@code {event = "notice", why = "shove", drift}}. */

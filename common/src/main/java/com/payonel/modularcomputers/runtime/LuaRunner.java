@@ -915,13 +915,16 @@ public final class LuaRunner implements Runner {
 		return taken;
 	}
 
+	/** What a board call that failed outside any device names, as an internal error's part. */
+	private static final String BOARD = "board";
+
 	/** Server side: makes a board call and hands back its answer. */
 	private void answer(Call call, Board board) {
 		Object answer;
 		try {
 			answer = call.call().apply(board);
 		} catch (RuntimeException e) {
-			answer = Result.fail(e.getMessage()); // a device never stops the machine
+			answer = Result.fail(Failure.internalError(BOARD, e)); // a device never stops the machine
 		}
 		answered++;
 		served++;

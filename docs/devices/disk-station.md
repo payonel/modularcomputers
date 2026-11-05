@@ -51,7 +51,7 @@ The station's file is text, as a sysfs attribute is.
   as they were when it was first read; seek back to the start to read them afresh.
 - **Write**: each line written is an action, done at once: `format`, `wipe`, `clone`, `install` or
   `update`. Any other line fails the write with `EINVAL`, and so does an action the station refuses
-  (`system_failure`: no disk, no power; `limit`: too big). Through `io`, a write is buffered: the line goes when the
+  (a `fault`: no disk, no power; `limit`: too big). Through `io`, a write is buffered: the line goes when the
   file is flushed or closed, and that call reports the failure.
 - For `sys.poll`, the file is always ready to read and to write, and never has `PRI` (the station has
   no interrupt).
@@ -64,8 +64,8 @@ echo install > /dev/diskstation0
 ### Its ioctls are its methods
 
 The file's ioctls are the methods below, by name, in any open mode. They say why an action was
-refused, as a write cannot: the ioctl gives `nil`, the station's message (`system_failure`, and `power` missing, `doesn't
-fit: ...`) and `EINVAL`. An action that worked gives `true`.
+refused, as a write cannot: the ioctl gives `nil`, its why (`fault`, `limit`), `EINVAL` and the failure
+(`{why = "fault", condition = "missing", part = "power", message = "power required"}`). An action that worked gives `true`.
 
 <!-- lua-fragment -->
 ```lua
@@ -74,8 +74,9 @@ local ok, why = sys.ioctl(sys.fileno(io.open("/dev/diskstation0")), "install")
 
 ## Methods
 
-Every action fails with `system_failure` (`"disk"` missing) when the target slot is empty, and with `system_failure` (and `"power"`, what's missing) when neither
-the bus nor the battery can pay for it.
+Every action fails with a fault, `condition = "missing"`, when it can't be done: `part = "destination"`
+(`message = "storage disk target required"`) when the target slot is empty, and `part = "power"` when
+neither the bus nor the battery can pay for it.
 
 ### format() → nothing
 
@@ -88,7 +89,8 @@ Makes the target raw, with no filesystem. Everything on it is gone.
 ### clone() → nothing
 
 Makes the target a copy of the source: its format and its contents, with the files' times kept.
-Fails with `system_failure` (`"source"` missing) when the source slot is empty, and with
+Fails with a fault, `condition = "missing"`, `part = "source"` (`message = "source disk required"`),
+when the source slot is empty, and with
 `{why = "limit", of = "disk", max = the target's capacity}` when what is on
 the source is larger than the target: an hfs source's used bytes, or a raw source's whole capacity
 (a raw source needs a target as big). Nothing changes when it is refused.

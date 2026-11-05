@@ -10,7 +10,7 @@
 -- A move and a release wait for the move before (commands); a stop never waits: it ends a move
 -- under way where it is, holding on (to let go at once: stop, then release). How a move went comes as
 -- an event (poll's PRI; the pull ioctl: {event = "move", ok, why}), and its letting go on its own as
--- a notice ({event = "notice", why}: lost, blocked or system_failure).
+-- a notice ({event = "notice", why}: lost, blocked or fault).
 local function number(word)
   return word and tonumber(word)
 end

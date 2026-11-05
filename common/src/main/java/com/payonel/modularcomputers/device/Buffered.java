@@ -65,11 +65,12 @@ public interface Buffered {
 	String NO_SPACE = com.payonel.modularcomputers.runtime.Failure.NO_SPACE;
 
 	/**
-	 * Why a command ended, a call was refused, or a notice: what it needs to do it is missing (the
-	 * user's, one shape, {@link EventQueue#systemFailure}): {@code missing} says what, one of the
-	 * {@code MISSING_} words. A call refused so answers {@code false, {why = "system_failure", missing}}.
+	 * Why a command ended, a call was refused, or a notice: something wrong with the machine itself
+	 * (the user's, one shape, {@link EventQueue#fault}): {@code condition}, {@code part} and {@code
+	 * message}; what it needs not there is condition {@code missing}, part one of the {@code MISSING_}
+	 * words. A call refused so answers {@code false, {why = "fault", condition, part, message}}.
 	 */
-	String SYSTEM_FAILURE = com.payonel.modularcomputers.runtime.Failure.SYSTEM_FAILURE;
+	String FAULT = com.payonel.modularcomputers.runtime.Failure.FAULT;
 	/** What's missing: a robot's legs (it's on its thrusters, or they're gone). */
 	String MISSING_LEGS = "legs";
 	/** What's missing: a robot's thrusters (a tier 1 has none). */
@@ -81,9 +82,9 @@ public interface Buffered {
 	/** What's missing: a robot's robotics, to work a crafting card (in a case there's none). */
 	String MISSING_ROBOTICS = "robotics";
 
-	/** A refusal: what it needs is missing ({@link #SYSTEM_FAILURE}, and what). */
-	static com.payonel.modularcomputers.runtime.Result missing(String what) {
-		return com.payonel.modularcomputers.runtime.Result.fail(com.payonel.modularcomputers.runtime.Failure.systemFailure(what));
+	/** A refusal: a part it needs is missing (a {@link #FAULT}, and what). */
+	static com.payonel.modularcomputers.runtime.Result missing(String part) {
+		return com.payonel.modularcomputers.runtime.Result.fail(com.payonel.modularcomputers.runtime.Failure.missing(part));
 	}
 
 	/** How far it is off where its last command left it, {forward, right, up}, for a drifted refusal (a robot's; nothing else drifts). */

@@ -103,7 +103,7 @@ device's event says when to give it again.
 
 A call never stops the machine. If a device is gone, or an argument is wrong, `board.invoke`
 returns `false` and its failure: a table, its `why` a word and its fields, the same for every
-failure with that why (`{why = "system_failure", missing = "legs"}`):
+failure with that why (`{why = "fault", condition = "missing", part = "legs", message = "legs required"}`):
 
 | why | fields | means |
 |---|---|---|
@@ -112,9 +112,14 @@ failure with that why (`{why = "system_failure", missing = "legs"}`):
 | `not_found` | `kind` (`device`, `method`, `entity`, `file`, `container`, `slot`, `block`, `boot_entry`, `offset`...), `value` (what was named) | what it names isn't there |
 | `limit` | `of`, `max` | over a limit |
 | `denied` | `reason`, `value` (what was refused) | not allowed |
-| `system_failure` | `missing` | what it needs to do it is missing (`legs`, `thrusters`, `power`, `body`, `storage`...) |
+| `fault` | `condition`, `part`, `message` | something wrong with the machine itself, not with how it was asked: a part it needs `missing` (`legs`, `thrusters`, `power`, `bench`, `robotics`, `body`, `position`, `projector`, `destination`, `source`), an `io_error` (its storage failed), or an `internal_error` (the mod failed: `part` the device's type, or `board`) |
 | `drifted` | `drift` | a robot off its spot |
 | `network` | `reason`, `message` | the internet card's and network card's: failed in transit |
+
+A `message` is information for a person, never a string to parse: its words may change. A program
+decides by the why and the other fields (`condition`, `part`, `reason`), and shows the message. A
+fault never carries the server's own error: an `io_error` and an `internal_error` say only
+`i/o error` and `internal error`, and the details go to the server's log.
 
 A few aren't named yet and keep their old message as their why (a field's `holding`, a disk's
 `already exists: /a`). This

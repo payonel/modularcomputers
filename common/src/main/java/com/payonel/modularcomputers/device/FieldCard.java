@@ -133,7 +133,7 @@ public final class FieldCard extends Card implements Buffered {
 			return;
 		}
 		if (!powered) {
-			lost(SYSTEM_FAILURE); // (its power gone: what it needs is missing, power)
+			lost(FAULT); // (its power gone: a fault, power missing)
 			return;
 		}
 		String why = projector != null ? projector.check() : null;
@@ -188,7 +188,7 @@ public final class FieldCard extends Card implements Buffered {
 		return held;
 	}
 
-	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, never through blocks. A command: true at once (its event: move, ok, or not and why: blocked, with name, the block in the way (\"\" for none: past its reach, or what it holds not loaded), and face, the side of what it holds that met it, in its computer's frame; lost; system_failure, missing power; stopped; each with its call), or false and why it can't start (not holding)")
+	@Method(doc = "move(forward[, right[, up]]): moves its field, and what it holds, by that much in its computer's frame, never through blocks. A command: true at once (its event: move, ok, or not and why: blocked, with name, the block in the way (\"\" for none: past its reach, or what it holds not loaded), and face, the side of what it holds that met it, in its computer's frame; lost; fault, condition missing, part power, and its message; stopped; each with its call), or false and why it can't start (not holding)")
 	public Result move(Arguments args) {
 		Result no = noProjector();
 		if (no != null) {
@@ -248,7 +248,7 @@ public final class FieldCard extends Card implements Buffered {
 		return Result.ok(now);
 	}
 
-	@Method(doc = "pull(): its oldest event, or nil: a move's end, {event = \"move\", ok, why}, or a notice of its letting go on its own: {event = \"notice\", why = \"lost\", name, id, at} (what it held is gone), {event = \"notice\", why = \"blocked\", name = \"\", face} (out of its reach: the side of what it held past the edge), {event = \"notice\", why = \"system_failure\", missing = \"power\"}")
+	@Method(doc = "pull(): its oldest event, or nil: a move's end, {event = \"move\", ok, why}, or a notice of its letting go on its own: {event = \"notice\", why = \"lost\", name, id, at} (what it held is gone), {event = \"notice\", why = \"blocked\", name = \"\", face} (out of its reach: the side of what it held past the edge), {event = \"notice\", why = \"fault\", condition = \"missing\", part = \"power\", message}")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -304,9 +304,9 @@ public final class FieldCard extends Card implements Buffered {
 		}
 		// Its power gone (the user's: a system failure, power missing).
 		if (wasMoving) {
-			events.systemFailure("move", MISSING_POWER, call); // (the move it was making ends with it)
+			events.fault("move", com.payonel.modularcomputers.runtime.Failure.missing(MISSING_POWER), call); // (the move it was making ends with it)
 		}
-		events.systemFailureNotice(MISSING_POWER);
+		events.faultNotice(com.payonel.modularcomputers.runtime.Failure.missing(MISSING_POWER));
 	}
 
 	/** The last command the board gave it and its arguments (the board's {@link #called}); the move under way's, and where what it holds was as it began. */

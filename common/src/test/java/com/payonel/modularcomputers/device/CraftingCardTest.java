@@ -86,7 +86,7 @@ class CraftingCardTest {
 		}
 		crafts = Buffered.missing(Buffered.MISSING_BENCH);
 		craftsTillItEnds();
-		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "craft", "ok", false, "why", "system_failure", "missing", "bench",
+		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "craft", "ok", false, "why", "fault", "condition", "missing", "part", "bench", "message", "crafting bench required",
 			"call", Map.of("args", List.of(3L), "progress", 1L)));
 	}
 

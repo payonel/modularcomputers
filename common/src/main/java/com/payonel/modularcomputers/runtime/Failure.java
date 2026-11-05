@@ -19,8 +19,35 @@ public final class Failure {
 	public static final String HELD = "held";
 	/** Positional, off its spot: how far off ({@code drift}). */
 	public static final String DRIFTED = "drifted";
-	/** What it needs to do it is missing ({@code missing}). */
-	public static final String SYSTEM_FAILURE = "system_failure";
+	/**
+	 * Something wrong with the machine itself, not with how it was asked: what's wrong ({@code
+	 * condition}: {@link #MISSING}, {@link #IO_ERROR}, {@link #INTERNAL_ERROR}), with what ({@code
+	 * part}), and a person's words for it ({@code message}: information, never a string to parse).
+	 */
+	public static final String FAULT = "fault";
+	/** A fault's condition: a part it needs isn't there. */
+	public static final String MISSING = "missing";
+	/** A fault's condition: its storage failed as it read or wrote (the host's error logged, never said). */
+	public static final String IO_ERROR = "io_error";
+	/** A fault's condition: the host failed (a bug: the exception logged, never said: it could tell of the host). */
+	public static final String INTERNAL_ERROR = "internal_error";
+	/** What a fault with its storage says. */
+	public static final String IO_ERROR_MESSAGE = "i/o error";
+	/** What the host's failure says. */
+	public static final String INTERNAL_ERROR_MESSAGE = "internal error";
+	/** Each part a fault can find missing, and what it says (a person's words, never parsed). */
+	private static final Map<String, String> REQUIRED = Map.ofEntries(
+		Map.entry("legs", "legs required"),
+		Map.entry("thrusters", "thrusters required"),
+		Map.entry("power", "power required"),
+		Map.entry("bench", "crafting bench required"),
+		Map.entry("robotics", "robotics required"),
+		Map.entry("body", "robot body required"),
+		Map.entry("position", "known position required"),
+		Map.entry("projector", "field projector required"),
+		Map.entry("destination", "storage disk target required"),
+		Map.entry("source", "source disk required"));
+	private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(com.payonel.modularcomputers.ModularComputers.MOD_ID);
 	/** An argument it can't use: which ({@code argument}), as given ({@code value}), what it takes ({@code expected}). */
 	public static final String BAD_ARGUMENT = "bad_argument";
 	/** Not allowed ({@code reason}), and what was refused ({@code value}). */
@@ -61,8 +88,32 @@ public final class Failure {
 		return new Failure(DRIFTED, "drift", drift);
 	}
 
-	public static Failure systemFailure(String missing) {
-		return new Failure(SYSTEM_FAILURE, "missing", missing);
+	/** A part it needs isn't there ({@code part}: one {@link #REQUIRED} names). */
+	public static Failure missing(String part) {
+		String message = REQUIRED.get(part);
+		if (message == null) {
+			throw new IllegalArgumentException("no missing part " + part);
+		}
+		return fault(MISSING, part, message);
+	}
+
+	/** Its storage ({@code part}) failed as it read or wrote: the host's error goes to the log, never to the program. */
+	public static Failure ioError(String part, Throwable cause) {
+		LOGGER.warn("{}: i/o error", part, cause);
+		return fault(IO_ERROR, part, IO_ERROR_MESSAGE);
+	}
+
+	/**
+	 * The host failed doing it ({@code part}: the device's type, or {@code board}): the exception goes
+	 * to the log, never to the program (its text could tell of the host: paths, its classes).
+	 */
+	public static Failure internalError(String part, Throwable cause) {
+		LOGGER.error("{}: internal error", part, cause);
+		return fault(INTERNAL_ERROR, part, INTERNAL_ERROR_MESSAGE);
+	}
+
+	private static Failure fault(String condition, String part, String message) {
+		return new Failure(FAULT, "condition", condition, "part", part, "message", message);
 	}
 
 	public static Failure badArgument(int argument, Object value, String expected) {

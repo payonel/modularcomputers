@@ -27,10 +27,9 @@ public final class DiskStation implements Device {
 	public static final int DRAW = 1;
 	public static final String TARGET = "target";
 	public static final String SOURCE = "source";
-	/** What's missing for an action ({@link Buffered#SYSTEM_FAILURE}'s): its target disk, a clone's source. */
-	public static final String MISSING_DISK = "disk";
+	/** What's missing for an action (a {@link Buffered#FAULT}'s part): its target disk, the one it writes; a clone's source. */
+	public static final String MISSING_DESTINATION = "destination";
 	public static final String MISSING_SOURCE = "source";
-	public static final String NO_POWER = Buffered.SYSTEM_FAILURE; // (and what's missing: power, the user's)
 	/** The image a disk gets when it's installed or updated: mcos. */
 	public static final String IMAGE = "mcos";
 	/** The actions, its methods (and the GUI's buttons). */
@@ -73,7 +72,7 @@ public final class DiskStation implements Device {
 	private Result onTarget(java.util.function.Function<Disk, Result> action) {
 		Disk target = bay.disk(TARGET);
 		if (target == null) {
-			return Buffered.missing(MISSING_DISK);
+			return Buffered.missing(MISSING_DESTINATION);
 		}
 		if (!bay.pay(ACTION_COST)) {
 			return Buffered.missing(Buffered.MISSING_POWER);

@@ -45,6 +45,11 @@ public final class DeviceMethods {
 		return Optional.ofNullable(of(device).get(name)).map(method -> method.getAnnotation(Method.class).doc());
 	}
 
+	/** What failed, as an internal error names it: a device's type ({@code storage}...), a handle's {@code handle}. */
+	private static String part(Object device) {
+		return device instanceof com.payonel.modularcomputers.bus.Device real ? real.type().name().toLowerCase(java.util.Locale.ROOT) : "handle";
+	}
+
 	/** Calls a device's method. Never throws. */
 	public static Result invoke(Object device, String name, Arguments args) {
 		java.lang.reflect.Method method = of(device).get(name);
@@ -56,9 +61,9 @@ public final class DeviceMethods {
 			return result == null ? Result.ok() : result;
 		} catch (InvocationTargetException e) {
 			Throwable cause = e.getCause();
-			return cause instanceof Arguments.ArgumentError bad ? Result.fail(bad.failure()) : Result.fail("device error: " + cause); // (a fault: not named yet)
+			return cause instanceof Arguments.ArgumentError bad ? Result.fail(bad.failure()) : Result.fail(Failure.internalError(part(device), cause));
 		} catch (ReflectiveOperationException | RuntimeException e) {
-			return Result.fail("device error: " + e);
+			return Result.fail(Failure.internalError(part(device), e));
 		}
 	}
 }

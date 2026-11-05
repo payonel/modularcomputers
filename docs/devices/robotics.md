@@ -200,7 +200,7 @@ does. How it gets there is below ([Walking](#walking)). With no arguments it wal
 its last command left it. A command; its event, `walk`: `ok`, or not and why, on the middle of the
 last block it reached; farther than 64 blocks any way, it's `blocked` at once and goes nowhere
 (`name = ""`, `face` toward where it was going). It fails with `bad_argument` (`expected =
-"squared"`: it wouldn't end squared), or with `system_failure`, `"legs"` missing (on its thrusters).
+"squared"`: it wouldn't end squared), or with a fault, `part = "legs"` missing (on its thrusters).
 
 ### walkTo(forward[, right[, up]]) → true
 
@@ -331,7 +331,7 @@ when there were none it could take. It fails with `not_found`: `kind = "containe
 ### fly(forward[, right[, up]]) → true
 
 A tier 2 golem's: its thrusters' calls (`fly`, `flyTo`, `land`) fail on a tier 1 with
-`system_failure`, `"thrusters"` missing (it walks; its own [energy field](/devices/energy-field-card/) can still carry it).
+a fault, `part = "thrusters"` missing (it walks; its own [energy field](/devices/energy-field-card/) can still carry it).
 
 Flies on its thrusters that far from where its last command left it, in its own frame, straight
 there and never through blocks. It must end squared, as a walk does, its feet's height whole blocks
@@ -467,12 +467,13 @@ local event = {event = "walk", ok = false, why = "blocked", name = "minecraft:la
 A command a `stop()` cut short ends `{event = <method>, ok = false, why = "stopped", call}`, and
 nothing else: always a command's end, never a notice.
 
-### System failure
+### Fault
 
-A command it can't do for want of a part of itself is refused `false, {why = "system_failure", missing}`:
-`missing` is `"legs"` (a walk on its thrusters) or `"thrusters"` (a tier 1's flight). One given
-while a field held it, and refused once it's let go, ends in the same shape instead:
-`{event = <method>, ok = false, why = "system_failure", missing = "legs", call}`.
+A command it can't do for want of a part of itself is refused `false, {why = "fault", condition =
+"missing", part, message}`: `part` is `"legs"` (a walk on its thrusters) or `"thrusters"` (a tier 1's
+flight), and `message` says so in words (`"legs required"`: for a person to read, never to parse).
+One given while a field held it, and refused once it's let go, ends in the same shape instead:
+`{event = <method>, ok = false, why = "fault", condition = "missing", part = "legs", message, call}`.
 
 ### Drifted
 

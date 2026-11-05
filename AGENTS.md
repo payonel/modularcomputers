@@ -279,10 +279,15 @@ device data), and user code, as a real CPU runs firmware under an OS.
   only wait; mcos's blocking reads and commands are the kernel waiting for a process.
 - **Every failure is one shape a why** (the user's, 2026-11-04): a call refused answers `false,
   {why, ...}`, a table built only by that why's own builder (`runtime/Failure`: `busy`/`held`
-  `{id}`, `drifted {drift}`, `system_failure {missing}`, `bad_argument {argument, value,
-  expected}`, `denied {reason, value}`, `limit {of, max}`, `network {reason, message}`), each
-  taking every field (none missing: `""` when there's nothing to say), its fields' names the field
-  dictionary's (a `name` a registry id everywhere, an `id` a UUID, `at` an offset). A refusal not
+  `{id}`, `drifted {drift}`, `fault {condition, part, message}`, `bad_argument {argument, value,
+  expected}`, `denied {reason, value}`, `limit {of, max}`, `network {reason, message}`,
+  `not_found {kind, value}`), each taking every field (none missing: `""` when there's nothing to
+  say), its fields' names the field dictionary's (a `name` a registry id everywhere, an `id` a
+  UUID, `at` an offset). A `message` is a person's words, never a string to parse (the user's): a
+  program decides by the other fields. **A fault is the machine's own** (the user's, 2026-11-04):
+  a part it needs `missing` (its message a fixed one a part, `Failure.missing`), an `io_error`, an
+  `internal_error` (anything the host threw); **no host error reaches a program** (its text could
+  tell of the server: paths, classes), only `i/o error` or `internal error`, the exception logged. A refusal not
   yet named is `Failure.legacy`, its old text as its why and no fields, until it's named. mcos's
   kernel reads a failure through `k.invoke` (its why as a word, then the table), and an ioctl
   gives a program `nil, why, errno, failure`; a record holds one nested (`failure`, the internet
@@ -387,7 +392,7 @@ moves them. What a broken block drops (or its hand is given) is caught: its stor
 off hand (a background catch, the user's: atypical, so storage is always preferred), else it stays
 in the world, and the swing's end says whether it kept it all.
 - **It flies two ways, each with its price** (the user's design, 2026-10-25), never with its legs
-  on and its tools as on the ground: on its **thrusters**, built into a tier 2 (a tier 1's thruster calls fail: `system_failure`, `thrusters` missing), no card (`fly`, `land`;
+  on and its tools as on the ground: on its **thrusters**, built into a tier 2 (a tier 1's thruster calls fail: a `fault`, `thrusters` missing), no card (`fly`, `land`;
   `fly()` takes off where it stands), its legs left standing where it took off (`GolemLegs`, a boat's kind of object), red
   beams from their sockets, 25 blocks a second, five CPUs' power a tick; legless it walks nowhere,
   works as a player off the ground does (its hand's fake player off the ground: the game's rules,
@@ -430,7 +435,7 @@ Storage and a 3x3 grid on a card (user design, 2026-10-24): its slots live on it
 vanilla contents component, read and written by `CraftingStorage`, its one home), so they go where
 the card goes. Any computer takes it, and its view gets a tab a card (right of the buttons) where a
 player crafts by hand, as at a crafting table (the game's result slot). Its methods need robotics:
-in a case they fail (`system_failure`, `robotics` missing), in a robot `CraftingBench` works them (the game's recipes;
+in a case they fail (a `fault`, `robotics` missing), in a robot `CraftingBench` works them (the game's recipes;
 what's made into storage, all or nothing: no room, no craft). Its commands (all but `pull`, `list`,
 `get` and `stop`) come after its robot's: robotics is how a robot handles things, its hands at a
 grid too (the user's, 2026-10-27 and -28), so each waits for the robot's moves to end. A craft's
@@ -691,12 +696,13 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   **A craft's `missing_inputs` and `no_space`** (the user's, 2026-11-04): its grid makes nothing
   (empty, no recipe) or no room for what it makes, each `{why, name, call}`
   (`EventQueue.missingInputs`, `noSpace`): `name` what it was making (its last craft's, `""` none;
-  no_space's, what found no room), its progress the crafts done. **`system_failure`** (the user's,
-  2026-11-04): what a device needs to do it is missing, `missing` saying what (`legs`, `thrusters`,
-  `power`, `bench`, `robotics`): a call refused so answers `false, {why = "system_failure", missing}`
-  (`Buffered.missing`), and a command given again once its robot's let go and refused becomes its
-  end in the same shape (`EventQueue.refused`, `systemFailure`), so an answer at once and the event
-  it becomes agree; a field losing power lets go, a notice (`systemFailureNotice`). **No why is
+  no_space's, what found no room), its progress the crafts done. **A part missing is a `fault`**
+  (the user's, 2026-11-04): `condition = "missing"`, `part` what (`legs`, `thrusters`, `power`,
+  `bench`, `robotics`, `body`, `position`, `projector`; a Disk Station's `destination`, `source`),
+  `message` its words: a call refused so answers `false, {why = "fault", condition, part,
+  message}` (`Buffered.missing`), and a command given again once its robot's let go and refused
+  becomes its end in the same shape (`EventQueue.refused`, `fault`), so an answer at once and the
+  event it becomes agree; a field losing power lets go, a notice (`faultNotice`). **No why is
   built another way:** `EventQueue.add` refuses an event with one, `ended` is a success's only, and
   every failure has its own method. A landing on its legs already is landed: `true`, ended `ok`. **Past a field's reach is `blocked`** (the user's: too far is just
   blocked), `name = ""`, `face` the side of what it holds past the edge: a move there ends at once,
@@ -998,9 +1004,14 @@ Lessons from mistakes, each with its test:
 - **An answer at once can become an event:** a command taken while its robot was held is given
   again once let go, and its refusal then was put in its end as a free-form why (`no legs`), and
   one that ended as it was given (a turn off its spot, drifted) got a second end. A refusal that
-  can be given again has its event's shape (`system_failure`, `EventQueue.refused`), and no why is
+  can be given again has its event's shape (a `fault`, `EventQueue.refused`), and no why is
   built but by its own method (`EventQueue.add` refuses one, `ended` is a success's).
-  (`whatItNeedsMissingIsASystemFailure...`, `aTurnTakenWhileHeld...EndsDriftedOnce`)
+  (`whatItNeedsMissingIsAFault...`, `aTurnTakenWhileHeld...EndsDriftedOnce`)
+- **A host's error text is the host's:** a disk's missing file was named by Java's
+  `NoSuchFileException`, the server's own path into the world save, and a device's exception went
+  to the program as its text. A failure names what the program knows (its path on the disk), and
+  what the host threw is a fault that says only its condition, the exception logged.
+  (`aFileTheHostFindsMissingIsNamedByItsPathOnTheDisk`, `aFaultNeverSaysTheHostsError`)
 - **A block's state isn't the block:** leaves change state as their log goes, crops as they grow;
   what's tied to a block (a golem's breaking) compares the block, not its state.
   (`aBlockWhoseStateChangesWhileItsBrokenStillBreaks`)

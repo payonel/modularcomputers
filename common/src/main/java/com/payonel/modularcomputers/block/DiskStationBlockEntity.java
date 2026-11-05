@@ -48,10 +48,11 @@ public final class DiskStationBlockEntity extends CardHolderBlockEntity {
 			}
 			var failure = result.failure();
 			return switch (failure.why()) {
-				case com.payonel.modularcomputers.runtime.Failure.SYSTEM_FAILURE -> switch (String.valueOf(failure.get("missing"))) {
-					case DiskStation.MISSING_DISK -> NO_DISK;
+				case com.payonel.modularcomputers.runtime.Failure.FAULT -> switch (String.valueOf(failure.get("part"))) {
+					case DiskStation.MISSING_DESTINATION -> NO_DISK;
 					case DiskStation.MISSING_SOURCE -> NO_SOURCE;
-					default -> NO_POWER;
+					case com.payonel.modularcomputers.device.Buffered.MISSING_POWER -> NO_POWER;
+					default -> FAILED;
 				};
 				case com.payonel.modularcomputers.runtime.Failure.DENIED -> Disk.READ_ONLY.equals(failure.get("reason")) ? READ_ONLY : FAILED;
 				case com.payonel.modularcomputers.runtime.Failure.LIMIT -> "disk".equals(failure.get("of")) ? NO_FIT : FAILED;

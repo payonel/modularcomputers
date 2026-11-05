@@ -11,7 +11,7 @@ local SHAPES = {
   limit = {"of", {open_files = "EMFILE", disk = "ENOSPC", link = "ENAMETOOLONG", memory = "ENOMEM"}},
   bad_argument = {"argument", true, "EINVAL"},
   denied = {"reason", {raw_disk = "ENODEV", read_only = "EROFS"}},
-  system_failure = {"missing", {storage = "ENODEV"}},
+  fault = {"condition", {io_error = "EIO", internal_error = "EIO"}},
 }
 
 -- ... and those not yet named, by their words: pattern, errno, pattern...

@@ -14,7 +14,7 @@ import java.util.Map;
  * crafting grid and the rest ({@link #STORAGE}) where what it crafts goes, on the card itself (its
  * item), so it goes where the card goes. In any computer a player crafts with it by hand, in its tab
  * of the computer's view; its methods need robotics (a robot's arms to work it): in a computer
- * without, each fails ({@link #NO_ROBOTICS}). Its commands wait for its robot's moves to end (they
+ * without, each fails (a fault: robotics missing, {@link #MISSING_ROBOTICS}). Its commands wait for its robot's moves to end (they
  * work where it is: the user's), and a craft's start costs its robot nothing: the craft is then the
  * card's, taking {@link #CRAFT_TICKS}, the card busy and its robot free (the user's, 2026-10-28), so
  * two cards craft side by side. What it crafts goes to its storage,
@@ -33,8 +33,6 @@ public final class CraftingCard extends Card implements Buffered {
 	public static final int CRAFT_COST = PowerUnits.CPU;
 	/** What moving items costs (a move, a pick up, a drop, a container's): a running CPU's tick. */
 	public static final int MOVE_COST = PowerUnits.CPU;
-	/** Why its methods fail in a computer that isn't a robot. */
-	public static final String NO_ROBOTICS = SYSTEM_FAILURE; // (and what's missing: robotics, the user's)
 	public static final String IDLE = "idle";
 	public static final String CRAFTING = "crafting";
 
@@ -180,9 +178,7 @@ public final class CraftingCard extends Card implements Buffered {
 		}
 		Result made = bench.craft();
 		if (made.failed()) {
-			// (no_space: what it would have made, no room for it; system_failure: what's missing)
-			Object about = made.failure().get(Buffered.SYSTEM_FAILURE.equals(made.error()) ? "missing" : "name");
-			finish(made.error(), about == null ? null : String.valueOf(about));
+			finish(made.error(), made.failure()); // (no_space: what it would have made, no room for it; a fault: what's wrong)
 			return;
 		}
 		power.charge(CRAFT_COST);
@@ -197,8 +193,8 @@ public final class CraftingCard extends Card implements Buffered {
 		}
 	}
 
-	/** The craft under way ended: done (no why), or why not, {@code about} what it says (no_space's item, system_failure's missing). */
-	private void finish(String why, String about) {
+	/** The craft under way ended: done (no why), or why not ({@code failure}, the bench's, in its own shape; none for a stop). */
+	private void finish(String why, com.payonel.modularcomputers.runtime.Failure failure) {
 		Map<String, Object> result = new LinkedHashMap<>();
 		if (craftedName != null) {
 			result.put("name", craftedName);
@@ -215,9 +211,9 @@ public final class CraftingCard extends Card implements Buffered {
 		} else if (MISSING_INPUTS.equals(why)) {
 			events.missingInputs("craft", String.valueOf(result.getOrDefault("name", "")), call);
 		} else if (NO_SPACE.equals(why)) {
-			events.noSpace("craft", about, call);
-		} else if (SYSTEM_FAILURE.equals(why)) {
-			events.systemFailure("craft", about, call);
+			events.noSpace("craft", String.valueOf(failure.get("name")), call);
+		} else if (FAULT.equals(why)) {
+			events.fault("craft", failure, call);
 		} else if (why == null) {
 			events.ended("craft", result);
 		} else {

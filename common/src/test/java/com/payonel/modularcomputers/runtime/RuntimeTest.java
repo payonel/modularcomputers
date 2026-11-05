@@ -146,11 +146,14 @@ class RuntimeTest {
 			errors.add(board.invoke("nowhere", "read").error());
 			errors.add(board.invoke("id:sensor-1", "fly").error());
 			errors.add(board.invoke("id:screen", "write", true).error());
-			errors.add(board.invoke("id:sensor-1", "explode").error());
+			Result exploded = board.invoke("id:sensor-1", "explode");
+			errors.add(exploded.error());
+			errors.add(String.valueOf(exploded.failure().table()));
 			errors.add(board.invoke("id:screen", "write", "hi").failed() ? "failed" : "ok");
 			com.payonel.modularcomputers.machine.Program.park(board);
 		});
-		assertThat(errors).containsExactly("not_found", "not_found", "bad_argument", "device error: java.lang.IllegalStateException: boom", "ok");
+		assertThat(errors).containsExactly("not_found", "not_found", "bad_argument", "fault",
+			String.valueOf(Failure.internalError("hearing", new IllegalStateException("boom")).table()), "ok"); // (the host's error logged, never said)
 		assertThat(display.buffer().row(0)).startsWith("hi");
 		assertThat(machine.isPowered()).isTrue();
 	}

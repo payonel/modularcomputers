@@ -37,7 +37,15 @@ public final class Arguments {
 	}
 
 	public Arguments(List<Object> values, MemoryAccount account) {
-		this.values = values.stream().map(Values::normalize).toList();
+		List<Object> held = new java.util.ArrayList<>();
+		for (int i = 0; i < values.size(); i++) {
+			try {
+				held.add(Values.normalize(values.get(i)));
+			} catch (IllegalArgumentException e) {
+				throw bad(i, values.get(i), VALUE); // (one a program can't hand a device: a function, a coroutine)
+			}
+		}
+		this.values = java.util.Collections.unmodifiableList(held); // (a sequence can hold nils)
 		this.account = account;
 	}
 
@@ -130,6 +138,9 @@ public final class Arguments {
 	public boolean optBoolean(int index, boolean fallback) {
 		return get(index) == null ? fallback : checkBoolean(index);
 	}
+
+	/** What an argument that isn't a value a device can take expects: a value (nil, a boolean, number, string, table or handle). */
+	public static final String VALUE = "value";
 
 	/** Argument {@code index} (from 0) is {@code value}, not what it takes ({@code expected}, a word: a type's name, or what it names). */
 	private static ArgumentError bad(int index, Object value, String expected) {

@@ -160,8 +160,8 @@ final class MotherboardApi implements Board {
 		}
 		try {
 			return DeviceMethods.invoke(device.get(), method, new Arguments(Arrays.asList(args), account.get()));
-		} catch (IllegalArgumentException e) {
-			return Result.fail(e.getMessage()); // an argument that isn't a value a program can hold
+		} catch (com.payonel.modularcomputers.runtime.Arguments.ArgumentError e) {
+			return Result.fail(e.failure()); // an argument that isn't a value a program can hold
 		}
 	}
 
@@ -172,8 +172,8 @@ final class MotherboardApi implements Board {
 		}
 		try {
 			return DeviceMethods.invoke(handle, method, new Arguments(Arrays.asList(args), account.get()));
-		} catch (IllegalArgumentException e) {
-			return Result.fail(e.getMessage());
+		} catch (com.payonel.modularcomputers.runtime.Arguments.ArgumentError e) {
+			return Result.fail(e.failure());
 		}
 	}
 

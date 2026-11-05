@@ -26,9 +26,11 @@ end
 print("source: " .. describe(slots.source))
 print("target: " .. describe(slots.target) .. " (everything on it will be gone)")
 
-local ok, why = sys.ioctl(fd, "clone")
+local ok, why, _, failure = sys.ioctl(fd, "clone")
 if not ok then
-  io.stderr:write("disk-station-clone: ", why, "\n") -- (too big: and how many bytes, system_failure...)
+  -- (a fault's message is for a person: shown, never parsed; a limit says its most)
+  local said = failure and (failure.message or failure.max and (failure.of .. " holds at most " .. failure.max .. " bytes"))
+  io.stderr:write("disk-station-clone: ", why, said and (": " .. said) or "", "\n")
   os.exit(1)
 end
 slots = assert(sys.ioctl(fd, "get"))

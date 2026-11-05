@@ -266,8 +266,8 @@ public class CraftingCardGameTest {
 		CraftingCard card = crafting(computer.board(), LANE);
 		Result listed = card.list(args());
 		Result crafted = card.craft(args());
-		same(helper, List.of(listed.error(), listed.failure().get("missing")), List.of("system_failure", "robotics"), "a program's call: robotics missing");
-		same(helper, List.of(crafted.error(), crafted.failure().get("missing")), List.of("system_failure", "robotics"), "a program's craft");
+		same(helper, List.of(listed.error(), listed.failure().get("part")), List.of("fault", "robotics"), "a program's call: robotics missing");
+		same(helper, List.of(crafted.error(), crafted.failure().get("part")), List.of("fault", "robotics"), "a program's craft");
 		var player = GameTests.serverPlayer(helper);
 		CaseMenu menu = (CaseMenu) computer.createMenu(1, player.getInventory(), player);
 		int lane = CaseMenu.CRAFT_SLOTS + LANE * CaseMenu.CRAFT_LANE_SLOTS;

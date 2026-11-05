@@ -80,14 +80,13 @@ class DiskStationTest {
 
 	@Test
 	void anActionNeedsADiskAndPowerAndACloneASource() {
-		assertThat(station.format(args()).failure().table()).isEqualTo(java.util.Map.of("why", "system_failure", "missing", "disk"));
+		assertThat(station.format(args()).failure().table()).isEqualTo(java.util.Map.of("why", "fault", "condition", "missing", "part", "destination", "message", "storage disk target required"));
 		Disk disk = disk("p");
 		bay.disks.put(DiskStation.TARGET, disk);
-		assertThat(station.clone(args()).failure().table()).isEqualTo(java.util.Map.of("why", "system_failure", "missing", "source"));
+		assertThat(station.clone(args()).failure().table()).isEqualTo(java.util.Map.of("why", "fault", "condition", "missing", "part", "source", "message", "source disk required"));
 		bay.powered = false;
 		Result unpowered = station.format(args());
-		assertThat(unpowered.error()).isEqualTo("system_failure");
-		assertThat(unpowered.failure().get("missing")).as("what's missing").isEqualTo("power");
+		assertThat(unpowered.failure().table()).isEqualTo(java.util.Map.of("why", "fault", "condition", "missing", "part", "power", "message", "power required"));
 		assertThat(world.resolve("p/home")).as("nothing done").exists();
 		disk.retire();
 	}

@@ -320,16 +320,16 @@ class RoboticsDeviceTest {
 	}
 
 	/**
-	 * What it needs missing is one shape (the user's): a call refused answers false, system_failure
-	 * and what's missing; a command taken while held and refused once let go ends in that shape, with
+	 * What it needs missing is one shape (the user's): a call refused answers false, a fault,
+	 * condition missing and the part; a command taken while held and refused once let go ends in that shape, with
 	 * its call, so the answer and the event it becomes agree.
 	 */
 	@Test
-	void whatItNeedsMissingIsASystemFailureAtItsCallAndInTheEndItBecomes() {
+	void whatItNeedsMissingIsAFaultAtItsCallAndInTheEndItBecomes() {
 		refuse = RoboticsDevice.NO_LEGS;
 		Result refused = device.walk(args(2L));
-		assertThat(refused.error()).isEqualTo(Buffered.SYSTEM_FAILURE);
-		assertThat(refused.failure().table()).as("what's missing").isEqualTo(Map.of("why", "system_failure", "missing", "legs"));
+		assertThat(refused.error()).isEqualTo(Buffered.FAULT);
+		assertThat(refused.failure().table()).as("what's missing").isEqualTo(Map.of("why", "fault", "condition", "missing", "part", "legs", "message", "legs required"));
 
 		Drifting body = new Drifting();
 		body.frozen = true;
@@ -340,7 +340,7 @@ class RoboticsDeviceTest {
 		body.frozen = false;
 		robot.thawed();
 		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "notice", "why", "held", "id", ""));
-		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "system_failure", "missing", "legs",
+		assertThat(robot.pull(args()).first()).isEqualTo(Map.of("event", "walk", "ok", false, "why", "fault", "condition", "missing", "part", "legs", "message", "legs required",
 			"call", Map.of("args", List.of(2L), "progress", 0L)));
 		assertThat(robot.busy()).isFalse();
 	}

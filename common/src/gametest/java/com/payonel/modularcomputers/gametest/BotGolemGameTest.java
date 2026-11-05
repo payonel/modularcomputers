@@ -363,7 +363,7 @@ public class BotGolemGameTest {
 			var none = new com.payonel.modularcomputers.runtime.Arguments(List.of());
 			var up = new com.payonel.modularcomputers.runtime.Arguments(List.of(0.0, 0.0, 1.0));
 			for (var said : List.of(golem.robotics().fly(up), golem.robotics().flyTo(up), golem.robotics().fly(none), golem.robotics().land(none))) {
-				helper.assertTrue("system_failure".equals(said.error()) && "thrusters".equals(said.failure().get("missing")), "thrusters missing: " + said);
+				helper.assertTrue("fault".equals(said.error()) && "thrusters".equals(said.failure().get("part")), "thrusters missing: " + said);
 			}
 			helper.assertTrue(golem.legs() && !golem.thrusting(), "still on its legs");
 			var field = golem.board().cards().stream().filter(com.payonel.modularcomputers.device.FieldCard.class::isInstance)

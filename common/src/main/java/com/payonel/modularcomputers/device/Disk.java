@@ -358,7 +358,7 @@ public final class Disk implements Device {
 
 	private Path root() {
 		if (storage == null) {
-			throw new Refused(com.payonel.modularcomputers.runtime.Failure.systemFailure("storage"));
+			throw noStorage();
 		}
 		if (!mode().equals(HFS)) {
 			throw new Refused(com.payonel.modularcomputers.runtime.Failure.denied("raw_disk", "")); // (no filesystem: it's bytes, by offset)
@@ -544,7 +544,24 @@ public final class Disk implements Device {
 		reserved += bytes;
 	}
 
-	private Result run(java.util.function.Supplier<Result> action) {
+	/** A disk with no folder behind it (a client's copy, a test's): the host's bug, never a program's, so an internal error. */
+	private static Refused noStorage() {
+		return new Refused(com.payonel.modularcomputers.runtime.Failure.internalError(PART, new IllegalStateException("a disk with no storage")));
+	}
+
+	/** A disk's part, as its faults name it: its type's name ({@link com.payonel.modularcomputers.bus.DeviceType#STORAGE}). */
+	private static final String PART = "storage";
+
+	/** A host file's path as the program knows it, from the disk's root ("": not on this disk). */
+	private String onDisk(String hostPath) {
+		if (storage == null || hostPath == null) {
+			return "";
+		}
+		Path at = Path.of(hostPath).toAbsolutePath().normalize();
+		return at.startsWith(storage) ? "/" + storage.relativize(at).toString().replace(java.io.File.separatorChar, '/') : "";
+	}
+
+	Result run(java.util.function.Supplier<Result> action) { // (the tests' too: a host error no call makes on purpose)
 		try {
 			return action.get();
 		} catch (Refused e) {
@@ -554,8 +571,8 @@ public final class Disk implements Device {
 		} catch (NoSuchFileRuntime e) {
 			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("file", e.getMessage()));
 		} catch (UncheckedIOException e) {
-			return e.getCause() instanceof NoSuchFileException missing ? Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("file", String.valueOf(missing.getFile())))
-				: Result.fail("i/o error: " + e.getCause().getMessage()); // (a fault: not named yet)
+			return e.getCause() instanceof NoSuchFileException missing ? Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("file", onDisk(missing.getFile()))) // (its path on the disk: never the host's)
+				: Result.fail(com.payonel.modularcomputers.runtime.Failure.ioError(PART, e.getCause()));
 		}
 	}
 
@@ -603,7 +620,7 @@ public final class Disk implements Device {
 
 	private void formatted(String mode) {
 		if (storage == null) {
-			throw new Refused(com.payonel.modularcomputers.runtime.Failure.systemFailure("storage"));
+			throw noStorage();
 		}
 		writable();
 		powerOff();
@@ -647,7 +664,7 @@ public final class Disk implements Device {
 	public Result cloneFrom(Disk source) {
 		return run(() -> {
 			if (storage == null || source.storage == null) {
-				throw new Refused(com.payonel.modularcomputers.runtime.Failure.systemFailure("storage"));
+				throw noStorage();
 			}
 			writable();
 			String mode = source.mode();
@@ -935,7 +952,7 @@ public final class Disk implements Device {
 	/** Its image's path, on a raw disk; refused on an hfs one. */
 	private Path rawImage() {
 		if (storage == null) {
-			throw new Refused(com.payonel.modularcomputers.runtime.Failure.systemFailure("storage"));
+			throw noStorage();
 		}
 		if (!mode().equals(RAW)) {
 			throw new Refused(com.payonel.modularcomputers.runtime.Failure.denied("hfs_disk", "")); // (its filesystem owns it: format it raw to read and write it by offset)
@@ -1194,7 +1211,7 @@ public final class Disk implements Device {
 			} catch (Refused e) {
 				return Result.fail(e.failure);
 			} catch (IOException e) {
-				return Result.fail("i/o error: " + e.getMessage());
+				return Result.fail(com.payonel.modularcomputers.runtime.Failure.ioError(PART, e));
 			}
 		}
 
@@ -1305,7 +1322,7 @@ public final class Disk implements Device {
 			} catch (Refused e) {
 				return Result.fail(e.failure);
 			} catch (IOException e) {
-				return Result.fail("i/o error: " + e.getMessage());
+				return Result.fail(com.payonel.modularcomputers.runtime.Failure.ioError(PART, e));
 			}
 		}
 

@@ -400,8 +400,8 @@ public final class RoboticsDevice implements Device, Buffered {
 
 	/**
 	 * What its body says it can't start without, as its body says it ({@link #NO_LEGS},
-	 * {@link #NO_THRUSTERS}): never a program's word; it answers {@code false, {why = "system_failure",
-	 * missing}} (the user's), the shape of the end it becomes when it's given again once let go.
+	 * {@link #NO_THRUSTERS}): never a program's word; it answers {@code false, {why = "fault", condition =
+	 * "missing", part, message}} (the user's), the shape of the end it becomes when it's given again once let go.
 	 */
 	public static final String NO_LEGS = "no legs";
 	public static final String NO_THRUSTERS = "no thrusters";
@@ -1086,7 +1086,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		try {
 			again = com.payonel.modularcomputers.runtime.DeviceMethods.invoke(this, method, new Arguments(new java.util.ArrayList<>(args)));
 		} catch (RuntimeException e) {
-			again = Result.fail(String.valueOf(e.getMessage()));
+			again = Result.fail(com.payonel.modularcomputers.runtime.Failure.internalError(type().name().toLowerCase(java.util.Locale.ROOT), e));
 		}
 		if (!again.failed()) { // (going, or ended as it started: drifted, a landing on its legs)
 			if ("swing".equals(method) && method.equals(active)) {
