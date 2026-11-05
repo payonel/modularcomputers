@@ -382,6 +382,33 @@ class McosTest extends McosHarness {
 		assertThat(read(root().resolve("st0"))).as("a device with no home for one").isEqualTo("1\n");
 	}
 
+	/**
+	 * A label's errno comes from its failure's shape: a device with no home for a label (its item) is
+	 * EPERM, one that can't be a label (too long) EINVAL. The kernel read the board's failure as
+	 * text once ("can't have"), and a failure is a table now: every refusal said EINVAL.
+	 */
+	@Test
+	void aLabelsErrnoComesFromItsFailuresShape() {
+		dataDisk();
+		((Disk) devices.get("sata:1")).labelIn(new com.payonel.modularcomputers.bus.Label(() -> null, label -> { }));
+		file("lab.lua", """
+			local sys = require("sys")
+			local function errno(path, label)
+			  local file = assert(io.open(path))
+			  local _, _, name = sys.ioctl(sys.fileno(file), "setLabel", label)
+			  file:close()
+			  return tostring(name)
+			end
+			local out = assert(io.open("/e", "w"))
+			out:write(errno("/dev/storage0", "boot"), "|", errno("/dev/storage1", string.rep("x", 40)))
+			out:close()
+			""");
+		boot();
+		type("lua /lab.lua; touch /done\r");
+		untilFile(root().resolve("done"), "");
+		assertThat(read(root().resolve("e"))).isEqualTo("EPERM|EINVAL");
+	}
+
 	@Test
 	void dmesgShowsDevicesJoiningAndTheirEventsAndMountsAndClears() {
 		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();

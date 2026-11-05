@@ -319,8 +319,7 @@ public final class Disk implements Device {
 
 	// ---- the host side -----------------------------------------------------------------------
 
-	/** Thrown for a soft failure, with the message the program gets. */
-	/** A call refused, why in its why's shape ({@link com.payonel.modularcomputers.runtime.Failure}): a not-yet-named one's old text, legacy. */
+	/** A call refused, why in its why's shape ({@link com.payonel.modularcomputers.runtime.Failure}). */
 	private static final class Refused extends RuntimeException {
 		final com.payonel.modularcomputers.runtime.Failure failure;
 

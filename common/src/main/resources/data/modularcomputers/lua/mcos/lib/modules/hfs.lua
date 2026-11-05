@@ -16,11 +16,12 @@ local SHAPES = {
   fault = {"condition", {io_error = "EIO", internal_error = "EIO"}},
 }
 
-local function failed(why, failure)
-  if type(failure) == "table" and failure.why == "symbolic_link" then
+-- A disk call's failure (k.invoke's: always the board's table) as an errno, or a link to follow.
+local function failed(_, failure)
+  if failure.why == "symbolic_link" then
     return nil, {at = failure.at, target = failure.target}, "REPARSE" -- (the VFS goes on from it)
   end
-  local shape = type(failure) == "table" and SHAPES[failure.why]
+  local shape = SHAPES[failure.why]
   if shape then
     local errno = shape[2] == true and shape[3] or shape[2][failure[shape[1]]]
     return fail(errno or "EIO")

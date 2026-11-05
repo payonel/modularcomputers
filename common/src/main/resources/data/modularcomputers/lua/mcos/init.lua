@@ -60,7 +60,7 @@ local k = {
 -- parts match words, and a program can be given the fields. Every part of the kernel calls devices so.
 function k.invoke(id, method, ...)
   local answer = table.pack(board.invoke(id, method, ...))
-  if not answer[1] and type(answer[2]) == "table" then
+  if not answer[1] then -- (a failure is always a table: its why and its fields)
     local failure = answer[2]
     if failure.why == "not_found" and failure.kind == "device" and k.refreshdevices then
       k.refreshdevices() -- (gone: the kernel's view of the bus was out of date)
@@ -1231,9 +1231,9 @@ function k.setlabel(device, label)
   if label ~= nil and type(label) ~= "string" then
     return fail("EINVAL")
   end
-  local ok, why = board.setLabel(device.id, label or "")
-  if not ok then
-    return fail(tostring(why):find("can't have") and "EPERM" or "EINVAL")
+  local ok, failure = board.setLabel(device.id, label or "")
+  if not ok then -- (no home for one: denied, not_labelable; else the label can't be one)
+    return fail(failure.why == "denied" and failure.reason == "not_labelable" and "EPERM" or "EINVAL")
   end
   described[device.id].label = label ~= "" and label or nil
   device.label = described[device.id].label

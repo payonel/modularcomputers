@@ -1014,6 +1014,11 @@ Lessons from mistakes, each with its test:
   to the program as its text. A failure names what the program knows (its path on the disk), and
   what the host threw is a fault that says only its condition, the exception logged.
   (`aFileTheHostFindsMissingIsNamedByItsPathOnTheDisk`, `aFaultNeverSaysTheHostsError`)
+- **A shape changed is every reader's change:** the kernel's label call matched the board's
+  refusal by its text (`can't have`), and once failures became tables it matched nothing: a device
+  with no home for a label said EINVAL, not EPERM, and the label test only read the exit status.
+  When a value's shape changes, grep every reader of it, Lua's too; a test reads the errno itself.
+  (`aLabelsErrnoComesFromItsFailuresShape`)
 - **A wait is the board's to say:** only the board knows the id whose news ends a wait, so a
   device's own guard that gave its refusal word (a crafting card given a craft while one ran, a
   robot's body saying held) made a `busy` or `held` with no id, one mcos would wait on for ever. A
