@@ -49,12 +49,12 @@ public final class BluetoothCard extends Card {
 			return Result.ok();
 		}
 		if (!(id instanceof String text)) {
-			return Result.fail("not a board id: " + id);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, com.payonel.modularcomputers.runtime.Arguments.given(id), "board_id"));
 		}
 		try {
 			relink.accept(UUID.fromString(text));
 		} catch (IllegalArgumentException e) {
-			return Result.fail("not a board id: " + text);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, text, "board_id"));
 		}
 		return Result.ok();
 	}

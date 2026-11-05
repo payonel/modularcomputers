@@ -23,15 +23,17 @@ class BootVariablesTest {
 	@Test
 	void anEntryNeedsAnIdAPathFromTheTopAndALabelThatCanBeOne() {
 		BootVariables vars = BootVariables.EMPTY;
-		assertThatThrownBy(() -> vars.withEntry(0, "sata:1", null, null)).hasMessage("not an id: sata:1");
-		assertThatThrownBy(() -> vars.withEntry(0, "id:not-a-uuid", null, null)).hasMessageContaining("not an id");
-		assertThatThrownBy(() -> vars.withEntry(0, DISK.toUpperCase().replace("ID:", "id:"), null, null)).hasMessageContaining("not an id: ");
-		assertThatThrownBy(() -> vars.withEntry(0, DISK, "init.lua", null)).hasMessage("not absolute: init.lua");
-		assertThatThrownBy(() -> vars.withEntry(0, DISK, "/my os.lua", null)).hasMessage("not printable");
-		assertThatThrownBy(() -> vars.withEntry(0, DISK, "/" + "a".repeat(BootVariables.MAX_PATH), null)).hasMessage("too long: " + BootVariables.MAX_PATH);
-		assertThatThrownBy(() -> vars.withEntry(0, DISK, null, "x".repeat(40))).hasMessage("too long: " + com.payonel.modularcomputers.bus.Label.MAX);
-		assertThatThrownBy(() -> vars.withEntry(BootVariables.ENTRIES, DISK, null, null)).hasMessage("not an entry: " + BootVariables.ENTRIES);
-		assertThatThrownBy(() -> vars.withEntry(-1, DISK, null, null)).hasMessage("not an entry: -1");
+		assertThat(refused(() -> vars.withEntry(0, "sata:1", null, null))).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 2L, "value", "sata:1", "expected", "disk_id"));
+		assertThat(refused(() -> vars.withEntry(0, "id:not-a-uuid", null, null))).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 2L, "value", "id:not-a-uuid", "expected", "disk_id"));
+		assertThat(refused(() -> vars.withEntry(0, DISK.toUpperCase().replace("ID:", "id:"), null, null)).get("expected")).isEqualTo("disk_id");
+		assertThat(refused(() -> vars.withEntry(0, DISK, "init.lua", null))).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 3L, "value", "init.lua", "expected", "absolute_path"));
+		assertThat(refused(() -> vars.withEntry(0, DISK, "/my os.lua", null))).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 3L, "value", "/my os.lua", "expected", "printable"));
+		assertThat(refused(() -> vars.withEntry(0, DISK, "/" + "a".repeat(BootVariables.MAX_PATH), null)))
+			.isEqualTo(java.util.Map.of("why", "limit", "of", "path", "max", (long) BootVariables.MAX_PATH));
+		assertThat(refused(() -> vars.withEntry(0, DISK, null, "x".repeat(40))))
+			.isEqualTo(java.util.Map.of("why", "limit", "of", "label", "max", (long) com.payonel.modularcomputers.bus.Label.MAX));
+		assertThat(refused(() -> vars.withEntry(BootVariables.ENTRIES, DISK, null, null))).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 1L, "value", (long) BootVariables.ENTRIES, "expected", "entry"));
+		assertThat(refused(() -> vars.withEntry(-1, DISK, null, null))).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 1L, "value", -1L, "expected", "entry"));
 	}
 
 	@Test
@@ -43,9 +45,9 @@ class BootVariablesTest {
 	@Test
 	void theOrderAndBootNextNameEntriesThatExistOnceEach() throws Exception {
 		BootVariables vars = BootVariables.EMPTY.withEntry(0, DISK, null, null).withEntry(1, OTHER, "/boot/os.lua", null);
-		assertThatThrownBy(() -> vars.withOrder(List.of(0L, 2L))).hasMessageContaining("no Boot0002");
-		assertThatThrownBy(() -> vars.withOrder(List.of(0L, 0L))).hasMessage("twice: Boot0000");
-		assertThatThrownBy(() -> vars.withNext(5)).hasMessageContaining("no Boot0005");
+		assertThat(refused(() -> vars.withOrder(List.of(0L, 2L)))).isEqualTo(java.util.Map.of("why", "not_found", "kind", "boot_entry", "value", "0002"));
+		assertThat(refused(() -> vars.withOrder(List.of(0L, 0L)))).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 1L, "value", 0L, "expected", "distinct_entries"));
+		assertThat(refused(() -> vars.withNext(5))).isEqualTo(java.util.Map.of("why", "not_found", "kind", "boot_entry", "value", "0005"));
 		BootVariables ordered = vars.withOrder(List.of(1L, 0L)).withNext(0);
 		assertThat(ordered.toTry()).as("BootNext's first, then the order's, each once")
 			.containsExactly(vars.entries().get(0), vars.entries().get(1));
@@ -59,7 +61,7 @@ class BootVariablesTest {
 		assertThat(left.entries()).containsOnlyKeys(1);
 		assertThat(left.order()).containsExactly(1);
 		assertThat(left.next()).isEqualTo(BootVariables.NONE);
-		assertThatThrownBy(() -> left.withoutEntry(0)).hasMessageContaining("no Boot0000");
+		assertThat(refused(() -> left.withoutEntry(0))).isEqualTo(java.util.Map.of("why", "not_found", "kind", "boot_entry", "value", "0000"));
 	}
 
 	@Test
@@ -68,7 +70,7 @@ class BootVariablesTest {
 		assertThat(eeprom.setBootEntry(args(0L, DISK, null, "mcos")).failed()).isFalse();
 		var refused = eeprom.setBootEntry(args(1L, "storage1"));
 		assertThat(refused.failed()).isTrue();
-		assertThat(refused.error()).startsWith("not an id: ");
+		assertThat(refused.failure().table()).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 2L, "value", "storage1", "expected", "disk_id"));
 		assertThat(eeprom.setBootOrder(args(Map.of(1L, 0L))).failed()).isFalse();
 		assertThat(eeprom.setBootOrder(args(Map.of(1L, 4L))).failed()).as("no such entry").isTrue();
 		assertThat(eeprom.setBootNext(args(0L)).failed()).isFalse();
@@ -77,5 +79,19 @@ class BootVariablesTest {
 		assertThat(eeprom.nvram().next()).isZero();
 		assertThat(eeprom.setBootNext(args()).failed()).isFalse();
 		assertThat(eeprom.nvram().next()).as("cleared").isEqualTo(BootVariables.NONE);
+	}
+
+	/** A change the variables refuse, as its failure's table. */
+	private interface Change {
+		Object apply() throws BootVariables.Invalid;
+	}
+
+	private static java.util.Map<String, Object> refused(Change change) {
+		try {
+			change.apply();
+		} catch (BootVariables.Invalid e) {
+			return e.failure().table();
+		}
+		throw new AssertionError("not refused");
 	}
 }

@@ -135,7 +135,7 @@ final class MotherboardApi implements Board {
 	public Result invoke(String address, String method, Object... args) {
 		Optional<Object> device = device(address);
 		if (device.isEmpty()) {
-			return Result.fail("no such device: " + address);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("device", address));
 		}
 		if (device.get() instanceof com.payonel.modularcomputers.device.Buffered buffered && !buffered.isFree(method)
 			&& DeviceMethods.of(device.get()).containsKey(method)) {
@@ -197,14 +197,14 @@ final class MotherboardApi implements Board {
 	public Result setLabel(String address, String label) {
 		Optional<?> found = device(address);
 		if (found.isEmpty() || !(found.get() instanceof Device device)) {
-			return Result.fail("no such device: " + address);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("device", address));
 		}
 		String text = label == null || label.isEmpty() ? null : label;
-		String invalid = text == null ? null : com.payonel.modularcomputers.bus.Label.invalid(text);
+		com.payonel.modularcomputers.runtime.Failure invalid = text == null ? null : com.payonel.modularcomputers.bus.Label.invalid(text, 2); // (setLabel's second)
 		if (invalid != null) {
 			return Result.fail(invalid);
 		}
-		return device.relabel(text) ? Result.ok() : Result.fail("not labelable");
+		return device.relabel(text) ? Result.ok() : Result.fail(com.payonel.modularcomputers.runtime.Failure.denied("not_labelable", address));
 	}
 
 	@Override

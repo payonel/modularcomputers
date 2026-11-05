@@ -103,12 +103,12 @@ public final class RoboticsDevice implements Device, Buffered {
 
 		/** What's in the space at {@code face} (one of {@link #FACES}), or in all six by face (null). */
 		default Result scan(String face) {
-			return Result.fail("no body");
+			return Buffered.missing("body");
 		}
 
 		/** What its hand holds (an item's table; {@code off}: its off hand), or nil. */
 		default Result held(boolean off) {
-			return Result.fail("no body");
+			return Buffered.missing("body");
 		}
 
 		/**
@@ -122,17 +122,17 @@ public final class RoboticsDevice implements Device, Buffered {
 
 		/** Starts walking to the point {@code forward}, {@code right}, {@code up} from its origin, in the origin's frame: null, or why not. */
 		default String walkTo(double forward, double right, double up) {
-			return "no position";
+			return NO_POSITION;
 		}
 
 		/** Starts flying to the point {@code forward}, {@code right}, {@code up} from its origin, in the origin's frame: null, or why not. */
 		default String flyTo(double forward, double right, double up) {
-			return "no position";
+			return NO_POSITION;
 		}
 
 		/** Where it really is from its origin, in the origin's frame: {forward, right, up, heading}. */
 		default Result position() {
-			return Result.fail("no position");
+			return Buffered.missing("position");
 		}
 
 		/** Its plan: where its last command left it, from its origin: {forward, right, up, heading}. */
@@ -197,7 +197,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		 * right, a right angle), its origin moved to make it so: null, or why not.
 		 */
 		default String setPosition(long forward, long right, long up, int heading) {
-			return "no position";
+			return NO_POSITION;
 		}
 
 		/** Whether it finds its way round things (the game's pathfinder) or goes straight. */
@@ -232,22 +232,22 @@ public final class RoboticsDevice implements Device, Buffered {
 
 		/** Swaps what its hands hold. */
 		default Result swap() {
-			return Result.fail("no body");
+			return Buffered.missing("body");
 		}
 
 		/** Uses what it holds on the space at {@code face}, as a player's right click: what it did, or false and why. */
 		default Result use(String face) {
-			return Result.fail("no body");
+			return Buffered.missing("body");
 		}
 
 		/** Swings what it holds at {@code face}: "attacked" (a mob there), "breaking" (the block there: its event, broke or failed), or false and why. */
 		default Result swing(String face) {
-			return Result.fail("no body");
+			return Buffered.missing("body");
 		}
 
 		/** What the container at {@code face} holds: its slots with items in, each an item's table and its slot. */
 		default Result contents(String face) {
-			return Result.fail("no body");
+			return Buffered.missing("body");
 		}
 
 		/**
@@ -255,12 +255,12 @@ public final class RoboticsDevice implements Device, Buffered {
 		 * {@code to}, from 1; 0: where it fits): true and 0 when none is left, else false and how many are.
 		 */
 		default Result store(String face, int count, int to) {
-			return Result.fail("no body");
+			return Buffered.missing("body");
 		}
 
 		/** Takes up to {@code count} from the container at {@code face} (its slot {@code slot}, from 1; 0: the first it can) into its hand: how many came. */
 		default Result take(String face, int slot, int count) {
-			return Result.fail("no body");
+			return Buffered.missing("body");
 		}
 	}
 
@@ -270,12 +270,12 @@ public final class RoboticsDevice implements Device, Buffered {
 	private Body body = new Body() {
 		@Override
 		public String walk(double forward, double right, double up) {
-			return "no body";
+			return NO_BODY;
 		}
 
 		@Override
 		public String turn(double degrees) {
-			return "no body";
+			return NO_BODY;
 		}
 
 		@Override
@@ -310,10 +310,10 @@ public final class RoboticsDevice implements Device, Buffered {
 		this.body = body;
 	}
 
-	@Method(doc = "walk(forward[, right[, up]]): walks that far from where its last command left it, in its own frame (forward the way it faces, right to its right, up its elevation's change, whole blocks), facing as it was. It must end on a block's middle, whole blocks from its origin (within a 4096th), else it's refused (not an integer: forward 4.4): from a block's middle whole numbers do, and after a stop the rest of the way. Without pathfinding (the default) it goes straight, forward then right, without turning (it walks backwards, or sideways), stepping freely within its elevation (onto a slab, over carpet), up a block at a time (a jump) only while up is above, down at most 3 at a time only while up is below, never into lava, fire or deep water; with pathfinding it finds its way. With none, it goes back to where its last command left it. A command: true at once (its event: walk, ok, or not and why, on the last block's middle it reached: blocked, with block, what stopped it, air too, a drop it can't take or an elevation it couldn't reach, and face, its own that met it), or false and why it can't start")
+	@Method(doc = "walk(forward[, right[, up]]): walks that far from where its last command left it, in its own frame (forward the way it faces, right to its right, up its elevation's change, whole blocks), facing as it was. It must end on a block's middle, whole blocks from its origin (within a 4096th), else it's refused, a bad argument ({why = \"bad_argument\", argument, value, expected = \"squared\"}: the one that wouldn't end squared): from a block's middle whole numbers do, and after a stop the rest of the way. Without pathfinding (the default) it goes straight, forward then right, without turning (it walks backwards, or sideways), stepping freely within its elevation (onto a slab, over carpet), up a block at a time (a jump) only while up is above, down at most 3 at a time only while up is below, never into lava, fire or deep water; with pathfinding it finds its way. With none, it goes back to where its last command left it. A command: true at once (its event: walk, ok, or not and why, on the last block's middle it reached: blocked, with block, what stopped it, air too, a drop it can't take or an elevation it couldn't reach, and face, its own that met it), or false and why it can't start")
 	public Result walk(Arguments args) {
 		double[] by = numbers(args); // (too far: blocked, its body's, the user's)
-		Move move = args.count() == 0 ? new Move(by, null) : squared(by, false); // (none: back to where its last command left it)
+		Move move = args.count() == 0 ? new Move(by, null) : squared(args, by, false); // (none: back to where its last command left it)
 		if (move.why() != null) {
 			return Result.fail(move.why());
 		}
@@ -326,15 +326,16 @@ public final class RoboticsDevice implements Device, Buffered {
 	 * for where an entity is, as its moves reach players (VecDeltaCodec's steps: a 4096th of a block).
 	 */
 	public static final double SQUARED = 1.0 / 4096;
-	/** Why a move wouldn't end squared, or a point given isn't whole: which coordinate, from its origin, and the number. */
-	public static final String NOT_AN_INTEGER = "not an integer: ";
-	/** The coordinates, as a failure names them. */
-	private static final String[] AXES = {"forward", "right", "up"};
-	/** How finely a failure says a number: to a thousandth. */
-	private static final int FAILURE_DECIMALS = 3;
+	/**
+	 * What an argument takes when a point given isn't whole ({@code integer}: walkTo, flyTo,
+	 * setPosition), or a move wouldn't end squared ({@code squared}: walk, fly, on a block's middle,
+	 * whole blocks from its origin): a bad argument's {@code expected}.
+	 */
+	public static final String INTEGER = "integer";
+	public static final String SQUARED_END = "squared";
 
 	/** A move's numbers (forward, right, up) in its own frame, ready for its body, or why it can't be made. */
-	private record Move(double[] by, String why) {
+	private record Move(double[] by, com.payonel.modularcomputers.runtime.Failure why) {
 	}
 
 	/** Arguments 0 to 2 (forward, right, up; 0 when not given). */
@@ -352,7 +353,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		for (int i = 0; i < at.length; i++) {
 			double whole = Math.rint(at[i]);
 			if (Math.abs(at[i] - whole) >= SQUARED) {
-				return new Move(null, NOT_AN_INTEGER + AXES[i] + " " + said(at[i]));
+				return new Move(null, com.payonel.modularcomputers.runtime.Failure.badArgument(i + 1, args.get(i), INTEGER));
 			}
 			at[i] = whole;
 		}
@@ -365,7 +366,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	 * (the block its feet are in), a flight's up its feet's height whole from its origin, each within
 	 * {@link #SQUARED} of whole. Its numbers made to end exactly there, or why not (where it would end).
 	 */
-	private Move squared(double[] by, boolean flight) {
+	private Move squared(Arguments args, double[] by, boolean flight) {
 		Result from = body.planned();
 		Map<?, ?> at = from.failed() || !(from.first() instanceof Map<?, ?> map) ? Map.of() : map;
 		double forward = coordinate(at, "forward");
@@ -380,7 +381,9 @@ public final class RoboticsDevice implements Device, Buffered {
 		for (int i = 0; i < end.length; i++) {
 			whole[i] = Math.rint(end[i]);
 			if (Math.abs(end[i] - whole[i]) >= SQUARED) {
-				return new Move(null, NOT_AN_INTEGER + AXES[i] + " " + said(end[i]));
+				// (the argument that moves it along that axis of its origin's: a quarter turn swaps forward and right)
+				int argument = i == 2 ? 3 : (cos != 0) == (i == 0) ? 1 : 2;
+				return new Move(null, com.payonel.modularcomputers.runtime.Failure.badArgument(argument, args.get(argument - 1), SQUARED_END)); // (as given)
 			}
 		}
 		double ahead = whole[0] - forward;
@@ -395,11 +398,6 @@ public final class RoboticsDevice implements Device, Buffered {
 		return at.get(name) instanceof Number number ? number.doubleValue() : 0;
 	}
 
-	/** A number as a failure says it: whole when it is, else to {@link #FAILURE_DECIMALS} places. */
-	private static String said(double value) {
-		return java.math.BigDecimal.valueOf(value).setScale(FAILURE_DECIMALS, java.math.RoundingMode.HALF_EVEN).stripTrailingZeros().toPlainString();
-	}
-
 	/**
 	 * What its body says it can't start without, as its body says it ({@link #NO_LEGS},
 	 * {@link #NO_THRUSTERS}): never a program's word; it answers {@code false, {why = "system_failure",
@@ -407,6 +405,9 @@ public final class RoboticsDevice implements Device, Buffered {
 	 */
 	public static final String NO_LEGS = "no legs";
 	public static final String NO_THRUSTERS = "no thrusters";
+	/** Its body's words for no body at all (no golem: a test's) and no position to move from. */
+	public static final String NO_BODY = "no body";
+	public static final String NO_POSITION = "no position";
 	/** Its body's word for a landing on its legs already: done (no failure, the user's). */
 	public static final String ON_LEGS = "on legs";
 
@@ -415,6 +416,8 @@ public final class RoboticsDevice implements Device, Buffered {
 		return switch (why) {
 			case NO_LEGS -> Buffered.missing(MISSING_LEGS);
 			case NO_THRUSTERS -> Buffered.missing(MISSING_THRUSTERS);
+			case NO_BODY -> Buffered.missing("body");
+			case NO_POSITION -> Buffered.missing("position");
 			default -> Result.fail(why);
 		};
 	}
@@ -559,7 +562,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		}
 	}
 
-	@Method(doc = "walkTo(forward[, right[, up]]): walks to the block that many whole blocks from its origin (not an integer: when one isn't), in the origin's frame (as position gives them), as walk does. A command: true at once (its event: walkTo, ok, or not and why), or false and why")
+	@Method(doc = "walkTo(forward[, right[, up]]): walks to the block that many whole blocks from its origin (bad_argument, expected integer: when one isn't), in the origin's frame (as position gives them), as walk does. A command: true at once (its event: walkTo, ok, or not and why), or false and why")
 	public Result walkTo(Arguments args) {
 		Move to = integers(args);
 		if (to.why() != null) {
@@ -569,7 +572,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return waits != null ? waits : start("walkTo", body.walkTo(to.by()[0], to.by()[1], to.by()[2]));
 	}
 
-	@Method(doc = "flyTo(forward[, right[, up]]): (a tier 2 golem's) flies to the point that many whole blocks from its origin (not an integer: when one isn't), in the origin's frame (as position gives them), as fly does. A command: true at once (its event: flyTo, ok, or not and why), or false and why")
+	@Method(doc = "flyTo(forward[, right[, up]]): (a tier 2 golem's) flies to the point that many whole blocks from its origin (bad_argument, expected integer: when one isn't), in the origin's frame (as position gives them), as fly does. A command: true at once (its event: flyTo, ok, or not and why), or false and why")
 	public Result flyTo(Arguments args) {
 		args.checkNumber(0);
 		Move to = integers(args);
@@ -594,7 +597,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		long[] at = {(long) given.by()[0], (long) given.by()[1], (long) given.by()[2]};
 		double heading = args.count() > 3 && args.get(3) != null ? args.checkNumber(3) : 0;
 		if (heading != Math.rint(heading) || Math.floorMod((long) heading, 90) != 0) {
-			return Result.fail("not a right angle: " + args.get(3));
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(4, args.get(3), "right_angle"));
 		}
 		String why = body.setPosition(at[0], at[1], at[2], (int) Math.floorMod((long) heading, 360));
 		return why == null ? Result.ok() : answer(why);
@@ -624,7 +627,7 @@ public final class RoboticsDevice implements Device, Buffered {
 			degrees = Double.NaN;
 		}
 		if (Double.isNaN(degrees)) {
-			return Result.fail("not a way: " + way);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, com.payonel.modularcomputers.runtime.Arguments.given(way), "way"));
 		}
 		Result waits = waitsHeld("turn", args);
 		if (waits != null) {
@@ -662,7 +665,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	public Result held(Arguments args) {
 		Object hand = args.count() > 0 ? args.get(0) : null;
 		if (hand != null && !"off".equals(hand) && !"main".equals(hand)) {
-			throw new Arguments.ArgumentError("a hand expected (main or off), got " + hand);
+			throw new Arguments.ArgumentError(1, hand, "hand"); // (main or off)
 		}
 		return body.held("off".equals(hand));
 	}
@@ -701,7 +704,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return body.contents(args.count() > 0 && args.get(0) != null ? face(args, 0) : CONTAINER_FACE);
 	}
 
-	@Method(doc = "store([face][, count[, to]]): puts what it holds (or count of it) into the container at a face (in front when none is given), into its slot to or where it fits: true, 0 when none of it is left in its hand; false and how many are, when the container's full; or false and why (no container there)")
+	@Method(doc = "store([face][, count[, to]]): puts what it holds (or count of it) into the container at a face (in front when none is given), into its slot to or where it fits: true, 0 when none of it is left in its hand; false and how many are, when the container's full; or false and why (not_found: a container, its face)")
 	public Result store(Arguments args) {
 		int at = args.count() > 0 && args.get(0) instanceof String ? 1 : 0;
 		String face = at == 1 ? face(args, 0) : CONTAINER_FACE;
@@ -725,7 +728,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	private static String face(Arguments args, int n) {
 		Object name = args.get(n);
 		if (!(name instanceof String face) || !FACES.contains(face)) {
-			throw new Arguments.ArgumentError("a face expected (front, back, left, right, up or down), got " + name);
+			throw new Arguments.ArgumentError(n + 1, name, "face");
 		}
 		return face;
 	}
@@ -734,15 +737,15 @@ public final class RoboticsDevice implements Device, Buffered {
 	private static int count(Arguments args, int n) {
 		double value = args.checkNumber(n);
 		if (value < 1 || value != Math.floor(value)) {
-			throw new Arguments.ArgumentError("a count of 1 or more expected, got " + args.get(n));
+			throw new Arguments.ArgumentError(n + 1, args.get(n), "count"); // (1 or more)
 		}
 		return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
 	}
 
-	@Method(doc = "fly(forward[, right[, up]]): (a tier 2 golem's) flies on its thrusters that far from where its last command left it, in its own frame, without turning, straight there (never through blocks; with pathfinding, round them); its legs, if it stands on them, are left standing where it was, and its thrusters fire beams from their sockets. In the air it walks nowhere, uses what it holds as a player off the ground does, and can be shoved (it flies back to where its last command left it). It must end on a squared point, whole blocks from its origin, its feet's height too (within a 4096th), else it's refused (not an integer: up 1.5). With no arguments, it takes off where it stands and holds there, or goes back to where its last command left it. A command: true at once (its event: fly, ok, or not and why), or false and why")
+	@Method(doc = "fly(forward[, right[, up]]): (a tier 2 golem's) flies on its thrusters that far from where its last command left it, in its own frame, without turning, straight there (never through blocks; with pathfinding, round them); its legs, if it stands on them, are left standing where it was, and its thrusters fire beams from their sockets. In the air it walks nowhere, uses what it holds as a player off the ground does, and can be shoved (it flies back to where its last command left it). It must end on a squared point, whole blocks from its origin, its feet's height too (within a 4096th), else it's refused (bad_argument, expected squared). With no arguments, it takes off where it stands and holds there, or goes back to where its last command left it. A command: true at once (its event: fly, ok, or not and why), or false and why")
 	public Result fly(Arguments args) {
 		double[] by = numbers(args); // (too far: blocked, its body's, the user's)
-		Move move = args.count() == 0 ? new Move(by, null) : squared(by, true); // (none: off where it stands, or back to where its last command left it)
+		Move move = args.count() == 0 ? new Move(by, null) : squared(args, by, true); // (none: off where it stands, or back to where its last command left it)
 		if (move.why() != null) {
 			return Result.fail(move.why());
 		}

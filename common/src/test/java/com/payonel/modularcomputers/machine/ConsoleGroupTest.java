@@ -143,7 +143,8 @@ class ConsoleGroupTest {
 
 	@Test
 	void onlyTerminalsOnTheBusCanBeUnbound() {
-		assertThat(console().unbind(address("sata:0")).error()).isEqualTo("not a terminal: sata:0");
+		var refused = console().unbind(address("sata:0")).failure();
+		assertThat(java.util.List.of(refused.why(), refused.get("argument"), refused.get("expected"))).isEqualTo(java.util.List.of("bad_argument", 1L, "terminal"));
 		assertThat(console().unbind(address("id:gone")).failed()).isTrue();
 		assertThat(console().unbind(address("id:first")).failed()).isFalse();
 		assertThat(console().isBound("id:first")).isFalse();

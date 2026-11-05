@@ -108,7 +108,7 @@ public final class FieldCard extends Card implements Buffered {
 	}
 
 	private Result noProjector() {
-		return projector == null ? Result.fail("no projector") : null;
+		return projector == null ? Buffered.missing("projector") : null; // (what it needs to project a field: its holder's)
 	}
 
 	@Override

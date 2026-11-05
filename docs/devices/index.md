@@ -103,8 +103,21 @@ device's event says when to give it again.
 
 A call never stops the machine. If a device is gone, or an argument is wrong, `board.invoke`
 returns `false` and its failure: a table, its `why` a word and its fields, the same for every
-failure with that why (`{why = "system_failure", missing = "legs"}`). Failures not named yet keep
-their old message as their why (`{why = "bad argument #1 (string expected, got nil)"}`). This
+failure with that why (`{why = "system_failure", missing = "legs"}`):
+
+| why | fields | means |
+|---|---|---|
+| `busy`, `held` | `id` | wait: the device named has news when it's free (mcos waits for you) |
+| `bad_argument` | `argument` (its position, from 1), `value` (as given), `expected` (a word: `string`, `integer`, `face`, `count`...) | it can't use an argument |
+| `not_found` | `kind` (`device`, `method`, `entity`, `file`, `container`, `slot`, `block`, `boot_entry`, `offset`...), `value` (what was named) | what it names isn't there |
+| `limit` | `of`, `max` | over a limit |
+| `denied` | `reason`, `value` (what was refused) | not allowed |
+| `system_failure` | `missing` | what it needs to do it is missing (`legs`, `thrusters`, `power`, `body`, `storage`...) |
+| `drifted` | `drift` | a robot off its spot |
+| `network` | `reason`, `message` | the internet card's and network card's: failed in transit |
+
+A few aren't named yet and keep their old message as their why (a field's `holding`, a disk's
+`already exists: /a`). This
 manual writes a method's results as the values after the leading `true`, and its failures by their
 why.
 

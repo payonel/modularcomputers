@@ -4,29 +4,35 @@ local k, vfs = ...
 
 local fail = vfs.fail
 
--- What the disk's failures mean, as errnos (its messages are its own): pattern, errno, pattern...
+-- What the disk's failures mean, as errnos: by their shape, a why and the field that tells them apart
+-- (field, then its values' errnos; true: any value) ...
+local SHAPES = {
+  not_found = {"kind", {file = "ENOENT", device = "ENODEV"}},
+  limit = {"of", {open_files = "EMFILE", disk = "ENOSPC", link = "ENAMETOOLONG", memory = "ENOMEM"}},
+  bad_argument = {"argument", true, "EINVAL"},
+  denied = {"reason", {raw_disk = "ENODEV", read_only = "EROFS"}},
+  system_failure = {"missing", {storage = "ENODEV"}},
+}
+
+-- ... and those not yet named, by their words: pattern, errno, pattern...
 local FAILURES = {
-  "^no such file", "ENOENT",
   "^already exists", "EEXIST",
   "^directory not empty", "ENOTEMPTY",
   "^is a directory", "EISDIR",
-  "^too many open files", "EMFILE",
-  "^No space left", "ENOSPC",
   "^can't move a directory into itself", "EINVAL",
-  "^bad ", "EINVAL",
-  "^outside the disk", "EINVAL",
-  "^raw disk", "ENODEV",
-  "^no storage", "ENODEV",
   "^can't remove the root", "EBUSY",
   "^closed handle", "EBADF",
   "^not open for", "EBADF",
-  "^no such device", "ENODEV",
-  "^name too long", "ENAMETOOLONG",
 }
 
 local REPARSE = "symbolic link\0" -- the disk met a link: its path, a NUL, its target
 
-local function failed(why)
+local function failed(why, failure)
+  local shape = type(failure) == "table" and SHAPES[failure.why]
+  if shape then
+    local errno = shape[2] == true and shape[3] or shape[2][failure[shape[1]]]
+    return fail(errno or "EIO")
+  end
   why = tostring(why)
   if why:sub(1, #REPARSE) == REPARSE then
     local at, target = why:match("^([^%z]*)%z(.*)$", #REPARSE + 1)
@@ -44,7 +50,7 @@ end
 local function call(target, method, ...)
   local result = table.pack(k.invoke(target, method, ...))
   if not result[1] then
-    return failed(result[2])
+    return failed(result[2], result[3])
   end
   return table.unpack(result, 2, result.n)
 end
@@ -64,16 +70,16 @@ local function file(handle)
   return {
     type = "file",
     read = function(self, n)
-      local ok, data = k.invoke(handle, "read", math.min(n, k.READ_SIZE))
+      local ok, data, failure = k.invoke(handle, "read", math.min(n, k.READ_SIZE))
       if not ok then
-        return failed(data)
+        return failed(data, failure)
       end
       return data or ""
     end,
     write = function(self, data)
-      local ok, why = k.invoke(handle, "write", data)
+      local ok, why, failure = k.invoke(handle, "write", data)
       if not ok then
-        return failed(why)
+        return failed(why, failure)
       end
       return #data
     end,

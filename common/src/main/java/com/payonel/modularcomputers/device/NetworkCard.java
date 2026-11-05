@@ -201,7 +201,7 @@ public final class NetworkCard extends Card {
 	/** A frame's data, if it fits; sending it costs power. */
 	private String checked(String data) {
 		if (data.length() > MTU) {
-			throw new Arguments.ArgumentError("too long: " + MTU);
+			throw new Arguments.ArgumentError(com.payonel.modularcomputers.runtime.Failure.limit("data", MTU));
 		}
 		power.charge(wireless() ? (int) Math.ceil(strength * WIRELESS_SEND_COST_PER_BLOCK) : WIRED_SEND_COST);
 		return data;
@@ -209,13 +209,13 @@ public final class NetworkCard extends Card {
 
 	@Method(doc = "getStrength(): how far its signal reaches, in blocks (a WLAN card's; OpenComputers')")
 	public Result getStrength(Arguments args) {
-		return wireless() ? Result.ok((long) strength) : Result.fail("wired");
+		return wireless() ? Result.ok((long) strength) : Result.fail(com.payonel.modularcomputers.runtime.Failure.denied("wired", ""));
 	}
 
 	@Method(doc = "setStrength(blocks): how far its signal reaches, up to its tier's (16, 400); a send costs more the farther it reaches; returns what it's set to")
 	public Result setStrength(Arguments args) {
 		if (!wireless()) {
-			return Result.fail("wired");
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.denied("wired", ""));
 		}
 		strength = (int) Math.clamp(args.checkInteger(0), 0, maxRange());
 		changed(); // (it's kept with the card's state)
@@ -236,7 +236,7 @@ public final class NetworkCard extends Card {
 	public Result setWake(Arguments args) {
 		String message = args.optString(0, null);
 		if (message != null && message.length() > MAX_WAKE) {
-			throw new Arguments.ArgumentError("too long: " + MAX_WAKE);
+			throw new Arguments.ArgumentError(com.payonel.modularcomputers.runtime.Failure.limit("wake_message", MAX_WAKE));
 		}
 		String old = wakeMessage;
 		wakeMessage = message == null || message.isEmpty() ? null : message;

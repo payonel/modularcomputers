@@ -103,9 +103,9 @@ class RoboticsDeviceTest {
 	void turnsRightAnglesOnly() {
 		device.turn(args("left"));
 		device.turn(args("around"));
-		assertThat(device.turn(args(45L)).error()).as("no degrees: right angles only (the user's)").startsWith("not a way");
+		assertThat(device.turn(args(45L)).failure().table()).as("no degrees: right angles only (the user's)").isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 1L, "value", 45L, "expected", "way"));
 		assertThat(asked).containsExactly("turn -90.0", "turn 180.0");
-		assertThat(device.turn(args("up")).error()).isEqualTo("not a way: up");
+		assertThat(device.turn(args("up")).failure().table()).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 1L, "value", "up", "expected", "way"));
 	}
 
 	/** A turn can face the world's way (the user's: a golem may know north): the body says how far, from its heading. */
@@ -117,25 +117,25 @@ class RoboticsDeviceTest {
 		assertThat(asked).as("facing north: a right, none, a left").containsExactly("turn 90.0", "turn 0.0", "turn -90.0");
 	}
 
-	/** Every move must end squared (the user's): whole blocks from its origin, within a 4096th, made exact; else it's refused, saying where it would end. */
+	/** Every move must end squared (the user's): whole blocks from its origin, within a 4096th, made exact; else it's refused, a bad argument: the one that wouldn't end squared, as given. */
 	@Test
 	void aMoveMustEndSquared() {
-		assertThat(device.walk(args(4.4)).error()).as("from a block's middle").isEqualTo("not an integer: forward 4.4");
-		assertThat(device.walk(args(2.0, 0L, 0.5)).error()).as("an elevation's change is whole").isEqualTo("not an integer: up 0.5");
+		assertThat(device.walk(args(4.4)).failure().table()).as("from a block's middle").isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 1L, "value", 4.4, "expected", "squared"));
+		assertThat(device.walk(args(2.0, 0L, 0.5)).failure().table()).as("an elevation's change is whole").isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 3L, "value", 0.5, "expected", "squared"));
 		assertThat(device.walk(args(2.0, -1L)).failed()).isFalse();
 		device.stop(args());
 		left = Map.of("forward", 0.6, "right", 0L, "up", 0L, "heading", 0L); // (stopped between blocks)
-		assertThat(device.walk(args(4.3)).error()).as("where it would end").isEqualTo("not an integer: forward 4.9");
+		assertThat(device.walk(args(4.3)).failure().table()).as("it would end at 4.9").isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 1L, "value", 4.3, "expected", "squared"));
 		assertThat(device.walk(args(4.4)).failed()).as("the rest of the way: squared").isFalse();
 		device.stop(args());
 		left = Map.of("forward", 0L, "right", 0.6, "up", 0L, "heading", 90L); // (facing the origin's right)
 		assertThat(device.walk(args(4.4)).failed()).as("its frame turned: forward is the origin's right").isFalse();
 		device.stop(args());
 		left = Map.of("forward", 0L, "right", 0L, "up", 0.5, "heading", 0L); // (on a slab)
-		assertThat(device.fly(args(0L, 0L, 1L)).error()).as("a flight's height is its feet's").isEqualTo("not an integer: up 1.5");
+		assertThat(device.fly(args(0L, 0L, 1L)).failure().table()).as("a flight's height is its feet's: it would end at 1.5").isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 3L, "value", 1L, "expected", "squared"));
 		assertThat(device.fly(args(0L, 0L, 1.5 + 1.0 / 8192)).failed()).as("within a 4096th").isFalse();
 		device.stop(args());
-		assertThat(device.walkTo(args(2.5)).error()).isEqualTo("not an integer: forward 2.5");
+		assertThat(device.walkTo(args(2.5)).failure().table()).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 1L, "value", 2.5, "expected", "integer"));
 		assertThat(device.walkTo(args(2L, 1L)).failed()).isFalse();
 		assertThat(asked).containsExactly("walk 2.0 -1.0 0.0", "stop", "walk 4.4 0.0 0.0", "stop", "walk 4.4 0.0 0.0", "stop",
 			"fly 0.0 0.0 1.5", "stop", "walkTo 2.0 1.0 0.0");

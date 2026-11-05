@@ -61,7 +61,11 @@ local k = {
 function k.invoke(id, method, ...)
   local answer = table.pack(board.invoke(id, method, ...))
   if not answer[1] and type(answer[2]) == "table" then
-    return false, answer[2].why, answer[2]
+    local failure = answer[2]
+    if failure.why == "not_found" and failure.kind == "device" and k.refreshdevices then
+      k.refreshdevices() -- (gone: the kernel's view of the bus was out of date)
+    end
+    return false, failure.why, failure
   end
   return table.unpack(answer, 1, answer.n)
 end

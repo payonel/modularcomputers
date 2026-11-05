@@ -288,10 +288,10 @@ public final class CraftingBench implements CraftingCard.Bench {
 		BotGolem golem = robot.get();
 		Container container = golem.hands().container(face);
 		if (container == null) {
-			return Result.fail("no container there");
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("container", face));
 		}
 		if (to > container.getContainerSize()) {
-			return Result.fail("no slot: " + to);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("slot", (long) to));
 		}
 		Direction side = golem.hands().direction(face).getOpposite();
 		int left = count;
@@ -317,10 +317,10 @@ public final class CraftingBench implements CraftingCard.Bench {
 		BotGolem golem = robot.get();
 		Container container = golem.hands().container(face);
 		if (container == null) {
-			return Result.fail("no container there");
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("container", face));
 		}
 		if (slot > container.getContainerSize()) {
-			return Result.fail("no slot: " + slot);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("slot", (long) slot));
 		}
 		Direction side = golem.hands().direction(face).getOpposite();
 		int taken = 0;

@@ -170,16 +170,16 @@ public final class FieldProjector implements FieldCard.Projector {
 		if (FieldCard.SELF.equals(id)) {
 			target = self.get();
 			if (target == null) {
-				return Result.fail("not a robot");
+				return Result.fail(com.payonel.modularcomputers.runtime.Failure.denied("not_a_robot", FieldCard.SELF)); // (its computer is a block: no robot to hold)
 			}
 		} else if (id != null) {
 			try {
 				target = level.get().getEntity(UUID.fromString(id));
 			} catch (IllegalArgumentException e) {
-				return Result.fail("not an id: " + id);
+				return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, id, "id"));
 			}
 			if (target == null || !holdable(target)) {
-				return Result.fail("no entity: " + id);
+				return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("entity", id));
 			}
 		} else {
 			Vec3 there = at.world(point[0], point[1], point[2]);
@@ -190,7 +190,7 @@ public final class FieldProjector implements FieldCard.Projector {
 					entity -> holdable(entity) && entity.getBoundingBox().getCenter().distanceTo(there) <= FieldCard.REACH)
 				.stream().min(Comparator.comparingDouble(entity -> entity.getBoundingBox().getCenter().distanceTo(there))).orElse(null);
 			if (target == null) {
-				return Result.fail("no entity");
+				return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("entity", java.util.Map.of("forward", point[0], "right", point[1], "up", point[2]))); // (none near the point given)
 			}
 		}
 		if (target != self.get() && target.getBoundingBox().getCenter().distanceTo(at.origin()) > FieldCard.RANGE) {

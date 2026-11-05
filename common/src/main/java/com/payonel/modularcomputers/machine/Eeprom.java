@@ -173,7 +173,7 @@ public final class Eeprom implements Device {
 		}
 		long number = args.checkInteger(0);
 		if (!storage.nvram().entries().containsKey((int) number) || number < 0 || number >= BootVariables.ENTRIES) {
-			return Result.fail("no Boot" + BootVariables.name((int) Math.max(0, Math.min(number, 0xFFFF))));
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("boot_entry", BootVariables.name((int) Math.max(0, Math.min(number, 0xFFFF)))));
 		}
 		bootCurrent = (int) number;
 		return Result.ok();
@@ -223,12 +223,12 @@ public final class Eeprom implements Device {
 		List<Long> numbers = new ArrayList<>();
 		for (long i = 1; i <= table.size(); i++) {
 			if (!(table.get(i) instanceof Long number)) {
-				throw new Arguments.ArgumentError("a list of entry numbers expected");
+				throw new Arguments.ArgumentError(1, Arguments.given(table.get(i)), "entry_numbers");
 			}
 			numbers.add(number);
 		}
 		if (numbers.size() != table.size()) {
-			throw new Arguments.ArgumentError("a list of entry numbers expected");
+			throw new Arguments.ArgumentError(1, "", "entry_numbers"); // (a list, nothing else in it)
 		}
 		return change(vars -> vars.withOrder(numbers));
 	}
@@ -260,7 +260,7 @@ public final class Eeprom implements Device {
 			storage.nvram(change.apply(storage.nvram()));
 			return Result.ok();
 		} catch (BootVariables.Invalid e) {
-			return Result.fail(e.getMessage());
+			return Result.fail(e.failure());
 		}
 	}
 

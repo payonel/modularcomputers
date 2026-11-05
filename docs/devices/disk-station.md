@@ -26,7 +26,7 @@ For the block and its slots, see [Disk Station](/hardware/disk-station/).
 ## Target and source
 
 The station works on its **target** disk. Its **source** disk is optional and only read, as a
-forensic dock's write blocker is: every write to it fails with `read-only disk`. The source is used
+forensic dock's write blocker is: every write to it fails with `denied` (`reason = "read_only"`). The source is used
 by `clone`.
 
 Both disks, and the station itself, are on the bus of the computers wired to it, beside each other.
@@ -51,7 +51,7 @@ The station's file is text, as a sysfs attribute is.
   as they were when it was first read; seek back to the start to read them afresh.
 - **Write**: each line written is an action, done at once: `format`, `wipe`, `clone`, `install` or
   `update`. Any other line fails the write with `EINVAL`, and so does an action the station refuses
-  (no disk, system_failure, too big). Through `io`, a write is buffered: the line goes when the
+  (`system_failure`: no disk, no power; `limit`: too big). Through `io`, a write is buffered: the line goes when the
   file is flushed or closed, and that call reports the failure.
 - For `sys.poll`, the file is always ready to read and to write, and never has `PRI` (the station has
   no interrupt).
@@ -74,7 +74,7 @@ local ok, why = sys.ioctl(sys.fileno(io.open("/dev/diskstation0")), "install")
 
 ## Methods
 
-Every action fails with `no disk` when the target slot is empty, and with `system_failure` (and `"power"`, what's missing) when neither
+Every action fails with `system_failure` (`"disk"` missing) when the target slot is empty, and with `system_failure` (and `"power"`, what's missing) when neither
 the bus nor the battery can pay for it.
 
 ### format() → nothing
@@ -88,7 +88,8 @@ Makes the target raw, with no filesystem. Everything on it is gone.
 ### clone() → nothing
 
 Makes the target a copy of the source: its format and its contents, with the files' times kept.
-Fails with `no source disk` when the source slot is empty, and with `too big: ` and the bytes it needs when what is on
+Fails with `system_failure` (`"source"` missing) when the source slot is empty, and with
+`{why = "limit", of = "disk", max = the target's capacity}` when what is on
 the source is larger than the target: an hfs source's used bytes, or a raw source's whole capacity
 (a raw source needs a target as big). Nothing changes when it is refused.
 
@@ -100,7 +101,7 @@ Formats the target as hfs, then copies mcos onto it (the mod's latest).
 
 Writes the mod's latest mcos files over the target's, `/etc` too. Everything else on the disk is
 left, and `/home` is never written over. The target must be hfs (a raw one fails with
-`raw disk: no filesystem`).
+`{why = "denied", reason = "raw_disk", value = ""}`).
 
 ### get() → {target = disk, source = disk}
 

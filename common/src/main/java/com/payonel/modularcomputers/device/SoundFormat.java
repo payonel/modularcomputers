@@ -26,16 +26,16 @@ public record SoundFormat(int rate, String encoding, int channels, int block) {
 	/** OSS's default. */
 	public static final SoundFormat DEFAULT = new SoundFormat(8000, U8, 1, 0);
 
-	/** Why it isn't one the card plays, or null. */
-	public String invalid() {
+	/** Why it isn't one the card plays (setFormat's table, its first argument: which of its fields), or null. */
+	public com.payonel.modularcomputers.runtime.Failure invalid() {
 		if (!RATES.contains(rate)) {
-			return "unsupported rate: " + rate;
+			return com.payonel.modularcomputers.runtime.Failure.badArgument(1, (long) rate, "rate");
 		} else if (!ENCODINGS.contains(encoding)) {
-			return "unsupported encoding: " + encoding;
+			return com.payonel.modularcomputers.runtime.Failure.badArgument(1, encoding, "encoding");
 		} else if (channels < 1 || channels > MAX_CHANNELS) {
-			return "unsupported channels: " + channels;
+			return com.payonel.modularcomputers.runtime.Failure.badArgument(1, (long) channels, "channels");
 		} else if (encoding.equals(IMA_ADPCM) && (block <= ImaAdpcm.HEADER * channels || block > MAX_BLOCK || block % (4 * channels) != 0)) {
-			return "bad ADPCM block size: " + block;
+			return com.payonel.modularcomputers.runtime.Failure.badArgument(1, (long) block, "block");
 		}
 		return null;
 	}

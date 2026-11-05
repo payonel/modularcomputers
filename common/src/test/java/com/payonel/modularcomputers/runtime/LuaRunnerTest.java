@@ -163,7 +163,7 @@ class LuaRunnerTest {
 			while true do board.waitForInterrupt(nil, 'park') end
 			""");
 		untilParked();
-		assertThat(row(0)).as("a failure: false and a table, its why").startsWith("true 50x16 false table no such device");
+		assertThat(row(0)).as("a failure: false and a table, its why").startsWith("true 50x16 false table not_found");
 	}
 
 	@Test

@@ -4,14 +4,27 @@ import java.util.List;
 
 /**
  * The arguments a program passed to a device method. A check that fails throws
- * {@link ArgumentError}, which the call turns into a soft failure ("bad argument #2 (number
- * expected, got string)"): the program gets it back, the machine carries on.
+ * {@link ArgumentError}, which the call turns into a soft failure, {@code bad_argument} (its
+ * position, the value given, what it takes: {@code {why = "bad_argument", argument = 2, value =
+ * "x", expected = "number"}}): the program gets it back, the machine carries on.
  */
 public final class Arguments {
-	/** A bad argument: becomes the call's failure message. */
+	/** A bad argument: becomes the call's failure, {@link Failure#badArgument}. */
 	public static final class ArgumentError extends RuntimeException {
-		public ArgumentError(String message) {
-			super(message);
+		private final Failure failure;
+
+		/** Argument {@code argument} (from 1) can't be {@code value}: it takes {@code expected} (a word). */
+		public ArgumentError(int argument, Object value, String expected) {
+			this(Failure.badArgument(argument, value, expected));
+		}
+
+		public ArgumentError(Failure failure) {
+			super(failure.toString());
+			this.failure = failure;
+		}
+
+		public Failure failure() {
+			return failure;
 		}
 	}
 
@@ -55,7 +68,7 @@ public final class Arguments {
 		if (value instanceof Double d && d == Math.rint(d) && !Double.isInfinite(d)) {
 			return d.longValue(); // Lua converts a float with an exact integer value
 		}
-		throw bad(index, value instanceof Double ? "number has no integer representation" : "number expected, got " + Values.typeName(value));
+		throw bad(index, value, "integer");
 	}
 
 	public double checkNumber(int index) {
@@ -66,7 +79,7 @@ public final class Arguments {
 		if (value instanceof Double d) {
 			return d;
 		}
-		throw bad(index, "number expected, got " + Values.typeName(value));
+		throw bad(index, value, "number");
 	}
 
 	public String checkString(int index) {
@@ -77,14 +90,14 @@ public final class Arguments {
 		if (value instanceof Long || value instanceof Double) {
 			return String.valueOf(value); // Lua converts numbers to strings too
 		}
-		throw bad(index, "string expected, got " + Values.typeName(value));
+		throw bad(index, value, "string");
 	}
 
 	public boolean checkBoolean(int index) {
 		if (get(index) instanceof Boolean b) {
 			return b;
 		}
-		throw bad(index, "boolean expected, got " + Values.typeName(get(index)));
+		throw bad(index, get(index), "boolean");
 	}
 
 	/** A table, as a map (a sequence's keys are its indexes, from 1; an empty table is an empty map). */
@@ -99,7 +112,7 @@ public final class Arguments {
 			}
 			return map;
 		}
-		throw bad(index, "table expected, got " + Values.typeName(get(index)));
+		throw bad(index, get(index), "table");
 	}
 
 	public java.util.Map<?, ?> optTable(int index) {
@@ -118,7 +131,13 @@ public final class Arguments {
 		return get(index) == null ? fallback : checkBoolean(index);
 	}
 
-	private static ArgumentError bad(int index, String why) {
-		return new ArgumentError("bad argument #" + (index + 1) + " (" + why + ")");
+	/** Argument {@code index} (from 0) is {@code value}, not what it takes ({@code expected}, a word: a type's name, or what it names). */
+	private static ArgumentError bad(int index, Object value, String expected) {
+		return new ArgumentError(index + 1, given(value), expected);
+	}
+
+	/** A value as a failure says it was given: itself, or its type's name for one a table can't hold as such (a handle). */
+	public static Object given(Object value) {
+		return value == null || value instanceof String || value instanceof Number || value instanceof Boolean ? value : Values.typeName(value);
 	}
 }

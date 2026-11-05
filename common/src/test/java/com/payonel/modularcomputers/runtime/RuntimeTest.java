@@ -150,8 +150,7 @@ class RuntimeTest {
 			errors.add(board.invoke("id:screen", "write", "hi").failed() ? "failed" : "ok");
 			com.payonel.modularcomputers.machine.Program.park(board);
 		});
-		assertThat(errors).containsExactly("no such device: nowhere", "no such method: fly",
-			"bad argument #1 (string expected, got boolean)", "device error: java.lang.IllegalStateException: boom", "ok");
+		assertThat(errors).containsExactly("not_found", "not_found", "bad_argument", "device error: java.lang.IllegalStateException: boom", "ok");
 		assertThat(display.buffer().row(0)).startsWith("hi");
 		assertThat(machine.isPowered()).isTrue();
 	}

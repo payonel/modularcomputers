@@ -56,8 +56,6 @@ import java.util.stream.Stream;
 public final class Disk implements Device {
 	public static final String HFS = "hfs";
 	public static final String RAW = "raw";
-	/** Why an image can't go onto it, before the bytes it needs: more than its tier holds. */
-	public static final String TOO_BIG = "too big: ";
 	/** What each file or directory costs on top of its bytes, like an inode. */
 	public static final int ENTRY = 512;
 	/** Open files at once, all programs together. */
@@ -66,10 +64,6 @@ public final class Disk implements Device {
 	public static final int MAX_READ = 4096;
 	/** How much of a file a handle holds to read from: what it costs the program's memory, whatever the file's size. */
 	public static final int WINDOW = 4096;
-	/** What a full disk says, as a real file descriptor's write does (ENOSPC). */
-	public static final String NO_SPACE = "No space left on device";
-	/** A write the program's memory has no room for (ENOMEM): a handle's buffered writes are charged to it. */
-	public static final String NO_MEMORY = "Cannot allocate memory";
 	/** A symbolic link's file: its size, exactly (as CIFS's mfsymlinks). */
 	public static final int LINK_SIZE = 1067;
 	/** A link's file starts with this. */
@@ -328,14 +322,23 @@ public final class Disk implements Device {
 	// ---- the host side -----------------------------------------------------------------------
 
 	/** Thrown for a soft failure, with the message the program gets. */
+	/** A call refused, why in its why's shape ({@link com.payonel.modularcomputers.runtime.Failure}): a not-yet-named one's old text, legacy. */
 	private static final class Refused extends RuntimeException {
-		Refused(String message) {
-			super(message, null, false, false);
+		final com.payonel.modularcomputers.runtime.Failure failure;
+
+		Refused(com.payonel.modularcomputers.runtime.Failure failure) {
+			super(failure.why(), null, false, false);
+			this.failure = failure;
+		}
+
+		/** Not yet named: its text as its why (a state: exists, not empty, closed...). */
+		Refused(String text) {
+			this(com.payonel.modularcomputers.runtime.Failure.legacy(text));
 		}
 	}
 
 	/** What a write to a read-only disk answers. */
-	public static final String READ_ONLY = "read-only disk";
+	public static final String READ_ONLY = "read_only";
 	/** A disk only read (a Disk Station's source, as behind a write blocker): every write is refused. */
 	private volatile boolean readOnly;
 
@@ -349,16 +352,16 @@ public final class Disk implements Device {
 
 	private void writable() {
 		if (readOnly) {
-			throw new Refused(READ_ONLY);
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.denied(READ_ONLY, ""));
 		}
 	}
 
 	private Path root() {
 		if (storage == null) {
-			throw new Refused("no storage");
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.systemFailure("storage"));
 		}
 		if (!mode().equals(HFS)) {
-			throw new Refused("raw disk: no filesystem");
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.denied("raw_disk", "")); // (no filesystem: it's bytes, by offset)
 		}
 		try {
 			Files.createDirectories(storage); // a new disk's root, on first use
@@ -383,11 +386,15 @@ public final class Disk implements Device {
 		return resolve(path, true);
 	}
 
+	Path resolve(String path, boolean follow) {
+		return resolve(path, follow, 1);
+	}
+
 	/**
 	 * As {@link #resolve(String)}; a link met on the way, or at the end when {@code follow}, fails the
 	 * call with {@link #REPARSE} (the OS follows it).
 	 */
-	Path resolve(String path, boolean follow) {
+	Path resolve(String path, boolean follow, int argument) {
 		Path root = root();
 		Path at = root;
 		String[] names = path.split("/");
@@ -409,7 +416,7 @@ public final class Disk implements Device {
 			int dot = bare.indexOf('.');
 			if (name.indexOf('\\') >= 0 || name.indexOf('\0') >= 0 || name.indexOf(':') >= 0 || name.endsWith(" ") || name.endsWith(".")
 				|| RESERVED.contains(dot < 0 ? bare : bare.substring(0, dot))) {
-				throw new Refused("bad name: " + name);
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badArgument(argument, name, "name"));
 			}
 			at = at.resolve(name);
 			walked.append('/').append(name);
@@ -421,7 +428,7 @@ public final class Disk implements Device {
 			}
 		}
 		if (!at.normalize().startsWith(root)) {
-			throw new Refused("outside the disk: " + path);
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.badArgument(argument, path, "path")); // (outside the disk)
 		}
 		try {
 			// Through links: the nearest part that exists must really be inside the folder.
@@ -431,7 +438,7 @@ public final class Disk implements Device {
 				nearest = nearest.getParent();
 			}
 			if (!nearest.toRealPath().startsWith(real)) {
-				throw new Refused("outside the disk: " + path);
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badArgument(argument, path, "path")); // (outside the disk, through a link)
 			}
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
@@ -524,7 +531,7 @@ public final class Disk implements Device {
 	/** Takes {@code bytes} more space (fewer, if negative), or refuses if there isn't room. */
 	void grow(long bytes) {
 		if (bytes > 0 && used() + reserved + bytes > tier.bytes()) {
-			throw new Refused(NO_SPACE);
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.limit("disk", tier.bytes()));
 		}
 		used = used() + bytes;
 	}
@@ -532,7 +539,7 @@ public final class Disk implements Device {
 	/** Reserves {@code bytes} more for a handle's buffered writes (fewer, if negative), or refuses if there isn't room. */
 	void reserve(long bytes) {
 		if (bytes > 0 && used() + reserved + bytes > tier.bytes()) {
-			throw new Refused(NO_SPACE);
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.limit("disk", tier.bytes()));
 		}
 		reserved += bytes;
 	}
@@ -541,13 +548,14 @@ public final class Disk implements Device {
 		try {
 			return action.get();
 		} catch (Refused e) {
-			return Result.fail(e.getMessage());
+			return Result.fail(e.failure);
 		} catch (Reparse e) {
-			return Result.fail(REPARSE + e.at + "\0" + e.target);
+			return Result.fail(REPARSE + e.at + "\0" + e.target); // (not a failure: to be its own answer, the user's, later)
 		} catch (NoSuchFileRuntime e) {
-			return Result.fail("no such file: " + e.getMessage());
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("file", e.getMessage()));
 		} catch (UncheckedIOException e) {
-			return Result.fail(e.getCause() instanceof NoSuchFileException missing ? "no such file" : "i/o error: " + e.getCause().getMessage());
+			return e.getCause() instanceof NoSuchFileException missing ? Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("file", String.valueOf(missing.getFile())))
+				: Result.fail("i/o error: " + e.getCause().getMessage()); // (a fault: not named yet)
 		}
 	}
 
@@ -585,7 +593,7 @@ public final class Disk implements Device {
 	 */
 	public Result format(String mode) {
 		if (!mode.equals(HFS) && !mode.equals(RAW)) {
-			return Result.fail("unknown mode: " + mode);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, mode, "mode"));
 		}
 		return run(() -> {
 			formatted(mode);
@@ -595,7 +603,7 @@ public final class Disk implements Device {
 
 	private void formatted(String mode) {
 		if (storage == null) {
-			throw new Refused("no storage");
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.systemFailure("storage"));
 		}
 		writable();
 		powerOff();
@@ -639,13 +647,13 @@ public final class Disk implements Device {
 	public Result cloneFrom(Disk source) {
 		return run(() -> {
 			if (storage == null || source.storage == null) {
-				throw new Refused("no storage");
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.systemFailure("storage"));
 			}
 			writable();
 			String mode = source.mode();
 			long needed = mode.equals(RAW) ? source.tier.bytes() : source.used();
 			if (needed > tier.bytes()) {
-				throw new Refused(TOO_BIG + needed); // (bytes it needs, more than its tier holds)
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.limit("disk", tier.bytes())); // (it needs more than its tier holds)
 			}
 			formatted(mode);
 			try {
@@ -713,7 +721,7 @@ public final class Disk implements Device {
 		String mode = args.optString(1, "r").replace("b", "");
 		return run(() -> {
 			if (!List.of("r", "r+", "w", "w+", "a", "a+").contains(mode)) {
-				throw new Refused("bad mode: " + mode);
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badArgument(2, mode, "mode"));
 			}
 			if (!mode.equals("r")) {
 				writable();
@@ -723,7 +731,7 @@ public final class Disk implements Device {
 				throw new Refused("is a directory: " + path);
 			}
 			if (handles.size() >= MAX_HANDLES) {
-				throw new Refused("too many open files");
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.limit("open_files", MAX_HANDLES));
 			}
 			boolean exists = Files.isRegularFile(file);
 			if (!exists && (mode.startsWith("r") || !Files.isDirectory(file.getParent()))) {
@@ -854,7 +862,7 @@ public final class Disk implements Device {
 		return run(() -> {
 			writable();
 			Path source = resolve(from, false);
-			Path target = resolve(to, false);
+			Path target = resolve(to, false, 2);
 			if (!Files.exists(source) || source.equals(storage)) {
 				throw new NoSuchFileRuntime(from);
 			}
@@ -883,12 +891,12 @@ public final class Disk implements Device {
 		return run(() -> {
 			writable();
 			if (target.isEmpty() || target.indexOf('\0') >= 0) {
-				throw new Refused("bad target");
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badArgument(1, target, "target"));
 			}
 			if (target.length() > LINK_MAX) {
-				throw new Refused("name too long: " + target.length() + " bytes, at most " + LINK_MAX);
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.limit("link", LINK_MAX));
 			}
-			Path at = resolve(path, false);
+			Path at = resolve(path, false, 2);
 			if (Files.exists(at)) {
 				throw new Refused("already exists: " + path);
 			}
@@ -927,10 +935,10 @@ public final class Disk implements Device {
 	/** Its image's path, on a raw disk; refused on an hfs one. */
 	private Path rawImage() {
 		if (storage == null) {
-			throw new Refused("no storage");
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.systemFailure("storage"));
 		}
 		if (!mode().equals(RAW)) {
-			throw new Refused("hfs disk: format it raw to read and write it by offset");
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.denied("hfs_disk", "")); // (its filesystem owns it: format it raw to read and write it by offset)
 		}
 		return image();
 	}
@@ -948,7 +956,7 @@ public final class Disk implements Device {
 	private long offset(Arguments args) {
 		long offset = args.checkInteger(0);
 		if (offset < 0 || offset > tier.bytes()) {
-			throw new Refused("no such offset: " + offset + " (0 to " + tier.bytes() + ")");
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.notFound("offset", offset)); // (0 to its capacity)
 		}
 		return offset;
 	}
@@ -959,7 +967,7 @@ public final class Disk implements Device {
 			long offset = offset(args);
 			long n = args.checkInteger(1);
 			if (n < 0) {
-				throw new Refused("a negative count: " + n);
+				throw new Refused(com.payonel.modularcomputers.runtime.Failure.badArgument(2, n, "count"));
 			}
 			int count = (int) Math.min(Math.min(n, MAX_READ), tier.bytes() - offset);
 			if (count == 0 && n > 0) {
@@ -1011,7 +1019,7 @@ public final class Disk implements Device {
 	 * read from ({@link #WINDOW} bytes, refilled as reads move on, so a file's size never costs the
 	 * program's memory), and the writes it hasn't committed, as extents over the file. Its own reads
 	 * see its writes. Writes reserve the space they'll take, or fail as a full disk does
-	 * ({@link #NO_SPACE}). {@code close} commits them atomically: the new file is built beside the
+	 * (a limit of the disk). {@code close} commits them atomically: the new file is built beside the
 	 * disk's folder and renamed over the old one, so the file is all old or all new; only when that
 	 * worked does the handle drop its buffer (a failure leaves it, to retry). Power lost before
 	 * {@code close} loses them, as in real life. It's a Lua userdata that Styx keeps when the computer
@@ -1169,7 +1177,7 @@ public final class Disk implements Device {
 		@Method(doc = "read(n): up to n bytes (at most " + MAX_READ + "), or nil at the end")
 		public Result read(Arguments args) {
 			if (!readable()) {
-				return Result.fail("not open for reading");
+				return Result.fail("not open for reading"); // (a state: not named yet)
 			}
 			int count = (int) Math.clamp(args.checkInteger(0), 0, MAX_READ);
 			try {
@@ -1184,7 +1192,7 @@ public final class Disk implements Device {
 				position += bytes.length;
 				return Result.ok(new String(bytes, StandardCharsets.ISO_8859_1));
 			} catch (Refused e) {
-				return Result.fail(e.getMessage());
+				return Result.fail(e.failure);
 			} catch (IOException e) {
 				return Result.fail("i/o error: " + e.getMessage());
 			}
@@ -1211,10 +1219,10 @@ public final class Disk implements Device {
 				}
 				account = payer;
 				if (!payer.charge(data.length)) {
-					return Result.fail(NO_MEMORY); // nothing written, the program's buffer as it was
+					return Result.fail(com.payonel.modularcomputers.runtime.Failure.limit("memory", payer.limit())); // nothing written, the program's buffer as it was
 				}
 				try {
-					disk.reserve(grows); // refuses with NO_SPACE: nothing written, the program's buffer as it was
+					disk.reserve(grows); // refuses, a limit of the disk: nothing written, the program's buffer as it was
 				} catch (Refused e) {
 					payer.release(data.length);
 					throw e;
@@ -1226,7 +1234,7 @@ public final class Disk implements Device {
 				position = at + data.length;
 				return Result.ok();
 			} catch (Refused e) {
-				return Result.fail(e.getMessage());
+				return Result.fail(e.failure);
 			}
 		}
 
@@ -1264,7 +1272,7 @@ public final class Disk implements Device {
 				default -> -1;
 			};
 			if (from < 0) {
-				return Result.fail("bad whence: " + whence);
+				return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, whence, "whence"));
 			}
 			if (from + offset < 0) {
 				return Result.fail("can't seek before the start");
@@ -1272,7 +1280,7 @@ public final class Disk implements Device {
 			try {
 				disk();
 			} catch (Refused e) {
-				return Result.fail(e.getMessage());
+				return Result.fail(e.failure);
 			}
 			position = from + offset;
 			return Result.ok(position);
@@ -1295,7 +1303,7 @@ public final class Disk implements Device {
 				clearWrites();
 				return Result.ok();
 			} catch (Refused e) {
-				return Result.fail(e.getMessage());
+				return Result.fail(e.failure);
 			} catch (IOException e) {
 				return Result.fail("i/o error: " + e.getMessage());
 			}

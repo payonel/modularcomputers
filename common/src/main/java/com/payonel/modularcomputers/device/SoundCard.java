@@ -101,7 +101,7 @@ public final class SoundCard extends Card {
 		if (!next.encoding().equals(SoundFormat.IMA_ADPCM)) {
 			next = new SoundFormat(next.rate(), next.encoding(), next.channels(), 0);
 		}
-		String invalid = next.invalid();
+		com.payonel.modularcomputers.runtime.Failure invalid = next.invalid();
 		if (invalid != null) {
 			return Result.fail(invalid);
 		} else if (next.equals(format)) {

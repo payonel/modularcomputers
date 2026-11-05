@@ -74,8 +74,8 @@ class RedstoneCardTest {
 	@Test
 	void aBadTableChangesNothing() {
 		assertThatThrownBy(() -> card.set(args(Map.of("north", Map.of("powered", 3L), "sideways", Map.of("powered", 1L)))))
-			.hasMessageContaining("no such face: sideways");
-		assertThatThrownBy(() -> card.set(args(Map.of("north", Map.of("powered", 2.5))))).hasMessageContaining("powered: integer expected");
+			.hasMessageContaining("value=sideways, expected=face");
+		assertThatThrownBy(() -> card.set(args(Map.of("north", Map.of("powered", 2.5))))).hasMessageContaining("value=2.5, expected=integer");
 		assertThat(card.output(NORTH)).isZero();
 	}
 
@@ -125,6 +125,6 @@ class RedstoneCardTest {
 		assertThat(card.output(0)).as("north, its left").isEqualTo(2);
 		assertThat(sides(card.get(args(List.of("front"))).first()).keySet()).as("answered by the world's names").containsExactly("east");
 		card.frontFrom(() -> null); // (no block has said where its front is)
-		assertThatThrownBy(() -> card.set(args(Map.of("back", Map.of("powered", 1L))))).hasMessageContaining("no front");
+		assertThatThrownBy(() -> card.set(args(Map.of("back", Map.of("powered", 1L))))).hasMessageContaining("value=back, expected=face");
 	}
 }

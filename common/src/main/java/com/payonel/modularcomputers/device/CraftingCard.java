@@ -359,7 +359,7 @@ public final class CraftingCard extends Card implements Buffered {
 		return bench.drop(face, given(args, at) ? slot(args, at) : 0, given(args, at + 1) ? count(args, at + 1) : Integer.MAX_VALUE);
 	}
 
-	@Method(doc = "store([face][, from[, count[, to]]]): puts items into the container at a face of the robot (in front when none is given): from one of its slots (all, or count), or with none, everything in its storage (not its grid); into the container's slot to, or where they fit: true, 0 when none of it is left; false and how many are, when there's no room; or false and why (no container there)")
+	@Method(doc = "store([face][, from[, count[, to]]]): puts items into the container at a face of the robot (in front when none is given): from one of its slots (all, or count), or with none, everything in its storage (not its grid); into the container's slot to, or where they fit: true, 0 when none of it is left; false and how many are, when there's no room; or false and why ({why = \"not_found\", kind = \"container\", value = the face})")
 	public Result store(Arguments args) {
 		Result no = needsRobotics();
 		if (no != null) {
@@ -403,7 +403,7 @@ public final class CraftingCard extends Card implements Buffered {
 	private static int slot(Arguments args, int n) {
 		double value = args.checkNumber(n);
 		if (value < 1 || value > SLOTS || value != Math.floor(value)) {
-			throw new Arguments.ArgumentError("a slot from 1 to " + SLOTS + " expected, got " + args.get(n));
+			throw new Arguments.ArgumentError(n + 1, args.get(n), "slot"); // (1 to SLOTS)
 		}
 		return (int) value;
 	}
@@ -411,7 +411,7 @@ public final class CraftingCard extends Card implements Buffered {
 	private static int count(Arguments args, int n) {
 		double value = args.checkNumber(n);
 		if (value < 1 || value != Math.floor(value)) {
-			throw new Arguments.ArgumentError("a count of 1 or more expected, got " + args.get(n));
+			throw new Arguments.ArgumentError(n + 1, args.get(n), "count"); // (1 or more)
 		}
 		return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
 	}
@@ -419,7 +419,7 @@ public final class CraftingCard extends Card implements Buffered {
 	private static String face(Arguments args, int n) {
 		Object name = args.get(n);
 		if (!(name instanceof String face) || !RoboticsDevice.FACES.contains(face)) {
-			throw new Arguments.ArgumentError("a face expected (front, back, left, right, up or down), got " + name);
+			throw new Arguments.ArgumentError(n + 1, name, "face");
 		}
 		return face;
 	}

@@ -53,12 +53,12 @@ public class Card implements Device {
 	/** The face a program named (the world's name, or one relative to its block's front: {@link Face}). */
 	protected Face face(Object name) {
 		if (!(name instanceof String text)) {
-			throw new com.payonel.modularcomputers.runtime.Arguments.ArgumentError("a face's name expected, got " + name);
+			throw new com.payonel.modularcomputers.runtime.Arguments.ArgumentError(1, name, "face"); // (a face is named in its first argument, or as its table's key)
 		}
 		try {
 			return Face.named(text, front.get());
 		} catch (IllegalArgumentException e) {
-			throw new com.payonel.modularcomputers.runtime.Arguments.ArgumentError(e.getMessage());
+			throw new com.payonel.modularcomputers.runtime.Arguments.ArgumentError(1, text, "face"); // (no such face, or none from this front)
 		}
 	}
 

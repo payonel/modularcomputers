@@ -29,6 +29,8 @@ public final class Failure {
 	public static final String LIMIT = "limit";
 	/** Failed in transit, or the other end answered badly ({@code reason}), and what was said of it ({@code message}). */
 	public static final String NETWORK = "network";
+	/** What it names isn't there: what kind of thing ({@code kind}), and as given ({@code value}). */
+	public static final String NOT_FOUND = "not_found";
 	/** A craft's grid makes nothing ({@code name}: what it was making, "" none). */
 	public static final String MISSING_INPUTS = "missing_inputs";
 	/** No room for what it makes ({@code name}: what). */
@@ -77,6 +79,15 @@ public final class Failure {
 
 	public static Failure network(String reason, String message) {
 		return new Failure(NETWORK, "reason", reason, "message", message);
+	}
+
+	/**
+	 * What it names isn't there: {@code kind} (a word: {@code device}, {@code method}, {@code entity},
+	 * {@code file}, {@code boot_entry}, {@code offset}, {@code container}, {@code slot}, {@code block}),
+	 * and {@code value}, what was named (an address, a name, a face, a number).
+	 */
+	public static Failure notFound(String kind, Object value) {
+		return new Failure(NOT_FOUND, "kind", kind, "value", value == null ? "" : value);
 	}
 
 	public static Failure missingInputs(String name) {

@@ -296,6 +296,11 @@ public final class LuaRunner implements Runner {
 
 		/** Devices' charges: what the program may hold (user code's share). Not exact across threads, but bounded. */
 		@Override
+		public long limit() {
+			return cap;
+		}
+
+		@Override
 		public boolean charge(long bytes) {
 			if (limited() && used + held.get() + bytes > baseline + cap) {
 				return false;
@@ -1141,7 +1146,7 @@ public final class LuaRunner implements Runner {
 				}
 				return target instanceof Handle handle ? board.invoke(handle, method, rest) : board.invoke(String.valueOf(target), method, rest);
 			};
-			default -> board -> Result.fail("no board call: " + name);
+			default -> board -> Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("board_call", name));
 		};
 		Call request = new Call(call, new CompletableFuture<>());
 		calls.add(request);

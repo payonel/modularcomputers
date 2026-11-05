@@ -27,11 +27,12 @@ public record Label(Supplier<String> read, Consumer<String> write) {
 	}
 
 	/** Why {@code label} can't be one (too long, or not printable), or null. */
-	public static String invalid(String label) {
+	/** Why {@code label} can't be one (its call's {@code argument}), or null. */
+	public static com.payonel.modularcomputers.runtime.Failure invalid(String label, int argument) {
 		if (label.length() > MAX) {
-			return "too long: " + MAX;
+			return com.payonel.modularcomputers.runtime.Failure.limit("label", MAX);
 		} else if (!label.codePoints().allMatch(c -> c >= ' ' && c != 0x7F)) {
-			return "not printable";
+			return com.payonel.modularcomputers.runtime.Failure.badArgument(argument, label, "printable");
 		}
 		return null;
 	}

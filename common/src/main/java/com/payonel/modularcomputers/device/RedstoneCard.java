@@ -128,12 +128,12 @@ public final class RedstoneCard extends Card implements Buffered {
 		for (Map.Entry<?, ?> entry : args.checkTable(0).entrySet()) {
 			int side = side(entry.getKey());
 			if (!(entry.getValue() instanceof Map<?, ?> fields)) {
-				throw new Arguments.ArgumentError(SIDES.get(side).id() + ": table expected");
+				throw new Arguments.ArgumentError(1, Arguments.given(entry.getValue()), "table"); // (a face's settings)
 			}
 			Object value = fields.get("powered");
 			if (value != null) {
 				if (!(value instanceof Long || value instanceof Double d && d == Math.rint(d))) {
-					throw new Arguments.ArgumentError(SIDES.get(side).id() + ": powered: integer expected");
+					throw new Arguments.ArgumentError(1, Arguments.given(value), "integer"); // (a face's powered)
 				}
 				settings.put(side, (int) Math.clamp(((Number) value).longValue(), 0, MAX_SIGNAL));
 			}

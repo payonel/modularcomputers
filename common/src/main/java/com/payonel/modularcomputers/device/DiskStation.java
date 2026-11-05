@@ -27,8 +27,9 @@ public final class DiskStation implements Device {
 	public static final int DRAW = 1;
 	public static final String TARGET = "target";
 	public static final String SOURCE = "source";
-	public static final String NO_DISK = "no disk";
-	public static final String NO_SOURCE = "no source disk";
+	/** What's missing for an action ({@link Buffered#SYSTEM_FAILURE}'s): its target disk, a clone's source. */
+	public static final String MISSING_DISK = "disk";
+	public static final String MISSING_SOURCE = "source";
 	public static final String NO_POWER = Buffered.SYSTEM_FAILURE; // (and what's missing: power, the user's)
 	/** The image a disk gets when it's installed or updated: mcos. */
 	public static final String IMAGE = "mcos";
@@ -72,7 +73,7 @@ public final class DiskStation implements Device {
 	private Result onTarget(java.util.function.Function<Disk, Result> action) {
 		Disk target = bay.disk(TARGET);
 		if (target == null) {
-			return Result.fail(NO_DISK);
+			return Buffered.missing(MISSING_DISK);
 		}
 		if (!bay.pay(ACTION_COST)) {
 			return Buffered.missing(Buffered.MISSING_POWER);
@@ -94,7 +95,7 @@ public final class DiskStation implements Device {
 	public Result clone(Arguments args) {
 		Disk source = bay.disk(SOURCE);
 		if (source == null) {
-			return Result.fail(NO_SOURCE);
+			return Buffered.missing(MISSING_SOURCE);
 		}
 		return onTarget(disk -> disk.cloneFrom(source));
 	}
@@ -141,7 +142,7 @@ public final class DiskStation implements Device {
 			case "clone" -> clone(none);
 			case "install" -> install(none);
 			case "update" -> update(none);
-			default -> Result.fail("not an action: " + action);
+			default -> Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, action, "action"));
 		};
 	}
 }

@@ -123,11 +123,10 @@ local function find(path)
   return devices[name], k.devices.byname[name]
 end
 
--- A device call's failure as an errno: a device that's gone is ENODEV (and the kernel's view of the
--- bus is read again: it was out of date); anything else, 'errno' (EIO unless said).
-local function failed(why, errno)
-  if (tostring(why)):find("^no such device") then
-    k.refreshdevices()
+-- A device call's failure as an errno: a device that's gone (not_found, a device: k.invoke has read
+-- the bus again, the kernel's view was out of date) is ENODEV; anything else, 'errno' (EIO unless said).
+local function failed(why, errno, failure)
+  if type(failure) == "table" and failure.why == "not_found" and failure.kind == "device" then
     return fail("ENODEV")
   end
   return fail(errno or "EIO")
@@ -176,13 +175,13 @@ local function deepcopy(value)
 end
 
 -- Takes what device 'id' has waiting into every file open on it: the device's last answer (true,
--- nil once it has nothing; or false and why, its failure), and how many it took.
+-- nil once it has nothing; or false and why, its failure), how many it took, and its failure ({why, ...}).
 local function deliver(id)
   local taken = 0
   while true do
-    local ok, event = k.take(id, "pull")
+    local ok, event, failure = k.take(id, "pull")
     if not ok or event == nil then
-      return ok, event, taken
+      return ok, event, taken, failure
     end
     taken = taken + 1
     k.delivered = true -- (into other files' queues too: their waiters have news, a pass of their own)
@@ -219,12 +218,12 @@ end
 -- false and why (the device's failure, once what it took is given).
 local function nextevent(id, key)
   enlist(id, key)
-  local ok, why = deliver(id)
+  local ok, why, _, failure = deliver(id)
   local queue = readers[id][key]
   if queue[1] ~= nil then
     return true, table.remove(queue, 1)
   elseif not ok then
-    return false, why
+    return false, why, failure
   end
   return true, nil
 end
@@ -251,8 +250,10 @@ local COMMAND_TRIES = 4 -- times a command is asked again at once, news having c
 local function sync(id)
   local tries = 0
   while true do
-    local ok, empty = k.invoke(id, "sync")
-    if not ok or empty then
+    local ok, empty, failure = k.invoke(id, "sync")
+    if not ok then
+      return nil, empty, nil, failure -- (its failure: why, no errno, the failure itself)
+    elseif empty then
       return ok, empty
     elseif not k.request then
       return nil, "busy", "EBUSY"
@@ -328,6 +329,8 @@ local function command(id, method, ...)
   end
   if answer[1] and isstop(method) then
     stopped[id] = (stopped[id] or 0) + 1
+  elseif not answer[1] then
+    return nil, answer[2], nil, answer[3] -- (its failure: why, no errno of its own, the failure itself)
   end
   return table.unpack(answer, 1, answer.n)
 end
@@ -347,9 +350,9 @@ local function eventfile(id, driver)
     if at < #line then
       return true
     end
-    local ok, got = nextevent(id, file)
+    local ok, got, failure = nextevent(id, file)
     if not ok then
-      return failed(got)
+      return failed(got, nil, failure)
     elseif got == nil then
       return false -- (k.take listens for the next)
     end
@@ -390,14 +393,14 @@ end
 -- one refuses writes: EROFS). Past its end, a read gives nothing and a write ENOSPC.
 local function diskfile(device)
   local id, at = device.id, 0
-  local function refused(why)
-    why = tostring(why)
-    if why:find("^hfs disk") then
+  local function refused(why, failure)
+    local reason = type(failure) == "table" and failure.why == "denied" and failure.reason
+    if reason == "hfs_disk" then
       return fail("EMEDIUMTYPE")
-    elseif why:find("^read%-only") then
+    elseif reason == "read_only" then
       return fail("EROFS")
     end
-    return failed(why)
+    return failed(why, nil, failure)
   end
   return {
     type = "device",
@@ -405,18 +408,18 @@ local function diskfile(device)
       return {IN = true, OUT = true}
     end,
     read = function(self, n)
-      local ok, data = k.invoke(id, "read", at, n)
+      local ok, data, failure = k.invoke(id, "read", at, n)
       if not ok then
-        return refused(data)
+        return refused(data, failure)
       end
       data = data or ""
       at = at + #data
       return data
     end,
     write = function(self, data)
-      local ok, count = k.invoke(id, "write", at, data)
+      local ok, count, failure = k.invoke(id, "write", at, data)
       if not ok then
-        return refused(count)
+        return refused(count, failure)
       elseif count == 0 and #data > 0 then
         return fail("ENOSPC")
       end
@@ -428,9 +431,9 @@ local function diskfile(device)
       if whence == "set" then
         base = 0
       elseif whence == "end" then
-        local ok, capacity = k.invoke(id, "getCapacity")
+        local ok, capacity, failure = k.invoke(id, "getCapacity")
         if not ok then
-          return failed(capacity)
+          return failed(capacity, nil, failure)
         end
         base = capacity
       end
@@ -460,18 +463,18 @@ end
 -- methods, as any device file's ioctls (setFormat).
 local function dspfile(device)
   local id = device.id
-  local ok, why = k.invoke(id, "setFormat", {rate = 8000, encoding = "u8", channels = 1})
+  local ok, why, failure = k.invoke(id, "setFormat", {rate = 8000, encoding = "u8", channels = 1})
   if not ok then
-    return failed(why)
+    return failed(why, nil, failure)
   end
   local function set(field, value, answer)
-    local done, err = k.invoke(id, "setFormat", {[field] = value})
+    local done, err, failure = k.invoke(id, "setFormat", {[field] = value})
     if not done then
-      return failed(err, "EINVAL")
+      return failed(err, "EINVAL", failure)
     end
-    local got, format = k.invoke(id, "getFormat")
+    local got, format, failure = k.invoke(id, "getFormat")
     if not got then
-      return failed(format)
+      return failed(format, nil, failure)
     end
     return answer(format)
   end
@@ -489,23 +492,23 @@ local function dspfile(device)
       return set("channels", channels, function(format) return format.channels end)
     end,
     SNDCTL_DSP_GETODELAY = function()
-      local got, delay = k.invoke(id, "getDelay")
+      local got, delay, failure = k.invoke(id, "getDelay")
       if not got then
-        return failed(delay)
+        return failed(delay, nil, failure)
       end
       return delay
     end,
     SNDCTL_DSP_RESET = function()
-      local done, err = k.invoke(id, "reset")
+      local done, err, failure = k.invoke(id, "reset")
       if not done then
-        return failed(err)
+        return failed(err, nil, failure)
       end
       return true
     end,
     SNDCTL_DSP_SYNC = function()
-      local done, drained = k.invoke(id, "sync")
+      local done, drained, failure = k.invoke(id, "sync")
       if not done then
-        return failed(drained)
+        return failed(drained, nil, failure)
       elseif not drained then
         k.listen(id) -- (its interrupt says when it's played out)
         return k.BLOCK
@@ -519,9 +522,9 @@ local function dspfile(device)
       return {OUT = true}
     end,
     write = function(self, data)
-      local done, count = k.invoke(id, "write", data)
+      local done, count, failure = k.invoke(id, "write", data)
       if not done then
-        return failed(count)
+        return failed(count, nil, failure)
       elseif count == 0 and #data > 0 then
         k.listen(id) -- full: its interrupt says when there's room
         return k.BLOCK
@@ -617,11 +620,11 @@ local function devicefile(device, mode)
     if call[1] == nil then
       return fail("EINVAL")
     end
-    local ok, why, errno = command(id, table.unpack(call, 1, call.n))
+    local ok, why, errno, failure = command(id, table.unpack(call, 1, call.n))
     if ok == k.BLOCK then
       return k.BLOCK
     elseif not ok then
-      return failed(why, errno or "EINVAL")
+      return failed(why, errno or "EINVAL", failure)
     end
     if driver.failed and driver.failed(why) then
       return fail("EINVAL") -- (its answer meant it failed: an operator's command that didn't succeed)
@@ -676,11 +679,11 @@ local function devicefile(device, mode)
       if data == nil then
         local answers = {}
         for i, method in ipairs(reads) do
-          local ok, got, errno = command(id, method)
+          local ok, got, errno, failure = command(id, method)
           if ok == k.BLOCK then
             return k.BLOCK -- (a buffered device's get waits its turn)
           elseif not ok then
-            return failed(got, errno)
+            return failed(got, errno, failure)
           end
           answers[i] = got
         end
@@ -748,9 +751,9 @@ local function devicefile(device, mode)
       if lines then
         return value == nil or value == "" or set(value) -- (a last line with no end)
       elseif value then
-        local ok, why = k.invoke(id, "set", table.concat(value))
+        local ok, why, failure = k.invoke(id, "set", table.concat(value))
         if not ok then
-          return failed(why)
+          return failed(why, nil, failure)
         end
       end
       return true
@@ -815,9 +818,9 @@ local function withmethods(d, device)
       end
     end
     if op == "pull" and d.eventkey and select("#", ...) == 0 then
-      local ok, event = nextevent(id, d.eventkey) -- (its own copy: every file sees every event)
+      local ok, event, failure = nextevent(id, d.eventkey) -- (its own copy: every file sees every event)
       if not ok then
-        return failed(event)
+        return failed(event, nil, failure)
       end
       return event
     end
@@ -841,11 +844,11 @@ local function withmethods(d, device)
       open[(...)] = nil
     end
     if not answer[1] then
-      local why = tostring(answer[2])
-      if why:find("^no such device") then
-        return failed(why)
+      local why, failure = tostring(answer[2]), answer[4]
+      if type(failure) == "table" and failure.why == "not_found" and failure.kind == "device" then
+        return failed(why, nil, failure)
       end
-      return nil, why, "EINVAL", answer[3] -- (its why, then the failure itself: {why, ...}, its fields)
+      return nil, why, "EINVAL", failure -- (its why, then the failure itself: {why, ...}, its fields)
     end
     if answer.n == 1 then
       return true -- (a method that answers nothing: done)

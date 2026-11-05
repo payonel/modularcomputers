@@ -302,9 +302,9 @@ final class GolemHands {
 				if (result.consumesAction()) {
 					return Result.ok("used");
 				}
-				return Result.fail("nothing to place against");
+				return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("block", face)); // (nothing to place against)
 			}
-			return Result.fail("nothing there");
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("block", face));
 		} finally {
 			done(player);
 		}
@@ -337,7 +337,7 @@ final class GolemHands {
 		}
 		BlockState state = level().getBlockState(pos);
 		if (state.isAir() || !state.getFluidState().isEmpty() && state.canBeReplaced()) {
-			return Result.fail("nothing there");
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("block", face));
 		}
 		stopBreaking(); // (unbreakable is its end's, a tick on: a call fails only when it can't be given, the user's)
 		breaking = pos.immutable();
@@ -473,7 +473,7 @@ final class GolemHands {
 	Result contents(String face) {
 		Container container = container(face);
 		if (container == null) {
-			return Result.fail("no container there");
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("container", face));
 		}
 		List<Object> slots = new ArrayList<>();
 		for (int slot = 0; slot < container.getContainerSize(); slot++) {
@@ -520,7 +520,7 @@ final class GolemHands {
 	Result store(String face, int count, int to) {
 		Container container = container(face);
 		if (container == null) {
-			return Result.fail("no container there");
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("container", face));
 		}
 		ItemStack hand = golem.getMainHandItem();
 		if (hand.isEmpty()) {
@@ -528,7 +528,7 @@ final class GolemHands {
 		}
 		int moving = Math.min(count, hand.getCount());
 		if (to > container.getContainerSize()) {
-			return Result.fail("no slot: " + to);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("slot", (long) to));
 		}
 		ItemStack left = put(container, to, hand.split(moving), direction(face).getOpposite());
 		hand.grow(left.getCount());
@@ -541,10 +541,10 @@ final class GolemHands {
 	Result take(String face, int slot, int count) {
 		Container container = container(face);
 		if (container == null) {
-			return Result.fail("no container there");
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("container", face));
 		}
 		if (slot > container.getContainerSize()) {
-			return Result.fail("no slot: " + slot);
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("slot", (long) slot));
 		}
 		Direction side = direction(face).getOpposite();
 		ItemStack hand = golem.getMainHandItem();

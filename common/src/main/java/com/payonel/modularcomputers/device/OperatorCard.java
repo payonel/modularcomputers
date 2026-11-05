@@ -41,7 +41,7 @@ public final class OperatorCard extends Card {
 			text = text.substring(1);
 		}
 		if (text.isEmpty()) {
-			return Result.fail("no command");
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, text, "command")); // (an empty one: nothing to run)
 		}
 		Outcome outcome = runner.apply(text);
 		last = outcome.output();

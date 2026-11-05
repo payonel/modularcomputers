@@ -31,4 +31,9 @@ public interface MemoryAccount {
 
 	/** Gives back {@code bytes} taken. */
 	void release(long bytes);
+
+	/** The most it may hold, in bytes (a refusal's limit: the RAM installed); 0: none set. */
+	default long limit() {
+		return 0;
+	}
 }

@@ -32,16 +32,24 @@ For the item and its sockets, see [Hard disk](/hardware/disk/). To format, wipe 
   Paths are the disk's own, from its root: `/notes/a.txt`. Nothing a program names can reach outside
   the disk, and `..` at the root stays at the root. Names a host could mistake for something else
   (a backslash, a colon, a NUL, a name ending in a space or a dot, and names like `con` or `nul`)
-  are refused (`bad name`).
+  are refused (`{why = "bad_argument", argument, value = the name, expected = "name"}`).
 - **raw** is a block device: bytes read and written at any byte offset, from 0 to the disk's
   capacity. A raw image ends where its data does, and past it are zeros.
 
 A disk in one format refuses the other format's methods. A file system's methods fail on a raw disk
-(`raw disk: no filesystem`), and `read` and `write` by offset fail on an hfs disk
-(`hfs disk: format it raw to read and write it by offset`).
+(`{why = "denied", reason = "raw_disk", value = ""}`), and `read` and `write` by offset fail on an
+hfs disk (`{why = "denied", reason = "hfs_disk", value = ""}`: format it raw to read and write it
+by offset).
 
 Space counts each file's bytes plus 512 for each file and directory, so empty files are not free.
-A full disk fails a write with `No space left on device`.
+A full disk fails a write with `{why = "limit", of = "disk", max = its capacity}`.
+
+Every failure is a table of its why and its fields (see [Devices](/devices/)); a path a method
+can't use is `bad_argument` (`expected = "path"` outside the disk), a path that isn't there
+`{why = "not_found", kind = "file", value = path}`. Some aren't named yet and keep their old
+message as their why: `already exists: path`, `is a directory: path`, `directory not empty: path`,
+`can't remove the root`, `can't move a directory into itself`, `not a link: path`, `closed handle`,
+`not open for reading` or `writing`, `can't seek before the start`.
 
 ## In mcos
 
@@ -112,7 +120,8 @@ The disk's format.
 ### setMode(mode) → nothing
 
 Formats the disk as `"hfs"` (an empty filesystem) or `"raw"`. Everything on it is lost and open
-files close. Any other mode fails with `unknown mode`; a read-only disk fails with `read-only disk`.
+files close. Any other mode fails with `bad_argument` (`expected = "mode"`); a read-only disk fails with
+`{why = "denied", reason = "read_only", value = ""}`.
 
 ### changes() → event or nil
 
@@ -120,14 +129,15 @@ The oldest change on the disk that has not been taken yet. See Events.
 
 ## Methods, hfs
 
-Every one fails on a raw disk. Writes fail with `read-only disk` on a read-only disk (a
-[Disk Station](/devices/disk-station/)'s source disk).
+Every one fails on a raw disk. Writes fail with `denied`, `reason = "read_only"`, on a read-only
+disk (a [Disk Station](/devices/disk-station/)'s source disk).
 
 ### open(path[, mode]) → handle
 
 Opens a file. `mode` is `r` (the default), `r+`, `w`, `w+`, `a` or `a+`, as C's `fopen` (a `b` is
 ignored). A new file is made at once, empty. At most 16 files are open at once on a disk
-(`too many open files`). Fails with `no such file: path`, `is a directory: path` or `bad mode`.
+(`{why = "limit", of = "open_files", max = 16}`). Fails with `not_found` (`kind = "file"`),
+`is a directory: path`, or `bad_argument` (`expected = "mode"`).
 
 The handle has its own methods, below.
 
@@ -135,7 +145,7 @@ The handle has its own methods, below.
 
 The names in a directory, sorted; directories end in `/`. With `typed` true, a table of
 `{name, type}` each, where type is `file`, `directory` or `link`. `path` defaults to `/`. Fails
-with `no such file` when it is not a directory.
+with `not_found` (`kind = "file"`) when it is not a directory.
 
 ### stat(path[, nofollow]) → {size, directory, modified} or nil
 
@@ -160,7 +170,7 @@ itself.
 ### symlink(target, path) → nothing
 
 Makes a symbolic link at `path`. The target is any text (the operating system follows it, the disk
-never does), at most 1023 bytes (`name too long`). `path` must not exist. A link is kept as a CIFS
+never does), at most 1023 bytes (`{why = "limit", of = "link", max = 1023}`). `path` must not exist. A link is kept as a CIFS
 `XSym` file of 1067 bytes.
 
 ### readlink(path) → target
@@ -168,7 +178,7 @@ never does), at most 1023 bytes (`name too long`). `path` must not exist. A link
 A link's target. Fails with `not a link`.
 
 A path that meets a link fails with the message `symbolic link`, a NUL, the link's path, a NUL and
-its target: the operating system goes on from there.
+its target, as its why (not yet given a shape of its own): the operating system goes on from there.
 
 ## Methods, raw
 
@@ -177,19 +187,20 @@ Every one fails on an hfs disk.
 ### read(offset, n) → string or nil
 
 Up to `n` bytes (at most 4096) from the byte offset, fewer at the end. Nil at the end. An offset
-past the capacity fails with `no such offset`, a negative `n` with `a negative count`.
+past the capacity fails with `{why = "not_found", kind = "offset", value = offset}`, a negative `n`
+with `bad_argument` (`expected = "count"`).
 
 ### write(offset, data) → count
 
 Writes the bytes at the offset, as many as fit before the end, and gives how many it wrote. Fails
-with `read-only disk` on a read-only disk.
+with `denied` (`reason = "read_only"`) on a read-only disk.
 
 ## File handles
 
 A handle never holds a host file open. It reads through a 4096 byte window, and buffers its writes.
 `close` commits them all at once: the file is all old or all new. Power lost, or the disk taken out,
 before `close` loses the writes. A handle left unclosed and forgotten is abandoned the same way.
-Writes reserve space as they go and fail with `No space left on device` when there is none.
+Writes reserve space as they go and fail with `{why = "limit", of = "disk", max}` when there is none.
 
 ### handle.read(n) → string or nil
 
@@ -199,12 +210,13 @@ end looks again for data another handle has added since.
 ### handle.write(data) → nothing
 
 Writes where the file is at (at the end, if opened to append). Takes effect at close. Fails with
-`not open for writing`, or `Cannot allocate memory` when the program's memory cannot hold it.
+`not open for writing`, or `{why = "limit", of = "memory", max}` when the program's memory cannot
+hold it (`max`: the RAM installed).
 
 ### handle.seek([whence[, offset]]) → position
 
 Moves to `offset` from `"set"` (the start), `"cur"` (the default) or `"end"`, and gives where it is.
-Fails with `bad whence` or `can't seek before the start`.
+Fails with `bad_argument` (`expected = "whence"`) or `can't seek before the start`.
 
 ### handle.close() → nothing
 

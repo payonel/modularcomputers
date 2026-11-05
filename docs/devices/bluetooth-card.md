@@ -67,7 +67,7 @@ The id of the board it links to, or nil.
 
 Links it to the board with that id, as linking it by hand does. Nil, or no argument, links it to
 none. The board need not be there now. An id that is not a UUID, or not a string, fails with
-`not a board id`. Through the ioctl it answers `true`.
+`bad_argument` (`expected = "board_id"`). Through the ioctl it answers `true`.
 
 ### getBoard() → id or nil
 

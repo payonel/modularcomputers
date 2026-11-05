@@ -71,10 +71,10 @@ class SoundCardTest {
 	void itStartsAtOssDefaultsAndRefusesWhatItCantPlay() {
 		SoundCard card = new SoundCard();
 		assertThat(card.format()).isEqualTo(SoundFormat.DEFAULT);
-		assertThat(card.setFormat(args(Map.of("rate", 12345L))).error()).startsWith("unsupported rate");
-		assertThat(card.setFormat(args(Map.of("encoding", "mp3"))).error()).startsWith("unsupported encoding");
-		assertThat(card.setFormat(args(Map.of("channels", 3L))).error()).startsWith("unsupported channels");
-		assertThat(card.setFormat(args(Map.of("encoding", SoundFormat.IMA_ADPCM, "block", 3L))).error()).startsWith("bad ADPCM block");
+		assertThat(card.setFormat(args(Map.of("rate", 12345L))).failure().table()).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 1L, "value", 12345L, "expected", "rate"));
+		assertThat(card.setFormat(args(Map.of("encoding", "mp3"))).failure().table()).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 1L, "value", "mp3", "expected", "encoding"));
+		assertThat(card.setFormat(args(Map.of("channels", 3L))).failure().table()).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 1L, "value", 3L, "expected", "channels"));
+		assertThat(card.setFormat(args(Map.of("encoding", SoundFormat.IMA_ADPCM, "block", 3L))).failure().table()).isEqualTo(java.util.Map.of("why", "bad_argument", "argument", 1L, "value", 3L, "expected", "block"));
 		assertThat(card.setFormat(args(Map.of("encoding", SoundFormat.IMA_ADPCM))).failed()).isFalse();
 		assertThat(card.format().block()).as("a block size if none is said").isEqualTo(SoundFormat.DEFAULT_BLOCK);
 	}

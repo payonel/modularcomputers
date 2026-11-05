@@ -46,13 +46,16 @@ public final class DiskStationBlockEntity extends CardHolderBlockEntity {
 			if (!result.failed()) {
 				return DONE;
 			}
-			String error = String.valueOf(result.error());
-			return switch (error) {
-				case DiskStation.NO_DISK -> NO_DISK;
-				case DiskStation.NO_SOURCE -> NO_SOURCE;
-				case DiskStation.NO_POWER -> NO_POWER;
-				case Disk.READ_ONLY -> READ_ONLY;
-				default -> error.startsWith(com.payonel.modularcomputers.device.Disk.TOO_BIG) ? NO_FIT : FAILED;
+			var failure = result.failure();
+			return switch (failure.why()) {
+				case com.payonel.modularcomputers.runtime.Failure.SYSTEM_FAILURE -> switch (String.valueOf(failure.get("missing"))) {
+					case DiskStation.MISSING_DISK -> NO_DISK;
+					case DiskStation.MISSING_SOURCE -> NO_SOURCE;
+					default -> NO_POWER;
+				};
+				case com.payonel.modularcomputers.runtime.Failure.DENIED -> Disk.READ_ONLY.equals(failure.get("reason")) ? READ_ONLY : FAILED;
+				case com.payonel.modularcomputers.runtime.Failure.LIMIT -> "disk".equals(failure.get("of")) ? NO_FIT : FAILED;
+				default -> FAILED;
 			};
 		}
 	}

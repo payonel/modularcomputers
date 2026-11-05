@@ -134,7 +134,7 @@ public final class RoboticPiston implements Device, Buffered {
 		try {
 			side = Face.named(args.checkString(0), front.get()).id();
 		} catch (IllegalArgumentException e) {
-			return Result.fail(e.getMessage());
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, args.checkString(0), "face"));
 		}
 		Moved moved = arms.move(side, motion);
 		if (moved != Moved.ALREADY) {

@@ -55,8 +55,9 @@ card's own: the robot is free while it crafts.
 Every command goes from where its last command left it, facing a right angle. `walk(1)` twice is
 two blocks from where the first began, whatever happened between. Every move ends **squared**: on a
 block's middle, whole blocks from its origin, a flight's height too (within a 4096th of a block).
-A move that wouldn't is refused, saying where it would end: from a block's middle, `walk(4.4)`
-fails with `not an integer: forward 4.4`.
+A move that wouldn't is refused, `bad_argument` and the argument that wouldn't end squared, as
+given: from a block's middle, `walk(4.4)` fails with
+`{why = "bad_argument", argument = 1, value = 4.4, expected = "squared"}`.
 
 What happens to it that no program asked for comes as one kind of event, a **notice**
 (`{event = "notice", why = ...}` for a shove or a fall, `{event = "notice", what = ...}` for a
@@ -198,21 +199,21 @@ on a block's middle: from one, whole numbers do; after a stop between blocks, th
 does. How it gets there is below ([Walking](#walking)). With no arguments it walks back to where
 its last command left it. A command; its event, `walk`: `ok`, or not and why, on the middle of the
 last block it reached; farther than 64 blocks any way, it's `blocked` at once and goes nowhere
-(`name = ""`, `face` toward where it was going). It fails with `not an integer: ` and where it would
-end (`forward 4.4`), or with `system_failure`, `"legs"` missing (on its thrusters).
+(`name = ""`, `face` toward where it was going). It fails with `bad_argument` (`expected =
+"squared"`: it wouldn't end squared), or with `system_failure`, `"legs"` missing (on its thrusters).
 
 ### walkTo(forward[, right[, up]]) → true
 
 Walks, as `walk` does, to the block that many whole blocks from its origin, in the origin's
 frame: the numbers `position` gives. `walkTo(0, 0, 0)` goes home. Its event: `walkTo`. Fails with
-`not an integer: ` and the number (`forward 2.5`).
+`bad_argument` (`expected = "integer"`) for a number that isn't whole (`walkTo(2.5)`).
 
 ### turn(way) → true
 
 Turns a right angle in place: `"left"` or `"right"`, or two, `"around"`, from the heading its last
 command left it; or to face the world's way, `"north"`, `"south"`, `"east"` or `"west"` (facing it
 already, it doesn't turn, and its event comes all the same).
-Its event: `turn`. It fails with `not a way: ` and what it was given: its heading is always a right
+Its event: `turn`. It fails with `bad_argument` (`expected = "way"`) for anything else: its heading is always a right
 angle from its origin's.
 
 ### stop() → {forward, right, up, heading}
@@ -240,8 +241,8 @@ moves to make it so, and `position` then gives exactly these numbers. Each is 0 
 `setPosition()` makes where it stands the origin. It moves onto its block's middle and turns to the
 nearest right angle first. From a place you know in another frame (a map's, a GPS's fix), it gives
 `position` that frame: `setPosition(12, -3, 65, 90)` says "I'm 12 forward, 3 left and 65 up from
-the origin, facing its right". Fails with `not an integer: ` and the number, or `not a right
-angle: ` and the heading.
+the origin, facing its right". Fails with `bad_argument`: `expected = "integer"` for a
+coordinate, `"right_angle"` for the heading.
 
 ### setPathfinding(on) → true
 
@@ -287,8 +288,8 @@ Uses what it holds on the space at a face, as a player's right click. A mob ther
 (shears on a sheep); then a block there is clicked on its face toward the robot (a door, a button,
 a lever, a log stripped with an axe); an empty space gets what it holds placed into it, against a
 neighbouring block, or with nothing to place against, what it holds is used the way it looks (a
-bucket into water). Answers `"placed"` or `"used"`; fails with `nothing happened`, `nothing to
-place against` or `nothing there`.
+bucket into water). Answers `"placed"` or `"used"`; fails with `nothing happened`, or
+`{why = "not_found", kind = "block", value = the face}` (nothing there, or nothing to place against).
 
 ### swing(face) → what, or nil and why
 
@@ -303,14 +304,14 @@ was breaking gone, `{why = "lost", name, id = "", at}`, its name, no id as a blo
 where it was, `{forward, right, up}` from where its last command left it), or `unbreakable` (the
 game won't let it be broken: bedrock, or a place protected from breaking, as a player's break
 there finishes its cracks and the block stays; the same fields, `{why = "unbreakable", name, id =
-"", at}`); each with its `call`, its `progress` the break so far, 0 to 1. It fails with `nothing
-there`.
+"", at}`); each with its `call`, its `progress` the break so far, 0 to 1. It fails with
+`{why = "not_found", kind = "block", value = the face}` (nothing there).
 
 ### contents([face]) → list, or nil and why
 
 What the container at a face (in front, when none is given) holds (a chest, a barrel, a furnace, a chest minecart): a list of its
 slots with something in, each `{slot, name, count, ...}` (slots from 1). It fails with
-`no container there`.
+`{why = "not_found", kind = "container", value = the face}`.
 
 ### store([face][, count[, to]]) → true, 0 or false, remaining; or nil and why
 
@@ -325,7 +326,7 @@ container there`.
 
 Takes items from the container at a face (in front, when none is given) into its hand: from `slot`, or the first it can take (the
 same as it holds, when it holds something); all its hand can hold, or `count`. How many came: 0
-when there were none it could take. It fails with `no container there` or `no slot: ` and the slot.
+when there were none it could take. It fails with `not_found`: `kind = "container"` (the face), or `"slot"` (the slot).
 
 ### fly(forward[, right[, up]]) → true
 
@@ -342,7 +343,7 @@ on its legs, as a player off the ground does it (its tools, a block breaking mor
 other cards work. Its event, `fly`: `ok` (then it holds
 there), or not and why (`blocked`, a block over it: `name = "minecraft:stone", face = "up"`). Its thrusters cost five running CPUs' power a
 tick. Farther than 64 blocks any way, it's `blocked` at once, before it takes off (`name = ""`,
-`face` toward where it was going). Fails with `not an integer: ` and where it would end.
+`face` toward where it was going). Fails with `bad_argument` (`expected = "squared"`).
 
 If its program ends while its thrusters hold it up, or its power runs out, it falls and powers off:
 its torso lies on the ground, off, to be picked up as a Tier 2 Bot Golem Torso.
@@ -350,7 +351,7 @@ its torso lies on the ground, off, to be picked up as a Tier 2 Bot Golem Torso.
 ### flyTo(forward[, right[, up]]) → true
 
 Flies, as `fly` does, to the point that many whole blocks from its origin, in the origin's frame.
-Its event: `flyTo`. Fails with `not an integer: ` and the number.
+Its event: `flyTo`. Fails with `bad_argument` (`expected = "integer"`).
 
 ### land([force]) → true
 

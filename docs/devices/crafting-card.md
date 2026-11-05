@@ -121,7 +121,8 @@ mcos it also ends every thread's wait to give the card a command (`ECANCELED`). 
 ### move(from, to[, count]) → number
 
 Moves items from one of its slots to another (all, or `count`): how many went. Fails with
-`slot taken: ` and the slot, when it holds something else, or `no slot: ` and the slot.
+`slot taken: ` and the slot, when it holds something else, or
+`{why = "not_found", kind = "slot", value = the slot}`.
 
 ### equip(slot) → true
 
@@ -143,7 +144,7 @@ takes them later isn't the robot's concern).
 Puts items into the container at a face (in front, when none is given): from slot `from` (all, or
 `count`), or with none everything in its storage; into the container's slot `to`, or where they fit.
 One answer says it all: `true, 0` when none of it is left (nothing to store too), else `false` and
-how many are left (the container is full). Fails with `no container there`.
+how many are left (the container is full). Fails with `{why = "not_found", kind = "container", value = the face}`.
 
 ### take([face][, from[, count[, to]]]) → number
 

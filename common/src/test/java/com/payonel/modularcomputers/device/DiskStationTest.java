@@ -80,10 +80,10 @@ class DiskStationTest {
 
 	@Test
 	void anActionNeedsADiskAndPowerAndACloneASource() {
-		assertThat(station.format(args()).error()).isEqualTo(DiskStation.NO_DISK);
+		assertThat(station.format(args()).failure().table()).isEqualTo(java.util.Map.of("why", "system_failure", "missing", "disk"));
 		Disk disk = disk("p");
 		bay.disks.put(DiskStation.TARGET, disk);
-		assertThat(station.clone(args()).error()).isEqualTo(DiskStation.NO_SOURCE);
+		assertThat(station.clone(args()).failure().table()).isEqualTo(java.util.Map.of("why", "system_failure", "missing", "source"));
 		bay.powered = false;
 		Result unpowered = station.format(args());
 		assertThat(unpowered.error()).isEqualTo("system_failure");

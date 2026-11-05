@@ -335,8 +335,9 @@ public class GolemWalkGameTest {
 				helper.assertTrue(Math.abs(from - stoppedAt[0]) < RoboticsDevice.SQUARED, "its next walk from exactly there: " + from);
 				double between = stoppedAt[0] - Math.floor(stoppedAt[0]);
 				if (between >= RoboticsDevice.SQUARED && 1 - between >= RoboticsDevice.SQUARED) {
-					String refused = golem.robotics().walk(args(1L)).error();
-					helper.assertTrue(refused != null && refused.startsWith(RoboticsDevice.NOT_AN_INTEGER + "forward"), "a block on from between blocks: " + refused);
+					var refused = golem.robotics().walk(args(1L)).failure();
+					helper.assertTrue(refused != null && java.util.Objects.equals(refused.table(), java.util.Map.of("why", "bad_argument", "argument", 1L, "value", 1L,
+						"expected", RoboticsDevice.SQUARED_END)), "a block on from between blocks: it wouldn't end squared: " + refused);
 				}
 				events.clear();
 				golem.robotics().walk(args(5 - stoppedAt[0])); // (the rest of the way)

@@ -35,20 +35,23 @@ class DiskFormatsTest {
 		return text;
 	}
 
+	/** A read-only disk's refusal (the user's: one shape), denied. */
+	private static final java.util.Map<String, Object> READ_ONLY = java.util.Map.of("why", "denied", "reason", "read_only", "value", "");
+
 	@Test
 	void aReadOnlyDiskReadsAndRefusesEveryWrite() {
 		Disk disk = disk("ro", DiskTier.TIER_1);
 		write(disk, "/a", "kept");
 		disk.readOnly(true);
 		assertThat(read(disk, "/a")).isEqualTo("kept");
-		assertThat(disk.open(args("/a", "w")).error()).isEqualTo(Disk.READ_ONLY);
-		assertThat(disk.open(args("/a", "a")).error()).isEqualTo(Disk.READ_ONLY);
-		assertThat(disk.mkdir(args("/d")).error()).isEqualTo(Disk.READ_ONLY);
-		assertThat(disk.remove(args("/a")).error()).isEqualTo(Disk.READ_ONLY);
-		assertThat(disk.rename(args("/a", "/b")).error()).isEqualTo(Disk.READ_ONLY);
-		assertThat(disk.symlink(args("/a", "/l")).error()).isEqualTo(Disk.READ_ONLY);
-		assertThat(disk.setMode(args(Disk.RAW)).error()).isEqualTo(Disk.READ_ONLY);
-		assertThat(disk.format(Disk.HFS).error()).isEqualTo(Disk.READ_ONLY);
+		assertThat(disk.open(args("/a", "w")).failure().table()).isEqualTo(READ_ONLY);
+		assertThat(disk.open(args("/a", "a")).failure().table()).isEqualTo(READ_ONLY);
+		assertThat(disk.mkdir(args("/d")).failure().table()).isEqualTo(READ_ONLY);
+		assertThat(disk.remove(args("/a")).failure().table()).isEqualTo(READ_ONLY);
+		assertThat(disk.rename(args("/a", "/b")).failure().table()).isEqualTo(READ_ONLY);
+		assertThat(disk.symlink(args("/a", "/l")).failure().table()).isEqualTo(READ_ONLY);
+		assertThat(disk.setMode(args(Disk.RAW)).failure().table()).isEqualTo(READ_ONLY);
+		assertThat(disk.format(Disk.HFS).failure().table()).isEqualTo(READ_ONLY);
 		assertThat(read(disk, "/a")).as("nothing changed").isEqualTo("kept");
 		disk.retire();
 	}
@@ -108,7 +111,8 @@ class DiskFormatsTest {
 		Disk big = disk("big", DiskTier.TIER_2);
 		big.format(Disk.RAW);
 		write(small, "/keep", "kept");
-		assertThat(small.cloneFrom(big).error()).as("a raw tier 2 is bigger than a tier 1").startsWith(Disk.TOO_BIG);
+		assertThat(small.cloneFrom(big).failure().table()).as("a raw tier 2 is bigger than a tier 1: a limit of the disk, its capacity")
+			.isEqualTo(java.util.Map.of("why", "limit", "of", "disk", "max", small.getCapacity(args()).first()));
 		assertThat(read(small, "/keep")).as("nothing changed").isEqualTo("kept");
 		for (Disk disk : List.of(source, target, small, big)) {
 			disk.retire();

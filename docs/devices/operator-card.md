@@ -53,7 +53,7 @@ The second command prints what the server said, such as `Set the time to 1000`.
 Runs a server command, with or without its leading `/`, and answers how it went. `success` says
 whether it worked, `result` is the command's value (0 when it failed), and `output` is what it said
 (its lines, each ending in a new line). A command that fails still answers (with `success` false);
-only an empty command fails the call, with `no command`. A card not in a world answers
+only an empty command fails the call, with `bad_argument` (`expected = "command"`). A card not in a world answers
 `success = false`, `output = "not in a world"`.
 
 ### get() → string

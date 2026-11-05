@@ -49,14 +49,14 @@ public final class DeviceMethods {
 	public static Result invoke(Object device, String name, Arguments args) {
 		java.lang.reflect.Method method = of(device).get(name);
 		if (method == null) {
-			return Result.fail("no such method: " + name);
+			return Result.fail(Failure.notFound("method", name));
 		}
 		try {
 			Result result = (Result) method.invoke(device, args);
 			return result == null ? Result.ok() : result;
 		} catch (InvocationTargetException e) {
 			Throwable cause = e.getCause();
-			return Result.fail(cause instanceof Arguments.ArgumentError ? cause.getMessage() : "device error: " + cause);
+			return cause instanceof Arguments.ArgumentError bad ? Result.fail(bad.failure()) : Result.fail("device error: " + cause); // (a fault: not named yet)
 		} catch (ReflectiveOperationException | RuntimeException e) {
 			return Result.fail("device error: " + e);
 		}

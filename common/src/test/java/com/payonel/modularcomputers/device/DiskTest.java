@@ -176,7 +176,8 @@ class DiskTest {
 		assertThat(account.held).as("overwriting what's buffered costs nothing more").isEqualTo(4000);
 		write.apply(new Object[] {chunk});
 		assertThat(account.held).isEqualTo(8000);
-		assertThat(write.apply(new Object[] {chunk}).error()).as("no room: ENOMEM, nothing written").isEqualTo(Disk.NO_MEMORY);
+		var refused = write.apply(new Object[] {chunk});
+		assertThat(List.of(refused.error(), refused.failure().get("of"))).as("no room: a limit of its memory (ENOMEM), nothing written").isEqualTo(List.of("limit", "memory"));
 		assertThat(account.held).isEqualTo(8000);
 		assertThat(file.close(new com.payonel.modularcomputers.runtime.Arguments(List.of())).failed()).isFalse();
 		assertThat(account.held).as("committed: given back").isZero();
@@ -235,7 +236,7 @@ class DiskTest {
 			seen.add(board.invoke("sata:0", "getUsed").first());
 			com.payonel.modularcomputers.machine.Program.park(board);
 		});
-		assertThat(seen).containsExactly((long) Disk.ENTRY, false, (long) Disk.ENTRY + 4096, Disk.NO_SPACE, 0L);
+		assertThat(seen).containsExactly((long) Disk.ENTRY, false, (long) Disk.ENTRY + 4096, "limit", 0L);
 	}
 
 	@Test
@@ -265,23 +266,23 @@ class DiskTest {
 	void formattingRawGivesBytesByOffsetInOneImageFileAndBackErasesIt() {
 		long size = DiskTier.TIER_1.bytes();
 		run(DiskTier.TIER_1, board -> {
-			seen.add(board.invoke("sata:0", "write", 0, "x").error()); // an hfs disk: its filesystem owns it
+			seen.add(board.invoke("sata:0", "write", 0, "x").failure().table()); // an hfs disk: its filesystem owns it
 			Handle file = (Handle) board.invoke("sata:0", "open", "/a", "w").first();
 			seen.add(board.invoke("sata:0", "setMode", "raw").failed());
 			seen.add(file.isOpen());
-			seen.add(board.invoke("sata:0", "open", "/a", "w").error());
+			seen.add(board.invoke("sata:0", "open", "/a", "w").failure().table());
 			seen.add(board.invoke("sata:0", "write", 1000, "boot").first());
 			seen.add(board.invoke("sata:0", "read", 998, 8).first()); // (never written: zeros)
 			seen.add(board.invoke("sata:0", "write", size - 2, "tail").first()); // as many as fit
 			seen.add(board.invoke("sata:0", "read", size - 2, 10).first());
 			seen.add(board.invoke("sata:0", "read", size, 1).first()); // the end
-			seen.add(board.invoke("sata:0", "read", size + 1, 1).error());
+			seen.add(board.invoke("sata:0", "read", size + 1, 1).failure().table());
 			seen.add(board.invoke("sata:0", "setMode", "hfs").failed());
 			seen.add(board.invoke("sata:0", "list", "/").first());
 			com.payonel.modularcomputers.machine.Program.park(board);
 		});
-		assertThat(seen).containsExactly("hfs disk: format it raw to read and write it by offset", false, false, "raw disk: no filesystem",
-			4L, "\0\0boot\0\0", 2L, "ta", null, "no such offset: " + (size + 1) + " (0 to " + size + ")", false, List.of());
+		assertThat(seen).containsExactly(Map.of("why", "denied", "reason", "hfs_disk", "value", ""), false, false, Map.of("why", "denied", "reason", "raw_disk", "value", ""),
+			4L, "\0\0boot\0\0", 2L, "ta", null, Map.of("why", "not_found", "kind", "offset", "value", size + 1), false, List.of());
 		assertThat(storage().resolveSibling("d1.img")).doesNotExist();
 	}
 
@@ -302,8 +303,8 @@ class DiskTest {
 			board.invoke(file, "close");
 			com.payonel.modularcomputers.machine.Program.park(board);
 		});
-		assertThat(seen.subList(0, 4)).allMatch(error -> String.valueOf(error).startsWith("no such file"));
-		assertThat(seen.subList(4, 10)).allMatch(error -> String.valueOf(error).startsWith("bad name"));
+		assertThat(seen.subList(0, 4)).allMatch(error -> "not_found".equals(error)); // (a file, as the disk's own path finds it)
+		assertThat(seen.subList(4, 10)).allMatch(error -> "bad_argument".equals(error)); // (a name a host could read as more)
 		assertThat(Files.readString(storage().resolve("escape.txt"))).as("written inside the disk").isEqualTo("stays in");
 		assertThat(Files.exists(world.resolve("escape.txt"))).isFalse();
 	}
@@ -318,7 +319,7 @@ class DiskTest {
 			seen.add(board.invoke("sata:0", "open", "/link/new.txt", "w").error());
 			com.payonel.modularcomputers.machine.Program.park(board);
 		});
-		assertThat(seen).allMatch(error -> String.valueOf(error).startsWith("outside the disk"));
+		assertThat(seen).allMatch(error -> "bad_argument".equals(error)); // (a path outside the disk)
 		assertThat(Files.exists(world.resolve("new.txt"))).isFalse();
 	}
 

@@ -48,9 +48,17 @@ public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, in
 	}
 
 	/** A change refused, and why (a device's failure: the program's to handle). */
+	/** A change refused, why in its why's shape (the argument of the EEPROM method that gave it). */
 	public static final class Invalid extends Exception {
-		public Invalid(String why) {
-			super(why, null, false, false);
+		private final com.payonel.modularcomputers.runtime.Failure failure;
+
+		public Invalid(com.payonel.modularcomputers.runtime.Failure failure) {
+			super(failure.why(), null, false, false);
+			this.failure = failure;
+		}
+
+		public com.payonel.modularcomputers.runtime.Failure failure() {
+			return failure;
 		}
 	}
 
@@ -67,12 +75,12 @@ public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, in
 	/** Adds entry {@code number} (or replaces it): {@code path} null for {@link #DEFAULT_PATH}, {@code label} null for none. */
 	public BootVariables withEntry(long number, String disk, String path, String label) throws Invalid {
 		int at = number(number);
-		String why = diskInvalid(disk);
+		com.payonel.modularcomputers.runtime.Failure why = diskInvalid(disk);
 		if (why == null) {
 			why = pathInvalid(path == null ? DEFAULT_PATH : path);
 		}
 		if (why == null && label != null) {
-			why = Label.invalid(label);
+			why = Label.invalid(label, 4); // (setBootEntry's fourth)
 		}
 		if (why != null) {
 			throw new Invalid(why);
@@ -98,7 +106,7 @@ public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, in
 		for (long number : numbers) {
 			int at = existing(number);
 			if (now.contains(at)) {
-				throw new Invalid("twice: Boot" + name(at)); // (in the order twice)
+				throw new Invalid(com.payonel.modularcomputers.runtime.Failure.badArgument(1, number, "distinct_entries")); // (in the order twice)
 			}
 			now.add(at);
 		}
@@ -132,7 +140,7 @@ public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, in
 
 	private static int number(long number) throws Invalid {
 		if (number < 0 || number >= ENTRIES) {
-			throw new Invalid("not an entry: " + number); // (0 to ENTRIES - 1)
+			throw new Invalid(com.payonel.modularcomputers.runtime.Failure.badArgument(1, number, "entry")); // (0 to ENTRIES - 1: an entry's number is each method's first)
 		}
 		return (int) number;
 	}
@@ -140,35 +148,36 @@ public record BootVariables(Map<Integer, Entry> entries, List<Integer> order, in
 	private int existing(long number) throws Invalid {
 		int at = number(number);
 		if (!entries.containsKey(at)) {
-			throw new Invalid("no Boot" + name(at));
+			throw new Invalid(com.payonel.modularcomputers.runtime.Failure.notFound("boot_entry", name(at)));
 		}
 		return at;
 	}
 
-	/** Why {@code disk} can't name a disk (an id, {@code id:<uuid>}, as the bus writes it), or null. */
-	public static String diskInvalid(String disk) {
+	/** Why {@code disk} can't name a disk (an id, {@code id:<uuid>}, as the bus writes it: setBootEntry's second), or null. */
+	public static com.payonel.modularcomputers.runtime.Failure diskInvalid(String disk) {
+		com.payonel.modularcomputers.runtime.Failure bad = com.payonel.modularcomputers.runtime.Failure.badArgument(2, disk, "disk_id");
 		if (!disk.startsWith(ID_PREFIX)) {
-			return "not an id: " + disk;
+			return bad;
 		}
 		try {
 			String uuid = disk.substring(ID_PREFIX.length());
 			if (!UUID.fromString(uuid).toString().equals(uuid)) {
-				return "not an id: " + disk; // (not as the bus writes one)
+				return bad; // (not as the bus writes one)
 			}
 		} catch (IllegalArgumentException e) {
-			return "not an id: " + disk;
+			return bad;
 		}
 		return null;
 	}
 
 	/** Why {@code path} can't be an entry's file (absolute, printable, at most {@link #MAX_PATH}), or null. */
-	public static String pathInvalid(String path) {
+	public static com.payonel.modularcomputers.runtime.Failure pathInvalid(String path) {
 		if (!path.startsWith("/")) {
-			return "not absolute: " + path;
+			return com.payonel.modularcomputers.runtime.Failure.badArgument(3, path, "absolute_path"); // (setBootEntry's third)
 		} else if (path.length() > MAX_PATH) {
-			return "too long: " + MAX_PATH;
+			return com.payonel.modularcomputers.runtime.Failure.limit("path", MAX_PATH);
 		} else if (!path.chars().allMatch(c -> c > ' ' && c < 0x7F)) {
-			return "not printable"; // (nor a space)
+			return com.payonel.modularcomputers.runtime.Failure.badArgument(3, path, "printable"); // (nor a space)
 		}
 		return null;
 	}
