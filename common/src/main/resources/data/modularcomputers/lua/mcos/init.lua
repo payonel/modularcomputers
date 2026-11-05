@@ -148,9 +148,11 @@ function k.log(source, id, text)
   end
 end
 
--- An event as the log's text: a table's fields in order of name ("x=1.5 z=-3.0"), each value cut
--- short past KLOG_VALUE.
-local function describe(value)
+-- An event as the log's text: a table's fields in order of name ("x=1.5 z=-3.0"), a table in one
+-- by its own fields' names after its own (at.forward=1.5: KLOG_DEPTH deep, then "{...}"), each value
+-- cut short past KLOG_VALUE.
+local KLOG_DEPTH = 1 -- how deep a table in an event is spelled out by its fields (at.forward=1.5)
+local function describe(value, prefix, depth)
   if type(value) ~= "table" then
     local text = tostring(value)
     return #text > KLOG_VALUE and text:sub(1, KLOG_VALUE) .. "..." or text
@@ -162,7 +164,14 @@ local function describe(value)
   table.sort(keys)
   for _, key in ipairs(keys) do
     local v = value[key] ~= nil and value[key] or value[tonumber(key)]
-    parts[#parts + 1] = key .. "=" .. (type(v) == "table" and "{...}" or describe(v))
+    local name = (prefix or "") .. key
+    if type(v) ~= "table" then
+      parts[#parts + 1] = name .. "=" .. describe(v)
+    elseif (depth or 0) < KLOG_DEPTH and next(v) ~= nil then
+      parts[#parts + 1] = describe(v, name .. ".", (depth or 0) + 1)
+    else
+      parts[#parts + 1] = name .. "={...}"
+    end
   end
   return table.concat(parts, " ")
 end

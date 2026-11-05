@@ -64,15 +64,16 @@ once.
 
 <!-- lua-fragment -->
 ```lua
-local event = sys.ioctl(fd, "pull")  -- {mob = "minecraft:pig", forward = 1.5, right = -3.0, up = 0.0}
+local event = sys.ioctl(fd, "pull")  -- {event = "motion", name = "minecraft:pig", at = {forward = 1.5, right = -3.0, up = 0.0}}
 ```
 
 ## Events
 
 | Field | Value |
 |---|---|
-| `mob` | the entity's type, such as `minecraft:pig` |
-| `forward`, `right`, `up` | where it is from its computer's middle, in its frame, in blocks, to one decimal place (floats) |
+| `event` | `"motion"` |
+| `name` | the entity's type, such as `minecraft:pig` |
+| `at` | `{forward, right, up}`: where it is from its computer's middle, in its frame, in blocks, to one decimal place (floats) |
 | `lost` | present when events were dropped: how many |
 
 Each event raises the sensor's interrupt, which stays raised while any wait. The sensor keeps at most

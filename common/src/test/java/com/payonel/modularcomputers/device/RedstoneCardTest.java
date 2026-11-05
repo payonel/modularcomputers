@@ -94,7 +94,7 @@ class RedstoneCardTest {
 		card.sense(NORTH, 7);
 		@SuppressWarnings("unchecked")
 		Map<String, Object> event = (Map<String, Object>) card.pull(args()).first();
-		assertThat(event).isEqualTo(Map.of("name", "redstone", "side", "north", "level", 7L, "powered", 0L));
+		assertThat(event).isEqualTo(Map.of("event", "change", "face", "north", "level", 7L, "powered", 0L));
 	}
 
 	@Test
@@ -110,7 +110,7 @@ class RedstoneCardTest {
 		assertThat(sides(set.get("result")).get("north")).containsEntry("level", 5L).containsEntry("powered", 5L);
 		block[0] = 12; // another card in the block puts out 12 below
 		card.report();
-		assertThat(card.pull(args()).first()).as("another card's").isEqualTo(Map.of("name", "redstone", "side", "down", "level", 12L, "powered", 0L));
+		assertThat(card.pull(args()).first()).as("another card's").isEqualTo(Map.of("event", "change", "face", "down", "level", 12L, "powered", 0L));
 		card.sense(DOWN, 3); // weaker than what's there: no change
 		assertThat(card.pull(args()).first()).isNull();
 	}

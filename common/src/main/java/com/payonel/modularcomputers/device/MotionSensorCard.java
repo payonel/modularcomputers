@@ -29,12 +29,12 @@ public final class MotionSensorCard extends Card {
 		super(CardKind.MOTION_SENSOR);
 	}
 
-	/** A mob moved, seen in the world: {mob, forward, right, up}. */
+	/** A creature moved, seen in the world: {event = "motion", name, at}. */
 	public void sense(Map<String, Object> event) {
 		events.add(event);
 	}
 
-	@Method(doc = "pull(): the oldest motion, as {mob, forward, right, up} (its type, and where, in its computer's frame: forward out of its front, right, up; a robot's own), or nil")
+	@Method(doc = "pull(): the oldest motion, as {event = \"motion\", name, at} (name its type; at where, {forward, right, up}, in its computer's frame: forward out of its front, right, up; a robot's own), or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}

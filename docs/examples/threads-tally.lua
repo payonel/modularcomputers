@@ -31,7 +31,7 @@ end
 local function watch(sensor)
   local device = assert(devices.open(sensor))
   while true do
-    record(devices.event(device).mob)
+    record(devices.event(device).name)
   end
 end
 

@@ -2,7 +2,7 @@
 -- up face is set from the nearest motion the sensor saw since the last look (15 right at the block,
 -- fading to 0 at the sensor's range), and goes dark when nothing moved.
 --
--- It uses the sensor's method, pull, through its file's ioctls: each event is a table, its forward,
+-- It uses the sensor's method, pull, through its file's ioctls: each event is a table, its at holding its forward,
 -- right and up numbers, with no text to parse. The sensor keeps its events (32 at most) while the program
 -- sleeps, so a look takes all that came since the last.
 local sys = require("sys")
@@ -19,7 +19,7 @@ local function nearest()
   local best
   local event = sys.ioctl(sensor, "pull")
   while event do
-    local d = math.sqrt(event.forward ^ 2 + event.right ^ 2 + event.up ^ 2)
+    local d = math.sqrt(event.at.forward ^ 2 + event.at.right ^ 2 + event.at.up ^ 2)
     if not best or d < best then
       best = d
     end

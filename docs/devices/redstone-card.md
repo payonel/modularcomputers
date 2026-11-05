@@ -126,7 +126,7 @@ The oldest event waiting (see Events), or nil when none waits. Each is taken onc
 
 <!-- lua-fragment -->
 ```lua
-local event = sys.ioctl(fd, "pull")  -- {name = "redstone", side = "west", level = 9, powered = 0}
+local event = sys.ioctl(fd, "pull")  -- {event = "change", face = "west", level = 9, powered = 0}
 ```
 
 ## Events
@@ -137,8 +137,8 @@ it is now:
 
 | Field | Value |
 |---|---|
-| `name` | `"redstone"` |
-| `side` | the face, by world name |
+| `event` | `"change"` |
+| `face` | the face, by world name |
 | `level` | the signal there, 0 to 15 |
 | `powered` | this card's output there |
 

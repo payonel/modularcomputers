@@ -30,7 +30,7 @@ At your OS's prompt:
 ```
 # methods redstone
 get([sides]): every face as {level ..., powered ...} by name ...
-pull(): the oldest change to a face, from wherever it came, as {name, side, level, powered} ...
+pull(): the oldest change to a face, from wherever it came, as {event = "change", face, level, powered} ...
 set(sides): sets each face named: powered, the signal it puts out (0 to 15) ...
 # call redstone set {north = {powered = 15}}
 {down = {level = 0, powered = 0}, east = ..., north = {level = 15, powered = 15}, ...}
@@ -39,7 +39,7 @@ set(sides): sets each face named: powered, the signal it puts out (0 to 15) ...
 # wait 1
 exp:0
 # call redstone pull
-{level = 15, name = "redstone", powered = 15, side = "north"}
+{event = "change", face = "north", level = 15, powered = 15}
 # run /blink.lua 3
 blink 1
 blink 2

@@ -65,15 +65,16 @@ taken once.
 
 <!-- lua-fragment -->
 ```lua
-local event = sys.ioctl(fd, "pull")  -- {sound = "minecraft:entity.pig.ambient", forward = 1.5, right = -3.0, up = 0.0}
+local event = sys.ioctl(fd, "pull")  -- {event = "sound", name = "minecraft:entity.pig.ambient", at = {forward = 1.5, right = -3.0, up = 0.0}}
 ```
 
 ## Events
 
 | Field | Value |
 |---|---|
-| `sound` | the sound's id |
-| `forward`, `right`, `up` | where it came from, from its computer's middle, in its frame, in blocks, to one decimal place |
+| `event` | `"sound"` |
+| `name` | the sound's id |
+| `at` | `{forward, right, up}`: where it came from, from its computer's middle, in its frame, in blocks, to one decimal place |
 | `lost` | present when events were dropped: how many |
 
 Each sound heard raises the sensor's interrupt, which stays raised while any wait. At most 32 wait. When more come, the oldest goes and the next event carries `lost`. Events are kept

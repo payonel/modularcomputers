@@ -33,6 +33,11 @@ import net.minecraft.world.level.block.state.BlockState;
  * tick.
  */
 public final class CardWorld {
+	/** A motion sensor's event: a creature moved, {event = "motion", name, at}. */
+	public static final String MOTION = "motion";
+	/** An audio sensor's event: a sound heard, {event = "sound", name, at}. */
+	public static final String SOUND = "sound";
+
 	/** How often a motion sensor looks for entities that moved, in ticks. */
 	private static final int MOTION_TICKS = 5;
 	/** How far a mob must move to count. */
@@ -211,8 +216,9 @@ public final class CardWorld {
 				continue;
 			}
 			Map<String, Object> event = new LinkedHashMap<>();
-			event.put("mob", BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString());
-			event.putAll(watch.frame.local(new net.minecraft.world.phys.Vec3(at[0], at[1], at[2])));
+			event.put("event", MOTION);
+			event.put("name", BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString());
+			event.put("at", watch.frame.local(new net.minecraft.world.phys.Vec3(at[0], at[1], at[2])));
 			motion.sense(event);
 		}
 		watch.entities.clear();
@@ -238,8 +244,9 @@ public final class CardWorld {
 				continue;
 			}
 			Map<String, Object> event = new LinkedHashMap<>();
-			event.put("sound", sound.location().toString());
-			event.putAll(watch.frame.local(new net.minecraft.world.phys.Vec3(x, y, z)));
+			event.put("event", SOUND);
+			event.put("name", sound.location().toString());
+			event.put("at", watch.frame.local(new net.minecraft.world.phys.Vec3(x, y, z)));
 			entry.getKey().hear(event);
 		}
 	}

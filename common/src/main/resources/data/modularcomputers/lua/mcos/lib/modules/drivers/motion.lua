@@ -4,6 +4,6 @@
 -- (as an input device's SYN_DROPPED).
 return {
   get = function(event)
-    return (event.lost and "lost " .. event.lost .. "\n" or "") .. event.mob .. " " .. event.forward .. " " .. event.right .. " " .. event.up .. "\n"
+    return (event.lost and "lost " .. event.lost .. "\n" or "") .. event.name .. " " .. event.at.forward .. " " .. event.at.right .. " " .. event.at.up .. "\n"
   end,
 }

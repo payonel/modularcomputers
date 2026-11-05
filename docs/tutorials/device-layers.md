@@ -58,7 +58,7 @@ Your OS is the only code running, so it does everything a driver would.
 2. **Sleep until it has news.** `board.waitForInterrupt(nil, card)` stops the computer, drawing only
    its waiting power, until the card's interrupt goes up: a face changed. `nil` is no time limit.
 3. **Take everything it has.** `board.invoke(card, "pull")` answers `true` and the card's oldest
-   change, `{side, level, powered}`, or `true, nil` when it has none left. Device methods never
+   change, `{event = "change", face, level, powered}`, or `true, nil` when it has none left. Device methods never
    wait, so the inner loop takes changes until `nil`: then the card's interrupt is down, and the next
    wait sleeps. (Interrupts are level-triggered: a change that comes while the OS is busy keeps the
    line up, so the next wait returns at once. Nothing is lost.)

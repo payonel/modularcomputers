@@ -32,7 +32,7 @@ while true do
   local pulses, lost = 0, 0
   for _, event in ipairs(changes()) do
     lost = lost + (event.lost or 0)
-    if event.side == FACE then
+    if event.face == FACE then
       if event.level > 0 and was == 0 then
         pulses = pulses + 1 -- off to on: a pulse
       end

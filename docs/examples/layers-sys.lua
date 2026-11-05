@@ -17,7 +17,7 @@ while true do
   sys.poll({[fd] = {PRI = true}}) -- sleeps until the card has news
   local change = sys.ioctl(fd, "pull") -- its oldest change, or nil
   while change do
-    if change.side == LEVER then
+    if change.face == LEVER then
       local on = change.level > 0
       sys.ioctl(fd, "set", {[LAMP] = {powered = on and ON or 0}})
       print("lever " .. (on and "on" or "off"))

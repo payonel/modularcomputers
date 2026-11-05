@@ -14,7 +14,7 @@ print("watching the lever")
 io.stdout:flush()
 while true do
   local change = devices.event(card) -- its next change, waiting for one
-  if change.side == LEVER then
+  if change.face == LEVER then
     local on = change.level > 0
     card.set({[LAMP] = {powered = on and ON or 0}})
     print("lever " .. (on and "on" or "off"))

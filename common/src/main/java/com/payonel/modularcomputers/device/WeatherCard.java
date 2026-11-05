@@ -17,6 +17,8 @@ public final class WeatherCard extends Card {
 	private final com.payonel.modularcomputers.bus.BusPower power = new com.payonel.modularcomputers.bus.BusPower(0);
 	private final EventQueue events = new EventQueue(line, this::changed, this::isAccepting);
 	private String weather;
+	/** Its event: the weather changed, {event = "change", old, new}. */
+	public static final String CHANGE = "change";
 
 	public WeatherCard() {
 		super(CardKind.WEATHER_SENSOR);
@@ -26,7 +28,7 @@ public final class WeatherCard extends Card {
 	public void sense(String now) {
 		if (weather != null && !weather.equals(now)) {
 			Map<String, Object> event = new LinkedHashMap<>();
-			event.put("name", "weather");
+			event.put("event", CHANGE); // (its state changed: no method caused it)
 			event.put("old", weather);
 			event.put("new", now);
 			events.add(event);
@@ -43,7 +45,7 @@ public final class WeatherCard extends Card {
 		return Result.ok(weather == null ? "clear" : weather);
 	}
 
-	@Method(doc = "pull(): the oldest change, as {name, old, new}, or nil")
+	@Method(doc = "pull(): the oldest change, as {event = \"change\", old, new}, or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}

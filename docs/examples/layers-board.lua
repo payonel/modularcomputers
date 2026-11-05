@@ -35,11 +35,11 @@ write("watching the lever\n")
 while true do
   board.waitForInterrupt(nil, card) -- sleeps until the card has news (its interrupt)
   while true do
-    local ok, change = board.invoke(card, "pull") -- its oldest: a face's change {side, level, powered}, a set's end, or nil
+    local ok, change = board.invoke(card, "pull") -- its oldest: a face's change {event = "change", face, level, powered}, a set's end, or nil
     if not ok or not change then
       break -- (all taken: its interrupt is down, and the next wait sleeps)
     end
-    if change.side == LEVER then -- (its own changes come as its set's end, not a face's news)
+    if change.face == LEVER then -- (its own changes come as its set's end, not a face's news)
       local on = change.level > 0
       want = on and ON or 0
       write("lever " .. (on and "on" or "off") .. "\n")

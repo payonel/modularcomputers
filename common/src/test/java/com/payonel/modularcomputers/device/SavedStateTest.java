@@ -70,7 +70,7 @@ class SavedStateTest {
 		RedstoneCard loaded = new RedstoneCard();
 		loaded.restore(card.saved());
 		loaded.accepting(true);
-		assertThat(loaded.pull(args()).first()).as("the world's change, kept").isEqualTo(Map.of("name", "redstone", "side", "down", "level", 9L, "powered", 0L));
+		assertThat(loaded.pull(args()).first()).as("the world's change, kept").isEqualTo(Map.of("event", "change", "face", "down", "level", 9L, "powered", 0L));
 		assertThat(loaded.refusal("set")).as("its set, saved before its tick: still waiting").isEqualTo("busy");
 		loaded.tick();
 		assertThat(loaded.output(0)).as("and applied after the load").isEqualTo(7);
@@ -113,7 +113,7 @@ class SavedStateTest {
 		loaded.restore(card.saved());
 		loaded.accepting(false); // (it joins: "what it had before isn't this program's", but it is)
 		loaded.accepting(true);
-		assertThat(loaded.pull(args()).first()).as("its event, kept").isEqualTo(Map.of("name", "redstone", "side", "down", "level", 9L, "powered", 0L));
+		assertThat(loaded.pull(args()).first()).as("its event, kept").isEqualTo(Map.of("event", "change", "face", "down", "level", 9L, "powered", 0L));
 		loaded.tick();
 		assertThat(loaded.output(0)).as("its set, kept and applied").isEqualTo(7);
 		loaded.sense(5, 3);
@@ -170,11 +170,11 @@ class SavedStateTest {
 	void aMotionSensorKeepsItsEvents() {
 		MotionSensorCard card = new MotionSensorCard();
 		card.accepting(true); // on a running board\'s bus
-		card.sense(Map.of("mob", "minecraft:pig", "forward", 1.0, "right", -2.0, "up", 0.0));
+		card.sense(Map.of("event", "motion", "name", "minecraft:pig", "at", Map.of("forward", 1.0, "right", -2.0, "up", 0.0)));
 		MotionSensorCard loaded = new MotionSensorCard();
 		loaded.restore(card.saved());
 		assertThat(loaded.interruptPending()).isTrue();
-		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("mob", "minecraft:pig", "forward", 1.0, "right", -2.0, "up", 0.0));
+		assertThat(loaded.pull(args()).first()).isEqualTo(Map.of("event", "motion", "name", "minecraft:pig", "at", Map.of("forward", 1.0, "right", -2.0, "up", 0.0)));
 	}
 
 	@Test

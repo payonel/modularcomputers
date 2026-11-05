@@ -3,7 +3,7 @@
 -- computer's own), and darkens the others. Put lamps on the block's faces and they show where the
 -- noise is, however the computer is turned.
 --
--- It uses the sensor's method, pull, through its file's ioctls (each sound a table: how far forward,
+-- It uses the sensor's method, pull, through its file's ioctls (each sound a table, its at: how far forward,
 -- right and up it was from the computer, its front's way), and the redstone card's set, every face
 -- in one call (faces named from its front, as the sensor's numbers are).
 local sys = require("sys")
@@ -33,7 +33,7 @@ while true do
     sound = sys.ioctl(sensor, "pull")
   end
   if last then
-    local face = toward(last.forward, last.right, last.up)
+    local face = toward(last.at.forward, last.at.right, last.at.up)
     if face ~= lit then
       local faces = {}
       for _, name in ipairs({"front", "back", "left", "right", "up", "down"}) do

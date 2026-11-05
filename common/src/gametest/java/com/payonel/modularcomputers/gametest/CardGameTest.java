@@ -105,10 +105,10 @@ public class CardGameTest {
 				while ((event = card.pull(args()).first()) != null) {
 					events.add((Map<?, ?>) event);
 				}
-				helper.assertTrue(events.stream().anyMatch(e -> "west".equals(e.get("side")) && Long.valueOf(15).equals(e.get("level"))), "the change, as an event: " + events);
+				helper.assertTrue(events.stream().anyMatch(e -> "west".equals(e.get("face")) && Long.valueOf(15).equals(e.get("level"))), "the change, as an event: " + events);
 				helper.assertTrue(events.stream().anyMatch(e -> "set".equals(e.get("event")) && e.get("result") instanceof Map<?, ?> faces
 					&& faces.get("east") instanceof Map<?, ?> east && Long.valueOf(15).equals(east.get("powered"))), "its own change: its set's end: " + events);
-				helper.assertTrue(events.stream().noneMatch(e -> "east".equals(e.get("side"))), "and no face's event for it: " + events);
+				helper.assertTrue(events.stream().noneMatch(e -> "east".equals(e.get("face"))), "and no face's event for it: " + events);
 				card.set(args(Map.of("east", Map.of("powered", 0L))));
 			})
 			.thenWaitUntil(() -> helper.assertBlockProperty(POS.east(), RedstoneLampBlock.LIT, false))
@@ -140,7 +140,7 @@ public class CardGameTest {
 				while ((event = loaded.pull(args()).first()) != null) {
 					events.add((Map<?, ?>) event);
 				}
-				helper.assertTrue(events.stream().anyMatch(e -> "west".equals(e.get("side")) && Long.valueOf(15).equals(e.get("level"))),
+				helper.assertTrue(events.stream().anyMatch(e -> "west".equals(e.get("face")) && Long.valueOf(15).equals(e.get("level"))),
 					"the events that waited: " + events);
 			})
 			.thenSucceed();
@@ -239,11 +239,11 @@ public class CardGameTest {
 				helper.assertTrue(!seen.isEmpty(), "saw something");
 			})
 			.thenExecute(() -> {
-				helper.assertTrue(seen.stream().allMatch(e -> "minecraft:pig".equals(e.get("mob"))), "mobs only: " + seen);
+				helper.assertTrue(seen.stream().allMatch(e -> "minecraft:pig".equals(e.get("name"))), "mobs only: " + seen);
 				Map<?, ?> first = seen.getFirst();
-				helper.assertValueEqual(first.keySet(), java.util.Set.of("mob", "forward", "right", "up"), "which mob, and where");
-				same(helper, first.get("forward"), -3.0, "three blocks north of it: behind (its front is south)");
-				same(helper, first.get("right"), 0.0, "straight behind");
+				helper.assertValueEqual(first.keySet(), java.util.Set.of("event", "name", "at"), "which mob, and where");
+				same(helper, ((Map<?, ?>) first.get("at")).get("forward"), -3.0, "three blocks north of it: behind (its front is south)");
+				same(helper, ((Map<?, ?>) first.get("at")).get("right"), 0.0, "straight behind");
 			})
 			.thenSucceed();
 	}
@@ -271,8 +271,8 @@ public class CardGameTest {
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertTrue(!seen.isEmpty(), "saw it"))
 			.thenExecute(() -> {
-				same(helper, seen.getLast().get("forward"), 3.0, "three blocks ahead (east, its heading)");
-				same(helper, seen.getLast().get("right"), 0.0, "straight ahead");
+				same(helper, ((Map<?, ?>) seen.getLast().get("at")).get("forward"), 3.0, "three blocks ahead (east, its heading)");
+				same(helper, ((Map<?, ?>) seen.getLast().get("at")).get("right"), 0.0, "straight ahead");
 				helper.assertTrue(!golem.robotics().turn(args("left")).failed(), "it turns left: north");
 			})
 			.thenWaitUntil(() -> helper.assertTrue(Math.abs(net.minecraft.util.Mth.wrapDegrees(golem.getYRot() - 180)) < 1, "facing north: " + golem.getYRot()))
@@ -282,8 +282,8 @@ public class CardGameTest {
 			})
 			.thenWaitUntil(() -> helper.assertTrue(!seen.isEmpty(), "saw it move"))
 			.thenExecute(() -> {
-				same(helper, seen.getLast().get("forward"), 0.0, "beside it now");
-				same(helper, seen.getLast().get("right"), 3.5, "on its own right (east, facing north)");
+				same(helper, ((Map<?, ?>) seen.getLast().get("at")).get("forward"), 0.0, "beside it now");
+				same(helper, ((Map<?, ?>) seen.getLast().get("at")).get("right"), 3.5, "on its own right (east, facing north)");
 			})
 			.thenSucceed();
 	}
@@ -319,7 +319,7 @@ public class CardGameTest {
 				Map<?, ?> end = events.stream().filter(e -> "set".equals(e.get("event"))).findFirst().orElseThrow();
 				Map<?, ?> north = (Map<?, ?>) ((Map<?, ?>) end.get("result")).get("north");
 				same(helper, north.get("level"), 0L, "its end says the face as it is then: the dust's dark too");
-				helper.assertTrue(events.stream().noneMatch(e -> "north".equals(e.get("side"))), "no news for its own change: " + events);
+				helper.assertTrue(events.stream().noneMatch(e -> "north".equals(e.get("face"))), "no news for its own change: " + events);
 			})
 			.thenSucceed();
 	}
@@ -342,7 +342,7 @@ public class CardGameTest {
 		helper.startSequence()
 			.thenExecuteAfter(5, () -> walked[0] = !golem.robotics().walk(args(2L)).failed())
 			.thenWaitUntil(() -> helper.assertTrue(walked[0] && !golem.robotics().busy(), "walked"))
-			.thenExecuteAfter(10, () -> helper.assertTrue(seen.stream().noneMatch(e -> itself.equals(e.get("mob"))), "never itself: " + seen))
+			.thenExecuteAfter(10, () -> helper.assertTrue(seen.stream().noneMatch(e -> itself.equals(e.get("name"))), "never itself: " + seen))
 			.thenSucceed();
 	}
 
@@ -365,17 +365,17 @@ public class CardGameTest {
 				Object event;
 				while ((event = card.pull(args()).first()) != null) {
 					// (only what this test played, north of it: tests run side by side, and it hears its neighbours' too)
-					if (((Map<?, ?>) event).get("right") instanceof Number right && right.doubleValue() == 0) {
+					if (((Map<?, ?>) ((Map<?, ?>) event).get("at")).get("right") instanceof Number right && right.doubleValue() == 0) {
 						heard.add((Map<?, ?>) event);
 					}
 				}
 				helper.assertValueEqual(heard.size(), 2, "the two near sounds: " + heard);
 			})
 			.thenExecute(() -> {
-				helper.assertValueEqual(heard.getFirst().get("sound"), "minecraft:entity.piglin.ambient", "the sound the game played, by its id");
-				helper.assertValueEqual(heard.getFirst().keySet(), java.util.Set.of("sound", "forward", "right", "up"), "and where: nothing else");
-				same(helper, heard.getFirst().get("forward"), -3.0, "three blocks north of it: behind (its front is south)");
-				helper.assertValueEqual(heard.get(1).get("sound"), "minecraft:block.dispenser.dispense", "a level event's sound");
+				helper.assertValueEqual(heard.getFirst().get("name"), "minecraft:entity.piglin.ambient", "the sound the game played, by its id");
+				helper.assertValueEqual(heard.getFirst().keySet(), java.util.Set.of("event", "name", "at"), "and where: nothing else");
+				same(helper, ((Map<?, ?>) heard.getFirst().get("at")).get("forward"), -3.0, "three blocks north of it: behind (its front is south)");
+				helper.assertValueEqual(heard.get(1).get("name"), "minecraft:block.dispenser.dispense", "a level event's sound");
 			})
 			.thenSucceed();
 	}
@@ -400,7 +400,7 @@ public class CardGameTest {
 				}
 				helper.assertValueEqual(card.getDelay(args()).first(), 0L, "played out, by game time");
 			})
-			.thenExecute(() -> helper.assertTrue(heard.stream().anyMatch(event -> "modularcomputers:sound_card".equals(event.get("sound"))),
+			.thenExecute(() -> helper.assertTrue(heard.stream().anyMatch(event -> "modularcomputers:sound_card".equals(event.get("name"))),
 				"the sensor heard it start: " + heard))
 			.thenSucceed();
 	}
@@ -421,7 +421,7 @@ public class CardGameTest {
 				while ((event = sensor.pull(args()).first()) != null) {
 					heard.add((Map<?, ?>) event);
 				}
-				helper.assertValueEqual(heard.stream().filter(sound -> "modularcomputers:bell".equals(sound.get("sound"))).count(), 2L,
+				helper.assertValueEqual(heard.stream().filter(sound -> "modularcomputers:bell".equals(sound.get("name"))).count(), 2L,
 					"\\a\\a\\a rings once, a \\a later again: " + heard);
 			})
 			.thenSucceed();
@@ -471,7 +471,7 @@ public class CardGameTest {
 				while ((event = card.pull(args()).first()) != null) {
 					seen.add((Map<?, ?>) event);
 				}
-				helper.assertTrue(seen.stream().anyMatch(e -> "minecraft:player".equals(e.get("mob"))), "saw the player: " + seen);
+				helper.assertTrue(seen.stream().anyMatch(e -> "minecraft:player".equals(e.get("name"))), "saw the player: " + seen);
 			})
 			.thenSucceed();
 	}

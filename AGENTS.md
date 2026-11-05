@@ -309,11 +309,13 @@ device data), and user code, as a real CPU runs firmware under an OS.
   over subtitles: a skeleton's step is `entity.skeleton.step`, and the stone under it is silent). It hears every sound the server sends players
   (`ServerLevelSounds`, a mixin on `playSeededSound`) and the sounds players make of level events
   (`LevelSounds`, the client's table, kept by hand; a block broken plays its own break sound).
-- **Sensors say where in their computer's frame** (the user's, 2026-10-27): `forward, right, up`
-  from its middle, as the field card's positions (`FieldProjector.Frame`: a block's front and right
+- **Sensors say where in their computer's frame** (the user's, 2026-10-27): `at = {forward, right,
+  up}` from its middle, as the field card's positions (`FieldProjector.Frame`: a block's front and right
   as `Face` names them, a robot's heading and its own right), never the world's axes, so a program
   works however its computer is turned, a robot's as it turns. `CardWorld.tick` takes each holder's
-  frame.
+  frame. **Every event says its kind in `event`** (the user's, 2026-11-05): a method's name for a
+  command's end, `notice` for a robot's news, and a sensor's or card's own news its own word
+  (`motion`, `sound`, `change`); a thing's `name` is its registry id (a creature's type, a sound's id).
 - **A Bluetooth card in a computer is a device:** its link (the board it links to) and its board
   are read and set by programs as by hand, on the card itself (its item).
 

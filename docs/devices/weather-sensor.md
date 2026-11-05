@@ -67,7 +67,7 @@ once.
 
 | Field | Value |
 |---|---|
-| `name` | `"weather"` |
+| `event` | `"change"` |
 | `old` | the weather before |
 | `new` | the weather now |
 | `lost` | present when events were dropped: how many |

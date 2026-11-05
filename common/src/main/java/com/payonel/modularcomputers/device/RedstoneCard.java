@@ -19,7 +19,7 @@ import java.util.function.IntUnaryOperator;
  * signal on any face of the block it's in (a computer, a hub), 0 to 15, and reads what's on each
  * face. A block may hold several: it puts out the strongest of theirs on each face. Any change to a
  * face's state, from wherever it came (a signal coming in, its own set, another card in the block),
- * is an event (its interrupt): {name = "redstone", side, level, powered}, the face as it is now
+ * is an event (its interrupt): {event = "change", face, level, powered}, the face as it is now
  * (user, 2026-10-21: a device reports every change to its state).
  * <p>
  * Programs see the faces as a table, by name: {@code {north = {level = 7, powered = 7}, ...}}.
@@ -106,8 +106,8 @@ public final class RedstoneCard extends Card implements Buffered {
 				reported[side][0] = level;
 				reported[side][1] = output[side];
 				Map<String, Object> event = new LinkedHashMap<>();
-				event.put("name", "redstone");
-				event.put("side", SIDES.get(side).id());
+				event.put("event", WeatherCard.CHANGE); // (its state changed: no method caused it)
+				event.put("face", SIDES.get(side).id());
 				event.put("level", (long) level);
 				event.put("powered", (long) output[side]);
 				changed();
@@ -200,7 +200,7 @@ public final class RedstoneCard extends Card implements Buffered {
 		events.ended("set", sides(allSides()));
 	}
 
-	@Method(doc = "pull(): its oldest event, or nil: a face the world changed, {name, side, level, powered} (the face as it is now), or a command's end, {event, ok, why, result}")
+	@Method(doc = "pull(): its oldest event, or nil: a face the world changed, {event = \"change\", face, level, powered} (the face as it is now), or a command's end, {event, ok, why, result}")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}

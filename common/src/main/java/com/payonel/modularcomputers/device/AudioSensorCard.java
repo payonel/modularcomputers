@@ -27,12 +27,12 @@ public final class AudioSensorCard extends Card {
 		super(CardKind.AUDIO_SENSOR);
 	}
 
-	/** A sound it heard, in the world: {sound, forward, right, up}. */
+	/** A sound it heard, in the world: {event = "sound", name, at}. */
 	public void hear(Map<String, Object> event) {
 		events.add(event);
 	}
 
-	@Method(doc = "pull(): the oldest sound it heard, as {sound, forward, right, up} (its id: \"minecraft:entity.pig.ambient\"; and where, in its computer's frame: forward out of its front, right, up; a robot's own), or nil")
+	@Method(doc = "pull(): the oldest sound it heard, as {event = \"sound\", name, at} (name its id: \"minecraft:entity.pig.ambient\"; at where, {forward, right, up}, in its computer's frame: forward out of its front, right, up; a robot's own), or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
