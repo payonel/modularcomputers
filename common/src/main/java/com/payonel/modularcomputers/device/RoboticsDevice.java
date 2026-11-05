@@ -408,6 +408,8 @@ public final class RoboticsDevice implements Device, Buffered {
 	/** Its body's words for no body at all (no golem: a test's) and no position to move from. */
 	public static final String NO_BODY = "no body";
 	public static final String NO_POSITION = "no position";
+	/** What a use came to when the game did nothing with it (a click on stone): no failure, the click given (the user's). */
+	public static final String NOTHING = "nothing";
 	/** Its body's word for a landing on its legs already: done (no failure, the user's). */
 	public static final String ON_LEGS = "on legs";
 
@@ -677,7 +679,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return body.swap();
 	}
 
-	@Method(doc = "use(face): uses what it holds on the space at a face, as a player's right click: places a block, opens a door, presses a button, uses a tool or a bucket; what it did (\"placed\", \"used\"), or false and why")
+	@Method(doc = "use(face): uses what it holds on the space at a face, as a player's right click: places a block, opens a door, presses a button, uses a tool or a bucket; what it did (\"placed\", \"used\", \"nothing\": the game did nothing with it), or false and why")
 	public Result use(Arguments args) {
 		String face = face(args, 0);
 		Result result = body.use(face);

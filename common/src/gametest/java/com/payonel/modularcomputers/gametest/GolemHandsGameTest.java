@@ -141,6 +141,15 @@ public class GolemHandsGameTest {
 		});
 	}
 
+	/** A click the game does nothing with (an empty hand on stone) is no failure: its answer says nothing came of it. */
+	@GameTest(maxTicks = 200)
+	public void aUseTheGameDoesNothingWithAnswersNothing(GameTestHelper helper) {
+		helper.setBlock(FRONT, Blocks.STONE);
+		List<Object> answers = new ArrayList<>();
+		start(helper, answers, call("use", "front"));
+		helper.succeedWhen(() -> same(helper, copy(answers).stream().findFirst().orElse(null), com.payonel.modularcomputers.device.RoboticsDevice.NOTHING, "its answer"));
+	}
+
 	@GameTest(maxTicks = 200)
 	public void itBreaksALogWithAnAxeAndCatchesItInItsOffHandWithNoStorage(GameTestHelper helper) {
 		helper.setBlock(FRONT, Blocks.OAK_LOG);

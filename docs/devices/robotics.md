@@ -288,7 +288,8 @@ Uses what it holds on the space at a face, as a player's right click. A mob ther
 (shears on a sheep); then a block there is clicked on its face toward the robot (a door, a button,
 a lever, a log stripped with an axe); an empty space gets what it holds placed into it, against a
 neighbouring block, or with nothing to place against, what it holds is used the way it looks (a
-bucket into water). Answers `"placed"` or `"used"`; fails with `nothing happened`, or
+bucket into water). Answers `"placed"` or `"used"`, or `"nothing"` when the game does nothing with it (an empty hand on
+stone, as a player's click does nothing); fails with
 `{why = "not_found", kind = "block", value = the face}` (nothing there, or nothing to place against).
 
 ### swing(face) → what, or nil and why

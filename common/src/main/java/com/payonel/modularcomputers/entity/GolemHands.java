@@ -282,7 +282,7 @@ final class GolemHands {
 				// Something there: clicked on its face toward it (a door opened, a button pressed, a log stripped).
 				BlockHitResult hit = new BlockHitResult(faceCenter(pos, toward.getOpposite()), toward.getOpposite(), pos, false);
 				InteractionResult result = player.gameMode.useItemOn(player, level(), held, InteractionHand.MAIN_HAND, hit);
-				return result.consumesAction() ? Result.ok("used") : Result.fail("nothing happened");
+				return Result.ok(result.consumesAction() ? "used" : com.payonel.modularcomputers.device.RoboticsDevice.NOTHING); // (a click the game does nothing with is no failure, as a player's on stone)
 			}
 			if (!held.isEmpty()) {
 				// An empty space (or one a block replaces: grass, water): placed into it, against a neighbour, as a player places.

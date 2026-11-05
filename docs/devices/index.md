@@ -122,8 +122,8 @@ decides by the why and the other fields (`condition`, `part`, `reason`), and sho
 fault never carries the server's own error: an `io_error` and an `internal_error` say only
 `i/o error` and `internal error`, and the details go to the server's log.
 
-A few aren't named yet and keep their old message as their why (a field's capture out of its
-reach, `target capture too far`). This
+A disk's path that meets a symbolic link answers in its own way for now (see the
+[disk](/devices/disk/)). This
 manual writes a method's results as the values after the leading `true`, and its failures by their
 why.
 

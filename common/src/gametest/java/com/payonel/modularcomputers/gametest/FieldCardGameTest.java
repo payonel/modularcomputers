@@ -294,7 +294,7 @@ public class FieldCardGameTest {
 			.thenExecuteAfter(2, () -> {
 				same(helper, card.capture(args(0.0, 0.0, 4.0)).failure().table(),
 					java.util.Map.of("why", "not_found", "kind", "entity", "value", java.util.Map.of("forward", 0.0, "right", 0.0, "up", 4.0)), "a point with nothing near it");
-				same(helper, card.capture(args(30.0)).error(), "target capture too far", "a point past its reach: it senses no farther"); // (whatever's there: a neighbour's)
+				same(helper, card.capture(args(30.0)).failure().table(), java.util.Map.of("why", "limit", "of", "reach", "max", 16L), "a point past its reach: it senses no farther"); // (whatever's there: a neighbour's)
 				card.capture(args(pig.getStringUUID()));
 				Object pigAt = pig.position();
 				same(helper, card.move(args(0.0, 0.0, FieldCard.RANGE + 1)).first(), true, "a move out of its reach: a command, its end says");

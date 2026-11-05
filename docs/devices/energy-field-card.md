@@ -101,7 +101,7 @@ Holds a creature or an item: an `id` from `scan`, `"self"` (a robot holding itse
 Fails with `{why = "bad_state", of = "hold", value, expected = "empty"}` (it holds something
 already, `value` its id), `{why = "not_found", kind = "entity", value}`
 (nothing near the point, `value` the point; or no such creature, `value` its id), `bad_argument`
-(`expected = "id"`: not an id), `target capture too far` (out of its reach: 16 blocks), `{why = "bad_state", of = "entity",
+(`expected = "id"`: not an id), `{why = "limit", of = "reach", max = 16}` (out of its reach: 16 blocks), `{why = "bad_state", of = "entity",
 value, expected = "free"}` (another field holds it, `value` its id), or in a block, `{why = "denied", reason = "not_a_robot", value = "self"}`.
 
 ### move(forward[, right[, up]]) → true, or nil and why
