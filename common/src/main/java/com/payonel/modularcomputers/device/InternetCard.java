@@ -65,8 +65,6 @@ public final class InternetCard extends Card {
 	private final java.util.concurrent.ConcurrentLinkedDeque<Map<String, Object>> log = new java.util.concurrent.ConcurrentLinkedDeque<>();
 	private final HttpExchange.Resolver resolver;
 	private long nextHandle = 1;
-	/** A log entry came that the program hasn't asked the card since (part of its interrupt). */
-	private volatile boolean unseen;
 	/** Something happened on a request's thread since the last tick: its interrupt, at the next. */
 	private final java.util.concurrent.atomic.AtomicBoolean news = new java.util.concurrent.atomic.AtomicBoolean();
 
@@ -206,8 +204,7 @@ public final class InternetCard extends Card {
 		while (log.size() > LOG) {
 			log.pollFirst();
 		}
-		unseen = true;
-		news.set(true); // (its interrupt: a reader of its log hears)
+		news.set(true); // (its interrupt: a reader of its log hears; pending till it's taken)
 	}
 
 	/** The request a handle names, its news now looked at; null: none (its caller's refusal: {@link #noSuchRequest}). */
@@ -216,8 +213,7 @@ public final class InternetCard extends Card {
 		if (request == null) {
 			return null;
 		}
-		request.fresh = false;
-		unseen = false; // (asked: its news is looked at)
+		request.fresh = false; // (asked: this request's news is looked at, and only its: a log entry is news till it's taken)
 		return request;
 	}
 
@@ -272,7 +268,6 @@ public final class InternetCard extends Card {
 
 	@Method(doc = "pull(): its access log's oldest entry, a request as it ended: {method, url, status, millis, bytes, failure (when it failed: {why, ...}, network or denied)}; or nil")
 	public Result pull(Arguments args) {
-		unseen = false;
 		return Result.ok(log.pollFirst());
 	}
 
@@ -295,9 +290,10 @@ public final class InternetCard extends Card {
 
 	@Override
 	public boolean interruptPending() {
-		// (a new log entry is pending until the program next asks the card anything: a reader of the log
-		// hears it whenever it came, and a program asking about its requests isn't woken by it again)
-		if (unseen) {
+		// (a log entry is pending until it's taken, its pull: a program's call about its own request
+		// answers for that request only, so a log reader hears every entry whenever it came; in mcos
+		// every file open on the card takes the log's entries, so they don't stay)
+		if (!log.isEmpty()) {
 			return true;
 		}
 		for (Request request : open.values()) {

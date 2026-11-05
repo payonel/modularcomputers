@@ -871,6 +871,10 @@ Lessons from mistakes, each with its test:
   raises once and doesn't hold pending is lost if nothing was waiting at that moment (an internet
   card's log entry after its request's end). A read that blocks has looked at nothing.
   (`theLogProgramKeepsEvery...`, `aProgramBlockedReading...`)
+- **A call answers for its own news only:** the internet card cleared its log entry's news at any
+  call on it, so curl reading its own body, between an entry and the kernel's look, left the entry
+  in the card with nothing pending, and the log reader never woke (CI failed now and then). A
+  device's news stays pending till what it's about is taken. (`aLogEntryStaysPendingTillItsTaken...`)
 - **"None" isn't "done":** a method that answers nothing gives `true` through an ioctl, so one whose
   answer means none says nil (`Result.ok((Object) null)`). (`aMethodWhoseAnswerIsNone...`)
 - **Never drain and refill a bounded queue another thread fills:** keep what's left of an item
