@@ -650,7 +650,9 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   it is (type, id, label, methods). **One door a command** (the user's, 2026-11-03): no device
   method stands for others (a `set` taking an action table, a `get` repeating another's answer),
   so an event's name is literally the method called, always; events no method caused have their
-  own names (robotics' `notice`). A disk's node
+  own names (robotics' `notice`), never a method's (the user's, 2026-11-06: a hard rule, kept by
+  convention, not code: an `event` naming a method means that method caused it; a network card's
+  frames are `send` and `broadcast` by the method that sent them, a frame that came `arrived`). A disk's node
   (`storage0`) is its bytes, as a block device's: read, written and sought by byte offset (its raw
   methods); an hfs disk's refuses (`EMEDIUMTYPE`, the user's call: Linux would let a mounted disk's
   bytes be read). A device with events and

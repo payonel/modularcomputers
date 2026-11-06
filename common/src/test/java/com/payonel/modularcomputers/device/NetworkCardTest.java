@@ -42,6 +42,46 @@ class NetworkCardTest {
 		return (Map<String, Object>) card.receive(args()).first();
 	}
 
+	/** A card's traffic log's newest entry (the rest taken and dropped). */
+	private static Object newest(NetworkCard card) {
+		Object last = null;
+		for (Object entry; (entry = card.pull(args()).first()) != null; ) {
+			last = entry;
+		}
+		return last;
+	}
+
+	/**
+	 * Its traffic log names each frame after what caused it (the user's): a send's and a broadcast's
+	 * after their methods, a frame that came its own news, arrived; how it went is ok, a refusal its
+	 * failure's own fields (send's answer), never a word in a string; a send that reached no card says
+	 * its distance as -1, its shape kept.
+	 */
+	@Test
+	void itsTrafficLogNamesEachFrameAfterWhatCausedItAndARefusalByItsFailure() {
+		NetworkCard a = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
+		NetworkCard b = card(CardKind.TIER2_WLAN, new BlockPos(3, 4, 0));
+		a.send(args(b.address(), "hello"));
+		assertThat(newest(a)).isEqualTo(Map.of("event", "send", "address", b.address(), "distance", 5.0, "bytes", 5L, "took", 1L, "ok", true));
+		assertThat(newest(b)).isEqualTo(Map.of("event", "arrived", "address", a.address(), "broadcast", false, "distance", 5.0, "bytes", 5L, "ok", true));
+		String nobody = UUID.randomUUID().toString();
+		a.send(args(nobody, "x"));
+		assertThat(newest(a)).isEqualTo(Map.of("event", "send", "address", nobody, "distance", -1.0, "bytes", 1L, "took", 0L, "ok", false,
+			"why", "network", "reason", "unreachable", "message", "no card in reach"));
+		a.broadcast(args("all"));
+		assertThat(newest(a)).isEqualTo(Map.of("event", "broadcast", "bytes", 3L, "took", 1L, "ok", true));
+		assertThat(newest(b)).isEqualTo(Map.of("event", "arrived", "address", a.address(), "broadcast", true, "distance", 5.0, "bytes", 3L, "ok", true));
+		while (a.send(args(b.address(), "more")).first() != null) { // (till its ring is full)
+		}
+		Map<String, Object> full = Map.of("why", "limit", "of", "frames", "max", (long) EventQueue.CAPACITY);
+		Map<String, Object> sent = new java.util.HashMap<>(Map.of("event", "send", "address", b.address(), "distance", 5.0, "bytes", 4L, "took", 0L, "ok", false));
+		sent.putAll(full);
+		assertThat(newest(a)).isEqualTo(sent);
+		Map<String, Object> came = new java.util.HashMap<>(Map.of("event", "arrived", "address", a.address(), "broadcast", false, "distance", 5.0, "bytes", 4L, "ok", false));
+		came.putAll(full);
+		assertThat(newest(b)).isEqualTo(came);
+	}
+
 	@Test
 	void aFrameGoesToTheCardAtItsAddressAcknowledgedAndABroadcastToEveryCardInRange() {
 		NetworkCard a = card(CardKind.TIER2_WLAN, BlockPos.ZERO);

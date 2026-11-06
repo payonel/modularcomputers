@@ -140,7 +140,7 @@ public final class NetworkCard extends Card {
 				frame.put("broadcast", true);
 			}
 			String refused = frames.offer(frame) ? null : FULL;
-			logged("in", from, distance, data.length(), refused == null ? (broadcast ? "broadcast" : "taken") : refused);
+			arrived(from, broadcast, distance, data.length(), refused);
 			return refused;
 		}
 		if (wakeMessage == null) {
@@ -157,7 +157,7 @@ public final class NetworkCard extends Card {
 		return Result.ok(address());
 	}
 
-	@Method(doc = "send(address, data): a frame to the card at that address (bytes, at most 8192); true when it took it, else false and why: {why = \"limit\", of = \"frames\", max} (its ring is full, or no program takes data there: try again), or {why = \"network\", reason = \"unreachable\", message = \"\"} (no card there in reach, or it's off). It never tries again itself")
+	@Method(doc = "send(address, data): a frame to the card at that address (bytes, at most 8192); true when it took it, else false and why: {why = \"limit\", of = \"frames\", max} (its ring is full, or no program takes data there: try again), or {why = \"network\", reason = \"unreachable\", message = \"no card in reach\"} (no card there in reach, or it's off). It never tries again itself")
 	public Result send(Arguments args) {
 		String to = args.checkString(0);
 		String data = checked(args.checkString(1));
@@ -165,27 +165,72 @@ public final class NetworkCard extends Card {
 		if (refused == null) {
 			return Result.ok(true);
 		}
-		return Result.fail(FULL.equals(refused) ? com.payonel.modularcomputers.runtime.Failure.limit("frames", EventQueue.CAPACITY) : com.payonel.modularcomputers.runtime.Failure.network(UNREACHABLE, null));
+		return Result.fail(failure(refused));
+	}
+
+	/** A frame's refusal (FULL, UNREACHABLE) as its failure: send's answer and its log's alike. */
+	static com.payonel.modularcomputers.runtime.Failure failure(String refused) {
+		return FULL.equals(refused) ? com.payonel.modularcomputers.runtime.Failure.limit("frames", EventQueue.CAPACITY) : com.payonel.modularcomputers.runtime.Failure.network(UNREACHABLE, null);
 	}
 
 	@Method(doc = "broadcast(data): a frame to every card it reaches (bytes, at most 8192), as best it can: how many took it")
 	public Result broadcast(Arguments args) {
 		String data = checked(args.checkString(0));
 		int took = Ether.broadcast(this, data);
-		logged("out", "broadcast", null, data.length(), took + " took it");
+		Map<String, Object> entry = new LinkedHashMap<>();
+		entry.put("event", "broadcast"); // (the method that caused it)
+		entry.put("bytes", (long) data.length());
+		entry.put("took", (long) took); // (best effort: ok, however many)
+		entry.put("ok", true);
+		logged(entry);
 		return Result.ok((long) took);
 	}
 
-	/** A frame in its traffic log: in or out, the other card (or broadcast), how far, its size, how it went. */
-	void logged(String direction, String address, Double distance, int bytes, String outcome) {
+	/** What a send's entry says of how far when no card was reached: none to measure (the shape keeps its field). */
+	public static final double NO_DISTANCE = -1;
+	/** Its traffic log's own news: a frame came (no method of its own caused it). */
+	public static final String ARRIVED = "arrived";
+
+	/**
+	 * A frame it sent to one card, in its traffic log, named after the method that caused it: {@code
+	 * {event = "send", address, distance, bytes, took, ok}}, refused with its failure's fields flat
+	 * (send's own answer); {@code distance} {@link #NO_DISTANCE} when no card was reached.
+	 */
+	void sent(String address, Double distance, int bytes, String refused) {
 		Map<String, Object> entry = new LinkedHashMap<>();
-		entry.put("direction", direction);
+		entry.put("event", "send");
 		entry.put("address", address);
-		if (distance != null) {
-			entry.put("distance", distance);
-		}
+		entry.put("distance", distance != null ? distance : NO_DISTANCE);
 		entry.put("bytes", (long) bytes);
-		entry.put("outcome", outcome);
+		entry.put("took", refused == null ? 1L : 0L);
+		outcome(entry, refused);
+		logged(entry);
+	}
+
+	/** A frame that came, its own news: {@code {event = "arrived", address, broadcast, distance, bytes, ok}}, refused with its failure's fields flat. */
+	private void arrived(String from, boolean broadcast, double distance, int bytes, String refused) {
+		Map<String, Object> entry = new LinkedHashMap<>();
+		entry.put("event", ARRIVED);
+		entry.put("address", from);
+		entry.put("broadcast", broadcast);
+		entry.put("distance", distance);
+		entry.put("bytes", (long) bytes);
+		outcome(entry, refused);
+		logged(entry);
+	}
+
+	/** How a frame went: ok, or not and why, its failure's own fields. */
+	private static void outcome(Map<String, Object> entry, String refused) {
+		entry.put("ok", refused == null);
+		if (refused != null) {
+			com.payonel.modularcomputers.runtime.Failure failed = failure(refused);
+			entry.put("why", failed.why());
+			entry.putAll(failed.fields());
+		}
+	}
+
+	/** An entry in its traffic log (its newest frames: the oldest go). */
+	private void logged(Map<String, Object> entry) {
 		traffic.addLast(entry);
 		while (traffic.size() > TRAFFIC) {
 			traffic.removeFirst();
@@ -193,7 +238,7 @@ public final class NetworkCard extends Card {
 		line.raise(); // (told once: its frames' interrupt isn't held up by a log nobody reads)
 	}
 
-	@Method(doc = "pull(): its traffic log's oldest frame: {direction (in, out), address, distance, bytes, outcome (taken, limit, unreachable, broadcast)}; or nil")
+	@Method(doc = "pull(): its traffic log's oldest frame: a send, {event = \"send\", address, distance (-1: no card reached), bytes, took (1 or 0), ok, and why and its fields when refused: limit or network}; a broadcast, {event = \"broadcast\", bytes, took (how many cards), ok}; or one that came, {event = \"arrived\", address, broadcast, distance, bytes, ok, and why and its fields when refused}; or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(traffic.pollFirst());
 	}

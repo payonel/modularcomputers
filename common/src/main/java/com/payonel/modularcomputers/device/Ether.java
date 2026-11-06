@@ -66,11 +66,11 @@ public final class Ether {
 		for (var entry : reached(from).entrySet()) {
 			if (to.equals(entry.getKey().address())) {
 				String refused = entry.getKey().hear(from.address(), data, entry.getValue(), false);
-				from.logged("out", to, entry.getValue(), data.length(), refused == null ? "taken" : refused);
+				from.sent(to, entry.getValue(), data.length(), refused);
 				return refused;
 			}
 		}
-		from.logged("out", to, null, data.length(), NetworkCard.UNREACHABLE);
+		from.sent(to, null, data.length(), NetworkCard.UNREACHABLE);
 		return NetworkCard.UNREACHABLE;
 	}
 

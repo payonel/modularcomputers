@@ -61,13 +61,14 @@ sent), the frame's bytes, and how it went:
 ```
 in 5f0c2a9e-41d7-4c4e-9b0a-2f3c4d5e6f70 0.0m 5 taken
 out 5f0c2a9e-41d7-4c4e-9b0a-2f3c4d5e6f70 0.0m 8 taken
-out 9a1b2c3d-0000-4000-8000-000000000001 - 12 unreachable
+out 9a1b2c3d-0000-4000-8000-000000000001 - 12 network unreachable no card in reach
 in 5f0c2a9e-41d7-4c4e-9b0a-2f3c4d5e6f70 0.0m 9 broadcast
 out broadcast - 4 2 took it
 ```
 
-An outcome is `taken`, `busy` or `unreachable` for a frame to one card, `broadcast` for a broadcast
-that came in, and `N took it` for one sent. The card keeps only its last 8 lines, so a reader sees
+How it went is `taken`; a refusal's why and its fields' values (`limit frames 32`, `network
+unreachable no card in reach`); `broadcast` for a broadcast that came in and was taken; and `N took
+it` for one sent. The card keeps only its last 8 lines, so a reader sees
 what's current.
 
 - **Reading** gives the next line; with none waiting, a read waits for one, as a keyboard's does.
@@ -123,15 +124,29 @@ The oldest frame that came, or nil. A frame is a table:
 
 ### pull() → entry or nil
 
-The traffic log's oldest entry, or nil: what the card's file reads as a line.
+The traffic log's oldest entry, or nil: what the card's file reads as a line. A frame it sent is
+named after the method that sent it; a frame that came is the card's own news, `arrived`:
+
+<!-- lua-fragment -->
+```lua
+{event = "send", address = "5f0c2a9e-...", distance = 3.0, bytes = 42, took = 1, ok = true}
+{event = "send", address = "5f0c2a9e-...", distance = 3.0, bytes = 42, took = 0, ok = false,
+ why = "limit", of = "frames", max = 32}
+{event = "send", address = "9a1b2c3d-...", distance = -1, bytes = 42, took = 0, ok = false,
+ why = "network", reason = "unreachable", message = "no card in reach"}
+{event = "broadcast", bytes = 17, took = 2, ok = true}
+{event = "arrived", address = "7e3d1f00-...", broadcast = true, distance = 12.5, bytes = 17, ok = true}
+```
 
 | Field | Value |
 |---|---|
-| `direction` | `"in"` or `"out"` |
-| `address` | the other card's, or `"broadcast"` |
-| `distance` | meters; missing for a broadcast sent |
+| `event` | `"send"`, `"broadcast"` (the method that sent it) or `"arrived"` (a frame that came) |
+| `address` | the other card's (a send's and an arrived frame's) |
+| `distance` | meters between the cards; `-1` for a send that reached no card |
+| `broadcast` | an arrived frame's: whether it was a broadcast |
 | `bytes` | the frame's size |
-| `outcome` | `"taken"`, `"limit"`, `"unreachable"`, `"broadcast"`, or `"N took it"` |
+| `took` | a send's and a broadcast's: how many cards took it (a send's 1 or 0) |
+| `ok` | how it went: `false` with the refusal's `why` and its fields beside it, as `send` answered (`limit`, `network`); a broadcast is always `ok` (best effort) |
 
 ### getWake() → string or nil
 
