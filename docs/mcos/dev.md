@@ -146,7 +146,7 @@ allowed); a read gives what the last command said.
 
 **Network card, WLAN card.** Read-only: its traffic, a line a frame, in or out: the other card's
 address (or `broadcast`), how far it is, the frame's size and how it went (`taken`; a refusal's
-why and its fields, `limit frames 32`; a broadcast's: how many took it). The card keeps its last 8 frames. Its data is read
+why and its fields, `limit frames 32`; a broadcast's: how many took it). The card keeps its last 32 (each that pushed an older one out saying `lost`). Its data is read
 through [sockets](/mcos/networking/).
 
 ```

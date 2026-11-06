@@ -7,7 +7,7 @@
 --   out 9a1b2c3d-... - 42 network unreachable no card in reach
 --   out broadcast - 17 2 took it
 --   in 7e3d1f00-... 12.5m 17 broadcast
--- (The card keeps only its last few frames: someone reading sees what's current.)
+-- "lost n" before one when n went before it, the card's log full (as an input device's SYN_DROPPED).
 local NO_DISTANCE = -1 -- a send's distance when no card was reached
 
 -- A failure's fields, in the order its why's shape gives them (the card's: limit, network).
@@ -35,6 +35,6 @@ return {
     local direction = entry.event == "arrived" and "in" or "out"
     local address = entry.event == "broadcast" and "broadcast" or entry.address
     local distance = (entry.distance == nil or entry.distance == NO_DISTANCE) and "-" or entry.distance .. "m"
-    return direction .. " " .. address .. " " .. distance .. " " .. entry.bytes .. " " .. went(entry) .. "\n"
+    return (entry.lost and "lost " .. entry.lost .. "\n" or "") .. direction .. " " .. address .. " " .. distance .. " " .. entry.bytes .. " " .. went(entry) .. "\n"
   end,
 }

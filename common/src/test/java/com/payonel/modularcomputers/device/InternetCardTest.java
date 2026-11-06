@@ -41,6 +41,7 @@ class InternetCardTest {
 		InternetCard.policyFrom(() -> new InternetPolicy(true, List.of("127.0.0.1"), List.of()));
 		try {
 			InternetCard card = new InternetCard();
+			card.accepting(true); // (as on a running computer's bus: it takes data)
 			long handle = (Long) card.request(args("http://127.0.0.1:" + web.getAddress().getPort() + "/")).first();
 			long deadline = System.currentTimeMillis() + ENDS_WITHIN;
 			Object piece;
@@ -49,9 +50,11 @@ class InternetCardTest {
 				assertThat(System.currentTimeMillis()).as("it ended in time").isLessThan(deadline);
 			} while (!"".equals(piece));
 			while (!card.interruptPending()) { // (its log entry comes as it ends)
+				card.tick();
 				assertThat(System.currentTimeMillis()).as("its log entry came").isLessThan(deadline);
 				Thread.onSpinWait();
 			}
+			card.tick(); // (its end on its way into the log)
 			card.response(args(handle)); // (asked about its request again: that news is looked at)
 			assertThat(card.interruptPending()).as("its log entry, untaken, is still news").isTrue();
 			assertThat(card.pull(args()).first()).isInstanceOf(Map.class);
@@ -69,6 +72,7 @@ class InternetCardTest {
 		long deadline = System.currentTimeMillis() + ENDS_WITHIN;
 		Object entry;
 		while ((entry = card.pull(args()).first()) == null) {
+			card.tick(); // (its block's tick: what ended on a request's thread goes into its log)
 			assertThat(System.currentTimeMillis()).as("its entry came").isLessThan(deadline);
 			Thread.onSpinWait();
 		}
@@ -106,6 +110,7 @@ class InternetCardTest {
 		try {
 			String base = "http://127.0.0.1:" + web.getAddress().getPort();
 			InternetCard card = new InternetCard();
+			card.accepting(true); // (as on a running computer's bus: it takes data)
 			long done = (Long) card.request(args(base + "/")).first();
 			Map<Object, Object> ended = entry(card);
 			assertThat(ended).containsEntry("event", "request").containsEntry("ok", true).containsEntry("method", "GET")

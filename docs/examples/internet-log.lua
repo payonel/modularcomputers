@@ -3,8 +3,8 @@
 --
 -- The card's file, /dev/internet0, is its access log, a line a request as a web server's:
 -- "GET https://example.com/ 200 143ms 1256" (the method, the URL, the status or "-" and why it
--- failed, its why and fields, how long it took, the bytes it brought). The card keeps only its last 8, so a program
--- that wants them all reads as they come. sys.poll waits (IN) until a line is there, so the
+-- failed, its why and fields, how long it took, the bytes it brought). The card keeps its last 32 (a "lost n" line
+-- says some went), so a program that wants them all reads as they come. sys.poll waits (IN) until a line is there, so the
 -- program uses no time between requests.
 --
 -- usage: lua internet-log.lua [log]

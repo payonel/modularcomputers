@@ -657,9 +657,10 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   methods); an hfs disk's refuses (`EMEDIUMTYPE`, the user's call: Linux would let a mounted disk's
   bytes be read). A device with events and
   no `get` (a sensor) has a read-only file, an event a line, and a read with none waiting blocks. A
-  log is a device's own small window (a NIC's traffic, the internet card's requests: the last 8,
-  older ones dropped), so a reader sees what's current and nothing grows: a NIC's file reads its
-  frames, one a line (direction, remote address, distance, bytes, outcome); its data is read
+  log is a device's own window (a NIC's traffic, the internet card's requests), kept as its events
+  are (an `EventQueue`, the user's, 2026-11-06: the newest 32, an entry that pushed one out saying
+  `lost`, never a silent drop), so nothing grows: a NIC's file reads its
+  frames, one a line (out or in, remote address, distance, bytes, how it went); its data is read
   through sockets.
 - **The computer's power is Linux's `/sys/class/power_supply`** (sysfs.lua, from `board.power`): a
   battery a bay (`BAT0`...) and the case's store (`case`, a UPS), Linux's files and units (µWh, µW: a

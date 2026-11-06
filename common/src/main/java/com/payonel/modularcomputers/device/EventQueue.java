@@ -64,6 +64,17 @@ public final class EventQueue {
 	}
 
 	/**
+	 * A log's entry (a device's record of what it did: the network card's traffic, the internet card's
+	 * requests), kept as any event is, its oldest going past {@link #CAPACITY} and the next saying how
+	 * many as {@code lost}: built by its device from the builders (a refusal's fields a {@link
+	 * com.payonel.modularcomputers.runtime.Failure}'s, an end's {@link #failed}), so its why isn't
+	 * refused here as {@link #add}'s is.
+	 */
+	void record(Map<String, Object> entry) {
+		put(entry);
+	}
+
+	/**
 	 * Puts an event in only if there's room and its card takes data now: whether it did (a device
 	 * that refuses rather than drops: its sender hears, and tries again).
 	 */

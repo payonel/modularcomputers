@@ -82,6 +82,27 @@ class NetworkCardTest {
 		assertThat(newest(b)).isEqualTo(came);
 	}
 
+	/**
+	 * Its traffic log is kept as a device's events are (the user's): a window of the newest, each entry
+	 * that pushed an older one out saying so as lost, never a silent drop.
+	 */
+	@Test
+	void itsTrafficLogSaysHowManyEntriesWentWhenItWasFull() {
+		NetworkCard a = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
+		String nobody = UUID.randomUUID().toString();
+		int over = 5;
+		for (int i = 0; i < EventQueue.CAPACITY + over; i++) {
+			a.send(args(nobody, "x"));
+		}
+		int left = 0;
+		long lost = 0;
+		for (Object entry; (entry = a.pull(args()).first()) != null; left++) {
+			lost += ((Map<?, ?>) entry).get("lost") instanceof Long n ? n : 0; // (each entry that pushed one out says so)
+		}
+		assertThat(left).as("a window of the newest").isEqualTo(EventQueue.CAPACITY);
+		assertThat(lost).as("every one that went, said").isEqualTo(over);
+	}
+
 	@Test
 	void aFrameGoesToTheCardAtItsAddressAcknowledgedAndABroadcastToEveryCardInRange() {
 		NetworkCard a = card(CardKind.TIER2_WLAN, BlockPos.ZERO);

@@ -64,8 +64,9 @@ GET http://10.0.0.1/ - 2ms 0 denied private 10.0.0.1
 ```
 
 - **Reading** gives the next line; with none waiting, a read waits for one. `cat /dev/internet0`
-  shows requests as they end (Ctrl+C stops it). The card keeps only the last 8 lines, so a reader
-  sees what is current, and they go when the computer stops.
+  shows requests as they end (Ctrl+C stops it). The card keeps the last 32, as a device keeps its events:
+  when more come, the oldest go, and the entry that pushed one out says so (`lost`, a `lost n` line
+  before it). They go when the computer stops.
 - **Writing** is refused: opening it for writing fails with `EACCES`.
 - **poll:** `IN` while a line of the log waits; `PRI` while a request has news (its response came, a
   piece of its body, its end or its failure), until the program next asks the card or reads its

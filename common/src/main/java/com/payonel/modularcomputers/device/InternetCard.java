@@ -45,8 +45,6 @@ public final class InternetCard extends Card {
 	private static final java.util.concurrent.atomic.AtomicInteger RUNNING = new java.util.concurrent.atomic.AtomicInteger();
 	/** Body pieces a request holds unread before its download waits. */
 	public static final int BUFFERED = 16;
-	/** Its access log's entries kept, at most: a small window (past it the oldest go; the user's: a reader sees what's current, at little memory). */
-	public static final int LOG = 8;
 	/** Its access log's event: a request's end. */
 	public static final String REQUEST = "request";
 	/** A body's bytes a failed request's call keeps (the user's: its start, enough to tell which; its size is the progress's sent). */
@@ -70,7 +68,14 @@ public final class InternetCard extends Card {
 	private final InterruptLine line = new InterruptLine();
 	private final BusPower power = new BusPower(DRAW);
 	private final Map<Long, Request> open = new ConcurrentHashMap<>();
-	private final java.util.concurrent.ConcurrentLinkedDeque<Map<String, Object>> log = new java.util.concurrent.ConcurrentLinkedDeque<>();
+	/**
+	 * Its access log, kept as a device's events are (the user's): a window, its oldest going past
+	 * {@link EventQueue#CAPACITY}, the next entry saying how many as lost; pending till taken. Server
+	 * thread only: entries made on a request's thread wait in {@link #ending} for the next tick.
+	 */
+	private final EventQueue log = new EventQueue(line, () -> { }, this::isAccepting);
+	/** Requests' ends made on their threads, for the next tick to put in the log, in order. */
+	private final java.util.concurrent.ConcurrentLinkedQueue<Map<String, Object>> ending = new java.util.concurrent.ConcurrentLinkedQueue<>();
 	private final HttpExchange.Resolver resolver;
 	private long nextHandle = 1;
 	/** Something happened on a request's thread since the last tick: its interrupt, at the next. */
@@ -232,11 +237,8 @@ public final class InternetCard extends Card {
 		said.put("method", request.method); // (what it is, always: never only in its call, the user's)
 		said.put("url", request.url);
 		said.putAll(entry);
-		log.addLast(said);
-		while (log.size() > LOG) {
-			log.pollFirst();
-		}
-		news.set(true); // (its interrupt: a reader of its log hears; pending till it's taken)
+		ending.add(said); // (the log's, at the next tick: it's the server thread's)
+		news.set(true);
 	}
 
 	/** The request a handle names, its news now looked at; null: none (its caller's refusal: {@link #noSuchRequest}). */
@@ -301,13 +303,16 @@ public final class InternetCard extends Card {
 		return Result.ok();
 	}
 
-	@Method(doc = "pull(): its access log's oldest entry, a request's end: {event = \"request\", ok = true, method, url, result = {status, millis, bytes}}, or {event = \"request\", ok = false, method, url, why (network, denied, stopped: closed first, or a fault), its why's fields, call = {args (a body cut to its first 16 bytes), progress = {status (0: no response), millis, bytes, sent}}}; or nil")
+	@Method(doc = "pull(): its access log's oldest entry, a request's end: {event = \"request\", ok = true, method, url, result = {status, millis, bytes}}, or {event = \"request\", ok = false, method, url, why (network, denied, stopped: closed first, or a fault), its why's fields, call = {args (a body cut to its first 16 bytes), progress = {status (0: no response), millis, bytes, sent}}}; lost (how many went before it, the log full) when some did; or nil")
 	public Result pull(Arguments args) {
-		return Result.ok(log.pollFirst());
+		return Result.ok(log.pull());
 	}
 
 	/** Each server tick (its block's): its interrupt, for news that came on its requests' threads. */
 	public void tick() {
+		for (Map<String, Object> ended; (ended = ending.poll()) != null; ) {
+			log.record(ended); // (raises its line: pending till it's taken)
+		}
 		if (news.getAndSet(false)) {
 			line.raise();
 		}
@@ -328,7 +333,7 @@ public final class InternetCard extends Card {
 		// (a log entry is pending until it's taken, its pull: a program's call about its own request
 		// answers for that request only, so a log reader hears every entry whenever it came; in mcos
 		// every file open on the card takes the log's entries, so they don't stay)
-		if (!log.isEmpty()) {
+		if (log.pending() || !ending.isEmpty()) { // (an end still on its way to the log is news too)
 			return true;
 		}
 		for (Request request : open.values()) {
@@ -348,6 +353,7 @@ public final class InternetCard extends Card {
 	private void closeAll() {
 		open.values().forEach(request -> request.exchange.close());
 		open.clear();
+		ending.clear();
 		log.clear();
 	}
 

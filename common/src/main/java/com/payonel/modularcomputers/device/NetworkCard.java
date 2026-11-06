@@ -54,8 +54,6 @@ public final class NetworkCard extends Card {
 	 * running CPU.
 	 */
 	public static final double WIRELESS_SEND_COST_PER_BLOCK = (double) PowerUnits.CPU / TIER1_RANGE;
-	/** Frames its traffic log keeps, at most: a small window (the user's: a reader sees what's current, at little memory). */
-	public static final int TRAFFIC = 8;
 	/** The longest wake message, in bytes. */
 	public static final int MAX_WAKE = 256;
 	private final InterruptLine line = new InterruptLine();
@@ -67,8 +65,13 @@ public final class NetworkCard extends Card {
 	private volatile Map<BlockPos, Integer> reach = Map.of();
 	/** What wakes its computer, or null: it doesn't. */
 	private String wakeMessage;
-	/** Its traffic, its newest frames in and out (its /dev file's: as tcpdump shows a card's). */
-	private final java.util.ArrayDeque<Map<String, Object>> traffic = new java.util.ArrayDeque<>();
+	/**
+	 * Its traffic, its frames in and out (its /dev file's: as tcpdump shows a card's), kept as a
+	 * device's events are: a window, its oldest going past {@link EventQueue#CAPACITY}, the next
+	 * entry saying how many as lost (the user's). Not saved, and its news isn't held pending: its
+	 * frames' interrupt isn't held up by a log nobody reads.
+	 */
+	private final EventQueue traffic = new EventQueue(line, () -> { }, this::isAccepting);
 	/** How far a WLAN card's signal reaches now, in blocks: at most its tier's, as set (OpenComputers' strength). */
 	private int strength;
 
@@ -229,18 +232,14 @@ public final class NetworkCard extends Card {
 		}
 	}
 
-	/** An entry in its traffic log (its newest frames: the oldest go). */
+	/** An entry in its traffic log. */
 	private void logged(Map<String, Object> entry) {
-		traffic.addLast(entry);
-		while (traffic.size() > TRAFFIC) {
-			traffic.removeFirst();
-		}
-		line.raise(); // (told once: its frames' interrupt isn't held up by a log nobody reads)
+		traffic.record(entry); // (its line raised once: not held pending, its frames' interrupt not held up by a log nobody reads)
 	}
 
-	@Method(doc = "pull(): its traffic log's oldest frame: a send, {event = \"send\", address, distance (-1: no card reached), bytes, took (1 or 0), ok, and why and its fields when refused: limit or network}; a broadcast, {event = \"broadcast\", bytes, took (how many cards), ok}; or one that came, {event = \"arrived\", address, broadcast, distance, bytes, ok, and why and its fields when refused}; or nil")
+	@Method(doc = "pull(): its traffic log's oldest frame: a send, {event = \"send\", address, distance (-1: no card reached), bytes, took (1 or 0), ok, and why and its fields when refused: limit or network}; a broadcast, {event = \"broadcast\", bytes, took (how many cards), ok}; or one that came, {event = \"arrived\", address, broadcast, distance, bytes, ok, and why and its fields when refused}; lost (how many went before it, the log full) when some did; or nil")
 	public Result pull(Arguments args) {
-		return Result.ok(traffic.pollFirst());
+		return Result.ok(traffic.pull());
 	}
 
 	/** A frame's data, if it fits; sending it costs power. */
@@ -331,6 +330,7 @@ public final class NetworkCard extends Card {
 	@Override
 	protected void dropData() {
 		frames.clear();
+		traffic.clear();
 	}
 
 	@Override
@@ -351,5 +351,6 @@ public final class NetworkCard extends Card {
 	@Override
 	public void powerOff() {
 		frames.clear();
+		traffic.clear();
 	}
 }

@@ -68,8 +68,8 @@ out broadcast - 4 2 took it
 
 How it went is `taken`; a refusal's why and its fields' values (`limit frames 32`, `network
 unreachable no card in reach`); `broadcast` for a broadcast that came in and was taken; and `N took
-it` for one sent. The card keeps only its last 8 lines, so a reader sees
-what's current.
+it` for one sent. The card keeps its last 32, as a device keeps its events: when more come,
+the oldest go, and the entry that pushed one out says so (`lost`, a `lost n` line before it).
 
 - **Reading** gives the next line; with none waiting, a read waits for one, as a keyboard's does.
   `cat /dev/network0` shows the traffic as it goes (Ctrl+C stops it).

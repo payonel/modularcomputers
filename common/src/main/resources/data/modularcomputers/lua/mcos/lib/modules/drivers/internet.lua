@@ -5,7 +5,7 @@
 --   GET https://example.com/ 200 143ms 1256
 --   GET http://10.0.0.1/ - 2ms 0 denied private 10.0.0.1
 --   GET https://slow.example/ - 30012ms 65536 network timed_out timed out
--- (The card keeps only the last few: someone reading sees what's current.)
+-- "lost n" before one when n went before it, the card's log full (as an input device's SYN_DROPPED).
 -- A failure's fields, in the order its why's shape gives them (the card's: denied, network, a fault).
 local FIELDS = {"reason", "condition", "part", "value", "message"}
 
@@ -29,7 +29,7 @@ return {
   get = function(entry)
     local how = entry.ok and entry.result or entry.call.progress -- (done: its result; else how far it got)
     local status = entry.ok and tostring(how.status) or "-"
-    return entry.method .. " " .. entry.url .. " " .. status .. " " .. how.millis .. "ms " .. how.bytes
+    return (entry.lost and "lost " .. entry.lost .. "\n" or "") .. entry.method .. " " .. entry.url .. " " .. status .. " " .. how.millis .. "ms " .. how.bytes
       .. (entry.ok and "" or " " .. said(entry)) .. "\n"
   end,
 }
