@@ -66,11 +66,12 @@ Silent: no messages.
 The User-Agent header.
 .SH EXIT STATUS
 0 when done; 2 for bad usage; 6 for an unknown host; 7 when it couldn't
-connect (refused, or the server forbids the address); 22 for an HTTP error
-with
+connect (refused, or the server forbids the address); 8 when the server's
+answer isn't HTTP it can read; 18 when the body ended early; 22 for an HTTP
+error with
 .BR \-f ;
-23 when the output can't be written; 28 when it timed out; 47 for too many
-redirects.
+23 when the output can't be written; 28 when it timed out; 35 when the secure
+connection failed; 47 for too many redirects; 56 when the connection was lost.
 .SH EXAMPLES
 .nf
 curl https://example.com/

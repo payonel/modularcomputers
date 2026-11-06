@@ -165,7 +165,7 @@ public final class NetworkCard extends Card {
 		if (refused == null) {
 			return Result.ok(true);
 		}
-		return Result.fail(FULL.equals(refused) ? com.payonel.modularcomputers.runtime.Failure.limit("frames", EventQueue.CAPACITY) : com.payonel.modularcomputers.runtime.Failure.network(UNREACHABLE, ""));
+		return Result.fail(FULL.equals(refused) ? com.payonel.modularcomputers.runtime.Failure.limit("frames", EventQueue.CAPACITY) : com.payonel.modularcomputers.runtime.Failure.network(UNREACHABLE, null));
 	}
 
 	@Method(doc = "broadcast(data): a frame to every card it reaches (bytes, at most 8192), as best it can: how many took it")

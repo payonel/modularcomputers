@@ -52,8 +52,8 @@ class NetworkCardTest {
 		assertThat(received(b)).containsEntry("from", a.address()).containsEntry("data", "hello").containsEntry("distance", 5.0)
 			.doesNotContainKey("broadcast");
 		assertThat(c.interruptPending()).as("not for it").isFalse();
-		assertThat(a.send(args("id:" + far.address(), "x")).failure().table()).as("out of range").isEqualTo(Map.of("why", "network", "reason", "unreachable", "message", ""));
-		assertThat(a.send(args(UUID.randomUUID().toString(), "x")).failure().table()).as("nobody there").isEqualTo(Map.of("why", "network", "reason", "unreachable", "message", ""));
+		assertThat(a.send(args("id:" + far.address(), "x")).failure().table()).as("out of range").isEqualTo(Map.of("why", "network", "reason", "unreachable", "message", "no card in reach"));
+		assertThat(a.send(args(UUID.randomUUID().toString(), "x")).failure().table()).as("nobody there").isEqualTo(Map.of("why", "network", "reason", "unreachable", "message", "no card in reach"));
 		assertThat(a.broadcast(args("all")).first()).as("how many took it").isEqualTo(2L);
 		assertThat(received(b)).containsEntry("data", "all").containsEntry("broadcast", true);
 		assertThat(received(c)).containsEntry("data", "all");

@@ -35,7 +35,7 @@ class InternetPolicyTest {
 		assertThat(InternetPolicy.DEFAULT.refused("rebind.example", List.of(at("93.184.216.34"), at("127.0.0.1"))).table())
 			.as("denied: its reason, and the address judged").isEqualTo(java.util.Map.of("why", "denied", "reason", "loopback", "value", "127.0.0.1"));
 		assertThat(InternetPolicy.DEFAULT.refused("example.com", List.of(at("93.184.216.34")))).isNull();
-		assertThat(InternetPolicy.DEFAULT.refused("nowhere", List.of()).table()).isEqualTo(java.util.Map.of("why", "network", "reason", "unknown_host", "message", ""));
+		assertThat(InternetPolicy.DEFAULT.refused("nowhere", List.of()).table()).isEqualTo(java.util.Map.of("why", "network", "reason", "unknown_host", "message", "host not found"));
 	}
 
 	@Test

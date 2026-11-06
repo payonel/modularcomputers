@@ -53,7 +53,7 @@ The card reaches only the public internet: never the server's own machine or net
 
 ## Exit status
 
-0 when done; 2 for bad usage; 6 for an unknown host; 7 when it couldn't connect (refused, or the server forbids the address); 22 for an HTTP error with <strong>-f</strong>; 23 when the output can't be written; 28 when it timed out; 47 for too many redirects.
+0 when done; 2 for bad usage; 6 for an unknown host; 7 when it couldn't connect (refused, or the server forbids the address); 8 when the server's answer isn't HTTP it can read; 18 when the body ended early; 22 for an HTTP error with <strong>-f</strong>; 23 when the output can't be written; 28 when it timed out; 35 when the secure connection failed; 47 for too many redirects; 56 when the connection was lost.
 
 ## Examples
 

@@ -31,7 +31,7 @@ public record InternetPolicy(boolean enabled, List<String> allow, List<String> d
 			return com.payonel.modularcomputers.runtime.Failure.denied("disabled", "");
 		}
 		if (addresses.isEmpty()) {
-			return com.payonel.modularcomputers.runtime.Failure.network("unknown_host", "");
+			return com.payonel.modularcomputers.runtime.Failure.network("unknown_host", null);
 		}
 		for (InetAddress address : addresses) {
 			if (listed(deny, host, address)) {

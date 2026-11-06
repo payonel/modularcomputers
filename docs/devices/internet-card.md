@@ -53,8 +53,9 @@ local handle = assert(sys.ioctl(card, "request", "https://example.com/"))
 ```
 
 Reading the file gives its **access log**, a line for each request as it ended, as a web server's:
-the method, the URL, the status (or `-` and its failure: its why and its fields' values), how long it
-took and the bytes it brought.
+the method, the URL, the status (or `-` and why it failed: its why and its fields' values), how long it
+took and the bytes it brought. A request its program closed before its end is there too, as
+`stopped`.
 
 ```
 GET https://example.com/ 200 143ms 1256
@@ -77,18 +78,21 @@ An ioctl's answer is the method's (`true` for `close`, which answers nothing). A
 
 Every failure is a table, `{why, ...}`: a word, and its own fields, every one always there (`""`
 when it has nothing to say). A method answers `false, failure` at the board, and `nil, why, errno,
-failure` through its file. A log entry carries one as `failure`.
+failure` through its file. A log entry, a request's end, has its why's fields beside `why` (below).
+A `message` is words for a person, never a string to parse: each reason has its own, and the
+server's own error (Java's) never reaches a program; it goes to the server's log.
 
 | why | fields | when |
 |---|---|---|
 | `bad_argument` | `argument` (its position), `value` (as given), `expected`: `url`, `http`, `host`, `method`, `header` or `handle` | a request can't be made of it, or a handle names no open request |
 | `denied` | `reason`, `value` (what was refused) | not allowed: `disabled` (the card is off, `""`), `credentials` (the URL), `reserved_header` (the header), or the address judged (`"127.0.0.1"`): `admin` (the operator's deny list), `loopback`, `private`, `link_local`, `shared`, `reserved`, `multicast`, `unspecified`, `documentation`, `teredo` |
 | `limit` | `of`, `max` | `open_requests` (the card's 4), `body` (1048576 bytes), `server_requests` (64, every card on the server) |
-| `network` | `reason`, `message` (what was said of it, `""` for none) | `unknown_host`, `timed_out`, `connection_refused`, `tls`, `other`, or the answer was bad: `not_http`, `bad_content_length`, `bad_chunk`, `closed_early`, `headers_too_long` |
+| `network` | `reason`, `message` (that reason's words) | in transit: `unknown_host` ("host not found"), `connection_refused` ("connection refused"), `timed_out` ("timed out"), `tls` ("secure connection failed"), `connection_lost` ("connection lost"); or the answer was bad: `not_http` ("not an HTTP response"), `bad_content_length` ("bad Content-Length"), `bad_chunk` ("bad chunked encoding"), `closed_early` ("connection closed early"), `headers_too_long` ("response headers too long") |
+| `fault` | `condition`, `part`, `message` | the card itself failed: `internal_error`, part `internet` ("internal error") |
 
 ```lua
 local full = {why = "limit", of = "open_requests", max = 4}
-local tls = {why = "network", reason = "tls", message = "PKIX path building failed"}
+local tls = {why = "network", reason = "tls", message = "secure connection failed"}
 ```
 
 [`wget`](/programs/wget/) and [`curl`](/programs/curl/) are built on these methods, through the
@@ -131,8 +135,30 @@ its connection.
 
 ### pull() → entry or nil
 
-The access log's oldest entry, what the file reads as a line: `{method, url, status, millis, bytes,
-failure}` (`status` is 0, and `failure` the request's, when it failed; no `failure` when it didn't).
+The access log's oldest entry: a request's end, as a [command's end](/devices/robotics/#one-command-at-a-time)
+is, what the file reads as a line. Its method and URL are always there; then how it went:
+
+<!-- lua-fragment -->
+```lua
+-- done (a 404 is done too: the server answered)
+{event = "request", ok = true, method = "GET", url = "https://example.com/",
+ result = {status = 200, millis = 143, bytes = 1256}}
+
+-- failed: its why's fields beside why, and its call
+{event = "request", ok = false, method = "GET", url = "https://slow.example/big",
+ why = "network", reason = "timed_out", message = "timed out",
+ call = {args = {"https://slow.example/big"}, progress = {status = 200, millis = 30012, bytes = 65536, sent = 0}}}
+
+-- closed by its program before its end
+{event = "request", ok = false, method = "POST", url = "https://api.example.com/upload", why = "stopped",
+ call = {args = {"https://api.example.com/upload", "POST", {}, '{"name":"backup-'},
+         progress = {status = 0, millis = 410, bytes = 0, sent = 52311}}}
+```
+
+`result` and `progress` are how far it got: `status` (0 when no response came), `millis`, the
+`bytes` its body brought, and, when it didn't end done, `sent`, its body's whole size. `call.args`
+are its arguments as given, a body cut to its first 16 bytes: it says which request, for working out
+what went wrong. Its `method` and `url` are what a program reads, always there.
 
 `response` and `read` fail with `bad_argument` (`expected = "handle"`) for a handle that is not open.
 

@@ -188,15 +188,15 @@ class HttpExchangeTest {
 		throw new AssertionError("not refused: " + url);
 	}
 
-	/** Failed in transit, one shape (the user's): network, its reason, and what was said of it, always there. */
+	/** Failed in transit, one shape (the user's): network, its reason, and that reason's own words, never Java's (it could tell of the server), whichever way it was found. */
 	@Test
 	void aNameThatDoesntResolveFailsInTransitItsReasonAndMessage() {
 		HttpExchange.Resolver none = host -> {
 			throw new java.net.UnknownHostException(host);
 		};
 		Heard heard = run("http://nowhere.invalid/", null, Map.of(), null, InternetPolicy.DEFAULT, none);
-		assertThat(heard.failed.table()).isEqualTo(Map.of("why", "network", "reason", "unknown_host", "message", "nowhere.invalid"));
+		assertThat(heard.failed.table()).isEqualTo(Map.of("why", "network", "reason", "unknown_host", "message", "host not found"));
 		Heard empty = run("http://nowhere.invalid/", null, Map.of(), null, InternetPolicy.DEFAULT, host -> List.of());
-		assertThat(empty.failed.table()).as("no address: nothing more said").isEqualTo(Map.of("why", "network", "reason", "unknown_host", "message", ""));
+		assertThat(empty.failed.table()).as("no address: the same words").isEqualTo(Map.of("why", "network", "reason", "unknown_host", "message", "host not found"));
 	}
 }

@@ -205,6 +205,32 @@ public final class EventQueue {
 		return ended;
 	}
 
+	/**
+	 * An end kept outside a queue (a record of its own: the internet card's access log), built here as
+	 * every end is: done, {@code {event, ok = true, result}}; failed, {@code {event, ok = false, why,
+	 * ...its fields, call}}, the failure's own shape; stopped, {@code {event, ok = false, why =
+	 * "stopped", call}}.
+	 */
+	public static Map<String, Object> done(String event, Object result) {
+		Map<String, Object> ended = new java.util.LinkedHashMap<>();
+		ended.put("event", event);
+		ended.put("ok", true);
+		ended.put("result", com.payonel.modularcomputers.runtime.Values.normalize(result));
+		return ended;
+	}
+
+	public static Map<String, Object> failed(String event, com.payonel.modularcomputers.runtime.Failure failure, Map<String, Object> call) {
+		Map<String, Object> ended = withCall(event, failure.why(), call);
+		ended.remove("call");
+		ended.putAll(failure.fields());
+		ended.put("call", call);
+		return ended;
+	}
+
+	public static Map<String, Object> stoppedEnd(String event, Map<String, Object> call) {
+		return withCall(event, Buffered.STOPPED, call);
+	}
+
 	/** A command's end that says only its why and its call. */
 	private static Map<String, Object> withCall(String event, String why, Map<String, Object> call) {
 		Map<String, Object> ended = new java.util.LinkedHashMap<>();

@@ -666,7 +666,7 @@ class McosTest extends McosHarness {
 	 * The internet card's failures are one shape each (the user's): an ioctl gives its why, its errno,
 	 * and the failure itself, {why, ...}, every field of its why there: a limit's of and max, a
 	 * denied address's reason and value, a bad handle's argument and what it takes; and its log's
-	 * entry carries the failure nested.
+	 * entry is the request's end: its method and URL, its why's fields flat, and its call.
 	 */
 	@Test
 	@org.junit.jupiter.api.parallel.ResourceLock(INTERNET_POLICY)
@@ -696,7 +696,8 @@ class McosTest extends McosHarness {
 			local _, w3, _, f3 = sys.ioctl(card, "response", 999)
 			out:write(w3, " ", f3.argument, " ", f3.value, " ", f3.expected, "\\n")
 			local entry = sys.ioctl(card, "pull")
-			out:write(entry.failure.why, " ", entry.failure.reason, " ", entry.failure.value, " ", tostring(entry.why), "\\n")
+			out:write(entry.event, " ", tostring(entry.ok), " ", entry.method, " ", entry.url, " ", entry.why, " ", entry.reason, " ", entry.value, " ",
+			  entry.call.args[1], " ", entry.call.progress.status, " ", tostring(entry.failure), "\\n")
 			out:close()
 			""".formatted(com.payonel.modularcomputers.device.InternetCard.MAX_OPEN));
 		boot();
@@ -708,7 +709,7 @@ class McosTest extends McosHarness {
 			nil limit EINVAL limit open_requests %d
 			nil denied loopback 127.0.0.2
 			bad_argument 1 999 handle
-			denied loopback 127.0.0.2 nil
+			request false GET http://127.0.0.2:1/ denied loopback 127.0.0.2 http://127.0.0.2:1/ 0 nil
 			""".formatted(com.payonel.modularcomputers.device.InternetCard.MAX_OPEN));
 	}
 

@@ -42,7 +42,7 @@ that is software's job (mcos's TCP does).
 
 - `{why = "limit", of = "frames", max = 32}`: the other card's queue is full, or no program on its
   computer is taking data.
-- `{why = "network", reason = "unreachable", message = ""}`: no card at that address in reach, or it
+- `{why = "network", reason = "unreachable", message = "no card in reach"}`: no card at that address in reach, or it
   is off.
 
 A broadcast is best effort: it says how many cards took it.

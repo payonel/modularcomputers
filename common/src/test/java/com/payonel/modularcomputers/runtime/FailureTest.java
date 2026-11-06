@@ -25,7 +25,7 @@ class FailureTest {
 		assertThat(Failure.badArgument(1, null, "url").get("value")).as("nothing given: \"\", never missing").isEqualTo("");
 		assertThat(Failure.denied("loopback", "127.0.0.1").table()).isEqualTo(Map.of("why", "denied", "reason", "loopback", "value", "127.0.0.1"));
 		assertThat(Failure.limit("open_requests", 4).table()).isEqualTo(Map.of("why", "limit", "of", "open_requests", "max", 4L));
-		assertThat(Failure.network("bad_chunk", "").table()).isEqualTo(Map.of("why", "network", "reason", "bad_chunk", "message", ""));
+		assertThat(Failure.network("bad_chunk", null).table()).isEqualTo(Map.of("why", "network", "reason", "bad_chunk", "message", "bad chunked encoding"));
 		assertThat(Failure.symbolicLink("/to", "/real").table()).isEqualTo(Map.of("why", "symbolic_link", "at", "/to", "target", "/real"));
 		assertThat(Failure.badState("path", "/a", "absent").table()).isEqualTo(Map.of("why", "bad_state", "of", "path", "value", "/a", "expected", "absent"));
 		assertThat(Failure.missingInputs("").table()).isEqualTo(Map.of("why", "missing_inputs", "name", ""));
@@ -36,7 +36,7 @@ class FailureTest {
 	void aFieldCantBeMissing() {
 		assertThatThrownBy(() -> Failure.busy(null)).isInstanceOf(NullPointerException.class).hasMessageContaining("busy's id");
 		assertThatThrownBy(() -> Failure.denied("loopback", null)).isInstanceOf(NullPointerException.class);
-		assertThatThrownBy(() -> Failure.network(null, "")).isInstanceOf(NullPointerException.class);
+		assertThatThrownBy(() -> Failure.network("other", null)).as("a reason with no words: none").isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> Failure.internalError(null, new IllegalStateException())).isInstanceOf(NullPointerException.class);
 	}
 
@@ -55,5 +55,7 @@ class FailureTest {
 		IllegalStateException host = new IllegalStateException("/home/someone/world/modularcomputers/disks/x");
 		assertThat(Failure.internalError("storage", host).toString()).doesNotContain("/home", "IllegalState");
 		assertThat(Failure.ioError("storage", new java.io.IOException(host.getMessage())).toString()).doesNotContain("/home");
+		assertThat(Failure.network("tls", new javax.net.ssl.SSLException("sun.security.provider.certpath.SunCertPathBuilderException")).toString())
+			.as("a network failure's words are its reason's").doesNotContain("sun.security");
 	}
 }

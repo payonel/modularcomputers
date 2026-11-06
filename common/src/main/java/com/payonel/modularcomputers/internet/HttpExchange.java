@@ -190,18 +190,25 @@ public final class HttpExchange implements Runnable {
 		}
 	}
 
-	/** Why it failed in transit (the network's, one shape): its reason, and what was said of it ("": nothing more). */
+	/**
+	 * Why it failed (the network's, one shape: its reason and that reason's words; Java's text only in
+	 * the log, never the program's: it could tell of the server): anything not the network's (the
+	 * card's own bug) is an internal error.
+	 */
 	private static com.payonel.modularcomputers.runtime.Failure why(Exception e) {
-		String said = e.getMessage() == null ? "" : e.getMessage();
 		return switch (e) {
-			case Bad bad -> com.payonel.modularcomputers.runtime.Failure.network(bad.reason, "");
-			case java.net.UnknownHostException unknown -> com.payonel.modularcomputers.runtime.Failure.network("unknown_host", said);
-			case java.net.SocketTimeoutException timeout -> com.payonel.modularcomputers.runtime.Failure.network("timed_out", said);
-			case java.net.ConnectException refused -> com.payonel.modularcomputers.runtime.Failure.network("connection_refused", said);
-			case javax.net.ssl.SSLException tls -> com.payonel.modularcomputers.runtime.Failure.network("tls", said);
-			default -> com.payonel.modularcomputers.runtime.Failure.network("other", said.isEmpty() ? e.getClass().getSimpleName() : said);
+			case Bad bad -> com.payonel.modularcomputers.runtime.Failure.network(bad.reason, null);
+			case java.net.UnknownHostException unknown -> com.payonel.modularcomputers.runtime.Failure.network("unknown_host", e);
+			case java.net.SocketTimeoutException timeout -> com.payonel.modularcomputers.runtime.Failure.network("timed_out", e);
+			case java.net.ConnectException refused -> com.payonel.modularcomputers.runtime.Failure.network("connection_refused", e);
+			case javax.net.ssl.SSLException tls -> com.payonel.modularcomputers.runtime.Failure.network("tls", e);
+			case IOException lost -> com.payonel.modularcomputers.runtime.Failure.network("connection_lost", e); // (reset, broken pipe: it broke mid-exchange)
+			default -> com.payonel.modularcomputers.runtime.Failure.internalError(PART, e);
 		};
 	}
+
+	/** The card's part, as an internal error names it (its device's type). */
+	private static final String PART = "internet";
 
 	/** Past its deadline: it ends. */
 	private void inTime() throws IOException {

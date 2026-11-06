@@ -39,8 +39,8 @@ local function card()
 end
 
 -- A failure's fields, in the order its why's shape gives them (the card's: bad_argument, denied, limit,
--- network).
-local FIELDS = {"reason", "of", "max", "argument", "value", "expected", "message"}
+-- network, a fault).
+local FIELDS = {"reason", "condition", "part", "of", "max", "argument", "value", "expected", "message"}
 
 -- A call's failure as words: its why, then each field that says something (the card's failure, the
 -- ioctl's fourth answer); else as the call said it.

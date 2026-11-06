@@ -293,8 +293,10 @@ device data), and user code, as a real CPU runs firmware under an OS.
   never follows one), and the VFS goes on. No refusal is a bare string (`Result.fail` takes only a
   `Failure`). mcos's
   kernel reads a failure through `k.invoke` (its why as a word, then the table), and an ioctl
-  gives a program `nil, why, errno, failure`; a record holds one nested (`failure`, the internet
-  log's), an event flat (its why's fields beside `why`).
+  gives a program `nil, why, errno, failure`; an end says it flat (its why's fields beside `why`).
+  **A `network` failure's message is its reason's own** (`Failure.network`'s table: a closed list of
+  reasons, each its words), never Java's text, which goes to the log; what isn't the network's (the
+  card's bug) is an internal error.
 - **Device failures are soft:** no device can stop the machine; only the program's own error or the
   board's supervision (CPU gone, power gone) ends a run. External devices are hot-plugged: one
   that isn't there isn't on the bus, and calls to it fail at once.
@@ -491,7 +493,10 @@ HTTP and HTTPS to the real internet (OC's internet card; the user's recipe: a co
 ender). The card speaks HTTP itself (`HttpExchange`, its own small client), since TLS is beyond a
 program's Lua. A program uses the card as any device (the user's call: no `sys.http`): its methods
 start a request (a handle), give its status and headers and read its body as it comes (`false`: not
-yet, its interrupt saying when to ask again), and `/dev/internet0`'s read is its access log, an
+yet, its interrupt saying when to ask again), and `/dev/internet0`'s read is its access log (each
+entry a request's end, the user's, 2026-11-05: a request is a command over time, `{event =
+"request", ok, method, url, ...}`, its `url` and `method` always, its `call` only a failure's and
+debug detail, a body cut to 16 bytes; a request closed first `stopped`), an
 Apache-like line a request (method, URL, status, time, bytes), read only. `lib/http.lua` is the
 library on its ioctls; `wget` and `curl` are built on it. **It's a program
 running on the server's network, so it's kept to the public internet** (`InternetPolicy`):

@@ -47,6 +47,19 @@ public final class Failure {
 		Map.entry("projector", "field projector required"),
 		Map.entry("destination", "storage disk target required"),
 		Map.entry("source", "source disk required"));
+	/** Each reason a network failure can have, and what it says (the internet card's, and the network card's unreachable). */
+	private static final Map<String, String> NETWORK_SAYS = Map.ofEntries(
+		Map.entry("unknown_host", "host not found"),
+		Map.entry("connection_refused", "connection refused"),
+		Map.entry("timed_out", "timed out"),
+		Map.entry("tls", "secure connection failed"),
+		Map.entry("not_http", "not an HTTP response"),
+		Map.entry("bad_content_length", "bad Content-Length"),
+		Map.entry("bad_chunk", "bad chunked encoding"),
+		Map.entry("closed_early", "connection closed early"),
+		Map.entry("headers_too_long", "response headers too long"),
+		Map.entry("connection_lost", "connection lost"),
+		Map.entry("unreachable", "no card in reach"));
 	private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(com.payonel.modularcomputers.ModularComputers.MOD_ID);
 	/** An argument it can't use: which ({@code argument}), as given ({@code value}), what it takes ({@code expected}). */
 	public static final String BAD_ARGUMENT = "bad_argument";
@@ -60,7 +73,11 @@ public final class Failure {
 	public static final String DENIED = "denied";
 	/** Over a limit: of what ({@code of}), and its most ({@code max}). */
 	public static final String LIMIT = "limit";
-	/** Failed in transit, or the other end answered badly ({@code reason}), and what was said of it ({@code message}). */
+	/**
+	 * Failed in transit, or the other end answered badly ({@code reason}, one {@link #NETWORK_SAYS}
+	 * names), and that reason's own words ({@code message}: a person's, never parsed, never the
+	 * host's error: the user's, 2026-11-05).
+	 */
 	public static final String NETWORK = "network";
 	/** What it names isn't there: what kind of thing ({@code kind}), and as given ({@code value}). */
 	public static final String NOT_FOUND = "not_found";
@@ -150,7 +167,15 @@ public final class Failure {
 		return new Failure(LIMIT, "of", of, "max", max);
 	}
 
-	public static Failure network(String reason, String message) {
+	/** A network failure ({@code reason}: one {@link #NETWORK_SAYS} names); {@code cause}, the host's error if any, goes to the log only. */
+	public static Failure network(String reason, Throwable cause) {
+		String message = NETWORK_SAYS.get(reason);
+		if (message == null) {
+			throw new IllegalArgumentException("no network reason " + reason);
+		}
+		if (cause != null) {
+			LOGGER.debug("network: {}", reason, cause); // (the internet's failures are routine: a debug line)
+		}
 		return new Failure(NETWORK, "reason", reason, "message", message);
 	}
 

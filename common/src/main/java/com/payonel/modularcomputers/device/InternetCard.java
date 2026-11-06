@@ -30,8 +30,12 @@ import java.util.function.Supplier;
  * finds no room waits (the handshake: nothing dropped), so a download goes at the program's pace.
  * At most {@link #MAX_OPEN} requests at a time.
  * <p>
- * Its stream ({@link #pull}) is its access log, as a web server's: each request as it ends, its
- * method, URL, status (or why it failed), how long it took and the bytes it brought.
+ * Its stream ({@link #pull}) is its access log, as a web server's: each request as it ends, as a
+ * command's end (the user's, 2026-11-05: a request is a command over time), its method and URL
+ * always, then how it went: {@code {event = "request", ok = true, method, url, result = {status,
+ * millis, bytes}}}, or {@code {event = "request", ok = false, method, url, why, ...its fields, call
+ * = {args, progress = {status, millis, bytes, sent}}}} (its why flat, as an end's; stopped when its
+ * program closed it first; its call the arguments as given, a body cut to {@link #BODY_KEPT} bytes).
  */
 public final class InternetCard extends Card {
 	/** Requests open at once, a card. */
@@ -43,6 +47,10 @@ public final class InternetCard extends Card {
 	public static final int BUFFERED = 16;
 	/** Its access log's entries kept, at most: a small window (past it the oldest go; the user's: a reader sees what's current, at little memory). */
 	public static final int LOG = 8;
+	/** Its access log's event: a request's end. */
+	public static final String REQUEST = "request";
+	/** A body's bytes a failed request's call keeps (the user's: its start, enough to tell which; its size is the progress's sent). */
+	public static final int BODY_KEPT = 16;
 	/** Its draw a tick, at rest. */
 	public static final int DRAW = 4;
 	/** What a request costs. */
@@ -72,7 +80,12 @@ public final class InternetCard extends Card {
 	private final class Request {
 		final String method;
 		final String url;
+		/** Its arguments as given, its body cut to its start; and its body's whole size. */
+		final java.util.List<Object> given;
+		final long sent;
 		final long started = System.nanoTime();
+		/** Its end is in the log (once: a close and its thread's end can meet). */
+		final java.util.concurrent.atomic.AtomicBoolean logged = new java.util.concurrent.atomic.AtomicBoolean();
 		final LinkedBlockingQueue<String> body = new LinkedBlockingQueue<>(BUFFERED);
 		volatile Map<String, Object> response;
 		volatile boolean ended;
@@ -84,9 +97,11 @@ public final class InternetCard extends Card {
 		volatile boolean fresh;
 		HttpExchange exchange;
 
-		Request(String method, String url) {
+		Request(String method, String url, java.util.List<Object> given, long sent) {
 			this.method = method;
 			this.url = url;
+			this.given = given;
+			this.sent = sent;
 		}
 
 		void told() {
@@ -127,7 +142,12 @@ public final class InternetCard extends Card {
 		}
 		byte[] body = args.get(3) instanceof String text ? text.getBytes(StandardCharsets.ISO_8859_1) : null;
 		long handle = nextHandle++;
-		Request request = new Request(method != null ? method.toUpperCase(java.util.Locale.ROOT) : body == null ? "GET" : "POST", url);
+		java.util.List<Object> given = new java.util.ArrayList<>(EventQueue.given(args.values()));
+		if (given.size() > 3 && given.get(3) instanceof String text && text.length() > BODY_KEPT) {
+			given.set(3, text.substring(0, BODY_KEPT)); // (the log keeps its start, not the whole body)
+		}
+		Request request = new Request(method != null ? method.toUpperCase(java.util.Locale.ROOT) : body == null ? "GET" : "POST", url,
+			java.util.Collections.unmodifiableList(given), body == null ? 0 : body.length);
 		try {
 			request.exchange = HttpExchange.of(url, method, headers, body, policy.get(), resolver, listener(handle, request));
 		} catch (com.payonel.modularcomputers.internet.HttpExchange.Refused e) {
@@ -175,32 +195,44 @@ public final class InternetCard extends Card {
 			@Override
 			public void end() {
 				request.ended = true;
-				logged(request);
+				logged(request, false);
 				request.told();
 			}
 
 			@Override
 			public void failed(com.payonel.modularcomputers.runtime.Failure why) {
 				request.error = why;
-				logged(request);
+				logged(request, false);
 				request.told();
 			}
 		};
 	}
 
-	/** A request ended: its line in the access log. */
-	private void logged(Request request) {
-		Map<String, Object> entry = new LinkedHashMap<>();
-		entry.put("method", request.method);
-		entry.put("url", request.url);
-		Object status = request.response != null ? request.response.get("status") : null;
-		entry.put("status", status != null ? status : 0L);
-		entry.put("millis", (System.nanoTime() - request.started) / 1_000_000);
-		entry.put("bytes", request.bytes);
-		if (request.error != null) {
-			entry.put("failure", request.error.table()); // (a record's failure, nested: its fields are the dictionary's, as the entry's are)
+	/** A request ended (done, failed, or {@code stopped} by its program): its entry in the access log, as a command's end. */
+	private void logged(Request request, boolean stopped) {
+		if (!request.logged.compareAndSet(false, true)) {
+			return;
 		}
-		log.addLast(entry);
+		Object status = request.response != null ? request.response.get("status") : null;
+		Map<String, Object> measures = new LinkedHashMap<>();
+		measures.put("status", status != null ? status : 0L); // (0: no response came)
+		measures.put("millis", (System.nanoTime() - request.started) / 1_000_000);
+		measures.put("bytes", request.bytes);
+		Map<String, Object> entry;
+		if (request.error == null && !stopped) {
+			entry = EventQueue.done(REQUEST, measures);
+		} else {
+			measures.put("sent", request.sent);
+			Map<String, Object> call = EventQueue.call(request.given, measures);
+			entry = request.error != null ? EventQueue.failed(REQUEST, request.error, call) : EventQueue.stoppedEnd(REQUEST, call);
+		}
+		Map<String, Object> said = new LinkedHashMap<>();
+		said.put("event", entry.remove("event"));
+		said.put("ok", entry.remove("ok"));
+		said.put("method", request.method); // (what it is, always: never only in its call, the user's)
+		said.put("url", request.url);
+		said.putAll(entry);
+		log.addLast(said);
 		while (log.size() > LOG) {
 			log.pollFirst();
 		}
@@ -262,11 +294,14 @@ public final class InternetCard extends Card {
 		Request request = open.remove(args.checkInteger(0));
 		if (request != null) {
 			request.exchange.close();
+			if (!request.ended && request.error == null) {
+				logged(request, true); // (closed before its end: stopped, as a command its program stopped)
+			}
 		}
 		return Result.ok();
 	}
 
-	@Method(doc = "pull(): its access log's oldest entry, a request as it ended: {method, url, status, millis, bytes, failure (when it failed: {why, ...}, network or denied)}; or nil")
+	@Method(doc = "pull(): its access log's oldest entry, a request's end: {event = \"request\", ok = true, method, url, result = {status, millis, bytes}}, or {event = \"request\", ok = false, method, url, why (network, denied, stopped: closed first, or a fault), its why's fields, call = {args (a body cut to its first 16 bytes), progress = {status (0: no response), millis, bytes, sent}}}; or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(log.pollFirst());
 	}

@@ -62,4 +62,73 @@ class InternetCardTest {
 			web.stop(0);
 		}
 	}
+
+	/** Waits till the card's log has an entry, and takes it. */
+	@SuppressWarnings("unchecked")
+	private static Map<Object, Object> entry(InternetCard card) {
+		long deadline = System.currentTimeMillis() + ENDS_WITHIN;
+		Object entry;
+		while ((entry = card.pull(args()).first()) == null) {
+			assertThat(System.currentTimeMillis()).as("its entry came").isLessThan(deadline);
+			Thread.onSpinWait();
+		}
+		return (Map<Object, Object>) entry;
+	}
+
+	/**
+	 * A request's log entry is its end (the user's, 2026-11-05): done, its method and URL and how it
+	 * went in result; closed by its program first, stopped, its call the arguments as given (its body
+	 * cut to its first 16 bytes) and its progress, the body's whole size in sent. Logged once, the
+	 * close and its thread's end meeting or not.
+	 */
+	@Test
+	@ResourceLock("InternetCard.policy")
+	void aRequestsEntryIsItsEndDoneOrStoppedWithItsCall() throws Exception {
+		java.util.concurrent.CountDownLatch hold = new java.util.concurrent.CountDownLatch(1);
+		HttpServer web = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+		web.createContext("/", exchange -> {
+			byte[] body = "hi".getBytes();
+			exchange.sendResponseHeaders(200, body.length);
+			exchange.getResponseBody().write(body);
+			exchange.close();
+		});
+		web.createContext("/slow", exchange -> {
+			exchange.getRequestBody().readAllBytes();
+			try {
+				hold.await(); // (never answers till the test lets it go)
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+			exchange.close();
+		});
+		web.start();
+		InternetCard.policyFrom(() -> new InternetPolicy(true, List.of("127.0.0.1"), List.of()));
+		try {
+			String base = "http://127.0.0.1:" + web.getAddress().getPort();
+			InternetCard card = new InternetCard();
+			long done = (Long) card.request(args(base + "/")).first();
+			Map<Object, Object> ended = entry(card);
+			assertThat(ended).containsEntry("event", "request").containsEntry("ok", true).containsEntry("method", "GET")
+				.containsEntry("url", base + "/").doesNotContainKey("call");
+			assertThat(ended.get("result")).isEqualTo(Map.of("status", 200L, "bytes", 2L, "millis", ((Map<?, ?>) ended.get("result")).get("millis")));
+			card.close(args(done));
+
+			String body = "0123456789abcdef-and-the-rest";
+			long slow = (Long) card.request(args(base + "/slow", "POST", Map.of(), body)).first();
+			Thread.sleep(200); // (under way: sent, waiting for its answer)
+			card.close(args(slow));
+			Map<Object, Object> stopped = entry(card);
+			assertThat(stopped).containsEntry("event", "request").containsEntry("ok", false).containsEntry("method", "POST")
+				.containsEntry("url", base + "/slow").containsEntry("why", "stopped");
+			Map<?, ?> call = (Map<?, ?>) stopped.get("call");
+			assertThat(call.get("args")).as("as given, its body's start").isEqualTo(List.of(base + "/slow", "POST", Map.of(), "0123456789abcdef"));
+			Map<?, ?> progress = (Map<?, ?>) call.get("progress");
+			assertThat(progress).isEqualTo(Map.of("status", 0L, "bytes", 0L, "sent", (long) body.length(), "millis", progress.get("millis")));
+			assertThat(card.pull(args()).first()).as("logged once").isNull();
+		} finally {
+			hold.countDown();
+			InternetCard.policyFrom(() -> InternetPolicy.DEFAULT);
+			web.stop(0);
+		}
+	}
 }
