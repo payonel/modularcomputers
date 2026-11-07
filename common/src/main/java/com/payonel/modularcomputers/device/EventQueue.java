@@ -49,6 +49,12 @@ public final class EventQueue {
 		}
 		restored = false;
 		if (events.size() >= CAPACITY) {
+			// A burst over CAPACITY between a program's pulls loses its oldest here however fast the
+			// program drains: it takes only as fast as its board calls run, a share of each tick. For a
+			// log (the network card's traffic, the internet card's requests) that's a lost line, not
+			// lost data (frames refuse instead: offer), so it's accepted for now. The user's idea, if it
+			// matters later: no bound within a tick, then at the server tick, once the program has had
+			// its chance to take them, drop the oldest back under the limit (lost counted as here).
 			events.removeFirst();
 			lost++;
 		}
