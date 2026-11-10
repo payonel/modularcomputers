@@ -483,9 +483,13 @@ reports a robot docking and leaving.
 
 Creative only (OC's debug card, named for Minecraft's operators: Lua has its own debug). It runs
 server commands as a command block does, at its block, with a command block's permission
-(gamemaster: `time`, `weather`, `give`..., not `op` or `stop`), and returns how it went and what it
-said; each command is logged on the server. In mcos, `/dev/operator0`: a line written runs one, a
-read gives what the last one said.
+(gamemaster: `time`, `weather`, `give`..., not `op` or `stop`); each command is logged on the
+server. A command that ran answers `true` and what the game gave of it, nothing added (the user's,
+2026-11-10: the card dispatched it, the rest is the command's, as an HTTP response is a server's):
+`{successes, result, message, key}`, a command block's success count, its last run's value, what it
+said, its last message's translation key. No `get` (one door): in mcos, `/dev/operator0`'s line
+written runs one, and a read gives what the last one written said, kept by devfs (a driver's
+`answers`).
 
 ### The internet card
 

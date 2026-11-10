@@ -206,13 +206,13 @@ class DeviceExamplesTest extends McosHarness {
 		card.runWith(command -> {
 			ran.add(command);
 			if (command.startsWith("time")) {
-				return new OperatorCard.Outcome(true, 1000, "Set the time to 1000\n");
+				return new OperatorCard.Outcome(1, 1000, "Set the time to 1000\n", "commands.time.set.absolute");
 			} else if (command.startsWith("weather")) {
-				return new OperatorCard.Outcome(true, 1, "Set the weather to clear\n");
+				return new OperatorCard.Outcome(1, 1, "Set the weather to clear\n", "commands.weather.set.clear");
 			} else if (command.startsWith("title")) {
-				return new OperatorCard.Outcome(true, 1, "Showing new title for payonel\n");
+				return new OperatorCard.Outcome(1, 1, "Showing new title for payonel\n", "commands.title.show.title.single");
 			}
-			return new OperatorCard.Outcome(false, 0, "Unknown or incomplete command\n");
+			return new OperatorCard.Outcome(0, 0, "Unknown or incomplete command\n", "command.unknown.command");
 		});
 		return card;
 	}

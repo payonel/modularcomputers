@@ -99,7 +99,7 @@ public final class ExpansionHubBlockEntity extends CardHolderBlockEntity {
 		if (card instanceof com.payonel.modularcomputers.device.OperatorCard operator) {
 			operator.runWith(command -> level instanceof net.minecraft.server.level.ServerLevel server
 				? OperatorCommands.run(server, worldPosition, command)
-				: new com.payonel.modularcomputers.device.OperatorCard.Outcome(false, 0, "not in a world"));
+				: null); // (no world: the card says it's the host's bug)
 		}
 		// Minecraft writes only chunks marked changed: its cards' events and settings change as they're used.
 		card.onChange(() -> ChunkMarks.changed(level, worldPosition));

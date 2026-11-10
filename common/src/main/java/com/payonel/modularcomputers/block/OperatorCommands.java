@@ -25,10 +25,12 @@ public final class OperatorCommands {
 
 	public static OperatorCard.Outcome run(ServerLevel level, BlockPos pos, String command) {
 		StringBuilder output = new StringBuilder();
+		String[] key = {""};
 		CommandSource listener = new CommandSource() {
 			@Override
 			public void sendSystemMessage(Component message) {
 				output.append(message.getString()).append('\n');
+				key[0] = message.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents translated ? translated.getKey() : ""; // (the last one's: what a command block keeps)
 			}
 
 			@Override
@@ -46,15 +48,17 @@ public final class OperatorCommands {
 				return false; // (the log says what ran)
 			}
 		};
-		boolean[] success = {false};
+		long[] successes = {0};
 		long[] result = {0};
 		CommandSourceStack source = new CommandSourceStack(listener, Vec3.atCenterOf(pos), Vec2.ZERO, level, LevelBasedPermissionSet.GAMEMASTER, NAME,
 			level.getServer()).withCallback((ok, value) -> {
-				success[0] |= ok;
+				if (ok) {
+					successes[0]++; // (as a command block counts its SuccessCount)
+				}
 				result[0] = value;
 			});
 		ModularComputers.LOGGER.info("Operator Card at {} in {}: {}", pos.toShortString(), level.dimension().identifier(), command);
 		level.getServer().getCommands().performPrefixedCommand(source, command);
-		return new OperatorCard.Outcome(success[0], result[0], output.toString());
+		return new OperatorCard.Outcome(successes[0], result[0], output.toString(), key[0]);
 	}
 }

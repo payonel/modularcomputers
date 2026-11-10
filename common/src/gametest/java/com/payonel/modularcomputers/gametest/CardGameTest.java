@@ -431,11 +431,13 @@ public class CardGameTest {
 	public void anOperatorCardRunsServerCommandsAsACommandBlockDoes(GameTestHelper helper) {
 		var card = computerWith(helper, ModItems.OPERATOR_CARD, com.payonel.modularcomputers.device.OperatorCard.class);
 		Map<?, ?> answer = (Map<?, ?>) card.command(args("time set 1000")).first();
-		helper.assertValueEqual(answer.get("success"), true, "it ran: " + answer);
+		helper.assertValueEqual(answer.get("successes"), 1L, "it ran, once: " + answer);
 		helper.assertValueEqual(helper.getLevel().getOverworldClockTime() % 24000, 1000L, "the world's time is set");
-		helper.assertTrue(String.valueOf(answer.get("output")).contains("1000"), "and it said so: " + answer);
+		helper.assertTrue(String.valueOf(answer.get("message")).contains("1000"), "and it said so: " + answer);
+		helper.assertValueEqual(answer.get("key"), "commands.time.set.absolute", "its message's own key, as the game gave it");
+		helper.assertValueEqual(answer.keySet(), java.util.Set.of("successes", "result", "message", "key"), "what the game gave, nothing more");
 		Map<?, ?> refused = (Map<?, ?>) card.command(args("op somebody")).first();
-		helper.assertValueEqual(refused.get("success"), false, "an operator's own command is past a command block's permission");
+		helper.assertValueEqual(refused.get("successes"), 0L, "an operator's own command is past a command block's permission");
 		helper.succeed();
 	}
 

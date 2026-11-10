@@ -31,12 +31,13 @@ any player.
 `/dev/operator0` (`operator1` for the next card) runs commands.
 
 - **Write:** a line written runs one, at once (a leading `/` is allowed). A write whose command
-  failed fails (`EINVAL`), and the file then says why. An empty line fails the same way.
-- **Read:** what the last command said, its lines. The text is taken at the first read; seek back to
-  the start to read the newest.
+  succeeded in no run fails (`EINVAL`), and the file then says why. An empty line fails the same way.
+- **Read:** what the last command written to it said (its `message`), kept by mcos, not the card.
+  The text is taken at the first read; seek back to the start to read the newest.
 - **Poll:** always ready for `IN` and `OUT`. The card has no interrupt, so never `PRI`.
 - **ioctls:** its methods below, by name, in any open mode:
-  `sys.ioctl(fd, "command", "time set day")`. A failure is `nil`, its message and `EINVAL`.
+  `sys.ioctl(fd, "command", "time set day")`. A failure is `nil`, its why, `EINVAL` and the
+  failure.
   `setLabel` sets its label, as on every device file.
 
 ```sh
@@ -48,17 +49,26 @@ The second command prints what the server said, such as `Set the time to 1000`.
 
 ## Methods
 
-### command(text) → {success, result, output}
+### command(text) → {successes, result, message, key}
 
-Runs a server command, with or without its leading `/`, and answers how it went. `success` says
-whether it worked, `result` is the command's value (0 when it failed), and `output` is what it said
-(its lines, each ending in a new line). A command that fails still answers (with `success` false);
-only an empty command fails the call, with `bad_argument` (`expected = "command"`). A card not in a world answers
-`success = false`, `output = "not in a world"`.
+Runs a server command, with or without its leading `/`, and answers with what the game gave of it,
+as an HTTP response is a server's: the card ran it, and the rest is the command's own.
 
-### get() → string
+<!-- lua-fragment -->
+```lua
+local ok, answer = board.invoke(card, "command", "time set day")
+-- ok = true, answer = {successes = 1, result = 1000, message = "Set the time to 1000\n", key = "commands.time.set.absolute"}
+```
 
-What the last command said (its `output`), or `""` before the first.
+| Field | Value |
+|---|---|
+| `successes` | how many of its runs succeeded (a command block's success count: 0, it didn't work; more than 1 for a command run for several targets, such as `execute as @e ...`) |
+| `result` | its last run's value (what `execute store result` would keep), when it succeeded |
+| `message` | what it said, its lines, each ending in a new line: words for a person, never to parse |
+| `key` | its last message's translation key (`commands.time.set.absolute`, `argument.item.id.invalid`), the same in every language the server speaks; `""` when it said nothing, or nothing translatable |
+
+A command that didn't work still answers, with `successes = 0`: only an empty command fails the
+call, with `bad_argument` (`expected = "command"`).
 
 ## Events
 
@@ -79,7 +89,7 @@ A file of commands run through the `command` ioctl, each logged, stopping at the
 ```
 
 A greeter at the door: a redstone card hears a pressure plate, `command` runs a `title` command, and its
-`output` says who it was shown to:
+`message` says who it was shown to:
 
 ```lua
 {% include operator-greeter.lua %}

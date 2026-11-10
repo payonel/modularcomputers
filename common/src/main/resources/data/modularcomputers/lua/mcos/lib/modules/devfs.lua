@@ -573,12 +573,20 @@ local function aboutfile(device)
   }
 end
 
+-- The last line's answer written to a device whose driver reads it back (its answers: an operator
+-- card's, the card keeping nothing to repeat), by device id: the kernel's, so a cat after an echo
+-- reads it, as the device's own last answer would be.
+local answered = {}
+
 local function devicefile(device, mode)
   local plus = mode:find("+", 1, true)
   local reads, writes = mode:sub(1, 1) == "r" or plus, mode:sub(1, 1) ~= "r" or plus
   local driver = driverof(device)
   local reads = driver and driver.reads or {"get"} -- (the methods a read gives the answers of: its driver knows its type's)
-  local readable = (driver and driver.reads or device.get) ~= nil
+  -- (or what the last line written to it answered, as its driver says it: a device whose read is its
+  -- own last command's, no get repeating it: an operator card's)
+  local answers = driver and driver.answers
+  local readable = (driver and (driver.reads or answers) or device.get) ~= nil
   local lines = driver and driver.line
   local writable = (lines or device.set) ~= nil -- (lines is false with no driver: never "~= nil" alone)
   local events = device.pull and not readable
@@ -625,6 +633,9 @@ local function devicefile(device, mode)
       return k.BLOCK
     elseif not ok then
       return failed(why, errno or "EINVAL", failure)
+    end
+    if answers then
+      answered[id], data, at = why, nil, 0 -- (the next read gives this answer, from its start)
     end
     if driver.failed and driver.failed(why) then
       return fail("EINVAL") -- (its answer meant it failed: an operator's command that didn't succeed)
@@ -676,7 +687,9 @@ local function devicefile(device, mode)
       return 0
     end,
     read = function(self, n)
-      if data == nil then
+      if data == nil and answers then
+        data = answers(answered[id])
+      elseif data == nil then
         local answers = {}
         for i, method in ipairs(reads) do
           local ok, got, errno, failure = command(id, method)

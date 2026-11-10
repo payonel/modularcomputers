@@ -2,8 +2,9 @@
 -- lua operator-script.lua setup.txt [log]
 --
 -- Blank lines and lines starting with # are skipped. Each command goes to the operator card's
--- command method (an ioctl on its file, /dev/operator0), which answers a table: success, result
--- (the command's value) and output (what the server said). The log gets a line per command; the
+-- command method (an ioctl on its file, /dev/operator0), which answers what the game gave of it:
+-- successes (how many of its runs succeeded), result (the command's value), message (what the
+-- server said) and key (that message's translation key). The log gets a line per command; the
 -- first command that fails stops the run, and the exit status is 1, so a shell script can tell.
 local sys = require("sys")
 
@@ -30,9 +31,9 @@ for line in input:lines() do
       log:write(("%d: %s: error: %s\n"):format(number, command, why))
       status = 1
     else
-      local said = answer.output:gsub("\n", " "):gsub("%s+$", "")
-      log:write(("%d: %s: %s %d %s\n"):format(number, command, answer.success and "ok" or "FAILED", answer.result, said))
-      if not answer.success then
+      local said = answer.message:gsub("\n", " "):gsub("%s+$", "")
+      log:write(("%d: %s: %s %d %s\n"):format(number, command, answer.successes > 0 and "ok" or "FAILED", answer.result, said))
+      if answer.successes == 0 then
         status = 1
       end
     end

@@ -785,8 +785,8 @@ class McosTest extends McosHarness {
 		card.runWith(command -> {
 			ran.add(command);
 			return command.startsWith("time")
-				? new com.payonel.modularcomputers.device.OperatorCard.Outcome(true, 1000, "Set the time to 1000\n")
-				: new com.payonel.modularcomputers.device.OperatorCard.Outcome(false, 0, "Unknown command\n");
+				? new com.payonel.modularcomputers.device.OperatorCard.Outcome(1, 1000, "Set the time to 1000\n", "commands.time.set.absolute")
+				: new com.payonel.modularcomputers.device.OperatorCard.Outcome(0, 0, "Unknown command\n", "command.unknown.command");
 		});
 		devices.put(Motherboard.exp(0), card);
 		boot();

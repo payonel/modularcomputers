@@ -743,7 +743,7 @@ public final class BoardAssembly {
 		if (card instanceof com.payonel.modularcomputers.device.OperatorCard operator) {
 			operator.runWith(command -> host.level() instanceof ServerLevel server
 				? OperatorCommands.run(server, host.pos(), command)
-				: new com.payonel.modularcomputers.device.OperatorCard.Outcome(false, 0, "not in a world"));
+				: null); // (no world: the card says it's the host's bug)
 		}
 		card.onChange(host::markChanged);
 		card.frontFrom(() -> com.payonel.modularcomputers.device.Face.of(host.front().getName()));
