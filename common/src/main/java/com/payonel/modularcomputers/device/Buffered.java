@@ -144,6 +144,16 @@ public interface Buffered {
 	 * crafting card waiting for its robot's moves to end. The board's
 	 * refusal names it, so a program (and mcos) knows which device to wait on.
 	 */
+	/**
+	 * Whether its unread command ends fill its queue ({@link EventQueue#ENDS}): it takes no command
+	 * till its program reads some (the user's, 2026-11-11: an end is never dropped, the handshake),
+	 * refused at the board as a limit of events.
+	 */
+	boolean endsFull();
+
+	/** The most ends it holds unread (its queue's: the setting), what its refusal says as {@code max}. */
+	int endsMax();
+
 	default Object blocker(String method) {
 		return null;
 	}

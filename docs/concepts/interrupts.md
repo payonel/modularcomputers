@@ -92,6 +92,31 @@ and why), which raises its interrupt: the device's "idle again".
 A failure ends its own command only: the next one runs as any would. There's no queue to drain
 and no fault to clear.
 
+### No end is ever lost
+
+A command's end is the one answer to how it went, so a device never drops one, the way a disk
+controller never drops a completion. A program that reads its device's events never loses an end,
+however slow its computer runs. The rest of a device's events are news (a sighting, a change, a
+notice), which can be read again from its state, so it keeps the newest of them and drops the
+oldest past its window, the next event saying how many with `lost`.
+
+- **A device holds up to 1024 unread ends.** With that many waiting, its next command is refused,
+  `false, {why = "limit", of = "events", max = 1024}`, doing nothing, until its program reads some
+  (the `pull` method). It keeps sensing and acting on the world meanwhile. Under mcos the refusal
+  comes through as `nil, "limit", EAGAIN` and the failure: read the device's events, then give the
+  command again.
+- **Read the events of the commands you give.** A program that gives commands and never reads their
+  ends fills its device, and the device then refuses its commands until it does.
+- **Under mcos, every file open on a device gets every event, from the moment it's opened**, and a
+  file holds 32 unread. When one is full, mcos takes no more of that device's events till it's read
+  or closed: they wait in the device, nothing lost. So **every file open on a device must be read**:
+  one left open and unread (a forgotten `cat`) holds back the device's other readers.
+- **A program that wants a command's end opens the device's file first, then gives the command
+  through it**, and reads: a file opened after the end came doesn't see it, as on Linux.
+
+A server's admin sets the window and the ends (`device_event_window`, `device_command_ends`, each
+1024) in `config/modularcomputers.properties`.
+
 ## Why it matters
 
 A waiting computer draws the CPU's waiting rate, much less than its running rate: see

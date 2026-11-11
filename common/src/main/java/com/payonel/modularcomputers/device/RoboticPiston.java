@@ -41,6 +41,16 @@ public final class RoboticPiston implements Device, Buffered {
 	private boolean accepting;
 	private final EventQueue events = new EventQueue(line, () -> {
 	}, () -> accepting);
+
+	@Override
+	public boolean endsFull() {
+		return events.endsFull();
+	}
+
+	@Override
+	public int endsMax() {
+		return events.endsMax();
+	}
 	/** The move running: its method, and the ticks till it's done (0: none). */
 	private String moving;
 	private int left;

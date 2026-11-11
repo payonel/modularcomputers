@@ -139,6 +139,9 @@ final class MotherboardApi implements Board {
 		}
 		if (device.get() instanceof com.payonel.modularcomputers.device.Buffered buffered && !buffered.isFree(method)
 			&& DeviceMethods.of(device.get()).containsKey(method)) {
+			if (buffered.endsFull()) { // (its program's unread ends fill it: none is ever dropped, so it takes no more till they're read)
+				return Result.fail(com.payonel.modularcomputers.runtime.Failure.limit("events", buffered.endsMax())); // (its own limit: the setting, as its queue reads it)
+			}
 			String refused = buffered.refusal(method);
 			if (refused != null) {
 				// A command while another runs: nothing done (mcos waits, its thread only), and always the

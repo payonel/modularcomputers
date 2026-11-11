@@ -158,8 +158,11 @@ end
 -- A device's events, for every file open on it (the user's: each reader sees them all, a script and
 -- a cat alike): whoever asks takes what the device has (k.take, which listens when it has nothing),
 -- and every file open on it gets its own copy, in order. A file's own events are bounded: past
--- FILE_EVENTS the oldest go (a file nobody reads can't grow without end), the next one counting them
--- (lost), as a device's own queue does.
+-- FILE_EVENTS devfs takes no more of the device's events (the user's, 2026-11-11: devfs drops nothing
+-- and knows no kind of event; what's full is its own): they wait in the device, whose own policy says
+-- what it keeps (its news window, its ends a handshake), as a pipe's writer waits for its reader. A
+-- reader that stops reading holds its device's other readers too, till it reads or closes (its read
+-- or close is the kernel's progress: the others' waits are asked again, and take).
 local FILE_EVENTS = 32
 local readers = {} -- by device id: {[a file's key] = {its events, oldest first}}
 
@@ -179,6 +182,11 @@ end
 local function deliver(id)
   local taken = 0
   while true do
+    for _, queue in pairs(readers[id] or {}) do
+      if #queue >= FILE_EVENTS then
+        return true, nil, taken -- (a file full: the rest wait in the device, nothing dropped; its read wakes the others)
+      end
+    end
     local ok, event, failure = k.take(id, "pull")
     if not ok or event == nil then
       return ok, event, taken, failure
@@ -186,15 +194,7 @@ local function deliver(id)
     taken = taken + 1
     k.delivered = true -- (into other files' queues too: their waiters have news, a pass of their own)
     for _, queue in pairs(readers[id] or {}) do
-      if #queue >= FILE_EVENTS then
-        table.remove(queue, 1)
-        queue.lost = (queue.lost or 0) + 1
-      end
-      local own = deepcopy(event)
-      if queue.lost and type(own) == "table" then
-        own.lost, queue.lost = (own.lost or 0) + queue.lost, nil
-      end
-      queue[#queue + 1] = own
+      queue[#queue + 1] = deepcopy(event)
     end
   end
 end
@@ -850,6 +850,9 @@ local function withmethods(d, device)
       local why, failure = tostring(answer[2]), answer[4]
       if type(failure) == "table" and failure.why == "not_found" and failure.kind == "device" then
         return failed(why, nil, failure)
+      end
+      if type(failure) == "table" and failure.why == "limit" and failure.of == "events" then
+        return nil, why, "EAGAIN", failure -- (its unread ends fill it: read them, then give it more; Linux's flow control's word)
       end
       return nil, why, "EINVAL", failure -- (its why, then the failure itself: {why, ...}, its fields)
     end

@@ -26,6 +26,7 @@ local ERRNO = {
   ECHILD = "No child processes",
   EACCES = "Permission denied",
   EBUSY = "Device or resource busy",
+  EAGAIN = "Resource temporarily unavailable",
   EEXIST = "File exists",
   EXDEV = "Invalid cross-device link",
   ENODEV = "No such device",

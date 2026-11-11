@@ -46,6 +46,23 @@ class BufferedTest {
 			Map.of("event", "work", "ok", true), 1L);
 	}
 
+	/**
+	 * Its command ends are never dropped (the user's, 2026-11-11: lossless): with as many unread as it
+	 * holds, its next command is refused, a limit of events, till its program reads one.
+	 */
+	@Test
+	void withItsEndsUnreadFillingItItsNextCommandIsRefusedTillOneIsRead() {
+		List<Object> seen = new ArrayList<>();
+		run(board -> {
+			slow.endsUnread(com.payonel.modularcomputers.device.EventQueue.ends());
+			seen.add(board.invoke("id:slow", "work", 1L).failure().table());
+			board.invoke("id:slow", "pull");
+			seen.add(board.invoke("id:slow", "work", 1L).first());
+			Program.park(board);
+		});
+		assertThat(seen).containsExactly(Map.of("why", "limit", "of", "events", "max", (long) slow.endsMax()), true);
+	}
+
 	/** A refusal always names the device whose news ends the wait (the user's: one shape), its own too: false, why, its id. */
 	@Test
 	void aRefusalAlwaysNamesTheDeviceToWaitOnItsOwnToo() {

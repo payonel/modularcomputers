@@ -67,7 +67,7 @@ public final class NetworkCard extends Card {
 	private String wakeMessage;
 	/**
 	 * Its traffic, its frames in and out (its /dev file's: as tcpdump shows a card's), kept as a
-	 * device's events are: a window, its oldest going past {@link EventQueue#CAPACITY}, the next
+	 * device's events are: a window, its oldest going past {@link EventQueue#window}, the next
 	 * entry saying how many as lost (the user's). Not saved, and its news isn't held pending: its
 	 * frames' interrupt isn't held up by a log nobody reads.
 	 */
@@ -173,7 +173,7 @@ public final class NetworkCard extends Card {
 
 	/** A frame's refusal (FULL, UNREACHABLE) as its failure: send's answer and its log's alike. */
 	static com.payonel.modularcomputers.runtime.Failure failure(String refused) {
-		return FULL.equals(refused) ? com.payonel.modularcomputers.runtime.Failure.limit("frames", EventQueue.CAPACITY) : com.payonel.modularcomputers.runtime.Failure.network(UNREACHABLE, null);
+		return FULL.equals(refused) ? com.payonel.modularcomputers.runtime.Failure.limit("frames", EventQueue.FRAMES) : com.payonel.modularcomputers.runtime.Failure.network(UNREACHABLE, null);
 	}
 
 	@Method(doc = "broadcast(data): a frame to every card it reaches (bytes, at most 8192), as best it can: how many took it")

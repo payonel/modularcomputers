@@ -275,7 +275,13 @@ device data), and user code, as a real CPU runs firmware under an OS.
   calls is exact on a loaded host (a test asserting "exactly one call" failed on CI now and then,
   and was dropped). Keep these: no read past the end that costs a call, no fill past the budget.
 - **Flow control is a handshake, never a silent drop:** a device keeps its data until there's room;
-  what a full device does is its own business.
+  what a full device does is its own business. **A command's end is never lost** (the user's,
+  2026-11-11: NVMe's completion queue, io_uring's NODROP): a device's `EventQueue` keeps news in a
+  window (lossy, `lost` said: news is read again from its state) and every end, at most
+  `device_command_ends` unread (the config's, 1024), its next command then refused at the board,
+  `limit {of = "events", max}` its own (`Buffered.endsMax`), mcos's `EAGAIN`: never blocked, as only
+  user code gives commands, and a thread that both gives and reads would deadlock itself. So a
+  program that reads its device's events never loses an end, however slow its computer.
 - **A device reports every change to its state, from wherever it came:** an event in its own terms
   (a redstone face's level and whether the change came in, was its own, or another card's; a
   motion; a sound heard; a disk's change by path, or byte ranges raw), raising its interrupt, taken by a method of
@@ -782,7 +788,11 @@ before it takes off). A move already done (an arm out
   2026-11-10: evdev's way, a sitting `cat` or `tail -f` shows what happens; never a backlog): at an
   open, devfs gives what waits in the device to the files already open (none: it's gone), then
   takes the new file in. devfs takes them (`deliver`) and
-  gives each file its own copy, bounded, so a program and a `cat` each see them all; a file's
+  gives each file its own copy, bounded (32), so a program and a `cat` each see them all; **devfs
+  drops nothing and knows no kind of event** (the user's, 2026-11-11): with a file full it takes no
+  more of the device's, which wait in the device, as a pipe's writer waits (a file left unread holds
+  the device's other readers back; its read or close is the kernel's progress, and they take again:
+  nothing to wake, nothing spins, tested); a file's
   readiness counts what it holds (a poll that took the events itself would otherwise wait for a
   line that already fell).
 - **`lib/devices.lua` is user space's convenience over `/dev`, `/sys` and inotify** (the user's;

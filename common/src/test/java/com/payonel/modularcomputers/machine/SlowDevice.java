@@ -20,6 +20,30 @@ public final class SlowDevice implements com.payonel.modularcomputers.bus.Device
 	private boolean accepting;
 	private final EventQueue events = new EventQueue(line, () -> {
 	}, () -> accepting);
+
+	@Override
+	public boolean endsFull() {
+		return events.endsFull();
+	}
+
+	@Override
+	public int endsMax() {
+		return events.endsMax();
+	}
+
+	/** {@code n} events of its own news at once (a burst). */
+	public void newsBurst(int n) {
+		for (int i = 0; i < n; i++) {
+			events.add(Map.of("event", "news"));
+		}
+	}
+
+	/** Ends of work it did, unread, {@code n} of them (a program that never read its ends). */
+	public void endsUnread(int n) {
+		for (int i = 0; i < n; i++) {
+			events.ended("work", null);
+		}
+	}
 	/** Ticks left of the command running (0: idle). */
 	private long left;
 	private long done;

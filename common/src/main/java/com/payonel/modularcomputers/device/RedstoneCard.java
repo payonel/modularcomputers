@@ -45,6 +45,16 @@ public final class RedstoneCard extends Card implements Buffered {
 	/** It works while a running computer has it on its bus (it draws nothing to speak of at rest). */
 	private final BusPower power = new BusPower(0);
 	private final EventQueue events = new EventQueue(line, this::changed, this::isAccepting);
+
+	@Override
+	public boolean endsFull() {
+		return events.endsFull();
+	}
+
+	@Override
+	public int endsMax() {
+		return events.endsMax();
+	}
 	private final int[] output = new int[SIDES.size()];
 	/** What it last saw coming in on each face (from outside the block). */
 	private final int[] input = new int[SIDES.size()];

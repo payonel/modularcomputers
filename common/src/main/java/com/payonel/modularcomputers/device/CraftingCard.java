@@ -83,6 +83,16 @@ public final class CraftingCard extends Card implements Buffered {
 
 	private final InterruptLine line = new InterruptLine();
 	private final EventQueue events = new EventQueue(line, this::changed, this::isAccepting);
+
+	@Override
+	public boolean endsFull() {
+		return events.endsFull();
+	}
+
+	@Override
+	public int endsMax() {
+		return events.endsMax();
+	}
 	private final BusPower power = new BusPower(0);
 	private Bench bench = new Bench() {
 		@Override

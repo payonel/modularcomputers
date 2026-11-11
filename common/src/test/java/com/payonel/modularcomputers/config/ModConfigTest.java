@@ -35,6 +35,16 @@ class ModConfigTest {
 		assertThat(BatteryTier.TIER_3.infinite()).isTrue();
 	}
 
+	/** Devices' events are settings (the user's, 2026-11-11): the news window and the unread command ends, each 1024 by default. */
+	@Test
+	void devicesEventSettingsAreWrittenAtTheirDefaults() throws IOException {
+		Path file = dir.resolve("config").resolve(ModConfig.FILE_NAME);
+		ModConfig.load(file);
+		assertThat(Files.readString(file)).contains("device_event_window: 1024", "device_command_ends: 1024");
+		assertThat(com.payonel.modularcomputers.device.EventQueue.window()).isEqualTo(1024);
+		assertThat(com.payonel.modularcomputers.device.EventQueue.ends()).isEqualTo(1024);
+	}
+
 	@Test
 	void readsKeyColonValueLinesWithFractionsAndZeroForever() throws IOException {
 		Path file = dir.resolve(ModConfig.FILE_NAME);

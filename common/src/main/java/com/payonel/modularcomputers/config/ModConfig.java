@@ -38,6 +38,9 @@ public final class ModConfig {
 	public static final String INTERNET_ENABLED_KEY = "internet_enabled";
 	public static final String INTERNET_ALLOW_KEY = "internet_allow";
 	public static final String INTERNET_DENY_KEY = "internet_deny";
+	/** Devices' events: the news each keeps (lossy, a window), and the command ends it holds unread before it refuses its next command (lossless). */
+	public static final String EVENT_WINDOW_KEY = "device_event_window";
+	public static final String COMMAND_ENDS_KEY = "device_command_ends";
 	/** The internet's settings, as last loaded (the server's: clients never use them). */
 	private static volatile com.payonel.modularcomputers.internet.InternetPolicy internet = com.payonel.modularcomputers.internet.InternetPolicy.DEFAULT;
 
@@ -89,6 +92,9 @@ public final class ModConfig {
 		if (!enabled.equals("true") && !enabled.equals("false")) {
 			ModularComputers.LOGGER.warn("{}: {} should be true or false, not \"{}\"; using true", FILE_NAME, INTERNET_ENABLED_KEY, enabled);
 		}
+		com.payonel.modularcomputers.device.EventQueue.configure(
+			(int) Math.min(Integer.MAX_VALUE, number(properties, EVENT_WINDOW_KEY, com.payonel.modularcomputers.device.EventQueue.WINDOW, "a count of 1 or more")),
+			(int) Math.min(Integer.MAX_VALUE, number(properties, COMMAND_ENDS_KEY, com.payonel.modularcomputers.device.EventQueue.ENDS, "a count of 1 or more")));
 		internet = new com.payonel.modularcomputers.internet.InternetPolicy(!enabled.equals("false"), list(properties, INTERNET_ALLOW_KEY),
 			list(properties, INTERNET_DENY_KEY));
 	}
@@ -149,7 +155,21 @@ public final class ModConfig {
 				# internet_enabled: false turns them off. internet_deny: hosts, domains (.example.com) or ranges
 				# (203.0.113.0/24) also refused. internet_allow: ones reached though they'd be refused (a LAN service
 				# you mean computers to use). Comma-separated; a deny wins.
-				""", internetDefaults()));
+				""", internetDefaults()),
+			new Section("""
+				# What a device keeps for its computer's program. device_event_window: the news it keeps unread (a
+				# sensor's sightings, a card's changes, its logs' lines): when more come, the oldest go, and the next
+				# says how many were lost. device_command_ends: how many ends of its commands (how each went) it holds
+				# unread: none is ever dropped, so with that many waiting it takes no more commands till the program
+				# reads some. Each at least 1.
+				""", eventDefaults()));
+	}
+
+	private static Map<String, String> eventDefaults() {
+		Map<String, String> settings = new LinkedHashMap<>();
+		settings.put(EVENT_WINDOW_KEY, Integer.toString(com.payonel.modularcomputers.device.EventQueue.WINDOW));
+		settings.put(COMMAND_ENDS_KEY, Integer.toString(com.payonel.modularcomputers.device.EventQueue.ENDS));
+		return settings;
 	}
 
 	private static Map<String, String> internetDefaults() {

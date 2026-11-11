@@ -70,7 +70,7 @@ public final class InternetCard extends Card {
 	private final Map<Long, Request> open = new ConcurrentHashMap<>();
 	/**
 	 * Its access log, kept as a device's events are (the user's): a window, its oldest going past
-	 * {@link EventQueue#CAPACITY}, the next entry saying how many as lost; pending till taken. Server
+	 * {@link EventQueue#window}, the next entry saying how many as lost; pending till taken. Server
 	 * thread only: entries made on a request's thread wait in {@link #ending} for the next tick.
 	 */
 	private final EventQueue log = new EventQueue(line, () -> { }, this::isAccepting);

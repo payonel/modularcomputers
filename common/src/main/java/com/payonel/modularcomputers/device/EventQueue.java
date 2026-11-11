@@ -5,14 +5,31 @@ import java.util.ArrayDeque;
 import java.util.Map;
 
 /**
- * A sensor card's events, waiting for its program: its interrupt is pending while any wait, and
- * raising its line wakes its computer. Bounded: when it's full the oldest goes, and the next event
- * says how many were lost ({@code lost}), so a program can tell (this is the card's own choice of
- * what to drop: a device keeps its data until there's room for it, until it can't).
+ * A device's events, waiting for its program: its interrupt is pending while any wait, and raising
+ * its line wakes its computer. Two kinds, kept in order (the user's, 2026-11-11: command ends are
+ * lossless): news (a sensor's sighting, a change, a notice) is a window, {@link #window} at most,
+ * its oldest going when it's full and the next event saying how many were lost ({@code lost}), as
+ * news can be read again from the device's state; a command's end (an event with {@code ok}, built
+ * by the end builders here) is never dropped, {@link #ends} at most, its device refusing its next
+ * command while that many wait unread ({@link #endsFull}: the handshake). A log ({@link #record})
+ * is a window of all it holds.
  */
 public final class EventQueue {
-	public static final int CAPACITY = 32;
-	private final ArrayDeque<Map<String, Object>> events = new ArrayDeque<>();
+	/** A device's news window by default: the newest it keeps (the user's, 2026-11-11: 1024; a setting, {@link #window}). */
+	public static final int WINDOW = 1024;
+	/** The most command ends a device holds unread by default before it refuses its next command (the user's: 1024; a setting, {@link #ends}). */
+	public static final int ENDS = 1024;
+	/** A network card's frame ring: frames waiting for its program, the next refused when it's full (a data ring's handshake, not a window). */
+	public static final int FRAMES = 32;
+	/** The settings, as last loaded ({@code device_event_window}, {@code device_command_ends}). */
+	private static volatile int window = WINDOW;
+	private static volatile int endsLimit = ENDS;
+	/** An event waiting, and whether it's a command's end (never dropped). */
+	private record Waiting(Map<String, Object> event, boolean end) {
+	}
+	private final ArrayDeque<Waiting> events = new ArrayDeque<>();
+	/** How many of what waits are ends. */
+	private int ends;
 	private final InterruptLine line;
 	/** Its card, told when its contents change. */
 	private final Runnable changed;
@@ -48,8 +65,69 @@ public final class EventQueue {
 			return; // its card takes no data now
 		}
 		restored = false;
-		if (events.size() >= CAPACITY) {
-			// A burst over CAPACITY between a program's pulls loses its oldest here however fast the
+		boolean end = event.containsKey("ok"); // (a command's end: every end builder here gives one; news and notices have none)
+		if (!end && events.size() - ends >= window) {
+			for (var each = events.iterator(); each.hasNext(); ) { // (the oldest news goes: an end never does)
+				if (!each.next().end()) {
+					each.remove();
+					break;
+				}
+			}
+			lost++;
+		}
+		keep(event, end);
+	}
+
+	/** Puts an event in, saying how many went before it (lost). */
+	private void keep(Map<String, Object> event, boolean end) {
+		if (lost > 0) {
+			var counted = new java.util.LinkedHashMap<>(event);
+			counted.put("lost", lost);
+			event = counted;
+			lost = 0;
+		}
+		events.addLast(new Waiting(event, end));
+		if (end) {
+			ends++;
+		}
+		changed.run();
+		line.raise();
+	}
+
+	/** The most ends it holds unread before its device refuses a command (the setting, as it reads it now). */
+	public int endsMax() {
+		return endsLimit;
+	}
+
+	/** Whether its command ends fill it: its device takes no more commands till its program reads some (lossless, the handshake). */
+	public boolean endsFull() {
+		return ends >= endsLimit;
+	}
+
+	/** The news window now (the setting). */
+	public static int window() {
+		return window;
+	}
+
+	/** The most unread ends now (the setting). */
+	public static int ends() {
+		return endsLimit;
+	}
+
+	/** The server's settings (ModConfig's): each at least 1. */
+	public static void configure(int newsWindow, int commandEnds) {
+		window = Math.max(1, newsWindow);
+		endsLimit = Math.max(1, commandEnds);
+	}
+
+	/** A log's entry: a window of all it holds, its oldest going past {@link #window}. */
+	private void window(Map<String, Object> entry) {
+		if (!accepting.getAsBoolean()) {
+			return;
+		}
+		restored = false;
+		if (events.size() >= window) {
+			// A burst over its window between a program's pulls loses its oldest here however fast the
 			// program drains: it takes only as fast as its board calls run, a share of each tick. For a
 			// log (the network card's traffic, the internet card's requests) that's a lost line, not
 			// lost data (frames refuse instead: offer), so it's accepted for now. The user's idea, if it
@@ -58,26 +136,18 @@ public final class EventQueue {
 			events.removeFirst();
 			lost++;
 		}
-		if (lost > 0) {
-			var counted = new java.util.LinkedHashMap<>(event);
-			counted.put("lost", lost);
-			event = counted;
-			lost = 0;
-		}
-		events.addLast(event);
-		changed.run();
-		line.raise();
+		keep(entry, false);
 	}
 
 	/**
 	 * A log's entry (a device's record of what it did: the network card's traffic, the internet card's
-	 * requests), kept as any event is, its oldest going past {@link #CAPACITY} and the next saying how
+	 * requests), kept as any event is, its oldest going past {@link #window} and the next saying how
 	 * many as {@code lost}: built by its device from the builders (a refusal's fields a {@link
 	 * com.payonel.modularcomputers.runtime.Failure}'s, an end's {@link #failed}), so its why isn't
 	 * refused here as {@link #add}'s is.
 	 */
 	void record(Map<String, Object> entry) {
-		put(entry);
+		window(entry);
 	}
 
 	/**
@@ -85,10 +155,10 @@ public final class EventQueue {
 	 * that refuses rather than drops: its sender hears, and tries again).
 	 */
 	boolean offer(Map<String, Object> event) {
-		if (!accepting.getAsBoolean() || events.size() >= CAPACITY) {
+		if (!accepting.getAsBoolean() || events.size() >= FRAMES) {
 			return false;
 		}
-		events.addLast(event);
+		events.addLast(new Waiting(event, false));
 		changed.run();
 		line.raise();
 		return true;
@@ -366,11 +436,15 @@ public final class EventQueue {
 
 	public Map<String, Object> pull() {
 		restored = false;
-		Map<String, Object> event = events.pollFirst();
-		if (event != null) {
-			changed.run();
+		Waiting first = events.pollFirst();
+		if (first == null) {
+			return null;
 		}
-		return event;
+		if (first.end()) {
+			ends--;
+		}
+		changed.run();
+		return first.event();
 	}
 
 
@@ -392,6 +466,7 @@ public final class EventQueue {
 			return true; // nothing changed
 		}
 		events.clear();
+		ends = 0;
 		lost = 0;
 		changed.run();
 		return true;
@@ -399,7 +474,8 @@ public final class EventQueue {
 
 	/** What it holds, to save: the events waiting, and how many were lost since the last kept. */
 	public void save(Map<String, Object> saved) {
-		saved.put("events", java.util.List.copyOf(events));
+		saved.put("events", events.stream().map(Waiting::event).toList());
+		saved.put("ends", events.stream().map(Waiting::end).toList()); // (which are ends: never dropped, at a load too)
 		saved.put("lost", lost);
 	}
 
@@ -407,10 +483,16 @@ public final class EventQueue {
 	@SuppressWarnings("unchecked")
 	public void restore(Map<String, Object> saved) {
 		events.clear();
+		ends = 0;
+		java.util.List<?> kinds = saved.get("ends") instanceof java.util.List<?> list ? list : java.util.List.of();
 		if (saved.get("events") instanceof java.util.List<?> kept) {
-			for (Object event : kept) {
-				if (event instanceof Map<?, ?> map && events.size() < CAPACITY) {
-					events.addLast((Map<String, Object>) map);
+			for (int i = 0; i < kept.size(); i++) {
+				boolean end = i < kinds.size() && Boolean.TRUE.equals(kinds.get(i));
+				if (kept.get(i) instanceof Map<?, ?> map && (end ? ends < endsLimit : events.size() - ends < window)) {
+					events.addLast(new Waiting((Map<String, Object>) map, end));
+					if (end) {
+						ends++;
+					}
 				}
 			}
 		}

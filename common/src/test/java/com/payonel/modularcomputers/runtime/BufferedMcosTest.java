@@ -204,4 +204,99 @@ class BufferedMcosTest extends McosHarness {
 		type("lua /files.lua\r");
 		untilFile(root().resolve("out"), "work true work true false stopped bad_argument EINVAL\n");
 	}
+
+	/** A burst of news: more than a file's room (devfs's 32). */
+	private static final int BURST = 40;
+	/** How long the test holds a reader back, in ticks. */
+	private static final int STALLED_TICKS = 100;
+
+	/** A reader that keeps reading, however late, until it has its command's end: its events, how many were lost, whether the end came. */
+	private static final String READER = """
+		local sys = require("sys")
+		local fd = assert(sys.open("/dev/fabricator0"))
+		local started = io.open("/started", "w") started:close()
+		assert(sys.ioctl(fd, "work", %d))
+		sys.sleep(%s) -- (late: more than devfs holds a file come meanwhile)
+		local news, lost, ended, empty = 0, 0, false, 0
+		while not ended do
+		  local event = sys.ioctl(fd, "pull")
+		  if event == nil then
+		    empty = empty + 1 -- (woken, or looking, and nothing there)
+		    sys.poll({[fd] = {PRI = true}})
+		  else
+		    lost = lost + (event.lost or 0)
+		    if event.event == "work" then ended = true else news = news + 1 end
+		  end
+		end
+		local out = io.open("/out", "w")
+		out:write(news, " ", lost, " ", empty, "\\n")
+		out:close()
+		""";
+
+	/**
+	 * A reader that keeps reading loses nothing, however late it reads (the user's, 2026-11-11: a
+	 * program that reads its device's events never loses an end): devfs takes only what its file has
+	 * room for, the rest waiting in the device, never dropped.
+	 */
+	@Test
+	void aReaderThatReadsLateLosesNothing() {
+		slow.chatterEvery(1); // (an event a tick: far more than a file's room while it sleeps)
+		file("reader.lua", READER.formatted(60, "2"));
+		boot();
+		type("lua /reader.lua\r");
+		settle(() -> java.nio.file.Files.isRegularFile(root().resolve("out")) && read(root().resolve("out")).endsWith("\n"));
+		String[] said = read(root().resolve("out")).strip().split(" ");
+		assertThat(Long.parseLong(said[1])).as("none lost").isZero();
+		assertThat(Long.parseLong(said[0])).as("more than a file holds came while it slept: devfs held them in the device").isGreaterThan(32);
+	}
+
+	/**
+	 * A file open on a device that's never read holds its device's other readers back, nothing
+	 * dropped, till it's read or closed; and meanwhile nothing spins: the reader waits for that file,
+	 * not the device (whose interrupt stays up), so the computer idles.
+	 */
+	@Test
+	void aFileNeverReadHoldsTheOthersBackDroppingNothingAndNothingSpins() {
+		file("reader.lua", """
+			local sys = require("sys")
+			local fd = assert(sys.open("/dev/fabricator0"))
+			local started = io.open("/started", "w") started:close()
+			local news, lost, empty = 0, 0, 0
+			while news < %d do -- (the burst's, and nothing after: the device is quiet once it's come)
+			  local event = sys.ioctl(fd, "pull")
+			  if event == nil then
+			    empty = empty + 1
+			    sys.poll({[fd] = {PRI = true}})
+			  else
+			    lost = lost + (event.lost or 0)
+			    news = news + 1
+			  end
+			end
+			local out = io.open("/out", "w")
+			out:write(news, " ", lost, " ", empty, "\\n")
+			out:close()
+			""".formatted(BURST));
+		file("holder.lua", """
+			local sys = require("sys")
+			local fd = assert(sys.open("/dev/fabricator0")) -- (open, and never read)
+			local held = io.open("/held", "w") held:close()
+			io.read() -- (till a line is typed)
+			""");
+		boot();
+		type("lua /reader.lua &\r");
+		untilFile(root().resolve("started"), "");
+		type("lua /holder.lua\r");
+		untilFile(root().resolve("held"), "");
+		untilIdle();
+		server.add(() -> slow.newsBurst(BURST)); // (more than the holder's file holds: the reader takes its room's worth, then waits)
+		int[] ticks = {0};
+		settle(() -> ++ticks[0] > STALLED_TICKS); // (held back a while, the rest waiting in the device, its interrupt up)
+		assertThat(java.nio.file.Files.isRegularFile(root().resolve("out"))).as("held back: the holder's file is full").isFalse();
+		type("\r"); // (the holder goes: its file closes)
+		settle(() -> java.nio.file.Files.isRegularFile(root().resolve("out")) && read(root().resolve("out")).endsWith("\n"));
+		String[] said = read(root().resolve("out")).strip().split(" ");
+		assertThat(Long.parseLong(said[0])).as("every one of the burst, none dropped").isEqualTo(BURST);
+		assertThat(Long.parseLong(said[1])).as("none lost").isZero();
+		assertThat(Long.parseLong(said[2])).as("held back, it waited for the holder's file, never woken for nothing (no spin)").isLessThan(STALLED_TICKS / 10);
+	}
 }

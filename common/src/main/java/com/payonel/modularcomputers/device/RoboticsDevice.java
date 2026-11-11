@@ -267,6 +267,16 @@ public final class RoboticsDevice implements Device, Buffered {
 	private final InterruptLine line = new InterruptLine();
 	private final BusPower power = new BusPower(0);
 	private final EventQueue events = new EventQueue(line, this::changed, () -> this.accepting);
+
+	@Override
+	public boolean endsFull() {
+		return events.endsFull();
+	}
+
+	@Override
+	public int endsMax() {
+		return events.endsMax();
+	}
 	private Body body = new Body() {
 		@Override
 		public String walk(double forward, double right, double up) {
