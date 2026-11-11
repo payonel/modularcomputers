@@ -69,14 +69,14 @@ public final class RoboticPiston implements Device, Buffered {
 
 	/** Moves an arm in the world. */
 	public interface Arms {
-		Moved move(String side, Motion motion);
+		Moved move(String face, Motion motion);
 	}
 
-	private Arms arms = (side, motion) -> motion == Motion.RETRACT ? Moved.ALREADY : Moved.CANNOT_PUSH;
+	private Arms arms = (face, motion) -> motion == Motion.RETRACT ? Moved.ALREADY : Moved.CANNOT_PUSH;
 	/** The block keeping a push on a side from moving (null: none to name), in the world (its block). */
-	private java.util.function.UnaryOperator<String> blocker = side -> null;
+	private java.util.function.UnaryOperator<String> blocker = face -> null;
 	/** The block next to it on a side (its cable port's: what blocks a move there), in the world (its block). */
-	private java.util.function.UnaryOperator<String> neighbor = side -> null;
+	private java.util.function.UnaryOperator<String> neighbor = face -> null;
 
 	@Override
 	public DeviceType type() {
@@ -114,29 +114,29 @@ public final class RoboticPiston implements Device, Buffered {
 		this.neighbor = neighbor;
 	}
 
-	@Method(doc = "push(side): pushes as a piston does on that side (north, south, east, west, up or down; or front, back, left, right: its front is opposite its cable), and the arm comes back on its own. A command: true at once (its event: push, once the arm is back; at once when its arm is out already, ok: nothing to do; or not ok, blocked: block, the first down its line that won't move, left out when no one block is to blame, and face, the side), or false and why it can't start (no such face); on its cable port's side its end is blocked at once, by its cable (air when it's linked by Bluetooth)")
+	@Method(doc = "push(face): pushes as a piston does on that face (north, south, east, west, up or down; or front, back, left, right: its front is opposite its cable), and the arm comes back on its own. A command: true at once (its event: push, once the arm is back; at once when its arm is out already, ok: nothing to do; or not ok, blocked: block, the first down its line that won't move, left out when no one block is to blame, and face, the side), or false and why it can't start (no such face); on its cable port's side its end is blocked at once, by its cable (air when it's linked by Bluetooth)")
 	public Result push(Arguments args) {
 		return move(args, Motion.PUSH);
 	}
 
-	@Method(doc = "extend(side): pushes on that side and leaves the arm out until retract(side). A command: true at once (its event: extend, once it's out; at once when it's out already, ok and free; or not ok, blocked, as push's), or false and why it can't start (no such face); on its cable port's side, blocked, as push's")
+	@Method(doc = "extend(face): pushes on that face and leaves the arm out until retract(face). A command: true at once (its event: extend, once it's out; at once when it's out already, ok and free; or not ok, blocked, as push's), or false and why it can't start (no such face); on its cable port's side, blocked, as push's")
 	public Result extend(Arguments args) {
 		return move(args, Motion.EXTEND);
 	}
 
-	@Method(doc = "retract(side): takes the arm on that side back in (a sticky piston pulls what's in front of it). A command: true at once (its event: retract, once it's in; at once when no arm is out there, ok: nothing to do), or false and why it can't start (no such face); on its cable port's side, blocked, as push's")
+	@Method(doc = "retract(face): takes the arm on that face back in (a sticky piston pulls what's in front of it). A command: true at once (its event: retract, once it's in; at once when no arm is out there, ok: nothing to do), or false and why it can't start (no such face); on its cable port's side, blocked, as push's")
 	public Result retract(Arguments args) {
 		return move(args, Motion.RETRACT);
 	}
 
 	private Result move(Arguments args, Motion motion) {
-		String side;
+		String face;
 		try {
-			side = Face.named(args.checkString(0), front.get()).id();
+			face = Face.named(args.checkString(0), front.get()).id();
 		} catch (IllegalArgumentException e) {
 			return Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, args.checkString(0), "face"));
 		}
-		Moved moved = arms.move(side, motion);
+		Moved moved = arms.move(face, motion);
 		if (moved != Moved.ALREADY) {
 			power.charge(PUSH_COST);
 		}
@@ -153,12 +153,12 @@ public final class RoboticPiston implements Device, Buffered {
 			}
 			case CANNOT_PUSH -> {
 				// (its end at once, as every command's: blocked, the block, its face the world's way)
-				events.blocked(method, blocker.apply(side), side, call(method)); // (nothing moved: progress 0)
+				events.blocked(method, blocker.apply(face), face, call(method)); // (nothing moved: progress 0)
 				yield Result.ok(true);
 			}
 			case CABLE -> {
 				// (its cable port's side: no arm there, blocked by what's on it, its cable, or air with Bluetooth)
-				events.blocked(method, neighbor.apply(side), side, call(method));
+				events.blocked(method, neighbor.apply(face), face, call(method));
 				yield Result.ok(true);
 			}
 		};

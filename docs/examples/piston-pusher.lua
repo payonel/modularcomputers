@@ -1,5 +1,5 @@
 -- Push whatever is in front of the piston every few seconds, as a farm's harvester or a block
--- conveyor does: lua piston-pusher.lua [side] &
+-- conveyor does: lua piston-pusher.lua [face] &
 --
 -- push is a pulse: the arm goes out and comes back by itself. When nothing will move (the line
 -- of blocks is too long, or something immovable is in the way) its end says so (blocked, the block
@@ -12,7 +12,7 @@ local PERIOD = 2      -- seconds between pushes
 local BLOCKED = 10    -- seconds to wait after a push that could not move anything
 local LOG = "/home/pusher.log"
 
-local side = arg[1] or "front"
+local face = arg[1] or "front"
 local piston = assert(sys.open("/dev/actuator0"))
 
 local function log(text)
@@ -44,7 +44,7 @@ end
 
 local blocked = false
 while true do
-  local done, why = sys.ioctl(piston, "push", side)
+  local done, why = sys.ioctl(piston, "push", face)
   local got = done and ended(piston, "push")
   if done and got.ok then
     if blocked then

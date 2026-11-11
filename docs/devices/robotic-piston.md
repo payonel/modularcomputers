@@ -4,7 +4,7 @@ section: Devices
 order: 150
 ---
 
-A robotic piston pushes, as a vanilla piston does, on any side a program names. It is how a computer
+A robotic piston pushes, as a vanilla piston does, on any face a program names. It is how a computer
 moves blocks.
 
 <div class="infobox" markdown="1">
@@ -30,7 +30,7 @@ A push moves the blocks in front of it with vanilla piston mechanics, slide and 
 out, and goes back by itself. A sticky piston pulls back what is in front of its arm
 when the arm retracts. An arm cannot be pushed by other pistons.
 
-A piston has a **front**: the side opposite its cable port. A program can name a side by the world's
+A piston has a **front**: the side opposite its cable port. A program names a face by the world's
 names or relative to that front, so `front` is the side away from the cable. See
 [Faces](/concepts/faces/). It can take a Bluetooth card in its card slot instead of a cable.
 
@@ -44,11 +44,11 @@ Its file is `/dev/actuator0` (`actuator1` for the next; its type is `actuator`, 
 [`lsdev`](/programs/lsdev/) names it).
 
 - **Read:** its events, a move's end a line (`push ok`, `extend ok`, or `push failed blocked
-  minecraft:obsidian east`: the block, `-` when none is named, and the side), as they come; a read
+  minecraft:obsidian east`: the block, `-` when none is named, and the face), as they come; a read
   with none waiting waits for one.
 - **Write:** refused: opening it to write fails with `EACCES`.
 - **Poll:** ready for `IN` and `PRI` while a move's end is waiting to be read.
-- **ioctls:** its methods below, by name, with the side as their argument. A move that can't start is
+- **ioctls:** its methods below, by name, with the face as their argument. A move that can't start is
   `nil`, its message (`no such face: ...`) and `EINVAL`; a
   piston that has left the bus (its cable cut, say) is `ENODEV`. `setLabel` sets its label, as on
   every device file.
@@ -63,13 +63,13 @@ local done, why = sys.ioctl(piston, "push", "front")
 
 ## Methods
 
-A side is a face name: `north`, `south`, `east`, `west`, `up`, `down`, or `front`, `back`, `left`,
+A face is named as every device names one: `north`, `south`, `east`, `west`, `up`, `down`, or `front`, `back`, `left`,
 `right`. A name that is no face fails with `no such face`; a relative name fails when the piston has
 no front it knows, or `left` and `right` when its front is up or down.
 
-### push(side) → true
+### push(face) → true
 
-Pushes on that side. The arm goes out and comes back on its own; its event, `push`, once it's back.
+Pushes on that face. The arm goes out and comes back on its own; its event, `push`, once it's back.
 When something will not move, its event says so at once: `ok = false`, `why = "blocked"`, `name`
 the first block down its line that won't move (obsidian, bedrock, a block entity), `""` when no
 one block is to blame (more than a piston moves, the world's edge, a chunk not loaded), and `face`
@@ -77,16 +77,16 @@ the side. Its cable port's side has no arm: it's blocked there too, by what's on
 cable, `modularcomputers:cable`, or `minecraft:air` when it's linked by Bluetooth). With its arm out
 there already, nothing moves, and its event is `ok`.
 
-### extend(side) → true
+### extend(face) → true
 
 Pushes and leaves the arm out until `retract`; its event, `extend`, once it's out. Gives `true` also
 when the arm is out already (and then it stays out, free, its event at once: every extend ends in its
 event, so a program waiting for one never has to know which it was). Blocked, its event says so,
 as `push`'s does, its cable port's side too.
 
-### retract(side) → true
+### retract(face) → true
 
-Takes the arm on that side back in; a sticky piston pulls what is in front of it. Its event,
+Takes the arm on that face back in; a sticky piston pulls what is in front of it. Its event,
 `retract`, once it's in. With no arm out there, nothing moves, and its event is `ok` at once. On its
 cable port's side it's blocked, as `push` is.
 

@@ -1,16 +1,16 @@
 -- Fire every robotic piston on the bus in turn, a wave down a row of them:
--- lua piston-wave.lua [side] [rounds]
+-- lua piston-wave.lua [face] [rounds]
 --
 -- sys.devices() lists the pistons (type "actuator") in bus order, which you set at the computer;
 -- each has a file in /dev (actuator0, actuator1...) whose ioctls are its methods. Each piston is
--- pushed on its front side (or the side given), one after another, DELAY seconds apart, for as
+-- pushed on its front face (or the face given), one after another, DELAY seconds apart, for as
 -- many rounds as asked. A push that couldn't move (its end: blocked, the block that won't move, the
 -- face) is reported and the wave goes on.
 local sys = require("sys")
 
 local DELAY = 0.25   -- seconds between one piston and the next
 
-local side = arg[1] or "front"
+local face = arg[1] or "front"
 local rounds = tonumber(arg[2]) or 1
 
 -- The end of the piston's last 'method' command (its event): ok, or not, why, and for blocked the
@@ -47,7 +47,7 @@ end
 
 for _ = 1, rounds do
   for _, piston in ipairs(pistons) do
-    local done, why = sys.ioctl(piston.fd, "push", side)
+    local done, why = sys.ioctl(piston.fd, "push", face)
     local got = done and ended(piston.fd, "push")
     if not done or not got.ok then
       io.stderr:write("piston-wave: ", piston.name, ": ", got and said(got) or tostring(why), "\n")
