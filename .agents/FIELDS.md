@@ -70,19 +70,23 @@ A refusal's (`Failure`'s builders) and an end's (`EventQueue`'s). Every field al
 
 An event's `event` is the method that caused it, or one of the device's own-news words here.
 
-| Device | Own news (no method caused it) |
-|---|---|
-| robotics | `notice` (`why`: `shove`, `fall`, `held`) |
-| energy field card | `notice` (`why`: `lost`, `blocked`, `fault`) |
-| redstone card | `change` (a face's state) |
-| weather sensor | `change` |
-| motion sensor | `motion` |
-| audio sensor | `sound` |
-| network card | `arrived` (a frame came); its own `send` and `broadcast` are their methods |
-| charging pad | `docked`, `undocked` |
-| disk (`changes()`) | `create`, `modify`, `format`; `remove`, `rename`, `write` (see the review list) |
-| internet card | none: `request` is its method |
-| operator card | none: `command` is its method |
+| Device | Class | Own news (no method caused it) |
+|---|---|---|
+| robotics | `RoboticsDevice` | `notice` (its `why`: shove, fall, held) |
+| energy field card | `FieldCard` | `notice` (its `why`: lost, blocked, fault) |
+| redstone card | `RedstoneCard` | `change` (a face's state) |
+| weather sensor | `WeatherCard` | `change` |
+| motion sensor | `MotionSensorCard` | `motion` |
+| audio sensor | `AudioSensorCard` | `sound` |
+| network card | `NetworkCard` | `arrived` (a frame came) |
+| charging pad | `ChargingPad` | `docked`, `undocked` |
+| disk (`changes()`) | `Disk` | `create`, `modify`, `format` |
+
+Every other event is a method's: a command's end (`walk`, `craft`, `move`, `set`...), a disk's
+`remove`, `rename` and `write` changes, the network card's `send` and `broadcast`, the internet
+card's `request`, the operator card's `command`. The notices are built inside `EventQueue`
+(`notice`); the sensors' events in `CardWorld`, with their card's words. `FieldDictionaryTest`
+reads this table and the Fields below and checks the code against them.
 
 ## Fields
 

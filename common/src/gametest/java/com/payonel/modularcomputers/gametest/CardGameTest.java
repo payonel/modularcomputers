@@ -482,6 +482,9 @@ public class CardGameTest {
 	 * The whole way, in a world: mcos on a case with the least RAM (no cache: every read a call), a
 	 * motion sensor card put in while it runs, a pig, and a program reading the card's file.
 	 */
+	/** How often the pig steps on while head reads, in ticks. */
+	private static final int MOVE_EVERY = 5;
+
 	@GameTest(maxTicks = 3000) // (mcos boots off the disk, a board call a read: a loaded host's ticks are many)
 	public void mcosReadsAMotionSensorPutInWhileItRunsAsAMobMoves(GameTestHelper helper) {
 		helper.setBlock(POS, ModBlocks.TIER3_CASE.defaultBlockState().setValue(CaseBlock.FACING, Direction.SOUTH));
@@ -496,15 +499,20 @@ public class CardGameTest {
 		java.nio.file.Path seen = CaseBlockEntity.diskFolder(helper.getLevel().getServer(), disk).resolve("seen");
 		computer.pressPower();
 		var pig = helper.spawn(EntityTypes.PIG, POS.north(3));
+		int[] ticks = {0};
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertTrue(computer.machine().runner().map(r -> r.state() == com.payonel.modularcomputers.runtime.Runner.State.WAITING)
 				.orElse(false) && computer.terminal().buffer().rows().stream().anyMatch(row -> row.contains("$")), "at the shell"))
 			.thenExecute(() -> computer.parts().setItem(CaseMenu.EXP_SLOTS + 1, new ItemStack(ModItems.MOTION_SENSOR_CARD))) // (put in while it runs)
 			.thenIdle(10)
 			.thenExecute(() -> "head -n 2 /dev/motion0 > /seen\r".chars().forEach(c -> computer.terminal().press(String.valueOf((char) c))))
-			.thenIdle(5)
-			.thenExecute(() -> pig.teleportTo(pig.getX() + 1, pig.getY(), pig.getZ())) // (it moved)
 			.thenWaitUntil(() -> {
+				// It steps back and forth (staying in the sensor's reach), a step every few ticks, till two of
+				// its motions are read: a file shows what comes after its open (evdev's way), so moves before
+				// head opened it aren't its to read.
+				if (++ticks[0] % MOVE_EVERY == 0) {
+					pig.teleportTo(pig.getX() + (ticks[0] / MOVE_EVERY % 2 == 0 ? 1 : -1), pig.getY(), pig.getZ());
+				}
 				try {
 					helper.assertTrue(java.nio.file.Files.isRegularFile(seen) && java.nio.file.Files.readString(seen).lines().count() == 2,
 						"two motions read; the screen: " + computer.terminal().buffer().rows());

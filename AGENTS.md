@@ -862,6 +862,8 @@ before it takes off). A move already done (an arm out
   game test class** in `GameTests.CLASSES`. Nothing else registers them.
 - **A new failure is a why with its own builder** (`runtime/Failure` for a refusal, `EventQueue` for
   an event), every field required (there's no other way: `Result.fail` takes only a `Failure`).
+- **A new word in an answer or event** (a field, an own-news `event`) goes in `.agents/FIELDS.md`
+  with its meaning: `FieldDictionaryTest` scans the devices' sources and fails until it's there.
 - **A new cabled block's entity** holds `CablePorts`, and `Cabling` learns its ports and kind.
 - **A new device with an interrupt line** gets a stimulus in `DeviceInterruptsTest`; **a device whose
   `get`/`set` take tables** gets a driver (`lib/modules/drivers/<type>.lua`).
@@ -921,6 +923,11 @@ Lessons from mistakes, each with its test:
 - **An ignored signal stays ignored across spawn** (as across exec): a caller ignoring ^C while it
   waits (`os.execute`, as `system(3)`) gives its child SIGINT back (`sys.spawn`'s `default`), or the
   command can't be stopped. (`controlCDuringOsExecute...`)
+- **A device file reads from its open, so a test's event comes after it:** an event made before
+  the program opens its file is gone, and a game test whose sensor saw its pig as the card went in
+  passed only while `head` happened to open first. A test makes its event once the program waits,
+  or keeps the stimulus going till it's read (a pig stepping back and forth, in reach).
+  (`mcosReadsAMotionSensorPutInWhileItRunsAsAMobMoves`)
 - **A test types only once the program waits for it:** keys typed during an earlier read are that
   read's (a program says it's ready with a file). (`rawReadsWaitAsVminAndVtimeSay`)
 - **A buffer fills on demand, not only on its cadence:** a pad whose battery filled its buffer once
@@ -1068,6 +1075,9 @@ Lessons from mistakes, each with its test:
   call a read, a tier 1's the slowest) took over 400 ticks on a loaded host now and then; such a
   test gets thousands (the tree job's 3000), as it waits for the state it needs anyway.
   (`aNewEepromBootsMcosFromATier1Disk`)
+- **A file a test reads is the test task's input:** the dictionary test read `.agents/FIELDS.md`,
+  undeclared, so a change to it alone left the tests up to date, never run, and broken words passed.
+  Declare it (`inputs.file`, as `docs/` is). (`FieldDictionaryTest`, seen passing a broken dictionary)
 - `GameTestHelper.assertValueEqual` throws on a null value (it calls `value.equals`), crashing the
   test server instead of failing the test: compare with `Objects.equals` in an `assertTrue`.
 - An empty dedicated server stops ticking after a minute unless `pause-when-empty-seconds=-1`
