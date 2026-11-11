@@ -158,7 +158,7 @@ public class GolemHandsGameTest {
 		golem.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_AXE));
 		helper.succeedWhen(() -> {
 			List<Object> got = copy(answers);
-			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "swing", "ok", true, "result", Map.of("name", "minecraft:oak_log", "kept", true)), "its event: " + got);
+			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "swing", "ok", true, "result", Map.of("kind", "block", "name", "minecraft:oak_log", "id", "", "kept", 1L, "dropped", 0L)), "its event: " + got);
 			helper.assertBlockPresent(Blocks.AIR, FRONT);
 			helper.assertTrue(golem.getMainHandItem().getDamageValue() == 1, "the axe wore");
 			// No storage: its off hand caught the log, in the background.
@@ -177,7 +177,7 @@ public class GolemHandsGameTest {
 		golem.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.APPLE));
 		helper.succeedWhen(() -> {
 			List<Object> got = copy(answers);
-			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "swing", "ok", true, "result", Map.of("name", "minecraft:oak_log", "kept", false, "dropped", 1L)),
+			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "swing", "ok", true, "result", Map.of("kind", "block", "name", "minecraft:oak_log", "id", "", "kept", 0L, "dropped", 1L)),
 				"its event: " + got);
 			helper.assertTrue(golem.getOffhandItem().is(Items.APPLE), "its off hand kept its apple");
 			helper.assertTrue(!helper.getLevel().getEntitiesOfClass(ItemEntity.class, new AABB(helper.absolutePos(FRONT)).inflate(1),
@@ -194,7 +194,7 @@ public class GolemHandsGameTest {
 		golem.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.DIAMOND_PICKAXE));
 		helper.succeedWhen(() -> {
 			List<Object> got = copy(answers);
-			same(helper, got.isEmpty() ? null : got.getFirst(), "breaking", "its answer: " + got);
+			same(helper, got.isEmpty() ? null : got.getFirst(), true, "its answer: " + got);
 			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "swing", "ok", false, "why", "unbreakable", "name", "minecraft:bedrock", "id", "",
 				"at", Map.of("forward", 1L, "right", 0L, "up", 0L), "call", Map.of("args", List.of("front"), "progress", 0L)), "its event: " + got);
 			helper.assertBlockPresent(Blocks.BEDROCK, FRONT);
@@ -270,7 +270,10 @@ public class GolemHandsGameTest {
 		BotGolem golem = start(helper, answers, call("swing", "front"));
 		golem.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_SWORD));
 		helper.succeedWhen(() -> {
-			same(helper, copy(answers).isEmpty() ? null : copy(answers).getFirst(), "attacked", "its answer");
+			List<Object> got = copy(answers);
+			same(helper, got.isEmpty() ? null : got.getFirst(), true, "its answer");
+			same(helper, got.size() > 1 ? got.get(1) : null, Map.of("event", "swing", "ok", true, "result",
+				Map.of("kind", "entity", "name", "minecraft:pig", "id", pig.getStringUUID(), "kept", 0L, "dropped", 0L)), "its end, at once: what it hit (every swing ends the same way)");
 			// An iron sword's 6, full strength: a pig's 10 down to 4 (a bare hand's 1 would leave 9).
 			helper.assertTrue(pig.getHealth() <= 4.0f, "hit with the sword's damage: " + pig.getHealth());
 		});

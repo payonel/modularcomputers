@@ -36,10 +36,10 @@ open mode.
 
 ## Methods
 
-### get() → {charging, robot, buffer, capacity}
+### get() → {charging, docked, buffer, capacity}
 
-Whether it's charging a robot now, the robot's board id (nil: none on it), and its buffer's level
-and capacity, in power units.
+Whether it's charging now, `docked`, the board id of what's on it (whatever it is: `""` for
+nothing), and its buffer's level and capacity, in power units.
 
 ### pull() → event or nil
 
@@ -49,8 +49,8 @@ Its oldest event, or nil.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `docked` | `robot` (its board's id) | a robot stood on it |
-| `undocked` | `robot` | it left |
+| `docked` | `id` (its board's id) | something stood on it |
+| `undocked` | `id` | it left |
 
 Its interrupt is raised when an event comes, and stays raised while one waits. With no program
 running on the board that has it, it takes no data: its events go.

@@ -277,6 +277,9 @@ device data), and user code, as a real CPU runs firmware under an OS.
   started, its outcome an event later; a buffered device given a command while one runs refuses
   it (`busy`) rather than wait (see buffered devices, under mcos). `board.waitForInterrupt` is the
   only wait; mcos's blocking reads and commands are the kernel waiting for a process.
+- **The field dictionary is `.agents/FIELDS.md`** (the user's, 2026-11-10): every word devices
+  answer with, its one meaning, and the rules (camelCase fields, every field always there, `event`
+  the method that caused it); a new word goes there in the commit that first uses it.
 - **Every failure is one shape a why** (the user's, 2026-11-04): a call refused answers `false,
   {why, ...}`, a table built only by that why's own builder (`runtime/Failure`: `busy`/`held`
   `{id}`, `drifted {drift}`, `fault {condition, part, message}`, `bad_argument {argument, value,
@@ -397,7 +400,9 @@ user's, 2026-10-29, flight does everything; in a field it's frozen), a hit with 
 its swing's strength from the time since its last), a container's items in and out as a hopper
 moves them. What a broken block drops (or its hand is given) is caught: its storage first, else its
 off hand (a background catch, the user's: atypical, so storage is always preferred), else it stays
-in the world, and the swing's end says whether it kept it all.
+in the world. Every swing ends in its event, whatever it met (the user's, 2026-11-10: a creature
+hit or air there ends at once): its result the thing it met, `{kind, name, id}`, and how many of
+what it broke it `kept` and `dropped`.
 - **It flies two ways, each with its price** (the user's design, 2026-10-25), never with its legs
   on and its tools as on the ground: on its **thrusters**, built into a tier 2 (a tier 1's thruster calls fail: a `fault`, `thrusters` missing), no card (`fly`, `land`;
   `fly()` takes off where it stands), its legs left standing where it took off (`GolemLegs`, a boat's kind of object), red
@@ -477,7 +482,8 @@ A plate a robot stands on to charge (user design, 2026-10-24): green particles r
 does. Its power is a device's, as the Disk Station's: the bus's while a running computer has it,
 else its own buffer, which its battery fills. It charges the robot's battery (its board's buffer
 without one), ten running CPUs' worth a tick. Its device (`charger0`) says what it's doing and
-reports a robot docking and leaving.
+what's docked on it (`docked`, a board id, whatever it is: the user's), and reports each coming and
+leaving (`docked`, `undocked`, its `id`).
 
 ### The operator card
 

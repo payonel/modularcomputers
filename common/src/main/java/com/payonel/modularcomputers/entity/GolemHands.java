@@ -170,12 +170,8 @@ final class GolemHands {
 			space.put("hardness", (double) state.getDestroySpeed(level(), pos));
 			space.put("solid", !state.getCollisionShape(level(), pos).isEmpty()); // (it can't walk through it)
 			Container container = HopperBlockEntity.getContainerAt(level(), pos);
-			if (container != null) {
-				space.put("container", container.getContainerSize());
-			}
-			if (!fluid.isEmpty()) {
-				space.put("fluid", BuiltInRegistries.FLUID.getKey(fluid.getType()).toString()); // (waterlogged)
-			}
+			space.put("container", container != null ? container.getContainerSize() : 0); // (always there: 0, not a container)
+			space.put("fluid", fluid.isEmpty() ? "" : BuiltInRegistries.FLUID.getKey(fluid.getType()).toString()); // (waterlogged; "" none)
 		}
 		things.add(space);
 		return things;
@@ -203,13 +199,9 @@ final class GolemHands {
 		Map<String, Object> item = new LinkedHashMap<>();
 		item.put("name", BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
 		item.put("count", stack.getCount());
-		if (stack.isDamageableItem()) {
-			item.put("damage", stack.getDamageValue());
-			item.put("maxDamage", stack.getMaxDamage());
-		}
-		if (stack.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME)) {
-			item.put("label", stack.getHoverName().getString());
-		}
+		item.put("damage", stack.isDamageableItem() ? stack.getDamageValue() : 0); // (always there, the user's: 0 for an item that doesn't wear)
+		item.put("maxDamage", stack.isDamageableItem() ? stack.getMaxDamage() : 0);
+		item.put("label", stack.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME) ? stack.getHoverName().getString() : "");
 		return item;
 	}
 
@@ -336,8 +328,11 @@ final class GolemHands {
 			return attack(face, there.getFirst());
 		}
 		BlockState state = level().getBlockState(pos);
-		if (state.isAir() || !state.getFluidState().isEmpty() && state.canBeReplaced()) {
-			return Result.fail(com.payonel.modularcomputers.runtime.Failure.notFound("block", face));
+		if (state.isAir()) { // (nothing to hit: a swing all the same, the user's: its end says so)
+			return Result.ok(RoboticsDevice.swung("air", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString(), "", 0, 0));
+		}
+		if (!state.getFluidState().isEmpty() && state.canBeReplaced()) {
+			return Result.ok(RoboticsDevice.swung("fluid", BuiltInRegistries.FLUID.getKey(state.getFluidState().getType()).toString(), "", 0, 0));
 		}
 		stopBreaking(); // (unbreakable is its end's, a tick on: a call fails only when it can't be given, the user's)
 		breaking = pos.immutable();
@@ -359,7 +354,7 @@ final class GolemHands {
 			((AttackStrength) player).modularcomputers$setAttackStrengthTicker((int) Math.min(Integer.MAX_VALUE, now - lastAttack));
 			lastAttack = now;
 			player.attack(target);
-			return Result.ok("attacked");
+			return Result.ok(RoboticsDevice.swung("entity", BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).toString(), target.getStringUUID(), 0, 0));
 		} finally {
 			player.getAttributes().removeAttributeModifiers(weapon);
 			done(player);
@@ -408,9 +403,12 @@ final class GolemHands {
 			}
 			breaking = null;
 			level().levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, pos, net.minecraft.world.level.block.Block.getId(state));
+			int kept = 0;
 			int dropped = 0;
 			for (ItemEntity drop : level().getEntitiesOfClass(ItemEntity.class, around, entity -> !before.contains(entity.getId()))) {
+				int count = drop.getItem().getCount();
 				ItemStack left = golem.catchItem(drop.getItem().copy());
+				kept += count - left.getCount(); // (what it caught: the rest stays in the world)
 				if (left.isEmpty()) {
 					drop.discard();
 				} else {
@@ -418,7 +416,7 @@ final class GolemHands {
 					dropped += left.getCount();
 				}
 			}
-			golem.robotics().broke(name, dropped);
+			golem.robotics().broke(name, kept, dropped);
 		} finally {
 			done(player);
 		}

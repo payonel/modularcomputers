@@ -37,8 +37,8 @@ for dug = 0, LENGTH - 1 do
   local ahead = assert(sys.ioctl(robot, "scan", "front"))[1] -- (the first thing there: a creature, else its block)
   if ahead.kind == "block" then
     local swung, why = sys.ioctl(robot, "swing", "front")
-    if swung == "breaking" then
-      swung, why = ended("swing")
+    if swung then
+      swung, why = ended("swing") -- (every swing ends in its event: what it met, or why not)
     end
     if not swung then
       print("stopped after " .. dug .. ": " .. tostring(why))

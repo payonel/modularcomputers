@@ -145,8 +145,8 @@ end
 -- Breaks the block at a face with what it holds; problem if it can't.
 local function chop(face, what)
   local swung, why = robot.swing(face)
-  if swung == "breaking" then
-    swung, why = ended(robot, "swing") -- (its end: broken, or why not)
+  if swung then
+    swung, why = ended(robot, "swing") -- (every swing ends in its event: broken, or why not)
   end
   if not swung then
     problem("cutting " .. what .. ", it stopped: " .. tostring(why))

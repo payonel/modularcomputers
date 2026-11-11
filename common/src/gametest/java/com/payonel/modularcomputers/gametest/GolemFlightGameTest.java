@@ -157,7 +157,7 @@ public class GolemFlightGameTest {
 		java.util.function.Predicate<Object> cut = event -> event instanceof java.util.Map<?, ?> map && "swing".equals(map.get("event")) && Boolean.TRUE.equals(map.get("ok"));
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> {
-				same(helper, golem.robotics().swing(args("front")).first(), "breaking", "on its legs");
+				same(helper, golem.robotics().swing(args("front")).first(), true, "on its legs");
 				ticks[0] = helper.getTick();
 			})
 			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(cut), "cut on its legs: " + events))
@@ -170,7 +170,7 @@ public class GolemFlightGameTest {
 			.thenExecute(() -> {
 				var walked = golem.robotics().walk(args(1.0));
 				same(helper, java.util.List.of(walked.error(), walked.failure().get("part")), java.util.List.of("fault", "legs"), "it walks nowhere: its legs missing");
-				same(helper, golem.robotics().swing(args("front")).first(), "breaking", "its axe works on its thrusters");
+				same(helper, golem.robotics().swing(args("front")).first(), true, "its axe works on its thrusters");
 				ticks[2] = helper.getTick();
 			})
 			.thenWaitUntil(() -> helper.assertTrue(events.stream().anyMatch(cut), "cut in the air: " + events))
@@ -612,7 +612,7 @@ public class GolemFlightGameTest {
 		golem.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WOODEN_AXE));
 		List<Object> events = events(helper, golem);
 		helper.startSequence()
-			.thenExecuteAfter(3, () -> same(helper, golem.robotics().swing(args("front")).first(), "breaking", "it starts breaking"))
+			.thenExecuteAfter(3, () -> same(helper, golem.robotics().swing(args("front")).first(), true, "it starts breaking"))
 			.thenExecuteAfter(5, () -> helper.setBlock(FRONT, Blocks.OAK_PLANKS)) // (another block in its spot)
 			.thenWaitUntil(() -> helper.assertTrue(swingEnded(events, m -> Boolean.TRUE.equals(m.get("ok"))
 				&& m.get("result") instanceof java.util.Map<?, ?> r && "minecraft:oak_planks".equals(r.get("name"))), "the planks broken: " + events))
@@ -628,7 +628,7 @@ public class GolemFlightGameTest {
 		golem.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WOODEN_AXE));
 		List<Object> events = events(helper, golem);
 		helper.startSequence()
-			.thenExecuteAfter(3, () -> same(helper, golem.robotics().swing(args("front")).first(), "breaking", "it starts breaking"))
+			.thenExecuteAfter(3, () -> same(helper, golem.robotics().swing(args("front")).first(), true, "it starts breaking"))
 			.thenExecuteAfter(5, () -> helper.setBlock(FRONT, Blocks.AIR)) // (gone from its spot)
 			.thenWaitUntil(() -> helper.assertTrue(swingEnded(events, m -> java.util.Objects.equals(GameTests.withoutCall(m),
 				java.util.Map.of("event", "swing", "ok", false, "why", "lost", "name", "minecraft:oak_log", "id", "",
@@ -645,7 +645,7 @@ public class GolemFlightGameTest {
 		golem.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.WOODEN_AXE));
 		List<Object> events = events(helper, golem);
 		helper.startSequence()
-			.thenExecuteAfter(3, () -> same(helper, golem.robotics().swing(args("front")).first(), "breaking", "it starts breaking"))
+			.thenExecuteAfter(3, () -> same(helper, golem.robotics().swing(args("front")).first(), true, "it starts breaking"))
 			.thenExecuteAfter(3, () -> helper.assertTrue(!field(golem).capture(args(FieldCard.SELF)).failed(), "held mid-swing"))
 			.thenExecuteAfter(40, () -> {
 				helper.assertBlockPresent(Blocks.OAK_LOG, FRONT); // (paused: not broken while held)

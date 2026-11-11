@@ -15,7 +15,7 @@ for _, face in ipairs(FACES) do
     if thing.kind ~= "air" then
       line = line .. " " .. thing.name
     end
-    if thing.container then
+    if thing.kind == "block" and thing.container > 0 then -- (a block's: 0, not a container)
       line = line .. " (" .. thing.container .. " slots)"
     end
   end

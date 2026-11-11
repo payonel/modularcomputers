@@ -262,7 +262,7 @@ fields:
 | `kind` | Its own fields |
 |---|---|
 | `entity` | none more: `name` is a creature's (`minecraft:pig`) or an item's (its item's) |
-| `block` | `state` (its properties: `{axis = "y"}`, a door's `{facing = "back", open = false, ...}`, directions in its frame), `hardness` (-1: unbreakable), `solid` (it can't walk through it), `container` (its slots, when it's one), `fluid` (when waterlogged) |
+| `block` | `state` (its properties: `{axis = "y"}`, a door's `{facing = "back", open = false, ...}`, directions in its frame), `hardness` (-1: unbreakable), `solid` (it can't walk through it), `container` (its slots; 0, not a container), `fluid` (when waterlogged; `""` when not) |
 | `fluid` | `amount` (1 to 8), `source` (`name` the fluid's: `minecraft:water`) |
 | `air` | none more (`name = "minecraft:air"`) |
 
@@ -275,8 +275,9 @@ local things = {
 
 ### held([hand]) → item or nil
 
-What its hand holds (`"off"`: its off hand): `{name, count, damage, maxDamage, label}` (`damage`
-and `maxDamage` for what wears; `label` when it's named), or nil.
+What its hand holds (`"off"`: its off hand): `{name, count, damage, maxDamage, label}`, every field
+always there (`damage` and `maxDamage` 0 for what doesn't wear; `label` `""` when it isn't named), or
+nil.
 
 ### swap() → true
 
@@ -292,21 +293,31 @@ bucket into water). Answers `"placed"` or `"used"`, or `"nothing"` when the game
 stone, as a player's click does nothing); fails with
 `{why = "not_found", kind = "block", value = the face}` (nothing there, or nothing to place against).
 
-### swing(face) → what, or nil and why
+### swing(face) → true, or nil and why
 
-Swings what it holds at a face, as a player's left click (in the air, as a player off the ground). A mob there is hit:
-`"attacked"`. Else the block there starts breaking: `"breaking"`, a command running till it's
-broken. It breaks a place, as a player's swing does: another block pushed into it, the break goes
+Swings what it holds at a face, as a player's left click (in the air, as a player off the ground):
+a command, `true` at once, and every swing ends in its event, whatever it met. A creature there is
+hit, and its event ends at once; air (or a fluid) there, there's nothing to hit, and its event ends
+at once too. Else the block there breaks, a command running till it's broken. It breaks a place, as a player's swing does: another block pushed into it, the break goes
 on into that block at its own pace; another item put in its hand, the break starts again with it;
 held in a field, it pauses, and goes on once let go. Its event, `swing`: `ok`, and its `result`,
-`{name, kept, dropped}` (the block's name; `kept`: true when it caught all the block dropped, else
-false and how many it `dropped` into the world), or not and why: `lost` (air there now: what it
+`{kind, name, id, kept, dropped}`: what it met, as a scan names a thing (`kind` `entity`, `block`,
+`fluid` or `air`), and of what a broken block dropped, how many it `kept` (caught: its storage
+first, else its off hand) and how many it `dropped` into the world (both 0 for a creature or air):
+
+<!-- lua-fragment -->
+```lua
+{event = "swing", ok = true, result = {kind = "block", name = "minecraft:oak_log", id = "", kept = 1, dropped = 0}}
+{event = "swing", ok = true, result = {kind = "entity", name = "minecraft:zombie", id = "5c1e…", kept = 0, dropped = 0}}
+{event = "swing", ok = true, result = {kind = "air", name = "minecraft:air", id = "", kept = 0, dropped = 0}}
+```
+
+Or not and why: `lost` (air there now: what it
 was breaking gone, `{why = "lost", name, id = "", at}`, its name, no id as a block has none, and
 where it was, `{forward, right, up}` from where its last command left it), or `unbreakable` (the
 game won't let it be broken: bedrock, or a place protected from breaking, as a player's break
 there finishes its cracks and the block stays; the same fields, `{why = "unbreakable", name, id =
-"", at}`); each with its `call`, its `progress` the break so far, 0 to 1. It fails with
-`{why = "not_found", kind = "block", value = the face}` (nothing there).
+"", at}`); each with its `call`, its `progress` the break so far, 0 to 1.
 
 ### contents([face]) → list, or nil and why
 
@@ -373,7 +384,7 @@ into an inventory, its own `use` too.
 Live, never waiting: what it's doing now (`idle`, `walking`, `turning`, `breaking`, `flying`,
 `hovering`, `landing`, `falling` or `held`), whether it stands on its legs, whether it
 finds its way round things, where it really is and where its last command left it (`planned`; each
-as `position` gives it), and how far it's away from there (`{forward, right, up}`; none when it's
+as `position` gives it), and how far it's away from there (`{forward, right, up}`; all 0 when it's
 there). It answers while a field
 holds it too: a program can follow the carry.
 

@@ -237,8 +237,8 @@ across a save, and dropped when no program runs.
 |---|---|
 | `modify`, `create`, `remove` | `path` |
 | `rename` | `path` (the new one), `from` |
-| `format` | `path` (`/`), `mode` |
-| `write` (raw) | `offset`, `length` |
+| `format` | `path` (`/`), `mode`: formatted, or replaced whole (a Disk Station's clone) |
+| `write` (raw) | `offset`, `length`: its `write` method's |
 
 The disk's interrupt line is up while any wait. Under mcos, the kernel takes a mounted disk's
 reports and gives them to programs as inotify notices, in the paths it is mounted at

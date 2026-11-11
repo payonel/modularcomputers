@@ -2,7 +2,7 @@
 --
 --   lua charger-log.lua [log]   (run it with & to keep it going)
 --
--- The pad's file says what it's doing ("charging <robot> 26400/26400"); its events (docked,
+-- The pad's file says what it's doing ("charging <board id> 26400/26400"); its events (docked,
 -- undocked) come as poll's PRI and the pull ioctl. sys.poll blocks until there's news, so the
 -- program uses no time while nothing comes or goes.
 local sys = require("sys")
@@ -21,7 +21,7 @@ while true do
   local event = sys.ioctl(pad, "pull")
   if event then
     local log = assert(io.open(LOG, "a"))
-    log:write(event.event, " ", event.robot, " (", state(), ")\n")
+    log:write(event.event, " ", event.id, " (", state(), ")\n")
     log:close()
   else
     sys.poll({[pad] = {PRI = true}})

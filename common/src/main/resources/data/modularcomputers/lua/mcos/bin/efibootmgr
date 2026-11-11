@@ -162,10 +162,10 @@ end
 local function hex(n)
   return string.format("%04X", n)
 end
-if boot.current then
+if boot.current >= 0 then -- (-1: none; entries count from 0)
   print("BootCurrent: " .. hex(boot.current))
 end
-if boot.next then
+if boot.next >= 0 then
   print("BootNext: " .. hex(boot.next))
 end
 local order = {}

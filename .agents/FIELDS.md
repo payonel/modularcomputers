@@ -29,7 +29,16 @@ kept by this document and the test that checks the code against it.
 8. **A device's state is a `get`; what happens on it is its events.** A `/dev` read of events starts
    at the file's open, never a backlog.
 9. **A thing is `{kind, name, id, at}`:** what sort of thing, its registry id, its own UUID (`""`
-   for a block), where.
+   for a block), where. A thing's further fields depend on its `kind` (a block's `container`, a
+   fluid's `amount`), each always there for its kind.
+10. **A field name is camelCase** (`maxDamage`), as the methods are (`walkTo`); a value from a
+    closed set is snake_case (`missing_inputs`, `internal_error`). (The user's, 2026-11-10.)
+11. **`id` is the id of the thing the table describes; another thing named by its id has a field
+    named for what it is** (`docked`, `disk`, `address`), so the name says what the id names.
+    `busy` and `held` name the device to wait on as `id`: the why is about that device.
+12. **`size` is a thing's size; `bytes` an amount read, written or moved.**
+13. **Every swing ends in its event**, whatever it met, the thing it met its result (the user's,
+    2026-11-10: a swing at the air is a swing, `true`, its end saying so).
 
 ## Whys
 
@@ -98,14 +107,15 @@ An event's `event` is the method that caused it, or one of the device's own-news
 | `condition` | what's wrong with the machine (`missing`, `io_error`, `internal_error`) | word | `fault` |
 | `container` | a block's container size, in slots | number | a scan's block |
 | `count` | how many items | number | items |
-| `current` | the boot entry booted now | number | EEPROM's `getBoot` |
+| `current` | the boot entry booted now (`-1` none) | number | EEPROM's `getBoot` |
 | `damage` | an item's wear | number | items |
 | `data` | a frame's bytes | string | received frames |
 | `directory` | whether a path is a directory | boolean | disk's `stat` |
 | `disk` | a disk's id (a boot entry's) | string | EEPROM's boot entries |
+| `docked` | the board id of what's on a charging pad (`""` nothing) | string | charging pad's `get` |
 | `dropped` | how many of what a broken block dropped stayed in the world | number | a swing's `result` |
 | `distance` | how far between two cards, meters; `-1` none reached | number | network card |
-| `drift` | how far a robot is off its spot, `{forward, right, up}` | table | `drifted`, notices, robotics' `get` |
+| `drift` | how far a robot is off its spot, `{forward, right, up}` (all 0 on it) | table | `drifted`, notices, robotics' `get` |
 | `encoding` | a sound format's encoding | word | sound card |
 | `entries` | the boot entries | list | EEPROM's `getBoot` |
 | `event` | what an event is (rule 5) | word | every event |
@@ -118,7 +128,7 @@ An event's `event` is the method that caused it, or one of the device's own-news
 | `headers` | an HTTP response's headers, by name in lower case | table | internet `response` |
 | `heading` | which way it faces, degrees right of the origin's forward | number | robotics' positions |
 | `id` | a thing's or device's own UUID (`""` for a block) | string | things, `busy`, `held`, devices |
-| `kept` | whether a swing kept all a broken block dropped | boolean | a swing's `result` |
+| `kept` | how many of what a broken block dropped a swing caught | number | a swing's `result` |
 | `key` | a Minecraft message's translation key | string | operator card |
 | `kind` | what sort of thing (`entity`, `item`, `block`, `fluid`, `air`; `not_found`'s `device`, `file`...) | word | things, `not_found` |
 | `label` | a device's or entry's label | string | device info, boot entries, items |
@@ -128,7 +138,7 @@ An event's `event` is the method that caused it, or one of the device's own-news
 | `link` | a symbolic link's target | string | disk's `stat` |
 | `lost` | how many events went before this one, its queue full | number | any event |
 | `max` | a limit's most | number | `limit` |
-| `maxDamage` | an item's most wear (see the review list) | number | items |
+| `maxDamage` | an item's most wear (0: it doesn't wear) | number | items |
 | `message` | a person's words, never parsed | string | `fault`, `network`, HTTP `response`, operator, `lastShutdown()` |
 | `method` | an HTTP method | word | internet card |
 | `millis` | how long it took, milliseconds | number | internet log |
@@ -136,7 +146,7 @@ An event's `event` is the method that caused it, or one of the device's own-news
 | `mode` | a disk's format (`hfs`, `raw`) | word | disk |
 | `modified` | when a file last changed, the world's milliseconds | number | disk's `stat` |
 | `name` | what a thing is called: a registry id for the game's things | string | things, items, sightings, whys |
-| `next` | the boot entry to boot once next | number | EEPROM's `getBoot` |
+| `next` | the boot entry to boot once next (`-1` none; entries count from 0) | number | EEPROM's `getBoot` |
 | `new`, `old` | the weather now and before | word | weather's `change` |
 | `number` | a boot entry's number | number | EEPROM's boot entries |
 | `offset` | a byte offset on a raw disk | number | a raw disk's `write` change |
@@ -153,20 +163,19 @@ An event's `event` is the method that caused it, or one of the device's own-news
 | `rate` | a sound format's samples a second | number | sound card |
 | `reason` | why, a word from its why's closed list | word | `denied`, `network` |
 | `result` | a done command's answer; a Minecraft command's value | any | ends, operator |
-| `robot` | the board id of the robot on a pad (see the review list) | string | charging pad |
 | `sent` | a request body's whole size, bytes | number | internet log's `progress` |
 | `size` | a file's size in bytes | number | disk's `stat` |
 | `slot` | a container's slot, from 1 | number | items in containers |
 | `solid` | whether a block can't be walked through | boolean | a scan's block |
 | `source` | whether a fluid is a source block | boolean | a scan's fluid |
-| `state` | (two meanings: see the review list) | | |
+| `state` | what a device is doing (a word: robotics' `walking`, the field card's `holding`); a scanned block's block state, its properties' values (vanilla's word) | word / table | robotics, field card; a scan's block |
 | `status` | an HTTP status; `0` no response | number | internet card |
 | `successes` | how many of a Minecraft command's runs succeeded | number | operator card |
 | `target` | a symbolic link's target | string | `symbolic_link` |
 | `tier` | a device's tier | number | disk info |
 | `time` | when, the world's time | number | `lastShutdown()` |
 | `took` | how many cards took a frame | number | network log |
-| `type` | (two meanings: see the review list) | | |
+| `type` | what kind of device (`storage`), or of path (`file`, `directory`, `link`) | word | device info; disk's `list` |
 | `url` | a URL | string | internet card |
 | `used` | bytes in use | number | disk |
 | `value` | what was given or named, as given | any | `bad_argument`, `bad_state`, `denied`, `not_found` |
@@ -176,23 +185,20 @@ An event's `event` is the method that caused it, or one of the device's own-news
 Not answers, so not here: the keys a device uses to save itself (`saved`), and the save format's own
 (`k`, `v`).
 
-## Found, to review
+## Ruled (2026-11-10)
 
-What the inventory turned up that breaks a rule above, for the user to rule on (nothing changed yet):
+What the first inventory found, and the user's rulings:
 
-1. **`maxDamage`** (an item's most wear) is camelCase; every other field is lower case with
-   underscores.
-2. **Fields left out when there's none** (rule 4): the charging pad's `robot`, robotics' `get`
-   (`position`, `planned`, `drift`), the EEPROM's `next` and `current`, an item's `damage` and
-   `maxDamage`, a scan block's `container` and `fluid`, a broken block's `dropped`.
-3. **`state` means two things:** what robotics is doing (a word, `walking`), and a scanned block's
-   properties (a table).
-4. **`type` means two things:** a device's type (`storage`), and a listed path's (`file`,
-   `directory`, `link`).
-5. **The charging pad's `robot` is an id** (a board's): by rule 9 an id is `id`.
-6. **`size` and `bytes`** both count bytes (a file's, a frame's).
-7. **The disk's `remove`, `rename` and `write` changes** share their methods' names: by rule 5 that
-   says those methods caused them. `remove` and `rename` are their methods'; a raw `write` is the
-   `write` method's, but `modify` comes from a handle's close, with no method of its own.
-8. **A swing's `result` says `kept` and `dropped` together:** `kept` is `dropped == 0`, the same
-   fact twice (and `dropped` is left out when 0: item 2).
+- `maxDamage`: field names are camelCase (rule 10); it stays.
+- Fields left out when there was none are always there now: the charging pad's `docked` (`""`),
+  robotics' `drift` (all 0), the EEPROM's `next` and `current` (`-1`: entries count from 0), an
+  item's `damage`, `maxDamage` (0) and `label` (`""`), a scanned block's `container` (0) and `fluid`
+  (`""`).
+- `state` and `type` keep their two meanings each (an intuitive word twice over a new one).
+- The charging pad says what's docked, whatever it is (`docked`, its board id; its events' `id`);
+  rule 11.
+- `size` and `bytes`: rule 12.
+- The disk's change reports: one stream in inotify's terms (`create`, `modify`, `remove`, `rename`,
+  `format`, `write`); `remove`, `rename` and `write` come only from their methods (a raw clone is a
+  `format`, not a `write`).
+- A swing: rule 13; its result `{kind, name, id, kept, dropped}`, counts both ways.

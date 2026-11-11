@@ -42,7 +42,7 @@ return {
     if plan then
       text = text .. "planned " .. plan.forward .. " " .. plan.right .. " " .. plan.up .. " " .. plan.heading .. "\n"
     end
-    if drift then
+    if drift.forward ~= 0 or drift.right ~= 0 or drift.up ~= 0 then -- (all 0: on its spot)
       text = text .. "drift " .. drift.forward .. " " .. drift.right .. " " .. drift.up .. "\n"
     end
     return text

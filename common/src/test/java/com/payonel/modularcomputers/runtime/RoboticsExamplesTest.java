@@ -25,7 +25,7 @@ class RoboticsExamplesTest extends McosHarness {
 	/** What the stand-in sees round it: stone ahead, a chest to its right, the floor below, air elsewhere. */
 	private static java.util.List<Object> space(String face) {
 		return java.util.List.of(switch (face) {
-			case "front", "down" -> java.util.Map.of("kind", "block", "name", "minecraft:stone", "id", "");
+			case "front", "down" -> java.util.Map.of("kind", "block", "name", "minecraft:stone", "id", "", "container", 0);
 			case "right" -> java.util.Map.of("kind", "block", "name", "minecraft:chest", "id", "", "container", 27);
 			default -> java.util.Map.of("kind", "air", "name", "minecraft:air", "id", "");
 		});
@@ -106,7 +106,7 @@ class RoboticsExamplesTest extends McosHarness {
 				asked.add("swing " + face);
 				boolean stuck = bedrockAfter == 0;
 				bedrockAfter--;
-				server.add(stuck ? () -> robotics.unbreakable("minecraft:bedrock", "", RoboticsDevice.toward(face)) : () -> robotics.broke("minecraft:stone", 0));
+				server.add(stuck ? () -> robotics.unbreakable("minecraft:bedrock", "", RoboticsDevice.toward(face)) : () -> robotics.broke("minecraft:stone", 1, 0));
 				return Result.ok(RoboticsDevice.BREAKING);
 			}
 		});

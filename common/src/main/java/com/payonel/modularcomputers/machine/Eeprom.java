@@ -141,7 +141,7 @@ public final class Eeprom implements Device {
 		return storage.nvram();
 	}
 
-	@Method(doc = "getBoot(): the NVRAM's boot variables: {entries = {{number, disk, path, label}, ...} by number, order = {numbers}, next = a number or nil}")
+	@Method(doc = "getBoot(): the NVRAM's boot variables: {entries = {{number, disk, path, label}, ...} by number, order = {numbers}, next = a number, current = the entry booted now; each -1 for none (entries count from 0, as UEFI's)}")
 	public Result getBoot(Arguments args) {
 		BootVariables vars = storage.nvram();
 		List<Map<String, Object>> entries = new ArrayList<>();
@@ -156,12 +156,8 @@ public final class Eeprom implements Device {
 		Map<String, Object> boot = new LinkedHashMap<>();
 		boot.put("entries", entries);
 		boot.put("order", vars.order().stream().map(Integer::longValue).toList());
-		if (vars.next() != BootVariables.NONE) {
-			boot.put("next", (long) vars.next());
-		}
-		if (bootCurrent != BootVariables.NONE) {
-			boot.put("current", (long) bootCurrent);
-		}
+		boot.put("next", (long) vars.next()); // (always there: -1, none, as entries count from 0)
+		boot.put("current", (long) bootCurrent);
 		return Result.ok(boot);
 	}
 

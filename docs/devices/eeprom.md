@@ -134,8 +134,8 @@ Replaces the chip's contents with `data`. It takes effect at the next power-on.
 ### getBoot() → table
 
 The boot variables: `entries`, a list of `{number, disk, path, label}` by number; `order`, a list of
-numbers; `next`, a number, or nil when there's no BootNext; and `current`, the entry that booted, or
-nil.
+numbers; `next`, BootNext's number; and `current`, the entry that booted. `next` and `current` are
+`-1` for none (entries count from 0, as UEFI's `Boot0000`).
 
 ### setBootEntry(number, disk[, path[, label]]) → nothing
 

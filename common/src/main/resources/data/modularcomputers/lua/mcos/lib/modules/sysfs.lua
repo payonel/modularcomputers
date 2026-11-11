@@ -102,10 +102,10 @@ local function efivars()
           order[i] = string.format("%04X\n", number)
         end
         vars.BootOrder = table.concat(order)
-        if boot.next then
+        if boot.next >= 0 then -- (-1: none; entries count from 0)
           vars.BootNext = string.format("%04X\n", boot.next)
         end
-        if boot.current then
+        if boot.current >= 0 then
           vars.BootCurrent = string.format("%04X\n", boot.current)
         end
         local got, restore = board.invoke(device.id, "getRestoreOnPowerLoss")

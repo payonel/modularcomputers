@@ -240,7 +240,7 @@ public final class RoboticsDevice implements Device, Buffered {
 			return Buffered.missing("body");
 		}
 
-		/** Swings what it holds at {@code face}: "attacked" (a mob there), "breaking" (the block there: its event, broke or failed), or false and why. */
+		/** Swings what it holds at {@code face}: what it met, done ({@link #swung}: a creature hit, air there), or "breaking" (the block there: its event, broke or failed), or false and why. */
 		default Result swing(String face) {
 			return Buffered.missing("body");
 		}
@@ -687,19 +687,32 @@ public final class RoboticsDevice implements Device, Buffered {
 		return result;
 	}
 
-	@Method(doc = "swing(face): swings what it holds at a face, as a player's left click: a mob there is hit (\"attacked\", as hard as a player's swing: full strength once the weapon has recovered); else the block there starts breaking, as a player breaks it (its tool matters: a pickaxe for stone, an axe for wood): \"breaking\", a command running till it's broken, a break of the place as a player's is (another block pushed in, it goes on into it; another item in its hand, it starts again; held in a field, it pauses) (its event: swing, ok and result {name, kept, dropped}: the block's name and whether it kept all it dropped, its storage first, else its off hand; or not and why: lost, air there now, or unbreakable, the game won't let it be broken (bedrock, a protected place), each with its name, id \"\" and where it is, and its call); or false and why")
+	@Method(doc = "swing(face): swings what it holds at a face, as a player's left click: a command, true at once, every swing ending in its event (swing, ok and result {kind, name, id, kept, dropped}: what it met, a scan's thing, and how many of what it broke dropped it caught, its storage first, else its off hand, and how many stayed in the world): a creature there is hit, as hard as a player's swing (full strength once the weapon has recovered), its end at once; air (or a fluid) there, nothing to hit, its end at once; else the block there breaks, as a player breaks it (its tool matters: a pickaxe for stone, an axe for wood), a break of the place as a player's is (another block pushed in, it goes on into it; another item in its hand, it starts again; held in a field, it pauses), its end once it's broken; or not and why: lost, air there now, or unbreakable, the game won't let it be broken (bedrock, a protected place), each with its name, id \"\" and where it is, and its call; or false and why")
 	public Result swing(Arguments args) {
 		String face = face(args, 0);
 		if (body.offSpot()) {
 			return drifted("swing");
 		}
 		Result result = body.swing(face);
-		if (!result.failed()) {
-			power.charge(ACTION_COST);
-			if (BREAKING.equals(result.first())) {
-				begin("swing");
-			}
+		if (result.failed()) {
+			return result;
 		}
+		power.charge(ACTION_COST);
+		begin("swing");
+		if (!BREAKING.equals(result.first())) {
+			end(true, null, result.first()); // (done as it was given: a creature hit, or air there; its end at once, as every swing has one, the user's)
+		}
+		return Result.ok(true);
+	}
+
+	/** What a swing met, its end's result: the thing, {@code kind}, {@code name}, {@code id}, and how many of its drops it kept and how many stayed in the world. */
+	public static Map<String, Object> swung(String kind, String name, String id, long kept, long dropped) {
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("kind", kind);
+		result.put("name", name);
+		result.put("id", id);
+		result.put("kept", kept);
+		result.put("dropped", dropped);
 		return result;
 	}
 
@@ -779,7 +792,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		changed();
 	}
 
-	@Method(doc = "get(): live, never waiting: {state, legs, pathfinding, position, planned, drift}: what it's doing now (idle, walking, turning, breaking, flying, hovering, landing, returning, falling or held), whether it stands on its legs, whether it finds its way round things, where it really is and where its last command left it (planned; each as position gives it), and how far it's away from there ({forward, right, up}; none when it's there)")
+	@Method(doc = "get(): live, never waiting: {state, legs, pathfinding, position, planned, drift}: what it's doing now (idle, walking, turning, breaking, flying, hovering, landing, falling or held), whether it stands on its legs, whether it finds its way round things, where it really is and where its last command left it (planned; each as position gives it), and how far it's away from there ({forward, right, up}; all 0 when it's there)")
 	public Result get(Arguments args) {
 		Map<String, Object> now = new LinkedHashMap<>();
 		now.put("state", state());
@@ -794,9 +807,7 @@ public final class RoboticsDevice implements Device, Buffered {
 			now.put("planned", planned.first());
 		}
 		Map<String, Object> drift = body.drift();
-		if (drift != null) {
-			now.put("drift", drift);
-		}
+		now.put("drift", drift != null ? drift : Map.of("forward", 0L, "right", 0L, "up", 0L)); // (always there: none, on its spot)
 		return Result.ok(now);
 	}
 
@@ -829,17 +840,12 @@ public final class RoboticsDevice implements Device, Buffered {
 	}
 
 	/**
-	 * The body broke the block it was breaking ({@code block}: its name); {@code dropped}: how many of
-	 * what it dropped stayed in the world (no room in its storage, nor its off hand).
+	 * The body broke the block it was breaking ({@code block}: its name): {@code kept}, how many of
+	 * what it dropped it caught (its storage, else its off hand), {@code dropped}, how many stayed in
+	 * the world.
 	 */
-	public void broke(String block, int dropped) {
-		Map<String, Object> result = new LinkedHashMap<>();
-		result.put("name", block); // (a thing's name: its registry id, the user's)
-		result.put("kept", dropped == 0);
-		if (dropped > 0) {
-			result.put("dropped", (long) dropped);
-		}
-		end(true, null, result);
+	public void broke(String block, int kept, int dropped) {
+		end(true, null, swung("block", block, "", kept, dropped));
 	}
 
 	/**

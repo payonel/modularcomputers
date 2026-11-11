@@ -13,8 +13,10 @@ import java.util.Map;
 /**
  * A charging pad on the bus (user design, 2026-10-24): it charges a robot standing on it, from the
  * bus's power while a running computer has it on its bus, else from its own buffer (its battery
- * fills it). It reports a robot coming onto it and leaving (its interrupt): {@code docked} (with the
- * robot's board id) and {@code undocked}. Its pad ({@link Pad}: its block) says what's on it.
+ * fills it). It reports what comes onto it and leaves (its interrupt): {@code docked} and {@code
+ * undocked}, each with its board's id, {@code id}. Its pad ({@link Pad}: its block) says what's on
+ * it: {@code docked}, the board id of what's on it, whatever it is (the user's: not always a robot),
+ * {@code ""} for nothing, always there.
  */
 public final class ChargingPad implements Device {
 	/** What it says about itself, now: from its block. */
@@ -48,19 +50,17 @@ public final class ChargingPad implements Device {
 		return DeviceType.CHARGER;
 	}
 
-	@Method(doc = "get(): {charging, robot (its board's id, or nil), buffer, capacity (power units)}")
+	@Method(doc = "get(): {charging, docked (the board id of what's on it, \"\" for nothing), buffer, capacity (power units)}")
 	public Result get(Arguments args) {
 		Map<String, Object> now = new LinkedHashMap<>();
 		now.put("charging", pad.charging());
-		if (pad.robot() != null) {
-			now.put("robot", pad.robot());
-		}
+		now.put("docked", pad.robot() != null ? pad.robot() : ""); // (always there: "" for nothing)
 		now.put("buffer", (long) pad.buffer());
 		now.put("capacity", (long) pad.capacity());
 		return Result.ok(now);
 	}
 
-	@Method(doc = "pull(): its oldest event, {event = \"docked\", robot} or {event = \"undocked\", robot}, or nil")
+	@Method(doc = "pull(): its oldest event, {event = \"docked\", id} or {event = \"undocked\", id} (id: the board id of what came or left), or nil")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}
@@ -78,7 +78,7 @@ public final class ChargingPad implements Device {
 	private void event(String name, String robot) {
 		Map<String, Object> event = new LinkedHashMap<>();
 		event.put("event", name);
-		event.put("robot", robot);
+		event.put("id", robot); // (the thing the event is about: its board's id)
 		events.add(event);
 	}
 

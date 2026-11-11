@@ -679,7 +679,7 @@ public final class Disk implements Device {
 					if (Files.isRegularFile(source.image())) {
 						Files.copy(source.image(), image(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 					}
-					report("write", null, "offset", 0L, "length", tier.bytes());
+					report("format", "/", "mode", mode); // (replaced whole, its bytes the source's: a format, never a write, which is the write method's: the user's)
 				} else if (Files.exists(source.storage)) {
 					Files.createDirectories(storage);
 					try (Stream<Path> paths = Files.walk(source.storage)) {
