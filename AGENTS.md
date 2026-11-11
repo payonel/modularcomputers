@@ -487,9 +487,10 @@ server commands as a command block does, at its block, with a command block's pe
 server. A command that ran answers `true` and what the game gave of it, nothing added (the user's,
 2026-11-10: the card dispatched it, the rest is the command's, as an HTTP response is a server's):
 `{successes, result, message, key}`, a command block's success count, its last run's value, what it
-said, its last message's translation key. No `get` (one door): in mcos, `/dev/operator0`'s line
-written runs one, and a read gives what the last one written said, kept by devfs (a driver's
-`answers`).
+said, its last message's translation key. Its `get` is its last answer (a command block's own
+state, as it keeps SuccessCount and LastOutput: a device's state, not a second door), and its
+`pull` its log, a `command` event a command run; in mcos, `/dev/operator0`'s line written runs one,
+and a read is its log from the file's open (the driver's `stream`).
 
 ### The internet card
 
@@ -761,7 +762,10 @@ before it takes off). A move already done (an arm out
     computer gone, out of reach or power) deletes the record, loaded or not. Its card unloaded, the
     field acts on nothing (it heard from it a tick ago at most: `Hold.seen`), frozen in time;
     what it holds unloaded, its card still holds, a move ending `blocked` with `name = ""`.
-- **A device's events go to every file open on it** (the user's): devfs takes them (`deliver`) and
+- **A device's events go to every file open on it** (the user's), **from its open on** (the user's,
+  2026-11-10: evdev's way, a sitting `cat` or `tail -f` shows what happens; never a backlog): at an
+  open, devfs gives what waits in the device to the files already open (none: it's gone), then
+  takes the new file in. devfs takes them (`deliver`) and
   gives each file its own copy, bounded, so a program and a `cat` each see them all; a file's
   readiness counts what it holds (a poll that took the events itself would otherwise wait for a
   line that already fell).

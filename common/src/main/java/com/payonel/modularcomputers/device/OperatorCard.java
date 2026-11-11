@@ -15,8 +15,10 @@ import java.util.function.Function;
  * it said go to the server's log. A command that ran answers with what Minecraft gave of it, as an
  * HTTP response is a server's (the user's, 2026-11-10: the card dispatched it; the rest is the
  * command's): how many of its runs succeeded (a command block's SuccessCount), its result, what it
- * said, and its last message's translation key. In mcos it's a file: a line written runs a command,
- * and a read gives what the last one written through that file said.
+ * said, and its last message's translation key. It keeps its last command's answer, as a command
+ * block keeps its SuccessCount and LastOutput ({@link #get}), and a log of the commands it runs
+ * ({@link #pull}: what's happening on it, a device's events). In mcos it's a file: a line written
+ * runs a command, and a read gives its log from the file's open on, an entry a line.
  */
 public final class OperatorCard extends Card {
 	/**
@@ -30,6 +32,13 @@ public final class OperatorCard extends Card {
 
 	/** How its block runs a command (in its world, at its place); null: it isn't in one (a client's copy, a test's). */
 	private Function<String, Outcome> runner = command -> null;
+	/** Its log's event: a command it ran (the method that caused it). */
+	public static final String COMMAND = "command";
+	private final com.payonel.modularcomputers.bus.InterruptLine line = new com.payonel.modularcomputers.bus.InterruptLine();
+	/** Its log: the commands it ran, kept as a device's events are (a window; lost said). Not saved. */
+	private final EventQueue log = new EventQueue(line, () -> { }, this::isAccepting);
+	/** Its last command's answer (a command block's own state: its SuccessCount and LastOutput); null before the first. */
+	private Map<String, Object> last;
 
 	public OperatorCard() {
 		super(CardKind.OPERATOR);
@@ -59,7 +68,44 @@ public final class OperatorCard extends Card {
 		answer.put("result", outcome.result());
 		answer.put("message", outcome.message());
 		answer.put("key", outcome.key());
+		last = answer;
+		Map<String, Object> entry = new LinkedHashMap<>();
+		entry.put("event", COMMAND);
+		entry.put("command", text);
+		entry.putAll(answer);
+		log.add(entry);
 		return Result.ok(answer);
+	}
+
+	@Method(doc = "get(): its last command's answer, {successes, result, message, key}, as a command block keeps its own (nil before the first)")
+	public Result get(Arguments args) {
+		return Result.ok((Object) last);
+	}
+
+	@Method(doc = "pull(): its log's oldest entry, a command it ran, {event = \"command\", command (as run), successes, result, message, key}; lost (how many went before it, the log full) when some did; or nil")
+	public Result pull(Arguments args) {
+		return Result.ok(log.pull());
+	}
+
+	@Override
+	public String streamMethod() {
+		return "pull";
+	}
+
+	@Override
+	public boolean interruptPending() {
+		return log.pending();
+	}
+
+	@Override
+	public com.payonel.modularcomputers.bus.InterruptLine interruptLine() {
+		return line;
+	}
+
+	/** It stopped taking data: its log goes. */
+	@Override
+	protected void dropData() {
+		log.clear();
 	}
 
 }

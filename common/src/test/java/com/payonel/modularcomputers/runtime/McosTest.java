@@ -414,8 +414,9 @@ class McosTest extends McosHarness {
 		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
 		devices.put(Motherboard.exp(0), motion);
 		boot();
-		server.add(() -> motion.sense(Map.of("event", "motion", "name", "minecraft:pig", "at", Map.of("forward", 1.5, "right", -3.0, "up", 0.0))));
 		type("head -n 1 /dev/motion0 > /dev/null; dmesg > /d; dmesg -C; dmesg > /e; touch /done\r");
+		untilIdle(); // (head waits: a device file shows events from its open on)
+		server.add(() -> motion.sense(Map.of("event", "motion", "name", "minecraft:pig", "at", Map.of("forward", 1.5, "right", -3.0, "up", 0.0))));
 		untilFile(root().resolve("done"), "");
 		String log = read(root().resolve("d"));
 		assertThat(log).as("a device joining").containsPattern("motion0 +" + "[0-9a-f-]+ +attached: motion at exp:0");
@@ -779,7 +780,7 @@ class McosTest extends McosHarness {
 	}
 
 	@Test
-	void anOperatorCardsFileRunsALineAsACommandAndReadsWhatItSaid() {
+	void anOperatorCardsFileRunsALineAsACommandAndReadsItsLogFromItsOpen() {
 		var card = new com.payonel.modularcomputers.device.OperatorCard();
 		java.util.List<String> ran = new java.util.ArrayList<>();
 		card.runWith(command -> {
@@ -791,12 +792,20 @@ class McosTest extends McosHarness {
 		devices.put(Motherboard.exp(0), card);
 		boot();
 		file("bogus.txt", "bogus\n");
-		type("echo /time set day > /dev/operator0; cat /dev/operator0 > /o; cp /bogus.txt /dev/operator0 2> /e; cat /dev/operator0 > /why; touch /done\r");
+		file("last.lua", """
+			local sys = require("sys")
+			local out = assert(io.open("/last", "w"))
+			out:write(sys.ioctl(assert(sys.open("/dev/operator0")), "get").message)
+			out:close()
+			""");
+		type("tail -f /dev/operator0 | head -n 2 > /o &\r"); // (its log, from its open: as they run)
+		untilIdle();
+		type("echo /time set day > /dev/operator0; cp /bogus.txt /dev/operator0 2> /e; lua /last.lua; touch /done\r");
 		untilFile(root().resolve("done"), "");
 		assertThat(ran).as("each line a command, its / dropped").containsExactly("time set day", "bogus");
-		assertThat(read(root().resolve("o"))).isEqualTo("Set the time to 1000\n");
 		assertThat(read(root().resolve("e"))).as("a command that failed fails its write").isNotEmpty();
-		assertThat(read(root().resolve("why"))).as("and its file says why").isEqualTo("Unknown command\n");
+		assertThat(read(root().resolve("last"))).as("its last answer, the card's own").isEqualTo("Unknown command\n");
+		untilFile(root().resolve("o"), "time set day: 1 1000 Set the time to 1000\nbogus: 0 0 Unknown command\n");
 	}
 
 	@Test
@@ -891,16 +900,17 @@ class McosTest extends McosHarness {
 	}
 
 	@Test
-	void tailFollowsASensorsFileShowingWhatWaitsThenEachEventAsItComes() {
+	void tailFollowsASensorsFileFromItsOpenEachEventAsItComes() {
 		com.payonel.modularcomputers.device.MotionSensorCard motion = new com.payonel.modularcomputers.device.MotionSensorCard();
 		devices.put(Motherboard.exp(0), motion); // (a card in a slot, as in a case)
 		boot();
 		server.add(() -> motion.sense(Map.of("event", "motion", "name", "minecraft:pig", "at", Map.of("forward", 1.5, "right", -3.0, "up", 0.0)))); // (before tail starts)
 		untilIdle();
 		type("tail -f /dev/motion0 | head -n 2 > /m\r"); // (head ends at its second line; tail goes on, as GNU's, until it writes again)
-		untilIdle(); // tail shows the one waiting and follows
+		untilIdle(); // tail follows from its open: the pig, before it, isn't shown (evdev's way, the user's)
 		server.add(() -> motion.sense(Map.of("event", "motion", "name", "minecraft:zombie", "at", Map.of("forward", 0.0, "right", 2.0, "up", 0.0))));
-		untilFile(root().resolve("m"), "minecraft:pig 1.5 -3.0 0.0\nminecraft:zombie 0.0 2.0 0.0\n");
+		server.add(() -> motion.sense(Map.of("event", "motion", "name", "minecraft:cow", "at", Map.of("forward", 1.0, "right", 0.0, "up", 0.0))));
+		untilFile(root().resolve("m"), "minecraft:zombie 0.0 2.0 0.0\nminecraft:cow 1.0 0.0 0.0\n");
 	}
 
 	@Test

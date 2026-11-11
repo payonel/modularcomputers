@@ -2,9 +2,9 @@
 -- lua operator-daylight.lua &
 --
 -- The operator card's file runs a line written to it as a server command, as a command block
--- would, at once. A command that fails fails the write, and reading the file then says what the
--- server answered. The world's clock is the computer's (os.date's hours are the game's), so the
--- program looks once a minute of game time and sleeps in between.
+-- would, at once. A command that fails fails the write, and the card's get (an ioctl on the same
+-- file) gives its last answer: what the server said. The world's clock is the computer's (os.date's
+-- hours are the game's), so the program looks once a minute of game time and sleeps in between.
 local sys = require("sys")
 
 local DUSK = 18          -- the hour (of the game's 24) after which it is time to act
@@ -19,9 +19,8 @@ while true do
       card:write(command, "\n")
       local ok = card:flush()
       if not ok then
-        local answer = io.open("/dev/operator0")
-        io.stderr:write("daylight: ", command, ": ", answer:read("a"))
-        answer:close()
+        local answer = sys.ioctl(sys.fileno(card), "get")
+        io.stderr:write("daylight: ", command, ": ", answer and answer.message or "?\n")
       end
     end
   end

@@ -56,6 +56,11 @@ class DeviceInterruptsTest {
 			((WeatherCard) device).sense("rain"); // (a change is an event, not the first look)
 		}),
 		Map.entry(MotionSensorCard.class, device -> ((MotionSensorCard) device).sense(Map.of("event", "motion", "name", "minecraft:pig", "at", Map.of("forward", 1.0, "right", 0.0, "up", 0.0)))),
+		Map.entry(com.payonel.modularcomputers.device.OperatorCard.class, device -> {
+			var card = (com.payonel.modularcomputers.device.OperatorCard) device;
+			card.runWith(command -> new com.payonel.modularcomputers.device.OperatorCard.Outcome(1, 1000, "Set the time to 1000\n", "commands.time.set.absolute"));
+			card.command(new com.payonel.modularcomputers.runtime.Arguments(List.of("time set day"))); // (its log's entry)
+		}),
 		Map.entry(com.payonel.modularcomputers.device.SoundCard.class, device -> {
 			var card = (com.payonel.modularcomputers.device.SoundCard) device;
 			card.write(new com.payonel.modularcomputers.runtime.Arguments(List.of("x".repeat(20_000)))); // more than fits: refused

@@ -31,21 +31,24 @@ any player.
 `/dev/operator0` (`operator1` for the next card) runs commands.
 
 - **Write:** a line written runs one, at once (a leading `/` is allowed). A write whose command
-  succeeded in no run fails (`EINVAL`), and the file then says why. An empty line fails the same way.
-- **Read:** what the last command written to it said (its `message`), kept by mcos, not the card.
-  The text is taken at the first read; seek back to the start to read the newest.
-- **Poll:** always ready for `IN` and `OUT`. The card has no interrupt, so never `PRI`.
+  succeeded in no run fails (`EINVAL`); the card's `get` then says what the server answered. An
+  empty line fails the same way.
+- **Read:** its log, a line for each command it runs (any program's), from the moment the file was
+  opened: the command, how many of its runs succeeded, its result and what it said. A read waits for
+  the next one, so a `cat` or `tail -f` left running shows commands as they run. The card keeps its
+  last 32; a `lost n` line says some went before a reader took them.
+- **Poll:** `IN` once a line is there to read.
 - **ioctls:** its methods below, by name, in any open mode:
   `sys.ioctl(fd, "command", "time set day")`. A failure is `nil`, its why, `EINVAL` and the
   failure.
   `setLabel` sets its label, as on every device file.
 
 ```sh
+tail -f /dev/operator0 &
 echo time set day > /dev/operator0
-cat /dev/operator0
 ```
 
-The second command prints what the server said, such as `Set the time to 1000`.
+The `tail` shows the command as it runs: `time set day: 1 1000 Set the time to 1000`.
 
 ## Methods
 
@@ -70,9 +73,18 @@ local ok, answer = board.invoke(card, "command", "time set day")
 A command that didn't work still answers, with `successes = 0`: only an empty command fails the
 call, with `bad_argument` (`expected = "command"`).
 
+### get() → {successes, result, message, key} or nil
+
+Its last command's answer, as a command block keeps its own (nil before the first).
+
+### pull() → entry or nil
+
+Its log's oldest entry, a command it ran: `{event = "command", command, successes, result, message,
+key}` (`command` as it ran, its `/` dropped), and `lost` when entries went before it.
+
 ## Events
 
-None.
+Each command it runs is an entry in its log (`pull`), and raises its interrupt.
 
 ## Examples
 

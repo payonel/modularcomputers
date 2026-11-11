@@ -158,11 +158,11 @@ out broadcast - 4 2 took it
 **Internet card.** Read-only: its access log, a line a request as it ended (method, URL, status,
 time, bytes). See the [internet card](/devices/internet-card/).
 
-**Motion sensor, audio sensor, weather sensor.** Read-only; an event a line, and a read with none
-waiting waits for one, as a keyboard does.
+**Motion sensor, audio sensor, weather sensor.** Read-only; an event a line, from the file's open
+on, and a read with none waiting waits for one, as a keyboard does.
 
-- motion: `mob x y z`, e.g. `minecraft:pig 1.5 0.0 -3.0`
-- audio: `sound x y z`, e.g. `minecraft:entity.pig.ambient 1.5 0.0 -3.0`
+- motion: `name forward right up`, e.g. `minecraft:pig 1.5 -3.0 0.0`
+- audio: `name forward right up`, e.g. `minecraft:entity.pig.ambient 1.5 -3.0 0.0`
 - weather: the weather now: `clear`, `rain`, `snow` or `thunder`
 
 Positions are relative to the sensor's block. If the sensor's buffer filled and events were
@@ -205,5 +205,8 @@ An ADPCM block's size (WAV's block align), which OSS never had, is the card's ow
 A device file can be polled with `sys.poll` (see [The sys library](/mcos/sys-api/)). A redstone file
 is always readable and reports a change as `PRI`, as a GPIO's sysfs value does; any other device's
 file reports its device's news as `PRI`. An event file is
-readable while an event waits. When a program blocks on a device and nothing else has work, the
+readable while an event waits. **A file gets its device's events from the moment it's opened, never
+ones from before** (as Linux's event devices do): every file open on a device gets each event that
+comes after its open, and an event that came while no file was open is gone by the next open. So a
+`cat` or a `tail -f` left running shows what happens, as it happens. When a program blocks on a device and nothing else has work, the
 kernel sleeps the computer until the device's [interrupt](/concepts/interrupts/).
