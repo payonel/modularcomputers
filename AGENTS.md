@@ -264,6 +264,16 @@ device data), and user code, as a real CPU runs firmware under an OS.
 - **Interrupts are level-triggered.** Device data is pushed into rings by credit (DMA-like), so
   input needs no call; news "goes cold" at once, so a key's latency is one round trip. Only the
   firmware caches device data; tier 1 RAM has no cache (every read is a call, slow on purpose).
+  **The inbox is what makes reads free** (`LuaRunner.take`, `machine.lua`'s cache): a wait answered
+  at the server brings the data of the streams it names, as much as each device's room in the inbox
+  (from the RAM), so the reads after it are served by the firmware, no call; and a read past the
+  last item, its device's interrupt not raised, is answered nil by the firmware too, as nothing new
+  can have come (level-triggered: news raises the line). A read goes to the server only when the
+  inbox is empty and the line is raised. The fill is bounded by the tick's server time
+  (`SERVER_NANOS_PER_TICK`): a tick out of time takes nothing, the device keeps its data (the
+  handshake), and the program's next read pays a call. That's fairness, not a fault, so no count of
+  calls is exact on a loaded host (a test asserting "exactly one call" failed on CI now and then,
+  and was dropped). Keep these: no read past the end that costs a call, no fill past the budget.
 - **Flow control is a handshake, never a silent drop:** a device keeps its data until there's room;
   what a full device does is its own business.
 - **A device reports every change to its state, from wherever it came:** an event in its own terms

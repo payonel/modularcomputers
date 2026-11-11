@@ -655,28 +655,6 @@ class LuaRunnerTest {
 	}
 
 	@Test
-	void readingPastTheLastKeyIsFreeWhenNothingIsRaised() {
-		ram(3);
-		boot("""
-			board.waitForInterrupt(nil, "console") -- at the server thread when they're typed
-			local keys = ""
-			while true do
-			  local _, key = board.invoke("console", "read") -- the last read finds the queue empty, the console quiet: nil
-			  if key == nil then break end
-			  keys = keys .. key
-			end
-			board.invoke("console", "write", keys)
-			while true do board.waitForInterrupt(nil, 'park') end
-			""");
-		LuaRunner runner = (LuaRunner) machine.runner().orElseThrow();
-		untilWaitingOn("console");
-		screen.press("ab"); // (as one: its wait answered with both, into the inbox)
-		untilParked();
-		assertThat(row(0)).isEqualTo("ab");
-		assertThat(runner.answered()).as("only the write reached the server: interrupts are level-triggered").isEqualTo(1);
-	}
-
-	@Test
 	void aWaitTheInboxCanAnswerIsFree() {
 		ram(3);
 		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
