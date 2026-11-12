@@ -27,8 +27,8 @@ machine that runs Minecraft, on both Fabric and NeoForge.
 
 A computer runs three layers, as a real one runs firmware under an operating system.
 
-1. **The host** is the Java side. A runner on the computer's own thread (a low-priority thread of
-   its own) runs the Lua virtual machine. Anything that touches the world, such as a device or a
+1. **The host** is the Java side. A runner on the computer's own thread runs the Lua virtual
+   machine, on one of the cores the server gives computers. Anything that touches the world, such as a device or a
    block, is done for it on the server thread, and the computer's thread waits for the answer.
 2. **The firmware** (`machine.lua`) is the CPU's layer. It is unbudgeted, and user code cannot reach
    it. It builds the sandbox, loads the EEPROM's program, budgets and freezes it, and answers its
@@ -48,8 +48,13 @@ There are three limits.
   cannot hang the computer or the server; it is just cut into slices.
 - **Server time.** Devices live on the server thread, so a program's calls to them (a **board
   call**) get 1 millisecond of the server's time each tick for each computer. A program that makes
-  too many calls waits for the next tick. It costs the server a bounded amount, however many
-  computers there are. Lua itself runs on the computer's own thread and costs the server nothing.
+  too many calls waits for the next tick. Each computer costs the server a bounded amount. Lua
+  itself runs on the computer's own thread and costs the server's thread nothing.
+- **Cores.** At most a few computers run Lua at once (`cpu_cores` in
+  `config/modularcomputers.properties`, 4 by default), however many there are, as an operating system
+  shares its CPUs among its threads. A busy computer runs as fast as its core goes, a slice at a time;
+  with more busy computers than cores, they take turns, a slice each, in the order they asked. A
+  computer waiting for an interrupt or for the server holds no core.
 - **Memory.** A program's memory is the RAM installed, above a measured baseline, so a
   [memory](/hardware/memory/) stick means the same to a program whatever the firmware itself costs.
   A program that fills it gets Lua's out-of-memory error, as it would on a real machine without

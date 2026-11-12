@@ -155,6 +155,39 @@ class LuaRunnerTest {
 	}
 
 	@Test
+	void busyComputersShareTheHostsCoresAndAllSpin() {
+		// Twice as many busy loops as cores: at most the cores' many run Lua at once, and every one
+		// gets its turns (a slice each, in turn), none starved.
+		int computers = CpuCores.size() * 2;
+		java.util.List<Machine> spinners = new java.util.ArrayList<>();
+		java.util.List<LuaRunner> runners = new java.util.ArrayList<>();
+		try {
+			LuaRunner.PEAK_IN_LUA.set(0);
+			for (int i = 0; i < computers; i++) {
+				Machine spinner = new Machine(new Motherboard(Hardware.computer(), new Bus()));
+				spinner.board().setCpu(new Cpu(CpuTier.TIER_3));
+				TestBus.of(spinner, new LinkedHashMap<>());
+				spinner.setServer(server::add);
+				spinner.board().setEeprom(new Eeprom("while true do end"));
+				assertThat(spinner.pressPower()).isEqualTo(Machine.PowerPress.ON);
+				spinners.add(spinner);
+			}
+			for (Machine spinner : spinners) {
+				settle(spinner, () -> spinner.runner().isPresent());
+				runners.add((LuaRunner) spinner.runner().orElseThrow());
+			}
+			settle(spinners.getFirst(), () -> runners.stream().allMatch(runner -> runner.resumes() >= 5));
+			assertThat(LuaRunner.PEAK_IN_LUA.get()).as("computers in Lua at once").isLessThanOrEqualTo(CpuCores.size());
+		} finally {
+			spinners.forEach(spinner -> {
+				if (spinner.isPowered()) {
+					spinner.pressPower();
+				}
+			});
+		}
+	}
+
+	@Test
 	void invokeAnswersAsPcallDoes() {
 		boot("""
 			local ok, w, h = board.invoke("id:screen", "getSize")

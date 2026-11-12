@@ -61,7 +61,8 @@ import java.util.function.Supplier;
  * <p>
  * <b>The server's tick is protected by time, not by counting calls</b>: each tick, a computer's calls
  * get {@link #SERVER_NANOS_PER_TICK} of the server thread; past that, they wait for the next tick.
- * Lua itself runs on the computer's thread and costs the server nothing.
+ * Lua itself runs on the computer's thread and costs the server nothing; at most {@link CpuCores}'s
+ * many computers run it at once, each holding a core from a resume to its next request.
  * <p>
  * Values cross as {@link Values}: strings as bytes (ISO-8859-1), handles as userdata, the board's
  * records as tables. The Lua state is only ever touched by the computer's thread.
@@ -980,7 +981,19 @@ public final class LuaRunner implements Runner {
 					for (Object value : reply) {
 						push(firmwareCo, value);
 					}
-					lua_ResumeResult result = lua_resume(firmwareCo, null, reply.size());
+					// Lua runs on one of the host's cores, held to its next request (CpuCores). Waiting for
+					// one isn't a safe point (its reply is on the stack, its request gone): a save waits for
+					// the next, a round of slices away at most.
+					CpuCores.acquire(this::notStopped);
+					lua_ResumeResult result;
+					PEAK_IN_LUA.accumulateAndGet(IN_LUA.incrementAndGet(), Math::max);
+					resumes++;
+					try {
+						result = lua_resume(firmwareCo, null, reply.size());
+					} finally {
+						IN_LUA.decrementAndGet();
+						CpuCores.release();
+					}
 					if (result.status != LUA_YIELD) {
 						end(result);
 						return;
@@ -1109,6 +1122,11 @@ public final class LuaRunner implements Runner {
 	/** Parks the computer's thread until {@link #ring} (or a stop, which interrupts it). */
 	private void park() {
 		java.util.concurrent.locks.LockSupport.park(this);
+		notStopped();
+	}
+
+	/** Ends the computer's thread if it's been stopped (a stop interrupts it). */
+	private void notStopped() {
 		if (Thread.interrupted() || stopping) {
 			throw new Stopped();
 		}
@@ -1175,6 +1193,16 @@ public final class LuaRunner implements Runner {
 			}
 			park();
 		}
+	}
+
+	/** How many computers are in Lua now, and the most there have been at once (tests: the cores' bound). */
+	static final java.util.concurrent.atomic.AtomicInteger IN_LUA = new java.util.concurrent.atomic.AtomicInteger();
+	static final java.util.concurrent.atomic.AtomicInteger PEAK_IN_LUA = new java.util.concurrent.atomic.AtomicInteger();
+	/** How many times its firmware has been resumed: its turns on a core (tests). */
+	private volatile long resumes;
+
+	long resumes() {
+		return resumes;
 	}
 
 	/** What the server thread handed the computer: calls' and waits' answers (tests). */

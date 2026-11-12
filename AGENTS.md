@@ -258,6 +258,12 @@ The host (a VM runner on the computer's own thread), the firmware (sandbox, budg
 device data), and user code, as a real CPU runs firmware under an OS.
 - **Board calls run on the server thread** (devices live there), each computer limited by server
   *time* a tick (1 ms), not call counts: fair to the server.
+- **Lua runs on a pool of the host's cores** (the user's, 2026-11-12: OpenComputers' threads, 4,
+  `cpu_cores`; "let the machines spin"): each computer keeps its own thread, but runs its firmware
+  only holding a core (`CpuCores`), from a resume to its next request, given up at each (a slice, a
+  call, a wait), handed on first come first served. So a busy loop runs flat out, taking turns a
+  slice each with the others; tiers don't change Lua's speed; no tier has a clock rate. Waiting for
+  a core isn't a safe point (its reply is pushed, its request gone): a save waits for the next.
 - **Syscalls freeze, they don't yield:** a budget callback freezes the whole user chain wherever it
   is, so no user coroutine sees a yield and `pcall` can't catch it. Traps (`board.trap`) are the
   syscall instruction; a spent slice stops the same way.

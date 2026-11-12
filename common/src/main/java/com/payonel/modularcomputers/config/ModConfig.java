@@ -92,6 +92,7 @@ public final class ModConfig {
 			ModularComputers.LOGGER.warn("{}: {} should be true or false, not \"{}\"; using true", FILE_NAME, INTERNET_ENABLED_KEY, enabled);
 		}
 		com.payonel.modularcomputers.device.RingDepths.configure(ringDepths(properties));
+		com.payonel.modularcomputers.runtime.CpuCores.configure(count(properties, com.payonel.modularcomputers.runtime.CpuCores.KEY, com.payonel.modularcomputers.runtime.CpuCores.DEFAULT));
 		com.payonel.modularcomputers.device.InternetCard.responseBuffer(count(properties, INTERNET_RESPONSE_BUFFER_KEY, com.payonel.modularcomputers.device.InternetCard.RESPONSE_BUFFER_KIB));
 		internet = new com.payonel.modularcomputers.internet.InternetPolicy(!enabled.equals("false"), list(properties, INTERNET_ALLOW_KEY),
 			list(properties, INTERNET_DENY_KEY));
@@ -179,6 +180,12 @@ public final class ModConfig {
 				# internet_response_buffer_kib: how much of a response's body each request holds unread, in KiB,
 				# before its download waits for the program to read it.
 				""", internetDefaults()),
+			new Section("""
+				# How many computers run their Lua at once: the server's cores they may use together. A busy
+				# computer runs as fast as it can on one, taking turns with the others when there are more
+				# computers than cores; a computer waiting (for a key, a device, the server) holds none.
+				# A whole count, 1 or more.
+				""", Map.of(com.payonel.modularcomputers.runtime.CpuCores.KEY, Integer.toString(com.payonel.modularcomputers.runtime.CpuCores.DEFAULT))),
 			new Section("""
 				# How deep a device's rings are: the events it keeps for its computer's program. Its news (a
 				# sensor's sightings, a card's changes, its logs' lines) keeps the newest that many: when more come,
