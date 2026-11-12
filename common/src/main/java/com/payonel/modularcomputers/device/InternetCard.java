@@ -26,7 +26,7 @@ import java.util.function.Supplier;
  * comes (false: not yet; "": its end), and either fails with why the request did; {@link #close}
  * stops it. Its interrupt says when a request has news. Each request runs on a thread of its own
  * ({@link HttpExchange}, which keeps it to the public internet: {@link InternetPolicy}); its body
- * waits in the card, at most {@link #BUFFERED} pieces a request, and a request whose next piece
+ * waits in the card, at most its setting's worth a request ({@link #RESPONSE_BUFFER_KIB} KiB by default), and a request whose next piece
  * finds no room waits (the handshake: nothing dropped), so a download goes at the program's pace.
  * At most {@link #MAX_OPEN} requests at a time.
  * <p>
@@ -43,14 +43,19 @@ public final class InternetCard extends Card {
 	/** And on the whole server: however many computers a player builds, its threads are bounded. */
 	public static final int MAX_RUNNING = 64;
 	private static final java.util.concurrent.atomic.AtomicInteger RUNNING = new java.util.concurrent.atomic.AtomicInteger();
-	/** Body pieces a request holds unread before its download waits, by default (each up to {@link HttpExchange#CHUNK} bytes: a data buffer, its own setting). */
-	public static final int BUFFERED = 16;
-	/** Body pieces a request holds, as last loaded ({@code internet_body_pieces}). */
-	private static volatile int bodyPieces = BUFFERED;
+	/** How much of a response's body a request holds unread before its download waits, by default, in KiB (a data buffer, its own setting). */
+	public static final int RESPONSE_BUFFER_KIB = 64;
+	/** Body pieces a request holds unread, each up to {@link HttpExchange#CHUNK} bytes, as last loaded ({@code internet_response_buffer_kib}). */
+	private static volatile int bodyPieces = pieces(RESPONSE_BUFFER_KIB);
 
-	/** The server's setting (ModConfig's): at least 1. */
-	public static void bodyPieces(int pieces) {
-		bodyPieces = Math.max(1, pieces);
+	/** The server's setting (ModConfig's), in KiB: at least one piece. */
+	public static void responseBuffer(int kib) {
+		bodyPieces = pieces(kib);
+	}
+
+	/** How many pieces hold that many KiB (a part of one rounds up). */
+	private static int pieces(int kib) {
+		return (int) Math.max(1, Math.ceilDiv((long) kib * 1024, HttpExchange.CHUNK));
 	}
 	/** Its access log's event: a request's end. */
 	public static final String REQUEST = "request";

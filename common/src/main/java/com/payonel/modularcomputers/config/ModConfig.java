@@ -38,8 +38,8 @@ public final class ModConfig {
 	public static final String INTERNET_ENABLED_KEY = "internet_enabled";
 	public static final String INTERNET_ALLOW_KEY = "internet_allow";
 	public static final String INTERNET_DENY_KEY = "internet_deny";
-	/** The internet card's body pieces a request holds unread (a data buffer, its own). */
-	public static final String INTERNET_BODY_PIECES_KEY = "internet_body_pieces";
+	/** How much of a response's body an internet request holds unread, in KiB (a data buffer, its own). */
+	public static final String INTERNET_RESPONSE_BUFFER_KEY = "internet_response_buffer_kib";
 	/** The internet's settings, as last loaded (the server's: clients never use them). */
 	private static volatile com.payonel.modularcomputers.internet.InternetPolicy internet = com.payonel.modularcomputers.internet.InternetPolicy.DEFAULT;
 
@@ -92,7 +92,7 @@ public final class ModConfig {
 			ModularComputers.LOGGER.warn("{}: {} should be true or false, not \"{}\"; using true", FILE_NAME, INTERNET_ENABLED_KEY, enabled);
 		}
 		com.payonel.modularcomputers.device.RingDepths.configure(ringDepths(properties));
-		com.payonel.modularcomputers.device.InternetCard.bodyPieces(count(properties, INTERNET_BODY_PIECES_KEY, com.payonel.modularcomputers.device.InternetCard.BUFFERED));
+		com.payonel.modularcomputers.device.InternetCard.responseBuffer(count(properties, INTERNET_RESPONSE_BUFFER_KEY, com.payonel.modularcomputers.device.InternetCard.RESPONSE_BUFFER_KIB));
 		internet = new com.payonel.modularcomputers.internet.InternetPolicy(!enabled.equals("false"), list(properties, INTERNET_ALLOW_KEY),
 			list(properties, INTERNET_DENY_KEY));
 	}
@@ -176,8 +176,8 @@ public final class ModConfig {
 				# internet_enabled: false turns them off. internet_deny: hosts, domains (.example.com) or ranges
 				# (203.0.113.0/24) also refused. internet_allow: ones reached though they'd be refused (a LAN service
 				# you mean computers to use). Comma-separated; a deny wins.
-				# internet_body_pieces: how much of a body a request holds unread before its download waits for the
-				# program, in pieces of up to 4096 bytes.
+				# internet_response_buffer_kib: how much of a response's body each request holds unread, in KiB,
+				# before its download waits for the program to read it.
 				""", internetDefaults()),
 			new Section("""
 				# How deep a device's rings are: the events it keeps for its computer's program. Its news (a
@@ -195,7 +195,7 @@ public final class ModConfig {
 		settings.put(INTERNET_ENABLED_KEY, "true");
 		settings.put(INTERNET_ALLOW_KEY, "");
 		settings.put(INTERNET_DENY_KEY, "");
-		settings.put(INTERNET_BODY_PIECES_KEY, Integer.toString(com.payonel.modularcomputers.device.InternetCard.BUFFERED));
+		settings.put(INTERNET_RESPONSE_BUFFER_KEY, Integer.toString(com.payonel.modularcomputers.device.InternetCard.RESPONSE_BUFFER_KIB));
 		return settings;
 	}
 

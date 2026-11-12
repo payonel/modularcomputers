@@ -43,7 +43,7 @@ class ModConfigTest {
 	void ringDepthsAreEveryonesUnlessATypeSetsItsOwn() throws IOException {
 		Path file = dir.resolve("config").resolve(ModConfig.FILE_NAME);
 		ModConfig.load(file);
-		assertThat(Files.readString(file)).contains("ring_depth: 512", "internet_body_pieces: 16").doesNotContain("robotics_ring_depth:");
+		assertThat(Files.readString(file)).contains("ring_depth: 512", "internet_response_buffer_kib: 64").doesNotContain("robotics_ring_depth:");
 		java.util.Properties set = new java.util.Properties();
 		set.setProperty("ring_depth", "300");
 		set.setProperty("robotics_ring_depth", "40");

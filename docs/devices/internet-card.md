@@ -34,7 +34,8 @@ cannot carry line breaks in a header, and cannot put credentials in its URL. The
 proxies, cookies or server details; it names itself `ModularComputers`.
 
 A server's operator can turn it off (`internet_enabled`) and allow or deny hosts and ranges
-(`internet_allow`, `internet_deny`). When it is off, `request` fails with
+(`internet_allow`, `internet_deny`), and set how much of a response's body each request holds unread
+before its download waits for the program (`internet_response_buffer_kib`, 64 by default). When it is off, `request` fails with
 `{why = "denied", reason = "disabled", value = ""}`.
 
 Timeouts: 10 seconds to connect, 30 with nothing read, 10 minutes in all. The status line and
