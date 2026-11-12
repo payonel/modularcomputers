@@ -1076,6 +1076,11 @@ Lessons from mistakes, each with its test:
   robot's body saying held) made a `busy` or `held` with no id, one mcos would wait on for ever. A
   device past the board's check that meets a wait is the host's bug: an `internal_error`.
   (`aCraftGivenPastTheBoardWhileOneRunsIsAnInternalError`, `aWaitItsBodySaysIsAnInternalError...`)
+- **To pass one entity, exempt that entity, never collisions:** a landing's last 3 blocks moved by
+  `setPos` (no collision), only so the torso could settle through its own solid legs, and so passed
+  through any roof or slab there too, against "never through blocks". The torso's `canCollideWith`
+  now skips just the legs it lands on, and it moves with the world's collisions all the way.
+  (`aLandingIsBlockedByABlockInItsLastBlocksAsAnywhere`, seen failing on the old landing)
 - **A block's state isn't the block:** leaves change state as their log goes, crops as they grow;
   what's tied to a block (a golem's breaking) compares the block, not its state.
   (`aBlockWhoseStateChangesWhileItsBrokenStillBreaks`)

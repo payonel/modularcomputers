@@ -472,6 +472,32 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
+	/**
+	 * A landing never goes through blocks, its last blocks onto its legs too: a stone put between it and
+	 * its legs, in the last of its way down, ends it blocked there, the robot above the stone, legless.
+	 * (Its last blocks once moved with no collision, to pass its own legs, and so passed anything.)
+	 */
+	@GameTest(maxTicks = 300)
+	public void aLandingIsBlockedByABlockInItsLastBlocksAsAnywhere(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
+		net.minecraft.core.BlockPos[] stone = {null};
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().fly(args(0.0, 0.0, 3.0)))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "up: " + events))
+			.thenExecute(() -> {
+				stone[0] = legs(helper).getFirst().blockPosition().above(); // (just over its legs: in the last of its way down)
+				helper.getLevel().setBlockAndUpdate(stone[0], net.minecraft.world.level.block.Blocks.STONE.defaultBlockState());
+				helper.assertTrue(!golem.robotics().land(args()).failed(), "it lands");
+			})
+			.thenWaitUntil(() -> helper.assertTrue(blockedBelow(events), "blocked by the stone: " + events))
+			.thenExecute(() -> {
+				helper.assertTrue(!golem.legs(), "not on its legs: the stone between");
+				helper.assertTrue(golem.getY() >= stone[0].getY() + 1 - 1e-6, "above the stone, never through it: " + golem.getY() + " over " + stone[0]);
+			})
+			.thenSucceed();
+	}
+
 	@GameTest(maxTicks = 200)
 	public void withNoLegsBelowItWontLandAndHoversOn(GameTestHelper helper) {
 		BotGolem golem = golem(helper, false);

@@ -734,6 +734,12 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	 * a mob, a blast's knockback; in the air it's pushed as anything is.
 	 */
 	/** It's solid, as a boat is: a player walks into it, not through it (the user's), and can stand on it. */
+	/** It collides with what anything does, but the legs it's landing on: it settles onto them, through their solid shape. */
+	@Override
+	public boolean canCollideWith(net.minecraft.world.entity.Entity other) {
+		return other != landing && super.canCollideWith(other);
+	}
+
 	@Override
 	public boolean canBeCollidedWith(net.minecraft.world.entity.Entity other) {
 		return isAlive();
@@ -1387,16 +1393,14 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			// Over its last block it slows, settling onto its legs (the user's), as a craft easing down.
 			double speed = LANDING_SPEED * Math.max(LANDING_SLOWEST, Math.min(1, left.length() / LANDING_EASE));
 			Vec3 step = left.scale(Math.min(1, speed / left.length()));
-			if (left.length() > LEGS_REACH) {
-				Vec3 from = position();
-				move(net.minecraft.world.entity.MoverType.SELF, step);
-				if (position().distanceTo(from) < step.length() * BLOCKED_SHARE) {
-					landing = null;
-					blockedMoving(from, step);
-					robotics.hovering();
-				}
-			} else {
-				setPos(position().add(step));
+			// With the world's collisions all the way down, never through blocks (the user's): its own legs, the
+			// ones it lands on, are all it passes (canCollideWith), to settle onto them.
+			Vec3 from = position();
+			move(net.minecraft.world.entity.MoverType.SELF, step);
+			if (position().distanceTo(from) < step.length() * BLOCKED_SHARE) {
+				landing = null;
+				blockedMoving(from, step);
+				robotics.hovering();
 			}
 			setDeltaMovement(Vec3.ZERO);
 			return;
