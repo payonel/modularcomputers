@@ -43,8 +43,15 @@ public final class InternetCard extends Card {
 	/** And on the whole server: however many computers a player builds, its threads are bounded. */
 	public static final int MAX_RUNNING = 64;
 	private static final java.util.concurrent.atomic.AtomicInteger RUNNING = new java.util.concurrent.atomic.AtomicInteger();
-	/** Body pieces a request holds unread before its download waits. */
+	/** Body pieces a request holds unread before its download waits, by default (each up to {@link HttpExchange#CHUNK} bytes: a data buffer, its own setting). */
 	public static final int BUFFERED = 16;
+	/** Body pieces a request holds, as last loaded ({@code internet_body_pieces}). */
+	private static volatile int bodyPieces = BUFFERED;
+
+	/** The server's setting (ModConfig's): at least 1. */
+	public static void bodyPieces(int pieces) {
+		bodyPieces = Math.max(1, pieces);
+	}
 	/** Its access log's event: a request's end. */
 	public static final String REQUEST = "request";
 	/** A body's bytes a failed request's call keeps (the user's: its start, enough to tell which; its size is the progress's sent). */
@@ -73,7 +80,7 @@ public final class InternetCard extends Card {
 	 * {@link EventQueue#window}, the next entry saying how many as lost; pending till taken. Server
 	 * thread only: entries made on a request's thread wait in {@link #ending} for the next tick.
 	 */
-	private final EventQueue log = new EventQueue(line, () -> { }, this::isAccepting);
+	private final EventQueue log = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.INTERNET, line, () -> { }, this::isAccepting);
 	/** Requests' ends made on their threads, for the next tick to put in the log, in order. */
 	private final java.util.concurrent.ConcurrentLinkedQueue<Map<String, Object>> ending = new java.util.concurrent.ConcurrentLinkedQueue<>();
 	private final HttpExchange.Resolver resolver;
@@ -91,7 +98,7 @@ public final class InternetCard extends Card {
 		final long started = System.nanoTime();
 		/** Its end is in the log (once: a close and its thread's end can meet). */
 		final java.util.concurrent.atomic.AtomicBoolean logged = new java.util.concurrent.atomic.AtomicBoolean();
-		final LinkedBlockingQueue<String> body = new LinkedBlockingQueue<>(BUFFERED);
+		final LinkedBlockingQueue<String> body = new LinkedBlockingQueue<>(bodyPieces); // (the setting as the request starts)
 		volatile Map<String, Object> response;
 		volatile boolean ended;
 		volatile com.payonel.modularcomputers.runtime.Failure error;

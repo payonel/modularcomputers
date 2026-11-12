@@ -59,7 +59,7 @@ public final class NetworkCard extends Card {
 	private final InterruptLine line = new InterruptLine();
 	private final InterruptLine wake = new InterruptLine();
 	private final BusPower power;
-	private final EventQueue frames = new EventQueue(line, this::changed, this::isAccepting);
+	private final EventQueue frames = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.NETWORK, line, this::changed, this::isAccepting);
 	private volatile Ether.Place place;
 	/** The blocks its cables reach (a wired card's), by meters along them. */
 	private volatile Map<BlockPos, Integer> reach = Map.of();
@@ -71,7 +71,7 @@ public final class NetworkCard extends Card {
 	 * entry saying how many as lost (the user's). Not saved, and its news isn't held pending: its
 	 * frames' interrupt isn't held up by a log nobody reads.
 	 */
-	private final EventQueue traffic = new EventQueue(line, () -> { }, this::isAccepting);
+	private final EventQueue traffic = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.NETWORK, line, () -> { }, this::isAccepting);
 	/** How far a WLAN card's signal reaches now, in blocks: at most its tier's, as set (OpenComputers' strength). */
 	private int strength;
 
@@ -173,7 +173,7 @@ public final class NetworkCard extends Card {
 
 	/** A frame's refusal (FULL, UNREACHABLE) as its failure: send's answer and its log's alike. */
 	static com.payonel.modularcomputers.runtime.Failure failure(String refused) {
-		return FULL.equals(refused) ? com.payonel.modularcomputers.runtime.Failure.limit("frames", EventQueue.FRAMES) : com.payonel.modularcomputers.runtime.Failure.network(UNREACHABLE, null);
+		return FULL.equals(refused) ? com.payonel.modularcomputers.runtime.Failure.limit("frames", RingDepths.of(com.payonel.modularcomputers.bus.DeviceType.NETWORK)) : com.payonel.modularcomputers.runtime.Failure.network(UNREACHABLE, null);
 	}
 
 	@Method(doc = "broadcast(data): a frame to every card it reaches (bytes, at most 8192), as best it can: how many took it")

@@ -266,7 +266,7 @@ public final class RoboticsDevice implements Device, Buffered {
 
 	private final InterruptLine line = new InterruptLine();
 	private final BusPower power = new BusPower(0);
-	private final EventQueue events = new EventQueue(line, this::changed, () -> this.accepting);
+	private final EventQueue events = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.ROBOTICS, line, this::changed, () -> this.accepting);
 
 	@Override
 	public boolean endsFull() {

@@ -54,7 +54,7 @@ class BufferedTest {
 	void withItsEndsUnreadFillingItItsNextCommandIsRefusedTillOneIsRead() {
 		List<Object> seen = new ArrayList<>();
 		run(board -> {
-			slow.endsUnread(com.payonel.modularcomputers.device.EventQueue.ends());
+			slow.endsUnread(slow.endsMax());
 			seen.add(board.invoke("id:slow", "work", 1L).failure().table());
 			board.invoke("id:slow", "pull");
 			seen.add(board.invoke("id:slow", "work", 1L).first());

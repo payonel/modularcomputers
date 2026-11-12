@@ -15,7 +15,7 @@ public final class WeatherCard extends Card {
 	private final InterruptLine line = new InterruptLine();
 	/** It works while a running computer has it on its bus (it draws nothing to speak of). */
 	private final com.payonel.modularcomputers.bus.BusPower power = new com.payonel.modularcomputers.bus.BusPower(0);
-	private final EventQueue events = new EventQueue(line, this::changed, this::isAccepting);
+	private final EventQueue events = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.WEATHER, line, this::changed, this::isAccepting);
 	private String weather;
 	/** Its event: the weather changed, {event = "change", old, new}. */
 	public static final String CHANGE = "change";

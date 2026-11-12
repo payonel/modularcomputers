@@ -277,8 +277,9 @@ device data), and user code, as a real CPU runs firmware under an OS.
 - **Flow control is a handshake, never a silent drop:** a device keeps its data until there's room;
   what a full device does is its own business. **A command's end is never lost** (the user's,
   2026-11-11: NVMe's completion queue, io_uring's NODROP): a device's `EventQueue` keeps news in a
-  window (lossy, `lost` said: news is read again from its state) and every end, at most
-  `device_command_ends` unread (the config's, 1024), its next command then refused at the board,
+  window (lossy, `lost` said: news is read again from its state) and every end, both as deep as its
+  ring (`RingDepths`, the user's, 2026-11-11: `ring_depth`, 512, a type's own only if an admin sets
+  `<type>_ring_depth`, opt-in: a device without a type reads everyone's), its next command then refused at the board,
   `limit {of = "events", max}` its own (`Buffered.endsMax`), mcos's `EAGAIN`: never blocked, as only
   user code gives commands, and a thread that both gives and reads would deadlock itself. So a
   program that reads its device's events never loses an end, however slow its computer.

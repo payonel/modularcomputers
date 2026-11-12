@@ -100,8 +100,8 @@ however slow its computer runs. The rest of a device's events are news (a sighti
 notice), which can be read again from its state, so it keeps the newest of them and drops the
 oldest past its window, the next event saying how many with `lost`.
 
-- **A device holds up to 1024 unread ends.** With that many waiting, its next command is refused,
-  `false, {why = "limit", of = "events", max = 1024}`, doing nothing, until its program reads some
+- **A device holds up to 512 unread ends** (its ring depth). With that many waiting, its next command
+  is refused, `false, {why = "limit", of = "events", max = 512}`, doing nothing, until its program reads some
   (the `pull` method). It keeps sensing and acting on the world meanwhile. Under mcos the refusal
   comes through as `nil, "limit", EAGAIN` and the failure: read the device's events, then give the
   command again.
@@ -114,8 +114,9 @@ oldest past its window, the next event saying how many with `lost`.
 - **A program that wants a command's end opens the device's file first, then gives the command
   through it**, and reads: a file opened after the end came doesn't see it, as on Linux.
 
-A server's admin sets the window and the ends (`device_event_window`, `device_command_ends`, each
-1024) in `config/modularcomputers.properties`.
+A device's news window and its unread ends are both its **ring depth**: 512, unless a server's admin
+sets another in `config/modularcomputers.properties`, for every device (`ring_depth`) or for one
+type (`robotics_ring_depth`, `motion_ring_depth`...).
 
 ## Why it matters
 

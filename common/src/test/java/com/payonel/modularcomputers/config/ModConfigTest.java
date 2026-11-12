@@ -35,14 +35,22 @@ class ModConfigTest {
 		assertThat(BatteryTier.TIER_3.infinite()).isTrue();
 	}
 
-	/** Devices' events are settings (the user's, 2026-11-11): the news window and the unread command ends, each 1024 by default. */
+	/**
+	 * Ring depths are settings (the user's, 2026-11-11): everyone's, 512 by default, written; a
+	 * type's own only where it's set, else everyone's. The internet card's body pieces are their own.
+	 */
 	@Test
-	void devicesEventSettingsAreWrittenAtTheirDefaults() throws IOException {
+	void ringDepthsAreEveryonesUnlessATypeSetsItsOwn() throws IOException {
 		Path file = dir.resolve("config").resolve(ModConfig.FILE_NAME);
 		ModConfig.load(file);
-		assertThat(Files.readString(file)).contains("device_event_window: 1024", "device_command_ends: 1024");
-		assertThat(com.payonel.modularcomputers.device.EventQueue.window()).isEqualTo(1024);
-		assertThat(com.payonel.modularcomputers.device.EventQueue.ends()).isEqualTo(1024);
+		assertThat(Files.readString(file)).contains("ring_depth: 512", "internet_body_pieces: 16").doesNotContain("robotics_ring_depth:");
+		java.util.Properties set = new java.util.Properties();
+		set.setProperty("ring_depth", "300");
+		set.setProperty("robotics_ring_depth", "40");
+		var depths = ModConfig.ringDepths(set); // (worked out, not applied: other tests' devices read the server's)
+		assertThat(depths.of(com.payonel.modularcomputers.bus.DeviceType.ROBOTICS)).as("its own").isEqualTo(40);
+		assertThat(depths.of(com.payonel.modularcomputers.bus.DeviceType.MOTION)).as("everyone's").isEqualTo(300);
+		assertThat(ModConfig.ringDepths(new java.util.Properties()).of(com.payonel.modularcomputers.bus.DeviceType.ROBOTICS)).as("none set: the default").isEqualTo(512);
 	}
 
 	@Test

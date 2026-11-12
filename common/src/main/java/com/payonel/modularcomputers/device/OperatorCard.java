@@ -36,7 +36,7 @@ public final class OperatorCard extends Card {
 	public static final String COMMAND = "command";
 	private final com.payonel.modularcomputers.bus.InterruptLine line = new com.payonel.modularcomputers.bus.InterruptLine();
 	/** Its log: the commands it ran, kept as a device's events are (a window; lost said). Not saved. */
-	private final EventQueue log = new EventQueue(line, () -> { }, this::isAccepting);
+	private final EventQueue log = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.OPERATOR, line, () -> { }, this::isAccepting);
 	/** Its last command's answer (a command block's own state: its SuccessCount and LastOutput); null before the first. */
 	private Map<String, Object> last;
 

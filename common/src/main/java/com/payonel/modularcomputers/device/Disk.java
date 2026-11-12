@@ -93,7 +93,7 @@ public final class Disk implements Device {
 	 * length} (raw: a write). Bounded, as a sensor's events.
 	 */
 	private final InterruptLine line = new InterruptLine();
-	private final EventQueue changes = new EventQueue(line, this::changed, () -> this.accepting);
+	private final EventQueue changes = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.STORAGE, line, this::changed, () -> this.accepting);
 	private boolean accepting;
 	private Runnable changed = () -> {
 	};

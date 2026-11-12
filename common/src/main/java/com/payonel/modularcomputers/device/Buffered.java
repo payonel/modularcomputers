@@ -145,7 +145,7 @@ public interface Buffered {
 	 * refusal names it, so a program (and mcos) knows which device to wait on.
 	 */
 	/**
-	 * Whether its unread command ends fill its queue ({@link EventQueue#ENDS}): it takes no command
+	 * Whether its unread command ends fill its queue ({@link RingDepths}: its type's ring depth): it takes no command
 	 * till its program reads some (the user's, 2026-11-11: an end is never dropped, the handshake),
 	 * refused at the board as a limit of events.
 	 */

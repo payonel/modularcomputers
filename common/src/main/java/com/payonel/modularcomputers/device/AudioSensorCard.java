@@ -20,7 +20,7 @@ public final class AudioSensorCard extends Card {
 	/** Its draw a tick, as a motion sensor's. */
 	public static final int DRAW = 9;
 	private final InterruptLine line = new InterruptLine();
-	private final EventQueue events = new EventQueue(line, this::changed, this::isAccepting);
+	private final EventQueue events = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.HEARING, line, this::changed, this::isAccepting);
 	private final BusPower power = new BusPower(DRAW);
 
 	public AudioSensorCard() {

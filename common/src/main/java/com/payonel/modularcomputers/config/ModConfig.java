@@ -38,9 +38,8 @@ public final class ModConfig {
 	public static final String INTERNET_ENABLED_KEY = "internet_enabled";
 	public static final String INTERNET_ALLOW_KEY = "internet_allow";
 	public static final String INTERNET_DENY_KEY = "internet_deny";
-	/** Devices' events: the news each keeps (lossy, a window), and the command ends it holds unread before it refuses its next command (lossless). */
-	public static final String EVENT_WINDOW_KEY = "device_event_window";
-	public static final String COMMAND_ENDS_KEY = "device_command_ends";
+	/** The internet card's body pieces a request holds unread (a data buffer, its own). */
+	public static final String INTERNET_BODY_PIECES_KEY = "internet_body_pieces";
 	/** The internet's settings, as last loaded (the server's: clients never use them). */
 	private static volatile com.payonel.modularcomputers.internet.InternetPolicy internet = com.payonel.modularcomputers.internet.InternetPolicy.DEFAULT;
 
@@ -92,11 +91,33 @@ public final class ModConfig {
 		if (!enabled.equals("true") && !enabled.equals("false")) {
 			ModularComputers.LOGGER.warn("{}: {} should be true or false, not \"{}\"; using true", FILE_NAME, INTERNET_ENABLED_KEY, enabled);
 		}
-		com.payonel.modularcomputers.device.EventQueue.configure(
-			(int) Math.min(Integer.MAX_VALUE, number(properties, EVENT_WINDOW_KEY, com.payonel.modularcomputers.device.EventQueue.WINDOW, "a count of 1 or more")),
-			(int) Math.min(Integer.MAX_VALUE, number(properties, COMMAND_ENDS_KEY, com.payonel.modularcomputers.device.EventQueue.ENDS, "a count of 1 or more")));
+		com.payonel.modularcomputers.device.RingDepths.configure(ringDepths(properties));
+		com.payonel.modularcomputers.device.InternetCard.bodyPieces(count(properties, INTERNET_BODY_PIECES_KEY, com.payonel.modularcomputers.device.InternetCard.BUFFERED));
 		internet = new com.payonel.modularcomputers.internet.InternetPolicy(!enabled.equals("false"), list(properties, INTERNET_ALLOW_KEY),
 			list(properties, INTERNET_DENY_KEY));
+	}
+
+	/** Ring depths: everyone's (ring_depth, else the default), then a type's own where it's set (the user's, 2026-11-11). */
+	static com.payonel.modularcomputers.device.RingDepths.Depths ringDepths(Properties properties) {
+		int depth = count(properties, com.payonel.modularcomputers.device.RingDepths.GLOBAL_KEY, com.payonel.modularcomputers.device.RingDepths.DEFAULT);
+		Map<com.payonel.modularcomputers.bus.DeviceType, Integer> own = new LinkedHashMap<>();
+		for (com.payonel.modularcomputers.bus.DeviceType type : com.payonel.modularcomputers.bus.DeviceType.values()) {
+			String key = com.payonel.modularcomputers.device.RingDepths.key(type);
+			if (properties.containsKey(key)) {
+				own.put(type, count(properties, key, depth));
+			}
+		}
+		return new com.payonel.modularcomputers.device.RingDepths.Depths(depth, own);
+	}
+
+	/** A setting that's a whole count, 1 or more, or {@code fallback} (with a warning) if it isn't. */
+	private static int count(Properties properties, String key, int fallback) {
+		double number = number(properties, key, fallback, "a whole count of 1 or more");
+		if (number < 1 || number != Math.rint(number)) {
+			ModularComputers.LOGGER.warn("{}: {} should be a whole count of 1 or more, not \"{}\"; using {}", FILE_NAME, key, properties.getProperty(key), fallback);
+			return fallback;
+		}
+		return (int) Math.min(Integer.MAX_VALUE, number);
 	}
 
 	/** A setting that's a list, separated by commas. */
@@ -155,21 +176,18 @@ public final class ModConfig {
 				# internet_enabled: false turns them off. internet_deny: hosts, domains (.example.com) or ranges
 				# (203.0.113.0/24) also refused. internet_allow: ones reached though they'd be refused (a LAN service
 				# you mean computers to use). Comma-separated; a deny wins.
+				# internet_body_pieces: how much of a body a request holds unread before its download waits for the
+				# program, in pieces of up to 4096 bytes.
 				""", internetDefaults()),
 			new Section("""
-				# What a device keeps for its computer's program. device_event_window: the news it keeps unread (a
-				# sensor's sightings, a card's changes, its logs' lines): when more come, the oldest go, and the next
-				# says how many were lost. device_command_ends: how many ends of its commands (how each went) it holds
-				# unread: none is ever dropped, so with that many waiting it takes no more commands till the program
-				# reads some. Each at least 1.
-				""", eventDefaults()));
-	}
-
-	private static Map<String, String> eventDefaults() {
-		Map<String, String> settings = new LinkedHashMap<>();
-		settings.put(EVENT_WINDOW_KEY, Integer.toString(com.payonel.modularcomputers.device.EventQueue.WINDOW));
-		settings.put(COMMAND_ENDS_KEY, Integer.toString(com.payonel.modularcomputers.device.EventQueue.ENDS));
-		return settings;
+				# How deep a device's rings are: the events it keeps for its computer's program. Its news (a
+				# sensor's sightings, a card's changes, its logs' lines) keeps the newest that many: when more come,
+				# the oldest go, and the next says how many were lost. Its commands' ends (how each went) are never
+				# dropped: with that many unread, it takes no more commands till the program reads some. A network
+				# card's frames wait as many. ring_depth is every device's; a type sets its own with
+				# <type>_ring_depth (robotics_ring_depth, redstone_ring_depth, motion_ring_depth, network_ring_depth...).
+				# Each a whole count, 1 or more.
+				""", Map.of(com.payonel.modularcomputers.device.RingDepths.GLOBAL_KEY, Integer.toString(com.payonel.modularcomputers.device.RingDepths.DEFAULT))));
 	}
 
 	private static Map<String, String> internetDefaults() {
@@ -177,6 +195,7 @@ public final class ModConfig {
 		settings.put(INTERNET_ENABLED_KEY, "true");
 		settings.put(INTERNET_ALLOW_KEY, "");
 		settings.put(INTERNET_DENY_KEY, "");
+		settings.put(INTERNET_BODY_PIECES_KEY, Integer.toString(com.payonel.modularcomputers.device.InternetCard.BUFFERED));
 		return settings;
 	}
 

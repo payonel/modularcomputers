@@ -7,23 +7,16 @@ import java.util.Map;
 /**
  * A device's events, waiting for its program: its interrupt is pending while any wait, and raising
  * its line wakes its computer. Two kinds, kept in order (the user's, 2026-11-11: command ends are
- * lossless): news (a sensor's sighting, a change, a notice) is a window, {@link #window} at most,
+ * lossless): news (a sensor's sighting, a change, a notice) is a window, {@link #depth} at most,
  * its oldest going when it's full and the next event saying how many were lost ({@code lost}), as
  * news can be read again from the device's state; a command's end (an event with {@code ok}, built
- * by the end builders here) is never dropped, {@link #ends} at most, its device refusing its next
+ * by the end builders here) is never dropped, {@link #depth} at most, its device refusing its next
  * command while that many wait unread ({@link #endsFull}: the handshake). A log ({@link #record})
  * is a window of all it holds.
  */
 public final class EventQueue {
-	/** A device's news window by default: the newest it keeps (the user's, 2026-11-11: 1024; a setting, {@link #window}). */
-	public static final int WINDOW = 1024;
-	/** The most command ends a device holds unread by default before it refuses its next command (the user's: 1024; a setting, {@link #ends}). */
-	public static final int ENDS = 1024;
-	/** A network card's frame ring: frames waiting for its program, the next refused when it's full (a data ring's handshake, not a window). */
-	public static final int FRAMES = 32;
-	/** The settings, as last loaded ({@code device_event_window}, {@code device_command_ends}). */
-	private static volatile int window = WINDOW;
-	private static volatile int endsLimit = ENDS;
+	/** Its device's type, whose ring depth it keeps ({@link RingDepths}: its news window, its unread ends, a ring's room alike); null: everyone's. */
+	private final com.payonel.modularcomputers.bus.DeviceType type;
 	/** An event waiting, and whether it's a command's end (never dropped). */
 	private record Waiting(Map<String, Object> event, boolean end) {
 	}
@@ -44,6 +37,12 @@ public final class EventQueue {
 	private boolean restored;
 
 	public EventQueue(InterruptLine line, Runnable changed, java.util.function.BooleanSupplier accepting) {
+		this(null, line, changed, accepting);
+	}
+
+	/** A queue of a device of {@code type}: its rings as deep as that type's setting, read as it fills (a reload applies at once). */
+	public EventQueue(com.payonel.modularcomputers.bus.DeviceType type, InterruptLine line, Runnable changed, java.util.function.BooleanSupplier accepting) {
+		this.type = type;
 		this.line = line;
 		this.changed = changed;
 		this.accepting = accepting;
@@ -66,7 +65,7 @@ public final class EventQueue {
 		}
 		restored = false;
 		boolean end = event.containsKey("ok"); // (a command's end: every end builder here gives one; news and notices have none)
-		if (!end && events.size() - ends >= window) {
+		if (!end && events.size() - ends >= depth()) {
 			for (var each = events.iterator(); each.hasNext(); ) { // (the oldest news goes: an end never does)
 				if (!each.next().end()) {
 					each.remove();
@@ -94,39 +93,28 @@ public final class EventQueue {
 		line.raise();
 	}
 
-	/** The most ends it holds unread before its device refuses a command (the setting, as it reads it now). */
+	/** How deep its rings are now: its type's setting. */
+	public int depth() {
+		return RingDepths.of(type);
+	}
+
+	/** The most ends it holds unread before its device refuses a command (its depth). */
 	public int endsMax() {
-		return endsLimit;
+		return depth();
 	}
 
 	/** Whether its command ends fill it: its device takes no more commands till its program reads some (lossless, the handshake). */
 	public boolean endsFull() {
-		return ends >= endsLimit;
+		return ends >= depth();
 	}
 
-	/** The news window now (the setting). */
-	public static int window() {
-		return window;
-	}
-
-	/** The most unread ends now (the setting). */
-	public static int ends() {
-		return endsLimit;
-	}
-
-	/** The server's settings (ModConfig's): each at least 1. */
-	public static void configure(int newsWindow, int commandEnds) {
-		window = Math.max(1, newsWindow);
-		endsLimit = Math.max(1, commandEnds);
-	}
-
-	/** A log's entry: a window of all it holds, its oldest going past {@link #window}. */
+	/** A log's entry: a window of all it holds, its oldest going past {@link #depth}. */
 	private void window(Map<String, Object> entry) {
 		if (!accepting.getAsBoolean()) {
 			return;
 		}
 		restored = false;
-		if (events.size() >= window) {
+		if (events.size() >= depth()) {
 			// A burst over its window between a program's pulls loses its oldest here however fast the
 			// program drains: it takes only as fast as its board calls run, a share of each tick. For a
 			// log (the network card's traffic, the internet card's requests) that's a lost line, not
@@ -141,7 +129,7 @@ public final class EventQueue {
 
 	/**
 	 * A log's entry (a device's record of what it did: the network card's traffic, the internet card's
-	 * requests), kept as any event is, its oldest going past {@link #window} and the next saying how
+	 * requests), kept as any event is, its oldest going past {@link #depth} and the next saying how
 	 * many as {@code lost}: built by its device from the builders (a refusal's fields a {@link
 	 * com.payonel.modularcomputers.runtime.Failure}'s, an end's {@link #failed}), so its why isn't
 	 * refused here as {@link #add}'s is.
@@ -155,7 +143,7 @@ public final class EventQueue {
 	 * that refuses rather than drops: its sender hears, and tries again).
 	 */
 	boolean offer(Map<String, Object> event) {
-		if (!accepting.getAsBoolean() || events.size() >= FRAMES) {
+		if (!accepting.getAsBoolean() || events.size() >= depth()) {
 			return false;
 		}
 		events.addLast(new Waiting(event, false));
@@ -488,7 +476,7 @@ public final class EventQueue {
 		if (saved.get("events") instanceof java.util.List<?> kept) {
 			for (int i = 0; i < kept.size(); i++) {
 				boolean end = i < kinds.size() && Boolean.TRUE.equals(kinds.get(i));
-				if (kept.get(i) instanceof Map<?, ?> map && (end ? ends < endsLimit : events.size() - ends < window)) {
+				if (kept.get(i) instanceof Map<?, ?> map && (end ? ends < depth() : events.size() - ends < depth())) {
 					events.addLast(new Waiting((Map<String, Object>) map, end));
 					if (end) {
 						ends++;

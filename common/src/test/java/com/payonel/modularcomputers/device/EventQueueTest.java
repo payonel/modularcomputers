@@ -24,18 +24,18 @@ class EventQueueTest {
 	void aCommandsEndIsNeverDroppedNewsGoesFirst() {
 		queue.ended("work", null);
 		int over = 5;
-		for (int i = 0; i < EventQueue.window() + over; i++) {
+		for (int i = 0; i < RingDepths.of(null) + over; i++) {
 			queue.add(Map.of("event", "news"));
 		}
 		List<Map<String, Object>> taken = all();
 		assertThat(taken.stream().filter(event -> "work".equals(event.get("event"))).count()).as("its end, kept").isEqualTo(1);
-		assertThat(taken.stream().filter(event -> "news".equals(event.get("event"))).count()).as("a window of news").isEqualTo(EventQueue.window());
+		assertThat(taken.stream().filter(event -> "news".equals(event.get("event"))).count()).as("a window of news").isEqualTo(RingDepths.of(null));
 		assertThat(taken.stream().mapToLong(event -> event.get("lost") instanceof Long n ? n : 0).sum()).as("every one that went, said").isEqualTo(over);
 	}
 
 	@Test
 	void itsEndsFillItTillOneIsRead() {
-		for (int i = 0; i < EventQueue.ends(); i++) {
+		for (int i = 0; i < RingDepths.of(null); i++) {
 			assertThat(queue.endsFull()).isFalse();
 			queue.ended("work", null);
 		}
@@ -51,7 +51,7 @@ class EventQueueTest {
 		queue.save(saved);
 		EventQueue loaded = new EventQueue(new InterruptLine(), () -> { }, () -> true);
 		loaded.restore(saved);
-		for (int i = 0; i < EventQueue.window() + 1; i++) {
+		for (int i = 0; i < RingDepths.of(null) + 1; i++) {
 			loaded.add(Map.of("event", "news"));
 		}
 		assertThat(loaded.pull()).as("its end, still the oldest: news went first").containsEntry("event", "work");

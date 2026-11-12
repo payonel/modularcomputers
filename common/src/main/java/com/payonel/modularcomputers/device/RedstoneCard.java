@@ -44,7 +44,7 @@ public final class RedstoneCard extends Card implements Buffered {
 	private final InterruptLine line = new InterruptLine();
 	/** It works while a running computer has it on its bus (it draws nothing to speak of at rest). */
 	private final BusPower power = new BusPower(0);
-	private final EventQueue events = new EventQueue(line, this::changed, this::isAccepting);
+	private final EventQueue events = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.REDSTONE, line, this::changed, this::isAccepting);
 
 	@Override
 	public boolean endsFull() {

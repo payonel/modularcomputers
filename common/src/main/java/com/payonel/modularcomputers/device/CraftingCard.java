@@ -82,7 +82,7 @@ public final class CraftingCard extends Card implements Buffered {
 	}
 
 	private final InterruptLine line = new InterruptLine();
-	private final EventQueue events = new EventQueue(line, this::changed, this::isAccepting);
+	private final EventQueue events = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.CRAFTING, line, this::changed, this::isAccepting);
 
 	@Override
 	public boolean endsFull() {

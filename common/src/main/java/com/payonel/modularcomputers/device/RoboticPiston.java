@@ -39,7 +39,7 @@ public final class RoboticPiston implements Device, Buffered {
 	private final BusPower power = new BusPower(0);
 	private final InterruptLine line = new InterruptLine();
 	private boolean accepting;
-	private final EventQueue events = new EventQueue(line, () -> {
+	private final EventQueue events = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.ACTUATOR, line, () -> {
 	}, () -> accepting);
 
 	@Override

@@ -35,7 +35,7 @@ public final class ChargingPad implements Device {
 
 	private final InterruptLine line = new InterruptLine();
 	private final BusPower power = new BusPower(0);
-	private final EventQueue events = new EventQueue(line, this::changed, () -> this.accepting);
+	private final EventQueue events = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.CHARGER, line, this::changed, () -> this.accepting);
 	private final Pad pad;
 	private boolean accepting;
 	private Runnable onChange = () -> {

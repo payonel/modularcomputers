@@ -73,7 +73,7 @@ class NetworkCardTest {
 		assertThat(newest(b)).isEqualTo(Map.of("event", "arrived", "address", a.address(), "broadcast", true, "distance", 5.0, "bytes", 3L, "ok", true));
 		while (a.send(args(b.address(), "more")).first() != null) { // (till its ring is full)
 		}
-		Map<String, Object> full = Map.of("why", "limit", "of", "frames", "max", (long) EventQueue.FRAMES);
+		Map<String, Object> full = Map.of("why", "limit", "of", "frames", "max", (long) RingDepths.of(com.payonel.modularcomputers.bus.DeviceType.NETWORK));
 		Map<String, Object> sent = new java.util.HashMap<>(Map.of("event", "send", "address", b.address(), "distance", 5.0, "bytes", 4L, "took", 0L, "ok", false));
 		sent.putAll(full);
 		assertThat(newest(a)).isEqualTo(sent);
@@ -91,7 +91,7 @@ class NetworkCardTest {
 		NetworkCard a = card(CardKind.TIER2_WLAN, BlockPos.ZERO);
 		String nobody = UUID.randomUUID().toString();
 		int over = 5;
-		for (int i = 0; i < EventQueue.window() + over; i++) {
+		for (int i = 0; i < RingDepths.of(com.payonel.modularcomputers.bus.DeviceType.NETWORK) + over; i++) {
 			a.send(args(nobody, "x"));
 		}
 		int left = 0;
@@ -99,7 +99,7 @@ class NetworkCardTest {
 		for (Object entry; (entry = a.pull(args()).first()) != null; left++) {
 			lost += ((Map<?, ?>) entry).get("lost") instanceof Long n ? n : 0; // (each entry that pushed one out says so)
 		}
-		assertThat(left).as("a window of the newest").isEqualTo(EventQueue.window());
+		assertThat(left).as("a window of the newest").isEqualTo(RingDepths.of(com.payonel.modularcomputers.bus.DeviceType.NETWORK));
 		assertThat(lost).as("every one that went, said").isEqualTo(over);
 	}
 
@@ -160,7 +160,7 @@ class NetworkCardTest {
 		assertThat(received(b)).containsEntry("data", "2");
 		assertThat(received(b)).isNull();
 		b.accepting(false); // no program: it takes nothing, and says so
-		assertThat(a.send(args(b.address(), "3")).failure().table()).as("not busy: a limit (no news of the sender's ends it)").isEqualTo(Map.of("why", "limit", "of", "frames", "max", (long) EventQueue.FRAMES));
+		assertThat(a.send(args(b.address(), "3")).failure().table()).as("not busy: a limit (no news of the sender's ends it)").isEqualTo(Map.of("why", "limit", "of", "frames", "max", (long) RingDepths.of(com.payonel.modularcomputers.bus.DeviceType.NETWORK)));
 		b.accepting(true);
 		assertThat(received(b)).isNull();
 	}
@@ -196,7 +196,7 @@ class NetworkCardTest {
 		while (!a.send(args(b.address(), "f" + sent)).failed()) {
 			sent++;
 		}
-		assertThat(a.send(args(b.address(), "more")).failure().table()).as("full: refused, not dropped").isEqualTo(Map.of("why", "limit", "of", "frames", "max", (long) EventQueue.FRAMES));
+		assertThat(a.send(args(b.address(), "more")).failure().table()).as("full: refused, not dropped").isEqualTo(Map.of("why", "limit", "of", "frames", "max", (long) RingDepths.of(com.payonel.modularcomputers.bus.DeviceType.NETWORK)));
 		assertThat(a.broadcast(args("all")).first()).as("a broadcast it can't take: missed, counted").isEqualTo(0L);
 		assertThat(received(b)).as("the oldest is still there").containsEntry("data", "f0");
 		assertThat(a.send(args(b.address(), "more")).first()).as("room again").isEqualTo(true);
