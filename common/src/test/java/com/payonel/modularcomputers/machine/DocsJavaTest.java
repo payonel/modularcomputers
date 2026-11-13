@@ -50,6 +50,9 @@ class DocsJavaTest {
 			loader.loadClass("InboxExample").getMethod("main", String[].class).invoke(null, (Object) new String[0]);
 		} finally {
 			System.setOut(was);
+			try (java.util.stream.Stream<Path> made = Files.walk(out)) {
+				made.sorted(java.util.Comparator.reverseOrder()).forEach(path -> path.toFile().delete()); // (its classes, then the folder)
+			}
 		}
 		String text = printed.toString(StandardCharsets.UTF_8);
 		// (Lua's print goes to the process's own stdout, not System.out: the host's lines are read.)

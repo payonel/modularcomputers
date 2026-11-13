@@ -729,22 +729,22 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		return false;
 	}
 
-	/*
-	 * On its legs it holds its ground (the user's): nothing shoves it, not a player walking into it,
-	 * a mob, a blast's knockback; in the air it's pushed as anything is.
-	 */
-	/** It's solid, as a boat is: a player walks into it, not through it (the user's), and can stand on it. */
 	/** It collides with what anything does, but the legs it's landing on: it settles onto them, through their solid shape. */
 	@Override
 	public boolean canCollideWith(net.minecraft.world.entity.Entity other) {
 		return other != landing && super.canCollideWith(other);
 	}
 
+	/** It's solid, as a boat is: a player walks into it, not through it (the user's), and can stand on it. */
 	@Override
 	public boolean canBeCollidedWith(net.minecraft.world.entity.Entity other) {
 		return isAlive();
 	}
 
+	/*
+	 * On its legs it holds its ground (the user's): nothing shoves it, not a player walking into it,
+	 * a mob, a blast's knockback; in the air it's pushed as anything is.
+	 */
 	/**
 	 * Whether it stands, which nothing shoves (on the ground, its thrusters off): hovering is flying,
 	 * even resting on its own legs where it took off (they're under it, solid, so it's on the ground).

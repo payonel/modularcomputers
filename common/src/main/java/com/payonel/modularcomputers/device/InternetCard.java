@@ -67,7 +67,7 @@ public final class InternetCard extends Card {
 	public static final int DATA_COST = PowerUnits.CPU / 10;
 	/** How many bytes of a body cost {@link #DATA_COST}: 4 KiB. */
 	public static final int DATA_UNIT = 4096;
-	/** How long a downloaded piece waits for room before looking again whether its request was closed, in milliseconds. */
+	/** How long what's downloaded waits for room before looking again whether its request was closed, in milliseconds. */
 	private static final long ROOM_MILLIS = 100;
 	/** The servers' settings, as loaded (a test's own). */
 	private static volatile Supplier<InternetPolicy> policy = () -> InternetPolicy.DEFAULT;
@@ -198,7 +198,7 @@ public final class InternetCard extends Card {
 			public boolean data(byte[] bytes) throws InterruptedException {
 				// As much as there's room for at once, the rest as the program reads (closed: it stops).
 				return request.body.put(new String(bytes, StandardCharsets.ISO_8859_1), () -> open.get(handle) == request, ROOM_MILLIS, put -> {
-					request.bytes += put;
+					request.bytes += put; // (its download's thread alone writes it)
 					request.told();
 				});
 			}

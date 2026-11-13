@@ -66,6 +66,9 @@ class InternetCardTest {
 		}
 	}
 
+	/** A tiny chunk, as a server dripping its body sends. */
+	private static final int TINY_CHUNK = 10;
+
 	/** What a request holds of its body unread, in bytes (its buffer, looked at from outside). */
 	private static long held(InternetCard card, long handle) throws Exception {
 		java.lang.reflect.Field open = InternetCard.class.getDeclaredField("open");
@@ -73,13 +76,7 @@ class InternetCardTest {
 		Object request = ((Map<?, ?>) open.get(card)).get(handle);
 		java.lang.reflect.Field field = request.getClass().getDeclaredField("body");
 		field.setAccessible(true);
-		Object body = field.get(request);
-		if (body instanceof java.util.Collection<?> pieces) { // (pieces, as it once held them)
-			return pieces.stream().mapToLong(piece -> ((String) piece).length()).sum();
-		}
-		java.lang.reflect.Method size = body.getClass().getDeclaredMethod("size");
-		size.setAccessible(true);
-		return ((Number) size.invoke(body)).longValue();
+		return ((BodyBuffer) field.get(request)).size();
 	}
 
 	/** Waits till the request holds {@code bytes} of its body unread. */
@@ -98,7 +95,7 @@ class InternetCardTest {
 	@Test
 	@ResourceLock("InternetCard.policy")
 	void aReadTakesEverythingHeldUpToWhatItAsks() throws Exception {
-		int size = 3 * DATA_PIECE;
+		int size = 3 * com.payonel.modularcomputers.internet.HttpExchange.CHUNK; // (three socket reads' worth)
 		HttpServer web = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
 		web.createContext("/", exchange -> {
 			exchange.sendResponseHeaders(200, size);
@@ -156,10 +153,6 @@ class InternetCardTest {
 			web.stop(0);
 		}
 	}
-
-	/** A socket read's size, at most (HttpExchange's), and a tiny chunk a server might send. */
-	private static final int DATA_PIECE = 4096;
-	private static final int TINY_CHUNK = 10;
 
 	/** Waits till the card's log has an entry, and takes it. */
 	@SuppressWarnings("unchecked")

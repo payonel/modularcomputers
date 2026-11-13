@@ -1,6 +1,7 @@
 package com.payonel.modularcomputers.device;
 
 import java.util.function.BooleanSupplier;
+import java.util.function.IntConsumer;
 
 /**
  * A request's body as it waits to be read (the user's, 2026-11-13: a socket's receive buffer, counted
@@ -18,10 +19,10 @@ final class BodyBuffer {
 
 	/**
 	 * The download's: puts {@code data}, waiting for room for what doesn't fit, looking every
-	 * {@code waitMillis} whether it's still {@code open}. {@code put} hears each part as it goes in
+	 * {@code waitMillis} whether it's still {@code open}. {@code heard} hears each part as it goes in
 	 * (its size). False when it was closed first: the rest wasn't put.
 	 */
-	synchronized boolean put(String data, BooleanSupplier open, long waitMillis, java.util.function.IntConsumer put) throws InterruptedException {
+	synchronized boolean put(String data, BooleanSupplier open, long waitMillis, IntConsumer heard) throws InterruptedException {
 		int from = 0;
 		while (from < data.length()) {
 			if (!open.getAsBoolean()) {
@@ -34,7 +35,7 @@ final class BodyBuffer {
 			}
 			int to = Math.min(data.length(), from + room);
 			held.append(data, from, to);
-			put.accept(to - from);
+			heard.accept(to - from);
 			from = to;
 		}
 		return true;

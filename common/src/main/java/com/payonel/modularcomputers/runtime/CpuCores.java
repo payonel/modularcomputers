@@ -10,7 +10,7 @@ import java.util.concurrent.locks.LockSupport;
  * runs (a resume, up to its next request: a slice spent, a board call, a wait), and gives it up at
  * each, so a busy loop gets a slice a turn, in turn (first come, first served), and a computer
  * waiting on the server or an interrupt holds none. A computer's thread waits for a core parked,
- * and is woken by a core handed to it, or by its own news (a save, a stop: {@code woken}).
+ * and is woken by a core handed to it, or by its own news (a stop: {@code woken}).
  * <p>
  * OpenComputers ran its computers on a pool of threads (its {@code threads} setting, 4); its
  * computers had to yield, so a pool thread was free at each. Ours never yield (their syscalls
@@ -53,8 +53,7 @@ public final class CpuCores {
 
 	/**
 	 * Takes a core, waiting for one parked. {@code woken} runs each time the thread wakes without
-	 * one (its own news: a save asked for is honoured there, a stop throws); a throw leaves the line
-	 * with no core held.
+	 * one (its own news: a stop throws); a throw leaves the line with no core held.
 	 */
 	public static void acquire(Runnable woken) {
 		Waiter me;
@@ -66,7 +65,6 @@ public final class CpuCores {
 			me = new Waiter();
 			waiting.add(me);
 		}
-		boolean done = false;
 		try {
 			while (!me.granted) {
 				LockSupport.park(CpuCores.class);
@@ -74,16 +72,14 @@ public final class CpuCores {
 					woken.run();
 				}
 			}
-			done = true;
-		} finally {
-			if (!done) {
-				synchronized (LOCK) {
-					if (!waiting.remove(me) && me.granted) {
-						held--; // handed one as it left: it goes to the next
-						grant();
-					}
+		} catch (RuntimeException | Error leaving) {
+			synchronized (LOCK) {
+				if (!waiting.remove(me)) {
+					held--; // handed one as it left: it goes to the next
+					grant();
 				}
 			}
+			throw leaving;
 		}
 	}
 
@@ -102,13 +98,6 @@ public final class CpuCores {
 			held++;
 			next.granted = true;
 			LockSupport.unpark(next.thread);
-		}
-	}
-
-	/** How many are held now (tests). */
-	static int held() {
-		synchronized (LOCK) {
-			return held;
 		}
 	}
 }
