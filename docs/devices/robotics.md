@@ -198,8 +198,7 @@ by `up` whole blocks, from where its last command left it, facing as it was. It 
 on a block's middle: from one, whole numbers do; after a stop between blocks, the rest of the way
 does. How it gets there is below ([Walking](#walking)). With no arguments it walks back to where
 its last command left it. A command; its event, `walk`: `ok`, or not and why, on the middle of the
-last block it reached; farther than 64 blocks any way, it's `blocked` at once and goes nowhere
-(`name = ""`, `face` toward where it was going). It fails with `bad_argument` (`expected =
+last block it reached. It goes as far as it's told: nothing in the robot limits a walk's length. It fails with `bad_argument` (`expected =
 "squared"`: it wouldn't end squared), or with a fault, `part = "legs"` missing (on its thrusters).
 
 ### walkTo(forward[, right[, up]]) → true
@@ -354,8 +353,7 @@ legs`), presses no pressure plates, and can be shoved (a `shove` notice; it stay
 on its legs, as a player off the ground does it (its tools, a block breaking more slowly), and its
 other cards work. Its event, `fly`: `ok` (then it holds
 there), or not and why (`blocked`, a block over it: `name = "minecraft:stone", face = "up"`). Its thrusters cost five running CPUs' power a
-tick. Farther than 64 blocks any way, it's `blocked` at once, before it takes off (`name = ""`,
-`face` toward where it was going). Fails with `bad_argument` (`expected = "squared"`).
+tick. It flies as far as it's told. Fails with `bad_argument` (`expected = "squared"`).
 
 If its program ends while its thrusters hold it up, or its power runs out, it falls and powers off:
 its torso lies on the ground, off, to be picked up as a Tier 2 Bot Golem Torso.

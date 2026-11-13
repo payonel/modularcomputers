@@ -40,8 +40,6 @@ public final class RoboticsDevice implements Device, Buffered {
 	public static final int WALK_COST = PowerUnits.CPU;
 	/** What a turn costs, however far: a running CPU's tick. */
 	public static final int TURN_COST = PowerUnits.CPU;
-	/** The farthest a walk may go, in blocks each way (the game's pathfinding range, about): farther, it's blocked at once (the user's: too far is blocked). */
-	public static final double MAX_WALK = 64;
 	public static final String IDLE = "idle";
 	public static final String WALKING = "walking";
 	public static final String TURNING = "turning";
@@ -70,8 +68,6 @@ public final class RoboticsDevice implements Device, Buffered {
 	private static final java.util.Set<String> POSITIONAL_OVER_TIME = java.util.Set.of("turn", "swing");
 	/** What its thrusters cost, each tick they fire (flying or hovering): five running CPUs' ticks. */
 	public static final int THRUST_COST = 5 * PowerUnits.CPU;
-	/** The farthest a flight may go, in blocks each way: farther, it's blocked at once (the user's: too far is blocked). */
-	public static final double MAX_FLIGHT = 64;
 	/** What an action with its hand costs (a use, a swing, a move to or from a container): a running CPU's tick. */
 	public static final int ACTION_COST = PowerUnits.CPU;
 	/** The spaces round it, in its own frame: its left and right its own, as it turns and walks. */
@@ -322,7 +318,7 @@ public final class RoboticsDevice implements Device, Buffered {
 
 	@Method(doc = "walk(forward[, right[, up]]): walks that far from where its last command left it, in its own frame (forward the way it faces, right to its right, up its elevation's change, whole blocks), facing as it was. It must end on a block's middle, whole blocks from its origin (within a 4096th), else it's refused, a bad argument ({why = \"bad_argument\", argument, value, expected = \"squared\"}: the one that wouldn't end squared): from a block's middle whole numbers do, and after a stop the rest of the way. Without pathfinding (the default) it goes straight, forward then right, without turning (it walks backwards, or sideways), stepping freely within its elevation (onto a slab, over carpet), up a block at a time (a jump) only while up is above, down at most 3 at a time only while up is below, never into lava, fire or deep water; with pathfinding it finds its way. With none, it goes back to where its last command left it. A command: true at once (its event: walk, ok, or not and why, on the last block's middle it reached: blocked, with block, what stopped it, air too, a drop it can't take or an elevation it couldn't reach, and face, its own that met it), or false and why it can't start")
 	public Result walk(Arguments args) {
-		double[] by = numbers(args); // (too far: blocked, its body's, the user's)
+		double[] by = numbers(args);
 		Move move = args.count() == 0 ? new Move(by, null) : squared(args, by, false); // (none: back to where its last command left it)
 		if (move.why() != null) {
 			return Result.fail(move.why());
@@ -771,7 +767,7 @@ public final class RoboticsDevice implements Device, Buffered {
 
 	@Method(doc = "fly(forward[, right[, up]]): (a tier 2 golem's) flies on its thrusters that far from where its last command left it, in its own frame, without turning, straight there (never through blocks; with pathfinding, round them); its legs, if it stands on them, are left standing where it was, and its thrusters fire beams from their sockets. In the air it walks nowhere, uses what it holds as a player off the ground does, and can be shoved (it flies back to where its last command left it). It must end on a squared point, whole blocks from its origin, its feet's height too (within a 4096th), else it's refused (bad_argument, expected squared). With no arguments, it takes off where it stands and holds there, or goes back to where its last command left it. A command: true at once (its event: fly, ok, or not and why), or false and why")
 	public Result fly(Arguments args) {
-		double[] by = numbers(args); // (too far: blocked, its body's, the user's)
+		double[] by = numbers(args);
 		Move move = args.count() == 0 ? new Move(by, null) : squared(args, by, true); // (none: off where it stands, or back to where its last command left it)
 		if (move.why() != null) {
 			return Result.fail(move.why());

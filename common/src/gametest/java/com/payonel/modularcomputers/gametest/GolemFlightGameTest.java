@@ -255,7 +255,7 @@ public class GolemFlightGameTest {
 			.thenExecute(() -> {
 				events.clear();
 				bottom[0] = pit(helper, golem);
-				helper.assertTrue(golem.getY() - bottom[0] > RoboticsDevice.MAX_FLIGHT, "deeper than a flight's reach");
+				helper.assertTrue(golem.getY() - bottom[0] > FAR, "deeper than a flight's reach");
 				GolemLegs legs = legs(helper).getFirst();
 				legs.setPos(legs.getX(), bottom[0], legs.getZ()); // (its legs at the bottom)
 				helper.assertTrue(Boolean.TRUE.equals(golem.robotics().land(args()).first()), "land(): its legs found, far below");
@@ -264,7 +264,7 @@ public class GolemFlightGameTest {
 			.thenExecute(() -> {
 				helper.assertTrue(golem.legs(), "on its legs");
 				events.clear();
-				golem.robotics().fly(args(0.0, 0.0, RoboticsDevice.MAX_FLIGHT));
+				golem.robotics().fly(args(0.0, 0.0, FAR));
 			})
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "up a flight's reach: " + events))
 			.thenExecute(() -> {
@@ -274,10 +274,10 @@ public class GolemFlightGameTest {
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "and two more: " + events))
 			.thenExecute(() -> {
 				events.clear();
-				for (GolemLegs legs : helper.getLevel().getEntitiesOfClass(GolemLegs.class, golem.getBoundingBox().inflate(BotGolem.LEGS_REACH, 2 * RoboticsDevice.MAX_FLIGHT, BotGolem.LEGS_REACH))) {
+				for (GolemLegs legs : helper.getLevel().getEntitiesOfClass(GolemLegs.class, golem.getBoundingBox().inflate(BotGolem.LEGS_REACH, 2 * FAR, BotGolem.LEGS_REACH))) {
 					legs.discard(); // (no legs, at the bottom where it left them: it lands on the ground)
 				}
-				helper.assertTrue(golem.getY() - bottom[0] > RoboticsDevice.MAX_FLIGHT, "past a flight's reach above the ground");
+				helper.assertTrue(golem.getY() - bottom[0] > FAR, "past a flight's reach above the ground");
 				helper.assertTrue(Boolean.TRUE.equals(golem.robotics().land(args(true)).first()), "land(true): the ground found, far below");
 			})
 			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("land")), "down onto the ground: " + events))
@@ -723,33 +723,52 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
-	/** A walk past its limit is blocked (the user's: too far is just blocked), at once, nothing to name, its face toward where it was going: it stays. */
+	/** How far the pit tests go: as far as the old limit, 64 blocks (a long way, no limit of its own now). */
+	private static final double FAR = 64;
+
+	/**
+	 * Its moves have no limit of their own (the user's, 2026-11-13: it goes as far as it's told): a
+	 * walk farther than 64 blocks starts walking, and a flight farther goes all the way. (Both were
+	 * once blocked at once.)
+	 */
 	@GameTest(maxTicks = 100)
-	public void aWalkTooFarIsBlockedAtOnceAndGoesNowhere(GameTestHelper helper) {
+	public void aLongWalkStartsWalking(GameTestHelper helper) {
 		BotGolem golem = golem(helper, false);
 		List<Object> events = events(helper, golem);
 		net.minecraft.world.phys.Vec3[] was = new net.minecraft.world.phys.Vec3[1];
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> {
 				was[0] = golem.position();
-				same(helper, golem.robotics().walk(args(RoboticsDevice.MAX_WALK + 1)).first(), true, "a command");
+				same(helper, golem.robotics().walk(args(FAR + 36)).first(), true, "a command");
 			})
-			.thenWaitUntil(() -> helper.assertTrue(events.stream().map(GameTests::withoutCall)
-				.anyMatch(java.util.Map.of("event", "walk", "ok", false, "why", "blocked", "name", "", "face", "front")::equals), "blocked, too far: " + events))
-			.thenExecute(() -> helper.assertTrue(golem.position().distanceTo(was[0]) < 0.1, "it went nowhere"))
+			.thenWaitUntil(() -> helper.assertTrue(golem.position().distanceTo(was[0]) > 0.5, "it walks: " + events))
+			.thenExecute(() -> {
+				helper.assertTrue(events.stream().noneMatch(event -> event instanceof java.util.Map<?, ?> map && "walk".equals(map.get("event"))), "not ended at once: " + events);
+				golem.robotics().stop(args());
+			})
 			.thenSucceed();
 	}
 
-	/** A flight past its limit is blocked too, before it takes off: its legs stay on. */
-	@GameTest(maxTicks = 100)
-	public void aFlightTooFarIsBlockedBeforeItTakesOff(GameTestHelper helper) {
+	/** (Down a pit, not up: a test's structure is boxed in by barriers.) */
+	@GameTest(maxTicks = 1200)
+	public void aLongFlightGoesAllTheWay(GameTestHelper helper) {
 		BotGolem golem = golem(helper, false);
 		List<Object> events = events(helper, golem);
+		double[] from = new double[1];
+		double down = FAR + 1; // (past the old limit: the pit is about 69 deep)
 		helper.startSequence()
-			.thenExecuteAfter(3, () -> same(helper, golem.robotics().fly(args(0.0, 0.0, RoboticsDevice.MAX_FLIGHT + 1)).first(), true, "a command"))
-			.thenWaitUntil(() -> helper.assertTrue(events.stream().map(GameTests::withoutCall)
-				.anyMatch(java.util.Map.of("event", "fly", "ok", false, "why", "blocked", "name", "", "face", "up")::equals), "blocked, too far: " + events))
-			.thenExecute(() -> helper.assertTrue(golem.legs() && !golem.thrusting(), "on its legs still, its thrusters off"))
+			.thenExecuteAfter(3, () -> golem.robotics().fly(args()))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "off its legs: " + events))
+			.thenExecute(() -> {
+				events.clear();
+				int bottom = pit(helper, golem);
+				legs(helper).forEach(GolemLegs::discard); // (out of its way: its own legs under it are solid)
+				from[0] = golem.getY();
+				helper.assertTrue(from[0] - bottom > down + 1, "the pit's deep enough: " + (from[0] - bottom));
+				same(helper, golem.robotics().fly(args(0.0, 0.0, -down)).first(), true, "a command");
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "it flew all the way: " + events))
+			.thenExecute(() -> helper.assertTrue(Math.abs(from[0] - golem.getY() - down) < 1e-3, "down " + down + ": " + (from[0] - golem.getY())))
 			.thenSucceed();
 	}
 }

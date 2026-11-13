@@ -758,8 +758,8 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   every failure has its own method. A landing on its legs already is landed: `true`, ended `ok`. **Past a field's reach is `blocked`** (the user's: too far is just
   blocked), `name = ""`, `face` the side of what it holds past the edge: a move there ends at once,
   nothing moved; what it holds out of reach, it lets go, a `blocked` notice (`blockedNotice`). A
-  robot's walk or flight past its limit (64 blocks each way) is blocked too, at once, nothing moved,
-  `face` toward where it was going. **A thing's `name` is its registry id, its `id` its own UUID**, everywhere
+  robot's moves have no limit of their own (the user's, 2026-11-13: it goes as far as it's told;
+  only the game's pathfinder has a range, `FOLLOW_RANGE`, its way not found there blocked). **A thing's `name` is its registry id, its `id` its own UUID**, everywhere
   (the user's): a block has none, so `id = ""`; `blocked`'s block is a `name` too. **A swing breaks a
   place**, as the game's own player does (`MultiPlayerGameMode`): another block pushed in, the break
   goes on into it at its pace; another item in hand, it starts again; air there, it's `lost`. Every way a walk can't go is blocked (the user's): a step up it can't take (by the step's
