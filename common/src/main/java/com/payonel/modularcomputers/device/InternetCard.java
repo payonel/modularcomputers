@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Supplier;
 
 /**
@@ -45,17 +44,16 @@ public final class InternetCard extends Card {
 	private static final java.util.concurrent.atomic.AtomicInteger RUNNING = new java.util.concurrent.atomic.AtomicInteger();
 	/** How much of a response's body a request holds unread before its download waits, by default, in KiB (a data buffer, its own setting). */
 	public static final int RESPONSE_BUFFER_KIB = 64;
-	/** Body pieces a request holds unread, each up to {@link HttpExchange#CHUNK} bytes, as last loaded ({@code internet_response_buffer_kib}). */
-	private static volatile int bodyPieces = pieces(RESPONSE_BUFFER_KIB);
+	/** Bytes of a body a request holds unread, as last loaded ({@code internet_response_buffer_kib}). */
+	private static volatile int bodyBytes = bytes(RESPONSE_BUFFER_KIB);
 
-	/** The server's setting (ModConfig's), in KiB: at least one piece. */
+	/** The server's setting (ModConfig's), in KiB. */
 	public static void responseBuffer(int kib) {
-		bodyPieces = pieces(kib);
+		bodyBytes = bytes(kib);
 	}
 
-	/** How many pieces hold that many KiB (a part of one rounds up). */
-	private static int pieces(int kib) {
-		return (int) Math.max(1, Math.ceilDiv((long) kib * 1024, HttpExchange.CHUNK));
+	private static int bytes(int kib) {
+		return (int) Math.min(Integer.MAX_VALUE, (long) kib * 1024);
 	}
 	/** Its access log's event: a request's end. */
 	public static final String REQUEST = "request";
@@ -65,8 +63,10 @@ public final class InternetCard extends Card {
 	public static final int DRAW = 4;
 	/** What a request costs. */
 	public static final int REQUEST_COST = PowerUnits.CPU;
-	/** What a piece of a body costs. */
+	/** What each {@link #DATA_UNIT} bytes of a body read cost (a part of one costs a whole one). */
 	public static final int DATA_COST = PowerUnits.CPU / 10;
+	/** How many bytes of a body cost {@link #DATA_COST}: 4 KiB. */
+	public static final int DATA_UNIT = 4096;
 	/** How long a downloaded piece waits for room before looking again whether its request was closed, in milliseconds. */
 	private static final long ROOM_MILLIS = 100;
 	/** The servers' settings, as loaded (a test's own). */
@@ -103,13 +103,11 @@ public final class InternetCard extends Card {
 		final long started = System.nanoTime();
 		/** Its end is in the log (once: a close and its thread's end can meet). */
 		final java.util.concurrent.atomic.AtomicBoolean logged = new java.util.concurrent.atomic.AtomicBoolean();
-		final LinkedBlockingQueue<String> body = new LinkedBlockingQueue<>(bodyPieces); // (the setting as the request starts)
+		final BodyBuffer body = new BodyBuffer(bodyBytes); // (the setting as the request starts)
 		volatile Map<String, Object> response;
 		volatile boolean ended;
 		volatile com.payonel.modularcomputers.runtime.Failure error;
 		volatile long bytes;
-		/** What's left of a piece a read took only part of (the reader's, on the server thread: it reads first). */
-		String rest;
 		/** News the program hasn't looked at (its interrupt stays pending while any request has some). */
 		volatile boolean fresh;
 		HttpExchange exchange;
@@ -198,15 +196,11 @@ public final class InternetCard extends Card {
 
 			@Override
 			public boolean data(byte[] bytes) throws InterruptedException {
-				String piece = new String(bytes, StandardCharsets.ISO_8859_1);
-				while (open.get(handle) == request) {
-					if (request.body.offer(piece, ROOM_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS)) {
-						request.bytes += bytes.length;
-						request.told();
-						return true;
-					}
-				}
-				return false; // (closed: it stops)
+				// As much as there's room for at once, the rest as the program reads (closed: it stops).
+				return request.body.put(new String(bytes, StandardCharsets.ISO_8859_1), () -> open.get(handle) == request, ROOM_MILLIS, put -> {
+					request.bytes += put;
+					request.told();
+				});
 			}
 
 			@Override
@@ -275,22 +269,17 @@ public final class InternetCard extends Card {
 		return request.error != null ? Result.fail(request.error) : Result.ok(false);
 	}
 
-	@Method(doc = "read(handle[, n]): the next piece of its body (at most n bytes); false: none yet; \"\": its end; fails with why the request did, {why, ...}: network, denied")
+	@Method(doc = "read(handle[, n]): what's come of its body, all of it or at most n bytes; false: none yet; \"\": its end; fails with why the request did, {why, ...}: network, denied")
 	public Result read(Arguments args) {
 		Request request = handle(args);
 		if (request == null) {
 			return noSuchRequest(args);
 		}
 		long most = args.count() > 1 ? Math.max(1, args.checkInteger(1)) : Long.MAX_VALUE;
-		String piece = request.rest != null ? request.rest : request.body.poll();
-		request.rest = null;
-		if (piece != null) {
-			power.charge(DATA_COST);
-			if (piece.length() <= most) {
-				return Result.ok(piece);
-			}
-			request.rest = piece.substring((int) most); // (the next read's, before what's queued)
-			return Result.ok(piece.substring(0, (int) most));
+		String data = request.body.take(most); // (everything held, up to most: read(2)'s way)
+		if (data != null) {
+			power.charge(DATA_COST * (int) Math.ceilDiv(data.length(), DATA_UNIT));
+			return Result.ok(data);
 		}
 		if (request.error != null) {
 			return Result.fail(request.error);

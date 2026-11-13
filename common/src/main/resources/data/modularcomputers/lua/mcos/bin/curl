@@ -8,7 +8,7 @@
 local sys = require("sys")
 local http = require("http")
 
-local READ_SIZE = 4096
+local READ_SIZE = 65536 -- a read takes all the card holds, up to this (its buffer's 64 KiB by default)
 
 local function usage()
   io.stderr:write("usage: curl [-X method] [-H header]... [-d data] [-o file] [-iIfLs] [-A agent] url\n")

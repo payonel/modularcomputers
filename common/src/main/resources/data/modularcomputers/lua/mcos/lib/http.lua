@@ -3,7 +3,7 @@
 -- to wait for its news. request(url, options) makes one, following redirects when options.follow
 -- (each hop a new request, judged by the card again: a redirect can't lead it where a URL couldn't),
 -- up to MAX_REDIRECTS; it gives the response ({status, message, headers, url: where it came from})
--- and its body ({read = function(n), close = function()}: read gives a piece, "" at the end, or nil
+-- and its body ({read = function(n), close = function()}: read gives what's come, at most n bytes, "" at the end, or nil
 -- and why), or nil and why: its failure as words, then the failure itself ({why, ...}: the card's,
 -- e.g. {why = "network", reason = "timed_out", message}; nil for http's own, too many redirects).
 -- options.device: the card's file (the first internet card's, else).

@@ -529,7 +529,9 @@ HTTP and HTTPS to the real internet (OC's internet card; the user's recipe: a co
 ender). The card speaks HTTP itself (`HttpExchange`, its own small client), since TLS is beyond a
 program's Lua. A program uses the card as any device (the user's call: no `sys.http`): its methods
 start a request (a handle), give its status and headers and read its body as it comes (`false`: not
-yet, its interrupt saying when to ask again), and `/dev/internet0`'s read is its access log (each
+yet, its interrupt saying when to ask again; a read takes all the card holds, up to `n`, as `read(2)`:
+the card joins what came, never the kernel, the user's, 2026-11-13; its buffer is bytes, 64 KiB, so a
+request carries its buffer a tick at most), and `/dev/internet0`'s read is its access log (each
 entry a request's end, the user's, 2026-11-05: a request is a command over time, `{event =
 "request", ok, method, url, ...}`, its `url` and `method` always, its `call` only a failure's and
 debug detail, a body cut to 16 bytes; a request closed first `stopped`), an

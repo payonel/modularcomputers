@@ -15,8 +15,8 @@ because a program's Lua cannot do TLS.
 | Type | `internet` |
 | Address | An expansion slot path such as `exp:0` |
 | Interrupt | Raised while a request has news for the program |
-| Power | 4 W at rest; a request costs a tick of a running CPU, and each piece of a body read a tenth of that |
-| Limits | 4 requests open per card, 64 on the server; 16 pieces of a body wait unread per request; a request body of at most 1 MiB |
+| Power | 4 W at rest; a request costs a tick of a running CPU, and each 4 KiB of a body read a tenth of that |
+| Limits | 4 requests open per card, 64 on the server; 64 KiB of a body waits unread per request (`internet_response_buffer_kib`); a request body of at most 1 MiB |
 | Info | `kind` (`internet`) |
 
 </div>
@@ -69,8 +69,8 @@ GET http://10.0.0.1/ - 2ms 0 denied private 10.0.0.1
   when more come, the oldest go, and the entry that pushed one out says so (`lost`, a `lost n` line
   before it). They go when the computer stops.
 - **Writing** is refused: opening it for writing fails with `EACCES`.
-- **poll:** `IN` while a line of the log waits; `PRI` while a request has news (its response came, a
-  piece of its body, its end or its failure), until the program next asks the card or reads its
+- **poll:** `IN` while a line of the log waits; `PRI` while a request has news (its response came,
+  more of its body, its end or its failure), until the program next asks the card or reads its
   file. A program waiting for a request polls for `PRI`, then asks again.
 
 An ioctl's answer is the method's (`true` for `close`, which answers nothing). A method's failure is
@@ -122,11 +122,12 @@ costs power.
 The status line and headers once they have come (`headers` by name, in lower case); `false` while
 they have not. It fails with the request's failure, when it failed (`denied`, `network`).
 
-### read(handle[, n]) → piece, "" or false
+### read(handle[, n]) → data, "" or false
 
-The next piece of the body, at most `n` bytes (a piece is at most 4096); `""` at its end; `false`
-while nothing more has come. What a piece had past `n` is the next read's. A failed request fails
-its reads with why, after what had come. Each piece costs power.
+Everything of the body that has come and not been read yet, or at most `n` bytes of it, as a
+read of a socket gives what's there; `""` at its end; `false` while nothing more has come. What
+was past `n` is the next read's. A failed request fails its reads with why, after what had come.
+Reading costs power by the 4 KiB.
 
 ### close(handle) → nothing
 
@@ -166,12 +167,14 @@ what went wrong. Its `method` and `url` are what a program reads, always there.
 
 ## Waiting
 
-The interrupt is raised when a request has news (its response came, a piece of its body, its end
+The interrupt is raised when a request has news (its response came, more of its body, its end
 or its failure) and stays raised until the program asks about it. In mcos, the card's file is
 ready for `sys.poll`'s `PRI` while it has news, so a program asks again after each poll.
 
-Each request holds at most 16 pieces of its body unread. A request whose next piece finds no room
-waits for it, so nothing is dropped: a big download goes at the program's pace. Everything stops
+Each request holds at most 64 KiB of its body unread (`internet_response_buffer_kib` in
+`config/modularcomputers.properties`). When that's full its download waits for the program to read,
+so nothing is dropped: a big download goes at the program's pace, and one read takes all that's
+waiting. Everything stops
 when the computer loses power or no program runs: requests close.
 
 ## Examples
