@@ -86,7 +86,9 @@ order: 10                   # place within the section (lower first)
   a world makes runs its examples in a server game test (`*ExamplesGameTest`). A block that is only a fragment (a signature, an ellipsis) has a
   `<!-- lua-fragment -->` line before it. Add a test when you add an example.
 - **Java in pages** (the host's inbox, for other hosts) is included the same way from
-  `docs/examples/*.java`, uses LungoLua alone, and is compiled and run by `DocsJavaTest`.
+  `docs/examples/*.java`, uses LungoLua alone, and is compiled and run by `DocsJavaTest`. C# beside it
+  (`docs/examples/*.cs`, LungoLua's C# port) says it isn't the mod's, and isn't tested by the build
+  (the port isn't published): build and run it by hand against a `lungolua.dll` when it changes.
 - Code highlighting comes from rouge, colored by `assets/style.css`.
 
 ## Checking

@@ -49,7 +49,9 @@ computers really work.
 - **The manual's programs are tested:** each `docs/examples/*.lua` runs in a `*ExamplesTest` (one
   class a group of devices, on `McosHarness`: a computer booting mcos, as `McosTest` uses). Its
   Java (`docs/examples/*.java`, the host's inbox page: LungoLua alone, for other hosts) is compiled
-  against LungoLua's jar only and run by `DocsJavaTest`.
+  against LungoLua's jar only and run by `DocsJavaTest`. Its C# (`docs/examples/*.cs`, the same
+  for a C# host, not the mod's) is the one example no test runs: LungoLua's C# port isn't published,
+  so the build can't get it; run it by hand against a `lungolua.dll` built from LungoLua when it changes.
 - **Tests bring their own programs** (Java `Program`s, or Lua files on the test disk) and never
   assert on what mcos prints; they check files on the disk and whether the machine runs.
 - **A test's bus is a case's bus** (`TestBus`, in the tests' `machine` package): parts on the

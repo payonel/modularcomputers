@@ -77,6 +77,22 @@ A slice is 10,000 steps, about 2,000 times round the loop. In the run above, the
 queued at freeze 644, which is 1,288,000 spins, and the program read it after 1,287,999: on its very
 first look after the thaw. Nothing was polled, and nothing was called.
 
+## The same in C#
+
+**This isn't part of the mod and doesn't work in it:** Modular Computers runs on Java, and the Java
+file above is how it's done. LungoLua also has a C# port, and this is how you'd do the same thing in
+a host written in C#. The steps and the calls are the same, with C# types: the budget is a
+delegate, Lua's strings are `HostString`s, and a `ConcurrentQueue` filled from another .NET thread
+takes the place of the `ConcurrentLinkedQueue`.
+
+```csharp
+{% include InboxExample.cs %}
+```
+
+The C# engine isn't published as a package. You build `lungolua.dll` yourself from LungoLua's
+source (`make -C csharp`, with the .NET 10 SDK), and then build this file against it. It prints what
+the Java one does, `C#:` in place of `java:`.
+
 ## In Modular Computers
 
 The computer's firmware works this way. While the program is frozen between slices, the firmware

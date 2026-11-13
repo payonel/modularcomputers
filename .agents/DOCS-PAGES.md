@@ -16,6 +16,6 @@ mcos: `mcos/index.md`, `boot.md`, `filesystem.md`, `shell.md`, `dev.md`, `networ
 Programs: `programs/index.md` and `programs/<name>.md` per man page (generated)
 Tutorials: `tutorials/index.md`, `first-computer.md`, `first-program.md`, `redstone.md`,
   `two-computers.md`, `disk-station.md`, `service.md`, `device-layers.md`, `from-opencomputers.md`
-Your own OS (`os/`): `index.md`, `boot.md`, `keyboard.md`, `shell.md`, `devices.md`, `inbox.md` (the host's inbox: Java on LungoLua alone)
+Your own OS (`os/`): `index.md`, `boot.md`, `keyboard.md`, `shell.md`, `devices.md`, `inbox.md` (the host's inbox: Java on LungoLua alone, and the same in C#)
 
 Links are root-relative with a trailing slash: `/hardware/case/`, `/programs/ls/`.
