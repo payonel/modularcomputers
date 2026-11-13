@@ -47,7 +47,9 @@ computers really work.
   then server game tests, then client game tests (a visible feature gets one, and its screenshots
   get looked at). Machine logic stays plain Java; Minecraft glue stays thin.
 - **The manual's programs are tested:** each `docs/examples/*.lua` runs in a `*ExamplesTest` (one
-  class a group of devices, on `McosHarness`: a computer booting mcos, as `McosTest` uses).
+  class a group of devices, on `McosHarness`: a computer booting mcos, as `McosTest` uses). Its
+  Java (`docs/examples/*.java`, the host's inbox page: LungoLua alone, for other hosts) is compiled
+  against LungoLua's jar only and run by `DocsJavaTest`.
 - **Tests bring their own programs** (Java `Program`s, or Lua files on the test disk) and never
   assert on what mcos prints; they check files on the disk and whether the machine runs.
 - **A test's bus is a case's bus** (`TestBus`, in the tests' `machine` package): parts on the

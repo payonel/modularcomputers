@@ -25,6 +25,9 @@ and you'll see exactly how a program talks to the computer's hardware.
 
 Do them in order: each page's OS is the last one with more added.
 
+Then, for the curious: [How data reaches a running program](/os/inbox/) shows the trick under the
+firmware, in Java against LungoLua alone, for anyone building a host of their own.
+
 ## How a computer starts
 
 There are three layers, as on a real PC:

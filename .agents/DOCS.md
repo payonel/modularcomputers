@@ -85,6 +85,8 @@ order: 10                   # place within the section (lower first)
   group of devices, `*ExamplesTest`, each on `McosHarness`: a computer booting mcos); a device only
   a world makes runs its examples in a server game test (`*ExamplesGameTest`). A block that is only a fragment (a signature, an ellipsis) has a
   `<!-- lua-fragment -->` line before it. Add a test when you add an example.
+- **Java in pages** (the host's inbox, for other hosts) is included the same way from
+  `docs/examples/*.java`, uses LungoLua alone, and is compiled and run by `DocsJavaTest`.
 - Code highlighting comes from rouge, colored by `assets/style.css`.
 
 ## Checking
