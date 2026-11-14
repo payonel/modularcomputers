@@ -17,8 +17,8 @@ using static Payonel.LungoLua.Vm.Ldebug;
 ** Sending data from another .NET thread into a Lua program that never yields and never calls the
 ** host, using LungoLua's budget and freeze.
 **
-** Build it against lungolua.dll (made by `make -C csharp` in payonel/lua, branch lungolua), with
-** the .NET 10 SDK, then run it: `dotnet InboxExample.dll`.
+** Put lungolua.dll (LungoLua's C# package, Payonel.LungoLua) beside this file and its project,
+** InboxExample.csproj, then run it with the .NET 10 SDK: `dotnet run`.
 **
 ** What it prints (the numbers vary):
 **   C#: queued "reading 1" at freeze 644

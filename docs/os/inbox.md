@@ -89,9 +89,21 @@ takes the place of the `ConcurrentLinkedQueue`.
 {% include InboxExample.cs %}
 ```
 
-The C# engine isn't published as a package. You build `lungolua.dll` yourself from LungoLua's
-source (`make -C csharp`, with the .NET 10 SDK), and then build this file against it. It prints what
-the Java one does, `C#:` in place of `java:`.
+Its project, beside it:
+
+```xml
+{% include InboxExample.csproj %}
+```
+
+The C# engine is `lungolua.dll`, from GitHub Packages, as LungoLua's jar is: the NuGet package
+`Payonel.LungoLua`, or the Maven package `com.payonel:lungoluacsharp`, a `.tar.gz` holding it. Put it
+beside the two files and run it with the .NET 10 SDK:
+
+```
+dotnet run
+```
+
+It prints what the Java one does, `C#:` in place of `java:`.
 
 ## In Modular Computers
 

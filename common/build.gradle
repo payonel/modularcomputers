@@ -23,6 +23,10 @@ sourceSets {
 	}
 }
 
+configurations {
+	lungoluaCsharp
+}
+
 dependencies {
 	// LungoLua, the Lua CPU's engine, and Styx, persisting a whole Lua state (each loader nests them).
 	api "com.payonel:lungolua:${project.lungolua_version}"
@@ -37,6 +41,9 @@ dependencies {
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 	testImplementation "org.mockito:mockito-core:${project.mockito_version}"
 	testImplementation "org.assertj:assertj-core:${project.assertj_version}"
+	// LungoLua's C# port, for the manual's C# example only (DocsCsharpTest): a .tar.gz holding
+	// lungoluacsharp/lungolua.dll. Nothing of the mod uses it.
+	lungoluaCsharp "com.payonel:lungoluacsharp:${project.lungolua_version}@tar.gz"
 }
 
 /**
@@ -45,8 +52,21 @@ dependencies {
  */
 def TEST_FORKS = Runtime.runtime.availableProcessors()
 
+// The C# port's package, unpacked for DocsCsharpTest: build/lungoluacsharp/lungolua.dll.
+def unpackLungoLuaCsharp = tasks.register('unpackLungoLuaCsharp', Sync) {
+	from { configurations.lungoluaCsharp.collect { tarTree(it) } }
+	into layout.buildDirectory.dir('lungoluacsharp')
+	eachFile { it.path = it.path.substring(it.path.indexOf('/') + 1) } // (out of its lungoluacsharp/ folder)
+	includeEmptyDirs = false
+}
+
 test {
 	useJUnitPlatform()
+	// The manual's C# example is built and run against the C# port (DocsCsharpTest), with the .NET 10
+	// SDK's dotnet: the `dotnet` Gradle property's path, else the one on PATH.
+	inputs.files(unpackLungoLuaCsharp).withPropertyName('lungoluaCsharp').withPathSensitivity(PathSensitivity.RELATIVE)
+	systemProperty 'modularcomputers.lungoluaCsharp', layout.buildDirectory.file('lungoluacsharp/lungolua.dll').get().asFile.absolutePath
+	systemProperty 'modularcomputers.dotnet', providers.gradleProperty('dotnet').getOrElse('dotnet')
 	maxParallelForks = TEST_FORKS
 	// A class marked @Execution(CONCURRENT) runs its tests side by side in its JVM (McosTest, the
 	// longest); every other class runs as before, a test at a time.

@@ -40,6 +40,8 @@ subprojects {
 			}
 			content {
 				includeModule 'com.payonel', 'lungolua'
+				// LungoLua's C# port (lungolua.dll), only for the manual's C# example (DocsCsharpTest).
+				includeModule 'com.payonel', 'lungoluacsharp'
 			}
 		}
 		maven {

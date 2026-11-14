@@ -49,7 +49,9 @@ gpr.user=your-github-user
 gpr.key=ghp_your_token
 ```
 
-(Or set `GITHUB_ACTOR` and `GITHUB_TOKEN`, as GitHub Actions does.) Then:
+(Or set `GITHUB_ACTOR` and `GITHUB_TOKEN`, as GitHub Actions does.) The tests also build the
+manual's C# example, with the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0):
+its `dotnet` on PATH, or its path as `dotnet=/path/to/dotnet` in the same file. Then:
 
 ```sh
 ./gradlew build      # compile and unit tests (seconds; doesn't start Minecraft)

@@ -1,0 +1,13 @@
+<!-- InboxExample.cs's project: put lungolua.dll beside it, then `dotnet run`. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="lungolua">
+      <HintPath>lungolua.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

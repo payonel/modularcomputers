@@ -87,8 +87,8 @@ order: 10                   # place within the section (lower first)
   `<!-- lua-fragment -->` line before it. Add a test when you add an example.
 - **Java in pages** (the host's inbox, for other hosts) is included the same way from
   `docs/examples/*.java`, uses LungoLua alone, and is compiled and run by `DocsJavaTest`. C# beside it
-  (`docs/examples/*.cs`, LungoLua's C# port) says it isn't the mod's, and isn't tested by the build
-  (the port isn't published): build and run it by hand against a `lungolua.dll` when it changes.
+  (`docs/examples/InboxExample.cs` and its `.csproj`, LungoLua's C# port) says it isn't the mod's,
+  and is built and run by `DocsCsharpTest` against the port's `lungolua.dll`, with the .NET 10 SDK.
 - Code highlighting comes from rouge, colored by `assets/style.css`.
 
 ## Checking

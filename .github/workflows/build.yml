@@ -15,6 +15,10 @@ jobs:
           java-version: '25'
           distribution: 'temurin'
       - uses: gradle/actions/setup-gradle@v6
+      # The manual's C# example is built and run by the unit tests (DocsCsharpTest).
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
       # The client game tests stay local (testAll): the runners' Xvfb has no OpenGL for the game.
       - name: unit tests and server game tests
         run: ./gradlew testServer
