@@ -498,7 +498,12 @@ public class CardGameTest {
 		java.util.UUID disk = computer.parts().getItem(CaseMenu.SATA_SLOTS).get(com.payonel.modularcomputers.item.ModComponents.SERIAL);
 		java.nio.file.Path seen = CaseBlockEntity.diskFolder(helper.getLevel().getServer(), disk).resolve("seen");
 		computer.pressPower();
+		// A pig that stays where it's put (no AI: one left to wander through the boot reached the test's
+		// barrier walls, and a step, a teleport, which has no collisions, put it in one, where it
+		// suffocated, and nothing moved again), stepping between two places of its own in the test's space.
 		var pig = helper.spawn(EntityTypes.PIG, POS.north(3));
+		pig.setNoAi(true);
+		double home = pig.getX();
 		int[] ticks = {0};
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertTrue(computer.machine().runner().map(r -> r.state() == com.payonel.modularcomputers.runtime.Runner.State.WAITING)
@@ -511,7 +516,7 @@ public class CardGameTest {
 				// its motions are read: a file shows what comes after its open (evdev's way), so moves before
 				// head opened it aren't its to read.
 				if (++ticks[0] % MOVE_EVERY == 0) {
-					pig.teleportTo(pig.getX() + (ticks[0] / MOVE_EVERY % 2 == 0 ? 1 : -1), pig.getY(), pig.getZ());
+					pig.teleportTo(home + (ticks[0] / MOVE_EVERY % 2 == 0 ? 1 : 0), pig.getY(), pig.getZ());
 				}
 				try {
 					helper.assertTrue(java.nio.file.Files.isRegularFile(seen) && java.nio.file.Files.readString(seen).lines().count() == 2,

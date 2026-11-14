@@ -95,7 +95,7 @@ public class GolemHandsGameTest {
 		helper.setBlock(FRONT, Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.WEST)); // facing it
 		helper.setBlock(LEFT, Blocks.WATER);
 		helper.setBlock(RIGHT, Blocks.OAK_LOG);
-		helper.spawn(EntityTypes.PIG, BACK);
+		helper.spawn(EntityTypes.PIG, BACK).setNoAi(true); // (it stays in the space it's scanned in: a pig left to wander may walk out first)
 		List<Object> answers = new ArrayList<>();
 		start(helper, answers, call("scan"));
 		helper.succeedWhen(() -> {

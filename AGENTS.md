@@ -964,6 +964,12 @@ Lessons from mistakes, each with its test:
   passed only while `head` happened to open first. A test makes its event once the program waits,
   or keeps the stimulus going till it's read (a pig stepping back and forth, in reach).
   (`mcosReadsAMotionSensorPutInWhileItRunsAsAMobMoves`)
+- **A test's mob stays where the test puts it:** a mob with its AI wanders (through a slow boot, as
+  far as the test's barrier walls), and a teleport has no collisions: that pig, stepped a block from
+  wherever it had got to, was put into a barrier and suffocated, so nothing moved again and its
+  sensor's reader waited for ever (CI, now and then). A mob a test places or steps has no AI
+  (`setNoAi`), and steps between places of the test's own, never from where it wandered.
+  (`mcosReadsAMotionSensorPutInWhileItRunsAsAMobMoves`, `aScanSeesTheSixSpacesRoundItAtOnceInItsOwnFrame`)
 - **A test types only once the program waits for it:** keys typed during an earlier read are that
   read's (a program says it's ready with a file). (`rawReadsWaitAsVminAndVtimeSay`)
 - **A buffer fills on demand, not only on its cadence:** a pad whose battery filled its buffer once
