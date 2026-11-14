@@ -227,6 +227,13 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		robotics.moveWith(new Legs());
 		board.solder(Motherboard.exp(GolemLayout.ROBOTICS_LANE), robotics);
 		setPersistenceRequired();
+		// Fluids are air to it (the user's, 2026-11-13): its pathfinder goes through them as through
+		// air, and beside lava (or fire) as anywhere.
+		for (var fluid : new net.minecraft.world.level.pathfinder.PathType[] {net.minecraft.world.level.pathfinder.PathType.WATER,
+			net.minecraft.world.level.pathfinder.PathType.WATER_BORDER, net.minecraft.world.level.pathfinder.PathType.LAVA,
+			net.minecraft.world.level.pathfinder.PathType.FIRE_IN_NEIGHBOR}) {
+			setPathfindingMalus(fluid, 0);
+		}
 	}
 
 	/** Its tier: its board's slots, and whether it flies on thrusters (tier 2). */
@@ -1587,9 +1594,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 		BlockPos feet = BlockPos.containing(next.x, floor + HAIR, next.z);
 		var state = level().getBlockState(feet);
-		if (state.getFluidState().is(net.minecraft.tags.FluidTags.LAVA) || state.is(net.minecraft.tags.BlockTags.FIRE)
-			|| state.getFluidState().is(net.minecraft.tags.FluidTags.WATER) && level().getFluidState(feet.below()).is(net.minecraft.tags.FluidTags.WATER)) {
-			return blockedBy(feet, toward); // (lava, fire, deep water: never into them)
+		if (state.is(net.minecraft.tags.BlockTags.FIRE)) {
+			return blockedBy(feet, toward); // (never into fire; fluids are air to it)
 		}
 		GolemSteps.Stop stop = GolemSteps.step(here, floor, goal);
 		if (stop == GolemSteps.Stop.HIGH) {
@@ -1768,6 +1774,26 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			}
 		}
 		return InteractionResult.SUCCESS;
+	}
+
+	/**
+	 * Fluids are air to it (the user's, 2026-11-13): it neither floats nor swims, sinking through
+	 * water or lava as through air, walking the bottom, its tools as on land; no current pushes it.
+	 */
+	@Override
+	public boolean isAffectedByFluids() {
+		return false;
+	}
+
+	@Override
+	public boolean isPushedByFluid() {
+		return false;
+	}
+
+	/** It has no air to run out of under water. */
+	@Override
+	public boolean canBreatheUnderwater() {
+		return true;
 	}
 
 	/** A player's hit picks it up (its item, its parts in it); nothing else harms it, but the world's end. */

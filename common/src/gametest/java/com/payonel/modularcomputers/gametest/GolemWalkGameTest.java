@@ -17,7 +17,7 @@ import net.minecraft.world.phys.Vec3;
  * A golem's walks and its position (user design, 2026-10-25): without pathfinding (the default) a walk
  * goes straight, whole blocks, onto a block's middle exactly, without turning (sideways, backwards),
  * stepping freely within its elevation, jumping a block at a time only up toward its height and
- * dropping at most three only down toward it, never into lava; with pathfinding it finds its way,
+ * dropping at most three only down toward it, through fluids as through air; with pathfinding it finds its way,
  * and still ends exactly, facing as it was. Its position is from its origin (its first tick, setPosition,
  * each dimension's own), kept through reboots and shoves, lost when it's picked up.
  */
@@ -185,11 +185,125 @@ public class GolemWalkGameTest {
 			.thenSucceed();
 	}
 
+	/** Fluids are air to it (the user's, 2026-11-13): it walks into lava, and through it, unburnt. */
 	@GameTest(maxTicks = 200)
-	public void itWontWalkIntoLava(GameTestHelper helper) {
+	public void itWalksThroughLavaAsThroughAirAndNeverBurns(GameTestHelper helper) {
 		helper.setBlock(AT.east(2), Blocks.LAVA);
-		walks(helper, new Object[] {3L}, blocked("minecraft:lava", "front"), at(1, 0, 0L));
+		helper.setBlock(AT.east(2).above(), Blocks.LAVA);
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.onEachTick(() -> helper.assertTrue(!golem.isOnFire(), "it never burns"));
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(3L)))
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its walk ended"))
+			.thenExecute(() -> {
+				same(helper, last(events), ARRIVED, "through the lava");
+				same(helper, position(golem), at(3, 0, 0L), "on the far side");
+			})
+			.thenSucceed();
 	}
+
+	/** Water over its head is air to it: it walks the bottom, and comes out the far side. */
+	@GameTest(maxTicks = 200)
+	public void itWalksAlongTheBottomOfDeepWater(GameTestHelper helper) {
+		for (int x = 2; x <= 3; x++) {
+			for (int y = 0; y < 3; y++) {
+				helper.setBlock(AT.east(x).above(y), Blocks.WATER);
+			}
+		}
+		walks(helper, new Object[] {4L}, ARRIVED, at(4, 0, 0L));
+	}
+
+	/**
+	 * It sinks as it falls through air, neither floating nor slowed: one golem dropped down a column of
+	 * water lands the tick another dropped beside it through air does.
+	 */
+	@GameTest(maxTicks = 200)
+	public void itSinksThroughWaterAsItFallsThroughAir(GameTestHelper helper) {
+		BotGolem dry = BotGolemGameTest.golem(helper, board -> {});
+		BotGolem wet = BotGolemGameTest.golem(helper, board -> {});
+		BlockPos column = AT.south(DROP_APART);
+		for (int y = 0; y < DROP; y++) {
+			helper.setBlock(column.above(y), Blocks.WATER);
+		}
+		dry.setPos(dry.getX(), dry.getY() + DROP, dry.getZ());
+		wet.setPos(wet.getX(), wet.getY() + DROP, wet.getZ() + DROP_APART);
+		long[] landed = {-1, -1};
+		helper.onEachTick(() -> {
+			if (landed[0] < 0 && dry.onGround()) {
+				landed[0] = helper.getTick();
+			}
+			if (landed[1] < 0 && wet.onGround()) {
+				landed[1] = helper.getTick();
+			}
+		});
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(landed[0] >= 0 && landed[1] >= 0, "both landed: " + landed[0] + ", " + landed[1]))
+			.thenExecute(() -> same(helper, landed[1], landed[0], "the tick it lands through water, against through air"))
+			.thenSucceed();
+	}
+
+	/** How far the golems drop in the sinking test, in blocks (the water's depth). */
+	private static final int DROP = 4;
+	/** How far apart the two golems drop, in blocks (side by side, on the test's floor). */
+	private static final int DROP_APART = 3;
+
+	/** A current doesn't push it: water flowing past where it stands leaves it on its block's middle. */
+	@GameTest(maxTicks = 200)
+	public void aCurrentDoesntPushIt(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		Vec3[] stood = {null};
+		long[] wet = {-1};
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> {
+				stood[0] = golem.position();
+				helper.setBlock(AT.west(), Blocks.WATER); // (its current flows east, past it)
+			})
+			.thenWaitUntil(() -> {
+				helper.assertTrue(helper.getLevel().getFluidState(helper.absolutePos(AT)).is(net.minecraft.tags.FluidTags.WATER), "the water reached it");
+				wet[0] = helper.getTick();
+			})
+			.thenIdle(CURRENT_TICKS)
+			.thenExecute(() -> {
+				same(helper, golem.position(), stood[0], "where it stood");
+				same(helper, events, List.of(), "no shove");
+			})
+			.thenSucceed();
+	}
+
+	/** How long the current runs past it in that test, in ticks: a push would carry it off its middle in a few. */
+	private static final int CURRENT_TICKS = 40;
+
+	/** With pathfinding, lava is a way like any: down a walled lane whose only way on is through it. */
+	@GameTest(maxTicks = 400)
+	public void withPathfindingItGoesThroughLava(GameTestHelper helper) {
+		for (int x = 0; x <= LANE; x++) {
+			for (int y = 0; y < 2; y++) {
+				helper.setBlock(AT.east(x - 1).north().above(y), Blocks.STONE);
+				helper.setBlock(AT.east(x - 1).south().above(y), Blocks.STONE);
+			}
+		}
+		helper.setBlock(AT.west(), Blocks.STONE);
+		helper.setBlock(AT.west().above(), Blocks.STONE);
+		helper.setBlock(AT.east(2), Blocks.LAVA);
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> {
+				golem.robotics().setPathfinding(args(true));
+				golem.robotics().walk(args(4L));
+			})
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "ended"))
+			.thenExecute(() -> {
+				same(helper, last(events), ARRIVED, "through the lava");
+				same(helper, position(golem), at(4, 0, 0L), "exactly");
+			})
+			.thenSucceed();
+	}
+
+	/** How long the lava test's walled lane is, in blocks. */
+	private static final int LANE = 6;
 
 	@GameTest(maxTicks = 300)
 	public void itsPositionOutlastsARebootAndAShoveAndWalkToGoesBackToItsOrigin(GameTestHelper helper) {

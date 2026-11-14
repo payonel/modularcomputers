@@ -416,7 +416,9 @@ and the move after it must still end squared), the origin stays. The docs say "w
 command left it", never "plan" (the user's: the word hid what it means). Without pathfinding (the default) it walks straight,
 forward then right, never turning (it strafes and backs up), by `GolemSteps`: free within its
 elevation (the block its feet are in: slabs), a block up at a time only toward `up`, down three at
-most only toward it. With pathfinding (`setPathfinding`, kept like the origin) the game's pathfinder
+most only toward it, never into fire. **Fluids are air to it** (the user's, 2026-11-13: simple for
+now): it and its legs never float, swim or burn, no current pushes them, it sinks and walks the
+bottom, its hand works under water as on land, and its pathfinder goes through fluids at air's cost. With pathfinding (`setPathfinding`, kept like the origin) the game's pathfinder
 walks it, the flying one flies it, ending exactly all the same. It names faces in its own frame only (`front`, `back`, `left`,
 `right`, `up`, `down`; its left its own, as it turns and walks, as `Face`'s is a block's), though
 it may know north (the user's, 2026-10-29: `turn` faces `north`, `south`, `east` or `west`); a block's direction it reads is turned into that frame. It

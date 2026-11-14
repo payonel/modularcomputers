@@ -239,6 +239,36 @@ public class GolemHandsGameTest {
 		});
 	}
 
+	/**
+	 * Fluids are air to it (the user's, 2026-11-13): under water its tools work as on land, a stone
+	 * broken in a player's dry time (a player's eyes under water would take five times it).
+	 */
+	@GameTest(maxTicks = 300)
+	public void underWaterItBreaksStoneInAPlayersDryTime(GameTestHelper helper) {
+		helper.setBlock(FRONT, Blocks.STONE);
+		for (BlockPos wet : List.of(AT, AT.above(), AT.above(2), FRONT.above(), FRONT.above(2), BACK, BACK.above(), BACK.above(2))) {
+			helper.setBlock(wet, Blocks.WATER); // (over its head, as deep as its eyes and the stone's top)
+		}
+		List<Object> answers = new ArrayList<>();
+		BotGolem golem = start(helper, answers, call("swing", "front"));
+		golem.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.WOODEN_PICKAXE));
+		long[] began = {-1};
+		helper.onEachTick(() -> {
+			if (began[0] < 0 && golem.robotics().state().equals("breaking")) {
+				began[0] = helper.getTick();
+			}
+		});
+		helper.succeedWhen(() -> {
+			helper.assertBlockPresent(Blocks.AIR, FRONT);
+			// As breakingStoneWithAPickaxeTakesAPlayersTime: 23 ticks, seen from the tick after it began.
+			long took = helper.getTick() - began[0];
+			helper.assertTrue(began[0] >= 0 && took >= DRY_BREAK_TICKS - 1 && took <= DRY_BREAK_TICKS + 1, "a dry break's time: " + took + " ticks");
+		});
+	}
+
+	/** How long a wooden pickaxe takes on stone, dry, in ticks (2 / 1.5 / 30 a tick). */
+	private static final int DRY_BREAK_TICKS = 23;
+
 	@GameTest(maxTicks = 200)
 	public void aBlockWhoseStateChangesWhileItsBrokenStillBreaks(GameTestHelper helper) {
 		// Leaves by a log: the log goes as it starts, so the leaves' distance changes under it (a tree cut).

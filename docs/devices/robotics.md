@@ -426,7 +426,7 @@ a stair's lower half is the ground's elevation:
 - **Within its elevation it steps freely**: onto a slab, along slabs, over carpet.
 - **Up an elevation** only while `up` is above where it is: a jump, at most one block at a time.
 - **Down** only while `up` is below: at most 3 blocks at a time, as far as a player falls unhurt.
-- **Never past `up`**, and never into lava, fire or deep water.
+- **Never past `up`**, and never into fire.
 
 It ends at exactly the elevation `up` asked, or its walk ends not `ok`, `blocked`
 (see [Blocked](#blocked)), by what stopped it:
@@ -434,7 +434,7 @@ It ends at exactly the elevation `up` asked, or its walk ends not `ok`, `blocked
 - **a step up** it wasn't to make, or more than a jump: the step's block, on the face it stepped toward;
 - **a drop** it wasn't to make, more than 3, or with no floor within its drop: the air it would step
   into (`minecraft:air`), on that face;
-- **a wall, a ceiling, lava, fire, deep water**: that block, on the face that met it;
+- **a wall, a ceiling, fire**: that block, on the face that met it;
 - **there, but at another elevation**: above where `up` asked, the block under it, on its `down`;
   below, the air over it it couldn't rise into, on its `up`.
 
@@ -454,6 +454,13 @@ short of it, `name = ""` (no one block to name) and `face` its face toward where
 flight with no way there is blocked at once, before it takes off. A flight with pathfinding flies
 round things too.
 
+### In water and lava
+
+Fluids are air to the robot. It doesn't float or swim, and no current pushes it: it sinks through
+water or lava as it falls through air, walks along the bottom, and comes out the far side. Its
+hand works under water as on land. Lava doesn't burn it, so a walk goes through lava as through
+water. With pathfinding, its way goes through fluids as freely as through air.
+
 ## Events
 
 ### Blocked
@@ -463,12 +470,12 @@ three fields beside it, the same for every one:
 
 | Field | What it is |
 |---|---|
-| `name` | the block in its way, its name (its registry id: `minecraft:stone`, `minecraft:lava`); `""` when no one block can be named (never `nil`) |
+| `name` | the block in its way, its name (its registry id: `minecraft:stone`, `minecraft:fire`); `""` when no one block can be named (never `nil`) |
 | `face` | the face of the robot that met it, its own: `front`, `back`, `left`, `right`, `up` or `down`. It's the side that was hit, not the way the move was mostly going: a flight sliding along a wall on its right met it on its `right` |
 | `call` | the command cut short: see below |
 
 ```lua
-local event = {event = "walk", ok = false, why = "blocked", name = "minecraft:lava", face = "front",
+local event = {event = "walk", ok = false, why = "blocked", name = "minecraft:stone", face = "front",
   call = {args = {3}, progress = {1, 0, 0}}}
 ```
 

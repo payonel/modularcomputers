@@ -22,10 +22,10 @@ public final class ModEntities {
 	/** A tier 1 golem walks; a tier 2 flies too (GolemLayout's tiers). */
 	public static final EntityType<BotGolem> TIER1_BOT_GOLEM = register("tier1_bot_golem",
 		EntityType.Builder.<BotGolem>of((type, level) -> new BotGolem(type, level, GolemLayout.TIER_1), MobCategory.MISC).sized(GOLEM_WIDTH, GOLEM_HEIGHT)
-			.clientTrackingRange(GOLEM_TRACKING));
+			.fireImmune().clientTrackingRange(GOLEM_TRACKING)); // (lava is a fluid like any to it: it never burns)
 	public static final EntityType<BotGolem> TIER2_BOT_GOLEM = register("tier2_bot_golem",
 		EntityType.Builder.<BotGolem>of((type, level) -> new BotGolem(type, level, GolemLayout.TIER_2), MobCategory.MISC).sized(GOLEM_WIDTH, GOLEM_HEIGHT)
-			.clientTrackingRange(GOLEM_TRACKING));
+			.fireImmune().clientTrackingRange(GOLEM_TRACKING)); // (lava is a fluid like any to it: it never burns)
 
 	/** A golem of a tier's type. */
 	public static EntityType<BotGolem> botGolem(GolemLayout tier) {
@@ -46,7 +46,7 @@ public final class ModEntities {
 	private static final float LEGS_HEIGHT = BotGolem.LEG_HEIGHT;
 
 	public static final EntityType<GolemLegs> GOLEM_LEGS = register("golem_legs",
-		EntityType.Builder.<GolemLegs>of(GolemLegs::new, MobCategory.MISC).sized(LEGS_WIDTH, LEGS_HEIGHT).clientTrackingRange(GOLEM_TRACKING));
+		EntityType.Builder.<GolemLegs>of(GolemLegs::new, MobCategory.MISC).sized(LEGS_WIDTH, LEGS_HEIGHT).fireImmune().clientTrackingRange(GOLEM_TRACKING)); // (as its golem: fluids are air to them)
 
 	private ModEntities() {
 	}
