@@ -33,6 +33,11 @@ so every server test runs on both. The client tests run on Fabric only: NeoForge
 harness (user's call, 2026-10-20; the one unofficial port found was too young to depend on). A
 NeoForge client that doesn't start would go unnoticed by the tests.
 
+**The two loaders' test servers tick differently, on purpose** (the user's, 2026-11-14: different
+runs cover more): Fabric's runs ticks as fast as it can (about 1200 a second here, 330 on CI),
+NeoForge's at the game's 20. So a `maxTicks` is only seconds on Fabric. Tests wait for the state
+they need, never for a time, so they pass at either pace. Don't make the two match.
+
 ## Where to put a test
 
 Prefer the lowest layer that can express it.
