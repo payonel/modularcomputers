@@ -418,8 +418,25 @@ forward then right, never turning (it strafes and backs up), by `GolemSteps`: fr
 elevation (the block its feet are in: slabs), a block up at a time only toward `up`, down three at
 most only toward it, never into fire. **Fluids are air to it** (the user's, 2026-11-13: simple for
 now): it and its legs never float, swim or burn, no current pushes them, it sinks and walks the
-bottom, its hand works under water as on land, and its pathfinder goes through fluids at air's cost. With pathfinding (`setPathfinding`, kept like the origin) the game's pathfinder
-walks it, the flying one flies it, ending exactly all the same. It names faces in its own frame only (`front`, `back`, `left`,
+bottom, its hand works under water as on land, and its pathfinder goes through fluids at air's cost. With pathfinding (`setPathfinding`, kept like the origin) a
+walk's way is its wayfinder's (`GolemWayfinder`, a robot's global planner: an A* of its own over
+the game's moves for a walker and their malus, the game's navigation following what it finds), a
+flight's the game's flying pathfinder's; both end exactly all the same. The wayfinder searches a
+slice of server time a tick (`NANOS_PER_TICK`, a board's millisecond: the game's own search runs in
+one go), a leg at a time (the user's, 2026-11-14): only places within the pathfinding range's
+blocks walked of the leg's start (`pathfinding_range`, 96 by default: the game's own range;
+`GolemWayfinder.range`), keeping all a leg explored, so its dead ends are explored once. A target
+past them, it walks the leg to the place nearest the target it found and searches on from there;
+each leg must end a block nearer (`LEG_PROGRESS`), else it's blocked (a way round longer than the
+range isn't found: the user's), so an unreachable target ends in bounded time. Chunk-bounded
+searches were measured and set aside (no cheaper, stuck sooner, and they poisoned the server's
+cache of places: the stress test logs them). A flight's way is the game's, found whole within the
+same range (its follow range, set from the setting at each flight). It sees only the loaded world: an unloaded
+chunk is nothing (no floor), and kept out of the server's shared cache of places. The game's news
+of a block changed by its way (`recomputePath`, its navigation's) makes it search again from where
+it is, at most once a second (the game's own rate); a way cut short searches on while it came
+nearer, else it's blocked. Its search and legs aren't saved: a load gives the walk again (as every
+command), searched afresh. It names faces in its own frame only (`front`, `back`, `left`,
 `right`, `up`, `down`; its left its own, as it turns and walks, as `Face`'s is a block's), though
 it may know north (the user's, 2026-10-29: `turn` faces `north`, `south`, `east` or `west`); a block's direction it reads is turned into that frame. It
 scans all six spaces at once (a list of every thing in a space, its creatures and items then its block, air too, each `{kind, name, id, at}`: the user's, 2026-11-04, the field card's `scan` the same shape), and works with its hand (its main hand, one item: a slot in its view,
@@ -764,14 +781,15 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   blocked), `name = ""`, `face` the side of what it holds past the edge: a move there ends at once,
   nothing moved; what it holds out of reach, it lets go, a `blocked` notice (`blockedNotice`). A
   robot's moves have no limit of their own (the user's, 2026-11-13: it goes as far as it's told;
-  only the game's pathfinder has a range, `FOLLOW_RANGE`, its way not found there blocked). **A thing's `name` is its registry id, its `id` its own UUID**, everywhere
+  only pathfinding has a range, `pathfinding_range`: a flight's way not found within it is
+  blocked, a walk's goes on in legs of it while each comes nearer). **A thing's `name` is its registry id, its `id` its own UUID**, everywhere
   (the user's): a block has none, so `id = ""`; `blocked`'s block is a `name` too. **A swing breaks a
   place**, as the game's own player does (`MultiPlayerGameMode`): another block pushed in, the break
   goes on into it at its pace; another item in hand, it starts again; air there, it's `lost`. Every way a walk can't go is blocked (the user's): a step up it can't take (by the step's
   block), a drop (by air), an elevation it couldn't reach (the block under it, `down`; the air over
-  it, `up`), a landing with force over no ground (air, `down`), and with pathfinding no way there
-or a way run out short (`name = ""`, its face toward where it was going; a flight's at once,
-before it takes off). A move already done (an arm out
+  it, `up`), a landing with force over no ground (air, `down`), and with pathfinding no way there,
+none nearer, or a way run out short (`name = ""`, its face toward where it was going; a flight's at
+once, before it takes off). A move already done (an arm out
   extended, in retracted) is no failure: `true`, its end `ok` (the user's: a lit lamp lit again).
   A tags-and-queues design came first
   and was set aside as too error-prone.
@@ -1097,6 +1115,12 @@ Lessons from mistakes, each with its test:
   robot's body saying held) made a `busy` or `held` with no id, one mcos would wait on for ever. A
   device past the board's check that meets a wait is the host's bug: an `internal_error`.
   (`aCraftGivenPastTheBoardWhileOneRunsIsAnInternalError`, `aWaitItsBodySaysIsAnInternalError...`)
+- **A search's view of the world goes into the server's cache:** the game's pathfinding context
+  caches what each place is (`PathTypeCache`, the server's, every mob's), so a search that sees a
+  chunk as nothing (not loaded, or past a region cut off at chunks) leaves holes in every mob's
+  world till those places change. The wayfinder judges an unloaded chunk's places open without
+  caching them. (`aSearchIntoAChunkNotLoadedLeavesTheServersCacheOfPlacesAlone`; the stress test's
+  chunk-bounded searches run last for it)
 - **To pass one entity, exempt that entity, never collisions:** a landing's last 3 blocks moved by
   `setPos` (no collision), only so the torso could settle through its own solid legs, and so passed
   through any roof or slab there too, against "never through blocks". The torso's `canCollideWith`

@@ -245,9 +245,9 @@ coordinate, `"right_angle"` for the heading.
 
 ### setPathfinding(on) → true
 
-Whether its walks and flights find their way round things (the game's pathfinder: it turns as it
-goes, jumps and drops as it finds, and turns back as it arrives) or go straight, the default. It's
-kept through reboots, and off again when the golem is picked up. `get` says which.
+Whether its walks and flights find their way round things (it turns as it goes, jumps and drops as
+it finds, and turns back as it arrives) or go straight, the default. It's kept through reboots, and
+off again when the golem is picked up. `get` says which.
 
 ### scan([face]) → things, or {face = things, ...}
 
@@ -448,11 +448,20 @@ It ends at exactly the elevation `up` asked, or its walk ends not `ok`, `blocked
 | ground | 4 down | blocked, `minecraft:air` | blocked, `minecraft:air` | blocked, `minecraft:air` |
 
 **With pathfinding** it finds its way, as a mob does: round walls, up stairs and slabs, jumping a
-block and dropping up to 3, turning as it goes. It still ends on the asked block's middle, at the
-asked elevation, facing as it began, or it's `blocked`: with no way there, or its way running out
-short of it, `name = ""` (no one block to name) and `face` its face toward where it was going; a
-flight with no way there is blocked at once, before it takes off. A flight with pathfinding flies
-round things too.
+block and dropping up to 3, turning as it goes. A walk finds its way a leg at a time: it looks as
+far as 96 blocks of walking from where it stands (the server's `pathfinding_range` setting, in
+`config/modularcomputers.properties`), walks to the place it found nearest where it's going, and
+looks again from there, so a walk goes however far it's told. A leg that gets no nearer ends the
+walk `blocked`: a way round longer than that range (a wall whose ends are farther off) isn't found.
+It sees only the loaded world: land
+whose chunks aren't loaded is nothing to it, no floor to walk on, so its way goes as far as the
+loaded world does. When something changes on its way (a block placed there, a door shut), it works
+its way out again from where it is. It still ends on the asked block's middle, at the asked
+elevation, facing as it began, or it's `blocked`: with no way there, no way nearer than it has
+come, or its way running out short of it, on the last block's middle it reached, `name = ""` (no
+one block to name) and `face` its face toward where it was going. A flight with pathfinding flies
+round things too, but finds its whole way at once, within the same range: a flight with no way
+there that it can find is blocked at once, before it takes off.
 
 ### In water and lava
 

@@ -53,6 +53,22 @@ class ModConfigTest {
 		assertThat(ModConfig.ringDepths(new java.util.Properties()).of(com.payonel.modularcomputers.bus.DeviceType.ROBOTICS)).as("none set: the default").isEqualTo(512);
 	}
 
+	/**
+	 * How far a bot golem's pathfinding searches is a setting (the user's, 2026-11-14): 96 blocks
+	 * walked by default, written; set, a leg searches that far.
+	 */
+	@Test
+	void thePathfindingRangeIsASetting() throws IOException {
+		Path file = dir.resolve("config").resolve(ModConfig.FILE_NAME);
+		ModConfig.load(file);
+		assertThat(Files.readString(file)).contains("pathfinding_range: 96");
+		assertThat(com.payonel.modularcomputers.entity.GolemWayfinder.range()).isEqualTo(96);
+		Files.writeString(file, Files.readString(file).replace("pathfinding_range: 96", "pathfinding_range: 40"));
+		ModConfig.load(file);
+		assertThat(com.payonel.modularcomputers.entity.GolemWayfinder.range()).isEqualTo(40);
+		com.payonel.modularcomputers.entity.GolemWayfinder.configure(com.payonel.modularcomputers.entity.GolemWayfinder.DEFAULT_RANGE);
+	}
+
 	@Test
 	void readsKeyColonValueLinesWithFractionsAndZeroForever() throws IOException {
 		Path file = dir.resolve(ModConfig.FILE_NAME);

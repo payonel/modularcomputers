@@ -93,6 +93,7 @@ public final class ModConfig {
 		}
 		com.payonel.modularcomputers.device.RingDepths.configure(ringDepths(properties));
 		com.payonel.modularcomputers.runtime.CpuCores.configure(count(properties, com.payonel.modularcomputers.runtime.CpuCores.KEY, com.payonel.modularcomputers.runtime.CpuCores.DEFAULT));
+		com.payonel.modularcomputers.entity.GolemWayfinder.configure(count(properties, com.payonel.modularcomputers.entity.GolemWayfinder.RANGE_KEY, com.payonel.modularcomputers.entity.GolemWayfinder.DEFAULT_RANGE));
 		com.payonel.modularcomputers.device.InternetCard.responseBuffer(count(properties, INTERNET_RESPONSE_BUFFER_KEY, com.payonel.modularcomputers.device.InternetCard.RESPONSE_BUFFER_KIB));
 		internet = new com.payonel.modularcomputers.internet.InternetPolicy(!enabled.equals("false"), list(properties, INTERNET_ALLOW_KEY),
 			list(properties, INTERNET_DENY_KEY));
@@ -186,6 +187,12 @@ public final class ModConfig {
 				# computers than cores; a computer waiting (for a key, a device, the server) holds none.
 				# A whole count, 1 or more.
 				""", Map.of(com.payonel.modularcomputers.runtime.CpuCores.KEY, Integer.toString(com.payonel.modularcomputers.runtime.CpuCores.DEFAULT))),
+			new Section("""
+				# How far a bot golem's pathfinding searches, in blocks walked. A walk finds its way a leg at a
+				# time: as far as this from where the leg starts, then on from its end; a leg that gets no nearer
+				# its target ends the walk blocked. A flight's way is found whole within this, or not at all.
+				# A whole count, 1 or more.
+				""", Map.of(com.payonel.modularcomputers.entity.GolemWayfinder.RANGE_KEY, Integer.toString(com.payonel.modularcomputers.entity.GolemWayfinder.DEFAULT_RANGE))),
 			new Section("""
 				# How deep a device's rings are: the events it keeps for its computer's program. Its news (a
 				# sensor's sightings, a card's changes, its logs' lines) keeps the newest that many: when more come,

@@ -74,12 +74,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	 * (Mob.setSpeed sets its forward input to it too), so it moves as a player at its square.
 	 */
 	public static final double WALKING_SPEED = Math.sqrt(PLAYER_SPEED * PLAYER_INPUT);
-	/**
-	 * How far the game's pathfinder looks for its way, in blocks: a limit of pathfinding's only, the
-	 * game's (a way it can't find there ends blocked, no way). Its moves have none of their own (the
-	 * user's, 2026-11-13: it goes as far as it's told).
-	 */
-	public static final double FOLLOW_RANGE = 96;
 	/** How far it turns a tick, in degrees: a right angle in five ticks. */
 	public static final float TURN_SPEED = 18;
 	/** How near the point a walk ends counts as there, in blocks (a path ends at a block's center). */
@@ -190,6 +184,21 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private Vec3 walkedFrom;
 	/** Its walk's way is found and under way (it's planned at a tick it stands on something). */
 	private boolean pathed;
+	/** A pathfinding walk's search under way (a slice a tick), and the target it searches for (another: it's dropped). */
+	private GolemWayfinder wayfinder;
+	private Vec3 wayfinderFor;
+	/** How near the target a pathfinding walk has come, in blocks, at its legs' starts: each leg must come nearer. */
+	private double closest;
+	/** Where its leg under way ends, short of the target (null: its way goes all the way), and how many legs it's set out on. */
+	private Vec3 legEnd;
+	private int legs;
+	/** How much nearer each leg of a pathfinding walk must bring it, in blocks (else it's blocked: no way on). */
+	private static final double LEG_PROGRESS = 1;
+	/** Something changed by its way (the game's news): it searches again from where it is. */
+	private boolean wayChanged;
+	/** When it last searched again for a change, in game time; and how often it may, in ticks (the game's own, for its mobs). */
+	private long changedAt = -CHANGES_EVERY;
+	private static final int CHANGES_EVERY = 20;
 	/** Its board has been set up in its world (at its first tick there: the plain game has no hook for an entity's arrival). */
 	private boolean placed;
 	/** The legs it's landing on (null: none). */
@@ -246,12 +255,27 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		return tier.thrusters() ? null : NO_THRUSTERS;
 	}
 
-	/** Its attributes: a player's walking speed, a pathfinding range for its longest walk. */
+	/** Its attributes: a player's walking speed, a pathfinding range for its flights (the game's pathfinder's). */
 	public static AttributeSupplier attributes() {
 		return PathfinderMob.createMobAttributes()
 			.add(Attributes.MOVEMENT_SPEED, WALKING_SPEED)
-			.add(Attributes.FOLLOW_RANGE, FOLLOW_RANGE)
+			.add(Attributes.FOLLOW_RANGE, GolemWayfinder.DEFAULT_RANGE)
 			.build();
+	}
+
+	/**
+	 * Its legs' navigation, the game's for walkers following the way its wayfinder found: the game's
+	 * news of a change by that way (a block placed or gone) is its own to act on, searching again from
+	 * where it is (the game's would search its own range for its own target, which it hasn't).
+	 */
+	@Override
+	protected net.minecraft.world.entity.ai.navigation.PathNavigation createNavigation(Level level) {
+		return new net.minecraft.world.entity.ai.navigation.GroundPathNavigation(this, level) {
+			@Override
+			public void recomputePath() {
+				wayChanged = true;
+			}
+		};
 	}
 
 	@Override
@@ -373,6 +397,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			if (pathfinding) {
 				target = start.add(inFrame(forward, right, 0)).add(0, up, 0);
 				walkedFrom = BotGolem.this.position();
+				closest = BotGolem.this.position().distanceTo(target);
+				legEnd = null;
+				legs = 0;
 				pathed = false; // (its tick finds the way, once it stands: the game plans no path for a mob in the air)
 				return null;
 			}
@@ -932,6 +959,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	/** What its moves under way were going to is moved by {@code by} (its frame was carried). */
 	private void carry(Vec3 by) {
 		target = target == null ? null : target.add(by);
+		legEnd = legEnd == null ? null : legEnd.add(by);
 		stepFrom = stepFrom == null ? null : stepFrom.add(by);
 		stepTo = stepTo == null ? null : stepTo.add(by);
 		walkedFrom = walkedFrom == null ? null : walkedFrom.add(by);
@@ -1264,9 +1292,17 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		if (!pathfinding) {
 			return false;
 		}
-		var navigation = new net.minecraft.world.entity.ai.navigation.FlyingPathNavigation(this, level());
-		Path path = navigation.createPath(BlockPos.containing(to), 0);
+		Path path = flightNavigation().createPath(BlockPos.containing(to), 0);
 		return path == null || !path.canReach();
+	}
+
+	/**
+	 * The game's navigation for fliers, searching as far as the pathfinding range (the setting's, as a
+	 * walk's legs: its follow range), all at once: a flight's way is found whole or not at all.
+	 */
+	private net.minecraft.world.entity.ai.navigation.FlyingPathNavigation flightNavigation() {
+		getAttribute(Attributes.FOLLOW_RANGE).setBaseValue(GolemWayfinder.range());
+		return new net.minecraft.world.entity.ai.navigation.FlyingPathNavigation(this, level());
 	}
 
 	/**
@@ -1294,8 +1330,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private String flyToward(Vec3 to) {
 		flightPath = null;
 		if (pathfinding) {
-			var navigation = new net.minecraft.world.entity.ai.navigation.FlyingPathNavigation(this, level());
-			Path path = navigation.createPath(BlockPos.containing(to), 0);
+			Path path = flightNavigation().createPath(BlockPos.containing(to), 0);
 			if (path == null || !path.canReach()) {
 				return blockedSoon(to);
 			}
@@ -1481,17 +1516,45 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		if (steps != null) {
 			stepWalk();
 		}
+		if (wayfinder != null && wayfinderFor != target) {
+			wayfinder.cancel(); // (its walk ended, or its target moved: a field carried it)
+			wayfinder = null;
+		}
+		if (target == null || !pathed) {
+			wayChanged = false; // (no way under way to search again)
+		} else if (wayChanged && level().getGameTime() - changedAt >= CHANGES_EVERY) {
+			wayChanged = false;
+			changedAt = level().getGameTime();
+			getNavigation().stop();
+			pathed = false; // (something changed by its way: it searches again, from where it is; a change sooner waits)
+		}
 		if (target != null && !pathed) {
 			if (!onGround()) {
 				return; // (in the air: it walks once it lands)
 			}
-			Path path = getNavigation().createPath(target.x, target.y, target.z, 0);
-			if (path == null) {
+			if (wayfinder == null) {
+				wayfinder = new GolemWayfinder(this, BlockPos.containing(target));
+				wayfinderFor = target;
+			}
+			if (!wayfinder.search(GolemWayfinder.NANOS_PER_TICK)) {
+				return; // (still searching: on at its next tick)
+			}
+			Path path = wayfinder.way();
+			boolean all = wayfinder.reached();
+			wayfinder = null;
+			closest = Math.min(closest, position().distanceTo(target));
+			if (path == null || !all && Vec3.atBottomCenterOf(path.getEndNode().asBlockPos()).distanceTo(target) > closest - LEG_PROGRESS) {
+				if (legs > 0) {
+					Vec3 middle = middle();
+					setPos(middle.x, getY(), middle.z); // (the middle of the last block it reached, its legs having taken it some way)
+				}
 				String face = faceOf(target.subtract(position()));
 				endWalk();
-				robotics.blocked("", face); // (no way there: blocked, no one block to name)
+				robotics.blocked("", face); // (no way there, or none nearer: blocked, no one block to name)
 				return;
 			}
+			legEnd = all ? null : Vec3.atBottomCenterOf(path.getEndNode().asBlockPos());
+			legs++;
 			getNavigation().moveTo(path, 1.0);
 			pathed = true;
 		}
@@ -1500,6 +1563,11 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			walkedFrom = position();
 			if (getNavigation().isDone()) {
 				boolean there = position().subtract(target).horizontalDistance() < ARRIVED;
+				boolean leg = legEnd != null && position().subtract(legEnd).horizontalDistance() < ARRIVED;
+				if (!there && (leg || position().distanceTo(target) < closest - LEG_PROGRESS)) {
+					pathed = false; // (a leg's end, or a way cut short nearer than it was: it searches on from here)
+					return;
+				}
 				Vec3 to = target;
 				if (there) {
 					setPos(to.x, getY(), to.z); // (onto its block's middle, exactly)
