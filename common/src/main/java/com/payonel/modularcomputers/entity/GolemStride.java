@@ -22,8 +22,15 @@ final class GolemStride {
 	/** How many blocks its body is over at once, as it starts room for (four: a body narrower than a block; more, it grows). */
 	private static final int UNDER = 4;
 
-	/** Why it stopped: the block in its way (air too), its side that met it (a world direction), and the block it was going into. */
-	record Stop(BlockPos block, Vec3 side, int x, int z) {
+	/**
+	 * Why it stopped: the block in its way (air too), its side that met it (a world direction), and
+	 * the block it was going into; {@code thing}, a thing in its way it couldn't push out of it (its
+	 * name, its type's registry id), else null (the block's).
+	 */
+	record Stop(BlockPos block, Vec3 side, int x, int z, @Nullable String thing) {
+		Stop(BlockPos block, Vec3 side, int x, int z) {
+			this(block, side, x, z, null);
+		}
 	}
 
 	/** Its points, across (its feet go by the floors). */
@@ -120,7 +127,9 @@ final class GolemStride {
 
 	/**
 	 * Walks on, {@code far} blocks at most; how far it went. It stops short once it's stepped up onto
-	 * a higher floor (its feet rise before it goes on), at its end, and where it's stopped.
+	 * a higher floor (its feet rise before it goes on), at its end, and where it's stopped: by the
+	 * ground, or by a thing in the space its body goes into it couldn't push out of its way (a walk's
+	 * ground sees them: {@link GolemGround#inTheWay}).
 	 */
 	double advance(GolemGround ground, double far) {
 		double went = 0;
@@ -132,6 +141,9 @@ final class GolemStride {
 			if (Math.min(inAt, outAt) <= reach + EPSILON) {
 				boolean goingIn = inAt <= outAt; // (at once: in before out)
 				double at = Math.max(along, goingIn ? inAt : outAt);
+				if (!clear(ground, at)) {
+					break;
+				}
 				went += at - along;
 				moveTo(at);
 				boolean rose;
@@ -148,6 +160,9 @@ final class GolemStride {
 				}
 				continue;
 			}
+			if (!clear(ground, reach)) {
+				break;
+			}
 			went += reach - along;
 			moveTo(reach);
 			if (reach >= length - EPSILON) {
@@ -159,6 +174,20 @@ final class GolemStride {
 			standing();
 		}
 		return went;
+	}
+
+	/** Whether its body can go on along its segment to {@code to} blocks: a thing there it can't push out of its way stops it. */
+	private boolean clear(GolemGround ground, double to) {
+		if (to <= along + EPSILON) {
+			return true; // (going nowhere: nothing to meet)
+		}
+		double toX = pointX[segment] + ux * to, toZ = pointZ[segment] + uz * to;
+		GolemGround.Met met = ground.inTheWay(x, z, toX, toZ, support);
+		if (met == null) {
+			return true;
+		}
+		stop = new Stop(met.at(), met.side(), (int) Math.floor(toX), (int) Math.floor(toZ), met.name());
+		return false;
 	}
 
 	/** Its body goes into a block: judged; true when it steps up onto it. */

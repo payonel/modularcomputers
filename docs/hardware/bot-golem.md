@@ -36,13 +36,15 @@ Use the golem item on a block: the golem stands there, facing the nearest right 
 block's middle: that's its origin, from which it always knows exactly how far it is (see
 [its position](/devices/robotics/#where-it-is-its-position)). Its walks go direct, in a straight line to where
 they're going, and end exactly where asked; with its pathfinding on, they find their way round
-what's on that line. Right-click it to see its
+what's on that line. It pushes what's in its way aside as it goes (creatures, you, boats,
+minecarts) and walks on; what can't be pushed, another golem standing or an armor stand, stops it
+as a wall would ([things in its way](/devices/robotics/#things-in-its-way)). Right-click it to see its
 screen (when its face has one), or crouch and right-click for its parts. Hit it to pick it up: it
 drops as its item, its parts and its board's id kept in it, as a broken case keeps them. Holding
 that item (a golem's or a torso's), crouch and right-click, in the air or at a block, to open its
 parts right there: change its parts, what it holds and its crafting cards' slots without setting it
 down (it's off while it's an item: no bus till it's set down). Nothing else harms it. It's solid: you walk into it, not through it, and can stand on it. While it
-stands on its legs it's hard to shove: not a player walking into it, a mob, or a blast. A piston
+stands on its legs (walking too) it's hard to shove: not a player walking into it, a mob, another golem, or a blast. A piston
 does shove it: it says so, and stays where it was put, for its program to take back.
 
 Its parts view is a case's, seen through its iron chest: the same board, the same slots, those its

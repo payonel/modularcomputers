@@ -664,4 +664,168 @@ public class GolemWalkGameTest {
 			})
 			.thenSucceed();
 	}
+
+	// ---- what's in its way (the user's, 2026-11-15: it shoves what can be pushed) ---------------
+
+	/** Where the thing in its way stands: two blocks ahead of it, on its line. */
+	private static final BlockPos AHEAD = AT.east(2);
+	/** A walk's shove takes what it pushes clear of its body, aside: at least this far off its line, in blocks (its half width and a pig's, less a hair). */
+	private static final double ASIDE = 0.8;
+
+	/** How long after its walk it's watched for a drift said, in ticks: a shove's judged once it's over (a tick still). */
+	private static final int SETTLE = 20;
+
+	/** A pig that does nothing of its own, standing at {@code at} (no AI: it can't wander into the test's walls). */
+	static net.minecraft.world.entity.animal.pig.Pig stillPig(GameTestHelper helper, BlockPos at) {
+		var pig = helper.spawn(net.minecraft.world.entity.EntityTypes.PIG, at);
+		pig.setNoAi(true);
+		return pig;
+	}
+
+	/** A golem standing at {@code at} with no board running: nothing shoves it. */
+	static BotGolem standingGolem(GameTestHelper helper, BlockPos at) {
+		BotGolem other = com.payonel.modularcomputers.entity.ModEntities.TIER1_BOT_GOLEM.create(helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+		Vec3 there = helper.absoluteVec(Vec3.atBottomCenterOf(at));
+		other.snapTo(there.x, there.y, there.z, BotGolemGameTest.EAST, 0);
+		helper.getLevel().addFreshEntity(other);
+		return other;
+	}
+
+	/** Whether {@code entity} is in no block (its box meets no block's collision). */
+	static boolean inNoBlock(GameTestHelper helper, net.minecraft.world.entity.Entity entity) {
+		for (var shape : helper.getLevel().getBlockCollisions(entity, entity.getBoundingBox().deflate(1e-4))) {
+			if (!shape.isEmpty()) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * A pig on its line is shoved aside as it comes (the user's, 2026-11-15: what the game lets be
+	 * pushed, it pushes out of its way, by the game's collisions), and it walks on, ending on its
+	 * target's middle; the pig is out of its way, in no block, and the shove is nothing it says (no
+	 * drift: it's on its spot). (It walked through the pig: seen failing; and its walk's end was
+	 * followed by a fall said, with no drop, as gravity came back: seen failing.)
+	 */
+	@GameTest(maxTicks = 200)
+	public void aPigInItsWayIsShovedAsideAndItWalksOn(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		var pig = stillPig(helper, AHEAD);
+		List<Object> events = events(helper, golem);
+		Vec3 line = helper.absoluteVec(Vec3.atBottomCenterOf(AT));
+		helper.onEachTick(() -> helper.assertTrue(inNoBlock(helper, pig), "the pig in no block: " + pig.position()));
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(4L)))
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its walk ended"))
+			.thenExecute(() -> {
+				same(helper, last(events), ARRIVED, "it walked on");
+				same(helper, position(golem), at(4, 0, 0L), "on its target's middle");
+				helper.assertTrue(pig.isAlive() && Math.abs(pig.getZ() - line.z) >= ASIDE, "the pig shoved aside: " + pig.position());
+				helper.assertTrue(!pig.getBoundingBox().intersects(golem.getBoundingBox()), "the pig out of its way");
+			})
+			.thenExecuteAfter(SETTLE, () -> {
+				same(helper, events.size(), 1, "its end alone: its shove isn't its own drift, no notice: " + events);
+				same(helper, real(golem), at(4, 0, 0L), "on its spot still");
+			})
+			.thenSucceed();
+	}
+
+	/**
+	 * What can't be pushed stops it as a block does (the user's, 2026-11-15): a standing golem (nothing
+	 * shoves one) ends its walk blocked, by the golem's type, met on its front, on the last block's
+	 * middle it reached. (Blocked by "minecraft:air", the block where the golem stood: seen failing.)
+	 */
+	@GameTest(maxTicks = 200)
+	public void aStandingGolemInItsWayBlocksItByItsType(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		BotGolem other = standingGolem(helper, AHEAD);
+		List<Object> events = events(helper, golem);
+		Vec3[] stood = new Vec3[1];
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(other.onGround(), "the other golem standing"))
+			.thenExecuteAfter(3, () -> {
+				stood[0] = other.position();
+				golem.robotics().walk(args(4L));
+			})
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its walk ended"))
+			.thenExecute(() -> {
+				same(helper, last(events), blocked("modularcomputers:tier1_bot_golem", "front"), "by the golem");
+				same(helper, position(golem), at(1, 0, 0L), "on the last middle it reached");
+				same(helper, other.position(), stood[0], "the other golem not moved");
+			})
+			.thenSucceed();
+	}
+
+	/**
+	 * An armor stand, which the game won't push, stops it as a block does: blocked by its type, on its
+	 * front. (It walked through it: seen failing.)
+	 */
+	@GameTest(maxTicks = 200)
+	public void anArmorStandInItsWayBlocksIt(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		helper.spawn(net.minecraft.world.entity.EntityTypes.ARMOR_STAND, AHEAD);
+		walks(helper, new Object[] {4L}, blocked("minecraft:armor_stand", "front"), at(1, 0, 0L));
+	}
+
+	/**
+	 * A shove never puts what it pushes into a block (the game's collisions): a pig in a corridor
+	 * can't go aside, so it's pushed ahead, and against the corridor's end it has no room to go, and
+	 * stops the walk as a block does, by the pig, met on its front; the pig never in a block. (It
+	 * walked through the pig: seen failing.)
+	 */
+	@GameTest(maxTicks = 200)
+	public void aShoveNeverPutsWhatItPushesIntoABlock(GameTestHelper helper) {
+		for (int x = AT.getX() + 1; x <= AT.getX() + 5; x++) {
+			for (int y = 1; y <= 2; y++) {
+				helper.setBlock(new BlockPos(x, y, AT.getZ() - 1), Blocks.STONE); // (the corridor's sides)
+				helper.setBlock(new BlockPos(x, y, AT.getZ() + 1), Blocks.STONE);
+			}
+		}
+		helper.setBlock(AT.east(5), Blocks.STONE); // (its end, too high to jump)
+		helper.setBlock(AT.east(5).above(), Blocks.STONE);
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		var pig = stillPig(helper, AHEAD);
+		List<Object> events = events(helper, golem);
+		helper.onEachTick(() -> helper.assertTrue(inNoBlock(helper, pig), "the pig in no block: " + pig.position()));
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(4L)))
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its walk ended"))
+			.thenExecute(() -> {
+				same(helper, last(events), blocked("minecraft:pig", "front"), "by the pig, with no room to go");
+				same(helper, position(golem), at(3, 0, 0L), "on the last middle it reached");
+				helper.assertTrue(pig.isAlive() && pig.getX() > helper.absoluteVec(Vec3.atBottomCenterOf(AHEAD)).x, "the pig pushed ahead: " + pig.position());
+			})
+			.thenSucceed();
+	}
+
+	/**
+	 * Two golems walking into each other each hold their ground (walking, nothing shoves one): each is
+	 * blocked by the other, by its type, on its front, and stays so. (The first blocked was off the
+	 * game's ground for a tick after its walk, so pushable, and the other shoved it aside and walked
+	 * on: seen failing.)
+	 */
+	@GameTest(maxTicks = 200)
+	public void twoGolemsWalkingIntoEachOtherAreBothBlocked(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		BotGolem other = GolemFlightGameTest.golem(helper, false);
+		Vec3 there = helper.absoluteVec(Vec3.atBottomCenterOf(AT.east(5)));
+		other.snapTo(there.x, there.y, there.z, -BotGolemGameTest.EAST, 0); // (facing west, toward it)
+		other.setYBodyRot(-BotGolemGameTest.EAST);
+		other.setYHeadRot(-BotGolemGameTest.EAST);
+		List<Object> events = events(helper, golem);
+		List<Object> others = events(helper, other);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> {
+				golem.robotics().walk(args(5L));
+				other.robotics().walk(args(5L));
+			})
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty() && !others.isEmpty(), "both walks ended"))
+			.thenExecute(() -> {
+				same(helper, last(events), blocked("modularcomputers:tier2_bot_golem", "front"), "it, by the other");
+				same(helper, last(others), blocked("modularcomputers:tier2_bot_golem", "front"), "the other, by it");
+				helper.assertTrue(!golem.getBoundingBox().intersects(other.getBoundingBox()), "apart");
+			})
+			.thenSucceed();
+	}
 }

@@ -423,7 +423,15 @@ nothing to stand on, a wall, or barred), its feet on the highest floor under its
 of it a step `GolemSteps` judges: without pathfinding (the default) free within its elevation (the
 block its feet are in: slabs), a block up at a time only toward `up`, down three at most only
 toward it, the first thing on its line that stops it ending the walk; off its line as it begins (a
-shove), it goes back to where its last command left it first. **Water passes, every other fluid
+shove), it goes back to where its last command left it first. **It shoves what's in its way**
+(the user's, 2026-11-15): what the game lets be pushed (`isPushable`, and not a vehicle with riders,
+a rider, or held in a field) it pushes out of the space its body goes into (`GolemShove`: aside, to
+the side it's on, else ahead; by the game's collisions, `move(SHULKER)` as a shulker's shell pushes,
+never into a block; a player by its motion, as knockback, its game moving it), and walks on, the
+shove no drift of its own; what can't be pushed (a standing golem, a walking one too, an armor
+stand, legs), or pushed with no room to go, stops it as a block does, `name` its type's id; what's
+no body (an item, an arrow) it passes. Flights the same; a landing shoves, and meets what can't be
+pushed as before; a field's carry passes through things. **Water passes, every other fluid
 blocks** (the user's, 2026-11-14), as fire does, every move alike (`GolemGround.bars`: a walk, a
 flight, a landing, and every way pathfinding finds): it and its legs never float or swim, no current
 pushes them, it sinks through water and walks the bottom, its hand works under water as on land,
@@ -439,7 +447,8 @@ far (`NODES_PER_BLOCK`, 16 places a block: a way too winding is no way, no mazes
 it's blocked (`name = ""`, its face toward its target), on the last middle it reached. The search
 is an A* whose every step is judged by the walk's own code (`GolemStride`), so a way it finds is
 one its walk takes and nothing its walk refuses is a way; it follows the way as found, and only
-what that way didn't expect (its stride stopped on it: a block placed, a door shut) makes it say so
+what that way didn't expect (its stride stopped on it: a block placed, a door shut, a thing it
+can't push: its search sees no things, the user's, so one that stays is met again, every time) makes it say so
 (the `blocked` notice) and search again from there, the same rule, as often as that happens (the
 user's: no count, no cleverness; a program decides). Nothing on its line it hadn't met is news.
 A walk itself goes however far it's told. A flight's way is the game's for fliers, found whole
@@ -494,7 +503,7 @@ what it broke it `kept` and `dropped`.
   no container is a failure (nil and why). `drop` fills a container there first and answers how
   many went into the world. A face left out is the front for containers, below for drops. A player's hit picks it up as its item, parts kept; nothing else harms
 it; it's solid, as a boat is (players walk into it, not through it), and standing nothing shoves
-it (players, mobs, knockback; `standing`: on the ground, thrusters off; hovering it's pushed, even
+it (players, mobs, knockback, another golem's walk; `standing`: on the ground or walking, thrusters off; hovering it's pushed, even
 resting on its own legs) but a piston, which moves it as it moves anything. Creative
 only until the Advanced Robotics Assembly. Its board's state reaches players by
 `BoardStatePayload` (an entity has no block update), its screen's rows as a block's do.
@@ -1088,6 +1097,11 @@ Lessons from mistakes, each with its test:
 - **A golem resting on its own legs is on the ground:** `fly()` takes off where it stands, its torso
   on its legs (solid), so `onGround()` stayed true and a hovering golem took no shove. Whether it
   stands asks `standing()` (on the ground, thrusters off). (`shovedInTheAirItSaysSoAndStaysWhereItWasPut`)
+- **A walk keeps it off the game's ground:** its steps move it with gravity off, so the game's
+  `onGround` goes false, and for a tick after a walk it looked to be falling (a fall said, no drop)
+  and pushable (of two golems walking into each other, the one stopped first was shoved aside by the
+  other). A walk's end puts it on the ground (`endWalk`); `standing()` counts a walk as standing.
+  (`twoGolemsWalkingIntoEachOtherAreBothBlocked`, `aPigInItsWayIsShovedAsideAndItWalksOn`)
 - **What no program asked for moves nothing a program's commands go from:** only a command's end or
   a stop moves where its next command goes from. A fall now leaves that point where it was, so the
   robot landed off its spot, and the shove watch took that as a shove: a fall's end marks its drift

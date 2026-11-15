@@ -444,6 +444,8 @@ what stopped it:
 - **a drop** it wasn't to make, more than 3, or with no floor within its drop: the air it would step
   into (`minecraft:air`), on the face it was going toward;
 - **a wall, a ceiling, fire, lava**: that block, on the face that met it;
+- **a thing it can't push out of its way** ([below](#things-in-its-way)): the thing, by its type
+  (`modularcomputers:tier1_bot_golem`, `minecraft:armor_stand`), on the face that met it;
 - **there, but at another elevation**: above where `up` asked, the block under it, on its `down`;
   below, the air over it it couldn't rise into, on its `up`.
 
@@ -472,15 +474,39 @@ then on along its line; not found, its walk ends `blocked`, on the last block's 
 goes however far it's told: only a search has a range.
 
 It goes the way it found as it found it. If it meets something there it didn't expect (a block
-placed in its way, a door shut), it says so, a notice, `{event = "notice", why = "blocked", name,
+placed in its way, a door shut, a thing it can't push), it says so, a notice, `{event = "notice", why = "blocked", name,
 face, position}` (`position` where it stood as it met it, from its origin, as `position` gives one),
 and looks again from there, the same way: it goes on, or its walk ends blocked. Something on its
-line it hadn't met yet isn't news: it just looks for a way round it.
+line it hadn't met yet isn't news: it just looks for a way round it. Its looking sees no things
+(they move), so a thing it can't push, staying on its way, it meets again on the same way, a notice
+each time, for as long as it stays: the program decides what to do (wait, `stop()`, go another way).
 
 It sees only the loaded world: land whose chunks aren't loaded is nothing to it, no floor to walk
 on, so a walk into them ends blocked. A flight with pathfinding flies round things too, but finds
 its whole way at once, within the same range: a flight with no way there that it can find is
 blocked at once, before it takes off.
+
+### Things in its way
+
+Whatever the game lets be pushed (a creature, a player, a boat, a minecart) it pushes out of its
+way as it walks, and walks on: aside, away from its line, to the side the thing is on (dead ahead,
+to its right), or ahead of it when there's no room aside (a corridor). It pushes as the game moves
+anything, by the game's collisions, so nothing is ever pushed into a block; a player gets it as a
+push, as a hit's knockback is. What it pushes isn't a shove of its own: it stays on its line, and
+says nothing of it.
+
+What can't be pushed stops it as a block does: another bot golem standing (nothing shoves one but a
+piston, a walking one included), an armor stand, a golem's legs, a boat or a minecart with a rider,
+anything held in a field; and so does what it pushes that has no room to go (a pig pushed into a
+corridor's end). Its walk ends `blocked`, `name` the thing's type (its registry id:
+`modularcomputers:tier1_bot_golem`, `minecraft:armor_stand`, `minecraft:pig`), `face` its own that
+met it, on the last block's middle it reached. Two golems walking into each other are both
+blocked. What's only in its space and no body to it (a dropped item, an arrow) it walks through,
+as anything does.
+
+Flights meet things the same way, pushing what can be pushed aside and blocked by what can't. A
+landing pushes aside what's under it; what can't be pushed it meets as it would a block. A field's
+carry moves through things, as it always has.
 
 ### In water, lava and other fluids
 
@@ -494,12 +520,12 @@ pathfinding finds goes through one. Nothing harms it, so lava it falls into does
 
 ### Blocked
 
-A move a block stopped (`walk`, `walkTo`, `fly`, `flyTo`, `land`) ends with `why = "blocked"`, and
+A move a block or a thing stopped (`walk`, `walkTo`, `fly`, `flyTo`, `land`) ends with `why = "blocked"`, and
 three fields beside it, the same for every one:
 
 | Field | What it is |
 |---|---|
-| `name` | the block in its way, its name (its registry id: `minecraft:stone`, `minecraft:fire`); `""` when no one block can be named (never `nil`) |
+| `name` | the block in its way, its name (its registry id: `minecraft:stone`, `minecraft:fire`), or the thing it couldn't push out of its way, its type's (`minecraft:armor_stand`); `""` when no one block can be named (never `nil`) |
 | `face` | the face of the robot that met it, its own: `front`, `back`, `left`, `right`, `up` or `down`. It's the side that was hit, not the way the move was mostly going: a flight sliding along a wall on its right met it on its `right` |
 | `call` | the command cut short: see below |
 

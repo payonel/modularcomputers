@@ -829,4 +829,45 @@ public class GolemFlightGameTest {
 			.thenExecute(() -> helper.assertTrue(Math.abs(from[0] - golem.getY() - down) < 1e-3, "down " + down + ": " + (from[0] - golem.getY())))
 			.thenSucceed();
 	}
+
+	/**
+	 * A flight meets what's in its way as a walk does (the user's, 2026-11-15): a standing golem,
+	 * which can't be pushed, stops it, blocked by the golem's type, met on its front, and it hovers
+	 * there. (Blocked by no one block, "": seen failing.)
+	 */
+	@GameTest(maxTicks = 200)
+	public void aStandingGolemInAFlightsWayBlocksItByItsType(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		BotGolem other = GolemWalkGameTest.standingGolem(helper, new BlockPos(1, 1, 1).east(3));
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenWaitUntil(() -> helper.assertTrue(other.onGround(), "the other golem standing"))
+			.thenExecuteAfter(3, () -> golem.robotics().fly(args(5.0, 0.0, 0.0)))
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its flight ended"))
+			.thenExecute(() -> {
+				same(helper, GameTests.withoutCall(events.getLast()),
+					java.util.Map.of("event", "fly", "ok", false, "why", "blocked", "name", "modularcomputers:tier1_bot_golem", "face", "front"), "by the golem");
+				same(helper, golem.robotics().state(), RoboticsDevice.HOVERING, "hovering there");
+				helper.assertTrue(golem.getBoundingBox().maxX <= other.getBoundingBox().minX + 1e-6, "short of it");
+			})
+			.thenSucceed();
+	}
+
+	/** A pig in a flight's way is shoved aside, and it flies on, arriving; the pig in no block. (It flew through it: seen failing.) */
+	@GameTest(maxTicks = 200)
+	public void aPigInAFlightsWayIsShovedAside(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		var pig = GolemWalkGameTest.stillPig(helper, new BlockPos(1, 1, 1).east(3));
+		List<Object> events = events(helper, golem);
+		double line = helper.absoluteVec(Vec3.atBottomCenterOf(new BlockPos(1, 1, 1))).z;
+		helper.onEachTick(() -> helper.assertTrue(GolemWalkGameTest.inNoBlock(helper, pig), "the pig in no block: " + pig.position()));
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().fly(args(5.0, 0.0, 0.0)))
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its flight ended"))
+			.thenExecute(() -> {
+				same(helper, events.getLast(), event("fly"), "it flew on");
+				helper.assertTrue(Math.abs(pig.getZ() - line) >= 0.8, "the pig shoved aside: " + pig.position());
+			})
+			.thenSucceed();
+	}
 }

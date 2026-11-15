@@ -40,7 +40,7 @@ public final class GolemGround implements BlockGetter {
 
 	private final Level world;
 	private final Mob golem;
-	/** Whether other entities' boxes are in its way too (a walk's), or only blocks (a search's: entities move). */
+	/** Whether other entities are in its way too, shoved or stopping it (a walk's), or only blocks (a search's: entities move, the user's). */
 	private final boolean entities;
 	private final double half;
 	private final double height;
@@ -52,7 +52,7 @@ public final class GolemGround implements BlockGetter {
 	/** Its blocks judged, by block and elevation: a few feet heights each (mostly one), what it found for each. */
 	private final Long2ObjectMap<Looks> cells = new Long2ObjectOpenHashMap<>();
 
-	/** The ground as {@code golem} meets it now (its size, its collisions); {@code entities}: whether other entities' boxes stop it too. */
+	/** The ground as {@code golem} meets it now (its size, its collisions); {@code entities}: whether other entities are in its way too ({@link #inTheWay}). */
 	public GolemGround(Mob golem, boolean entities) {
 		this.world = golem.level();
 		this.golem = golem;
@@ -178,12 +178,12 @@ public final class GolemGround implements BlockGetter {
 		return Double.NaN;
 	}
 
-	/** Whether its body fits with its feet at {@code x}, {@code y}, {@code z}: no block's collision in it (and no entity's, for a walk). */
+	/** Whether its body fits with its feet at {@code x}, {@code y}, {@code z}: no block's collision in it. */
 	boolean fits(double x, double y, double z) {
 		return blocking(x, y, z) == null;
 	}
 
-	/** The first block in its body's way with its feet at {@code x}, {@code y}, {@code z}, or null (an entity in its way: its block's). */
+	/** The first block in its body's way with its feet at {@code x}, {@code y}, {@code z}, or null. */
 	@Nullable BlockPos blocking(double x, double y, double z) {
 		AABB box = new AABB(x - half, y, z - half, x + half, y + height, z + half);
 		BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
@@ -210,10 +210,26 @@ public final class GolemGround implements BlockGetter {
 				}
 			}
 		}
-		if (entities && !world.getEntityCollisions(golem, box).isEmpty()) {
-			return BlockPos.containing(x, y + EPSILON, z);
-		}
 		return null;
+	}
+
+	/** What stopped its body that isn't a block: a thing's name (its type's registry id), the side of its body that met it (a world direction), and where it is. */
+	record Met(String name, net.minecraft.world.phys.Vec3 side, BlockPos at) {
+	}
+
+	/**
+	 * Its body going on from {@code fromX}, {@code fromZ} to {@code toX}, {@code toZ}, its feet at
+	 * {@code feet} (a walk's, with entities): what's in the space it goes into that can be pushed,
+	 * shoved out of it ({@link GolemShove}); the first thing there it can't push out of its way, or
+	 * null (its way's clear; always, without entities: a search's).
+	 */
+	@Nullable Met inTheWay(double fromX, double fromZ, double toX, double toZ, double feet) {
+		if (!entities) {
+			return null;
+		}
+		AABB to = new AABB(toX - half, feet, toZ - half, toX + half, feet + height, toZ + half);
+		var met = GolemShove.clear(golem, to, new net.minecraft.world.phys.Vec3(toX - fromX, 0, toZ - fromZ));
+		return met == null ? null : new Met(GolemShove.name(met), GolemShove.side(to, met), met.blockPosition());
 	}
 
 	// ---- its body's way across the blocks: a supercover as wide as it is -----------------------

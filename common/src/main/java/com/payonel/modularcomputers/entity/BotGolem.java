@@ -729,11 +729,12 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	 * a mob, a blast's knockback; in the air it's pushed as anything is.
 	 */
 	/**
-	 * Whether it stands, which nothing shoves (on the ground, its thrusters off): hovering is flying,
-	 * even resting on its own legs where it took off (they're under it, solid, so it's on the ground).
+	 * Whether it stands, which nothing shoves (on the ground, or walking on its legs: its steps hold
+	 * it up, off the game's ground; its thrusters off): hovering is flying, even resting on its own
+	 * legs where it took off (they're under it, solid, so it's on the ground).
 	 */
 	boolean standing() {
-		return onGround() && !thrusting();
+		return (onGround() || legs() && walking()) && !thrusting();
 	}
 
 	@Override
@@ -1137,11 +1138,18 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 	}
 
-	/** A walk's over (arrived, blocked or stopped): its heading back, gravity its own. */
+	/**
+	 * A walk's over (arrived or blocked, set down on its floor): its heading back, gravity its own,
+	 * and it stands there, on the ground at once (its steps kept it off the game's ground, gravity
+	 * off: a tick or two after, it had looked to be falling, a fall said with no drop, and shoved as
+	 * nothing standing is), its weight on its floor as the game's gravity puts it.
+	 */
 	private void endWalk() {
 		endStride();
 		setNoGravity(thrusting());
 		restoreHeading();
+		setOnGround(true);
+		setDeltaMovement(0, -getGravity(), 0); // (the game's next move meets its floor: on the ground still)
 	}
 
 	/** Its walk's way forgotten: its points, its line, a search due. */
@@ -1335,9 +1343,17 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		Vec3 step = left.length() > THRUST_SPEED ? left.normalize().scale(THRUST_SPEED) : left;
 		Vec3 from = position();
 		Barred barred = barredOn(step);
-		move(net.minecraft.world.entity.MoverType.SELF, barred != null ? barred.short_() : step);
+		Vec3 go = barred != null ? barred.short_() : step;
+		Bumped bumped = bumpedOn(go); // (what's in its way pushed aside, the user's: as a walk's)
+		move(net.minecraft.world.entity.MoverType.SELF, bumped != null ? bumped.short_() : go);
 		setDeltaMovement(Vec3.ZERO);
-		if (barred != null) {
+		if (bumped != null) {
+			flyTo = null;
+			flightPath = null;
+			restoreHeading();
+			robotics.blocked(GolemShove.name(bumped.thing()), faceOf(bumped.side())); // (what it couldn't push out of its way: a standing golem, an armor stand)
+			robotics.hovering();
+		} else if (barred != null) {
 			flyTo = null;
 			flightPath = null;
 			restoreHeading();
@@ -1358,6 +1374,28 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	/** How far a move's barred check goes at a time along it, in blocks: finer than its body, so no block it passes is missed. */
 	private static final double BARRED_GRAIN = 0.25;
+
+	/** A move's way into a thing it couldn't push out of it: the thing, the side of its body that met it (a world direction), and as much of the move as goes before. */
+	private record Bumped(net.minecraft.world.entity.Entity thing, Vec3 side, Vec3 short_) {
+	}
+
+	/**
+	 * A move {@code step} from where it is (a flight's, a landing's), the space its body goes into
+	 * cleared as it goes, a part at a time (the user's, 2026-11-15: what can be pushed, shoved out of
+	 * its way, {@link GolemShove}): the first thing there it can't push out of it, or null.
+	 */
+	private Bumped bumpedOn(Vec3 step) {
+		net.minecraft.world.phys.AABB box = getBoundingBox();
+		int parts = Math.max(1, (int) Math.ceil(step.length() / BARRED_GRAIN));
+		for (int part = 1; part <= parts; part++) {
+			net.minecraft.world.phys.AABB moved = box.move(step.scale(part / (double) parts));
+			var met = GolemShove.clear(this, moved, step);
+			if (met != null) {
+				return new Bumped(met, GolemShove.side(moved, met), step.scale((part - 1) / (double) parts));
+			}
+		}
+		return null;
+	}
 
 	/**
 	 * Whether a move {@code step} from where it is (a flight's, a landing's) takes its body into a block
@@ -1399,6 +1437,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				robotics.hovering();
 				return;
 			}
+			bumpedOn(step); // (what can be pushed, shoved aside; what can't, it comes down onto, as onto a block's top: below)
 			move(net.minecraft.world.entity.MoverType.SELF, step);
 			setDeltaMovement(Vec3.ZERO);
 			if (position().distanceTo(from) >= step.length() * BLOCKED_SHARE) {
@@ -1453,6 +1492,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				robotics.hovering();
 				return;
 			}
+			bumpedOn(step); // (what can be pushed, shoved aside; what can't, its collisions meet, as now)
 			move(net.minecraft.world.entity.MoverType.SELF, step);
 			if (position().distanceTo(from) < step.length() * BLOCKED_SHARE) {
 				landing = null;
@@ -1592,13 +1632,13 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				// (pathfinding: back onto its line past what stopped it, and past where it's come to)
 				if (stride.segment() < wayEnds) {
 					// (on the way its search found, it met what that way didn't expect: it says so, and searches again)
-					robotics.blockedOnItsWay(blockName(stop.block()), faceOf(stop.side()), positionFromOrigin());
+					robotics.blockedOnItsWay(stopName(stop), faceOf(stop.side()), positionFromOrigin());
 				}
 				searchPast = Math.max(GolemWayfinder.along(lineFrom, walkTo, stand), GolemWayfinder.along(lineFrom, walkTo, new Vec3(stop.x() + 0.5, 0, stop.z() + 0.5)));
 				search();
 				return;
 			}
-			String block = blockName(stop.block());
+			String block = stopName(stop);
 			setPos(stand.x, stand.y, stand.z); // (the last block's middle it reached)
 			endWalk();
 			robotics.blocked(block, faceOf(stop.side()));
@@ -1614,6 +1654,11 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				blockedAtHeight(off);
 			}
 		}
+	}
+
+	/** What stopped a walk: the thing in its way it couldn't push out of it (its type's id), else the block. */
+	private String stopName(GolemStride.Stop stop) {
+		return stop.thing() != null ? stop.thing() : blockName(stop.block());
 	}
 
 	/**

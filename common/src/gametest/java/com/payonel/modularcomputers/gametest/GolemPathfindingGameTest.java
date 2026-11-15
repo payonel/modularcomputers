@@ -777,4 +777,77 @@ public class GolemPathfindingGameTest {
 		helper.assertTrue(type != net.minecraft.world.level.pathfinder.PathType.OPEN, "the server's cache says what's there: " + type);
 		helper.succeed();
 	}
+
+	/** How far over the test's space the thing-on-its-way test builds, in blocks: over the notice test's. */
+	private static final int THING_UP = 96;
+	/** The one gap in that test's wall, in blocks south of its line: its way goes through it. */
+	private static final int GAP_SOUTH = 3;
+
+	/**
+	 * A thing it can't push put on the way its search found (an armor stand, in the one gap of a wall
+	 * across the field) stops it as a block would (the user's, 2026-11-15): it says so, a notice, by
+	 * the thing's type, met on one of its faces, where it stood then, and searches again from there
+	 * (its search sees no things: the same way), stopped by it again while it stays; once it's gone,
+	 * the walk goes on through the gap and ends exactly there. (No notice, the thing walked through:
+	 * seen failing.)
+	 */
+	@GameTest(maxTicks = 1200)
+	public void aThingItCantPushOnItsWaySaysSoAndItSearchesAgain(GameTestHelper helper) {
+		Maze field = new Maze(FIELD_ACROSS, FIELD_DEEP, SEED, helper.absolutePos(new BlockPos(0, THING_UP, 0)));
+		field.open();
+		for (int z = 1; z < field.sizeZ() - 1; z++) {
+			field.wall(WALL_AT, z, z != FIELD_ROW + GAP_SOUTH); // (right across, but for its gap)
+		}
+		field.forceChunks(helper.getLevel());
+		field.build(helper.getLevel());
+		BlockPos from = field.corner.offset(1, 0, FIELD_ROW);
+		BotGolem golem = golemAt(helper, from);
+		List<Object> events = new ArrayList<>();
+		List<java.util.Map<String, Object>> stoodAt = new ArrayList<>();
+		helper.onEachTick(() -> {
+			Object event;
+			while ((event = golem.robotics().pull(args()).first()) != null) {
+				events.add(event);
+				stoodAt.add(real(golem));
+			}
+		});
+		net.minecraft.world.entity.decoration.ArmorStand[] stand = new net.minecraft.world.entity.decoration.ArmorStand[1];
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(FIELD_WALK)))
+			.thenWaitUntil(() -> helper.assertTrue(golem.getZ() - (from.getZ() + 0.5) > 1, "on its way to the gap"))
+			.thenExecute(() -> {
+				stand[0] = net.minecraft.world.entity.EntityTypes.ARMOR_STAND.create(helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+				BlockPos gap = field.corner.offset(WALL_AT, 0, FIELD_ROW + GAP_SOUTH);
+				stand[0].snapTo(gap.getX() + 0.5, gap.getY(), gap.getZ() + 0.5, 0, 0);
+				helper.getLevel().addFreshEntity(stand[0]);
+			})
+			.thenWaitUntil(() -> helper.assertTrue(thingNotices(events).size() >= 2, "stopped by it, searched again, and stopped again: " + events))
+			.thenExecute(() -> {
+				helper.assertTrue(walks(events).isEmpty(), "still walking: " + events);
+				int first = thingNotices(events).getFirst();
+				var notice = (java.util.Map<?, ?>) events.get(first);
+				same(helper, notice.get("name"), "minecraft:armor_stand", "by the thing's type");
+				helper.assertTrue(java.util.Set.of("front", "back", "left", "right").contains(notice.get("face")), "met on a face of its: " + notice);
+				same(helper, notice.get("position"), stoodAt.get(first), "where it stood");
+				stand[0].discard();
+			})
+			.thenWaitUntil(() -> helper.assertTrue(!walks(events).isEmpty(), "its walk ended"))
+			.thenExecute(() -> {
+				same(helper, last(events), WALKED, "through the gap once it's gone");
+				same(helper, position(golem), at(FIELD_WALK, 0, 0), "exactly there");
+			})
+			.thenSucceed();
+	}
+
+	/** Where among {@code events} the blocked notices are, by a thing (an armor stand). */
+	private static List<Integer> thingNotices(List<Object> events) {
+		List<Integer> notices = new ArrayList<>();
+		for (int i = 0; i < events.size(); i++) {
+			if (events.get(i) instanceof java.util.Map<?, ?> m && "notice".equals(m.get("event")) && "blocked".equals(m.get("why"))
+				&& "minecraft:armor_stand".equals(m.get("name"))) {
+				notices.add(i);
+			}
+		}
+		return notices;
+	}
 }

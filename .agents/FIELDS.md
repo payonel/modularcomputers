@@ -59,7 +59,7 @@ A refusal's (`Failure`'s builders) and an end's (`EventQueue`'s). Every field al
 | `symbolic_link` | `at`, `target` | a disk path met a link: the OS goes on from it |
 | `missing_inputs` | `name`, `call` | a craft's grid makes nothing (an end) |
 | `no_space` | `name`, `call` | no room for what a craft makes (an end) |
-| `blocked` | `name`, `face`, `call` | a move met something (an end; a field's notice, without `call`; robotics' notice, `position` for `call`: a pathfinding walk's way met what it didn't expect) |
+| `blocked` | `name`, `face`, `call` | a move met something (an end; a field's notice, without `call`; robotics' notice, `position` for `call`: a pathfinding walk's way met what it didn't expect); `name` the block's id, or (a robot's) the type's id of a thing it couldn't push out of its way |
 | `stopped` | `call` | a program's `stop()` ended it (an end) |
 | `lost` | `name`, `id`, `at`, `call` | what it acted on is gone |
 | `unbreakable` | `name`, `id`, `at`, `call` | the game won't let it break (a swing's end) |
@@ -149,7 +149,7 @@ reads this table and the Fields below and checks the code against them.
 | `missing` | (gone: `fault`'s `part`) | | |
 | `mode` | a disk's format (`hfs`, `raw`) | word | disk |
 | `modified` | when a file last changed, the world's milliseconds | number | disk's `stat` |
-| `name` | what a thing is called: a registry id for the game's things | string | things, items, sightings, whys |
+| `name` | what a thing is called: a registry id for the game's things (a block's, an item's, an entity type's) | string | things, items, sightings, whys (`blocked`'s: a block, or a thing in a robot's way) |
 | `next` | the boot entry to boot once next (`-1` none; entries count from 0) | number | EEPROM's `getBoot` |
 | `new`, `old` | the weather now and before | word | weather's `change` |
 | `number` | a boot entry's number | number | EEPROM's boot entries |
