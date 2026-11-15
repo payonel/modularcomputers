@@ -316,7 +316,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		this.body = body;
 	}
 
-	@Method(doc = "walk(forward[, right[, up]]): walks that far from where its last command left it, in its own frame (forward the way it faces, right to its right, up its elevation's change, whole blocks), facing as it was. It must end on a block's middle, whole blocks from its origin (within a 4096th), else it's refused, a bad argument ({why = \"bad_argument\", argument, value, expected = \"squared\"}: the one that wouldn't end squared): from a block's middle whole numbers do, and after a stop the rest of the way. Without pathfinding (the default) it goes straight, forward then right, without turning (it walks backwards, or sideways), stepping freely within its elevation (onto a slab, over carpet), up a block at a time (a jump) only while up is above, down at most 3 at a time only while up is below, never into fire, through fluids as through air (it sinks, and walks the bottom); with pathfinding it finds its way in the loaded world, a leg at a time, each as far as the server's pathfinding range of walking and nearer (blocked, block \"\", once no way comes nearer). With none, it goes back to where its last command left it. A command: true at once (its event: walk, ok, or not and why, on the last block's middle it reached: blocked, with block, what stopped it, air too, a drop it can't take or an elevation it couldn't reach, and face, its own that met it), or false and why it can't start")
+	@Method(doc = "walk(forward[, right[, up]]): walks that far from where its last command left it, in its own frame (forward the way it faces, right to its right, up its elevation's change, whole blocks), facing as it was. It must end on a block's middle, whole blocks from its origin (within a 4096th), else it's refused, a bad argument ({why = \"bad_argument\", argument, value, expected = \"squared\"}: the one that wouldn't end squared): from a block's middle whole numbers do, and after a stop the rest of the way. It goes direct, in a straight line there (walk(3, 4) on the diagonal), without turning (it walks backwards, or sideways), its body as wide as it is going into every block on that line. Without pathfinding (the default) it keeps to the line, stepping freely within its elevation (onto a slab, over carpet), up a block at a time (a jump) only while up is above, down at most 3 at a time only while up is below, never into fire or a fluid other than water (water it walks through: it sinks, and walks the bottom); with pathfinding it walks the same line, its elevation free on the way, and where something stops it, finds its way back onto the line past it, as far as the server's pathfinding range of walking, in the loaded world (none: blocked, block \"\"); meeting something on that way it didn't expect, it says so (a notice: blocked, name, face, position) and looks again. With none, it goes back to where its last command left it. A command: true at once (its event: walk, ok, or not and why, on the last block's middle it reached: blocked, with block, what stopped it, air too, a drop it can't take or an elevation it couldn't reach, and face, its own that met it), or false and why it can't start")
 	public Result walk(Arguments args) {
 		double[] by = numbers(args);
 		Move move = args.count() == 0 ? new Move(by, null) : squared(args, by, false); // (none: back to where its last command left it)
@@ -613,7 +613,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return why == null ? Result.ok() : answer(why);
 	}
 
-	@Method(doc = "setPathfinding(on): whether walk, fly, walkTo and flyTo find their way round things (it turns as it goes, jumps and drops as it finds, and turns back as it arrives; a walk's way however far, a flight's the game's pathfinder's, only so far) or go straight (the default). Kept through reboots; off again when it's picked up")
+	@Method(doc = "setPathfinding(on): whether walk, fly, walkTo and flyTo find their way round things (a walk keeps to its line and comes back onto it past what's in its way, never turning, however far; a flight's way the game's pathfinder's, only so far) or go straight (the default). Kept through reboots; off again when it's picked up")
 	public Result setPathfinding(Arguments args) {
 		body.pathfinding(args.checkBoolean(0));
 		return Result.ok();
@@ -765,7 +765,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
 	}
 
-	@Method(doc = "fly(forward[, right[, up]]): (a tier 2 golem's) flies on its thrusters that far from where its last command left it, in its own frame, without turning, straight there (never through blocks; with pathfinding, round them); its legs, if it stands on them, are left standing where it was, and its thrusters fire beams from their sockets. In the air it walks nowhere, uses what it holds as a player off the ground does, and can be shoved (it flies back to where its last command left it). It must end on a squared point, whole blocks from its origin, its feet's height too (within a 4096th), else it's refused (bad_argument, expected squared). With no arguments, it takes off where it stands and holds there, or goes back to where its last command left it. A command: true at once (its event: fly, ok, or not and why), or false and why")
+	@Method(doc = "fly(forward[, right[, up]]): (a tier 2 golem's) flies on its thrusters that far from where its last command left it, in its own frame, without turning, straight there (never through blocks, fire, or a fluid other than water: blocked by it; with pathfinding, round them); its legs, if it stands on them, are left standing where it was, and its thrusters fire beams from their sockets. In the air it walks nowhere, uses what it holds as a player off the ground does, and can be shoved (it flies back to where its last command left it). It must end on a squared point, whole blocks from its origin, its feet's height too (within a 4096th), else it's refused (bad_argument, expected squared). With no arguments, it takes off where it stands and holds there, or goes back to where its last command left it. A command: true at once (its event: fly, ok, or not and why), or false and why")
 	public Result fly(Arguments args) {
 		double[] by = numbers(args);
 		Move move = args.count() == 0 ? new Move(by, null) : squared(args, by, true); // (none: off where it stands, or back to where its last command left it)
@@ -776,7 +776,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return waits != null ? waits : start("fly", body.fly(move.by()[0], move.by()[1], move.by()[2]));
 	}
 
-	@Method(doc = "land([force]): (a tier 2 golem's) a move, from where its last command left it: comes down onto its legs, standing below there however far down (within three blocks to the side), and onto them; force, with none there, comes straight down onto the ground beneath it without them, still running (its thrusters off; it walks nowhere, and flies again to fetch them), as safely as a crash would, but on. A command: true at once (its event: land, ok, or not and why: blocked, down, at once, without force finding no legs below by what it found there instead, with force finding nothing under it down to the world's bottom by air; it goes on hovering), on its legs already, done: true, its event ok; or false and why")
+	@Method(doc = "land([force]): (a tier 2 golem's) a move, from where its last command left it: comes down onto its legs, standing below there however far down (within three blocks to the side), and onto them; force, with none there, comes straight down onto the ground beneath it without them, still running (its thrusters off; it walks nowhere, and flies again to fetch them), as safely as a crash would, but on. A command: true at once (its event: land, ok, or not and why: blocked, down, at once, without force finding no legs below by what it found there instead; coming down into fire or a fluid other than water, by it; with force finding nothing under it down to the world's bottom by air; it goes on hovering), on its legs already, done: true, its event ok; or false and why")
 	public Result land(Arguments args) {
 		boolean force = args.count() > 0 && args.get(0) != null && args.checkBoolean(0);
 		Result waits = waitsHeld("land", args);
@@ -838,6 +838,16 @@ public final class RoboticsDevice implements Device, Buffered {
 	 */
 	public void blocked(String block, String face) {
 		end(false, BLOCKED, block, face, null);
+	}
+
+	/**
+	 * Its pathfinding walk, going the way it found, met what that way didn't expect ({@code block}: its
+	 * id, "" when none can be named; {@code face}: its own that met it; {@code position}: where it
+	 * stood, from its origin): it says so, a notice, and searches again (its walk goes on, or ends
+	 * blocked, its own end).
+	 */
+	public void blockedOnItsWay(String block, String face, Map<String, Object> position) {
+		events.blockedOnItsWay(block, face, position);
 	}
 
 	/** The body finished turning. */

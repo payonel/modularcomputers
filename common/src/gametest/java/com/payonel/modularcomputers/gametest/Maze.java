@@ -72,6 +72,11 @@ final class Maze {
 		}
 	}
 
+	/** Puts a wall at a block of it ({@code x}, {@code z} from its corner), or takes one away: before it's built. */
+	void wall(int x, int z, boolean wall) {
+		this.wall[x][z] = wall;
+	}
+
 	private void carve(Random random) {
 		boolean[][] seen = new boolean[across][deep];
 		ArrayDeque<int[]> stack = new ArrayDeque<>();

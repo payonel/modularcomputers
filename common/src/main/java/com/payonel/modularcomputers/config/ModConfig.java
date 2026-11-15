@@ -188,9 +188,11 @@ public final class ModConfig {
 				# A whole count, 1 or more.
 				""", Map.of(com.payonel.modularcomputers.runtime.CpuCores.KEY, Integer.toString(com.payonel.modularcomputers.runtime.CpuCores.DEFAULT))),
 			new Section("""
-				# How far a bot golem's pathfinding searches, in blocks walked. A walk finds its way a leg at a
-				# time: as far as this from where the leg starts, then on from its end; a leg that gets no nearer
-				# its target ends the walk blocked. A flight's way is found whole within this, or not at all.
+				# How far a bot golem's pathfinding searches, in blocks walked. A walk keeps to its line, and where
+				# something stops it, searches once, within this, for its way back onto the line past it (and no
+				# more places than the game's own budget for a search this far: 16 a block); none found, the walk
+				# ends blocked. A walk itself goes however far it's told. A flight's way is found whole within
+				# this, or not at all.
 				# A whole count, 1 or more.
 				""", Map.of(com.payonel.modularcomputers.entity.GolemWayfinder.RANGE_KEY, Integer.toString(com.payonel.modularcomputers.entity.GolemWayfinder.DEFAULT_RANGE))),
 			new Section("""

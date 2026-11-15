@@ -60,9 +60,9 @@ given: from a block's middle, `walk(4.4)` fails with
 `{why = "bad_argument", argument = 1, value = 4.4, expected = "squared"}`.
 
 What happens to it that no program asked for comes as one kind of event, a **notice**
-(`{event = "notice", why = ...}` for a shove or a fall, `{event = "notice", what = ...}` for a
-field's hold), so a program tells at once what it asked for (a command's end,
-named after its method) from what came to it.
+(`{event = "notice", why = ...}`: a shove, a fall, a field's hold, or a pathfinding walk's way
+blocked by something it didn't expect), so a program tells at once what it asked for (a command's
+end, named after its method) from what came to it.
 
 If something knocks it away from where its last command left it (a shove in the air, or a piston
 on its legs), it **drifts**: it says so (`{event = "notice", why = "shove", drift}`, how far), once
@@ -245,9 +245,10 @@ coordinate, `"right_angle"` for the heading.
 
 ### setPathfinding(on) → true
 
-Whether its walks and flights find their way round things (it turns as it goes, jumps and drops as
-it finds, and turns back as it arrives) or go straight, the default. It's kept through reboots, and
-off again when the golem is picked up. `get` says which.
+Whether its walks and flights find their way round what's in their way (a walk keeps to its line
+and comes back onto it; see [Walking](#walking)) or go straight and stop at it, the default. Either
+way it never turns as it goes. It's kept through reboots, and off again when the golem is picked
+up. `get` says which.
 
 ### scan([face]) → things, or {face = things, ...}
 
@@ -345,7 +346,8 @@ A tier 2 golem's: its thrusters' calls (`fly`, `flyTo`, `land`) fail on a tier 1
 a fault, `part = "thrusters"` missing (it walks; its own [energy field](/devices/energy-field-card/) can still carry it).
 
 Flies on its thrusters that far from where its last command left it, in its own frame, straight
-there and never through blocks. It must end squared, as a walk does, its feet's height whole blocks
+there and never through blocks, fire, or a fluid other than water (it's blocked by it, its `name`
+the fluid's block, `minecraft:lava`). It must end squared, as a walk does, its feet's height whole blocks
 from its origin too (from a slab, `fly(0, 0, 1.5)`). If it stands on its legs, they're left standing where it was: the thrusters fire red beams from
 their sockets. With no arguments, on its legs, it takes off where it stands and holds there; in
 the air, it flies back to where its last command left it. On its thrusters it walks nowhere (`no
@@ -371,7 +373,7 @@ it really is. With
 `force` (`land(true)`) and no legs there, it comes straight down onto the ground beneath it without
 them, and stays running, its thrusters off. That's what a crash does, but safely and still on.
 Legless, it walks nowhere; it flies again to fetch its legs and lands onto them. Its event, `land`:
-`ok`, or not and why (`blocked`: with no legs below, or its legs gone as it came down, `face = "down"` and `name` what it found below instead of its legs; it hovers there). With
+`ok`, or not and why (`blocked`: with no legs below, or its legs gone as it came down, `face = "down"` and `name` what it found below instead of its legs; or coming down into fire or a fluid other than water, that block; it hovers there). With
 `force` it comes down onto whatever ground is beneath it, however far; with nothing under it down
 to the world's bottom (the End's void, a hole through the world), its event says so at once, blocked by the air below
 (`name = "minecraft:air", face = "down"`), and it goes on hovering. On its legs already, it's landed: `true`, its event `ok` at once. A right click pops legs up
@@ -412,29 +414,36 @@ its position. Not where it is in the world: no compass, no coordinates.
   ([held in a field](#held-in-a-field)). It's lost when the golem is picked up (its item keeps no
   position): set down again, it has a new origin there.
 - **Its heading is always a right angle** from the origin's: a move begins by squaring it up, and
-  ends by giving it back, so pathfinding's turns never leave it facing a new way.
+  ends by giving it back. A walk never turns: it strafes, even round things with pathfinding.
 
 So a program can always say where to go from home: `walkTo(3, 0, 5)`, or `walk` and check `position`.
 
 ## Walking
 
-**Without pathfinding** (the default) a walk goes straight: forward, then right, block by block, onto
-each block's middle, without turning (it walks backwards and sideways). At each block it compares the
-floor there with the floor it stands on. Its *elevation* is the block its feet are in, so a slab or
-a stair's lower half is the ground's elevation:
+A walk goes **direct**: in a straight line from where its last command left it to where it's going,
+across (its height changes only as the ground does), without turning, so `walk(3, 4)` goes along the
+diagonal, not forward and then right, strafing as it goes. Its body is as wide as it is: every block
+any part of it crosses on that line counts, so it never slips between two blocks that meet at a
+corner. As it goes into each one it compares the floor there with the floor it stands on. Its
+*elevation* is the block its feet are in, so a slab or a stair's lower half is the ground's
+elevation.
+
+**Without pathfinding** (the default) it keeps to its line, and the first thing on it that stops it
+ends the walk:
 
 - **Within its elevation it steps freely**: onto a slab, along slabs, over carpet.
 - **Up an elevation** only while `up` is above where it is: a jump, at most one block at a time.
 - **Down** only while `up` is below: at most 3 blocks at a time, as far as a player falls unhurt.
-- **Never past `up`**, and never into fire.
+- **Never past `up`**, and never into fire or a fluid other than water ([below](#in-water-lava-and-other-fluids)).
 
-It ends at exactly the elevation `up` asked, or its walk ends not `ok`, `blocked`
-(see [Blocked](#blocked)), by what stopped it:
+It ends at exactly the elevation `up` asked, on the block's middle it was going to, or its walk
+ends not `ok`, `blocked` (see [Blocked](#blocked)), on the middle of the last block it reached, by
+what stopped it:
 
-- **a step up** it wasn't to make, or more than a jump: the step's block, on the face it stepped toward;
+- **a step up** it wasn't to make, or more than a jump: the step's block, on the face that met it;
 - **a drop** it wasn't to make, more than 3, or with no floor within its drop: the air it would step
-  into (`minecraft:air`), on that face;
-- **a wall, a ceiling, fire**: that block, on the face that met it;
+  into (`minecraft:air`), on the face it was going toward;
+- **a wall, a ceiling, fire, lava**: that block, on the face that met it;
 - **there, but at another elevation**: above where `up` asked, the block under it, on its `down`;
   below, the air over it it couldn't rise into, on its `up`.
 
@@ -447,28 +456,39 @@ It ends at exactly the elevation `up` asked, or its walk ends not `ok`, `blocked
 | ground | 3 down | blocked, `minecraft:air` | blocked, `minecraft:air` | drops |
 | ground | 4 down | blocked, `minecraft:air` | blocked, `minecraft:air` | blocked, `minecraft:air` |
 
-**With pathfinding** it finds its way, as a mob does: round walls, up stairs and slabs, jumping a
-block and dropping up to 3, turning as it goes. A walk finds its way a leg at a time: it looks as
-far as 96 blocks of walking from where it stands (the server's `pathfinding_range` setting, in
-`config/modularcomputers.properties`), walks to the place it found nearest where it's going, and
-looks again from there, so a walk goes however far it's told. A leg that gets no nearer ends the
-walk `blocked`: a way round longer than that range (a wall whose ends are farther off) isn't found.
-It sees only the loaded world: land
-whose chunks aren't loaded is nothing to it, no floor to walk on, so its way goes as far as the
-loaded world does. When something changes on its way (a block placed there, a door shut), it works
-its way out again from where it is. It still ends on the asked block's middle, at the asked
-elevation, facing as it began, or it's `blocked`: with no way there, no way nearer than it has
-come, or its way running out short of it, on the last block's middle it reached, `name = ""` (no
-one block to name) and `face` its face toward where it was going. A flight with pathfinding flies
-round things too, but finds its whole way at once, within the same range: a flight with no way
-there that it can find is blocked at once, before it takes off.
+Off its line as a walk begins (shoved, and not told to take where it is), it walks back to where
+its last command left it first, then along its line.
 
-### In water and lava
+**With pathfinding** it still walks its line, the same line, drawn once as the walk begins, and
+leaves it only to get round what's in its way. Its elevation is free on the way (a jump up, or a
+drop of up to 3, wherever the ground goes); only the end's is `up`'s. Where something stops it, it
+looks, from the last block's middle it reached, for the nearest way back onto its line past what
+stopped it: a block whose middle is within a block of the line, farther along it, or the target
+itself. It looks as far as 96 blocks of walking (the server's `pathfinding_range` setting, in
+`config/modularcomputers.properties`), and gives up once a way would be winding enough to need more
+looking than that range allows: it gets round walls and ledges, not mazes. Found, it goes that way,
+then on along its line; not found, its walk ends `blocked`, on the last block's middle it reached,
+`name = ""` (no one block to name) and `face` its face toward where it was going. A walk itself
+goes however far it's told: only a search has a range.
 
-Fluids are air to the robot. It doesn't float or swim, and no current pushes it: it sinks through
-water or lava as it falls through air, walks along the bottom, and comes out the far side. Its
-hand works under water as on land. Lava doesn't burn it, so a walk goes through lava as through
-water. With pathfinding, its way goes through fluids as freely as through air.
+It goes the way it found as it found it. If it meets something there it didn't expect (a block
+placed in its way, a door shut), it says so, a notice, `{event = "notice", why = "blocked", name,
+face, position}` (`position` where it stood as it met it, from its origin, as `position` gives one),
+and looks again from there, the same way: it goes on, or its walk ends blocked. Something on its
+line it hadn't met yet isn't news: it just looks for a way round it.
+
+It sees only the loaded world: land whose chunks aren't loaded is nothing to it, no floor to walk
+on, so a walk into them ends blocked. A flight with pathfinding flies round things too, but finds
+its whole way at once, within the same range: a flight with no way there that it can find is
+blocked at once, before it takes off.
+
+### In water, lava and other fluids
+
+Water is air to the robot. It doesn't float or swim, and no current pushes it: it sinks through
+water as it falls through air, walks along the bottom, and comes out the far side. Its hand works
+under water as on land. Every other fluid, lava or another mod's, stops its moves, as fire does: a
+walk, a flight or a landing into one ends blocked by it (`name = "minecraft:lava"`), and no way
+pathfinding finds goes through one. Nothing harms it, so lava it falls into doesn't burn it.
 
 ## Events
 
@@ -536,6 +556,7 @@ was going.
 | `why = "shove"` | `drift` (`{forward, right, up}`) | something knocked it away from where its last command left it, once the shove's over: it stays where it was put |
 | `why = "fall"` | `drift`, `below` (a block's id) | a fall it didn't ask for, on its legs, as it begins and as it lands (a caught fall: its flight's end says it); its `drift` then, and the block under it then, as it is |
 | `why = "held"` | `id` | a field took hold of it (`id`: that field's own; its robotics paused), and again once let go and down (`id = ""`: its robotics back, its origin carried) |
+| `why = "blocked"` | `name`, `face`, `position` | a pathfinding walk, going the way it found, met something that way didn't expect (`name` the block, `""` when no one block can be named; `face` its own that met it; `position` where it stood, as `position` gives one): it looks again for a way back onto its line, and goes on or ends blocked |
 
 Its interrupt is raised when an event comes, and stays raised while one waits. With no program
 running on its board it takes no data: its events go, and it stops.

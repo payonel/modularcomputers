@@ -406,37 +406,48 @@ ends the same however it was shoved. **Positional commands are positional, alway
 `{event = "notice", ...}`: a shove (`why = "shove"`, `drift`), a fall (`why = "fall"`, `drift`,
 `below`: the user's, 2026-11-04, one notice as it begins and as it lands, in pairs, a caught fall's
 end its flight's; `landed` gone), and a field's hold (`why = "held"`, `id` the field's own as it
-takes hold, `""` once it's let go and down: the user's, 2026-11-04, `frozen` and `thawed` gone);
-every other event is a
+takes hold, `""` once it's let go and down: the user's, 2026-11-04, `frozen` and `thawed` gone),
+and a pathfinding walk's way blocked by what it didn't expect (`why = "blocked"`, `name`, `face`,
+`position` where it stood: the user's, 2026-11-14, `EventQueue.blockedOnItsWay`); every other event is a
 command's end, named after its method. `position` is where the last left it
 (a command, so it waits its turn); `get` is live (where it really is, its drift). `stop` is free and
 at once, where it is (no centering), answering where; the next command goes on from exactly there,
 on its legs as in the air, its heading the nearest right angle (the user's: a stop squares nothing,
 and the move after it must still end squared), the origin stays. The docs say "where its last
-command left it", never "plan" (the user's: the word hid what it means). Without pathfinding (the default) it walks straight,
-forward then right, never turning (it strafes and backs up), by `GolemSteps`: free within its
-elevation (the block its feet are in: slabs), a block up at a time only toward `up`, down three at
-most only toward it, never into fire. **Fluids are air to it** (the user's, 2026-11-13: simple for
-now): it and its legs never float, swim or burn, no current pushes them, it sinks and walks the
-bottom, its hand works under water as on land, and its pathfinder goes through fluids at air's cost. With pathfinding (`setPathfinding`, kept like the origin) a
-walk's way is its wayfinder's (`GolemWayfinder`, a robot's global planner: an A* of its own over
-the game's moves for a walker and their malus, the game's navigation following what it finds), a
-flight's the game's flying pathfinder's; both end exactly all the same. The wayfinder searches a
-slice of server time a tick (`NANOS_PER_TICK`, a board's millisecond: the game's own search runs in
-one go), a leg at a time (the user's, 2026-11-14): only places within the pathfinding range's
-blocks walked of the leg's start (`pathfinding_range`, 96 by default: the game's own range;
-`GolemWayfinder.range`), keeping all a leg explored, so its dead ends are explored once. A target
-past them, it walks the leg to the place nearest the target it found and searches on from there;
-each leg must end a block nearer (`LEG_PROGRESS`), else it's blocked (a way round longer than the
-range isn't found: the user's), so an unreachable target ends in bounded time. Chunk-bounded
-searches were measured and set aside (no cheaper, stuck sooner, and they poisoned the server's
-cache of places: the stress test logs them). A flight's way is the game's, found whole within the
-same range (its follow range, set from the setting at each flight). It sees only the loaded world: an unloaded
-chunk is nothing (no floor), and kept out of the server's shared cache of places. The game's news
-of a block changed by its way (`recomputePath`, its navigation's) makes it search again from where
-it is, at most once a second (the game's own rate); a way cut short searches on while it came
-nearer, else it's blocked. Its search and legs aren't saved: a load gives the walk again (as every
-command), searched afresh. It names faces in its own frame only (`front`, `back`, `left`,
+command left it", never "plan" (the user's: the word hid what it means). **Every walk goes direct**
+(the user's, 2026-11-14): a straight line across from where its last command left it to its target
+(`walk(3, 4)` on the diagonal), never turning (it strafes and backs up), stepped by `GolemStride`:
+its body, as wide as it is, goes into every block it crosses (a supercover, `GolemGround.sweep`: no
+slipping between two blocks meeting at a corner), each judged as it goes in (`GolemGround`: a floor,
+nothing to stand on, a wall, or barred), its feet on the highest floor under its body, each change
+of it a step `GolemSteps` judges: without pathfinding (the default) free within its elevation (the
+block its feet are in: slabs), a block up at a time only toward `up`, down three at most only
+toward it, the first thing on its line that stops it ending the walk; off its line as it begins (a
+shove), it goes back to where its last command left it first. **Water passes, every other fluid
+blocks** (the user's, 2026-11-14), as fire does, every move alike (`GolemGround.bars`: a walk, a
+flight, a landing, and every way pathfinding finds): it and its legs never float or swim, no current
+pushes them, it sinks through water and walks the bottom, its hand works under water as on land,
+and nothing burns it (`fireImmune`: a fall into lava neither). **With pathfinding**
+(`setPathfinding`, kept like the origin) a walk is Bug2's (the user's, 2026-11-14): it walks the
+same line (drawn once a walk, from where its command started: a detour or a shove doesn't draw it
+again, a field's carry moves it), its elevation free on the way (`GolemSteps.freeStep`), and where
+something stops it, `GolemWayfinder` searches once, all in that tick, from the last block's middle
+it reached, for the nearest way back onto its line past what stopped it and where it left it (a
+block whose middle is within a block of the line, or its target), within `pathfinding_range`
+blocks walked (96 by default: the game's own range) and the game's own budget for a search that
+far (`NODES_PER_BLOCK`, 16 places a block: a way too winding is no way, no mazes, the user's); none,
+it's blocked (`name = ""`, its face toward its target), on the last middle it reached. The search
+is an A* whose every step is judged by the walk's own code (`GolemStride`), so a way it finds is
+one its walk takes and nothing its walk refuses is a way; it follows the way as found, and only
+what that way didn't expect (its stride stopped on it: a block placed, a door shut) makes it say so
+(the `blocked` notice) and search again from there, the same rule, as often as that happens (the
+user's: no count, no cleverness; a program decides). Nothing on its line it hadn't met is news.
+A walk itself goes however far it's told. A flight's way is the game's for fliers, found whole
+within the same range (its follow range, set from the setting at each flight), made to agree with
+a flight's moves (`GolemWayfinder.flights`: what bars it is blocked to its search). Both see only
+the loaded world: an unloaded chunk is nothing (no floor), never loaded by a look, and kept out of
+the server's shared cache of places. Its search isn't saved: a load gives the walk again (as every
+command), its line from where the command started, on from where it is. It names faces in its own frame only (`front`, `back`, `left`,
 `right`, `up`, `down`; its left its own, as it turns and walks, as `Face`'s is a block's), though
 it may know north (the user's, 2026-10-29: `turn` faces `north`, `south`, `east` or `west`); a block's direction it reads is turned into that frame. It
 scans all six spaces at once (a list of every thing in a space, its creatures and items then its block, air too, each `{kind, name, id, at}`: the user's, 2026-11-04, the field card's `scan` the same shape), and works with its hand (its main hand, one item: a slot in its view,
@@ -781,15 +792,15 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   blocked), `name = ""`, `face` the side of what it holds past the edge: a move there ends at once,
   nothing moved; what it holds out of reach, it lets go, a `blocked` notice (`blockedNotice`). A
   robot's moves have no limit of their own (the user's, 2026-11-13: it goes as far as it's told;
-  only pathfinding has a range, `pathfinding_range`: a flight's way not found within it is
-  blocked, a walk's goes on in legs of it while each comes nearer). **A thing's `name` is its registry id, its `id` its own UUID**, everywhere
+  only pathfinding's search has a range, `pathfinding_range`: a flight's way not found within it
+  is blocked, a walk's way back onto its line too). **A thing's `name` is its registry id, its `id` its own UUID**, everywhere
   (the user's): a block has none, so `id = ""`; `blocked`'s block is a `name` too. **A swing breaks a
   place**, as the game's own player does (`MultiPlayerGameMode`): another block pushed in, the break
   goes on into it at its pace; another item in hand, it starts again; air there, it's `lost`. Every way a walk can't go is blocked (the user's): a step up it can't take (by the step's
   block), a drop (by air), an elevation it couldn't reach (the block under it, `down`; the air over
-  it, `up`), a landing with force over no ground (air, `down`), and with pathfinding no way there,
-none nearer, or a way run out short (`name = ""`, its face toward where it was going; a flight's at
-once, before it takes off). A move already done (an arm out
+  it, `up`), a landing with force over no ground (air, `down`), fire or a fluid not water (that
+  block), and with pathfinding no way back onto its line (`name = ""`, its face toward where it was
+  going; a flight's no way there, at once, before it takes off). A move already done (an arm out
   extended, in retracted) is no failure: `true`, its end `ok` (the user's: a lit lamp lit again).
   A tags-and-queues design came first
   and was set aside as too error-prone.
@@ -1118,9 +1129,15 @@ Lessons from mistakes, each with its test:
 - **A search's view of the world goes into the server's cache:** the game's pathfinding context
   caches what each place is (`PathTypeCache`, the server's, every mob's), so a search that sees a
   chunk as nothing (not loaded, or past a region cut off at chunks) leaves holes in every mob's
-  world till those places change. The wayfinder judges an unloaded chunk's places open without
-  caching them. (`aSearchIntoAChunkNotLoadedLeavesTheServersCacheOfPlacesAlone`; the stress test's
-  chunk-bounded searches run last for it)
+  world till those places change. The walk's search reads the world itself (`GolemGround`), and a
+  flight's context judges an unloaded chunk's places open without caching them.
+  (`aSearchIntoAChunkNotLoadedLeavesTheServersCacheOfPlacesAlone`; the stress test's chunk-bounded
+  searches run last for it)
+- **A floor under something solid isn't a floor:** a golem's floor scan took the highest surface
+  its body fit on within its drop, so under a wall it found the space below the wall's floor, and
+  pathfinding (its elevation free) routed "down" through solid stone. A drop is the first floor
+  straight under its feet, its body fitting where it is. (`aWayRoundFartherThanTheRangeIsBlocked`,
+  `aWalkWithNoWayNearerEndsBlockedOnTheLastMiddleItReached`: seen failing, a maze's air under them)
 - **To pass one entity, exempt that entity, never collisions:** a landing's last 3 blocks moved by
   `setPos` (no collision), only so the torso could settle through its own solid legs, and so passed
   through any roof or slab there too, against "never through blocks". The torso's `canCollideWith`

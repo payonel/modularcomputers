@@ -32,7 +32,7 @@ public final class GolemLegs extends Entity {
 		super(type, level);
 	}
 
-	/** No current pushes them: fluids are air to them, as to their golem (the user's, 2026-11-13). */
+	/** No current pushes them, as none pushes their golem (the user's, 2026-11-13). */
 	@Override
 	public boolean isPushedByFluid() {
 		return false;

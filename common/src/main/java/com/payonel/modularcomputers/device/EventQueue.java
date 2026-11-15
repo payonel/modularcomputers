@@ -272,6 +272,20 @@ public final class EventQueue {
 		put(notice);
 	}
 
+	/**
+	 * A robot's pathfinding walk met what the way it found didn't expect (the user's, 2026-11-14), a
+	 * notice as it searches again from there: {@code {event = "notice", why = "blocked", name, face,
+	 * position}}, as {@link #blocked}'s, {@code position} where it stood as it met it (from its origin,
+	 * as a position is given: forward, right, up, heading).
+	 */
+	public void blockedOnItsWay(String block, String face, Map<String, Object> position) {
+		Map<String, Object> notice = notice(Buffered.BLOCKED);
+		notice.put("name", block == null ? "" : block);
+		notice.put("face", java.util.Objects.requireNonNull(face, "face"));
+		notice.put("position", java.util.Objects.requireNonNull(position, "position"));
+		put(notice);
+	}
+
 	/** An end with a thing's name ("" for none, never nil), before its call. */
 	private static Map<String, Object> named(Map<String, Object> ended, String name) {
 		Object call = ended.remove("call");

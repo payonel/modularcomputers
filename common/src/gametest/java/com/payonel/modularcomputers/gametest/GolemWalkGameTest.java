@@ -185,9 +185,12 @@ public class GolemWalkGameTest {
 			.thenSucceed();
 	}
 
-	/** Fluids are air to it (the user's, 2026-11-13): it walks into lava, and through it, unburnt. */
+	/**
+	 * Water passes, any other fluid blocks (the user's, 2026-11-14): lava in its way blocks its walk,
+	 * by the lava, met on its front, on the last block's middle it reached; it never burns.
+	 */
 	@GameTest(maxTicks = 200)
-	public void itWalksThroughLavaAsThroughAirAndNeverBurns(GameTestHelper helper) {
+	public void lavaInItsWayBlocksItsWalk(GameTestHelper helper) {
 		helper.setBlock(AT.east(2), Blocks.LAVA);
 		helper.setBlock(AT.east(2).above(), Blocks.LAVA);
 		BotGolem golem = GolemFlightGameTest.golem(helper, false);
@@ -197,8 +200,80 @@ public class GolemWalkGameTest {
 			.thenExecuteAfter(3, () -> golem.robotics().walk(args(3L)))
 			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its walk ended"))
 			.thenExecute(() -> {
-				same(helper, last(events), ARRIVED, "through the lava");
-				same(helper, position(golem), at(3, 0, 0L), "on the far side");
+				same(helper, last(events), blocked("minecraft:lava", "front"), "by the lava");
+				same(helper, position(golem), at(1, 0, 0L), "short of it");
+			})
+			.thenSucceed();
+	}
+
+	/**
+	 * A walk goes on the line to its target (the user's, 2026-11-14): walk(3, 4) crosses the
+	 * diagonal, not forward then right, strafing (it never turns), and ends on the target's middle.
+	 */
+	@GameTest(maxTicks = 200)
+	public void aWalkGoesStraightAlongItsLineNotForwardThenRight(GameTestHelper helper) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		Vec3 from = helper.absoluteVec(Vec3.atBottomCenterOf(AT));
+		Vec3 way = new Vec3(3, 0, 4); // (forward east, right south)
+		double[] off = {0};
+		boolean[] walking = {false};
+		helper.onEachTick(() -> {
+			if (walking[0]) {
+				Vec3 d = golem.position().subtract(from);
+				double along = Math.max(0, Math.min(1, (d.x * way.x + d.z * way.z) / way.lengthSqr()));
+				off[0] = Math.max(off[0], new Vec3(d.x - way.x * along, 0, d.z - way.z * along).horizontalDistance());
+				helper.assertTrue(golem.getYRot() == BotGolemGameTest.EAST, "never turning");
+			}
+		});
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> {
+				walking[0] = true;
+				golem.robotics().walk(args(3L, 4L));
+			})
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its walk ended"))
+			.thenExecute(() -> {
+				same(helper, last(events), ARRIVED, "there");
+				same(helper, position(golem), at(3, 4, 0L), "on its target's middle");
+				helper.assertTrue(off[0] < ON_ITS_LINE, "on its line all the way: " + off[0] + " off it at most");
+			})
+			.thenSucceed();
+	}
+
+	/** How far off its line a direct walk may be seen, in blocks: a hair (a tick's position, rounding). */
+	private static final double ON_ITS_LINE = 0.01;
+
+	/**
+	 * A block on its line blocks it, one forward then right would miss (walk(4, 2) crosses the block
+	 * at 2 forward, 1 right): blocked by it, met on its front, on the last block's middle it reached.
+	 */
+	@GameTest(maxTicks = 200)
+	public void aBlockOnItsLineBlocksItWhereForwardThenRightWouldMissIt(GameTestHelper helper) {
+		helper.setBlock(AT.east(2).south(), Blocks.STONE);
+		helper.setBlock(AT.east(2).south().above(), Blocks.STONE);
+		walks(helper, new Object[] {4L, 2L}, blocked("minecraft:stone", "front"), at(1, 1, 0L));
+	}
+
+	/**
+	 * Its body is as wide as it is (the user's): on the diagonal between two blocks meeting at a corner
+	 * it doesn't slip through, but is blocked by one of them where it stands.
+	 */
+	@GameTest(maxTicks = 200)
+	public void itDoesntSlipBetweenTwoBlocksMeetingAtACorner(GameTestHelper helper) {
+		for (BlockPos at : List.of(AT.east(), AT.south())) {
+			helper.setBlock(at, Blocks.STONE);
+			helper.setBlock(at.above(), Blocks.STONE);
+		}
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(2L, 2L)))
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its walk ended"))
+			.thenExecute(() -> {
+				Map<?, ?> end = (Map<?, ?>) last(events);
+				same(helper, end.get("why"), "blocked", "blocked");
+				same(helper, end.get("name"), "minecraft:stone", "by a stone");
+				same(helper, position(golem), at(0, 0, 0L), "where it stood");
 			})
 			.thenSucceed();
 	}
@@ -275,9 +350,13 @@ public class GolemWalkGameTest {
 	/** How long the current runs past it in that test, in ticks: a push would carry it off its middle in a few. */
 	private static final int CURRENT_TICKS = 40;
 
-	/** With pathfinding, lava is a way like any: down a walled lane whose only way on is through it. */
+	/**
+	 * With pathfinding, lava is no way (the user's, 2026-11-14: water passes, every other fluid blocks):
+	 * down a walled lane whose only way on is through it, it's blocked, no one block to name, on the
+	 * last middle it reached, its face toward its target.
+	 */
 	@GameTest(maxTicks = 400)
-	public void withPathfindingItGoesThroughLava(GameTestHelper helper) {
+	public void withPathfindingALaneOnlyLavaOpensHasNoWay(GameTestHelper helper) {
 		for (int x = 0; x <= LANE; x++) {
 			for (int y = 0; y < 2; y++) {
 				helper.setBlock(AT.east(x - 1).north().above(y), Blocks.STONE);
@@ -296,8 +375,8 @@ public class GolemWalkGameTest {
 			})
 			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "ended"))
 			.thenExecute(() -> {
-				same(helper, last(events), ARRIVED, "through the lava");
-				same(helper, position(golem), at(4, 0, 0L), "exactly");
+				same(helper, last(events), blocked("", "front"), "no way but through the lava");
+				same(helper, position(golem), at(1, 0, 0L), "short of it, on a middle");
 			})
 			.thenSucceed();
 	}

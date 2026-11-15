@@ -76,8 +76,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	public static final double WALKING_SPEED = Math.sqrt(PLAYER_SPEED * PLAYER_INPUT);
 	/** How far it turns a tick, in degrees: a right angle in five ticks. */
 	public static final float TURN_SPEED = 18;
-	/** How near the point a walk ends counts as there, in blocks (a path ends at a block's center). */
-	private static final double ARRIVED = 1.0;
 	/** How far its parts view reaches, in blocks (a container's). */
 	private static final double PARTS_REACH = 4.0;
 
@@ -137,14 +135,22 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private final RoboticsDevice robotics = new RoboticsDevice();
 	/** Its senses and its hand, in the world. */
 	private final GolemHands hands = new GolemHands(this);
-	/** Where a walk with pathfinding is going (null: none): its block's middle. */
-	private Vec3 target;
-	/** A walk without pathfinding: the blocks' middles still to step to, in order (null: none). */
-	private java.util.ArrayDeque<Vec3> steps;
-	/** The step under way (null: none): from one block's middle, on its floor, to the next's, and how far along (0 to 1). */
-	private Vec3 stepFrom;
-	private Vec3 stepTo;
-	private double stepDone;
+	/** A walk under way, stepped across the world (null: none, or a pathfinding walk searching): a straight line between each of its points. */
+	private GolemStride stride;
+	/** Where a walk is going (null: none): its target block's middle. */
+	private Vec3 walkTo;
+	/**
+	 * A walk with pathfinding's line (the user's, 2026-11-14: Bug2's), from where its command started
+	 * to its target, drawn once a walk (a detour or a shove doesn't draw it again; a field's carry moves
+	 * it): what it walks, and comes back onto past what's in its way (null: none, a walk without pathfinding).
+	 */
+	private Vec3 lineFrom;
+	/** A pathfinding walk's search due (NaN: none): for a way back onto its line farther along it than this, in blocks. */
+	private double searchPast = Double.NaN;
+	/** Where the way a pathfinding walk's search found ends, as its stride's point (back on its line; 0: no way found, on its line from the start). */
+	private int wayEnds;
+	/** How far it's walked since it last paid for a block walked, in blocks (less than one). */
+	private double walkedOwed;
 	/** The elevation its walk is to end at (the block its feet are in). */
 	private int goal;
 	/** Its heading as its move began: given back as it ends (a pathfinder turns it as it goes). */
@@ -180,25 +186,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	}
 	/** The heading a turn is going to, in degrees (NaN: none). */
 	private float turnTo = Float.NaN;
-	/** Where it was last tick, while walking: what it walked since. */
-	private Vec3 walkedFrom;
-	/** Its walk's way is found and under way (it's planned at a tick it stands on something). */
-	private boolean pathed;
-	/** A pathfinding walk's search under way (a slice a tick), and the target it searches for (another: it's dropped). */
-	private GolemWayfinder wayfinder;
-	private Vec3 wayfinderFor;
-	/** How near the target a pathfinding walk has come, in blocks, at its legs' starts: each leg must come nearer. */
-	private double closest;
-	/** Where its leg under way ends, short of the target (null: its way goes all the way), and how many legs it's set out on. */
-	private Vec3 legEnd;
-	private int legs;
-	/** How much nearer each leg of a pathfinding walk must bring it, in blocks (else it's blocked: no way on). */
-	private static final double LEG_PROGRESS = 1;
-	/** Something changed by its way (the game's news): it searches again from where it is. */
-	private boolean wayChanged;
-	/** When it last searched again for a change, in game time; and how often it may, in ticks (the game's own, for its mobs). */
-	private long changedAt = -CHANGES_EVERY;
-	private static final int CHANGES_EVERY = 20;
 	/** Its board has been set up in its world (at its first tick there: the plain game has no hook for an entity's arrival). */
 	private boolean placed;
 	/** The legs it's landing on (null: none). */
@@ -236,12 +223,16 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		robotics.moveWith(new Legs());
 		board.solder(Motherboard.exp(GolemLayout.ROBOTICS_LANE), robotics);
 		setPersistenceRequired();
-		// Fluids are air to it (the user's, 2026-11-13): its pathfinder goes through them as through
-		// air, and beside lava (or fire) as anywhere.
-		for (var fluid : new net.minecraft.world.level.pathfinder.PathType[] {net.minecraft.world.level.pathfinder.PathType.WATER,
-			net.minecraft.world.level.pathfinder.PathType.WATER_BORDER, net.minecraft.world.level.pathfinder.PathType.LAVA,
-			net.minecraft.world.level.pathfinder.PathType.FIRE_IN_NEIGHBOR}) {
-			setPathfindingMalus(fluid, 0);
+		// Water passes, every other fluid and fire bar it (the user's, 2026-11-14): its flights' way (the
+		// game's for fliers) goes through water as through air, never into lava or fire, and beside them
+		// as anywhere (what bars it is blocked to its search too: GolemWayfinder.flights).
+		for (var open : new net.minecraft.world.level.pathfinder.PathType[] {net.minecraft.world.level.pathfinder.PathType.WATER,
+			net.minecraft.world.level.pathfinder.PathType.WATER_BORDER, net.minecraft.world.level.pathfinder.PathType.FIRE_IN_NEIGHBOR}) {
+			setPathfindingMalus(open, 0);
+		}
+		for (var barred : new net.minecraft.world.level.pathfinder.PathType[] {net.minecraft.world.level.pathfinder.PathType.LAVA,
+			net.minecraft.world.level.pathfinder.PathType.FIRE}) {
+			setPathfindingMalus(barred, -1);
 		}
 	}
 
@@ -261,21 +252,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			.add(Attributes.MOVEMENT_SPEED, WALKING_SPEED)
 			.add(Attributes.FOLLOW_RANGE, GolemWayfinder.DEFAULT_RANGE)
 			.build();
-	}
-
-	/**
-	 * Its legs' navigation, the game's for walkers following the way its wayfinder found: the game's
-	 * news of a change by that way (a block placed or gone) is its own to act on, searching again from
-	 * where it is (the game's would search its own range for its own target, which it hasn't).
-	 */
-	@Override
-	protected net.minecraft.world.entity.ai.navigation.PathNavigation createNavigation(Level level) {
-		return new net.minecraft.world.entity.ai.navigation.GroundPathNavigation(this, level) {
-			@Override
-			public void recomputePath() {
-				wayChanged = true;
-			}
-		};
 	}
 
 	@Override
@@ -394,42 +370,25 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			Vec3 plan = planPoint();
 			Vec3 start = new Vec3(plan.x, getY(), plan.z); // (from its plan: where it is, even after a stop)
 			goal = GolemSteps.elevation(plan.y) + (int) up;
+			// Direct (the user's, 2026-11-14): on the line from where its last command left it to its
+			// target, without turning; from somewhere else (a shove's, a load's mid-walk), as below.
+			walkTo = start.add(inFrame(forward, right, 0));
+			Vec3 here = BotGolem.this.position();
+			boolean onLine = GolemWayfinder.fromLine(start, walkTo, here) <= OFF_PLAN;
 			if (pathfinding) {
-				target = start.add(inFrame(forward, right, 0)).add(0, up, 0);
-				walkedFrom = BotGolem.this.position();
-				closest = BotGolem.this.position().distanceTo(target);
-				legEnd = null;
-				legs = 0;
-				pathed = false; // (its tick finds the way, once it stands: the game plans no path for a mob in the air)
-				return null;
+				lineFrom = start; // (its line, once: off it, it searches its way back onto it, past where it is)
+				if (onLine) {
+					wayEnds = 0; // (no way found: its line, all of it)
+					stride = new GolemStride(new GolemGround(BotGolem.this, true), List.of(here, walkTo), getY(), goal, true);
+				} else {
+					searchPast = GolemWayfinder.along(start, walkTo, here);
+				}
+			} else {
+				// (off it, back to where its last command left it first: then its line)
+				stride = new GolemStride(new GolemGround(BotGolem.this, true), onLine ? List.of(here, walkTo) : List.of(here, start, walkTo), getY(), goal, false);
 			}
-			// Straight: forward, then right, a block's middle each, without turning.
-			steps = new java.util.ArrayDeque<>();
-			if (BotGolem.this.position().subtract(start).horizontalDistance() > OFF_PLAN) {
-				steps.add(start);
-			}
-			Vec3 at = stepAlong(start, inFrame(Math.signum(forward), 0, 0), Math.abs(forward));
-			stepAlong(at, inFrame(0, Math.signum(right), 0), Math.abs(right));
 			setNoGravity(true); // (it moves itself, step by step)
 			return null;
-		}
-
-		/**
-		 * A straight walk's steps {@code way} (a block, along its frame) from {@code at}, {@code far} in
-		 * all: from a stop between blocks the part onto the next block's middle first, then a block's
-		 * middle each. Where they end.
-		 */
-		private Vec3 stepAlong(Vec3 at, Vec3 way, double far) {
-			double first = far - Math.floor(far);
-			if (first > HAIR) {
-				at = at.add(way.scale(first));
-				steps.add(at);
-			}
-			for (long i = Math.round(far - first); i > 0; i--) {
-				at = at.add(way);
-				steps.add(at);
-			}
-			return at;
 		}
 
 		@Override
@@ -454,9 +413,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 		@Override
 		public String turn(double degrees) {
-			getNavigation().stop();
 			hands.stopBreaking();
-			target = null;
+			endStride();
 			turnTo = Mth.wrapDegrees(planYaw() + (float) degrees); // (from its plan's heading)
 			return null;
 		}
@@ -464,11 +422,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		@Override
 		public void stop() {
 			// At once, where it is: no centering, no turning back (the user's: forceful); its plan stays.
-			getNavigation().stop();
 			hands.stopBreaking();
-			target = null;
-			steps = null;
-			stepFrom = stepTo = null;
+			endStride();
 			heading = Float.NaN;
 			setNoGravity(thrusting());
 			setDeltaMovement(Vec3.ZERO);
@@ -671,8 +626,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 		@Override
 		public Result swing(String face) {
-			getNavigation().stop();
-			target = null;
+			endStride();
 			turnTo = Float.NaN;
 			return hands.swing(face);
 		}
@@ -856,9 +810,15 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			origins.put(dimension(), origin().carried(by));
 			carry(by);
 			hands.afterHold(); // (its break goes on, at its face where it's been set down)
-			pathed = false; // (a pathfinding walk finds its way again, from where it was set down)
-			if (steps != null || stepTo != null) {
-				setNoGravity(true); // (its straight walk goes on, step by step)
+			if (stride != null) {
+				// (its walk goes on from where it's been set down, its line and its points carried with it)
+				List<Vec3> rest = stride.rest();
+				rest.set(0, position());
+				wayEnds = Math.max(0, wayEnds - stride.segment()); // (its way's end, counted from where it goes on)
+				stride = new GolemStride(new GolemGround(this, true), rest, getY(), goal, lineFrom != null);
+			}
+			if (walking()) {
+				setNoGravity(true); // (its walk goes on, step by step)
 			}
 			robotics.thawed(); // (it says so, and a command taken while held goes now)
 		}
@@ -870,7 +830,12 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	 */
 	boolean falling() {
 		return legs() && !onGround() && getDeltaMovement().y < -FALL_SPEED && !frozen && !thrusting() && !EnergyField.held(this)
-			&& steps == null && stepTo == null && target == null && landing == null;
+			&& !walking() && landing == null;
+	}
+
+	/** Whether a walk is under way (stepping, or searching its way back onto its line). */
+	private boolean walking() {
+		return stride != null || !Double.isNaN(searchPast);
 	}
 
 	/** How fast it must be going down to be falling, in blocks a tick (a golem just placed, its ground not yet found, isn't). */
@@ -958,17 +923,12 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	/** What its moves under way were going to is moved by {@code by} (its frame was carried). */
 	private void carry(Vec3 by) {
-		target = target == null ? null : target.add(by);
-		legEnd = legEnd == null ? null : legEnd.add(by);
-		stepFrom = stepFrom == null ? null : stepFrom.add(by);
-		stepTo = stepTo == null ? null : stepTo.add(by);
-		walkedFrom = walkedFrom == null ? null : walkedFrom.add(by);
-		flyTo = flyTo == null ? null : flyTo.add(by);
-		if (steps != null) {
-			java.util.ArrayDeque<Vec3> moved = new java.util.ArrayDeque<>();
-			steps.forEach(step -> moved.add(step.add(by)));
-			steps = moved;
+		walkTo = walkTo == null ? null : walkTo.add(by);
+		lineFrom = lineFrom == null ? null : lineFrom.add(by);
+		if (stride != null) {
+			stride.carry(by);
 		}
+		flyTo = flyTo == null ? null : flyTo.add(by);
 		if (flightPath != null) {
 			java.util.ArrayDeque<Vec3> moved = new java.util.ArrayDeque<>();
 			flightPath.forEach(point -> moved.add(point.add(by)));
@@ -1162,11 +1122,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	/** A move begins: what it was doing stops, and it faces the nearest right angle (given back as it ends). */
 	private void begin() {
 		turnTo = Float.NaN;
-		getNavigation().stop();
 		hands.stopBreaking();
-		target = null;
-		steps = null;
-		stepFrom = stepTo = null;
+		endStride();
 		shovedTo = null; // (a command: a shove from here on is a new one)
 		face(planYaw()); // (from its plan: its heading too)
 		heading = getYRot();
@@ -1182,11 +1139,18 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	/** A walk's over (arrived, blocked or stopped): its heading back, gravity its own. */
 	private void endWalk() {
-		target = null;
-		steps = null;
-		stepFrom = stepTo = null;
+		endStride();
 		setNoGravity(thrusting());
 		restoreHeading();
+	}
+
+	/** Its walk's way forgotten: its points, its line, a search due. */
+	private void endStride() {
+		stride = null;
+		wayEnds = 0;
+		walkTo = null;
+		lineFrom = null;
+		searchPast = Double.NaN;
 	}
 
 	/** A point {@code forward}, {@code right} and {@code up} blocks from it, in its own frame, as a step from where it is. */
@@ -1212,9 +1176,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	/** Its thrusters take over: its legs, if it stands on them, left standing where it is, its torso where it was. */
 	private void takeOff() {
-		getNavigation().stop();
 		hands.stopBreaking();
-		target = null;
+		endStride();
 		turnTo = Float.NaN;
 		landing = null;
 		groundLanding = null;
@@ -1302,7 +1265,13 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	 */
 	private net.minecraft.world.entity.ai.navigation.FlyingPathNavigation flightNavigation() {
 		getAttribute(Attributes.FOLLOW_RANGE).setBaseValue(GolemWayfinder.range());
-		return new net.minecraft.world.entity.ai.navigation.FlyingPathNavigation(this, level());
+		return new net.minecraft.world.entity.ai.navigation.FlyingPathNavigation(this, level()) {
+			@Override
+			protected net.minecraft.world.level.pathfinder.PathFinder createPathFinder(int nodes) {
+				// (the game's for fliers, but what bars its moves is no way: its flight never meets one on it)
+				return GolemWayfinder.flights(nodes, BotGolem.this.level(), evaluator -> nodeEvaluator = evaluator);
+			}
+		};
 	}
 
 	/**
@@ -1365,15 +1334,48 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 		Vec3 step = left.length() > THRUST_SPEED ? left.normalize().scale(THRUST_SPEED) : left;
 		Vec3 from = position();
-		move(net.minecraft.world.entity.MoverType.SELF, step);
+		Barred barred = barredOn(step);
+		move(net.minecraft.world.entity.MoverType.SELF, barred != null ? barred.short_() : step);
 		setDeltaMovement(Vec3.ZERO);
-		if (position().distanceTo(from) < step.length() * BLOCKED_SHARE) {
+		if (barred != null) {
+			flyTo = null;
+			flightPath = null;
+			restoreHeading();
+			robotics.blocked(blockName(barred.block()), faceOf(step)); // (into fire, or a fluid not water: never)
+			robotics.hovering();
+		} else if (position().distanceTo(from) < step.length() * BLOCKED_SHARE) {
 			flyTo = null;
 			flightPath = null;
 			restoreHeading();
 			blockedMoving(from, step);
 			robotics.hovering();
 		}
+	}
+
+	/** A move's way barred: the block that bars it (fire, a fluid not water), and as much of the move as goes before its body meets it. */
+	private record Barred(BlockPos block, Vec3 short_) {
+	}
+
+	/** How far a move's barred check goes at a time along it, in blocks: finer than its body, so no block it passes is missed. */
+	private static final double BARRED_GRAIN = 0.25;
+
+	/**
+	 * Whether a move {@code step} from where it is (a flight's, a landing's) takes its body into a block
+	 * that bars every move of its (the user's, 2026-11-14: fire, a fluid not water), as its walks
+	 * judge one: the first such block, and how far it goes before; null, none.
+	 */
+	private Barred barredOn(Vec3 step) {
+		net.minecraft.world.phys.AABB box = getBoundingBox();
+		int parts = Math.max(1, (int) Math.ceil(step.length() / BARRED_GRAIN));
+		for (int part = 1; part <= parts; part++) {
+			net.minecraft.world.phys.AABB moved = box.move(step.scale(part / (double) parts)).deflate(HAIR);
+			for (BlockPos at : BlockPos.betweenClosed(BlockPos.containing(moved.minX, moved.minY, moved.minZ), BlockPos.containing(moved.maxX, moved.maxY, moved.maxZ))) {
+				if (!box.intersects(new net.minecraft.world.phys.AABB(at)) && level().isLoaded(at) && GolemGround.bars(level().getBlockState(at))) {
+					return new Barred(at.immutable(), step.scale((part - 1) / (double) parts));
+				}
+			}
+		}
+		return null;
 	}
 
 	/** A tick's landing: down to its legs (straight onto them once close: they'd stop a collision), and on, its legs gone into it. */
@@ -1388,6 +1390,15 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			double speed = LANDING_SPEED * Math.max(LANDING_SLOWEST, Math.min(1, left.length() / LANDING_EASE));
 			Vec3 step = left.scale(Math.min(1, speed / left.length()));
 			Vec3 from = position();
+			Barred barred = barredOn(step);
+			if (barred != null) {
+				move(net.minecraft.world.entity.MoverType.SELF, barred.short_());
+				setDeltaMovement(Vec3.ZERO);
+				groundLanding = null;
+				robotics.blocked(blockName(barred.block()), "down"); // (never down into fire, or a fluid not water: it goes on hovering)
+				robotics.hovering();
+				return;
+			}
 			move(net.minecraft.world.entity.MoverType.SELF, step);
 			setDeltaMovement(Vec3.ZERO);
 			if (position().distanceTo(from) >= step.length() * BLOCKED_SHARE) {
@@ -1433,6 +1444,15 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 			// With the world's collisions all the way down, never through blocks (the user's): its own legs, the
 			// ones it lands on, are all it passes (canCollideWith), to settle onto them.
 			Vec3 from = position();
+			Barred barred = barredOn(step);
+			if (barred != null) {
+				move(net.minecraft.world.entity.MoverType.SELF, barred.short_());
+				setDeltaMovement(Vec3.ZERO);
+				landing = null;
+				robotics.blocked(blockName(barred.block()), "down"); // (never down into fire, or a fluid not water: it goes on hovering)
+				robotics.hovering();
+				return;
+			}
 			move(net.minecraft.world.entity.MoverType.SELF, step);
 			if (position().distanceTo(from) < step.length() * BLOCKED_SHARE) {
 				landing = null;
@@ -1513,80 +1533,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	/** Its walk or turn under way, a tick of it: what it walked paid, and how it ended told. */
 	private void move() {
-		if (steps != null) {
-			stepWalk();
-		}
-		if (wayfinder != null && wayfinderFor != target) {
-			wayfinder.cancel(); // (its walk ended, or its target moved: a field carried it)
-			wayfinder = null;
-		}
-		if (target == null || !pathed) {
-			wayChanged = false; // (no way under way to search again)
-		} else if (wayChanged && level().getGameTime() - changedAt >= CHANGES_EVERY) {
-			wayChanged = false;
-			changedAt = level().getGameTime();
-			getNavigation().stop();
-			pathed = false; // (something changed by its way: it searches again, from where it is; a change sooner waits)
-		}
-		if (target != null && !pathed) {
-			if (!onGround()) {
-				return; // (in the air: it walks once it lands)
-			}
-			if (wayfinder == null) {
-				wayfinder = new GolemWayfinder(this, BlockPos.containing(target));
-				wayfinderFor = target;
-			}
-			if (!wayfinder.search(GolemWayfinder.NANOS_PER_TICK)) {
-				return; // (still searching: on at its next tick)
-			}
-			Path path = wayfinder.way();
-			boolean all = wayfinder.reached();
-			wayfinder = null;
-			closest = Math.min(closest, position().distanceTo(target));
-			if (path == null || !all && Vec3.atBottomCenterOf(path.getEndNode().asBlockPos()).distanceTo(target) > closest - LEG_PROGRESS) {
-				if (legs > 0) {
-					Vec3 middle = middle();
-					setPos(middle.x, getY(), middle.z); // (the middle of the last block it reached, its legs having taken it some way)
-				}
-				String face = faceOf(target.subtract(position()));
-				endWalk();
-				robotics.blocked("", face); // (no way there, or none nearer: blocked, no one block to name)
-				return;
-			}
-			legEnd = all ? null : Vec3.atBottomCenterOf(path.getEndNode().asBlockPos());
-			legs++;
-			getNavigation().moveTo(path, 1.0);
-			pathed = true;
-		}
-		if (target != null) {
-			robotics.walked(position().distanceTo(walkedFrom));
-			walkedFrom = position();
-			if (getNavigation().isDone()) {
-				boolean there = position().subtract(target).horizontalDistance() < ARRIVED;
-				boolean leg = legEnd != null && position().subtract(legEnd).horizontalDistance() < ARRIVED;
-				if (!there && (leg || position().distanceTo(target) < closest - LEG_PROGRESS)) {
-					pathed = false; // (a leg's end, or a way cut short nearer than it was: it searches on from here)
-					return;
-				}
-				Vec3 to = target;
-				if (there) {
-					setPos(to.x, getY(), to.z); // (onto its block's middle, exactly)
-				} else {
-					Vec3 middle = middle();
-					setPos(middle.x, getY(), middle.z); // (the middle of the last block it reached)
-				}
-				int off = GolemSteps.elevation(getY()) - goal;
-				endWalk();
-				if (there && off == 0) {
-					robotics.arrived();
-				} else {
-					if (there) {
-						blockedAtHeight(off);
-					} else {
-						robotics.blocked("", faceOf(to.subtract(position()))); // (its way ran out short: blocked, no one block to name)
-					}
-				}
-			}
+		if (walking()) {
+			walk();
 		}
 		if (!Float.isNaN(turnTo)) {
 			float left = Mth.wrapDegrees(turnTo - getYRot());
@@ -1602,111 +1550,99 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	/** How fast it steps, in blocks a tick: a player's walking pace (4.317 blocks a second). */
 	private static final double STEP_SPEED = 4.317 / 20;
-	/** A jump's share of a step it rises over (then it goes on, up there); a drop's share it goes before it falls. */
+	/** A jump's share of a block walked (its feet rise a block in the time it walks that: it goes on once up); a drop's of its drops (three blocks down in the time it walks that). */
 	private static final double JUMP_SHARE = 0.4;
 	private static final double DROP_SHARE = 0.5;
+	/** How fast its feet rise onto a step up, and come down a drop, in blocks a tick. */
+	private static final double RISE_SPEED = STEP_SPEED / JUMP_SHARE;
+	private static final double DROP_SPEED = STEP_SPEED * GolemSteps.MAX_DROP / DROP_SHARE;
 
-	/** A walk without pathfinding, a tick of it: the next block's floor judged (GolemSteps), and stepped onto. */
-	private void stepWalk() {
-		if (stepTo == null) {
-			Vec3 next = steps.peek();
-			if (next == null) {
-				int off = GolemSteps.elevation(getY()) - goal;
-				endWalk();
-				if (off == 0) {
-					robotics.arrived();
-				} else {
-					blockedAtHeight(off);
-				}
-				return;
-			}
-			Stop stop = stepOnto(next);
-			if (stop != null) {
-				endWalk();
-				stop.tell(robotics);
-				return;
-			}
-			steps.poll();
+	/**
+	 * A walk, a tick of it: its stride stepped on (its feet rising onto a step before it goes on, and
+	 * coming down a drop as it goes), and how it ended told. With pathfinding, what stops it is gone
+	 * round: it searches from where it is, at once, for its way back onto its line.
+	 */
+	private void walk() {
+		if (!Double.isNaN(searchPast) && !search()) {
+			return; // (no way back onto its line: blocked)
 		}
-		stepDone = Math.min(1, stepDone + STEP_SPEED);
-		double rise = stepTo.y - stepFrom.y;
-		double y;
-		if (rise > 0) {
-			y = stepFrom.y + rise * Math.min(1, stepDone / JUMP_SHARE);
-		} else if (rise < 0) {
-			y = stepFrom.y + (stepDone < DROP_SHARE ? 0 : rise * (stepDone - DROP_SHARE) / (1 - DROP_SHARE));
-		} else {
-			y = stepFrom.y;
+		if (stride == null) {
+			return;
 		}
-		setPos(Mth.lerp(stepDone, stepFrom.x, stepTo.x), y, Mth.lerp(stepDone, stepFrom.z, stepTo.z));
+		double support = stride.support();
+		if (getY() < support - HAIR) {
+			setPos(getX(), Math.min(support, getY() + RISE_SPEED), getZ()); // (up onto its step first)
+			setDeltaMovement(Vec3.ZERO);
+			return;
+		}
+		double went = stride.advance(new GolemGround(this, true), STEP_SPEED);
+		double feet = getY() > stride.support() ? Math.max(stride.support(), getY() - DROP_SPEED) : getY();
+		setPos(stride.x(), feet, stride.z());
 		setDeltaMovement(Vec3.ZERO);
 		calculateEntityAnimation(false); // (its legs swing as it goes)
-		if (stepDone >= 1) {
-			setPos(stepTo);
-			stepFrom = stepTo = null;
-			robotics.walked(1);
+		walkedOwed += went;
+		if (walkedOwed >= 1) {
+			robotics.walked(Math.floor(walkedOwed)); // (its cost a block walked, paid as each is)
+			walkedOwed -= Math.floor(walkedOwed);
 		}
-	}
-
-	/** Starts a step onto the block whose middle is {@code next}: null, or why it can't (the walk's blocked there). */
-	private Stop stepOnto(Vec3 next) {
-		double here = getY();
-		double floor = floorAt(next.x, next.z, here);
-		Vec3 toward = next.subtract(position());
-		if (Double.isNaN(floor)) {
-			if (fits(next.x, here, next.z)) {
-				return blockedBy(BlockPos.containing(next.x, here + HAIR, next.z), toward); // (no floor within its drop: blocked by the air it'd step into)
+		GolemStride.Stop stop = stride.stopped();
+		if (stop != null) {
+			Vec3 stand = stride.stand();
+			if (lineFrom != null) {
+				// (pathfinding: back onto its line past what stopped it, and past where it's come to)
+				if (stride.segment() < wayEnds) {
+					// (on the way its search found, it met what that way didn't expect: it says so, and searches again)
+					robotics.blockedOnItsWay(blockName(stop.block()), faceOf(stop.side()), positionFromOrigin());
+				}
+				searchPast = Math.max(GolemWayfinder.along(lineFrom, walkTo, stand), GolemWayfinder.along(lineFrom, walkTo, new Vec3(stop.x() + 0.5, 0, stop.z() + 0.5)));
+				search();
+				return;
 			}
-			BlockPos wall = BlockPos.containing(next.x, here + HAIR, next.z);
-			return blockedBy(level().getBlockState(wall).isAir() ? wall.above() : wall, toward);
+			String block = blockName(stop.block());
+			setPos(stand.x, stand.y, stand.z); // (the last block's middle it reached)
+			endWalk();
+			robotics.blocked(block, faceOf(stop.side()));
+			return;
 		}
-		BlockPos feet = BlockPos.containing(next.x, floor + HAIR, next.z);
-		var state = level().getBlockState(feet);
-		if (state.is(net.minecraft.tags.BlockTags.FIRE)) {
-			return blockedBy(feet, toward); // (never into fire; fluids are air to it)
+		if (stride.done() && Math.abs(getY() - stride.support()) < HAIR) {
+			setPos(walkTo.x, stride.support(), walkTo.z); // (onto its block's middle, exactly)
+			int off = GolemSteps.elevation(getY()) - goal;
+			endWalk();
+			if (off == 0) {
+				robotics.arrived();
+			} else {
+				blockedAtHeight(off);
+			}
 		}
-		GolemSteps.Stop stop = GolemSteps.step(here, floor, goal);
-		if (stop == GolemSteps.Stop.HIGH) {
-			return blockedBy(BlockPos.containing(next.x, floor - HAIR, next.z), toward); // (the step it can't climb)
-		} else if (stop == GolemSteps.Stop.LOW) {
-			return blockedBy(BlockPos.containing(next.x, here + HAIR, next.z), toward); // (the air it can't drop through)
-		}
-		if (floor > here && !fits(getX(), floor, getZ())) {
-			return blockedBy(BlockPos.containing(getX(), here + getBbHeight() + HAIR, getZ()), new Vec3(0, 1, 0)); // (a ceiling over it)
-		}
-		stepFrom = position();
-		stepTo = new Vec3(next.x, floor, next.z);
-		stepDone = 0;
-		return null;
 	}
 
 	/**
-	 * Where its feet would stand at the block whose middle is {@code x}, {@code z}: the highest floor
-	 * there, from a jump above {@code feet} to a drop below, its body fitting on it; NaN for none.
+	 * A pathfinding walk's search, all at once, from where it stands (the last block's middle it
+	 * reached) for its way back onto its line past where it must come back ({@link #searchPast}): its
+	 * stride to there, then on to its target; true, or, finding none, blocked (no one block to name,
+	 * its face toward its target), on the last block's middle it reached.
 	 */
-	private double floorAt(double x, double z, double feet) {
-		int top = Mth.floor(feet + GolemSteps.MAX_JUMP);
-		int bottom = Mth.floor(feet) - GolemSteps.MAX_DROP - 1;
-		for (int y = top; y >= bottom; y--) {
-			BlockPos at = BlockPos.containing(x, y, z);
-			var shape = level().getBlockState(at).getCollisionShape(level(), at, net.minecraft.world.phys.shapes.CollisionContext.of(this));
-			if (shape.isEmpty()) {
-				continue;
-			}
-			double surface = y + shape.max(net.minecraft.core.Direction.Axis.Y);
-			if (surface > feet + GolemSteps.MAX_JUMP + HAIR || surface < feet - GolemSteps.MAX_DROP - HAIR) {
-				continue;
-			}
-			if (fits(x, surface, z)) {
-				return surface;
-			}
+	private boolean search() {
+		double past = searchPast;
+		searchPast = Double.NaN;
+		Vec3 here = position();
+		Vec3 stand = stride != null ? stride.stand() : here;
+		Vec3 from = new Vec3(Math.floor(stand.x) + 0.5, stride != null ? stand.y : getY(), Math.floor(stand.z) + 0.5);
+		GolemWayfinder.Way way = GolemWayfinder.search(this, from, lineFrom, walkTo, past);
+		if (way.points() == null) {
+			setPos(stand.x, stand.y, stand.z);
+			String face = faceOf(walkTo.subtract(position()).multiply(1, 0, 1)); // (across: its target's way, whatever its height)
+			endWalk();
+			robotics.blocked("", face);
+			return false;
 		}
-		return Double.NaN;
-	}
-
-	/** Whether its body fits with its feet at {@code x}, {@code y}, {@code z}. */
-	private boolean fits(double x, double y, double z) {
-		return level().noCollision(this, getBoundingBox().move(x - getX(), y - getY(), z - getZ()));
+		List<Vec3> points = new ArrayList<>();
+		points.add(here);
+		points.addAll(way.points());
+		wayEnds = points.size() - 1; // (its way's end: back on its line; on from there to its target)
+		points.add(walkTo);
+		stride = new GolemStride(new GolemGround(this, true), points, getY(), goal, true);
+		return true;
 	}
 
 	/** Faces {@code yaw}, all of it: its body, its head. */
@@ -1845,8 +1781,9 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	}
 
 	/**
-	 * Fluids are air to it (the user's, 2026-11-13): it neither floats nor swims, sinking through
-	 * water or lava as through air, walking the bottom, its tools as on land; no current pushes it.
+	 * No fluid moves it (the user's, 2026-11-13): it neither floats nor swims, sinking through water
+	 * as through air, walking the bottom, its tools as on land; no current pushes it. (Its moves pass
+	 * water and are barred by every other fluid, the user's, 2026-11-14: GolemGround.bars.)
 	 */
 	@Override
 	public boolean isAffectedByFluids() {

@@ -24,6 +24,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.PressurePlateBlock;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * A golem's flight (user design, 2026-10-25): on its thrusters ({@code fly}, {@code hover}) its
@@ -722,6 +723,63 @@ public class GolemFlightGameTest {
 			.thenExecute(() -> helper.assertTrue(golem.legs() && !golem.thrusting(), "on its legs still, its thrusters off"))
 			.thenSucceed();
 	}
+
+	/**
+	 * Every move's rule (the user's, 2026-11-14: water passes, every other fluid blocks): a flight
+	 * into lava is blocked by it, met on its front, and hovers short of it.
+	 */
+	@GameTest(maxTicks = 200)
+	public void aFlightIntoLavaIsBlockedByIt(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
+		helper.setBlock(AT.east(3), Blocks.LAVA);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().fly(args(4.0)))
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its flight ended"))
+			.thenExecute(() -> {
+				same(helper, GameTests.withoutCall(events.getFirst()), java.util.Map.of("event", "fly", "ok", false, "why", "blocked", "name", "minecraft:lava", "face", "front"),
+					"by the lava");
+				double went = golem.getX() - helper.absoluteVec(Vec3.atBottomCenterOf(AT)).x;
+				helper.assertTrue(went > 1 && went < 2.5, "short of the lava: " + went);
+				helper.assertTrue(golem.thrusting(), "hovering");
+			})
+			.thenSucceed();
+	}
+
+	/**
+	 * With pathfinding, a flight's way never goes through lava: down a lane walled in all round (its
+	 * ceiling a block over its floor), lava across it, a flight to its far end has no way, blocked at
+	 * once before it takes off. (Its way through the lava, the game's way for fliers, was found before.)
+	 */
+	@GameTest(maxTicks = 100)
+	public void withPathfindingAFlightsWayNeverGoesThroughLava(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
+		for (int x = -1; x <= FLIGHT_LANE; x++) {
+			for (int z = -1; z <= 1; z++) {
+				helper.setBlock(AT.offset(x, 1, z), Blocks.STONE); // (its ceiling)
+				if (z != 0 || x < 0 || x == FLIGHT_LANE) {
+					helper.setBlock(AT.offset(x, 0, z), Blocks.STONE); // (its walls and ends)
+				}
+			}
+		}
+		helper.setBlock(AT.east(2), Blocks.LAVA);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> {
+				golem.robotics().setPathfinding(args(true));
+				same(helper, golem.robotics().fly(args(4.0)).first(), true, "a command");
+			})
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its flight ended"))
+			.thenExecute(() -> {
+				same(helper, GameTests.withoutCall(events.getFirst()), java.util.Map.of("event", "fly", "ok", false, "why", "blocked", "name", "", "face", "front"),
+					"no way but through the lava");
+				helper.assertTrue(golem.legs() && !golem.thrusting(), "on its legs still, its thrusters off");
+			})
+			.thenSucceed();
+	}
+
+	/** How long the lava flight's lane is, in blocks east of where it stands (its end wall's). */
+	private static final int FLIGHT_LANE = 6;
 
 	/** How far the pit tests go: as far as the old limit, 64 blocks (a long way, no limit of its own now). */
 	private static final double FAR = 64;

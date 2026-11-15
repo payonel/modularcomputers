@@ -17,12 +17,12 @@ import net.minecraft.world.level.pathfinder.PathFinder;
 import net.minecraft.world.level.pathfinder.WalkNodeEvaluator;
 
 /**
- * The golem's pathfinding in mazes (generated, seeded): a walk with pathfinding goes as far as it's
- * told, its way found by its wayfinder in legs (GolemWayfinder), round a maze longer than the game's
- * pathfinder's range, and ends blocked where no way comes nearer; a stop and a load mid-way keep
- * its rules. And what a search costs the server thread, logged: the game's pathfinder by its range
- * and a maze's size, reachable or not, and its ways compared searched at once, a step at a time,
- * a step to the next chunks at a time, and by the wayfinder.
+ * The golem's pathfinding (the user's, 2026-11-14: Bug2's): a walk with pathfinding goes along its
+ * line as far as it's told, round what's on it and back onto it (GolemWayfinder), and ends blocked
+ * where no way back onto it is within its range; a stop and a load mid-way keep its rules. And what
+ * a search costs the server thread, logged, in mazes and open floors (generated, seeded): the game's
+ * pathfinder by its range and a maze's size, reachable or not, its ways compared searched at once, a
+ * step at a time, a step to the next chunks at a time; and the wayfinder's one search.
  */
 public class GolemPathfindingGameTest {
 	/**
@@ -43,16 +43,19 @@ public class GolemPathfindingGameTest {
 	/** Each search's repetitions: the median and the worst are logged. */
 	private static final int REPEATS = 3;
 	/**
-	 * The walks' maze: a long one, 52 cells east (straight across, 102 blocks: past the game's
-	 * pathfinder's range of 96) and 2 south, its way round longer still.
+	 * The walks' corridor: a long one, 52 cells east (straight across, 102 blocks: past the
+	 * pathfinding range of 96) and 2 south (5 blocks), open, its line along its north row.
 	 */
 	private static final int LONG_ACROSS = 52;
 	private static final int LONG_DEEP = 2;
 	/** How far east its last cell is from its first, in blocks. */
 	private static final long ACROSS = (LONG_ACROSS - 1) * Maze.PITCH;
-	/** The load test's maze, 12 cells east (and LONG_DEEP south): its way within a leg's range; and its walk, to its last cell. */
+	/** Where pillars stand on the long corridor's line, in blocks east of its corner: each gone round. */
+	private static final int[] PILLARS = {30, 70};
+	/** The load test's corridor, 12 cells east (and LONG_DEEP south); its walk, to its last cell; a pillar on its line past where the load finds it. */
 	private static final int LOAD_ACROSS = 12;
 	private static final long LOAD_WALK = (LOAD_ACROSS - 1) * Maze.PITCH;
+	private static final int LOAD_PILLAR = 17;
 
 	/** What a search took: server time, memory allocated, whether it reached, the way's nodes, nodes it explored. */
 	record Search(long nanos, long bytes, Path path, int explored) {
@@ -154,54 +157,34 @@ public class GolemPathfindingGameTest {
 	}
 
 	/**
-	 * A walk by the wayfinder (the mod's own search, a slice of server time a tick): legs of the
-	 * pathfinding range each, the next from the last's end while it comes nearer.
+	 * A search by the wayfinder (the mod's own, all at once in a tick: its way back onto a walk's line,
+	 * the line from {@code start} to {@code target}, farther along it than {@code share} of it), timed
+	 * over repeats: the median and the worst, the memory, what it explored against its cap.
 	 */
-	private static String wayfinder(ServerLevel level, BlockPos start, BlockPos target) {
+	private static String wayfinder(ServerLevel level, BlockPos start, BlockPos target, double share) {
 		BotGolem probe = probe(level, start);
-		double best = Math.sqrt(start.distSqr(target));
-		long total = 0, worst = 0, bytes = 0;
-		int legs = 0, slices = 0, walked = 0, explored = 0;
-		boolean reached = false;
-		while (legs < 1000) {
-			legs++;
+		net.minecraft.world.phys.Vec3 from = net.minecraft.world.phys.Vec3.atBottomCenterOf(start), to = net.minecraft.world.phys.Vec3.atBottomCenterOf(target);
+		double past = share * from.subtract(to).horizontalDistance();
+		long[] nanos = new long[REPEATS];
+		long bytes = 0;
+		com.payonel.modularcomputers.entity.GolemWayfinder.Way way = null;
+		for (int i = 0; i < REPEATS; i++) {
 			long allocated = THREADS.getCurrentThreadAllocatedBytes();
-			var finder = new com.payonel.modularcomputers.entity.GolemWayfinder(probe, target);
-			while (true) {
-				long began = System.nanoTime();
-				boolean done = finder.search(com.payonel.modularcomputers.entity.GolemWayfinder.NANOS_PER_TICK);
-				long took = System.nanoTime() - began;
-				total += took;
-				worst = Math.max(worst, took);
-				slices++;
-				if (done) {
-					break;
-				}
-			}
-			Path way = finder.way();
-			bytes = Math.max(bytes, THREADS.getCurrentThreadAllocatedBytes() - allocated);
-			explored += finder.explored();
-			if (way == null) {
-				break;
-			}
-			walked += way.getNodeCount() - 1;
-			if (finder.reached()) {
-				reached = true;
-				break;
-			}
-			BlockPos end = way.getEndNode().asBlockPos();
-			double left = Math.sqrt(end.distSqr(target));
-			if (left > best - 1) {
-				break;
-			}
-			best = left;
-			probe.snapTo(end.getX() + 0.5, end.getY(), end.getZ() + 0.5, 0, 0);
+			long began = System.nanoTime();
+			way = com.payonel.modularcomputers.entity.GolemWayfinder.search(probe, from, from, to, past);
+			nanos[i] = System.nanoTime() - began;
+			bytes = THREADS.getCurrentThreadAllocatedBytes() - allocated;
 		}
 		probe.discard();
-		return String.format("wayfinder: %s after %2d legs, %5d explored, %4d blocks walked, %8.3f ms in all over %3d slices, %6.3f ms worst slice, %6d KB a leg%s",
-			reached ? "reached" : "stuck  ", legs, explored, walked, total / 1e6, slices, worst / 1e6, bytes / 1024,
-			reached ? "" : String.format(", %.0f blocks short", best));
+		java.util.Arrays.sort(nanos);
+		int cap = com.payonel.modularcomputers.entity.GolemWayfinder.NODES_PER_BLOCK * com.payonel.modularcomputers.entity.GolemWayfinder.range();
+		return String.format("wayfinder, back on its line past %3.0f%% of it: %s, explored %5d of %d, way %3d blocks, %7.3f ms median, %7.3f ms worst, %6d KB",
+			share * 100, way.points() != null ? "found" : "none ", way.explored(), cap, way.points() == null ? 0 : way.points().size() - 1,
+			nanos[REPEATS / 2] / 1e6, nanos[REPEATS - 1] / 1e6, bytes / 1024);
 	}
+
+	/** How far along its line the stress test's searches must come back onto it: at once (a wall's detour), halfway, and only at its end (its target: the worst, when it's sealed in). */
+	private static final double[] PASTS = {0, 0.5, 1};
 
 	/** The pathfinder's cost in mazes, logged (no assertion on time: a loaded host's timing is its own). */
 	@GameTest(maxTicks = 2000)
@@ -233,7 +216,9 @@ public class GolemPathfindingGameTest {
 			for (float range : new float[] {16, 32, 96}) {
 				steps.add(() -> log.add("  progressive " + progressive(level, maze[0].cell(0, 0), maze[0].cell(cells - 1, cells - 1), range, -1)));
 			}
-			steps.add(() -> log.add("  " + wayfinder(level, maze[0].cell(0, 0), maze[0].cell(cells - 1, cells - 1))));
+			for (double share : PASTS) {
+				steps.add(() -> log.add("  " + wayfinder(level, maze[0].cell(0, 0), maze[0].cell(cells - 1, cells - 1), share)));
+			}
 			for (int chunks : new int[] {1, 2}) { // (last: a region cut off at chunks leaves the world's cache of places wrong at its edges)
 				steps.add(() -> log.add("  progressive " + progressive(level, maze[0].cell(0, 0), maze[0].cell(cells - 1, cells - 1), 16 * chunks + 16, chunks)));
 			}
@@ -243,7 +228,9 @@ public class GolemPathfindingGameTest {
 				maze[0].build(level);
 				log.add("  sealed (unreachable):");
 			});
-			steps.add(() -> log.add("  " + wayfinder(level, maze[0].cell(0, 0), maze[0].cell(cells - 1, cells - 1))));
+			for (double share : PASTS) {
+				steps.add(() -> log.add("  " + wayfinder(level, maze[0].cell(0, 0), maze[0].cell(cells - 1, cells - 1), share)));
+			}
 			for (float range : RANGES) {
 				steps.add(() -> {
 					BotGolem probe = probe(level, maze[0].cell(0, 0));
@@ -258,7 +245,9 @@ public class GolemPathfindingGameTest {
 				maze[0].build(level);
 				log.add("  open floor, target sealed in (unreachable):");
 			});
-			steps.add(() -> log.add("  " + wayfinder(level, maze[0].cell(0, 0), maze[0].cell(cells - 1, cells - 1))));
+			for (double share : PASTS) {
+				steps.add(() -> log.add("  " + wayfinder(level, maze[0].cell(0, 0), maze[0].cell(cells - 1, cells - 1), share)));
+			}
 			for (float range : RANGES) {
 				steps.add(() -> {
 					BotGolem probe = probe(level, maze[0].cell(0, 0));
@@ -295,6 +284,18 @@ public class GolemPathfindingGameTest {
 		maze.forceChunks(helper.getLevel());
 		maze.build(helper.getLevel());
 		return maze;
+	}
+
+	/** An open corridor over the test, {@code up} blocks over its space, its chunks kept loaded, pillars on its first row (blocks east of its corner). */
+	private static Maze corridor(GameTestHelper helper, int across, int deep, int up, int... pillars) {
+		Maze corridor = new Maze(across, deep, SEED, helper.absolutePos(new BlockPos(0, up, 0)));
+		corridor.open();
+		for (int x : pillars) {
+			corridor.wall(x, 1, true);
+		}
+		corridor.forceChunks(helper.getLevel());
+		corridor.build(helper.getLevel());
+		return corridor;
 	}
 
 	/** A golem with pathfinding on, on a maze's first cell, facing east (its forward), its program waiting. */
@@ -347,21 +348,20 @@ public class GolemPathfindingGameTest {
 	}
 
 	/**
-	 * A walk past the game's pathfinder's range (102 blocks east; its way round the maze longer) finds
-	 * its way, and ends exactly on its target's middle, facing as it was. (The game's pathfinder alone
-	 * found no way there: blocked, seen failing.)
+	 * A walk past the pathfinding range (102 blocks east) goes along its line however far (only a
+	 * search has a range), round the pillars on it, and ends exactly on its target's middle, facing
+	 * as it was.
 	 */
 	@GameTest(maxTicks = 6000)
-	public void aWalkPastThePathfindersRangeFindsItsWayRoundAMaze(GameTestHelper helper) {
-		Maze maze = maze(helper, LONG_ACROSS, LONG_DEEP, REACH_UP);
-		ModularComputers.LOGGER.info("The long maze's way: {} blocks, {} straight", maze.wayLength(0, 0, LONG_ACROSS - 1, 0), ACROSS);
+	public void aWalkPastTheRangeGoesAlongItsLineRoundWhatsOnIt(GameTestHelper helper) {
+		Maze maze = corridor(helper, LONG_ACROSS, LONG_DEEP, REACH_UP, PILLARS);
 		BotGolem golem = golemIn(helper, maze);
 		List<Object> events = events(helper, golem);
 		helper.startSequence()
 			.thenExecuteAfter(3, () -> helper.assertTrue(!golem.robotics().walk(args(ACROSS)).failed(), "it starts"))
 			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its walk ended"))
 			.thenExecute(() -> {
-				same(helper, last(events), WALKED, "round the maze");
+				same(helper, last(events), WALKED, "round the pillars");
 				same(helper, position(golem), at(ACROSS, 0, 0), "exactly there");
 				same(helper, real(golem), at(ACROSS, 0, 0), "really there");
 				same(helper, golem.getYRot(), BotGolemGameTest.EAST, "facing as it was");
@@ -370,9 +370,9 @@ public class GolemPathfindingGameTest {
 	}
 
 	/**
-	 * A walk to where no way goes (a corridor's end walls it in, its target 200 blocks on) walks as
-	 * near as its way goes, and once no way comes nearer, ends blocked there, on the last middle it
-	 * reached, no one block to name, its face toward its target.
+	 * A walk to where no way goes (a corridor's end walls it in, its target 200 blocks on) walks its
+	 * line to the wall, finds no way back onto it past the wall, and ends blocked there, on the last
+	 * middle it reached, no one block to name, its face toward its target.
 	 */
 	@GameTest(maxTicks = 300)
 	public void aWalkWithNoWayNearerEndsBlockedOnTheLastMiddleItReached(GameTestHelper helper) {
@@ -396,7 +396,7 @@ public class GolemPathfindingGameTest {
 	 */
 	@GameTest(maxTicks = 400)
 	public void aStopMidWayStopsItWhereItIsAndItsWayWithIt(GameTestHelper helper) {
-		Maze maze = maze(helper, LONG_ACROSS, LONG_DEEP, STOP_UP);
+		Maze maze = corridor(helper, LONG_ACROSS, LONG_DEEP, STOP_UP);
 		BotGolem golem = golemIn(helper, maze);
 		List<Object> events = events(helper, golem);
 		net.minecraft.world.phys.Vec3[] stopped = new net.minecraft.world.phys.Vec3[1];
@@ -423,15 +423,13 @@ public class GolemPathfindingGameTest {
 
 	/**
 	 * Saved mid-way, a walk goes on after the load (the user's): given again as it was, from where its
-	 * last command left it, its way found afresh from where it is, and it ends where it would have.
-	 * (Its robotics as a load restores it: what was saved, then its program running again.) Its maze's
-	 * way is within one leg's range from anywhere in it, so where the load finds it doesn't decide the
-	 * way (a leg from some places in a longer maze ends in a dead end, blocked: the range's rule).
+	 * last command left it (its line the same), on from where it is, round the pillar past where the
+	 * load found it, and it ends where it would have. (Its robotics as a load restores it: what was
+	 * saved, then its program running again.)
 	 */
 	@GameTest(maxTicks = 6000)
 	public void savedMidWayAWalkGoesOnAfterALoadAndEndsWhereItWouldHave(GameTestHelper helper) {
-		Maze maze = maze(helper, LOAD_ACROSS, LONG_DEEP, LOAD_UP);
-		helper.assertTrue(maze.wayLength(0, 0, LOAD_ACROSS - 1, 0) <= com.payonel.modularcomputers.entity.GolemWayfinder.range(), "its way within one leg");
+		Maze maze = corridor(helper, LOAD_ACROSS, LONG_DEEP, LOAD_UP, LOAD_PILLAR);
 		BotGolem golem = golemIn(helper, maze);
 		List<Object> events = events(helper, golem);
 		helper.startSequence()
@@ -441,6 +439,7 @@ public class GolemPathfindingGameTest {
 			})
 			.thenExecuteAfter(60, () -> {
 				helper.assertTrue(events.isEmpty(), "still walking");
+				helper.assertTrue(golem.getX() < maze.corner.getX() + LOAD_PILLAR - 1, "short of the pillar: " + golem.getX());
 				var saved = golem.robotics().saved();
 				golem.robotics().accepting(false); // (its program gone: its robotics stops, as at a save's load)
 				golem.robotics().restore(saved);
@@ -461,9 +460,10 @@ public class GolemPathfindingGameTest {
 	private static final int WALL_REACH = com.payonel.modularcomputers.entity.GolemWayfinder.DEFAULT_RANGE + 8;
 
 	/**
-	 * A leg searches only the pathfinding range (the user's, 2026-11-14: 96 blocks walked): its target
-	 * just over a wall whose ends are farther than that, it finds no way nearer, and is blocked where
-	 * it got, on the last middle it reached, no one block to name, its face toward its target.
+	 * A search goes only the pathfinding range (the user's, 2026-11-14: 96 blocks walked): its target
+	 * just over a wall whose ends are farther than that, it finds no way back onto its line past the
+	 * wall, and is blocked where it got, on the last middle it reached, no one block to name, its face
+	 * toward its target.
 	 */
 	@GameTest(maxTicks = 1200)
 	public void aWayRoundFartherThanTheRangeIsBlocked(GameTestHelper helper) {
@@ -505,6 +505,249 @@ public class GolemPathfindingGameTest {
 			.thenSucceed();
 	}
 
+	// ---- its line (the user's, 2026-11-14: Bug2's) ----------------------------------------------
+
+	/**
+	 * How far over the test's space the line tests build, in blocks: over every maze and wall here, and
+	 * apart (each a field's floor and walls, and the air over them).
+	 */
+	private static final int ROUND_UP = 76;
+	private static final int PLACED_UP = 80;
+	private static final int NO_WAY_UP = 84;
+	private static final int ONE_TICK_UP = 88;
+	/** The line tests' field, in cells (21 blocks east, 13 south), the golem's row its middle one, and its walk east along it. */
+	private static final int FIELD_ACROSS = 10;
+	private static final int FIELD_DEEP = 6;
+	private static final int FIELD_ROW = FIELD_DEEP * Maze.PITCH / 2;
+	private static final long FIELD_WALK = 16;
+	/** Where the wall across its line stands, in blocks east of the field's corner (the golem starts 1 east), and how far it reaches either side of the line. */
+	private static final int WALL_AT = 8;
+	private static final int WALL_SIDE = 2;
+	/** How far off its line it may be seen walking it, in blocks: a hair. */
+	private static final double ON_LINE = 0.01;
+	/** How far off its line the line's rule says it's on it, in blocks (the user's: a middle within a block of it). */
+	private static final double NEAR_LINE = 1;
+
+	/** An open field (stone, walled in all round) over the test, {@code up} blocks over its space, a wall across its golem's line or not. */
+	private static Maze field(GameTestHelper helper, int up, boolean wall, int side) {
+		Maze field = new Maze(FIELD_ACROSS, FIELD_DEEP, SEED, helper.absolutePos(new BlockPos(0, up, 0)));
+		field.open();
+		if (wall) {
+			for (int z = FIELD_ROW - side; z <= FIELD_ROW + side; z++) {
+				field.wall(WALL_AT, z, true);
+			}
+		}
+		field.forceChunks(helper.getLevel());
+		field.build(helper.getLevel());
+		return field;
+	}
+
+	/** A golem with pathfinding on, in a field's row, a block in from its west wall, facing east. */
+	private static BotGolem golemAt(GameTestHelper helper, BlockPos at) {
+		BotGolem golem = GolemFlightGameTest.golem(helper, false);
+		golem.snapTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, BotGolemGameTest.EAST, 0);
+		golem.setYBodyRot(BotGolemGameTest.EAST);
+		golem.setYHeadRot(BotGolemGameTest.EAST);
+		golem.robotics().setPathfinding(args(true));
+		return golem;
+	}
+
+	/** Where it is each tick, from where it started (east, south). */
+	private static List<net.minecraft.world.phys.Vec3> track(GameTestHelper helper, BotGolem golem, BlockPos from) {
+		List<net.minecraft.world.phys.Vec3> track = new ArrayList<>();
+		net.minecraft.world.phys.Vec3 start = net.minecraft.world.phys.Vec3.atBottomCenterOf(from);
+		helper.onEachTick(() -> track.add(golem.position().subtract(start)));
+		return track;
+	}
+
+	/**
+	 * A wall across its line, within its range (Bug2's way, the user's): it walks the line till the
+	 * wall, goes round it, comes back onto the line past it (a block from it at most), and goes on to
+	 * its target, ending exactly on its middle, facing as it was. (Its old way, the shortest, left the
+	 * line from the start: seen failing.)
+	 */
+	@GameTest(maxTicks = 600)
+	public void aWallAcrossItsLineIsGoneRoundAndItComesBackOntoTheLine(GameTestHelper helper) {
+		Maze field = field(helper, ROUND_UP, true, WALL_SIDE);
+		BlockPos from = field.corner.offset(1, 0, FIELD_ROW);
+		BotGolem golem = golemAt(helper, from);
+		List<Object> events = events(helper, golem);
+		List<net.minecraft.world.phys.Vec3> track = track(helper, golem, from);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> {
+				track.clear();
+				golem.robotics().walk(args(FIELD_WALK));
+			})
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its walk ended"))
+			.thenExecute(() -> {
+				same(helper, last(events), WALKED, "round the wall");
+				same(helper, position(golem), at(FIELD_WALK, 0, 0), "exactly there");
+				same(helper, golem.getYRot(), BotGolemGameTest.EAST, "facing as it was");
+				var left = track.stream().filter(at -> Math.abs(at.z) > ON_LINE).findFirst().orElse(null);
+				helper.assertTrue(left != null && left.x >= WALL_AT - 3, "on its line till the wall: it left it at " + left);
+				helper.assertTrue(track.stream().anyMatch(at -> Math.abs(at.z) > WALL_SIDE), "round the wall");
+				helper.assertTrue(track.stream().filter(at -> at.x > WALL_AT + 3).allMatch(at -> Math.abs(at.z) <= NEAR_LINE + ON_LINE),
+					"back on its line past it: " + track.stream().filter(at -> at.x > WALL_AT + 3).mapToDouble(at -> Math.abs(at.z)).max());
+			})
+			.thenSucceed();
+	}
+
+	/**
+	 * A wall put across its line as it walks it (something it didn't know of): it's stopped by it,
+	 * searches once from there, and goes round, ending exactly there.
+	 */
+	@GameTest(maxTicks = 600)
+	public void aWallPutAcrossItsLineAsItWalksIsGoneRound(GameTestHelper helper) {
+		Maze field = field(helper, PLACED_UP, false, 0);
+		BlockPos from = field.corner.offset(1, 0, FIELD_ROW);
+		BotGolem golem = golemAt(helper, from);
+		List<Object> events = events(helper, golem);
+		List<net.minecraft.world.phys.Vec3> track = track(helper, golem, from);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(FIELD_WALK)))
+			.thenWaitUntil(() -> helper.assertTrue(golem.getX() - from.getX() > 3, "on its way"))
+			.thenExecute(() -> wallAcross(helper, field, WALL_SIDE))
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its walk ended"))
+			.thenExecute(() -> {
+				same(helper, last(events), WALKED, "round the wall");
+				same(helper, position(golem), at(FIELD_WALK, 0, 0), "exactly there");
+				helper.assertTrue(track.stream().anyMatch(at -> Math.abs(at.z) > WALL_SIDE), "round the wall");
+			})
+			.thenSucceed();
+	}
+
+	/**
+	 * A wall put right across the field as it walks (no way round): it's stopped by it, searches, finds
+	 * no way back onto its line past it, and is blocked, no one block to name, on the last middle it
+	 * reached, its face toward its target.
+	 */
+	@GameTest(maxTicks = 600)
+	public void aWallPutAcrossItsLineWithNoWayRoundBlocksIt(GameTestHelper helper) {
+		Maze field = field(helper, NO_WAY_UP, false, 0);
+		BlockPos from = field.corner.offset(1, 0, FIELD_ROW);
+		BotGolem golem = golemAt(helper, from);
+		List<Object> events = events(helper, golem);
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(FIELD_WALK)))
+			.thenWaitUntil(() -> helper.assertTrue(golem.getX() - from.getX() > 3, "on its way"))
+			.thenExecute(() -> wallAcross(helper, field, FIELD_ROW))
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its walk ended"))
+			.thenExecute(() -> {
+				same(helper, last(events), java.util.Map.of("event", "walk", "ok", false, "why", "blocked", "name", "", "face", "front"), "no way round");
+				same(helper, position(golem), at(WALL_AT - 2, 0, 0), "against the wall, on its middle");
+			})
+			.thenSucceed();
+	}
+
+	/** How far over the test's space the notice test builds, in blocks: over the other line tests. */
+	private static final int ON_ITS_WAY_UP = 92;
+
+	/**
+	 * A block put on the way its search found, as it goes round a wall (something that way didn't
+	 * expect): it says so once, a notice (the user's, 2026-11-14: blocked, by that block, met on one of
+	 * its faces, where it stood then, as position gives one), searches again from there, and goes round
+	 * the wall's other side, ending exactly there. (The wall on its line, met first, is said by nothing:
+	 * its line was all it had.)
+	 */
+	@GameTest(maxTicks = 600)
+	public void aBlockPutOnItsWaySaysSoOnceAndItSearchesAgain(GameTestHelper helper) {
+		Maze field = field(helper, ON_ITS_WAY_UP, true, WALL_SIDE);
+		BlockPos from = field.corner.offset(1, 0, FIELD_ROW);
+		BotGolem golem = golemAt(helper, from);
+		List<Object> events = new ArrayList<>();
+		List<java.util.Map<String, Object>> stoodAt = new ArrayList<>();
+		helper.onEachTick(() -> {
+			Object event;
+			while ((event = golem.robotics().pull(args()).first()) != null) {
+				events.add(event);
+				stoodAt.add(real(golem)); // (where it is as it says it: it searches again in the tick it met it, and goes on at its next)
+			}
+		});
+		int[] side = {0};
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().walk(args(FIELD_WALK)))
+			.thenWaitUntil(() -> helper.assertTrue(Math.abs(golem.getZ() - (from.getZ() + 0.5)) > 1.5, "going round the wall"))
+			.thenExecute(() -> {
+				side[0] = golem.getZ() < from.getZ() + 0.5 ? -1 : 1;
+				for (int z = FIELD_ROW + side[0] * (WALL_SIDE + 1); z > 0 && z < field.sizeZ() - 1; z += side[0]) {
+					for (int y = 0; y < Maze.WALL_HEIGHT; y++) { // (the wall on to the rim, its side: the way it found)
+						helper.getLevel().setBlock(field.corner.offset(WALL_AT, y, z), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(),
+							net.minecraft.world.level.block.Block.UPDATE_ALL);
+					}
+				}
+			})
+			.thenWaitUntil(() -> helper.assertTrue(!walks(events).isEmpty(), "its walk ended"))
+			.thenExecute(() -> {
+				List<Integer> notices = new ArrayList<>();
+				for (int i = 0; i < events.size(); i++) {
+					if (events.get(i) instanceof java.util.Map<?, ?> m && "notice".equals(m.get("event")) && "blocked".equals(m.get("why"))) {
+						notices.add(i);
+					}
+				}
+				same(helper, notices.size(), 1, "one notice: " + events);
+				var notice = (java.util.Map<?, ?>) events.get(notices.getFirst());
+				same(helper, notice.get("name"), "minecraft:stone", "by the block put on its way");
+				helper.assertTrue(java.util.Set.of("front", "back", "left", "right").contains(notice.get("face")), "met on a face of its: " + notice);
+				same(helper, notice.get("position"), stoodAt.get(notices.getFirst()), "where it stood");
+				same(helper, last(events), WALKED, "round the wall's other side");
+				same(helper, position(golem), at(FIELD_WALK, 0, 0), "exactly there");
+			})
+			.thenSucceed();
+	}
+
+	/** A wall put across a field's row at {@link #WALL_AT}, {@code side} blocks either side of it, too high to jump. */
+	private static void wallAcross(GameTestHelper helper, Maze field, int side) {
+		for (int z = FIELD_ROW - side; z <= FIELD_ROW + side; z++) {
+			for (int y = 0; y < Maze.WALL_HEIGHT; y++) {
+				helper.getLevel().setBlock(field.corner.offset(WALL_AT, y, z), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(),
+					net.minecraft.world.level.block.Block.UPDATE_ALL);
+			}
+		}
+	}
+
+	/** The one-tick test's field, in cells a side (97 blocks: thousands of places on its side of the wall, more than a search's cap). */
+	private static final int WIDE_CELLS = 48;
+
+	/**
+	 * A search fits in a tick (the user's: it moves or is blocked within a server tick): against a
+	 * wall right across a wide field, with nothing past it to come back to its line on, its walk is
+	 * blocked by the tick after the one it was given in.
+	 */
+	@GameTest(maxTicks = 600)
+	public void aSearchWithNoWayEndsTheWalkByTheNextTick(GameTestHelper helper) {
+		Maze field = new Maze(WIDE_CELLS, SEED, helper.absolutePos(new BlockPos(0, ONE_TICK_UP, 0)));
+		field.open();
+		int middle = WIDE_CELLS * Maze.PITCH / 2;
+		for (int z = 1; z < field.sizeZ() - 1; z++) {
+			field.wall(middle + 1, z, true); // (right in front of it)
+		}
+		field.forceChunks(helper.getLevel());
+		field.build(helper.getLevel());
+		BotGolem golem = golemAt(helper, field.corner.offset(middle, 0, middle));
+		List<Object> events = events(helper, golem);
+		long[] given = {-1};
+		long[] ended = {-1};
+		helper.onEachTick(() -> {
+			if (ended[0] < 0 && !walks(events).isEmpty()) {
+				ended[0] = helper.getTick();
+			}
+		});
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> {
+				given[0] = helper.getTick();
+				golem.robotics().walk(args(10L));
+			})
+			.thenWaitUntil(() -> helper.assertTrue(ended[0] >= 0, "its walk ended"))
+			.thenExecute(() -> {
+				same(helper, GameTests.withoutCall(walks(events).getFirst()), java.util.Map.of("event", "walk", "ok", false, "why", "blocked", "name", "", "face", "front"), "no way");
+				helper.assertTrue(ended[0] - given[0] <= ONE_TICK, "ended " + (ended[0] - given[0]) + " ticks after it was given");
+			})
+			.thenSucceed();
+	}
+
+	/** How many ticks after a walk is given its end may be seen in: the next (its tick), and the test's look after it. */
+	private static final int ONE_TICK = 2;
+
 	/** How far from the test its unloaded chunk test goes, in blocks: away from every other test's chunks. */
 	private static final int FAR_AWAY = 4096;
 
@@ -524,8 +767,8 @@ public class GolemPathfindingGameTest {
 		int edge = (chunkX << 4) + 15, z = (chunkZ << 4) + 8;
 		int surface = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, edge, z);
 		BotGolem probe = probe(level, new BlockPos(edge, surface, z));
-		var finder = new com.payonel.modularcomputers.entity.GolemWayfinder(probe, new BlockPos(edge + 8, surface, z));
-		finder.search(Long.MAX_VALUE);
+		var from = net.minecraft.world.phys.Vec3.atBottomCenterOf(new BlockPos(edge, surface, z));
+		com.payonel.modularcomputers.entity.GolemWayfinder.search(probe, from, from, from.add(8, 0, 0), 0);
 		probe.discard();
 		BlockPos ground = new BlockPos(edge + 1, surface - 1, z); // (in the chunk east, under where the search looked first)
 		level.getChunk(chunkX + 1, chunkZ);

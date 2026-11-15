@@ -52,4 +52,27 @@ public final class GolemSteps {
 		}
 		return null;
 	}
+
+	/**
+	 * Whether it may step from feet at {@code from} to feet at {@code to} on a walk with pathfinding,
+	 * whose elevation is free on its way (the user's, 2026-11-14: only its end's is {@code up}'s): up
+	 * a jump at most, down at most {@link #MAX_DROP}; null, or why not.
+	 */
+	public static Stop freeStep(double from, double to) {
+		if (to - from > MAX_JUMP + EPSILON) {
+			return Stop.HIGH;
+		}
+		if (from - to > MAX_DROP + EPSILON) {
+			return Stop.LOW;
+		}
+		return null;
+	}
+
+	/**
+	 * Whether what's in a block bars its way (the user's, 2026-11-14), every move's alike: fire, or a
+	 * fluid that isn't water (lava, any other mod's); water, still or flowing, passes as air.
+	 */
+	public static boolean bars(boolean fire, boolean fluid, boolean water) {
+		return fire || fluid && !water;
+	}
 }

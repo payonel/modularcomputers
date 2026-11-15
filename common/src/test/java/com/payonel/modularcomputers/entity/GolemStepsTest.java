@@ -44,4 +44,24 @@ class GolemStepsTest {
 		assertThat(GolemSteps.step(GROUND, 62, 63)).as("past where it was to go").isEqualTo(GolemSteps.Stop.LOW);
 		assertThat(GolemSteps.step(GROUND, 65, 60)).as("up, going down").isEqualTo(GolemSteps.Stop.HIGH);
 	}
+
+	@Test
+	void withPathfindingItsElevationIsFreeOnTheWay() {
+		assertThat(GolemSteps.freeStep(GROUND, 65)).as("a jump, whatever its walk's height").isNull();
+		assertThat(GolemSteps.freeStep(GROUND, 61)).as("three down").isNull();
+		assertThat(GolemSteps.freeStep(GROUND, 66)).isEqualTo(GolemSteps.Stop.HIGH);
+		assertThat(GolemSteps.freeStep(GROUND, 60)).isEqualTo(GolemSteps.Stop.LOW);
+	}
+
+	/**
+	 * Water passes, every other fluid bars it, and fire (the user's, 2026-11-14). The game has no fluid
+	 * but water and lava, so another mod's is the rule's else, a fluid that isn't water: as lava is.
+	 */
+	@Test
+	void waterPassesAndEveryOtherFluidAndFireBarIt() {
+		assertThat(GolemSteps.bars(false, false, false)).as("air").isFalse();
+		assertThat(GolemSteps.bars(false, true, true)).as("water, still or flowing").isFalse();
+		assertThat(GolemSteps.bars(false, true, false)).as("lava, any other mod's fluid").isTrue();
+		assertThat(GolemSteps.bars(true, false, false)).as("fire").isTrue();
+	}
 }

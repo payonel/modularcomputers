@@ -59,7 +59,7 @@ A refusal's (`Failure`'s builders) and an end's (`EventQueue`'s). Every field al
 | `symbolic_link` | `at`, `target` | a disk path met a link: the OS goes on from it |
 | `missing_inputs` | `name`, `call` | a craft's grid makes nothing (an end) |
 | `no_space` | `name`, `call` | no room for what a craft makes (an end) |
-| `blocked` | `name`, `face`, `call` | a move met something (an end, or a field's notice) |
+| `blocked` | `name`, `face`, `call` | a move met something (an end; a field's notice, without `call`; robotics' notice, `position` for `call`: a pathfinding walk's way met what it didn't expect) |
 | `stopped` | `call` | a program's `stop()` ended it (an end) |
 | `lost` | `name`, `id`, `at`, `call` | what it acted on is gone |
 | `unbreakable` | `name`, `id`, `at`, `call` | the game won't let it break (a swing's end) |
@@ -72,7 +72,7 @@ An event's `event` is the method that caused it, or one of the device's own-news
 
 | Device | Class | Own news (no method caused it) |
 |---|---|---|
-| robotics | `RoboticsDevice` | `notice` (its `why`: shove, fall, held) |
+| robotics | `RoboticsDevice` | `notice` (its `why`: shove, fall, held, blocked) |
 | energy field card | `FieldCard` | `notice` (its `why`: lost, blocked, fault) |
 | redstone card | `RedstoneCard` | `change` (a face's state) |
 | weather sensor | `WeatherCard` | `change` |
@@ -161,7 +161,7 @@ reads this table and the Fields below and checks the code against them.
 | `path` | a path on a disk | string | disk |
 | `pathfinding` | whether the robot finds its way round things | boolean | robotics |
 | `planned` | where its last command left it, as a position | table | robotics' `get` |
-| `position` | where it really is: `{forward, right, up, heading}` from its origin | table | robotics |
+| `position` | where it really is: `{forward, right, up, heading}` from its origin | table | robotics (`get`; its `blocked` notice: where it stood as it met it) |
 | `powered` | what a redstone card puts out on a face | number | redstone |
 | `progress` | how far a command got, in its arguments' terms | any | `call` |
 | `rate` | a sound format's samples a second | number | sound card |
