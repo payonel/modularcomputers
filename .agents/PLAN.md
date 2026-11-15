@@ -124,6 +124,14 @@ them. `AGENTS.md` describes the code as it is; this file is what isn't built. Ke
   block walks ending exactly, straight without pathfinding (the default), the game's pathfinder as
   a mode, walkTo/flyTo from the origin. Still to consider: whether the field card's moves should land
   on block middles too (they're exact offsets now).
+- **Golem upgrades, later** (the user's, 2026-11-14), each lifting a limit the golem has for now:
+  - **Through fire and other fluids:** lava, fire and every fluid but water stop its moves and its
+    pathfinding today (water it walks through, sinking); an upgrade could let it through.
+  - **A chunk loader:** a walk into chunks not loaded is blocked (it sees nothing there, the
+    pathfinder no floor); an upgrade could keep its chunks loaded as it goes.
+  - **Maze solving through world scanning:** pathfinding goes direct (the Bug2 kind: round what's in
+    its way, back onto its line within the pathfinding range, else blocked) and solves no mazes. With
+    scanning upgrades a program could map the world and solve them itself: a user's problem.
 - **The bot golem** (user design, 2026-10-24), next to build: an entity a block in size, an iron
   golem's look, walking as fast as a player. Its GUI is a case's (CPU, RAM, EEPROM, disk, battery,
   cards: none soldered) in the golem's own art, and it holds only a tier 1 screen. One slot holds a
