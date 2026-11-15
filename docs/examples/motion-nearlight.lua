@@ -3,7 +3,7 @@
 -- fading to 0 at the sensor's range), and goes dark when nothing moved.
 --
 -- It uses the sensor's method, pull, through its file's ioctls: each event is a table, its at holding its forward,
--- right and up numbers, with no text to parse. The sensor keeps its events (32 at most) while the program
+-- right and up numbers, with no text to parse. The sensor keeps its events (512 at most, its ring depth) while the program
 -- sleeps, so a look takes all that came since the last.
 local sys = require("sys")
 

@@ -124,17 +124,17 @@ public final class RoboticPiston implements Device, Buffered {
 		this.neighbor = neighbor;
 	}
 
-	@Method(doc = "push(face): pushes as a piston does on that face (north, south, east, west, up or down; or front, back, left, right: its front is opposite its cable), and the arm comes back on its own. A command: true at once (its event: push, once the arm is back; at once when its arm is out already, ok: nothing to do; or not ok, blocked: block, the first down its line that won't move, left out when no one block is to blame, and face, the side), or false and why it can't start (no such face); on its cable port's side its end is blocked at once, by its cable (air when it's linked by Bluetooth)")
+	@Method(doc = "push(face): pushes as a piston does on that face (north, south, east, west, up or down; or front, back, left, right: its front is opposite its cable), and the arm comes back on its own. A command: true at once (its event: push, once the arm is back; at once when its arm is out already, ok: nothing to do; or not ok, blocked: name, the first block down its line that won't move, \"\" when no one block is to blame, and face, the side), or false and why it can't start (bad_argument: no such face); on its cable port's side its end is blocked at once, by its cable (air when it's linked by Bluetooth)")
 	public Result push(Arguments args) {
 		return move(args, Motion.PUSH);
 	}
 
-	@Method(doc = "extend(face): pushes on that face and leaves the arm out until retract(face). A command: true at once (its event: extend, once it's out; at once when it's out already, ok and free; or not ok, blocked, as push's), or false and why it can't start (no such face); on its cable port's side, blocked, as push's")
+	@Method(doc = "extend(face): pushes on that face and leaves the arm out until retract(face). A command: true at once (its event: extend, once it's out; at once when it's out already, ok and free; or not ok, blocked, as push's), or false and why it can't start (bad_argument: no such face); on its cable port's side, blocked, as push's")
 	public Result extend(Arguments args) {
 		return move(args, Motion.EXTEND);
 	}
 
-	@Method(doc = "retract(face): takes the arm on that face back in (a sticky piston pulls what's in front of it). A command: true at once (its event: retract, once it's in; at once when no arm is out there, ok: nothing to do), or false and why it can't start (no such face); on its cable port's side, blocked, as push's")
+	@Method(doc = "retract(face): takes the arm on that face back in (a sticky piston pulls what's in front of it). A command: true at once (its event: retract, once it's in; at once when no arm is out there, ok: nothing to do), or false and why it can't start (bad_argument: no such face); on its cable port's side, blocked, as push's")
 	public Result retract(Arguments args) {
 		return move(args, Motion.RETRACT);
 	}

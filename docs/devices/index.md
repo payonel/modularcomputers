@@ -96,10 +96,13 @@ device that writes to and reads from every terminal.
 with no keys gives `nil`), and a slow action answers when it has started, its outcome coming later
 as an event. To wait for a device, use `board.waitForInterrupt`, then call it. See
 [Interrupts](/concepts/interrupts/#device-calls-never-wait). A device that acts over time (a robot, a
-field card, a redstone card, a robotic piston) runs [one command at a
+crafting card, a field card, a redstone card, a robotic piston) runs [one command at a
 time](/concepts/interrupts/#one-command-at-a-time): given one while another runs, it answers
 `false, {why = "busy", id}`, the id of the device whose news ends the wait (its own, or another's); that
-device's event says when to give it again.
+device's event says when to give it again. Each command ends in an event, and a device never drops
+one: given a command while its ring of unread ends is full (512 by default), it answers
+`false, {why = "limit", of = "events", max}` until its program reads some
+([No end is ever lost](/concepts/interrupts/#no-end-is-ever-lost)).
 
 A call never stops the machine. If a device is gone, or an argument is wrong, `board.invoke`
 returns `false` and its failure: a table, its `why` a word and its fields, the same for every
@@ -111,7 +114,7 @@ failure with that why (`{why = "fault", condition = "missing", part = "legs", me
 | `bad_argument` | `argument` (its position, from 1), `value` (as given), `expected` (a word: `string`, `integer`, `face`, `count`...) | it can't use an argument |
 | `not_found` | `kind` (`device`, `method`, `entity`, `file`, `container`, `slot`, `block`, `boot_entry`, `offset`...), `value` (what was named) | what it names isn't there |
 | `bad_state` | `of` (`path`, `handle`, `hold`, `slot`, `entity`), `value` (which: as named, `""` none), `expected` (the state it needs: `absent`, `empty`, `file`, `open`, `free`...) | the call is fine, but what it acts on isn't in the state it needs |
-| `limit` | `of`, `max` | over a limit |
+| `limit` | `of` (`events`, `frames`, `data`, `reach`, `disk`...), `max` | over a limit |
 | `denied` | `reason`, `value` (what was refused) | not allowed |
 | `fault` | `condition`, `part`, `message` | something wrong with the machine itself, not with how it was asked: a part it needs `missing` (`legs`, `thrusters`, `power`, `bench`, `robotics`, `body`, `position`, `projector`, `destination`, `source`), an `io_error` (its storage failed), or an `internal_error` (the mod failed: `part` the device's type, or `board`) |
 | `drifted` | `drift` | a robot off its spot |

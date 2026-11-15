@@ -366,7 +366,7 @@ public final class CraftingCard extends Card implements Buffered {
 		return bench.drop(face, given(args, at) ? slot(args, at) : 0, given(args, at + 1) ? count(args, at + 1) : Integer.MAX_VALUE);
 	}
 
-	@Method(doc = "store([face][, from[, count[, to]]]): puts items into the container at a face of the robot (in front when none is given): from one of its slots (all, or count), or with none, everything in its storage (not its grid); into the container's slot to, or where they fit: true, 0 when none of it is left; false and how many are, when there's no room; or false and why ({why = \"not_found\", kind = \"container\", value = the face})")
+	@Method(doc = "store([face][, from[, count[, to]]]): puts items into the container at a face of the robot (in front when none is given): from one of its slots (all, or count), or with none, everything in its storage (not its grid); into the container's slot to, or where they fit: true, 0 when none of it is left; false and how many are, when there's no room; or false and why ({why = \"not_found\", kind = \"container\", value = the face}, or kind = \"slot\", value = to)")
 	public Result store(Arguments args) {
 		Result no = needsRobotics();
 		if (no != null) {
@@ -379,7 +379,7 @@ public final class CraftingCard extends Card implements Buffered {
 			given(args, at + 2) ? count(args, at + 2) : 0);
 	}
 
-	@Method(doc = "take([face][, from[, count[, to]]]): takes items from the container at a face of the robot (in front when none is given): from its slot from, or the first it can; all, or count; into its own slot to (its grid's too), or where they fit in its storage: how many came")
+	@Method(doc = "take([face][, from[, count[, to]]]): takes items from the container at a face of the robot (in front when none is given): from its slot from, or the first it can; all, or count; into its own slot to (its grid's too), or where they fit in its storage: how many came; or false and why ({why = \"not_found\", kind = \"container\", value = the face}, or kind = \"slot\", value = from)")
 	public Result take(Arguments args) {
 		Result no = needsRobotics();
 		if (no != null) {

@@ -24,8 +24,9 @@
 -- How an action that runs over time went comes as an event named after it (poll's PRI; the pull
 -- ioctl: {event = "walk", ok, why}), and notices of what no program asked for ({event = "notice",
 -- why = "shove", drift}, {event = "notice", why = "fall", drift, below}; {event = "notice",
--- why = "held", id} as a field takes hold, id "" once let go).
--- containers are ioctls (scan, held, take...).
+-- why = "held", id} as a field takes hold, id "" once let go; {event = "notice", why = "blocked",
+-- name, face, position} as a pathfinding walk's way meets what it didn't expect). Its scans, hands
+-- and containers are ioctls (scan, held, take...).
 local function number(word)
   return word and tonumber(word)
 end

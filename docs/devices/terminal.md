@@ -56,8 +56,8 @@ Each terminal also has a file of its own, `/dev/terminal0` (`terminal1` for the 
 - **Poll:** always ready for `IN` (that text). Ready for `PRI` while the terminal has news: keys
   arrived since the file was last read or asked an ioctl.
 - **ioctls:** the terminal's methods below, by name, with their arguments. A method that answers
-  nothing gives `true`; a failure is `nil`, its message and `EINVAL`, or `ENODEV` once the terminal
-  is gone. `setLabel` sets its label, as on every device file.
+  nothing gives `true`; a failure is `nil`, its why, `EINVAL` and the failure itself (see
+  [/dev](/mcos/dev/)), or `ENODEV` once the terminal is gone. `setLabel` sets its label, as on every device file.
 
 <!-- lua-fragment -->
 ```lua

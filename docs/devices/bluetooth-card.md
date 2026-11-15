@@ -54,7 +54,8 @@ writable (`OUT`). Its ioctls are the card's methods, by name, in any open mode:
 sys.ioctl(fd, "setLink", "5f0c0000-0000-0000-0000-000000000000")
 ```
 
-A method that fails answers `nil`, its message and `EINVAL`; a card that is gone, `ENODEV`.
+A method that fails answers `nil`, its why, `EINVAL` and the failure itself (see [/dev](/mcos/dev/));
+a card that is gone, `ENODEV`.
 `setLabel` labels the card, as for any device (see [The sys library](/mcos/sys-api/)).
 
 ## Methods

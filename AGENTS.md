@@ -738,7 +738,7 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   bytes be read). A device with events and
   no `get` (a sensor) has a read-only file, an event a line, and a read with none waiting blocks. A
   log is a device's own window (a NIC's traffic, the internet card's requests), kept as its events
-  are (an `EventQueue`, the user's, 2026-11-06: the newest 32, an entry that pushed one out saying
+  are (an `EventQueue`, the user's, 2026-11-06: the newest as deep as its ring, `RingDepths`, an entry that pushed one out saying
   `lost`, never a silent drop), so nothing grows: a NIC's file reads its
   frames, one a line (out or in, remote address, distance, bytes, how it went); its data is read
   through sockets.

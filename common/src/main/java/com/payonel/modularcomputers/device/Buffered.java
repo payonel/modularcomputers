@@ -18,7 +18,7 @@ public interface Buffered {
 
 	/**
 	 * Why a move ended: a block in its way (the user's: one shape, wherever it's said). Its event
-	 * says which block ({@code block}, the block's id; "" when no one block can be named, never nil) and
+	 * says which block ({@code name}, the block's id; "" when no one block can be named, never nil) and
 	 * which face of what moved met it ({@code face}, in the device's own terms), as {@link EventQueue#blocked}
 	 * gives them ({@link EventQueue#blocked}, the one way it's built).
 	 */

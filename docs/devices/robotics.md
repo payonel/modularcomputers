@@ -10,9 +10,10 @@ it, and stops it; it senses the six spaces round it; and it works with what's in
 uses it on a space (places a block, opens a door, presses a button), breaks blocks and hits mobs
 with it, and moves items in and out of a container. It says how each went.
 
-The robot knows nothing of where it is in the world, not even which way is north: every face is
-named in its own frame, `front`, `back`, `left`, `right`, `up` and `down`, its left and right its own
-(as it turns and walks), and a block's direction it reads (a door's `facing`) is in that frame too.
+The robot knows nothing of where it is in the world: every face is named in its own frame,
+`front`, `back`, `left`, `right`, `up` and `down`, its left and right its own (as it turns and
+walks), and a block's direction it reads (a door's `facing`) is in that frame too. It does know
+north: `turn` can face it `north`, `south`, `east` or `west`.
 But it always knows exactly how far it is from where it started, as a real robot's odometry does:
 its [position](#where-it-is-its-position).
 
@@ -46,7 +47,10 @@ would.
 
 Four methods never wait: `get` (what it's doing now, and where it really is), `pull` (its events),
 `stop` (it stops at once), and `sync` (whether its queue is empty: mcos's sync waits on it). Under the board's own calls, a command while another runs is refused at once
-with `busy`, doing nothing (mcos turns that into the wait). A [crafting
+with `busy`, doing nothing (mcos turns that into the wait). A command given while 512 of its ends
+wait unread (its [ring depth](/concepts/interrupts/#no-end-is-ever-lost)) is refused too,
+`{why = "limit", of = "events", max = 512}`, until its program reads some with `pull`: in mcos,
+`nil`, `"limit"`, `EAGAIN` and the failure. A [crafting
 card](/devices/crafting-card/)'s commands wait for the robot's moves too, but its craft is the
 card's own: the robot is free while it crafts.
 
@@ -317,7 +321,8 @@ was breaking gone, `{why = "lost", name, id = "", at}`, its name, no id as a blo
 where it was, `{forward, right, up}` from where its last command left it), or `unbreakable` (the
 game won't let it be broken: bedrock, or a place protected from breaking, as a player's break
 there finishes its cracks and the block stays; the same fields, `{why = "unbreakable", name, id =
-"", at}`); each with its `call`, its `progress` the break so far, 0 to 1.
+"", at}`), or `drifted`, `stopped`, `interrupted` or a `fault` (see [Events](#events)); each with its
+`call`, its `progress` the break so far, 0 to 1.
 
 ### contents([face]) → list, or nil and why
 
@@ -331,8 +336,9 @@ Puts what it holds (or `count` of it) into the container at a face (in front, wh
 given), into its slot `to` or where it fits, as a hopper
 would (a furnace takes fuel from its side, what it smelts from above). One answer says it all: `true,
 0` when none of it is left in its hand (an empty hand too), else `false` and how many are left (the
-container is full), so a program never has to look again to know. It fails (nil and why) with `no
-container there`.
+container is full), so a program never has to look again to know. It fails (nil and why) with `not_found`:
+`{why = "not_found", kind = "container", value = the face}` (no container there), or `kind =
+"slot"` (no slot `to` in it).
 
 ### take([face][, slot[, count]]) → number, or nil and why
 
@@ -350,8 +356,7 @@ there and never through blocks, fire, or a fluid other than water (it's blocked 
 the fluid's block, `minecraft:lava`). It must end squared, as a walk does, its feet's height whole blocks
 from its origin too (from a slab, `fly(0, 0, 1.5)`). If it stands on its legs, they're left standing where it was: the thrusters fire red beams from
 their sockets. With no arguments, on its legs, it takes off where it stands and holds there; in
-the air, it flies back to where its last command left it. On its thrusters it walks nowhere (`no
-legs`), presses no pressure plates, and can be shoved (a `shove` notice; it stays where it was put); everything else it does as
+the air, it flies back to where its last command left it. On its thrusters it walks nowhere (a walk fails, a fault, `part = "legs"`), presses no pressure plates, and can be shoved (a `shove` notice; it stays where it was put); everything else it does as
 on its legs, as a player off the ground does it (its tools, a block breaking more slowly), and its
 other cards work. Its event, `fly`: `ok` (then it holds
 there), or not and why (`blocked`, a block over it: `name = "minecraft:stone", face = "up"`). Its thrusters cost five running CPUs' power a
@@ -402,7 +407,8 @@ Its oldest event, or nil.
 
 A robot always knows exactly how far it is from its origin, and which way it faces from the
 origin's way, as a real robot's odometry does: what it does itself (walking, flying, turning) moves
-its position. Not where it is in the world: no compass, no coordinates.
+its position. Not where it is in the world: no coordinates (`turn` can face it north, but its
+position is its origin's frame, never the world's).
 
 - **Its origin** is where it stood, on its block's middle, and the way it faced, a right angle. It's
   set the first time the golem runs (powered on, or set down), by `setPosition`, and in each
@@ -542,8 +548,9 @@ nothing else: always a command's end, never a notice.
 ### Fault
 
 A command it can't do for want of a part of itself is refused `false, {why = "fault", condition =
-"missing", part, message}`: `part` is `"legs"` (a walk on its thrusters) or `"thrusters"` (a tier 1's
-flight), and `message` says so in words (`"legs required"`: for a person to read, never to parse).
+"missing", part, message}`: `part` is `"legs"` (a walk on its thrusters), `"thrusters"` (a tier 1's
+flight), `"body"` (a robotics device with no robot body to move) or `"position"` (a body that keeps
+no position, for `walkTo`, `flyTo`, `position` and `setPosition`), and `message` says so in words (`"legs required"`: for a person to read, never to parse).
 One given while a field held it, and refused once it's let go, ends in the same shape instead:
 `{event = <method>, ok = false, why = "fault", condition = "missing", part = "legs", message, call}`.
 
@@ -555,7 +562,8 @@ how far it is off where its last command left it, in its origin's frame.
 
 ### Call
 
-A stopped, blocked or drifted end says the command it cut short: `call = {args, progress}`.
+Every end that isn't `ok` (blocked, stopped, drifted, lost, unbreakable, interrupted, or a fault)
+says the command it cut short: `call = {args, progress}`.
 `args` are the command's arguments as the program gave them (`walk(20)` is `{20}`); `progress` is
 how far it got, in their terms:
 
@@ -574,7 +582,7 @@ was going.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `walk`, `walkTo`, `fly`, `flyTo`, `turn`, `land`, `swing` | `ok`, `why` (`blocked`: and `name`, `face`; `lost`: and `name`, `id`, `at`; `drifted`: and `drift`; with those, `stopped` and `interrupted`, `call`), `result` | that command ended: `ok`, or not and why (`stopped` when a `stop` cut it short; `interrupted` when a world's save cut it short and it couldn't go on after the load); a swing's `result` is `{name, kept, dropped}` |
+| `walk`, `walkTo`, `fly`, `flyTo`, `turn`, `land`, `swing` | `ok`, `why` (`blocked`: and `name`, `face`; `lost` and `unbreakable`: and `name`, `id`, `at`; `drifted`: and `drift`; `fault`: and `condition`, `part`, `message`; `stopped`; `interrupted`; every one with its `call`), `result` | that command ended: `ok`, or not and why (`stopped` when a `stop` cut it short; `interrupted` when a world's save cut it short and it couldn't go on after the load); a swing's `result` is `{kind, name, id, kept, dropped}` |
 | `notice` | `why`, and its fields | something happened to it that no program asked for (below) |
 
 | Notice | Other fields | When |

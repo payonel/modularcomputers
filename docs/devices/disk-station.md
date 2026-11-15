@@ -51,7 +51,7 @@ The station's file is text, as a sysfs attribute is.
   as they were when it was first read; seek back to the start to read them afresh.
 - **Write**: each line written is an action, done at once: `format`, `wipe`, `clone`, `install` or
   `update`. Any other line fails the write with `EINVAL`, and so does an action the station refuses
-  (a `fault`: no disk, no power; `limit`: too big). Through `io`, a write is buffered: the line goes when the
+  (a `fault`: no disk, no power; `limit`, `of = "disk"`: the source too big for the target). Through `io`, a write is buffered: the line goes when the
   file is flushed or closed, and that call reports the failure.
 - For `sys.poll`, the file is always ready to read and to write, and never has `PRI` (the station has
   no interrupt).
@@ -76,7 +76,9 @@ local ok, why = sys.ioctl(sys.fileno(io.open("/dev/diskstation0")), "install")
 
 Every action fails with a fault, `condition = "missing"`, when it can't be done: `part = "destination"`
 (`message = "storage disk target required"`) when the target slot is empty, and `part = "power"` when
-neither the bus nor the battery can pay for it.
+neither the bus nor the battery can pay for it. An action asked for by a name that isn't one of
+these (its screen's switches ask by name) is `{why = "bad_argument", argument = 1, value = the name,
+expected = "action"}`; a line written that isn't one fails the write with `EINVAL`.
 
 ### format() → nothing
 

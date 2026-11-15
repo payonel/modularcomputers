@@ -27,6 +27,9 @@ the method's (`true` for a method that answers nothing); a method's failure is `
 word: `busy`, `fault`, `denied`...), `EINVAL`, and then the failure itself, a table of its
 why and its fields (`{why = "fault", condition = "missing", part = "legs", message = "legs required"}`: each why always
 has the same fields; a `message` is for a person to read, never to parse); a device gone is `ENODEV`.
+A command refused because its device's unread ends fill it (`{why = "limit", of = "events", max}`)
+is `EAGAIN` instead: read its events, then give it again (see
+[Interrupts](/concepts/interrupts/#no-end-is-ever-lost)).
 
 ```lua
 local sys = require("sys")
@@ -38,9 +41,9 @@ sys.close(card)
 
 A device's file is ready for `sys.poll`'s `PRI` while the device has news: its interrupt came
 since the file was last read, or an event waits in the file. Each file open on a device gets every
-event the device has (a program and a `cat` each see them all; at most 32 wait in a file, the
-oldest dropped past that, and the next says how many went, `lost`), and the file's `pull` ioctl
-takes from its own. The methods each device has are on its page.
+event the device has, from the file's open on (a program and a `cat` each see them all; at most
+32 wait in a file, and with one full mcos takes no more of the device's till it's read or closed:
+they wait in the device, nothing dropped), and the file's `pull` ioctl takes from its own. The methods each device has are on its page.
 
 A device that does [one command at a time](/concepts/interrupts/#one-command-at-a-time) (a robot,
 a crafting card, a field card, a redstone card, a robotic piston) makes an ioctl or a write given while it's busy
@@ -146,7 +149,7 @@ allowed); a read gives what the last command said.
 
 **Network card, WLAN card.** Read-only: its traffic, a line a frame, in or out: the other card's
 address (or `broadcast`), how far it is, the frame's size and how it went (`taken`; a refusal's
-why and its fields, `limit frames 32`; a broadcast's: how many took it). The card keeps its last 32 (each that pushed an older one out saying `lost`). Its data is read
+why and its fields, `limit frames 512`; a broadcast's: how many took it). The card keeps its last 512, its ring depth (each that pushed an older one out saying `lost`). Its data is read
 through [sockets](/mcos/networking/).
 
 ```

@@ -15,7 +15,7 @@ moves blocks.
 | Type | `actuator` |
 | Address | Cabled: it is known by its `id:` name |
 | Faces | Every side but the one with its cable port |
-| Interrupt | None |
+| Interrupt | Raised while a move's end waits |
 | Power | Nothing at rest; every push, extend or retract costs five ticks of a running CPU |
 | Info | none beyond the common ones |
 
@@ -49,7 +49,8 @@ Its file is `/dev/actuator0` (`actuator1` for the next; its type is `actuator`, 
 - **Write:** refused: opening it to write fails with `EACCES`.
 - **Poll:** ready for `IN` and `PRI` while a move's end is waiting to be read.
 - **ioctls:** its methods below, by name, with the face as their argument. A move that can't start is
-  `nil`, its message (`no such face: ...`) and `EINVAL`; a
+  `nil`, its why, `EINVAL` and the failure itself (`{why = "bad_argument", argument = 1, value =
+  "sideways", expected = "face"}`), or `EAGAIN` when its unread ends fill it (below); a
   piston that has left the bus (its cable cut, say) is `ENODEV`. `setLabel` sets its label, as on
   every device file.
 
@@ -64,8 +65,14 @@ local done, why = sys.ioctl(piston, "push", "front")
 ## Methods
 
 A face is named as every device names one: `north`, `south`, `east`, `west`, `up`, `down`, or `front`, `back`, `left`,
-`right`. A name that is no face fails with `no such face`; a relative name fails when the piston has
-no front it knows, or `left` and `right` when its front is up or down.
+`right`. A name that is no face fails with `{why = "bad_argument", argument = 1, value, expected =
+"face"}`, its value the name given; so does a relative name when the piston has no front it knows,
+or `left` and `right` when its front is up or down.
+
+A move given while 512 of its ends wait unread (its
+[ring depth](/concepts/interrupts/#no-end-is-ever-lost)) is refused, `{why = "limit", of = "events",
+max = 512}`, until its program reads some with `pull`; in mcos, `nil`, `"limit"`, `EAGAIN` and the
+failure.
 
 ### push(face) → true
 

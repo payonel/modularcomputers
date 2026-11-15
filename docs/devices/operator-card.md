@@ -14,7 +14,7 @@ An operator card runs server commands, as a command block does. It exists in cre
 | Type | `operator` |
 | Address | An expansion slot path such as `exp:0`, or a hub's |
 | Availability | Creative only |
-| Interrupt | None |
+| Interrupt | Raised while a log entry waits (`pull`) |
 | Info | `kind` (`operator`) |
 
 </div>
@@ -36,7 +36,7 @@ any player.
 - **Read:** its log, a line for each command it runs (any program's), from the moment the file was
   opened: the command, how many of its runs succeeded, its result and what it said. A read waits for
   the next one, so a `cat` or `tail -f` left running shows commands as they run. The card keeps its
-  last 32; a `lost n` line says some went before a reader took them.
+  last 512 (its [ring depth](/concepts/interrupts/)); a `lost n` line says some went before a reader took them.
 - **Poll:** `IN` once a line is there to read.
 - **ioctls:** its methods below, by name, in any open mode:
   `sys.ioctl(fd, "command", "time set day")`. A failure is `nil`, its why, `EINVAL` and the

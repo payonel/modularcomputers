@@ -40,7 +40,8 @@ cable are two hosts on it. Two cards in one block are on the same wire, 0 meters
 A frame sent to one card is taken, or the sender hears why not at once. The card never tries again;
 that is software's job (mcos's TCP does).
 
-- `{why = "limit", of = "frames", max = 32}`: the other card's queue is full, or no program on its
+- `{why = "limit", of = "frames", max = 512}`: the other card's queue is full (`max` its ring
+  depth: 512, unless a server's admin sets another, `network_ring_depth`), or no program on its
   computer is taking data.
 - `{why = "network", reason = "unreachable", message = "no card in reach"}`: no card at that address in reach, or it
   is off.
@@ -66,9 +67,9 @@ in 5f0c2a9e-41d7-4c4e-9b0a-2f3c4d5e6f70 0.0m 9 broadcast
 out broadcast - 4 2 took it
 ```
 
-How it went is `taken`; a refusal's why and its fields' values (`limit frames 32`, `network
+How it went is `taken`; a refusal's why and its fields' values (`limit frames 512`, `network
 unreachable no card in reach`); `broadcast` for a broadcast that came in and was taken; and `N took
-it` for one sent. The card keeps its last 32, as a device keeps its events: when more come,
+it` for one sent. The card keeps its last 512 (its ring depth), as a device keeps its events: when more come,
 the oldest go, and the entry that pushed one out says so (`lost`, a `lost n` line before it).
 
 - **Reading** gives the next line; with none waiting, a read waits for one, as a keyboard's does.
@@ -86,7 +87,8 @@ print(sys.ioctl(card, "address"))  -- this card's address
 sys.ioctl(card, "setWake", "letmein")
 ```
 
-A method's failure is `nil`, its message and `EINVAL`; a card that has gone is `ENODEV`. The
+A method's failure is `nil`, its why, `EINVAL` and the failure itself (`{why = "limit", ...}`); a
+card that has gone is `ENODEV`. The
 kernel's own ioctl `setLabel` sets the card's label (see [/dev](/mcos/dev/)).
 
 Once a program has used a socket, the kernel takes every frame the card gets, for its sockets, so
@@ -131,7 +133,7 @@ named after the method that sent it; a frame that came is the card's own news, `
 ```lua
 {event = "send", address = "5f0c2a9e-...", distance = 3.0, bytes = 42, took = 1, ok = true}
 {event = "send", address = "5f0c2a9e-...", distance = 3.0, bytes = 42, took = 0, ok = false,
- why = "limit", of = "frames", max = 32}
+ why = "limit", of = "frames", max = 512}
 {event = "send", address = "9a1b2c3d-...", distance = -1, bytes = 42, took = 0, ok = false,
  why = "network", reason = "unreachable", message = "no card in reach"}
 {event = "broadcast", bytes = 17, took = 2, ok = true}
@@ -165,7 +167,7 @@ A WLAN card's signal strength (see [WLAN Cards](/devices/wlan-card/)). On a wire
 ## Events
 
 Each frame that arrives is an event, taken with `receive`, and raises the card's interrupt; it stays
-raised while frames wait. At most 32 wait, which is the card's ring; a frame that finds it full is
+raised while frames wait. At most 512 wait, which is the card's ring (its ring depth); a frame that finds it full is
 refused as a `limit`, not dropped. Frames wait only while the card has power and a program runs on
 its computer; they are dropped when it stops. Each frame in or out also adds a line to the traffic
 log (`pull`).

@@ -87,6 +87,13 @@ Its ioctls are its methods, by name. Its events come as `sys.poll`'s `PRI`, and 
 
 ## Methods
 
+`scan`, `capture` and `move` need something to project its field from: a card with none (not in a
+computer or a robot) fails them with a fault, `{why = "fault", condition = "missing", part =
+"projector", message}`. Its commands (`capture`, `move`, `release`) are refused,
+`{why = "limit", of = "events", max = 512}`, while 512 of its ends wait unread (its
+[ring depth](/concepts/interrupts/#no-end-is-ever-lost)), until its program reads some with `pull`:
+in mcos, `nil`, `"limit"`, `EAGAIN` and the failure.
+
 ### scan([range]) → list
 
 What's within `range` (16 at most) of its computer, nearest first: creatures (players too) and items,

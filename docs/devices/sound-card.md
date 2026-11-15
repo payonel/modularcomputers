@@ -76,7 +76,8 @@ sys.ioctl(dsp, "setFormat", {block = 1024})
 ```
 
 A method's ioctl answers what the method does (`true` for one that answers nothing); its failure is
-`nil`, the card's message and `EINVAL`. `setLabel` sets the card's label, as on every device file.
+`nil`, its why, `EINVAL` and the failure itself (`{why = "bad_argument", ...}`: see
+[/dev](/mcos/dev/)). `setLabel` sets the card's label, as on every device file.
 
 ## Methods
 

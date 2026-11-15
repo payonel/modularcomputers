@@ -86,7 +86,8 @@ df                      # each mounted disk's size and use
 
 The file's ioctls are the disk's methods below, by name, with their arguments, in any open mode,
 on either format, mounted or not. A method that answers nothing gives `true`; one that fails gives
-`nil`, its message and `EINVAL`; a disk that is gone gives `ENODEV`.
+`nil`, its why, `EINVAL` and the failure itself (`{why = "not_found", ...}`: see
+[/dev](/mcos/dev/)); a disk that is gone gives `ENODEV`.
 
 <!-- lua-fragment -->
 ```lua
@@ -229,7 +230,7 @@ Commits what was written and closes. On failure the handle stays open with its w
 ## Events
 
 A disk reports every change made on it, whoever made it (this computer, another one, a Disk
-Station), as an event. The oldest is taken with `changes()`. At most 32 wait; when more come, the
+Station), as an event. The oldest is taken with `changes()`. At most 512 wait (its [ring depth](/concepts/interrupts/)); when more come, the
 oldest is dropped and the next event to arrive carries `lost`, the number dropped. Reports are kept
 across a save, and dropped when no program runs.
 

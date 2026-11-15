@@ -16,7 +16,8 @@ import java.util.Map;
  * the only way it moves (a robot never acts on its own). It walks to a point given relative to
  * itself, in its own frame (forward, right, up: it knows nothing of where it is, as a robot
  * without a GPS), turns in place, and stops. It senses the six spaces round it, named in its own
- * frame ({@link #FACES}: it knows no compass), and works with what's in its hand: uses it on a space
+ * frame ({@link #FACES}; it can turn to face north, south, east or west, but names no face by
+ * them), and works with what's in its hand: uses it on a space
  * (places a block, opens a door, presses a button), breaks a block with it (in a player's time), and
  * moves it in and out of a container. It flies on its thrusters (the user's design, 2026-10-25):
  * {@code fly} leaves its legs standing where it is and fires beams from their sockets (it walks
@@ -27,13 +28,16 @@ import java.util.Map;
  * It's buffered ({@link Buffered}): one command at a time. A command that runs over time (a walk,
  * a turn, a flight, a landing, a block's breaking) ends in its event, named after its method:
  * {@code {event = "walk", ok = false, why = "blocked", name = "minecraft:oak_log", face = "front"}}. Its commands run
- * from its <b>plan</b>, where the last one left it: a golem shoved off it in the air holds its plan
- * (it flies back, raising {@code shoved}), and a positional command given while it's off its plan (a
- * shove, a stop mid-walk) sends it back first ({@code return}'s event), refused busy until it's
- * there; falling on its legs (a block gone from under it) it's busy till it lands, its plan following
- * it down ({@code landed}). Held in a field (any field) its robotics freezes ({@code frozen}, {@code thawed}): what it
- * was doing pauses, commands are refused {@code held}, and the field's carry moves its origin with
- * it. {@code get}, {@code pull} and {@code stop} are free.
+ * from where its last command left it (only a command's end or a stop moves that point). Shoved off
+ * it (in the air, or by a piston on its legs) it stays where it was put, saying so once the shove's
+ * over ({@code notice}, {@code why = "shove"}, its {@code drift}): no way back of its own, the program
+ * corrects it ({@code walk()}, {@code fly()}) or takes where it is ({@code stop()}). A positional
+ * command given off that spot fails {@code drifted} (one answering at once) or ends so (one over
+ * time). Falling on its legs (a block gone from under it) it's busy till it lands, a {@code fall}
+ * notice as it begins and as it lands. Held in a field (any field) its robotics freezes ({@code
+ * held} notices as it's taken and let go): what it was doing pauses, a command over time given then
+ * waits till it's let go, one answering at once is refused {@code held}, and the field's carry moves
+ * its origin with it. {@code get}, {@code pull}, {@code stop} and {@code sync} are free.
  */
 public final class RoboticsDevice implements Device, Buffered {
 	/** What walking a block costs: a running CPU's tick. */
@@ -51,7 +55,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	public static final String FALLING = "falling";
 	/**
 	 * The event of whatever happened to it that no program asked for (the user's, 2026-10-29: one
-	 * type, so a program tells at once what it asked for from what came to it), {@code what} saying it.
+	 * type, so a program tells at once what it asked for from what came to it), {@code why} saying it.
 	 */
 	public static final String NOTICE = "notice";
 	/** Its commands taken while it falls (the user's): a tier 2 catches itself on its thrusters, its legs dropped. */
@@ -316,7 +320,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		this.body = body;
 	}
 
-	@Method(doc = "walk(forward[, right[, up]]): walks that far from where its last command left it, in its own frame (forward the way it faces, right to its right, up its elevation's change, whole blocks), facing as it was. It must end on a block's middle, whole blocks from its origin (within a 4096th), else it's refused, a bad argument ({why = \"bad_argument\", argument, value, expected = \"squared\"}: the one that wouldn't end squared): from a block's middle whole numbers do, and after a stop the rest of the way. It goes direct, in a straight line there (walk(3, 4) on the diagonal), without turning (it walks backwards, or sideways), its body as wide as it is going into every block on that line. What the game lets be pushed in its way (a creature, a player, a boat, a minecart) it shoves aside (ahead, with no room aside), by the game's collisions, never into a block, and walks on; what can't be pushed (a standing golem, an armor stand, its legs), or has no room to go, stops it as a block does (blocked, name its type's id). Without pathfinding (the default) it keeps to the line, stepping freely within its elevation (onto a slab, over carpet), up a block at a time (a jump) only while up is above, down at most 3 at a time only while up is below, never into fire or a fluid other than water (water it walks through: it sinks, and walks the bottom); with pathfinding it walks the same line, its elevation free on the way, and where something stops it, finds its way back onto the line past it, as far as the server's pathfinding range of walking, in the loaded world (none: blocked, block \"\"); meeting something on that way it didn't expect, it says so (a notice: blocked, name, face, position) and looks again (it looks past no things: one it can't push, still there, stops it again, a notice each time). With none, it goes back to where its last command left it. A command: true at once (its event: walk, ok, or not and why, on the last block's middle it reached: blocked, with name, what stopped it, a block, air too, a drop it can't take or an elevation it couldn't reach, or a thing it couldn't push, its type's, and face, its own that met it), or false and why it can't start")
+	@Method(doc = "walk(forward[, right[, up]]): walks that far from where its last command left it, in its own frame (forward the way it faces, right to its right, up its elevation's change, whole blocks), facing as it was. It must end on a block's middle, whole blocks from its origin (within a 4096th), else it's refused, a bad argument ({why = \"bad_argument\", argument, value, expected = \"squared\"}: the one that wouldn't end squared): from a block's middle whole numbers do, and after a stop the rest of the way. It goes direct, in a straight line there (walk(3, 4) on the diagonal), without turning (it walks backwards, or sideways), its body as wide as it is going into every block on that line. What the game lets be pushed in its way (a creature, a player, a boat, a minecart) it shoves aside (ahead, with no room aside), by the game's collisions, never into a block, and walks on; what can't be pushed (a standing golem, an armor stand, its legs), or has no room to go, stops it as a block does (blocked, name its type's id). Without pathfinding (the default) it keeps to the line, stepping freely within its elevation (onto a slab, over carpet), up a block at a time (a jump) only while up is above, down at most 3 at a time only while up is below, never into fire or a fluid other than water (water it walks through: it sinks, and walks the bottom); with pathfinding it walks the same line, its elevation free on the way, and where something stops it, finds its way back onto the line past it, as far as the server's pathfinding range of walking, in the loaded world (none: blocked, name \"\"); meeting something on that way it didn't expect, it says so (a notice: blocked, name, face, position) and looks again (it looks past no things: one it can't push, still there, stops it again, a notice each time). With none, it goes back to where its last command left it. A command: true at once (its event: walk, ok, or not and why, on the last block's middle it reached: blocked, with name, what stopped it, a block, air too, a drop it can't take or an elevation it couldn't reach, or a thing it couldn't push, its type's, and face, its own that met it), or false and why it can't start")
 	public Result walk(Arguments args) {
 		double[] by = numbers(args);
 		Move move = args.count() == 0 ? new Move(by, null) : squared(args, by, false); // (none: back to where its last command left it)
@@ -727,7 +731,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return body.contents(args.count() > 0 && args.get(0) != null ? face(args, 0) : CONTAINER_FACE);
 	}
 
-	@Method(doc = "store([face][, count[, to]]): puts what it holds (or count of it) into the container at a face (in front when none is given), into its slot to or where it fits: true, 0 when none of it is left in its hand; false and how many are, when the container's full; or false and why (not_found: a container, its face)")
+	@Method(doc = "store([face][, count[, to]]): puts what it holds (or count of it) into the container at a face (in front when none is given), into its slot to or where it fits: true, 0 when none of it is left in its hand; false and how many are, when the container's full; or false and why (not_found: a container, its face; or a slot, to)")
 	public Result store(Arguments args) {
 		int at = args.count() > 0 && args.get(0) instanceof String ? 1 : 0;
 		String face = at == 1 ? face(args, 0) : CONTAINER_FACE;
@@ -765,7 +769,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
 	}
 
-	@Method(doc = "fly(forward[, right[, up]]): (a tier 2 golem's) flies on its thrusters that far from where its last command left it, in its own frame, without turning, straight there (never through blocks, fire, or a fluid other than water: blocked by it; with pathfinding, round them), shoving aside what's in its way as a walk does, blocked by a thing it can't push (name its type's id); its legs, if it stands on them, are left standing where it was, and its thrusters fire beams from their sockets. In the air it walks nowhere, uses what it holds as a player off the ground does, and can be shoved (it flies back to where its last command left it). It must end on a squared point, whole blocks from its origin, its feet's height too (within a 4096th), else it's refused (bad_argument, expected squared). With no arguments, it takes off where it stands and holds there, or goes back to where its last command left it. A command: true at once (its event: fly, ok, or not and why), or false and why")
+	@Method(doc = "fly(forward[, right[, up]]): (a tier 2 golem's) flies on its thrusters that far from where its last command left it, in its own frame, without turning, straight there (never through blocks, fire, or a fluid other than water: blocked by it; with pathfinding, round them), shoving aside what's in its way as a walk does, blocked by a thing it can't push (name its type's id); its legs, if it stands on them, are left standing where it was, and its thrusters fire beams from their sockets. In the air it walks nowhere, uses what it holds as a player off the ground does, and can be shoved (it stays where it was put, saying so in a notice: a program brings it back, fly() with no arguments, or takes where it is, stop()). It must end on a squared point, whole blocks from its origin, its feet's height too (within a 4096th), else it's refused (bad_argument, expected squared). With no arguments, it takes off where it stands and holds there, or goes back to where its last command left it. A command: true at once (its event: fly, ok, or not and why), or false and why")
 	public Result fly(Arguments args) {
 		double[] by = numbers(args);
 		Move move = args.count() == 0 ? new Move(by, null) : squared(args, by, true); // (none: off where it stands, or back to where its last command left it)
@@ -817,7 +821,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		return Result.ok(now);
 	}
 
-	@Method(doc = "pull(): its oldest event, or nil: a command's end, {event = method, ok, why, result} (walk, walkTo, fly, flyTo, turn, land, swing), or a notice of what happened to it that no program asked for: {event = \"notice\", why = \"shove\", drift} once a shove's over, {event = \"notice\", why = \"fall\", drift, below} as a fall begins and as it lands, or {event = \"notice\", why = \"held\", id} as a field takes hold (id: the field's own) and as it lets go (id \"\")")
+	@Method(doc = "pull(): its oldest event, or nil: a command's end, {event = method, ok, why, result} (walk, walkTo, fly, flyTo, turn, land, swing), or a notice of what happened to it that no program asked for: {event = \"notice\", why = \"shove\", drift} once a shove's over, {event = \"notice\", why = \"fall\", drift, below} as a fall begins and as it lands, {event = \"notice\", why = \"held\", id} as a field takes hold (id: the field's own) and as it lets go (id \"\"), or {event = \"notice\", why = \"blocked\", name, face, position} as a pathfinding walk's way meets what it didn't expect")
 	public Result pull(Arguments args) {
 		return Result.ok(events.pull());
 	}

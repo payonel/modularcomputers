@@ -55,7 +55,7 @@ or sought back to its start, so a read from the start always gives the faces as 
 
 A line written, `face powered`, sets that face once the line is written
 (flushed), as a sysfs attribute does: `north 11`. Relative names work too (`front 15`). A line that is not a face and a
-number fails the write with `EINVAL`, and so does an unknown face (`no such face`).
+number fails the write with `EINVAL`, and so does an unknown face (`bad_argument`, `expected = "face"`).
 
 The file is always readable (`poll`'s `IN`) and writable (`OUT`). A change to any face since the
 file was last sought to its start shows as `PRI`, and stays until the file is sought there again
@@ -69,8 +69,9 @@ tail -f /dev/redstone0
 ```
 
 The file's ioctls are the card's methods, by name, in any open mode:
-`sys.ioctl(fd, "set", {north = {powered = 15}})`. A method that fails answers `nil`, its message
-and `EINVAL`; a card that is gone, `ENODEV`. `setLabel` labels the card, as for any device (see
+`sys.ioctl(fd, "set", {north = {powered = 15}})`. A method that fails answers `nil`, its why,
+`EINVAL` and the failure itself (`{why = "bad_argument", ...}`: see [/dev](/mcos/dev/)); a card that
+is gone, `ENODEV`. `setLabel` labels the card, as for any device (see
 [The sys library](/mcos/sys-api/)).
 
 The file's `PRI` comes from the card's events, and polling loses none: the events a poll found are
@@ -90,7 +91,8 @@ at once, so a `set` ends in its event once it's applied, and the card takes one 
 Every face as `{level, powered}`, by world name: `{north = {level = 7, powered = 7}, ...}`. With a
 table, only the faces it names, as keys or as a list of names, relative names too (`{"front"}`
 answers the face that is the block's front, by its world name). An unknown face fails with
-`no such face`.
+`{why = "bad_argument", argument = 1, value = "northwest", expected = "face"}` (its value the name
+given).
 
 <!-- lua-fragment -->
 ```lua
@@ -102,12 +104,17 @@ local west = sys.ioctl(fd, "get", {"west"}).west.level
 Takes a table in the same shape and sets each face it names:
 `{north = {powered = 11}}`.
 `powered` is the signal to put out; it is clamped to 0 through 15 and must be an integer
-(`north: powered: integer expected`). `level` is what is detected, so it is ignored, and a face the
+(else `{why = "bad_argument", argument = 1, value = 1.5, expected = "integer"}`). `level` is what is detected, so it is ignored, and a face the
 table leaves out stays as it was. Answers `true` at once; once applied, its event, `set`, carries
 every face as `get()` gives them (`result`). The arguments are all checked
 before anything changes, so a table with one bad face changes nothing. An unknown face fails with
-`no such face`; a face that is not a table, with `north: table expected`. Each output that changes
-costs a tick of a running CPU's power.
+`bad_argument`, `expected = "face"`; a face that is not a table, with `bad_argument`,
+`expected = "table"` (its value the type given, `"number"`). Each output that changes costs a tick
+of a running CPU's power.
+
+Given while 512 of its ends wait unread (its [ring depth](/concepts/interrupts/#no-end-is-ever-lost)),
+a `set` (or a `get`, which waits behind one) is refused, `{why = "limit", of = "events", max = 512}`, until its program reads some with
+`pull`; in mcos, `nil`, `"limit"`, `EAGAIN` and the failure.
 
 <!-- lua-fragment -->
 ```lua
@@ -144,8 +151,9 @@ it is now:
 
 A `set`'s end is `{event = "set", ok = true, result = {north = {level = 15, powered = 15}, ...}}`.
 
-At most 32 wait. When more come, the oldest is dropped and the next event carries `lost`, the number
-dropped. The events are kept across a save, and dropped when no program runs on the computer.
+Changes are news: at most 512 wait (the card's [ring depth](/concepts/interrupts/), which a
+server's admin can change with `redstone_ring_depth`). When more come, the oldest change is dropped
+and the next event carries `lost`, the number dropped; a `set`'s end is never dropped. The events are kept across a save, and dropped when no program runs on the computer.
 
 ## Examples
 
@@ -209,5 +217,5 @@ The door's own change (its face powered) wakes `poll` too; that only starts the 
 ```
 [Download redstone-counter.lua](/examples/redstone-counter.lua)
 
-The card keeps at most 32 changes: a pulse is two, so with more than 16 pulses a period some are
-lost (the log says so). Shorten `PERIOD` for a faster clock.
+The card keeps at most 512 changes (its ring depth): a pulse is two, so with more than 256 pulses a
+period some are lost (the log says so). Shorten `PERIOD` for a faster clock.

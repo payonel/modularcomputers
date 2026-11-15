@@ -65,7 +65,7 @@ GET http://10.0.0.1/ - 2ms 0 denied private 10.0.0.1
 ```
 
 - **Reading** gives the next line; with none waiting, a read waits for one. `cat /dev/internet0`
-  shows requests as they end (Ctrl+C stops it). The card keeps the last 32, as a device keeps its events:
+  shows requests as they end (Ctrl+C stops it). The card keeps the last 512 (its [ring depth](/concepts/interrupts/)), as a device keeps its events:
   when more come, the oldest go, and the entry that pushed one out says so (`lost`, a `lost n` line
   before it). They go when the computer stops.
 - **Writing** is refused: opening it for writing fails with `EACCES`.

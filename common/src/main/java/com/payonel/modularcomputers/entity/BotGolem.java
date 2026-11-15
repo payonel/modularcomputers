@@ -846,14 +846,14 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private double fallFrom = Double.NaN;
 
 	/**
-	 * Its tick's look at a fall: once down on its legs, its plan follows it down (its odometry felt
-	 * the drop, as a robot's IMU does: not drift, nothing to go back up to), and it says so, the news
-	 * ending a wait for it (commands are busy while it falls).
+	 * Its tick's look at a fall: it says so as the fall begins and once it's down on its legs, the
+	 * news ending a wait for it (commands are busy while it falls); where its last command left it
+	 * stays (a fall moves it nowhere, only a stop does).
 	 */
 	/**
 	 * Standing idle on its legs, moved off where its last command left it by something it didn't ask
-	 * for (a piston: the user's, flight's way on the ground too), it says so and walks back, as a
-	 * hovering one flies back; a fall isn't a shove (where it goes on from follows it down).
+	 * for (a piston: the user's, flight's way on the ground too), it says so and stays where it was
+	 * put, as a hovering one does; a fall isn't a shove (its landing's notice says it).
 	 */
 	private void shovedOnItsLegs() {
 		Vec3 now = position();

@@ -43,8 +43,10 @@ A golem with a crafting card carries a tiny chest on its back.
 ## Robotics needed
 
 Programs work the card only in a robot: crafting, moving its items and its file need a robot's
-robotics to do the work. In a case every method fails with a fault, `condition = "missing"`, `part = "robotics"` (the card's
-details, with Shift held, say so); its tab still works by hand.
+robotics to do the work. In a case every method but `stop`, `pull` and `sync` fails with a fault,
+`{why = "fault", condition = "missing", part = "robotics", message}` (the card's details, with Shift
+held, say so); its tab still works by hand. A card with nothing to work its items (no bench) fails
+the same way with `part = "bench"`.
 
 Its methods are [commands](/devices/robotics/#one-command-at-a-time) that come after the robot's:
 each waits while the robot is doing something else (a walk, a swing), and a robot held in a field
@@ -58,6 +60,10 @@ card's, and goes on, but the robot is what works the card (a case has none), so 
 card is given waits until the robot is let go. Its `pull`, `list` (its own
 slots) and `stop` never wait. At the board a refusal names the device whose news ends the wait:
 the robot while it's busy (`false, {why = "busy", id = "id:<the robot>"}`), the card itself while it crafts.
+A command given while 512 of its ends wait unread (its
+[ring depth](/concepts/interrupts/#no-end-is-ever-lost)) is refused,
+`{why = "limit", of = "events", max = 512}`, until its program reads some with `pull`: in mcos,
+`nil`, `"limit"`, `EAGAIN` and the failure.
 
 ## In mcos
 
@@ -144,13 +150,15 @@ takes them later isn't the robot's concern).
 Puts items into the container at a face (in front, when none is given): from slot `from` (all, or
 `count`), or with none everything in its storage; into the container's slot `to`, or where they fit.
 One answer says it all: `true, 0` when none of it is left (nothing to store too), else `false` and
-how many are left (the container is full). Fails with `{why = "not_found", kind = "container", value = the face}`.
+how many are left (the container is full). Fails with `{why = "not_found", kind = "container", value = the face}`
+(no container there), or `kind = "slot"`, `value = to` (no such slot in it).
 
-### take([face][, from[, count[, to]]]) → number
+### take([face][, from[, count[, to]]]) → number, or nil and why
 
 Takes items from the container at a face (in front, when none is given): from its slot `from`, or the
 first it can; all, or `count`; into the card's slot `to` (its grid's too, to lay out a recipe), or
-where they fit in its storage. How many came.
+where they fit in its storage. How many came. Fails with `{why = "not_found", kind = "container",
+value = the face}` (no container there), or `kind = "slot"`, `value = from` (no such slot in it).
 
 ### sync() → boolean
 
@@ -166,7 +174,7 @@ Its oldest event, or nil.
 
 | `event` | Other fields | When |
 |---|---|---|
-| `craft` | `ok`, `why`, `result` (`{name, count}`), or for `stopped`, `call` (`{args, progress}`) | a craft ended: the crafts asked for are made, or one couldn't be (why, and how many were made before it); `stopped` by its `stop`; `interrupted` only when a world's save cut it short and it couldn't go on after the load (with its `call`) |
+| `craft` | `ok`, `result` (`{name, count}`); or `why`, its fields, and `call` (`{args, progress}`), on every end that isn't `ok` | a craft ended: the crafts asked for are made, or one couldn't be (why, and how many were made before it); `stopped` by its `stop`; `interrupted` only when a world's save cut it short and it couldn't go on after the load (with its `call`) |
 
 ## Example
 

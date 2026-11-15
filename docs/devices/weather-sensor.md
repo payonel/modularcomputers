@@ -72,7 +72,7 @@ once.
 | `new` | the weather now |
 | `lost` | present when events were dropped: how many |
 
-Each change raises the sensor's interrupt, which stays raised while any wait. At most 32 wait. Events are kept across a save, and the weather the sensor saw last is kept too, so
+Each change raises the sensor's interrupt, which stays raised while any wait. At most 512 wait (its [ring depth](/concepts/interrupts/)); when more come, the oldest goes and the next event carries `lost`. Events are kept across a save, and the weather the sensor saw last is kept too, so
 a load is not a change. Events are dropped while no program runs.
 
 ## Examples
