@@ -16,14 +16,17 @@ kept by this document and the test that checks the code against it.
    one of those (a command's end carries its method's name, recorded as the command started).
 3. **No data inside a string.** A number is a number field, a list a list; a string a program would
    have to cut up is two fields. A `message` is a person's words, never parsed.
-4. **Every field of a thing that exists is always there; a thing that doesn't exist isn't**
-   (the user's, 2026-11-18). A value with nothing to say is still there: `""` (a disk with no
-   label), a number's "none" its own documented value (`status = 0`, `distance = -1`), `false`
-   for a flag that's off. But a field whose value is itself a thing (a table), when that thing
-   doesn't exist, is left out, nil, Lua's own nothing: a Disk Station's slot with no disk in it has
-   no `source`, a command's end with nothing to give has no `result`. `""` says "it's there, with
-   nothing to say"; nil says "there's no such thing". What differs by kind (an event's, a thing's)
-   is always there for its kind.
+4. **Every field of a shape is always there** (the user's, 2026-11-18). A table's shape may depend
+   on the one field that says what it is (`event`, `why`, `kind`, `state`): each value has its own
+   shape, every field of it always there (a field card's `get` idle is `{state}`, holding
+   `{state, name, forward, right, up}`). Within a shape:
+   - **a string is never nil**: `""` when there's nothing to say (a disk with no label);
+   - **a number's "none" is its own documented value** (`status = 0`, `distance = -1`);
+   - **a flag may be left out for false** (nil is false in Lua, and false is never special: a
+     frame's `broadcast` is there only when true);
+   - **a field whose value is a thing (a table) is left out while that thing doesn't exist**: a
+     Disk Station's slot with no disk has no `source`, a command's end with nothing to give has no
+     `result`.
 5. **`event` is what caused it.** An event a method caused carries that method's name, literally,
    always; a device's own news (no method caused it) has its own word, listed below, never a
    method's name (the user's, 2026-11-06). So an `event` naming a method means that method caused it.
