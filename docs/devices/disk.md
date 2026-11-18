@@ -84,7 +84,7 @@ df                      # each mounted disk's size and use
 
 ### Its ioctls are its methods
 
-The file's ioctls are the disk's methods below, by name, with their arguments, in any open mode,
+The file's ioctls are the disk's methods below but `open`, by name, with their arguments, in any open mode,
 on either format, mounted or not. A method that answers nothing gives `true`; one that fails gives
 `nil`, its why, `EINVAL` and the failure itself (`{why = "not_found", ...}`: see
 [/dev](/mcos/dev/)); a disk that is gone gives `ENODEV`.
@@ -98,9 +98,10 @@ local free = sys.ioctl(sys.fileno(disk), "getCapacity") - sys.ioctl(sys.fileno(d
 Paths given to `list`, `stat` and the others are the disk's own, from its root, whatever it is
 mounted as. `setLabel` (the kernel's, on every device file) puts a label on the disk's item.
 
-Some methods are for code without an OS, such as an EEPROM's, and are not for programs under mcos:
-`open` gives a handle that only the firmware can use (under mcos, open files through the
-filesystem), and `changes` is taken by the kernel, which turns a mounted disk's reports into
+Some methods are for code without an OS, such as an EEPROM's, and are not for programs under mcos.
+`open` gives a handle that only the firmware can use, so mcos doesn't offer it: its ioctl answers as
+for a method the disk doesn't have (`{why = "not_found", kind = "method", value = "open"}`), and
+`/sys` doesn't list it (under mcos, open files through the filesystem). `changes` is taken by the kernel, which turns a mounted disk's reports into
 [inotify](/mcos/sys-api/) notices. Through an ioctl, `stat` of a path with nothing there answers
 `true` (the method answered nothing), and so does `read` at the end of a raw disk.
 
@@ -136,7 +137,7 @@ disk (a [Disk Station](/devices/disk-station/)'s source disk).
 
 ### open(path[, mode]) → handle
 
-Opens a file. `mode` is `r` (the default), `r+`, `w`, `w+`, `a` or `a+`, as C's `fopen` (a `b` is
+For code without an OS (not offered under mcos: see above). Opens a file. `mode` is `r` (the default), `r+`, `w`, `w+`, `a` or `a+`, as C's `fopen` (a `b` is
 ignored). A new file is made at once, empty. At most 16 files are open at once on a disk
 (`{why = "limit", of = "open_files", max = 16}`). Fails with `not_found` (`kind = "file"`),
 `bad_state` (`expected = "file"`: a directory), or `bad_argument` (`expected = "mode"`).

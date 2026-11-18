@@ -38,7 +38,8 @@ block's middle: that's its origin, from which it always knows exactly how far it
 they're going, and end exactly where asked; with its pathfinding on, they find their way round
 what's on that line. It pushes what's in its way aside as it goes (creatures, you, boats,
 minecarts) and walks on; what can't be pushed, another golem standing or an armor stand, stops it
-as a wall would ([things in its way](/devices/robotics/#things-in-its-way)). Right-click it to see its
+as a wall would. Flying, it pushes nothing: it needs its legs to, so anything in a flight's or a
+landing's way stops it ([things in its way](/devices/robotics/#things-in-its-way)). Right-click it to see its
 screen (when its face has one), or crouch and right-click for its parts. Hit it to pick it up: it
 drops as its item, its parts and its board's id kept in it, as a broken case keeps them. Holding
 that item (a golem's or a torso's), crouch and right-click, in the air or at a block, to open its
@@ -70,14 +71,14 @@ its hands.
 
 A golem flies two ways, each with its price:
 
-- **Its thrusters, legs off.** A tier 2 golem has them (a tier 1's thruster calls answer `no
-  thrusters`): its nozzles are the collars round its legs' sockets. `fly` leaves its legs standing where it was and
+- **Its thrusters, legs off.** A tier 2 golem has them (a tier 1's thruster calls fail, its
+  thrusters missing): its nozzles are the collars round its legs' sockets. `fly` leaves its legs standing where it was and
   fires red beams from their empty sockets: it needs no card, and costs five running CPUs' power a tick. On its
   thrusters it walks nowhere, but does everything else as a player off the ground would (its
-  tools work, a block breaking more slowly), presses no pressure plates, and can be shoved: it says so, and flies
-  back to where its program put it, as a drone holds its place. `fly()` takes it off where it
-  stands and holds it there; `land` brings it down onto its legs, below it, and won't with no legs
-  there. Chickens and cows run from it. If its program ends or its power runs out while its
+  tools work, a block breaking more slowly), presses no pressure plates, pushes nothing out of its way (a creature in it stops it), and can be
+  shoved: it says so, and stays where it was put, for its program to take back. `fly()` takes it off where it
+  stands and holds it there; `land` brings it down onto its legs, below it, fast and then slowly
+  for the last few blocks, as a drone lands, and won't with no legs there. Chickens and cows run from it. If its program ends or its power runs out while its
   thrusters hold it up, it falls and powers off.
 - **Its own field, legs on.** An [energy field card](/devices/energy-field-card/) holding the golem
   itself (`capture("self")`) carries it, legs and all: a tier 1's way up a cliff. But a field is stasis, for a golem as for any creature: its

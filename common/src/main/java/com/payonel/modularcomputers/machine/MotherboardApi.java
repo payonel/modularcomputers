@@ -24,6 +24,8 @@ import java.util.function.LongSupplier;
  * through their runner, which hands each call over.
  */
 final class MotherboardApi implements Board {
+	/** A device's info field with nothing to say (the field dictionary's: every field always there): no label, no id (a virtual device's). */
+	private static final String NONE = "";
 	private final Motherboard board;
 	private final LongSupplier uptime;
 	/** What the program holds of the memory (its runtime counts it). */
@@ -95,17 +97,15 @@ final class MotherboardApi implements Board {
 			if (device instanceof Device real) {
 				String at = bus.address(address).orElse(address);
 				info.put("address", at);
-				if (bus.id(at) != null) {
-					info.put("id", bus.id(at));
-				}
+				info.put("id", bus.id(at) != null ? bus.id(at) : NONE);
 				info.put("type", real.type().name().toLowerCase(Locale.ROOT));
-				if (real.label() != null) {
-					info.put("label", real.label());
-				}
+				info.put("label", real.label() != null ? real.label() : NONE);
 				info.putAll(real.info());
 			} else {
 				info.put("address", address); // a virtual device: its name is all it has
+				info.put("id", NONE);
 				info.put("type", address);
+				info.put("label", NONE);
 			}
 			return info;
 		});

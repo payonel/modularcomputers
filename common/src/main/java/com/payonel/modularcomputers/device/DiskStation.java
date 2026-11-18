@@ -112,7 +112,7 @@ public final class DiskStation implements Device {
 		return onTarget(disk -> disk.copyIn(folder -> bay.copyImage(IMAGE, folder, true)));
 	}
 
-	@Method(doc = "get(): {target = disk, source = disk} (a disk: {tier, mode, used, capacity, label}, or nothing for an empty slot)")
+	@Method(doc = "get(): {target = disk, source = disk} (a disk: {tier, mode, used, capacity, label: \"\" for none}, or nothing for an empty slot)")
 	public Result get(Arguments args) {
 		Map<String, Object> state = new LinkedHashMap<>();
 		for (String which : List.of(TARGET, SOURCE)) {
@@ -123,16 +123,14 @@ public final class DiskStation implements Device {
 				about.put("mode", disk.getMode(none()).first());
 				about.put("used", disk.getUsed(none()).first());
 				about.put("capacity", disk.getCapacity(none()).first());
-				if (disk.label() != null) {
-					about.put("label", disk.label());
-				}
+				about.put("label", disk.label() != null ? disk.label() : ""); // (always there: "" for none)
 				state.put(which, about);
 			}
 		}
 		return Result.ok(state);
 	}
 
-	/** An action by its name (a GUI button's). */
+	/** An action by its name (a GUI button's: its menu takes only the buttons it has, so any other is the host's bug). */
 	public Result act(String action) {
 		Arguments none = none();
 		return switch (action) {
@@ -141,7 +139,7 @@ public final class DiskStation implements Device {
 			case "clone" -> clone(none);
 			case "install" -> install(none);
 			case "update" -> update(none);
-			default -> Result.fail(com.payonel.modularcomputers.runtime.Failure.badArgument(1, action, "action"));
+			default -> throw new IllegalArgumentException("not a Disk Station action: " + action);
 		};
 	}
 }

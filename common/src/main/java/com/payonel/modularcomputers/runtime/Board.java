@@ -91,7 +91,7 @@ public interface Board {
 
 	/**
 	 * What a device says of itself, like {@code udevadm info} or {@code lsblk}: its address, id,
-	 * type and label (what the player named it, if anything), then what its kind adds (a tier, a
+	 * type and label (what the player named it, {@code ""} if nothing; a virtual device's id {@code ""} too), then what its kind adds (a tier, a
 	 * size). A Lua runtime gives it as a table. Empty for no such device.
 	 */
 	Optional<Map<String, Object>> info(String address);

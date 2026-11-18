@@ -40,7 +40,6 @@ public final class Failure {
 		Map.entry("legs", "legs required"),
 		Map.entry("thrusters", "thrusters required"),
 		Map.entry("power", "power required"),
-		Map.entry("bench", "crafting bench required"),
 		Map.entry("robotics", "robotics required"),
 		Map.entry("body", "robot body required"),
 		Map.entry("position", "known position required"),

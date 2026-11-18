@@ -82,7 +82,7 @@ kernel itself, can use a global `board`. It is the motherboard's API:
 | Call | Gives |
 |---|---|
 | `board.list()` | the devices on the bus, in bus order: a table each with `address`, `id` and `type` |
-| `board.info(address)` | a table about one device: `address`, `id`, `type`, `label` (if it has one) and what its kind adds; nil if there is no such device |
+| `board.info(address)` | a table about one device: `address`, `id`, `type`, `label` (`""` when it has none; `id` too, for a virtual device such as `console`) and what its kind adds; nil if there is no such device |
 | `board.methods(address)` | the names of the device's methods, in name order |
 | `board.doc(address, method)` | one line saying what a method does |
 | `board.invoke(address, method, ...)` | calls a method: `true` and its results, or `false` and its failure, `{why, ...}` (a busy device's refusal: `{why = "busy", id}`, the device whose news ends the wait) |
@@ -116,7 +116,7 @@ failure with that why (`{why = "fault", condition = "missing", part = "legs", me
 | `bad_state` | `of` (`path`, `handle`, `hold`, `slot`, `entity`), `value` (which: as named, `""` none), `expected` (the state it needs: `absent`, `empty`, `file`, `open`, `free`...) | the call is fine, but what it acts on isn't in the state it needs |
 | `limit` | `of` (`events`, `frames`, `data`, `reach`, `disk`...), `max` | over a limit |
 | `denied` | `reason`, `value` (what was refused) | not allowed |
-| `fault` | `condition`, `part`, `message` | something wrong with the machine itself, not with how it was asked: a part it needs `missing` (`legs`, `thrusters`, `power`, `bench`, `robotics`, `body`, `position`, `projector`, `destination`, `source`), an `io_error` (its storage failed), or an `internal_error` (the mod failed: `part` the device's type, or `board`) |
+| `fault` | `condition`, `part`, `message` | something wrong with the machine itself, not with how it was asked: a part it needs `missing` (`legs`, `thrusters`, `power`, `robotics`, `body`, `position`, `projector`, `destination`, `source`), an `io_error` (its storage failed), or an `internal_error` (the mod failed: `part` the device's type, or `board`) |
 | `drifted` | `drift` | a robot off its spot |
 | `network` | `reason`, `message` | the internet card's and network card's: failed in transit |
 | `symbolic_link` | `at`, `target` | a disk's path met a link: the operating system goes on from it (see the [disk](/devices/disk/)) |

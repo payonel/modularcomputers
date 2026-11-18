@@ -10,7 +10,8 @@ local function disk(name, about)
   if not about then
     return name .. " -\n"
   end
-  return table.concat({name, about.tier, about.mode, about.used, about.capacity, about.label}, " ") .. "\n"
+  local label = about.label ~= "" and " " .. about.label or "" -- (none: the line ends after its capacity)
+  return table.concat({name, about.tier, about.mode, about.used, about.capacity}, " ") .. label .. "\n"
 end
 
 return {

@@ -101,6 +101,25 @@ public class DiskStationGameTest {
 		helper.succeed();
 	}
 
+	/**
+	 * A button its screen doesn't have (a modified client's packet: untrusted) is ignored, and
+	 * logged: nothing done, its last outcome as it was, no failure for any program.
+	 */
+	@GameTest
+	public void aButtonItsScreenDoesntHaveChangesNothing(GameTestHelper helper) {
+		DiskStationBlockEntity station = station(helper, true);
+		var player = GameTests.serverPlayer(helper);
+		DiskStationMenu menu = (DiskStationMenu) station.createMenu(0, player.getInventory(), player);
+		Path folder = folder(helper, station, DiskStationBlockEntity.TARGET);
+		List<String> before = files(folder);
+		for (int id : new int[] {-1, DiskStationMenu.ACTIONS.size(), Integer.MAX_VALUE}) {
+			helper.assertTrue(!menu.clickMenuButton(player, id), "no button " + id);
+		}
+		helper.assertTrue(menu.outcome() == DiskStationBlockEntity.Outcome.NONE, "its outcome as it was: " + menu.outcome());
+		helper.assertValueEqual(files(folder), before, "its disk untouched");
+		helper.succeed();
+	}
+
 	@GameTest(maxTicks = 100)
 	public void aWiredComputerHasItAndItsDisksOnItsBusTheSourceOnlyRead(GameTestHelper helper) {
 		CaseBlockEntity computer = onABus(helper, true);

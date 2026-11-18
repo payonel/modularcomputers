@@ -14,7 +14,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A golem moving shoves what's in its way (the user's, 2026-11-15): what the game lets be pushed
+ * A golem walking shoves what's in its way (the user's, 2026-11-15): what the game lets be pushed
  * ({@link Entity#isPushable}: creatures, players, boats, minecarts; not a vehicle with a rider, nor
  * a rider, nor what a field holds) it pushes out of the space its body is going into, aside (away
  * from its way, to the side the thing is on; dead ahead, to its own right) or, with no room there,
@@ -22,7 +22,9 @@ import org.jspecify.annotations.Nullable;
  * into a block); a player is sent the push as knockback is (a player's moves are its game's). What
  * can't be pushed (a standing golem, an armor stand, a golem's legs), or what's pushed and has no
  * room to go, stops it, as a block does. What's only in its space and nothing to its body (an item,
- * an arrow, a marker) it passes, as the game's bodies do.
+ * an arrow, a marker) it passes, as the game's bodies do. On its thrusters it shoves nothing (the
+ * user's, 2026-11-18: a flying bot can't shove, it needs legs): whatever body is in its way stops it
+ * ({@link #met}).
  */
 final class GolemShove {
 	/** Lengths this close count as the same, in blocks (floating point's). */
@@ -63,6 +65,27 @@ final class GolemShove {
 			}
 			if (!shove(golem, other, to, way) && toward(golem, other, way)) {
 				return other; // (no room to push it to)
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * The first body in the space {@code to} that {@code golem}'s body goes into, moving {@code way}
+	 * (nearest it first), pushable or not, nothing pushed: what a golem on its thrusters meets; null,
+	 * its way's clear. What the game lets pass through it (its team's collision rule) and what's
+	 * behind it as it goes never stop it, as in {@link #clear}.
+	 */
+	static @Nullable Entity met(Entity golem, AABB to, Vec3 way) {
+		List<Entity> bodies = new java.util.ArrayList<>(golem.level().getEntities(golem, to, other -> body(golem, other)));
+		bodies.sort(Comparator.comparingDouble(golem::distanceToSqr));
+		var pushable = EntitySelector.pushableBy(golem);
+		for (Entity other : bodies) {
+			if (movable(other) && !pushable.test(other)) {
+				continue; // (its team's collision rule: the game lets them pass through each other)
+			}
+			if (toward(golem, other, way)) {
+				return other;
 			}
 		}
 		return null;

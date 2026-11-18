@@ -105,9 +105,9 @@ class BoardInfoTest {
 		});
 		assertThat(seen.get(0)).isEqualTo(Optional.of(Map.of("address", "sata:0", "id", diskId, "type", "storage", "label", "backups",
 			"tier", 2L, "capacity", (long) DiskTier.TIER_2.bytes(), "mode", "hfs")));
-		assertThat(seen.get(1)).as("no label unless named").isEqualTo(Optional.of(Map.of("address", "id:screen", "id", "id:screen",
-			"type", "terminal", "tier", 2L, "width", 50L, "height", 16L, "colors", 16L)));
-		assertThat(seen.get(2)).isEqualTo(Optional.of(Map.of("address", "console", "type", "console")));
+		assertThat(seen.get(1)).as("an empty label unless named").isEqualTo(Optional.of(Map.of("address", "id:screen", "id", "id:screen",
+			"type", "terminal", "label", "", "tier", 2L, "width", 50L, "height", 16L, "colors", 16L)));
+		assertThat(seen.get(2)).isEqualTo(Optional.of(Map.of("address", "console", "id", "", "type", "console", "label", "")));
 		assertThat(seen.get(3)).isEqualTo(Optional.empty());
 	}
 

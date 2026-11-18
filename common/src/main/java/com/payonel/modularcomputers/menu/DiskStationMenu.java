@@ -86,6 +86,10 @@ public final class DiskStationMenu extends AbstractContainerMenu {
 				return false;
 			}
 			if (id < 0 || id >= ACTIONS.size()) {
+				// A packet from a client is untrusted (a modified one can send any id): no such switch,
+				// so nothing is done, and it's no program's failure to tell.
+				com.payonel.modularcomputers.ModularComputers.LOGGER.warn("{} pressed Disk Station button {} at {}, which it doesn't have; ignored",
+					player.getName().getString(), id, at.toShortString());
 				return false;
 			}
 			station.act(ACTIONS.get(id));

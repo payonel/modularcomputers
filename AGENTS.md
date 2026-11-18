@@ -423,15 +423,15 @@ nothing to stand on, a wall, or barred), its feet on the highest floor under its
 of it a step `GolemSteps` judges: without pathfinding (the default) free within its elevation (the
 block its feet are in: slabs), a block up at a time only toward `up`, down three at most only
 toward it, the first thing on its line that stops it ending the walk; off its line as it begins (a
-shove), it goes back to where its last command left it first. **It shoves what's in its way**
+shove), it goes back to where its last command left it first. **Walking, it shoves what's in its way**
 (the user's, 2026-11-15): what the game lets be pushed (`isPushable`, and not a vehicle with riders,
 a rider, or held in a field) it pushes out of the space its body goes into (`GolemShove`: aside, to
 the side it's on, else ahead; by the game's collisions, `move(SHULKER)` as a shulker's shell pushes,
 never into a block; a player by its motion, as knockback, its game moving it), and walks on, the
 shove no drift of its own; what can't be pushed (a standing golem, a walking one too, an armor
 stand, legs), or pushed with no room to go, stops it as a block does, `name` its type's id; what's
-no body (an item, an arrow) it passes. Flights the same; a landing shoves, and meets what can't be
-pushed as before; a field's carry passes through things. **Water passes, every other fluid
+no body (an item, an arrow) it passes. Only a walk shoves (the user's, 2026-11-18: it needs legs):
+on its thrusters any body in its way stops it (`GolemShove.met`); a field's carry passes through things. **Water passes, every other fluid
 blocks** (the user's, 2026-11-14), as fire does, every move alike (`GolemGround.bars`: a walk, a
 flight, a landing, and every way pathfinding finds): it and its legs never float or swim, no current
 pushes them, it sinks through water and walks the bottom, its hand works under water as on land,
@@ -478,7 +478,11 @@ what it broke it `kept` and `dropped`.
   a break slower), ignores
   block triggers, and can be shoved; `land` comes down onto its legs below it and refuses with none
   there, but `land(true)` (the user's, 2026-10-29: a crash's landing, safely) comes straight down
-  without them, still running; a fall on its legs is a `fall` notice as it begins, and a tier
+  without them, still running; a landing comes down at its flight's speed till it's
+  `LANDING_SLOWING` above where it lands, then slowly (the user's, 2026-11-18: as a drone's
+  autopilot lands), paying thrust all the way; **on its thrusters it shoves nothing** (the user's,
+  2026-11-18: a flying bot needs legs to shove; only a walk does, `GolemShove`): a flight's or a
+  landing's way meeting any thing, a pig too, ends it `blocked` by the thing's type, hovering; a fall on its legs is a `fall` notice as it begins, and a tier
   2's flights are taken mid-fall (it catches itself, its legs dropped); `stop()` then `fly()`
   catches it where it is (the user's, 2026-11-03: no `stop(true)`, no hover; a `stop()` lets a fall
   go on, as it isn't something the robot does, but takes where it is). Or carried in **a field**, its own too, legs and all (10 blocks a second): stasis, as for
@@ -718,7 +722,8 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   (`sys.ioctl(fd, "setStrength", 4)`, in any open mode, with the arguments given and no more: a stream
   method called with none takes what's come; a method answering nothing gives `true`, so one whose
   answer is "none" (a missing path's `stat`, a read at the end) says nil; a handle stays in the
-  kernel), so
+  kernel: a method only the kernel can use, a disk's `open`, isn't offered, its ioctl a method the
+  device hasn't and `/sys` not listing it, the kernel's `KERNEL_METHODS`), so
   nothing mcos makes up stands for a device's method (no invented `SIOC*`). Its file is ready for
   poll (`PRI`) while its device has news, its interrupt since the file last read or asked. **Polling
   takes nothing:** an event a poll found is the file's to give the next `pull` ioctl (or read), so a
@@ -791,7 +796,7 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   (`EventQueue.missingInputs`, `noSpace`): `name` what it was making (its last craft's, `""` none;
   no_space's, what found no room), its progress the crafts done. **A part missing is a `fault`**
   (the user's, 2026-11-04): `condition = "missing"`, `part` what (`legs`, `thrusters`, `power`,
-  `bench`, `robotics`, `body`, `position`, `projector`; a Disk Station's `destination`, `source`),
+  `robotics`, `body`, `position`, `projector`; a Disk Station's `destination`, `source`),
   `message` its words: a call refused so answers `false, {why = "fault", condition, part,
   message}` (`Buffered.missing`), and a command given again once its robot's let go and refused
   becomes its end in the same shape (`EventQueue.refused`, `fault`), so an answer at once and the
@@ -1061,6 +1066,15 @@ Lessons from mistakes, each with its test:
 - **A wait for ever wraps round:** a deadline is now plus its length, and `Long.MAX_VALUE` ticks
   added to now is in the past, so a Java program's park (`Program.park`) answered at once and spun.
   Saturate a deadline at the end of time. (`RuntimeTest.callsAreImmediate...`)
+- **A field with nothing to say is put with its none, never left out:** the Disk Station's `get`
+  and the board's `info` put `label` only when there was one (`if (label != null) put`), against
+  "every field always there", so a reader met a key that was sometimes missing. Put `""`.
+  (`aDiskWithNoLabelHasAnEmptyOne`, `eachDeviceSaysWhatItIs`)
+- **What a program can't use isn't offered, and is refused before the call, never after:** a
+  disk's `open` through an ioctl ran (its file made, its handle left open in the disk) and only its
+  answer was refused, a bare string. A method only the kernel can use is in the kernel's
+  `KERNEL_METHODS`: not in `/sys`, its ioctl a method the device hasn't.
+  (`aDisksOpenIsntOfferedThroughItsFileOrSys`)
 - An hfs file shows its writes only at close: watch a file a program keeps open on `/tmp` (tmpfs).
 - Typing more than 256 keys at once in a test drops the rest (a terminal's key queue): split lines.
 - Lua 5.5 for-loop variables are constants (a compile error when the script loads: `LuaScriptsTest`

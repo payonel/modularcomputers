@@ -358,8 +358,10 @@ from its origin too (from a slab, `fly(0, 0, 1.5)`). If it stands on its legs, t
 their sockets. With no arguments, on its legs, it takes off where it stands and holds there; in
 the air, it flies back to where its last command left it. On its thrusters it walks nowhere (a walk fails, a fault, `part = "legs"`), presses no pressure plates, and can be shoved (a `shove` notice; it stays where it was put); everything else it does as
 on its legs, as a player off the ground does it (its tools, a block breaking more slowly), and its
-other cards work. Its event, `fly`: `ok` (then it holds
-there), or not and why (`blocked`, a block over it: `name = "minecraft:stone", face = "up"`). Its thrusters cost five running CPUs' power a
+other cards work. It pushes nothing out of its way (only a walk does): a creature, a player, a
+boat, anything there stops it, as a block does ([things in its way](#things-in-its-way)). Its event, `fly`: `ok` (then it holds
+there), or not and why (`blocked`, a block over it: `name = "minecraft:stone", face = "up"`; a
+pig in front: `name = "minecraft:pig", face = "front"`). Its thrusters cost five running CPUs' power a
 tick. It flies as far as it's told. Fails with `bad_argument` (`expected = "squared"`).
 
 If its program ends while its thrusters hold it up, or its power runs out, it falls and powers off:
@@ -374,7 +376,10 @@ Its event: `flyTo`. Fails with `bad_argument` (`expected = "integer"`).
 
 Comes down onto its legs, standing below where its last command left it however far down (within
 three blocks to its side), and onto them: a move, so from that spot, getting there from wherever
-it really is. With
+it really is. It comes down as a drone does: at its flight's pace until it's a few blocks above
+where it lands, then slowly for those last blocks. A thing in its way down (a creature under it)
+stops it, `blocked`, `face = "down"`, by the thing's type, and it hovers on: on its thrusters it
+can't push. With
 `force` (`land(true)`) and no legs there, it comes straight down onto the ground beneath it without
 them, and stays running, its thrusters off. That's what a crash does, but safely and still on.
 Legless, it walks nowhere; it flies again to fetch its legs and lands onto them. Its event, `land`:
@@ -510,9 +515,10 @@ met it, on the last block's middle it reached. Two golems walking into each othe
 blocked. What's only in its space and no body to it (a dropped item, an arrow) it walks through,
 as anything does.
 
-Flights meet things the same way, pushing what can be pushed aside and blocked by what can't. A
-landing pushes aside what's under it; what can't be pushed it meets as it would a block. A field's
-carry moves through things, as it always has.
+Only a walk pushes: it needs its legs. On its thrusters (a flight, a landing) it pushes nothing,
+and whatever is in its way stops it, a pig as much as another golem: its move ends `blocked`,
+`name` the thing's type (`minecraft:pig`), `face` its own that met it (`down` for a creature under
+a landing), and it hovers there. A field's carry moves through things, as it always has.
 
 ### In water, lava and other fluids
 
@@ -531,7 +537,7 @@ three fields beside it, the same for every one:
 
 | Field | What it is |
 |---|---|
-| `name` | the block in its way, its name (its registry id: `minecraft:stone`, `minecraft:fire`), or the thing it couldn't push out of its way, its type's (`minecraft:armor_stand`); `""` when no one block can be named (never `nil`) |
+| `name` | the block in its way, its name (its registry id: `minecraft:stone`, `minecraft:fire`), or the thing that stopped it, its type's (`minecraft:armor_stand`; on its thrusters, any thing: `minecraft:pig`); `""` when no one block can be named (never `nil`) |
 | `face` | the face of the robot that met it, its own: `front`, `back`, `left`, `right`, `up` or `down`. It's the side that was hit, not the way the move was mostly going: a flight sliding along a wall on its right met it on its `right` |
 | `call` | the command cut short: see below |
 

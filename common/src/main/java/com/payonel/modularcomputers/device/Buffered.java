@@ -77,8 +77,6 @@ public interface Buffered {
 	String MISSING_THRUSTERS = "thrusters";
 	/** What's missing: power. */
 	String MISSING_POWER = "power";
-	/** What's missing: what works a crafting card's items (it's in nothing that does). */
-	String MISSING_BENCH = "bench";
 	/** What's missing: a robot's robotics, to work a crafting card (in a case there's none). */
 	String MISSING_ROBOTICS = "robotics";
 

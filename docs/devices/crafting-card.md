@@ -45,8 +45,7 @@ A golem with a crafting card carries a tiny chest on its back.
 Programs work the card only in a robot: crafting, moving its items and its file need a robot's
 robotics to do the work. In a case every method but `stop`, `pull` and `sync` fails with a fault,
 `{why = "fault", condition = "missing", part = "robotics", message}` (the card's details, with Shift
-held, say so); its tab still works by hand. A card with nothing to work its items (no bench) fails
-the same way with `part = "bench"`.
+held, say so); its tab still works by hand.
 
 Its methods are [commands](/devices/robotics/#one-command-at-a-time) that come after the robot's:
 each waits while the robot is doing something else (a walk, a swing), and a robot held in a field

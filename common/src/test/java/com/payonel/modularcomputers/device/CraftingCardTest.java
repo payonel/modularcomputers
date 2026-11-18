@@ -82,18 +82,18 @@ class CraftingCardTest {
 		}
 	}
 
-	/** What works its items gone mid-count: a fault, the bench missing, its call the crafts done. */
+	/** A fault its robot's robotics answers mid-count ends the craft in its shape, its call the crafts done. */
 	@Test
-	void itsBenchMissingMidCountEndsAFault() {
+	void aFaultMidCountEndsTheCraft() {
 		card.called("craft", List.of(3L));
 		card.craft(args(3L));
 		card.tick(); // (no craft yet: it takes its time)
 		for (int tick = 1; tick < CraftingCard.CRAFT_TICKS; tick++) {
 			card.tick();
 		}
-		crafts = Buffered.missing(Buffered.MISSING_BENCH);
+		crafts = Buffered.missing(Buffered.MISSING_ROBOTICS);
 		craftsTillItEnds();
-		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "craft", "ok", false, "why", "fault", "condition", "missing", "part", "bench", "message", "crafting bench required",
+		assertThat(card.pull(args()).first()).isEqualTo(Map.of("event", "craft", "ok", false, "why", "fault", "condition", "missing", "part", "robotics", "message", "robotics required",
 			"call", Map.of("args", List.of(3L), "progress", 1L)));
 	}
 

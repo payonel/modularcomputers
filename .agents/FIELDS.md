@@ -59,7 +59,7 @@ A refusal's (`Failure`'s builders) and an end's (`EventQueue`'s). Every field al
 | `symbolic_link` | `at`, `target` | a disk path met a link: the OS goes on from it |
 | `missing_inputs` | `name`, `call` | a craft's grid makes nothing (an end) |
 | `no_space` | `name`, `call` | no room for what a craft makes (an end) |
-| `blocked` | `name`, `face`, `call` | a move met something (an end; a field's notice, without `call`; robotics' notice, `position` for `call`: a pathfinding walk's way met what it didn't expect); `name` the block's id, or (a robot's) the type's id of a thing it couldn't push out of its way |
+| `blocked` | `name`, `face`, `call` | a move met something (an end; a field's notice, without `call`; robotics' notice, `position` for `call`: a pathfinding walk's way met what it didn't expect); `name` the block's id, or (a robot's) the type's id of a thing that stopped it (walking, one it couldn't push out of its way; on its thrusters, any) |
 | `stopped` | `call` | a program's `stop()` ended it (an end) |
 | `lost` | `name`, `id`, `at`, `call` | what it acted on is gone |
 | `unbreakable` | `name`, `id`, `at`, `call` | the game won't let it break (a swing's end) |

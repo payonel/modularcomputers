@@ -853,20 +853,106 @@ public class GolemFlightGameTest {
 			.thenSucceed();
 	}
 
-	/** A pig in a flight's way is shoved aside, and it flies on, arriving; the pig in no block. (It flew through it: seen failing.) */
+	/**
+	 * A pig in a flight's way blocks it (the user's: a flying bot can't shove, it needs legs), named
+	 * by its type, on the face that met it; it hovers there, short of the pig, which stays where it
+	 * was. (It shoved the pig aside and flew on: seen failing.)
+	 */
 	@GameTest(maxTicks = 200)
-	public void aPigInAFlightsWayIsShovedAside(GameTestHelper helper) {
+	public void aPigInAFlightsWayBlocksIt(GameTestHelper helper) {
 		BotGolem golem = golem(helper, false);
 		var pig = GolemWalkGameTest.stillPig(helper, new BlockPos(1, 1, 1).east(3));
 		List<Object> events = events(helper, golem);
-		double line = helper.absoluteVec(Vec3.atBottomCenterOf(new BlockPos(1, 1, 1))).z;
-		helper.onEachTick(() -> helper.assertTrue(GolemWalkGameTest.inNoBlock(helper, pig), "the pig in no block: " + pig.position()));
+		Vec3[] was = new Vec3[1];
 		helper.startSequence()
-			.thenExecuteAfter(3, () -> golem.robotics().fly(args(5.0, 0.0, 0.0)))
+			.thenExecuteAfter(3, () -> {
+				was[0] = pig.position();
+				golem.robotics().fly(args(5.0, 0.0, 0.0));
+			})
 			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its flight ended"))
 			.thenExecute(() -> {
-				same(helper, events.getLast(), event("fly"), "it flew on");
-				helper.assertTrue(Math.abs(pig.getZ() - line) >= 0.8, "the pig shoved aside: " + pig.position());
+				same(helper, GameTests.withoutCall(events.getLast()),
+					java.util.Map.of("event", "fly", "ok", false, "why", "blocked", "name", "minecraft:pig", "face", "front"), "by the pig");
+				same(helper, golem.robotics().state(), RoboticsDevice.HOVERING, "hovering there");
+				helper.assertTrue(golem.getBoundingBox().maxX <= pig.getBoundingBox().minX + 1e-6, "short of it");
+				helper.assertTrue(pig.position().distanceTo(was[0]) < 1e-6, "the pig not shoved: " + pig.position() + ", was " + was[0]);
+			})
+			.thenSucceed();
+	}
+
+	/**
+	 * A landing without its legs onto a creature is blocked by it (a flying bot can't shove): down,
+	 * by its type, and it goes on hovering, the pig where it was. (It shoved the pig aside and landed:
+	 * seen failing.)
+	 */
+	@GameTest(maxTicks = 200)
+	public void aLandingWithForceOntoAPigIsBlockedByIt(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
+		Object[] pig = new Object[1];
+		Vec3[] was = new Vec3[1];
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().fly(args(0.0, 0.0, LIFT)))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "up: " + events))
+			.thenExecute(() -> {
+				for (GolemLegs legs : legs(helper)) {
+					legs.discard(); // (no legs: it lands on what's under it)
+				}
+				pig[0] = GolemWalkGameTest.stillPig(helper, AT);
+			})
+			.thenExecuteAfter(1, () -> {
+				events.clear();
+				was[0] = ((net.minecraft.world.entity.Entity) pig[0]).position();
+				helper.assertTrue(Boolean.TRUE.equals(golem.robotics().land(args(true)).first()), "land(true): a command");
+			})
+			.thenWaitUntil(() -> helper.assertTrue(!events.isEmpty(), "its landing ended"))
+			.thenExecute(() -> {
+				var thing = (net.minecraft.world.entity.Entity) pig[0];
+				same(helper, GameTests.withoutCall(events.getLast()),
+					java.util.Map.of("event", "land", "ok", false, "why", "blocked", "name", "minecraft:pig", "face", "down"), "by the pig");
+				helper.assertTrue(golem.thrusting() && !golem.legs(), "still hovering, legless");
+				helper.assertTrue(golem.getBoundingBox().minY >= thing.getBoundingBox().maxY - 1e-6, "above it");
+				helper.assertTrue(thing.position().distanceTo(was[0]) < 1e-6, "the pig not shoved: " + thing.position() + ", was " + was[0]);
+			})
+			.thenSucceed();
+	}
+
+	/**
+	 * A landing comes down as a drone does (the user's): at its flight's speed till it's within
+	 * {@link BotGolem#LANDING_SLOWING} of its legs, then slowly for those last blocks, onto them. So
+	 * from high above it lands in about a flight's ticks for the fast part and the slow last blocks',
+	 * far sooner than its slow pace all the way allows. (It came down slowly all the way: seen failing.)
+	 */
+	@GameTest(maxTicks = 2400)
+	public void aLandingComesDownFastThenSlowsForItsLastBlocks(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		List<Object> events = events(helper, golem);
+		double[] height = new double[1];
+		long[] began = new long[1];
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> golem.robotics().fly(args()))
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("fly")), "off its legs: " + events))
+			.thenExecute(() -> {
+				events.clear();
+				int bottom = pit(helper, golem);
+				GolemLegs legs = legs(helper).getFirst();
+				legs.setPos(legs.getX(), bottom, legs.getZ()); // (its legs at the bottom, far below)
+				height[0] = golem.getY() - bottom; // (its torso comes down to where its legs stand)
+				helper.assertTrue(height[0] > 4 * BotGolem.LANDING_SLOWING, "far above them: " + height[0]);
+				helper.assertTrue(Boolean.TRUE.equals(golem.robotics().land(args()).first()), "land(): its legs found");
+				began[0] = helper.getTick();
+			})
+			.thenWaitUntil(() -> helper.assertTrue(events.contains(event("land")), "down onto its legs: " + events))
+			.thenExecute(() -> {
+				long took = helper.getTick() - began[0];
+				// The fast part at a flight's speed; the slow part at its landing speed, then over its last
+				// block easing to its slowest at worst; a tick either side for its start and its end.
+				double fast = Math.ceil((height[0] - BotGolem.LANDING_SLOWING) / BotGolem.THRUST_SPEED);
+				double slow = Math.ceil((BotGolem.LANDING_SLOWING - BotGolem.LANDING_EASE) / BotGolem.LANDING_SPEED)
+					+ Math.ceil(BotGolem.LANDING_EASE / (BotGolem.LANDING_SPEED * BotGolem.LANDING_SLOWEST));
+				helper.assertTrue(took <= fast + slow + 2, "a flight's pace, then slow: " + took + " ticks for " + height[0] + " blocks");
+				helper.assertTrue(took < height[0] / BotGolem.LANDING_SPEED, "sooner than its slow pace all the way: " + took + " ticks");
+				helper.assertTrue(golem.legs() && !golem.thrusting(), "on its legs");
 			})
 			.thenSucceed();
 	}

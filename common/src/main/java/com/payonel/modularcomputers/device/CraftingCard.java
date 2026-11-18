@@ -94,6 +94,7 @@ public final class CraftingCard extends Card implements Buffered {
 		return events.endsMax();
 	}
 	private final BusPower power = new BusPower(0);
+	/** In nothing that works it (a case's card, before its holder gives it one): no robotics. */
 	private Bench bench = new Bench() {
 		@Override
 		public boolean robotics() {
@@ -141,7 +142,7 @@ public final class CraftingCard extends Card implements Buffered {
 		}
 
 		private Result none() {
-			return Buffered.missing(MISSING_BENCH);
+			return Buffered.missing(MISSING_ROBOTICS); // (never reached: with no robotics, every method fails before it asks)
 		}
 	};
 	/** Crafts still to make, of those asked for; the crafts done so far (its call's progress), and the items they made. */

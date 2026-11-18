@@ -115,6 +115,7 @@ local devices = {
 
 local DISK = "storage" -- a disk's device type: its file is a block device's
 local SOUND = "sound" -- a sound card's: its file is OSS's /dev/dsp
+local NOT_FOUND = "not_found" -- the board's why for what isn't there (a method a device hasn't)
 
 -- What a path in /dev names: one of the kernel's devices (its maker), or a bus device (every one
 -- has a file).
@@ -548,8 +549,7 @@ end
 -- A device with nothing to read or write (no get, set or events): its file says what it is, its
 -- type, id, slot, label and methods, a line each (its methods are its ioctls).
 local function aboutfile(device)
-  local methods = board.methods(device.id) or {}
-  table.sort(methods)
+  local methods = k.methods(device)
   local text = table.concat({"type " .. tostring(device.type), "id " .. tostring(device.id), "path " .. (device.path or "-"),
     "label " .. (device.label or "-"), "methods " .. table.concat(methods, " ")}, "\n") .. "\n"
   local at = 0
@@ -813,6 +813,9 @@ local function withmethods(d, device)
     if type(op) ~= "string" then
       return fail("ENOTTY")
     end
+    if not k.offered(device, op) then -- (the kernel's own: not there, as the board says of a method it hasn't)
+      return nil, NOT_FOUND, "EINVAL", {why = NOT_FOUND, kind = "method", value = op}
+    end
     k.news[id] = nil -- (asked: its news is looked at)
     if op == "pull" and d.held then
       local event = d.held(d)
@@ -858,11 +861,6 @@ local function withmethods(d, device)
     end
     if answer.n == 1 then
       return true -- (a method that answers nothing: done)
-    end
-    for i = 2, answer.n do
-      if type(answer[i]) == "userdata" then
-        return nil, "a handle stays in the kernel: use the filesystem", "EINVAL" -- (a disk's open)
-      end
     end
     return table.unpack(answer, 2, answer.n)
   end

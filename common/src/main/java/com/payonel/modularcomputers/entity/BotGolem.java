@@ -89,11 +89,18 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	private static final EntityDataAccessor<Boolean> THRUSTING = SynchedEntityData.defineId(BotGolem.class, EntityDataSerializers.BOOLEAN);
 	/** How fast its thrusters fly it, in blocks a tick: 25 a second (clearly faster than its field's 10; a player sprints 5.6). */
 	public static final double THRUST_SPEED = 1.25;
-	/** How fast it comes down onto its legs, in blocks a tick. */
-	private static final double LANDING_SPEED = 0.25;
-	/** How far from its legs it starts slowing, in blocks, and its slowest then (a share of its speed). */
-	private static final double LANDING_EASE = 1;
-	private static final double LANDING_SLOWEST = 0.1;
+	/**
+	 * How far above where it lands (its legs, or the ground) a landing slows, in blocks: above it, it
+	 * comes down at its flight's speed ({@link #THRUST_SPEED}); within it, at {@link #LANDING_SPEED}.
+	 * As a drone's autopilot lands (ArduPilot's LAND_ALT_LOW, PX4's MPC_LAND_ALT1: fast down to a
+	 * few metres, then slowly), its few metres a block-high robot's few blocks.
+	 */
+	public static final double LANDING_SLOWING = 3;
+	/** How fast it comes down for its last blocks ({@link #LANDING_SLOWING}), in blocks a tick. */
+	public static final double LANDING_SPEED = 0.25;
+	/** How far from where it lands it eases down further, in blocks, and its slowest then (a share of its landing speed). */
+	public static final double LANDING_EASE = 1;
+	public static final double LANDING_SLOWEST = 0.1;
 	/** How near a flight's point counts as there, in blocks. */
 	private static final double FLOWN = 0.05;
 	/** A tick's flight that makes less than this share of its step is blocked (something in the way). */
@@ -1344,14 +1351,14 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		Vec3 from = position();
 		Barred barred = barredOn(step);
 		Vec3 go = barred != null ? barred.short_() : step;
-		Bumped bumped = bumpedOn(go); // (what's in its way pushed aside, the user's: as a walk's)
+		Bumped bumped = bumpedOn(go); // (what's in its way stops it: flying, it can't shove, the user's)
 		move(net.minecraft.world.entity.MoverType.SELF, bumped != null ? bumped.short_() : go);
 		setDeltaMovement(Vec3.ZERO);
 		if (bumped != null) {
 			flyTo = null;
 			flightPath = null;
 			restoreHeading();
-			robotics.blocked(GolemShove.name(bumped.thing()), faceOf(bumped.side())); // (what it couldn't push out of its way: a standing golem, an armor stand)
+			robotics.blocked(GolemShove.name(bumped.thing()), faceOf(bumped.side())); // (a pig as a standing golem: by its type)
 			robotics.hovering();
 		} else if (barred != null) {
 			flyTo = null;
@@ -1375,21 +1382,23 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	/** How far a move's barred check goes at a time along it, in blocks: finer than its body, so no block it passes is missed. */
 	private static final double BARRED_GRAIN = 0.25;
 
-	/** A move's way into a thing it couldn't push out of it: the thing, the side of its body that met it (a world direction), and as much of the move as goes before. */
+	/** A move's way into a thing on its thrusters: the thing, the side of its body that met it (a world direction), and as much of the move as goes before. */
 	private record Bumped(net.minecraft.world.entity.Entity thing, Vec3 side, Vec3 short_) {
 	}
 
 	/**
-	 * A move {@code step} from where it is (a flight's, a landing's), the space its body goes into
-	 * cleared as it goes, a part at a time (the user's, 2026-11-15: what can be pushed, shoved out of
-	 * its way, {@link GolemShove}): the first thing there it can't push out of it, or null.
+	 * A move {@code step} from where it is on its thrusters (a flight's, a landing's), the space its
+	 * body goes into looked at as it goes, a part at a time: the first thing there, pushable or not,
+	 * or null. On its thrusters it shoves nothing (the user's, 2026-11-18: a flying bot can't shove,
+	 * it needs legs; only a walk does, {@link GolemShove#clear}), so whatever's there stops it. Its
+	 * own legs it's landing on aren't in its way ({@link #canCollideWith}).
 	 */
 	private Bumped bumpedOn(Vec3 step) {
 		net.minecraft.world.phys.AABB box = getBoundingBox();
 		int parts = Math.max(1, (int) Math.ceil(step.length() / BARRED_GRAIN));
 		for (int part = 1; part <= parts; part++) {
 			net.minecraft.world.phys.AABB moved = box.move(step.scale(part / (double) parts));
-			var met = GolemShove.clear(this, moved, step);
+			var met = GolemShove.met(this, moved, step);
 			if (met != null) {
 				return new Bumped(met, GolemShove.side(moved, met), step.scale((part - 1) / (double) parts));
 			}
@@ -1418,15 +1427,15 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 
 	/** A tick's landing: down to its legs (straight onto them once close: they'd stop a collision), and on, its legs gone into it. */
 	/**
-	 * A tick of a landing without its legs (land with force): straight down, slowing over its last
-	 * block, onto what's beneath it; there its thrusters stop, and it rests on the ground, legless,
-	 * still running (not a crash: nothing let go of it).
+	 * A tick of a landing without its legs (land with force): straight down, fast then slowing over
+	 * its last blocks ({@link #landingStep}), onto what's beneath it; there its thrusters stop, and it
+	 * rests on the ground, legless, still running (not a crash: nothing let go of it). A thing in its
+	 * way (a creature on the ground there) stops it, blocked, and it hovers: it can't shove.
 	 */
 	private void groundStep() {
 		Vec3 left = groundLanding.subtract(position());
 		if (left.length() > ON_LEGS) {
-			double speed = LANDING_SPEED * Math.max(LANDING_SLOWEST, Math.min(1, left.length() / LANDING_EASE));
-			Vec3 step = left.scale(Math.min(1, speed / left.length()));
+			Vec3 step = landingStep(left);
 			Vec3 from = position();
 			Barred barred = barredOn(step);
 			if (barred != null) {
@@ -1437,7 +1446,15 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				robotics.hovering();
 				return;
 			}
-			bumpedOn(step); // (what can be pushed, shoved aside; what can't, it comes down onto, as onto a block's top: below)
+			Bumped bumped = bumpedOn(step);
+			if (bumped != null) {
+				move(net.minecraft.world.entity.MoverType.SELF, bumped.short_());
+				setDeltaMovement(Vec3.ZERO);
+				groundLanding = null;
+				robotics.blocked(GolemShove.name(bumped.thing()), faceOf(bumped.side())); // (on a pig as on a standing golem: by its type; it goes on hovering)
+				robotics.hovering();
+				return;
+			}
 			move(net.minecraft.world.entity.MoverType.SELF, step);
 			setDeltaMovement(Vec3.ZERO);
 			if (position().distanceTo(from) >= step.length() * BLOCKED_SHARE) {
@@ -1451,6 +1468,18 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		thrusters(false);
 		airborne = false; // (down by its own landing: nothing let go of it)
 		robotics.landed();
+	}
+
+	/**
+	 * A tick's step of a landing, {@code left} the way to where it lands: at its flight's speed till
+	 * it's {@link #LANDING_SLOWING} above it (never past that, so its last blocks are all slow), then
+	 * at its landing speed, easing over its last {@link #LANDING_EASE} (the user's, as a drone lands).
+	 */
+	private static Vec3 landingStep(Vec3 left) {
+		double length = left.length();
+		double speed = length > LANDING_SLOWING ? Math.min(THRUST_SPEED, length - LANDING_SLOWING)
+			: LANDING_SPEED * Math.max(LANDING_SLOWEST, Math.min(1, length / LANDING_EASE));
+		return left.scale(Math.min(1, speed / length));
 	}
 
 	/** Where its torso comes down to straight below it, on what it would rest on, however far down (null: nothing, down to the world's bottom). */
@@ -1477,9 +1506,8 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 		Vec3 left = landing.position().subtract(position());
 		if (left.length() > ON_LEGS) {
-			// Over its last block it slows, settling onto its legs (the user's), as a craft easing down.
-			double speed = LANDING_SPEED * Math.max(LANDING_SLOWEST, Math.min(1, left.length() / LANDING_EASE));
-			Vec3 step = left.scale(Math.min(1, speed / left.length()));
+			// Fast, then slowing over its last blocks, settling onto its legs (the user's), as a drone lands.
+			Vec3 step = landingStep(left);
 			// With the world's collisions all the way down, never through blocks (the user's): its own legs, the
 			// ones it lands on, are all it passes (canCollideWith), to settle onto them.
 			Vec3 from = position();
@@ -1492,7 +1520,15 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 				robotics.hovering();
 				return;
 			}
-			bumpedOn(step); // (what can be pushed, shoved aside; what can't, its collisions meet, as now)
+			Bumped bumped = bumpedOn(step); // (a thing on its way down, on its legs too, stops it: it can't shove)
+			if (bumped != null) {
+				move(net.minecraft.world.entity.MoverType.SELF, bumped.short_());
+				setDeltaMovement(Vec3.ZERO);
+				landing = null;
+				robotics.blocked(GolemShove.name(bumped.thing()), faceOf(bumped.side()));
+				robotics.hovering();
+				return;
+			}
 			move(net.minecraft.world.entity.MoverType.SELF, step);
 			if (position().distanceTo(from) < step.length() * BLOCKED_SHARE) {
 				landing = null;

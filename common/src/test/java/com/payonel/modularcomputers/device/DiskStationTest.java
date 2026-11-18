@@ -116,4 +116,27 @@ class DiskStationTest {
 		assertThat(target).containsEntry("mode", Disk.RAW).containsEntry("tier", 1L);
 		bay.disks.get(DiskStation.TARGET).retire();
 	}
+
+	/** A disk with no label says so with "" (the field dictionary's: every field always there), one with one its label. */
+	@Test
+	void aDiskWithNoLabelHasAnEmptyOne() {
+		bay.disks.put(DiskStation.TARGET, disk("h"));
+		Disk named = disk("i");
+		named.labelIn(new com.payonel.modularcomputers.bus.Label(() -> "backups", null));
+		bay.disks.put(DiskStation.SOURCE, named);
+		@SuppressWarnings("unchecked")
+		Map<String, Map<String, Object>> state = (Map<String, Map<String, Object>>) station.get(args()).first();
+		assertThat(state.get(DiskStation.TARGET)).containsEntry("label", "");
+		assertThat(state.get(DiskStation.SOURCE)).containsEntry("label", "backups");
+		bay.disks.values().forEach(Disk::retire);
+	}
+
+	/** An action by a name it doesn't have is the host's bug (only its menu asks, and only for its buttons): nothing done. */
+	@Test
+	void anActionItDoesntHaveIsTheHostsBug() {
+		bay.disks.put(DiskStation.TARGET, disk("j"));
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> station.act("frobnicate")).isInstanceOf(IllegalArgumentException.class);
+		assertThat(Files.exists(world.resolve("j").resolve("home"))).as("nothing done").isTrue();
+		bay.disks.get(DiskStation.TARGET).retire();
+	}
 }

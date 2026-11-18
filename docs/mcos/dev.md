@@ -61,7 +61,8 @@ kind of device on the bus, and in it a directory for each device, by its `/dev` 
 `/sys/class` has (`/sys/class/net/eth0`). In a device's directory, its attributes are small
 read-only files (`type`, `id`, `path`: its slot, or `-` when it's cabled; `label`), and `methods`
 has a file for each of its methods (its file's ioctls): the method's arguments and what it does,
-from the device's own descriptions. Linux has a `/sys/devices` tree too, by where each device is
+from the device's own descriptions. A method only the kernel can use (a disk's `open`, whose handle
+stays in the kernel) is neither listed there nor an ioctl: asked for, it's a method the device doesn't have. Linux has a `/sys/devices` tree too, by where each device is
 attached; mcos's bus is flat, so there's only the class tree.
 
 ```sh

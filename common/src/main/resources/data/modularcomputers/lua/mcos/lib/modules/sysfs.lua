@@ -73,9 +73,7 @@ local function about(device, name)
 end
 
 local function methods(device)
-  local list = board.methods(device.id) or {}
-  table.sort(list)
-  return list
+  return k.methods(device) -- (what its file offers: not the kernel's own)
 end
 
 local function kind(device)

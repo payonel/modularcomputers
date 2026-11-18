@@ -70,6 +70,29 @@ function k.invoke(id, method, ...)
   return table.unpack(answer, 1, answer.n)
 end
 
+-- Device methods only the kernel calls, by device type: the board's layer, what they answer can't
+-- leave the kernel (a disk's open, a handle: "a handle stays in the kernel"). Through /dev and /sys
+-- they aren't there: an ioctl naming one answers as for a method the device doesn't have.
+local KERNEL_METHODS = {storage = {open = true}}
+
+-- Whether a program may call a device's method through its file (not one of the kernel's own).
+function k.offered(device, method)
+  local own = KERNEL_METHODS[device.type]
+  return not (own and own[method])
+end
+
+-- The methods a program may call on a device (its file's ioctls), sorted.
+function k.methods(device)
+  local list = {}
+  for _, name in ipairs(board.methods(device.id) or {}) do
+    if k.offered(device, name) then
+      list[#list + 1] = name
+    end
+  end
+  table.sort(list)
+  return list
+end
+
 -- A file of the kernel's, read off the boot disk itself (the VFS isn't up yet), run with its arguments.
 local function kload(path, ...)
   local opened, file = k.invoke(root, "open", path)
@@ -196,7 +219,7 @@ function k.refreshdevices()
     local about = described[id]
     if not about then
       local info = board.info(device.address) or {}
-      about = {label = info.label}
+      about = {label = info.label ~= "" and info.label or nil} -- ("": none)
       for _, method in ipairs(board.methods(device.address) or {}) do
         if method == "get" or method == "set" or method == "pull" then
           about[method] = true
@@ -204,7 +227,8 @@ function k.refreshdevices()
       end
       described[id] = about
     elseif not was[id] then
-      about.label = (board.info(device.address) or {}).label -- (back: relabeled elsewhere, maybe)
+      local label = (board.info(device.address) or {}).label -- (back: relabeled elsewhere, maybe)
+      about.label = label ~= "" and label or nil
     end
     local slot = device.address ~= device.id and not device.address:find("^id:") and device.address or nil
     local name = SINGLE[slot] or LINUX[kind] and LINUX[kind] .. (n == 0 and "" or n) or kind .. n

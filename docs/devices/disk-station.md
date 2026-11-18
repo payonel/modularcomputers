@@ -76,9 +76,8 @@ local ok, why = sys.ioctl(sys.fileno(io.open("/dev/diskstation0")), "install")
 
 Every action fails with a fault, `condition = "missing"`, when it can't be done: `part = "destination"`
 (`message = "storage disk target required"`) when the target slot is empty, and `part = "power"` when
-neither the bus nor the battery can pay for it. An action asked for by a name that isn't one of
-these (its screen's switches ask by name) is `{why = "bad_argument", argument = 1, value = the name,
-expected = "action"}`; a line written that isn't one fails the write with `EINVAL`.
+neither the bus nor the battery can pay for it. A line written that isn't an action fails the write
+with `EINVAL`.
 
 ### format() → nothing
 
@@ -109,7 +108,7 @@ left, and `/home` is never written over. The target must be hfs (a raw one fails
 
 ### get() → {target = disk, source = disk}
 
-The state of the slots. A disk is `{tier, mode, used, capacity, label}`; `label` is left out when
+The state of the slots. A disk is `{tier, mode, used, capacity, label}`; `label` is `""` when
 the disk has none, and an empty slot is left out of the table.
 
 ## Events

@@ -43,10 +43,11 @@ class FailureTest {
 	/** Every part a fault finds missing has its message; a part with none is refused, never said without one. */
 	@Test
 	void aMissingPartIsOneWithItsMessage() {
-		for (String part : List.of("legs", "thrusters", "power", "bench", "robotics", "body", "position", "projector", "destination", "source")) {
+		for (String part : List.of("legs", "thrusters", "power", "robotics", "body", "position", "projector", "destination", "source")) {
 			assertThat((String) Failure.missing(part).get("message")).as(part).isNotEmpty();
 		}
 		assertThatThrownBy(() -> Failure.missing("storage")).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> Failure.missing("bench")).as("a crafting card has no bench of its own: robotics works it").isInstanceOf(IllegalArgumentException.class);
 	}
 
 	/** The host's errors never reach a program: their text could tell of the host (its paths, its classes). */
