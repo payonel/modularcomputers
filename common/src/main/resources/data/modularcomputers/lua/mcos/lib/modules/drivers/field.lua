@@ -50,10 +50,7 @@ return {
       if not at then
         return nil
       end
-      if action == "move" then
-        return "move", at[1], at[2], at[3]
-      end
-      return "capture", at
+      return action, at[1], at[2], at[3] -- (capture and move take a point alike: forward, right, up)
     end
   end,
 }

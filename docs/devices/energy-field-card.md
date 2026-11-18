@@ -101,10 +101,11 @@ a list of things in the same shape as a [robot's `scan`](/devices/robotics/) giv
 `{kind = "entity", name, id, at}`: what it is (`name`, its registry id), its own `id` (for
 `capture`), and where it is (`at`, `{forward, right, up}` in its computer's frame).
 
-### capture(target) → name, or nil and why
+### capture(target | forward[, right[, up]]) → name, or nil and why
 
-Holds a creature or an item: an `id` from `scan`, `"self"` (a robot holding itself, legs and all), or a point
-`forward[, right[, up]]` (the nearest thing within a block and a half of it). Answers its name.
+Holds a creature or an item: `target` an `id` from `scan` or `"self"` (a robot holding itself, legs
+and all), or a point, `forward[, right[, up]]`, given as `move` takes one (`field.capture(3, 0, 1)`),
+the nearest thing within a block and a half of it. Answers its name.
 Fails with `{why = "bad_state", of = "hold", value, expected = "empty"}` (it holds something
 already, `value` its id), `{why = "not_found", kind = "entity", value}`
 (nothing near the point, `value` the point; or no such creature, `value` its id), `bad_argument`

@@ -174,7 +174,7 @@ public final class FieldCard extends Card implements Buffered {
 		return projector.scan(Math.min(RANGE, Math.max(0, range)));
 	}
 
-	@Method(doc = "capture(target): suspends a creature or an item in its field, where it can't act: an id from scan, \"self\" (a robot holding itself), or a point, forward[, right[, up]], the nearest within a block and a half of it; what it holds (its name), or false and why")
+	@Method(doc = "capture(target | forward[, right[, up]]): suspends a creature or an item in its field, where it can't act: target an id from scan or \"self\" (a robot holding itself), or a point, forward[, right[, up]] in its computer's frame (as move takes it), the nearest within a block and a half of it; what it holds (its name), or false and why")
 	public Result capture(Arguments args) {
 		Result no = noProjector();
 		if (no != null) {
@@ -187,9 +187,6 @@ public final class FieldCard extends Card implements Buffered {
 		Result held;
 		if (args.get(0) instanceof String id) {
 			held = projector.capture(id, null);
-		} else if (args.get(0) instanceof java.util.List<?> point) {
-			// (a point as a list: forward, right, up)
-			return capture(new Arguments(new java.util.ArrayList<>(point)));
 		} else {
 			double[] at = {args.checkNumber(0), args.count() > 1 ? args.checkNumber(1) : 0, args.count() > 2 ? args.checkNumber(2) : 0};
 			held = projector.capture(null, at);

@@ -27,6 +27,7 @@ class FieldCardTest {
 
 			@Override
 			public Result capture(String id, double[] at) {
+				capturedAt = at;
 				holding = true;
 				return Result.ok("minecraft:pig");
 			}
@@ -70,8 +71,23 @@ class FieldCardTest {
 		card.accepting(true);
 	}
 
+	/** Where the projector was last asked to capture, a point (null: by an id). */
+	private double[] capturedAt;
+
 	private static Arguments args(Object... values) {
 		return new Arguments(List.of(values));
+	}
+
+	/**
+	 * A point is given as move takes one, three numbers (the user's, 2026-11-18: the method's call is
+	 * its file's line, capture 3 0 1); a point wrapped in a table is no argument it takes.
+	 */
+	@Test
+	void aCaptureTakesItsPointAsMoveDoesThreeNumbers() {
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> card.capture(args(List.of(3.0, 0.0, 1.0)))).as("a table: a bad argument")
+			.isInstanceOf(Arguments.ArgumentError.class).hasMessageContaining("expected=number");
+		assertThat(card.capture(args(3.0, 0.0, 1.0)).failed()).isFalse();
+		assertThat(capturedAt).containsExactly(3.0, 0.0, 1.0);
 	}
 
 	@Test
