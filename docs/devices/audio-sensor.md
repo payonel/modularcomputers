@@ -77,7 +77,7 @@ local event = sys.ioctl(fd, "pull")  -- {event = "sound", name = "minecraft:enti
 | `at` | `{forward, right, up}`: where it came from, from its computer's middle, in its frame, in blocks, to one decimal place |
 | `lost` | present when events were dropped: how many |
 
-Each sound heard raises the sensor's interrupt, which stays raised while any wait. At most 512 wait (its [ring depth](/concepts/interrupts/)). When more come, the oldest goes and the next event carries `lost`. Events are kept
+Each sound heard raises the sensor's interrupt, which stays raised while any wait. At most its [ring depth](/concepts/interrupts/) wait. When more come, the oldest goes and the next event carries `lost`. Events are kept
 across a save, and dropped while no program runs. A [sound card](/devices/sound-card/) starting to
 play is heard once at its start.
 

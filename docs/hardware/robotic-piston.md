@@ -15,7 +15,7 @@ A robotic piston is a piston a computer can push with.
 | Kinds | Robotic Piston, Robotic Sticky Piston |
 | Stack | 64 |
 | Slots | 1, for a Bluetooth card |
-| Power | 6.94 mWh a push (five ticks of a running CPU), from the bus |
+| Power | Each push costs power, from the bus (a server setting: see [Settings](/settings/#power-cost)) |
 | Faces | Its front is opposite its cable port |
 
 </div>

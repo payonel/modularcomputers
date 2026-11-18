@@ -18,7 +18,7 @@ goes into its storage.
 | Where | Any expansion slot of a computer or a [Bot Golem](/hardware/bot-golem/) |
 | `/dev` | `crafting0` (`crafting1` the next) |
 | Slots | 1 to 9 its grid (rows left to right, top to bottom), 10 to 25 its storage |
-| Power | A running CPU's tick for each craft, and each move |
+| Power | Each craft, and each move, costs power (a server setting: see [Settings](/settings/#power-cost)) |
 | Recipe | Crafting table, chip, chest over three copper nuggets over three gold nuggets |
 
 </div>
@@ -59,9 +59,9 @@ card's, and goes on, but the robot is what works the card (a case has none), so 
 card is given waits until the robot is let go. Its `pull`, `list` (its own
 slots) and `stop` never wait. At the board a refusal names the device whose news ends the wait:
 the robot while it's busy (`false, {why = "busy", id = "id:<the robot>"}`), the card itself while it crafts.
-A command given while 512 of its ends wait unread (its
-[ring depth](/concepts/interrupts/#no-end-is-ever-lost)) is refused,
-`{why = "limit", of = "events", max = 512}`, until its program reads some with `pull`: in mcos,
+A command given while as many of its ends wait unread as its
+[ring depth](/concepts/interrupts/#no-end-is-ever-lost) is refused,
+`{why = "limit", of = "events", max}`, until its program reads some with `pull`: in mcos,
 `nil`, `"limit"`, `EAGAIN` and the failure.
 
 ## In mcos

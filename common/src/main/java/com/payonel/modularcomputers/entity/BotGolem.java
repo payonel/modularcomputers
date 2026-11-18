@@ -257,7 +257,7 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	public static AttributeSupplier attributes() {
 		return PathfinderMob.createMobAttributes()
 			.add(Attributes.MOVEMENT_SPEED, WALKING_SPEED)
-			.add(Attributes.FOLLOW_RANGE, GolemWayfinder.DEFAULT_RANGE)
+			.add(Attributes.FOLLOW_RANGE, GolemWayfinder.range()) // (as loaded; each golem's is set again as it searches)
 			.build();
 	}
 

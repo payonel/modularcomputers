@@ -457,7 +457,7 @@ public class GolemPathfindingGameTest {
 	/** How far over the test's space the long wall's test builds, in blocks: over every maze here. */
 	private static final int WALL_UP = 72;
 	/** How far the long wall reaches either side of the golem, in blocks: its ends farther than a leg's range. */
-	private static final int WALL_REACH = com.payonel.modularcomputers.entity.GolemWayfinder.DEFAULT_RANGE + 8;
+	private static final int WALL_REACH = com.payonel.modularcomputers.entity.GolemWayfinder.range() + 8;
 
 	/**
 	 * A search goes only the pathfinding range (the user's, 2026-11-14: 96 blocks walked): its target

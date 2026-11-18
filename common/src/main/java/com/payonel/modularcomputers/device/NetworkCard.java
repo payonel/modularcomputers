@@ -2,7 +2,6 @@ package com.payonel.modularcomputers.device;
 
 import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.InterruptLine;
-import com.payonel.modularcomputers.power.PowerUnits;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
@@ -46,14 +45,6 @@ public final class NetworkCard extends Card {
 	public static final int WIRED_DRAW = 2;
 	/** What a WLAN card draws a tick, at rest (its radio listening). */
 	public static final int WIRELESS_DRAW = 5;
-	/** What sending a frame costs a wired card. */
-	public static final int WIRED_SEND_COST = PowerUnits.CPU / 10;
-	/**
-	 * What sending a frame costs a WLAN card for each block its signal reaches (OpenComputers'
-	 * wirelessCostPerRange: a farther signal costs more): a tier 1 at its strongest, a tick of a
-	 * running CPU.
-	 */
-	public static final double WIRELESS_SEND_COST_PER_BLOCK = (double) PowerUnits.CPU / TIER1_RANGE;
 	/** The longest wake message, in bytes. */
 	public static final int MAX_WAKE = 256;
 	private final InterruptLine line = new InterruptLine();
@@ -247,7 +238,8 @@ public final class NetworkCard extends Card {
 		if (data.length() > MTU) {
 			throw new Arguments.ArgumentError(com.payonel.modularcomputers.runtime.Failure.limit("data", MTU));
 		}
-		power.charge(wireless() ? (int) Math.ceil(strength * WIRELESS_SEND_COST_PER_BLOCK) : WIRED_SEND_COST);
+		var costs = com.payonel.modularcomputers.config.ModConfig.costs(); // (a WLAN card's by the blocks its signal reaches: OpenComputers' wirelessCostPerRange)
+		power.charge(wireless() ? (int) Math.ceil(strength * costs.wirelessSendPerBlock()) : costs.wiredSend());
 		return data;
 	}
 

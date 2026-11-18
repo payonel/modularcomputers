@@ -2,7 +2,6 @@ package com.payonel.modularcomputers.device;
 
 import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.InterruptLine;
-import com.payonel.modularcomputers.power.PowerUnits;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
@@ -34,10 +33,6 @@ public final class FieldCard extends Card implements Buffered {
 		com.payonel.modularcomputers.runtime.Result.fail(com.payonel.modularcomputers.runtime.Failure.limit("reach", (long) RANGE));
 	/** How near a point given to capture something must be, in blocks. */
 	public static final double REACH = 1.5;
-	/** What holding costs, a tick: two running CPUs'. */
-	public static final int HOLD_COST = 2 * PowerUnits.CPU;
-	/** What moving what it holds costs, a block: a running CPU's tick. */
-	public static final int MOVE_COST = PowerUnits.CPU;
 	public static final String IDLE = "idle";
 	public static final String HOLDING = "holding";
 	/** What a field's bad_state is of: its hold, and what a capture needs it to be (one at a time). */
@@ -157,14 +152,14 @@ public final class FieldCard extends Card implements Buffered {
 			lost(why);
 			return;
 		}
-		power.charge(HOLD_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().fieldHold());
 	}
 
 	/** What it holds moved {@code blocks} (paid for as it goes). */
 	public void movedBy(double blocks) {
 		moved += blocks;
 		if (moved >= 1) {
-			power.charge((int) Math.floor(moved) * MOVE_COST);
+			power.charge((int) Math.floor(moved) * com.payonel.modularcomputers.config.ModConfig.costs().fieldMove());
 			moved -= Math.floor(moved);
 		}
 	}

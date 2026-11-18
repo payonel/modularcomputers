@@ -77,7 +77,7 @@ public class ChargingPadGameTest {
 		BotGolem golem = golem(helper, PAD);
 		helper.succeedWhen(() -> {
 			helper.assertTrue(pad.charging(), "charging");
-			helper.assertTrue(charge(golem) >= ChargingPadBlockEntity.CHARGE_RATE * 10, "its battery filling: " + charge(golem));
+			helper.assertTrue(charge(golem) >= com.payonel.modularcomputers.config.ModConfig.costs().chargingPadRate() * 10, "its battery filling: " + charge(golem));
 		});
 	}
 

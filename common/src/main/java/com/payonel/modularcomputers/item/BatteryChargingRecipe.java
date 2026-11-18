@@ -48,7 +48,7 @@ public final class BatteryChargingRecipe extends CustomRecipe {
 	/** A full tier 1's charge; its default size if tier 1 is configured never to run out. */
 	private static long tier1Full() {
 		BatteryTier tier1 = BatteryTier.TIER_1;
-		return tier1.infinite() ? Math.round(tier1.defaultDays() * PowerUnits.DAY) : tier1.capacity();
+		return tier1.infinite() ? Math.round(com.payonel.modularcomputers.config.Defaults.Power.Battery.Tier1.DURATION * PowerUnits.DAY) : tier1.capacity();
 	}
 
 	public static final BatteryChargingRecipe INSTANCE = new BatteryChargingRecipe();

@@ -100,7 +100,7 @@ crafting card, a field card, a redstone card, a robotic piston) runs [one comman
 time](/concepts/interrupts/#one-command-at-a-time): given one while another runs, it answers
 `false, {why = "busy", id}`, the id of the device whose news ends the wait (its own, or another's); that
 device's event says when to give it again. Each command ends in an event, and a device never drops
-one: given a command while its ring of unread ends is full (512 by default), it answers
+one: given a command while its ring of unread ends is full, it answers
 `false, {why = "limit", of = "events", max}` until its program reads some
 ([No end is ever lost](/concepts/interrupts/#no-end-is-ever-lost)).
 

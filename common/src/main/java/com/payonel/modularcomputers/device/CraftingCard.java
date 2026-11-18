@@ -2,7 +2,6 @@ package com.payonel.modularcomputers.device;
 
 import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.InterruptLine;
-import com.payonel.modularcomputers.power.PowerUnits;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
@@ -29,10 +28,6 @@ public final class CraftingCard extends Card implements Buffered {
 	public static final int SLOTS = GRID + STORAGE;
 	/** How long a craft takes, in ticks: its robot's hands at the grid, as quick as a player's click at a crafting table. */
 	public static final int CRAFT_TICKS = 1;
-	/** What a craft costs: a running CPU's tick. */
-	public static final int CRAFT_COST = PowerUnits.CPU;
-	/** What moving items costs (a move, a pick up, a drop, a container's): a running CPU's tick. */
-	public static final int MOVE_COST = PowerUnits.CPU;
 	public static final String IDLE = "idle";
 	public static final String CRAFTING = "crafting";
 
@@ -192,7 +187,7 @@ public final class CraftingCard extends Card implements Buffered {
 			finish(made.error(), made.failure()); // (no_space: what it would have made, no room for it; a fault: what's wrong)
 			return;
 		}
-		power.charge(CRAFT_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().craft());
 		Map<?, ?> item = (Map<?, ?>) made.first();
 		craftedName = String.valueOf(item.get("name"));
 		crafted += ((Number) item.get("count")).intValue();
@@ -326,7 +321,7 @@ public final class CraftingCard extends Card implements Buffered {
 		if (no != null) {
 			return no;
 		}
-		power.charge(MOVE_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().craftingMove());
 		return bench.move(slot(args, 0), slot(args, 1), args.count() > 2 ? count(args, 2) : Integer.MAX_VALUE);
 	}
 
@@ -336,7 +331,7 @@ public final class CraftingCard extends Card implements Buffered {
 		if (no != null) {
 			return no;
 		}
-		power.charge(MOVE_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().craftingMove());
 		return bench.equip(slot(args, 0));
 	}
 
@@ -346,7 +341,7 @@ public final class CraftingCard extends Card implements Buffered {
 		if (no != null) {
 			return no;
 		}
-		power.charge(MOVE_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().craftingMove());
 		return bench.pickup();
 	}
 
@@ -363,7 +358,7 @@ public final class CraftingCard extends Card implements Buffered {
 		}
 		int at = faceGiven(args) ? 1 : 0;
 		String face = at == 1 ? face(args, 0) : DROP_FACE;
-		power.charge(MOVE_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().craftingMove());
 		return bench.drop(face, given(args, at) ? slot(args, at) : 0, given(args, at + 1) ? count(args, at + 1) : Integer.MAX_VALUE);
 	}
 
@@ -375,7 +370,7 @@ public final class CraftingCard extends Card implements Buffered {
 		}
 		int at = faceGiven(args) ? 1 : 0;
 		String face = at == 1 ? face(args, 0) : CONTAINER_FACE;
-		power.charge(MOVE_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().craftingMove());
 		return bench.store(face, given(args, at) ? slot(args, at) : 0, given(args, at + 1) ? count(args, at + 1) : Integer.MAX_VALUE,
 			given(args, at + 2) ? count(args, at + 2) : 0);
 	}
@@ -388,7 +383,7 @@ public final class CraftingCard extends Card implements Buffered {
 		}
 		int at = faceGiven(args) ? 1 : 0;
 		String face = at == 1 ? face(args, 0) : CONTAINER_FACE;
-		power.charge(MOVE_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().craftingMove());
 		return bench.take(face, given(args, at) ? count(args, at) : 0, given(args, at + 1) ? count(args, at + 1) : Integer.MAX_VALUE,
 			given(args, at + 2) ? slot(args, at + 2) : 0);
 	}

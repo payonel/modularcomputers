@@ -32,8 +32,7 @@ reaches it. A WLAN card hears only WLAN cards, never a wired one.
 A card starts at its tier's strongest signal. A program lowers it to save power and raises it again,
 up to the tier's:
 
-- A send costs `ceil(strength * 100 / 16)` power units: a tier 1 card at full strength costs one
-  tick of a running CPU, a tier 2 card at full strength 25 ticks' worth.
+- A send costs power for each block of its strength, so a weaker signal costs less (a server setting: see [Settings](/settings/#power-cost)).
 - A `distance` in a received frame is the straight line between the two blocks, in meters, to one
   decimal place. A card at strength 0 reaches only cards in its own block.
 

@@ -25,15 +25,12 @@ tier 3 four. A computer is ready to run when it has a [CPU](/hardware/cpu/) and 
 charge. The case view shows the charge, the load, and how long the batteries will last.
 
 A battery is rated in days of a running computer: a [CPU](/hardware/cpu/)'s 100 W and a
-[screen](/hardware/screen/)'s 10 W, 110 W. By default:
+[screen](/hardware/screen/)'s 10 W, 110 W. How many days each tier lasts full is a server
+setting (see [Settings](/settings/#power-battery)), as is how fast a tier 2 recharges itself.
 
 | | Tier 1 | Tier 2 | Tier 3 |
 |---|---|---|---|
-| Lasts, full | 10 days | 20 days | Never runs out |
-| Recharges itself | no | yes, while it is not in use | not needed |
-
-These lengths can be changed in the game's settings. A tier 2 battery recharges at half the rate
-of a running computer's draw, so two seconds of rest charge one second of running.
+| Recharges itself | no | yes, while it is not in use | no |
 
 A new battery is empty. Charging and power are shown in watt-hours; see [Power](/concepts/power/).
 

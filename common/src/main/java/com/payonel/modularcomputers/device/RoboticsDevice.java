@@ -4,7 +4,6 @@ import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.bus.DeviceType;
 import com.payonel.modularcomputers.bus.InterruptLine;
-import com.payonel.modularcomputers.power.PowerUnits;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
@@ -40,10 +39,6 @@ import java.util.Map;
  * its origin with it. {@code get}, {@code pull}, {@code stop} and {@code sync} are free.
  */
 public final class RoboticsDevice implements Device, Buffered {
-	/** What walking a block costs: a running CPU's tick. */
-	public static final int WALK_COST = PowerUnits.CPU;
-	/** What a turn costs, however far: a running CPU's tick. */
-	public static final int TURN_COST = PowerUnits.CPU;
 	public static final String IDLE = "idle";
 	public static final String WALKING = "walking";
 	public static final String TURNING = "turning";
@@ -70,10 +65,6 @@ public final class RoboticsDevice implements Device, Buffered {
 	private static final java.util.Set<String> OVER_TIME = java.util.Set.of("walk", "walkTo", "fly", "flyTo", "turn", "land");
 	/** The commands that act there over time without moving it: given off its spot, each starts and ends at once, drifted. */
 	private static final java.util.Set<String> POSITIONAL_OVER_TIME = java.util.Set.of("turn", "swing");
-	/** What its thrusters cost, each tick they fire (flying or hovering): five running CPUs' ticks. */
-	public static final int THRUST_COST = 5 * PowerUnits.CPU;
-	/** What an action with its hand costs (a use, a swing, a move to or from a container): a running CPU's tick. */
-	public static final int ACTION_COST = PowerUnits.CPU;
 	/** The spaces round it, in its own frame: its left and right its own, as it turns and walks. */
 	public static final java.util.List<String> FACES = java.util.List.of("front", "back", "left", "right", "up", "down");
 	/** Where a container is when no face is given: in front of it. */
@@ -652,7 +643,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		}
 		Result started = start("turn", body.turn(degrees));
 		if (!started.failed()) {
-			power.charge(TURN_COST);
+			power.charge(com.payonel.modularcomputers.config.ModConfig.costs().turn());
 		}
 		return started;
 	}
@@ -693,7 +684,7 @@ public final class RoboticsDevice implements Device, Buffered {
 	public Result use(Arguments args) {
 		String face = face(args, 0);
 		Result result = body.use(face);
-		power.charge(ACTION_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().hand());
 		return result;
 	}
 
@@ -707,7 +698,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		if (result.failed()) {
 			return result;
 		}
-		power.charge(ACTION_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().hand());
 		begin("swing");
 		if (!BREAKING.equals(result.first())) {
 			end(true, null, result.first()); // (done as it was given: a creature hit, or air there; its end at once, as every swing has one, the user's)
@@ -737,7 +728,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		String face = at == 1 ? face(args, 0) : CONTAINER_FACE;
 		int count = args.count() > at && args.get(at) != null ? count(args, at) : Integer.MAX_VALUE;
 		int to = args.count() > at + 1 && args.get(at + 1) != null ? count(args, at + 1) : 0;
-		power.charge(ACTION_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().hand());
 		return body.store(face, count, to);
 	}
 
@@ -747,7 +738,7 @@ public final class RoboticsDevice implements Device, Buffered {
 		String face = at == 1 ? face(args, 0) : CONTAINER_FACE;
 		int slot = args.count() > at && args.get(at) != null ? count(args, at) : 0;
 		int count = args.count() > at + 1 && args.get(at + 1) != null ? count(args, at + 1) : Integer.MAX_VALUE;
-		power.charge(ACTION_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().hand());
 		return body.take(face, slot, count);
 	}
 
@@ -794,7 +785,7 @@ public final class RoboticsDevice implements Device, Buffered {
 
 	/** Its thrusters fired a tick (flying or hovering): their cost. */
 	public void thrusted() {
-		power.charge(THRUST_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().thrusters());
 	}
 
 	/** The body hovers again (a flight given up, a landing blocked). */
@@ -828,7 +819,7 @@ public final class RoboticsDevice implements Device, Buffered {
 
 	/** The body walked {@code blocks} more (its cost). */
 	public void walked(double blocks) {
-		power.charge((int) Math.ceil(blocks * WALK_COST));
+		power.charge((int) Math.ceil(blocks * com.payonel.modularcomputers.config.ModConfig.costs().walk()));
 	}
 
 	/** The body got where it was going (a walk, a flight, its way back to its plan). */

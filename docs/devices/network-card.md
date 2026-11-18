@@ -15,7 +15,7 @@ It has the shape of a real NIC.
 | Type | `network` |
 | Address | An expansion slot path such as `exp:0` |
 | Interrupt | Raised while frames wait; also a wake line |
-| Power | 2 W at rest; a send costs a tenth of a tick of a running CPU |
+| Power | 2 W at rest; each send costs power (a server setting: see [Settings](/settings/#power-cost)) |
 | Frame size | At most 8192 bytes |
 | Info | `kind` (`network`), `wireless` (false) |
 
@@ -40,8 +40,8 @@ cable are two hosts on it. Two cards in one block are on the same wire, 0 meters
 A frame sent to one card is taken, or the sender hears why not at once. The card never tries again;
 that is software's job (mcos's TCP does).
 
-- `{why = "limit", of = "frames", max = 512}`: the other card's queue is full (`max` its ring
-  depth: 512, unless a server's admin sets another, `network_ring_depth`), or no program on its
+- `{why = "limit", of = "frames", max}`: the other card's queue is full (`max` its
+  [ring depth](/concepts/interrupts/#no-end-is-ever-lost)), or no program on its
   computer is taking data.
 - `{why = "network", reason = "unreachable", message = "no card in reach"}`: no card at that address in reach, or it
   is off.
@@ -67,9 +67,9 @@ in 5f0c2a9e-41d7-4c4e-9b0a-2f3c4d5e6f70 0.0m 9 broadcast
 out broadcast - 4 2 took it
 ```
 
-How it went is `taken`; a refusal's why and its fields' values (`limit frames 512`, `network
+How it went is `taken`; a refusal's why and its fields' values (`limit frames` and its max, `network
 unreachable no card in reach`); `broadcast` for a broadcast that came in and was taken; and `N took
-it` for one sent. The card keeps its last 512 (its ring depth), as a device keeps its events: when more come,
+it` for one sent. The card keeps as many as its ring depth, as a device keeps its events: when more come,
 the oldest go, and the entry that pushed one out says so (`lost`, a `lost n` line before it).
 
 - **Reading** gives the next line; with none waiting, a read waits for one, as a keyboard's does.
@@ -167,7 +167,7 @@ A WLAN card's signal strength (see [WLAN Cards](/devices/wlan-card/)). On a wire
 ## Events
 
 Each frame that arrives is an event, taken with `receive`, and raises the card's interrupt; it stays
-raised while frames wait. At most 512 wait, which is the card's ring (its ring depth); a frame that finds it full is
+raised while frames wait. At most its [ring depth](/concepts/interrupts/#no-end-is-ever-lost) wait; a frame that finds it full is
 refused as a `limit`, not dropped. Frames wait only while the card has power and a program runs on
 its computer; they are dropped when it stops. Each frame in or out also adds a line to the traffic
 log (`pull`).

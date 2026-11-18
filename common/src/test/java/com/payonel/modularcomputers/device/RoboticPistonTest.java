@@ -40,10 +40,10 @@ class RoboticPistonTest {
 	void aMoveAndAFailedPushCost() {
 		piston.moveWith((side, motion) -> RoboticPiston.Moved.DONE);
 		piston.extend(new Arguments(List.of("up")));
-		assertThat(owed()).isEqualTo(RoboticPiston.PUSH_COST);
+		assertThat(owed()).isEqualTo(com.payonel.modularcomputers.config.ModConfig.costs().pistonPush());
 		piston.moveWith((side, motion) -> RoboticPiston.Moved.CANNOT_PUSH);
 		assertThat(piston.push(new Arguments(List.of("up"))).first()).as("a command: true, its end says how").isEqualTo(true);
-		assertThat(owed()).isEqualTo(RoboticPiston.PUSH_COST);
+		assertThat(owed()).isEqualTo(com.payonel.modularcomputers.config.ModConfig.costs().pistonPush());
 	}
 
 	/** Its cable port's side is blocked too (the user's): by what's on it, its cable; its end at once, the call true. */

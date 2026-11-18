@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
  * a search, all at once in a tick, from where it stands for the nearest way back onto the line past
  * what's in its way (a block whose middle is a block from the line at most, farther along it than
  * where it left it and what stopped it, or its target), within the pathfinding range's blocks walked
- * ({@link #range()}, the {@code pathfinding_range} setting) and the game's own budget for a search
+ * ({@link #range()}, the {@code robot.pathfinding_range} setting) and the game's own budget for a search
  * that far ({@link #NODES_PER_BLOCK} places a block). An A* over the blocks round it, eight ways from
  * each, each step judged as its walk judges one ({@link GolemStride}: the same code), so a way it
  * finds is one its walk takes; in the loaded world (a chunk not loaded is nothing: no floor), which it
@@ -34,11 +34,8 @@ import org.jspecify.annotations.Nullable;
  * moves: what bars them (fire, a fluid not water) is no way.
  */
 public final class GolemWayfinder {
-	/** How far a search goes by default, in blocks walked: the game's own pathfinding range for its mobs. */
-	public static final int DEFAULT_RANGE = 96;
-	/** The setting that sets it. */
-	public static final String RANGE_KEY = "pathfinding_range";
-	private static volatile int range = DEFAULT_RANGE;
+	/** How far a search goes, in blocks walked: the setting's, its default till the settings load. */
+	private static volatile int range = com.payonel.modularcomputers.config.Defaults.Robot.PATHFINDING_RANGE;
 	/** How many places a search explores at most, a block of its range: the game's own (its PathFinder's: its follow range's 16 a block). */
 	public static final int NODES_PER_BLOCK = 16;
 	/** How much more the distance left weighs than the way walked: the game's own (its PathFinder's), quicker than the shortest way, a little longer. */

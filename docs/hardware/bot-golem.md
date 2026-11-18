@@ -73,7 +73,7 @@ A golem flies two ways, each with its price:
 
 - **Its thrusters, legs off.** A tier 2 golem has them (a tier 1's thruster calls fail, its
   thrusters missing): its nozzles are the collars round its legs' sockets. `fly` leaves its legs standing where it was and
-  fires red beams from their empty sockets: it needs no card, and costs five running CPUs' power a tick. On its
+  fires red beams from their empty sockets: it needs no card, and costs power each tick it fires (a server setting: see [Settings](/settings/#robot)). On its
   thrusters it walks nowhere, but does everything else as a player off the ground would (its
   tools work, a block breaking more slowly), presses no pressure plates, pushes nothing out of its way (a creature in it stops it), and can be
   shoved: it says so, and stays where it was put, for its program to take back. `fly()` takes it off where it

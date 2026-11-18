@@ -3,7 +3,6 @@ package com.payonel.modularcomputers.device;
 import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.bus.DeviceType;
-import com.payonel.modularcomputers.power.PowerUnits;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
@@ -21,8 +20,6 @@ import java.util.Map;
  * Disks go in and come out by hand, in its GUI.
  */
 public final class DiskStation implements Device {
-	/** What an action costs: a second of a running CPU. */
-	public static final int ACTION_COST = 20 * PowerUnits.CPU;
 	/** What it draws at rest, a tick. */
 	public static final int DRAW = 1;
 	public static final String TARGET = "target";
@@ -74,7 +71,7 @@ public final class DiskStation implements Device {
 		if (target == null) {
 			return Buffered.missing(MISSING_DESTINATION);
 		}
-		if (!bay.pay(ACTION_COST)) {
+		if (!bay.pay(com.payonel.modularcomputers.config.ModConfig.costs().diskStationAction())) {
 			return Buffered.missing(Buffered.MISSING_POWER);
 		}
 		return action.apply(target);

@@ -61,7 +61,7 @@ class BatteryChargeTest {
 			}
 			assertThat(charge.units()).as("settled every 20 ticks, nothing lost").isBetween(299, 300);
 		} finally {
-			BatteryTier.TIER_2.setRechargeRate(BatteryTier.TIER_2.defaultRechargeRate());
+			BatteryTier.TIER_2.setRechargeRate(com.payonel.modularcomputers.config.Defaults.Power.Battery.Tier2.RECHARGE_RATE);
 		}
 	}
 

@@ -25,7 +25,7 @@ its [position](#where-it-is-its-position).
 | Type | `robotics` |
 | Where | Soldered onto a bot golem's last expansion lane (`exp:3`) |
 | `/dev` | `robotics0` |
-| Power | A running CPU's tick for each block walked, each turn, and each action with its hand |
+| Power | Each block walked, each turn, and each action with its hand costs power (a server setting: see [Settings](/settings/#robot)) |
 
 </div>
 
@@ -47,9 +47,9 @@ would.
 
 Four methods never wait: `get` (what it's doing now, and where it really is), `pull` (its events),
 `stop` (it stops at once), and `sync` (whether its queue is empty: mcos's sync waits on it). Under the board's own calls, a command while another runs is refused at once
-with `busy`, doing nothing (mcos turns that into the wait). A command given while 512 of its ends
-wait unread (its [ring depth](/concepts/interrupts/#no-end-is-ever-lost)) is refused too,
-`{why = "limit", of = "events", max = 512}`, until its program reads some with `pull`: in mcos,
+with `busy`, doing nothing (mcos turns that into the wait). A command given while as many of its ends
+wait unread as its [ring depth](/concepts/interrupts/#no-end-is-ever-lost) is refused too,
+`{why = "limit", of = "events", max}`, until its program reads some with `pull`: in mcos,
 `nil`, `"limit"`, `EAGAIN` and the failure. A [crafting
 card](/devices/crafting-card/)'s commands wait for the robot's moves too, but its craft is the
 card's own: the robot is free while it crafts.
@@ -361,8 +361,8 @@ on its legs, as a player off the ground does it (its tools, a block breaking mor
 other cards work. It pushes nothing out of its way (only a walk does): a creature, a player, a
 boat, anything there stops it, as a block does ([things in its way](#things-in-its-way)). Its event, `fly`: `ok` (then it holds
 there), or not and why (`blocked`, a block over it: `name = "minecraft:stone", face = "up"`; a
-pig in front: `name = "minecraft:pig", face = "front"`). Its thrusters cost five running CPUs' power a
-tick. It flies as far as it's told. Fails with `bad_argument` (`expected = "squared"`).
+pig in front: `name = "minecraft:pig", face = "front"`). Its thrusters cost power each
+tick they fire (a server setting: see [Settings](/settings/#robot)). It flies as far as it's told. Fails with `bad_argument` (`expected = "squared"`).
 
 If its program ends while its thrusters hold it up, or its power runs out, it falls and powers off:
 its torso lies on the ground, off, to be picked up as a Tier 2 Bot Golem Torso.
@@ -477,8 +477,8 @@ leaves it only to get round what's in its way. Its elevation is free on the way 
 drop of up to 3, wherever the ground goes); only the end's is `up`'s. Where something stops it, it
 looks, from the last block's middle it reached, for the nearest way back onto its line past what
 stopped it: a block whose middle is within a block of the line, farther along it, or the target
-itself. It looks as far as 96 blocks of walking (the server's `pathfinding_range` setting, in
-`config/modularcomputers.properties`), and gives up once a way would be winding enough to need more
+itself. How far it looks, in blocks of walking, is
+a server setting: see [Settings](/settings/#robot); it gives up once a way would be winding enough to need more
 looking than that range allows: it gets round walls and ledges, not mazes. Found, it goes that way,
 then on along its line; not found, its walk ends `blocked`, on the last block's middle it reached,
 `name = ""` (no one block to name) and `face` its face toward where it was going. A walk itself

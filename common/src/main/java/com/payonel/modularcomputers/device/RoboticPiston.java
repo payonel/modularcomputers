@@ -5,7 +5,6 @@ import com.payonel.modularcomputers.bus.InterruptLine;
 import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.Device;
 import com.payonel.modularcomputers.bus.DeviceType;
-import com.payonel.modularcomputers.power.PowerUnits;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
@@ -30,8 +29,6 @@ public final class RoboticPiston implements Device, Buffered {
 	public void frontFrom(java.util.function.Supplier<Face> front) {
 		this.front = front;
 	}
-	/** What a push costs, moved or not: five ticks of a running CPU. */
-	public static final int PUSH_COST = 5 * PowerUnits.CPU;
 	/** A vanilla piston's move, in ticks: an extend's or a retract's time. */
 	public static final int MOVE_TICKS = 2;
 	/** A push's time: out, and back (its block's arm time). */
@@ -148,7 +145,7 @@ public final class RoboticPiston implements Device, Buffered {
 		}
 		Moved moved = arms.move(face, motion);
 		if (moved != Moved.ALREADY) {
-			power.charge(PUSH_COST);
+			power.charge(com.payonel.modularcomputers.config.ModConfig.costs().pistonPush()); // (moved or not)
 		}
 		String method = motion.name().toLowerCase(java.util.Locale.ROOT);
 		return switch (moved) {

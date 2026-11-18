@@ -9,7 +9,6 @@ import com.payonel.modularcomputers.menu.CaseMenu;
 import com.payonel.modularcomputers.menu.ChargingPadMenu;
 import com.payonel.modularcomputers.power.BatteryCharge;
 import com.payonel.modularcomputers.power.PowerBuffer;
-import com.payonel.modularcomputers.power.PowerUnits;
 import com.payonel.modularcomputers.sound.ModSounds;
 import java.util.List;
 import net.minecraft.core.BlockPos;
@@ -38,8 +37,6 @@ public final class ChargingPadBlockEntity extends CardHolderBlockEntity {
 	public static final int BATTERY = 0;
 	public static final int RADIO = 1;
 	public static final int SLOTS = 2;
-	/** What it gives a robot a tick, in power units: ten running CPUs' worth, so a robot charges far faster than it runs down. */
-	public static final int CHARGE_RATE = 10 * PowerUnits.CPU;
 	/** How often its buffer takes from its battery, in ticks (a case's battery check). */
 	private static final int BATTERY_TICKS = 20;
 	/** How often it shows its particles while charging, in ticks, and how many. */
@@ -192,7 +189,7 @@ public final class ChargingPadBlockEntity extends CardHolderBlockEntity {
 		} else {
 			room = robot.board().power().capacity() - robot.board().power().level();
 		}
-		int amount = Math.min(CHARGE_RATE, room);
+		int amount = Math.min(com.payonel.modularcomputers.config.ModConfig.costs().chargingPadRate(), room); // (power.rate.charging_pad)
 		if (amount <= 0 || !pay(amount)) {
 			return false;
 		}

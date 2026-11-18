@@ -2,12 +2,24 @@ package com.payonel.modularcomputers.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.payonel.modularcomputers.power.BatteryCharge;
+import com.payonel.modularcomputers.bus.DeviceType;
+import com.payonel.modularcomputers.device.RoboticPiston;
+import com.payonel.modularcomputers.device.RoboticsDevice;
+import com.payonel.modularcomputers.entity.GolemWayfinder;
 import com.payonel.modularcomputers.power.BatteryTier;
 import com.payonel.modularcomputers.power.PowerUnits;
+import com.payonel.modularcomputers.runtime.Arguments;
+import com.payonel.modularcomputers.runtime.CpuCores;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Properties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -18,67 +30,192 @@ class ModConfigTest {
 
 	@AfterEach
 	void restoreDefaults() {
-		for (BatteryTier tier : BatteryTier.values()) {
-			tier.setDays(tier.defaultDays());
-			tier.setRechargeRate(tier.defaultRechargeRate());
+		ModConfig.apply(new Properties());
+	}
+
+	private Path file() {
+		return dir.resolve("config").resolve(ModConfig.FILE_NAME);
+	}
+
+	/** A file holding these lines, loaded: what it warned of. */
+	private List<String> load(String text) throws IOException {
+		Path file = file();
+		Files.createDirectories(file.getParent());
+		Files.writeString(file, text);
+		return ModConfig.load(file);
+	}
+
+	/** Defaults' constants by the keys their paths name (the user's, 2026-11-18: Robot.Cost.WALK is robot.cost.walk). */
+	static Map<String, Object> defaultsByKey() throws IllegalAccessException {
+		Map<String, Object> keys = new LinkedHashMap<>();
+		walk(Defaults.class, "", keys);
+		return keys;
+	}
+
+	private static void walk(Class<?> group, String prefix, Map<String, Object> keys) throws IllegalAccessException {
+		for (Field field : group.getDeclaredFields()) {
+			int modifiers = field.getModifiers();
+			if (Modifier.isStatic(modifiers) && Modifier.isFinal(modifiers) && Modifier.isPublic(modifiers)) {
+				keys.put(prefix + field.getName().toLowerCase(Locale.ROOT), field.get(null));
+			}
 		}
+		for (Class<?> nested : group.getDeclaredClasses()) {
+			walk(nested, prefix + snake(nested.getSimpleName()) + ".", keys);
+		}
+	}
+
+	/** A group's name as a key's: its words in snake_case (RingDepth is ring_depth, Tier1 tier1). */
+	private static String snake(String name) {
+		return name.replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase(Locale.ROOT);
+	}
+
+	/**
+	 * Every setting's default is one constant in Defaults, at the path its key names, and nowhere else
+	 * (the user's, 2026-11-18): every key the config reads is a constant there, with the same default,
+	 * and every constant there is a key in the file written by default, explained by a comment over it
+	 * (or over the small group it's in).
+	 */
+	@Test
+	void everySettingIsADefaultAtItsKeysPathAndEveryDefaultIsAnExplainedSetting() throws Exception {
+		Map<String, Object> defaults = defaultsByKey();
+		Map<String, Object> read = new LinkedHashMap<>();
+		ModConfig.settings().forEach(setting -> read.put(setting.key(), setting.fallback()));
+		assertThat(read.keySet()).as("every key the config reads is a Defaults constant").isSubsetOf(defaults.keySet());
+		assertThat(defaults.keySet()).as("every Defaults constant is a key the config reads").isSubsetOf(read.keySet());
+		assertThat(read).as("each with that constant as its default").isEqualTo(defaults);
+
+		List<String> lines = ModConfig.defaults().lines().toList();
+		for (String key : defaults.keySet()) {
+			int at = -1;
+			for (int i = 0; i < lines.size(); i++) {
+				if (lines.get(i).startsWith(key + ":")) {
+					at = i;
+				}
+			}
+			assertThat(at).as(key + " is in the file written by default").isNotNegative();
+			int above = at - 1;
+			while (above >= 0 && !lines.get(above).isBlank() && !lines.get(above).startsWith("#")) {
+				above--; // (a small group's settings under one comment)
+			}
+			assertThat(above >= 0 && lines.get(above).startsWith("#")).as(key + " has a comment over it").isTrue();
+		}
+		Properties written = new Properties();
+		written.load(new java.io.StringReader(ModConfig.defaults()));
+		assertThat(written.stringPropertyNames()).as("and nothing else").containsExactlyInAnyOrderElementsOf(defaults.keySet());
+	}
+
+	/** The manual's settings page, found from wherever the tests run. */
+	private static Path settingsPage() {
+		Path dir = Path.of("").toAbsolutePath();
+		while (!Files.isRegularFile(dir.resolve(SETTINGS_PAGE))) {
+			dir = dir.getParent();
+		}
+		return dir.resolve(SETTINGS_PAGE);
+	}
+
+	/** Where the manual lists every setting (the user's, 2026-11-18: the one page that gives their values). */
+	private static final String SETTINGS_PAGE = "docs/settings.md";
+	/** A table row of the page naming a setting: its key, its default. */
+	private static final java.util.regex.Pattern PAGE_ROW = java.util.regex.Pattern.compile("^\\| `([a-z0-9_.<>]+)` \\| ([^|]+?) \\|");
+	/** What the page says for an empty default, and for an opt-in setting's (none of its own). */
+	private static final String PAGE_EMPTY = "nothing";
+	private static final String PAGE_NOT_SET = "not set";
+
+	/**
+	 * The settings page is written by hand, and kept to the settings by this test: every setting is on
+	 * it once, with its default, and nothing else is (an opt-in family's row aside, not set).
+	 */
+	@Test
+	void theManualsSettingsPageListsEverySettingWithItsDefault() throws IOException {
+		Map<String, String> page = new LinkedHashMap<>();
+		for (String line : Files.readAllLines(settingsPage())) {
+			var row = PAGE_ROW.matcher(line);
+			if (row.find()) {
+				String cell = row.group(2).strip();
+				assertThat(page.put(row.group(1), cell.startsWith("`") ? cell.substring(1, cell.length() - 1) : cell))
+					.as(row.group(1) + " is on the page once").isNull();
+			}
+		}
+		assertThat(page.remove(ModConfig.RING_DEPTH_TYPE_PREFIX + "<type>")).as("a type's own ring depth, opt-in").isEqualTo(PAGE_NOT_SET);
+		Map<String, String> settings = new LinkedHashMap<>();
+		ModConfig.settings().forEach(setting -> settings.put(setting.key(), setting.text().isEmpty() ? PAGE_EMPTY : setting.text()));
+		assertThat(page).as("every setting, with its default, and nothing else").containsExactlyInAnyOrderEntriesOf(settings);
+	}
+
+	/** A type's own ring depth is opt-in: no default of its own, in the group of the depth it falls back to. */
+	@Test
+	void aTypesOwnRingDepthHasNoDefaultAndFallsBackToEveryones() throws Exception {
+		String group = ModConfig.RING_DEPTH.key().substring(0, ModConfig.RING_DEPTH.key().lastIndexOf('.') + 1);
+		assertThat(ModConfig.RING_DEPTH_TYPE_PREFIX).isEqualTo(group);
+		assertThat(ModConfig.ringDepthKey(DeviceType.ROBOTICS)).isEqualTo("device.ring_depth.robotics");
+		assertThat(defaultsByKey()).doesNotContainKey("device.ring_depth.robotics");
+		assertThat(ModConfig.defaults()).doesNotContain("device.ring_depth.robotics:");
 	}
 
 	@Test
 	void writesTheDefaultsTheFirstTime() throws IOException {
-		Path file = dir.resolve("config").resolve(ModConfig.FILE_NAME);
-		ModConfig.load(file);
-		assertThat(Files.readString(file)).contains("battery_tier1_duration: 10", "battery_tier2_duration: 20", "battery_tier3_duration: 0",
-			"battery_tier2_recharge_rate: 0.5");
+		ModConfig.load(file());
+		assertThat(Files.readString(file())).contains("computer.cpu_cores: 4\n", "power.battery.tier1.duration: 10\n",
+			"power.battery.tier2.duration: 20\n", "power.battery.tier3.duration: 0\n", "power.battery.tier2.recharge_rate: 0.5\n",
+			"power.rate.charging_pad: 10\n", "power.cost.network.wireless_send_per_block: 0.0625\n", "power.cost.terminal.write: 0.01\n",
+			"device.ring_depth.all: 512\n", "internet.enabled: true\n", "internet.allow:\n", "internet.deny:\n",
+			"internet.response_buffer_kib: 64\n", "robot.pathfinding_range: 96\n", "robot.cost.walk: 1\n", "robot.cost.turn: 1\n",
+			"robot.cost.hand: 1\n", "robot.cost.thrusters: 5\n");
 		assertThat(BatteryTier.TIER_2.rechargeRate()).isEqualTo(0.5);
 		assertThat(BatteryTier.TIER_1.days()).isEqualTo(10);
 		assertThat(BatteryTier.TIER_3.infinite()).isTrue();
+		assertThat(CpuCores.size()).isEqualTo(4);
+	}
+
+	/** A value set is read back, wherever it's used. */
+	@Test
+	void aValueSetIsReadBack() throws IOException {
+		ModConfig.load(file());
+		Files.writeString(file(), Files.readString(file()).replace("computer.cpu_cores: 4", "computer.cpu_cores: 2")
+			.replace("internet.enabled: true", "internet.enabled: false").replace("internet.deny:", "internet.deny: a.example, 203.0.113.0/24"));
+		assertThat(ModConfig.load(file())).isEmpty();
+		assertThat(CpuCores.size()).isEqualTo(2);
+		assertThat(ModConfig.internet().enabled()).isFalse();
+		assertThat(ModConfig.internet().deny()).containsExactly("a.example", "203.0.113.0/24");
 	}
 
 	/**
 	 * Ring depths are settings (the user's, 2026-11-11): everyone's, 512 by default, written; a
-	 * type's own only where it's set, else everyone's. The internet card's body pieces are their own.
+	 * type's own only where it's set, else everyone's.
 	 */
 	@Test
-	void ringDepthsAreEveryonesUnlessATypeSetsItsOwn() throws IOException {
-		Path file = dir.resolve("config").resolve(ModConfig.FILE_NAME);
-		ModConfig.load(file);
-		assertThat(Files.readString(file)).contains("ring_depth: 512", "internet_response_buffer_kib: 64").doesNotContain("robotics_ring_depth:");
-		java.util.Properties set = new java.util.Properties();
-		set.setProperty("ring_depth", "300");
-		set.setProperty("robotics_ring_depth", "40");
+	void ringDepthsAreEveryonesUnlessATypeSetsItsOwn() {
+		Properties set = new Properties();
+		set.setProperty("device.ring_depth.all", "300");
+		set.setProperty("device.ring_depth.robotics", "40");
 		var depths = ModConfig.ringDepths(set); // (worked out, not applied: other tests' devices read the server's)
-		assertThat(depths.of(com.payonel.modularcomputers.bus.DeviceType.ROBOTICS)).as("its own").isEqualTo(40);
-		assertThat(depths.of(com.payonel.modularcomputers.bus.DeviceType.MOTION)).as("everyone's").isEqualTo(300);
-		assertThat(ModConfig.ringDepths(new java.util.Properties()).of(com.payonel.modularcomputers.bus.DeviceType.ROBOTICS)).as("none set: the default").isEqualTo(512);
+		assertThat(depths.of(DeviceType.ROBOTICS)).as("its own").isEqualTo(40);
+		assertThat(depths.of(DeviceType.MOTION)).as("everyone's").isEqualTo(300);
+		assertThat(ModConfig.ringDepths(new Properties()).of(DeviceType.ROBOTICS)).as("none set: the default").isEqualTo(512);
+		set.setProperty("device.ring_depth.robotics", "deep");
+		assertThat(ModConfig.ringDepths(set).of(DeviceType.ROBOTICS)).as("bad: everyone's").isEqualTo(300);
 	}
 
 	/**
 	 * How far a bot golem's pathfinding searches is a setting (the user's, 2026-11-14): 96 blocks
-	 * walked by default, written; set, a leg searches that far.
+	 * walked by default; set, a leg searches that far.
 	 */
 	@Test
 	void thePathfindingRangeIsASetting() throws IOException {
-		Path file = dir.resolve("config").resolve(ModConfig.FILE_NAME);
-		ModConfig.load(file);
-		assertThat(Files.readString(file)).contains("pathfinding_range: 96");
-		assertThat(com.payonel.modularcomputers.entity.GolemWayfinder.range()).isEqualTo(96);
-		Files.writeString(file, Files.readString(file).replace("pathfinding_range: 96", "pathfinding_range: 40"));
-		ModConfig.load(file);
-		assertThat(com.payonel.modularcomputers.entity.GolemWayfinder.range()).isEqualTo(40);
-		com.payonel.modularcomputers.entity.GolemWayfinder.configure(com.payonel.modularcomputers.entity.GolemWayfinder.DEFAULT_RANGE);
+		ModConfig.load(file());
+		assertThat(GolemWayfinder.range()).isEqualTo(96);
+		Files.writeString(file(), Files.readString(file()).replace("robot.pathfinding_range: 96", "robot.pathfinding_range: 40"));
+		ModConfig.load(file());
+		assertThat(GolemWayfinder.range()).isEqualTo(40);
 	}
 
 	@Test
 	void readsKeyColonValueLinesWithFractionsAndZeroForever() throws IOException {
-		Path file = dir.resolve(ModConfig.FILE_NAME);
-		Files.writeString(file, "battery_tier1_duration: 0.5\nbattery_tier2_duration: 1\nbattery_tier3_duration: 0\n");
-		ModConfig.load(file);
+		load("power.battery.tier1.duration: 0.5\npower.battery.tier2.duration: 1\npower.battery.tier3.duration: 0\n");
 		assertThat(BatteryTier.TIER_1.capacity()).isEqualTo(PowerUnits.DAY / 2);
 		assertThat(BatteryTier.TIER_2.capacity()).isEqualTo(PowerUnits.DAY);
 		assertThat(BatteryTier.TIER_3.infinite()).isTrue();
-		Files.writeString(file, "battery_tier1_duration: 0\nbattery_tier3_duration: 3\n");
-		ModConfig.load(file);
+		ModConfig.apply(props("power.battery.tier1.duration", "0", "power.battery.tier3.duration", "3"));
 		assertThat(BatteryTier.TIER_1.infinite()).as("any tier can be set to last forever").isTrue();
 		assertThat(BatteryTier.TIER_2.days()).as("missing: back to the default").isEqualTo(20);
 		assertThat(BatteryTier.TIER_3.infinite()).isFalse();
@@ -86,38 +223,87 @@ class ModConfigTest {
 	}
 
 	@Test
-	void anOlderFileGetsTheNewSettingsAddedAndKeepsItsOwn() throws IOException {
-		Path file = dir.resolve(ModConfig.FILE_NAME);
-		Files.writeString(file, "# mine\nbattery_tier1_duration: 0.5\nbattery_tier2_duration: 1\nbattery_tier3_duration: 0\n");
-		ModConfig.load(file);
-		String text = Files.readString(file);
-		assertThat(text).startsWith("# mine\nbattery_tier1_duration: 0.5\n").contains("battery_tier2_recharge_rate: 0.5");
-		assertThat(text).containsOnlyOnce("battery_tier1_duration");
+	void anOlderFileGetsTheNewSettingsAddedUnderTheirGroupsAndKeepsItsOwn() throws IOException {
+		load("# mine\npower.battery.tier1.duration: 0.5\npower.battery.tier2.duration: 1\npower.battery.tier3.duration: 0\n");
+		String text = Files.readString(file());
+		assertThat(text).startsWith("# mine\npower.battery.tier1.duration: 0.5\n").contains("\n# power.battery: ",
+			"power.battery.tier2.recharge_rate: 0.5\n", "\n# robot: ", "robot.cost.thrusters: 5\n");
+		assertThat(text).containsOnlyOnce("power.battery.tier1.duration");
 		assertThat(BatteryTier.TIER_1.days()).isEqualTo(0.5);
-		ModConfig.load(file);
-		assertThat(Files.readString(file)).as("nothing more to add").isEqualTo(text);
-	}
-
-		@Test
-	void tier2RechargeRateCanBeChangedOrTurnedOff() throws IOException {
-		Path file = dir.resolve(ModConfig.FILE_NAME);
-		Files.writeString(file, "battery_tier2_recharge_rate: 1\n");
-		ModConfig.load(file);
-		assertThat(BatteryTier.TIER_2.rechargeRate()).isEqualTo(1);
-		Files.writeString(file, "battery_tier2_recharge_rate: 0\n");
-		ModConfig.load(file);
-		assertThat(BatteryTier.TIER_2.selfCharging()).isFalse();
-		Files.writeString(file, "battery_tier2_recharge_rate: fast\n");
-		ModConfig.load(file);
-		assertThat(BatteryTier.TIER_2.rechargeRate()).as("bad: the default").isEqualTo(0.5);
+		ModConfig.load(file());
+		assertThat(Files.readString(file())).as("nothing more to add").isEqualTo(text);
+		Properties all = new Properties();
+		all.load(new java.io.StringReader(text));
+		assertThat(all.stringPropertyNames()).containsExactlyInAnyOrderElementsOf(ModConfig.settings().stream().map(ModConfig.Setting::key).toList());
 	}
 
 	@Test
-	void badValuesFallBackToTheDefaults() throws IOException {
-		Path file = dir.resolve(ModConfig.FILE_NAME);
-		Files.writeString(file, "battery_tier1_duration: lots\nbattery_tier2_duration: -4\n");
-		ModConfig.load(file);
+	void tier2RechargeRateCanBeChangedOrTurnedOff() throws IOException {
+		load("power.battery.tier2.recharge_rate: 1\n");
+		assertThat(BatteryTier.TIER_2.rechargeRate()).isEqualTo(1);
+		ModConfig.apply(props("power.battery.tier2.recharge_rate", "0"));
+		assertThat(BatteryTier.TIER_2.selfCharging()).isFalse();
+		ModConfig.apply(props("power.battery.tier2.recharge_rate", "fast"));
+		assertThat(BatteryTier.TIER_2.rechargeRate()).as("bad: the default").isEqualTo(0.5);
+	}
+
+	/** A bad value falls back to its default, and says so; a key that's no setting (an old name) is warned of, and ignored. */
+	@Test
+	void badValuesFallBackToTheDefaultsWithAWarning() {
+		List<String> warnings = ModConfig.apply(props("power.battery.tier1.duration", "lots", "power.battery.tier2.duration", "-4",
+			"computer.cpu_cores", "1.5", "internet.enabled", "maybe", "robot.cost.walk", "-1", "cpu_cores", "8"));
 		assertThat(BatteryTier.TIER_1.days()).isEqualTo(10);
 		assertThat(BatteryTier.TIER_2.days()).isEqualTo(20);
+		assertThat(CpuCores.size()).isEqualTo(4);
+		assertThat(ModConfig.internet().enabled()).isTrue();
+		assertThat(ModConfig.costs().walk()).isEqualTo(PowerUnits.CPU);
+		assertThat(warnings).hasSize(6).anySatisfy(warning -> assertThat(warning).startsWith("power.battery.tier1.duration should be")
+			.endsWith("not \"lots\"; using 10")).anySatisfy(warning -> assertThat(warning).startsWith("computer.cpu_cores should be a whole count"))
+			.anySatisfy(warning -> assertThat(warning).startsWith("internet.enabled should be true or false"))
+			.anySatisfy(warning -> assertThat(warning).startsWith("robot.cost.walk should be"))
+			.contains("cpu_cores is no setting; ignored");
+		assertThat(ModConfig.apply(props("device.ring_depth.robotics", "40"))).as("a type's own depth is a setting").isEmpty();
+	}
+
+	/**
+	 * The bot golem's costs and every device's are settings (the user's, 2026-11-18), in running
+	 * CPUs' ticks, fractions too: their defaults today's, a value set what's charged.
+	 */
+	@Test
+	void theCostsAreSettingsAndAreWhatsCharged() throws IOException {
+		ModConfig.load(file());
+		PowerCosts costs = ModConfig.costs();
+		assertThat(List.of(costs.walk(), (double) costs.turn(), (double) costs.hand(), (double) costs.thrusters()))
+			.as("today's: a running CPU's tick a block, a turn and a hand's action, five a tick of thrust").containsExactly(100.0, 100.0, 100.0, 500.0);
+		assertThat(List.of(costs.redstoneChange(), costs.pistonPush(), costs.fieldHold(), costs.fieldMove(), costs.craft(), costs.craftingMove(),
+			costs.diskStationAction(), costs.wiredSend(), costs.internetRequest(), costs.internetData(), costs.terminalWrite(), costs.chargingPadRate()))
+			.containsExactly(100, 500, 200, 100, 100, 100, 2000, 10, 100, 10, 1, 1000);
+		assertThat(costs.wirelessSendPerBlock()).isEqualTo(6.25);
+
+		Files.writeString(file(), Files.readString(file()).replace("robot.cost.walk: 1\n", "robot.cost.walk: 0.5\n")
+			.replace("robot.cost.thrusters: 5\n", "robot.cost.thrusters: 2\n").replace("robot.cost.turn: 1\n", "robot.cost.turn: 0\n")
+			.replace("robot.cost.hand: 1\n", "robot.cost.hand: 3\n").replace("power.cost.robotic_piston.push: 5\n", "power.cost.robotic_piston.push: 0.25\n"));
+		assertThat(ModConfig.load(file())).isEmpty();
+		RoboticsDevice robotics = new RoboticsDevice();
+		robotics.power().supply(this);
+		robotics.walked(3);
+		assertThat(robotics.power().collect(0)).as("half a CPU's tick a block").isEqualTo(150);
+		robotics.thrusted();
+		assertThat(robotics.power().collect(0)).isEqualTo(200);
+		assertThat(ModConfig.costs().turn()).as("free").isZero();
+		assertThat(ModConfig.costs().hand()).isEqualTo(300);
+		RoboticPiston piston = new RoboticPiston();
+		piston.power().supply(this);
+		piston.moveWith((side, motion) -> RoboticPiston.Moved.DONE);
+		piston.extend(new Arguments(List.of("up")));
+		assertThat(piston.power().collect(0)).isEqualTo(25);
+	}
+
+	private static Properties props(String... pairs) {
+		Properties properties = new Properties();
+		for (int i = 0; i < pairs.length; i += 2) {
+			properties.setProperty(pairs[i], pairs[i + 1]);
+		}
+		return properties;
 	}
 }

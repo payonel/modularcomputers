@@ -143,7 +143,7 @@ class BusPowerTest {
 		});
 		cabled(machine);
 		machine.pressPower();
-		assertThat(machine.powerUse(0)).as("one tick of CPU, and 8 writes").isEqualTo(CpuTier.TIER_3.running() + 8 * PowerUnits.TERMINAL_WRITE);
+		assertThat(machine.powerUse(0)).as("one tick of CPU, and 8 writes").isEqualTo(CpuTier.TIER_3.running() + 8 * com.payonel.modularcomputers.config.ModConfig.costs().terminalWrite());
 	}
 
 	@Test

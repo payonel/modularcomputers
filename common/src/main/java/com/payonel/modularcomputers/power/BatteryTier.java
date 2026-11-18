@@ -1,33 +1,34 @@
 package com.payonel.modularcomputers.power;
 
+import com.payonel.modularcomputers.config.Defaults;
+
 /**
  * The batteries that power a computer, by how much they hold, in power units
  * ({@link PowerUnits}). How many Minecraft days of a running computer each tier lasts is
- * configurable ({@link #setDays}; 0 means it never runs out). By default a full tier 1 runs one
+ * a setting ({@link #setDays}; 0 means it never runs out; its defaults are {@link Defaults}'). By default a full tier 1 runs one
  * for ten days (10% a day), tier 2 holds twice that and recharges itself while it isn't running
  * anything, and tier 3 never runs out. Tier 2 recharges itself at a configurable rate
  * ({@link #setRechargeRate}), as a share of a running computer's draw: by default half, so two
  * seconds of rest charge one second of running.
  */
 public enum BatteryTier {
-	TIER_1(10, 0),
-	TIER_2(20, 0.5),
-	TIER_3(0, 0);
+	TIER_1(Defaults.Power.Battery.Tier1.DURATION, Fixed.NO_RECHARGE),
+	TIER_2(Defaults.Power.Battery.Tier2.DURATION, Defaults.Power.Battery.Tier2.RECHARGE_RATE),
+	TIER_3(Defaults.Power.Battery.Tier3.DURATION, Fixed.NO_RECHARGE);
 
-	private final double defaultDays;
-	private final double defaultRechargeRate;
+	/** What isn't a setting. */
+	private static final class Fixed {
+		/** Tiers 1 and 3 don't recharge themselves: it's what they are. */
+		static final double NO_RECHARGE = 0;
+	}
+
 	private volatile double days;
 	private volatile double rechargeRate;
 
-	BatteryTier(double defaultDays, double defaultRechargeRate) {
-		this.defaultDays = defaultDays;
-		this.defaultRechargeRate = defaultRechargeRate;
-		this.days = defaultDays;
-		this.rechargeRate = defaultRechargeRate;
-	}
-
-	public double defaultRechargeRate() {
-		return defaultRechargeRate;
+	/** Its settings' defaults ({@link Defaults}), till the settings load. */
+	BatteryTier(double days, double rechargeRate) {
+		this.days = days;
+		this.rechargeRate = rechargeRate;
 	}
 
 	/** What it regains each tick it rests, as a share of a running computer's draw; 0 means it doesn't recharge itself. */
@@ -40,10 +41,6 @@ public enum BatteryTier {
 		if (rate >= 0 && Double.isFinite(rate)) {
 			this.rechargeRate = rate;
 		}
-	}
-
-	public double defaultDays() {
-		return defaultDays;
 	}
 
 	/** How many days a full one runs a computer; 0 means forever. */

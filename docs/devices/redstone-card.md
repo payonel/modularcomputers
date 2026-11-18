@@ -16,7 +16,7 @@ the signal on each face.
 | Type | `redstone` |
 | Address | An expansion slot path such as `exp:0`, or a hub's |
 | Interrupt | Raised while a change to a face waits |
-| Power | Nothing at rest; each change of an output costs a tick of a running CPU |
+| Power | Nothing at rest; each change of an output costs power (a server setting: see [Settings](/settings/#power-cost)) |
 | Info | `kind` (`redstone`) |
 
 </div>
@@ -109,11 +109,11 @@ table leaves out stays as it was. Answers `true` at once; once applied, its even
 every face as `get()` gives them (`result`). The arguments are all checked
 before anything changes, so a table with one bad face changes nothing. An unknown face fails with
 `bad_argument`, `expected = "face"`; a face that is not a table, with `bad_argument`,
-`expected = "table"` (its value the type given, `"number"`). Each output that changes costs a tick
-of a running CPU's power.
+`expected = "table"` (its value the type given, `"number"`). Each output that changes costs
+power.
 
-Given while 512 of its ends wait unread (its [ring depth](/concepts/interrupts/#no-end-is-ever-lost)),
-a `set` (or a `get`, which waits behind one) is refused, `{why = "limit", of = "events", max = 512}`, until its program reads some with
+Given while as many of its ends wait unread as its [ring depth](/concepts/interrupts/#no-end-is-ever-lost),
+a `set` (or a `get`, which waits behind one) is refused, `{why = "limit", of = "events", max}`, until its program reads some with
 `pull`; in mcos, `nil`, `"limit"`, `EAGAIN` and the failure.
 
 <!-- lua-fragment -->
@@ -151,8 +151,7 @@ it is now:
 
 A `set`'s end is `{event = "set", ok = true, result = {north = {level = 15, powered = 15}, ...}}`.
 
-Changes are news: at most 512 wait (the card's [ring depth](/concepts/interrupts/), which a
-server's admin can change with `redstone_ring_depth`). When more come, the oldest change is dropped
+Changes are news: at most the card's [ring depth](/concepts/interrupts/) wait. When more come, the oldest change is dropped
 and the next event carries `lost`, the number dropped; a `set`'s end is never dropped. The events are kept across a save, and dropped when no program runs on the computer.
 
 ## Examples
@@ -217,5 +216,5 @@ The door's own change (its face powered) wakes `poll` too; that only starts the 
 ```
 [Download redstone-counter.lua](/examples/redstone-counter.lua)
 
-The card keeps at most 512 changes (its ring depth): a pulse is two, so with more than 256 pulses a
-period some are lost (the log says so). Shorten `PERIOD` for a faster clock.
+The card keeps as many changes as its ring depth: a pulse is two, so with more pulses a period
+than half its depth some are lost (the log says so). Shorten `PERIOD` for a faster clock.

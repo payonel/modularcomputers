@@ -125,7 +125,7 @@ class InternetCardTest {
 	@Test
 	@ResourceLock("InternetCard.policy")
 	void tinyChunksStillFillTheWholeBuffer() throws Exception {
-		int buffer = InternetCard.RESPONSE_BUFFER_KIB * 1024;
+		int buffer = com.payonel.modularcomputers.config.Defaults.Internet.RESPONSE_BUFFER_KIB * 1024;
 		HttpServer web = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
 		web.createContext("/", exchange -> {
 			exchange.sendResponseHeaders(200, 0); // (chunked)
@@ -140,7 +140,7 @@ class InternetCardTest {
 		});
 		web.start();
 		InternetCard.policyFrom(() -> new InternetPolicy(true, List.of("127.0.0.1"), List.of()));
-		InternetCard.responseBuffer(InternetCard.RESPONSE_BUFFER_KIB);
+		InternetCard.responseBuffer(com.payonel.modularcomputers.config.Defaults.Internet.RESPONSE_BUFFER_KIB);
 		try {
 			InternetCard card = new InternetCard();
 			card.accepting(true);

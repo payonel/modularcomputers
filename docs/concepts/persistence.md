@@ -50,8 +50,8 @@ There are three limits.
   call**) get 1 millisecond of the server's time each tick for each computer. A program that makes
   too many calls waits for the next tick. Each computer costs the server a bounded amount. Lua
   itself runs on the computer's own thread and costs the server's thread nothing.
-- **Cores.** At most a few computers run Lua at once (`cpu_cores` in
-  `config/modularcomputers.properties`, 4 by default), however many there are, as an operating system
+- **Cores.** At most a few computers run Lua at once (a server setting: see [Settings](/settings/#computer)),
+  however many there are, as an operating system
   shares its CPUs among its threads. A busy computer runs as fast as its core goes, a slice at a time;
   with more busy computers than cores, they take turns, a slice each, in the order they asked. A
   computer waiting for an interrupt or for the server holds no core.

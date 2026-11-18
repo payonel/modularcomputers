@@ -91,6 +91,13 @@ computers really work.
   folder) through a small source, never a copy synced back. Point out the pattern when seen. Slots
   kept on an item are an `ItemContents` (a crafting card's, a held golem's parts and hands).
 - **Named constants**, each with a comment, for every tunable; no magic numbers.
+- **Every setting's default lives in one place** (`config/Defaults`, the user's, 2026-11-18): nested
+  classes a group, a commented constant a setting, its key in `config/modularcomputers.properties`
+  its path there, in snake_case (`Defaults.Robot.Cost.WALK` is `robot.cost.walk`), grouped as
+  OpenComputers grouped its settings. Code reads a setting's value through `ModConfig` (and the
+  holders it configures), never from `Defaults`. A setting with no default of its own (a type's own
+  ring depth) has no constant and is documented as falling back. The file is `.properties`, dotted
+  keys under section comments (the user's: a line stands alone, no parser to get wrong).
 - **No old-save compatibility:** formats change freely, without shims.
 - **Debugging:** run one quick test before a long suite after a risky change
   (`--tests '*McosTest.haltPowersOff'`, under `timeout`). A test that fails alone but passes with its
@@ -264,7 +271,7 @@ device data), and user code, as a real CPU runs firmware under an OS.
 - **Board calls run on the server thread** (devices live there), each computer limited by server
   *time* a tick (1 ms), not call counts: fair to the server.
 - **Lua runs on a pool of the host's cores** (the user's, 2026-11-12: OpenComputers' threads, 4,
-  `cpu_cores`; "let the machines spin"): each computer keeps its own thread, but runs its firmware
+  `computer.cpu_cores`; "let the machines spin"): each computer keeps its own thread, but runs its firmware
   only holding a core (`CpuCores`), from a resume to its next request, given up at each (a slice, a
   call, a wait), handed on first come first served. So a busy loop runs flat out, taking turns a
   slice each with the others; tiers don't change Lua's speed; no tier has a clock rate. Waiting for
@@ -289,8 +296,8 @@ device data), and user code, as a real CPU runs firmware under an OS.
   what a full device does is its own business. **A command's end is never lost** (the user's,
   2026-11-11: NVMe's completion queue, io_uring's NODROP): a device's `EventQueue` keeps news in a
   window (lossy, `lost` said: news is read again from its state) and every end, both as deep as its
-  ring (`RingDepths`, the user's, 2026-11-11: `ring_depth`, 512, a type's own only if an admin sets
-  `<type>_ring_depth`, opt-in: a device without a type reads everyone's), its next command then refused at the board,
+  ring (`RingDepths`, the user's, 2026-11-11: `device.ring_depth.all`, 512, a type's own only if an admin sets
+  `device.ring_depth.<type>`, opt-in: a device without a type reads everyone's), its next command then refused at the board,
   `limit {of = "events", max}` its own (`Buffered.endsMax`), mcos's `EAGAIN`: never blocked, as only
   user code gives commands, and a thread that both gives and reads would deadlock itself. So a
   program that reads its device's events never loses an end, however slow its computer.
@@ -441,7 +448,7 @@ same line (drawn once a walk, from where its command started: a detour or a shov
 again, a field's carry moves it), its elevation free on the way (`GolemSteps.freeStep`), and where
 something stops it, `GolemWayfinder` searches once, all in that tick, from the last block's middle
 it reached, for the nearest way back onto its line past what stopped it and where it left it (a
-block whose middle is within a block of the line, or its target), within `pathfinding_range`
+block whose middle is within a block of the line, or its target), within `robot.pathfinding_range`
 blocks walked (96 by default: the game's own range) and the game's own budget for a search that
 far (`NODES_PER_BLOCK`, 16 places a block: a way too winding is no way, no mazes, the user's); none,
 it's blocked (`name = ""`, its face toward its target), on the last middle it reached. The search
@@ -473,7 +480,7 @@ what it broke it `kept` and `dropped`.
 - **It flies two ways, each with its price** (the user's design, 2026-10-25), never with its legs
   on and its tools as on the ground: on its **thrusters**, built into a tier 2 (a tier 1's thruster calls fail: a `fault`, `thrusters` missing), no card (`fly`, `land`;
   `fly()` takes off where it stands), its legs left standing where it took off (`GolemLegs`, a boat's kind of object), red
-  beams from their sockets, 25 blocks a second, five CPUs' power a tick; legless it walks nowhere,
+  beams from their sockets, 25 blocks a second, five CPUs' power a tick by default (`robot.cost.thrusters`); legless it walks nowhere,
   works as a player off the ground does (its hand's fake player off the ground: the game's rules,
   a break slower), ignores
   block triggers, and can be shoved; `land` comes down onto its legs below it and refuses with none
@@ -555,7 +562,7 @@ waits for a move under way); `stop` is free, ending a move where it is and holdi
 A plate a robot stands on to charge (user design, 2026-10-24): green particles round it while it
 does. Its power is a device's, as the Disk Station's: the bus's while a running computer has it,
 else its own buffer, which its battery fills. It charges the robot's battery (its board's buffer
-without one), ten running CPUs' worth a tick. Its device (`charger0`) says what it's doing and
+without one), ten running CPUs' worth a tick by default (`power.rate.charging_pad`). Its device (`charger0`) says what it's doing and
 what's docked on it (`docked`, a board id, whatever it is: the user's), and reports each coming and
 leaving (`docked`, `undocked`, its `id`).
 
@@ -593,7 +600,7 @@ socket opens to the address judged (no second lookup: no DNS rebinding); redirec
 program's, so each hop is judged again; a request can't set the headers that frame it (Host,
 Content-Length, Connection...), carry line breaks, or send credentials in its URL; no proxies,
 cookies or server details are sent. Admins can turn it off and allow or deny hosts and ranges
-(`internet_*` settings). Its events wait in the card with a handshake (a full card pauses the
+(`internet.*` settings). Its events wait in the card with a handshake (a full card pauses the
 download), and the kernel caps what it holds unread.
 
 ### Network cards
@@ -809,7 +816,7 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   blocked), `name = ""`, `face` the side of what it holds past the edge: a move there ends at once,
   nothing moved; what it holds out of reach, it lets go, a `blocked` notice (`blockedNotice`). A
   robot's moves have no limit of their own (the user's, 2026-11-13: it goes as far as it's told;
-  only pathfinding's search has a range, `pathfinding_range`: a flight's way not found within it
+  only pathfinding's search has a range, `robot.pathfinding_range`: a flight's way not found within it
   is blocked, a walk's way back onto its line too). **A thing's `name` is its registry id, its `id` its own UUID**, everywhere
   (the user's): a block has none, so `id = ""`; `blocked`'s block is a `name` too. **A swing breaks a
   place**, as the game's own player does (`MultiPlayerGameMode`): another block pushed in, the break
@@ -942,6 +949,10 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   in a loader's entry point calling a common hook. `common` can't see a loader's API.
 - **A new packet** goes in `ModNetwork`'s lists (a client handler in `ModNetworkClient`); **a new
   game test class** in `GameTests.CLASSES`. Nothing else registers them.
+- **A new setting** gets its default in `Defaults` at the path its key names, with a comment; a
+  `Setting` in `ModConfig` under its group's comment; and a row on `docs/settings.md`.
+  `ModConfigTest` fails until all three agree. No other manual page gives its value: they link to
+  the settings page.
 - **A new failure is a why with its own builder** (`runtime/Failure` for a refusal, `EventQueue` for
   an event), every field required (there's no other way: `Result.fail` takes only a `Failure`).
 - **A new word in an answer or event** (a field, an own-news `event`) goes in `.agents/FIELDS.md`

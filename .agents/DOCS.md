@@ -89,6 +89,11 @@ order: 10                   # place within the section (lower first)
   `docs/examples/*.java`, uses LungoLua alone, and is compiled and run by `DocsJavaTest`. C# beside it
   (`docs/examples/InboxExample.cs` and its `.csproj`, LungoLua's C# port) says it isn't the mod's,
   and is built and run by `DocsCsharpTest` against the port's `lungolua.dll`, with the .NET 10 SDK.
+- **A setting is documented on `settings.md` only** (the user's, 2026-11-18): its key, default, what
+  it does and its values, grouped as the file is. Another page says only that a behavior is a server
+  setting and links to its group's anchor (`[Settings](/settings/#robot)`), giving no value, as it
+  gives no timing. The page is written by hand, and `ModConfigTest` fails when it disagrees with the
+  settings.
 - Code highlighting comes from rouge, colored by `assets/style.css`.
 
 ## Checking

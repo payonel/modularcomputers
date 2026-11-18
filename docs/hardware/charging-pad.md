@@ -16,7 +16,7 @@ glowing particles rise round the golem while it does.
 | Stack | 64 |
 | Slots | A battery, a Bluetooth card |
 | Power | A running computer's, by cable; else its own battery |
-| Rate | 1,000 power units a tick: ten running CPUs' worth |
+| Rate | A server setting: see [Settings](/settings/#power-rate) |
 | Faces | Its front (its battery hatch) faces you when you place it |
 | Recipe | Gold ingot, glowstone dust, gold ingot; iron ingot, redstone block, iron ingot; three iron ingots |
 

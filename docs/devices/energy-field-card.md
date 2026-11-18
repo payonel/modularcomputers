@@ -23,7 +23,7 @@ off.
 | Where | Any expansion slot of a computer, an expansion hub, or a golem |
 | `/dev` | `field0` (`field1` the next) |
 | Reach | 16 blocks from its computer (a robot holding itself carries it along) |
-| Power | Two running CPUs' a tick while it holds something, and a CPU's tick a block moved |
+| Power | Each tick it holds something, and each block it moves it, costs power (a server setting: see [Settings](/settings/#power-cost)) |
 | Recipe | Ender pearl, chip, amethyst shard over three copper nuggets over three gold nuggets |
 
 </div>
@@ -90,8 +90,8 @@ Its ioctls are its methods, by name. Its events come as `sys.poll`'s `PRI`, and 
 `scan`, `capture` and `move` need something to project its field from: a card with none (not in a
 computer or a robot) fails them with a fault, `{why = "fault", condition = "missing", part =
 "projector", message}`. Its commands (`capture`, `move`, `release`) are refused,
-`{why = "limit", of = "events", max = 512}`, while 512 of its ends wait unread (its
-[ring depth](/concepts/interrupts/#no-end-is-ever-lost)), until its program reads some with `pull`:
+`{why = "limit", of = "events", max}`, while as many of its ends wait unread as its
+[ring depth](/concepts/interrupts/#no-end-is-ever-lost), until its program reads some with `pull`:
 in mcos, `nil`, `"limit"`, `EAGAIN` and the failure.
 
 ### scan([range]) → list

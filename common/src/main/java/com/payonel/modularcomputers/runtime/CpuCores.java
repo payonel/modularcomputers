@@ -18,12 +18,8 @@ import java.util.concurrent.locks.LockSupport;
  * host's cores, without making the runner a task a pool can resume.
  */
 public final class CpuCores {
-	/** How many computers run Lua at once by default (OpenComputers' threads). */
-	public static final int DEFAULT = 4;
-	/** The setting that sets it. */
-	public static final String KEY = "cpu_cores";
-
-	private static volatile int size = DEFAULT;
+	/** How many there are: the setting's ({@code computer.cpu_cores}), its default till the settings load. */
+	private static volatile int size = com.payonel.modularcomputers.config.Defaults.Computer.CPU_CORES;
 	private static int held;
 	/** The threads waiting for a core, first come first served; a core freed goes to the head. */
 	private static final ArrayDeque<Waiter> waiting = new ArrayDeque<>();

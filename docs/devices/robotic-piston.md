@@ -16,7 +16,7 @@ moves blocks.
 | Address | Cabled: it is known by its `id:` name |
 | Faces | Every side but the one with its cable port |
 | Interrupt | Raised while a move's end waits |
-| Power | Nothing at rest; every push, extend or retract costs five ticks of a running CPU |
+| Power | Nothing at rest; every push, extend or retract costs power (a server setting: see [Settings](/settings/#power-cost)) |
 | Info | none beyond the common ones |
 
 </div>
@@ -69,9 +69,9 @@ A face is named as every device names one: `north`, `south`, `east`, `west`, `up
 "face"}`, its value the name given; so does a relative name when the piston has no front it knows,
 or `left` and `right` when its front is up or down.
 
-A move given while 512 of its ends wait unread (its
-[ring depth](/concepts/interrupts/#no-end-is-ever-lost)) is refused, `{why = "limit", of = "events",
-max = 512}`, until its program reads some with `pull`; in mcos, `nil`, `"limit"`, `EAGAIN` and the
+A move given while as many of its ends wait unread as its
+[ring depth](/concepts/interrupts/#no-end-is-ever-lost) is refused, `{why = "limit", of = "events",
+max}`, until its program reads some with `pull`; in mcos, `nil`, `"limit"`, `EAGAIN` and the
 failure.
 
 ### push(face) → true

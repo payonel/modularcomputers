@@ -15,8 +15,8 @@ because a program's Lua cannot do TLS.
 | Type | `internet` |
 | Address | An expansion slot path such as `exp:0` |
 | Interrupt | Raised while a request has news for the program |
-| Power | 4 W at rest; a request costs a tick of a running CPU, and each 4 KiB of a body read a tenth of that |
-| Limits | 4 requests open per card, 64 on the server; 64 KiB of a body waits unread per request (`internet_response_buffer_kib`); a request body of at most 1 MiB |
+| Power | 4 W at rest; each request, and each 4 KiB of a body read, costs power (a server setting: see [Settings](/settings/#power-cost)) |
+| Limits | 4 requests open per card, 64 on the server; a server-set amount of a body waits unread per request ([Settings](/settings/#internet)); a request body of at most 1 MiB |
 | Info | `kind` (`internet`) |
 
 </div>
@@ -33,9 +33,9 @@ A request cannot set the headers that frame it (`Host`, `Content-Length`, `Conne
 cannot carry line breaks in a header, and cannot put credentials in its URL. The card sends no
 proxies, cookies or server details; it names itself `ModularComputers`.
 
-A server's operator can turn it off (`internet_enabled`) and allow or deny hosts and ranges
-(`internet_allow`, `internet_deny`), and set how much of a response's body each request holds unread
-before its download waits for the program (`internet_response_buffer_kib`, 64 by default). When it is off, `request` fails with
+A server's operator can turn it off, allow or deny hosts and ranges, and set how much of a
+response's body each request holds unread before its download waits for the program (server
+settings: see [Settings](/settings/#internet)). When it is off, `request` fails with
 `{why = "denied", reason = "disabled", value = ""}`.
 
 Timeouts: 10 seconds to connect, 30 with nothing read, 10 minutes in all. The status line and
@@ -65,7 +65,7 @@ GET http://10.0.0.1/ - 2ms 0 denied private 10.0.0.1
 ```
 
 - **Reading** gives the next line; with none waiting, a read waits for one. `cat /dev/internet0`
-  shows requests as they end (Ctrl+C stops it). The card keeps the last 512 (its [ring depth](/concepts/interrupts/)), as a device keeps its events:
+  shows requests as they end (Ctrl+C stops it). The card keeps as many as its [ring depth](/concepts/interrupts/), as a device keeps its events:
   when more come, the oldest go, and the entry that pushed one out says so (`lost`, a `lost n` line
   before it). They go when the computer stops.
 - **Writing** is refused: opening it for writing fails with `EACCES`.
@@ -171,8 +171,7 @@ The interrupt is raised when a request has news (its response came, more of its 
 or its failure) and stays raised until the program asks about it. In mcos, the card's file is
 ready for `sys.poll`'s `PRI` while it has news, so a program asks again after each poll.
 
-Each request holds at most 64 KiB of its body unread (`internet_response_buffer_kib` in
-`config/modularcomputers.properties`). When that's full its download waits for the program to read,
+Each request holds only so much of its body unread (a server setting: see [Settings](/settings/#internet)). When that's full its download waits for the program to read,
 so nothing is dropped: a big download goes at the program's pace, and one read takes all that's
 waiting. Everything stops
 when the computer loses power or no program runs: requests close.

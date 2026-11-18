@@ -4,7 +4,6 @@ import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.InterruptLine;
 import com.payonel.modularcomputers.internet.HttpExchange;
 import com.payonel.modularcomputers.internet.InternetPolicy;
-import com.payonel.modularcomputers.power.PowerUnits;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
@@ -25,7 +24,7 @@ import java.util.function.Supplier;
  * comes (false: not yet; "": its end), and either fails with why the request did; {@link #close}
  * stops it. Its interrupt says when a request has news. Each request runs on a thread of its own
  * ({@link HttpExchange}, which keeps it to the public internet: {@link InternetPolicy}); its body
- * waits in the card, at most its setting's worth a request ({@link #RESPONSE_BUFFER_KIB} KiB by default), and a request whose next piece
+ * waits in the card, at most its setting's worth a request ({@code internet.response_buffer_kib}), and a request whose next piece
  * finds no room waits (the handshake: nothing dropped), so a download goes at the program's pace.
  * At most {@link #MAX_OPEN} requests at a time.
  * <p>
@@ -42,10 +41,8 @@ public final class InternetCard extends Card {
 	/** And on the whole server: however many computers a player builds, its threads are bounded. */
 	public static final int MAX_RUNNING = 64;
 	private static final java.util.concurrent.atomic.AtomicInteger RUNNING = new java.util.concurrent.atomic.AtomicInteger();
-	/** How much of a response's body a request holds unread before its download waits, by default, in KiB (a data buffer, its own setting). */
-	public static final int RESPONSE_BUFFER_KIB = 64;
-	/** Bytes of a body a request holds unread, as last loaded ({@code internet_response_buffer_kib}). */
-	private static volatile int bodyBytes = bytes(RESPONSE_BUFFER_KIB);
+	/** Bytes of a body a request holds unread, as last loaded ({@code internet.response_buffer_kib}: a data buffer, its own setting). */
+	private static volatile int bodyBytes = bytes(com.payonel.modularcomputers.config.Defaults.Internet.RESPONSE_BUFFER_KIB);
 
 	/** The server's setting (ModConfig's), in KiB. */
 	public static void responseBuffer(int kib) {
@@ -61,11 +58,7 @@ public final class InternetCard extends Card {
 	public static final int BODY_KEPT = 16;
 	/** Its draw a tick, at rest. */
 	public static final int DRAW = 4;
-	/** What a request costs. */
-	public static final int REQUEST_COST = PowerUnits.CPU;
-	/** What each {@link #DATA_UNIT} bytes of a body read cost (a part of one costs a whole one). */
-	public static final int DATA_COST = PowerUnits.CPU / 10;
-	/** How many bytes of a body cost {@link #DATA_COST}: 4 KiB. */
+	/** How many bytes of a body cost its data cost ({@code power.cost.internet.data}; a part of them costs it whole): 4 KiB. */
 	public static final int DATA_UNIT = 4096;
 	/** How long what's downloaded waits for room before looking again whether its request was closed, in milliseconds. */
 	private static final long ROOM_MILLIS = 100;
@@ -168,7 +161,7 @@ public final class InternetCard extends Card {
 		} catch (com.payonel.modularcomputers.internet.HttpExchange.Refused e) {
 			return Result.fail(e.failure());
 		}
-		power.charge(REQUEST_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().internetRequest());
 		open.put(handle, request);
 		RUNNING.incrementAndGet();
 		THREADS.execute(() -> {
@@ -278,7 +271,7 @@ public final class InternetCard extends Card {
 		long most = args.count() > 1 ? Math.max(1, args.checkInteger(1)) : Long.MAX_VALUE;
 		String data = request.body.take(most); // (everything held, up to most: read(2)'s way)
 		if (data != null) {
-			power.charge(DATA_COST * (int) Math.ceilDiv(data.length(), DATA_UNIT));
+			power.charge(com.payonel.modularcomputers.config.ModConfig.costs().internetData() * (int) Math.ceilDiv(data.length(), DATA_UNIT));
 			return Result.ok(data);
 		}
 		if (request.error != null) {

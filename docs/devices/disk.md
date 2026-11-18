@@ -241,7 +241,7 @@ Commits what was written and closes. On failure the handle stays open with its w
 ## Events
 
 A disk reports every change made on it, whoever made it (this computer, another one, a Disk
-Station), as an event. The oldest is taken with `changes()`. At most 512 wait (its [ring depth](/concepts/interrupts/)); when more come, the
+Station), as an event. The oldest is taken with `changes()`. At most its [ring depth](/concepts/interrupts/) wait; when more come, the
 oldest is dropped and the next event to arrive carries `lost`, the number dropped. Reports are kept
 across a save, and dropped when no program runs.
 

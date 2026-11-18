@@ -2,21 +2,16 @@ package com.payonel.modularcomputers.device;
 
 import com.payonel.modularcomputers.bus.DeviceType;
 import java.util.EnumMap;
-import java.util.Locale;
 import java.util.Map;
 
 /**
  * How deep each device's rings are (the user's, 2026-11-11): the events it keeps for its program, its
  * news window and its unread command ends alike (a network card's frames and its log too). A device
- * type's own depth when the server sets one ({@code <type>_ring_depth}), else everyone's ({@code
- * ring_depth}), else {@link #DEFAULT}. The device is the front line against bursts, so its rings are
+ * type's own depth when the server sets one ({@code device.ring_depth.<type>}), else everyone's
+ * ({@code device.ring_depth.all}). The device is the front line against bursts, so its rings are
  * deep; mcos's own (a file's copy) are its own business, and small.
  */
 public final class RingDepths {
-	/** Every device's depth when the server sets none. */
-	public static final int DEFAULT = 512;
-	/** The setting for every device's depth. */
-	public static final String GLOBAL_KEY = "ring_depth";
 	/** The depths: everyone's, and the types that set their own. */
 	public record Depths(int global, Map<DeviceType, Integer> types) {
 		public Depths {
@@ -32,14 +27,10 @@ public final class RingDepths {
 		}
 	}
 
-	private static volatile Depths now = new Depths(DEFAULT, Map.of());
+	/** The depths now: the settings', their default till they load. */
+	private static volatile Depths now = new Depths(com.payonel.modularcomputers.config.Defaults.Device.RingDepth.ALL, Map.of());
 
 	private RingDepths() {
-	}
-
-	/** The setting for one type's depth: its name, as /sys names its class. */
-	public static String key(DeviceType type) {
-		return type.name().toLowerCase(Locale.ROOT) + "_ring_depth";
 	}
 
 	/** A type's depth now (null: everyone's). */

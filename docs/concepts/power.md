@@ -37,10 +37,9 @@ rate, not the running one.
 
 ## What stores it
 
-[Batteries](/hardware/battery/) sit in the case's battery bays. By default, a full tier 1 runs a
-computer for ten Minecraft days, a full tier 2 for twenty and also recharges itself while the
-computer isn't running anything (two seconds of rest charge one second of running), and a tier 3
-never runs out. These are defaults that a server's configuration can change.
+[Batteries](/hardware/battery/) sit in the case's battery bays. How many Minecraft days a full one
+runs a computer is a server setting for each tier (see [Settings](/settings/#power-battery)); a
+tier 2 also recharges itself while the computer isn't running anything.
 
 ## Bus-powered devices
 

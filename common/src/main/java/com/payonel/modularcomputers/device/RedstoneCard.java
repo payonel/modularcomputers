@@ -2,7 +2,6 @@ package com.payonel.modularcomputers.device;
 
 import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.InterruptLine;
-import com.payonel.modularcomputers.power.PowerUnits;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
@@ -39,8 +38,6 @@ public final class RedstoneCard extends Card implements Buffered {
 	public static final List<Face> SIDES = List.of(Face.NORTH, Face.SOUTH, Face.EAST, Face.WEST, Face.UP, Face.DOWN);
 	/** A redstone signal's strength, at most (Minecraft's 0 to 15). */
 	public static final int MAX_SIGNAL = 15;
-	/** What changing a face's signal costs: a tick of a running CPU. */
-	public static final int CHANGE_COST = PowerUnits.CPU;
 	private final InterruptLine line = new InterruptLine();
 	/** It works while a running computer has it on its bus (it draws nothing to speak of at rest). */
 	private final BusPower power = new BusPower(0);
@@ -190,7 +187,7 @@ public final class RedstoneCard extends Card implements Buffered {
 		for (Map.Entry<Integer, Integer> setting : settings.entrySet()) {
 			int side = setting.getKey();
 			if (output[side] != setting.getValue()) {
-				power.charge(CHANGE_COST);
+				power.charge(com.payonel.modularcomputers.config.ModConfig.costs().redstoneChange());
 				output[side] = setting.getValue();
 				changedOutput = true;
 			}

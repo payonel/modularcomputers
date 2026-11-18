@@ -28,7 +28,7 @@ import java.util.Optional;
  * reads first gets the key, as under UEFI's splitter). Typing comes from the screen
  * view: only the terminal a player has open gets the keys.
  * <p>
- * It's bus-powered ({@link #DRAW}, plus {@link #WRITE_COST} a write): with no running computer
+ * It's bus-powered ({@link #DRAW}, plus a write's cost, {@code power.cost.terminal.write}): with no running computer
  * supplying it, it's dark.
  * <p>
  * <b>Scrollback</b> (user, 2026-10-15): lines that scroll off the top of its main screen are kept
@@ -49,8 +49,6 @@ import java.util.Optional;
 public final class Terminal implements Device {
 	/** What a terminal draws each tick it has power: a tenth of a running CPU. */
 	public static final int DRAW = PowerUnits.TERMINAL;
-	/** What one write costs, flat. */
-	public static final int WRITE_COST = PowerUnits.TERMINAL_WRITE;
 
 	private final BusPower power = new BusPower(DRAW);
 	private final InterruptLine interruptLine = new InterruptLine();
@@ -302,7 +300,7 @@ public final class Terminal implements Device {
 
 	/** Text down the line to the terminal, decoded as it arrives. Each write costs power. */
 	public void write(String text) {
-		power.charge(WRITE_COST);
+		power.charge(com.payonel.modularcomputers.config.ModConfig.costs().terminalWrite());
 		scrollToBottom();
 		decoder.write(text);
 		changed.run();

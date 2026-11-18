@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * What internet cards may reach (a server's settings: {@code internet_*}). A computer in the world
+ * What internet cards may reach (a server's settings: {@code internet.*}). A computer in the world
  * is someone else's program running on the server's network, so by default it reaches only the
  * public internet: never the server itself (loopback), its LAN (private ranges), link-local
  * addresses (which hold cloud machines' metadata services, 169.254.169.254, and their keys),

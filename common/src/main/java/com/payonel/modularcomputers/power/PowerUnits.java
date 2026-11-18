@@ -11,8 +11,6 @@ public final class PowerUnits {
 	public static final int CPU = 100;
 	/** A terminal, each tick it has power. */
 	public static final int TERMINAL = 10;
-	/** One write to a terminal, flat. */
-	public static final int TERMINAL_WRITE = 1;
 	/** A running computer (a CPU and a terminal), each tick: the yardstick. */
 	public static final int COMPUTER = CPU + TERMINAL;
 	/** A day of a running computer. */

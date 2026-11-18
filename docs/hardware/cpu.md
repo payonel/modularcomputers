@@ -35,8 +35,7 @@ an EEPROM, a battery, a disk and one card or external device.
 An off CPU draws nothing. See [Power](/concepts/power/).
 
 Every tier runs Lua at the same speed: as fast as the server's core it runs on. The server lets a
-number of computers run at once (`cpu_cores` in `config/modularcomputers.properties`, 4 by
-default), and when more are busy than that, they take turns, a slice each. A computer waiting for
+number of computers run at once (a server setting: see [Settings](/settings/#computer)), and when more are busy than that, they take turns, a slice each. A computer waiting for
 something (a key, a device, the server) takes no turn. See
 [Persistence](/concepts/persistence/#what-a-budget-means).
 

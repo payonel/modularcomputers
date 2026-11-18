@@ -224,7 +224,7 @@ class RoboticsDeviceTest {
 	void walkingCostsPowerByTheBlock() {
 		device.power().supply(this); // (a running board pays)
 		device.walked(2.5);
-		assertThat(device.power().collect(0)).isEqualTo((long) Math.ceil(2.5 * RoboticsDevice.WALK_COST)); // (by the distance, a part of a block too)
+		assertThat(device.power().collect(0)).isEqualTo(250L); // (by the distance, a part of a block too: a running CPU's tick a block, by default)
 	}
 
 	/** A body that can drift, be off its spot, fall, and says what it was asked to plan. */

@@ -77,7 +77,7 @@ local event = sys.ioctl(fd, "pull")  -- {event = "motion", name = "minecraft:pig
 | `lost` | present when events were dropped: how many |
 
 Each event raises the sensor's interrupt, which stays raised while any wait. The sensor keeps at most
-512 events (its [ring depth](/concepts/interrupts/)). When it is full the oldest goes, and the next event says how many
+its [ring depth](/concepts/interrupts/) of events. When it is full the oldest goes, and the next event says how many
 were lost. Events are kept across a save, and dropped while no program runs.
 
 Where is in its computer's frame, as an [energy field card](/devices/energy-field-card/)'s
