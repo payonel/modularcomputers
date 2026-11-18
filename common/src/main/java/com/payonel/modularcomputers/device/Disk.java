@@ -542,6 +542,11 @@ public final class Disk implements Device {
 		return new Refused(com.payonel.modularcomputers.runtime.Failure.internalError(PART, new IllegalStateException("a disk with no storage")));
 	}
 
+	/** What a path is: {@link #stat}'s kinds, and {@link #list}'s types. */
+	private static final String FILE = "file";
+	private static final String DIRECTORY = "directory";
+	private static final String LINK = "link";
+
 	/** What a disk's bad_state is of: a path, a handle; and what a path needs to be made there. */
 	private static final String PATH = "path";
 	private static final String HANDLE = "handle";
@@ -782,7 +787,7 @@ public final class Disk implements Device {
 			try (Stream<Path> paths = Files.list(dir)) {
 				if (typed) {
 					return Result.ok(paths.sorted().map(entry -> (Object) Map.of("name", entry.getFileName().toString(),
-						"type", Files.isDirectory(entry) ? "directory" : linkTarget(entry) != null ? "link" : "file")).toList());
+						"type", Files.isDirectory(entry) ? DIRECTORY : linkTarget(entry) != null ? LINK : FILE)).toList());
 				}
 				return Result.ok(paths.map(entry -> entry.getFileName() + (Files.isDirectory(entry) ? "/" : "")).sorted().toList());
 			} catch (IOException e) {
@@ -791,14 +796,14 @@ public final class Disk implements Device {
 		});
 	}
 
-	@Method(doc = "stat(path[, nofollow]): {size, directory, modified} (modified: the world's time when it last changed, in milliseconds: a tick is 50), or nil if there's nothing there; nofollow: a link itself, with link = its target (and size its length)")
+	@Method(doc = "stat(path[, nofollow]): {kind, size, modified}, kind file or directory (modified: the world's time when it last changed, in milliseconds: a tick is 50), or nil if there's nothing there; nofollow: a link itself, {kind = link, size, link, modified}, link its target (and size its length)")
 	public Result stat(Arguments args) {
 		String path = args.checkString(0);
 		boolean nofollow = args.optBoolean(1, false);
 		return run(() -> {
 			Path at = resolve(path, !nofollow);
 			if (at.equals(storage)) {
-				return Result.ok(Map.of("size", 0L, "directory", true, "modified", 0L));
+				return Result.ok(Map.of("kind", DIRECTORY, "size", 0L, "modified", 0L));
 			}
 			if (!Files.exists(at)) {
 				return Result.ok((Object) null); // (none: nil, not done)
@@ -807,14 +812,14 @@ public final class Disk implements Device {
 				Map<String, Object> stat = new LinkedHashMap<>();
 				String target = nofollow ? linkTarget(at) : null;
 				if (target != null) {
+					stat.put("kind", LINK);
 					stat.put("size", (long) target.length());
-					stat.put("directory", false);
 					stat.put("link", target);
 					stat.put("modified", Files.getLastModifiedTime(at).toMillis());
 					return Result.ok(stat);
 				}
+				stat.put("kind", Files.isDirectory(at) ? DIRECTORY : FILE);
 				stat.put("size", size(at));
-				stat.put("directory", Files.isDirectory(at));
 				stat.put("modified", Files.getLastModifiedTime(at).toMillis());
 				return Result.ok(stat);
 			} catch (IOException e) {

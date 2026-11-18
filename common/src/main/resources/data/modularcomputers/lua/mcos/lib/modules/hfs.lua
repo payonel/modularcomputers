@@ -91,8 +91,7 @@ function fs:stat(path, nofollow)
     end
     return fail("ENOENT")
   end
-  return {type = st.link and "link" or st.directory and "directory" or "file", size = st.size,
-    modified = st.modified, target = st.link}
+  return {type = st.kind, size = st.size, modified = st.modified, target = st.link}
 end
 
 function fs:list(path)

@@ -123,7 +123,6 @@ reads this table and the Fields below and checks the code against them.
 | `current` | the boot entry booted now (`-1` none) | number | EEPROM's `getBoot` |
 | `damage` | an item's wear | number | items |
 | `data` | a frame's bytes | string | received frames |
-| `directory` | whether a path is a directory | boolean | disk's `stat` |
 | `disk` | a disk's id (a boot entry's) | string | EEPROM's boot entries |
 | `docked` | the board id of what's on a charging pad (`""` nothing) | string | charging pad's `get` |
 | `dropped` | how many of what a broken block dropped stayed in the world | number | a swing's `result` |
@@ -143,12 +142,12 @@ reads this table and the Fields below and checks the code against them.
 | `id` | a thing's or device's own UUID (`""` for a block) | string | things, `busy`, `held`, devices |
 | `kept` | how many of what a broken block dropped a swing caught | number | a swing's `result` |
 | `key` | a Minecraft message's translation key | string | operator card |
-| `kind` | what sort of thing (`entity`, `item`, `block`, `fluid`, `air`; `not_found`'s `device`, `file`...) | word | things, `not_found` |
+| `kind` | what sort of thing (`entity`, `item`, `block`, `fluid`, `air`; `not_found`'s `device`, `file`...); what a disk's path is (`file`, `directory`, `link`) | word | things, `not_found`, disk's `stat` |
 | `label` | a device's or entry's label | string | device info, boot entries, items |
 | `length` | how many bytes, from an `offset` | number | a raw disk's `write` change |
 | `legs` | whether the robot stands on its legs | boolean | robotics' `get` |
 | `level` | a redstone face's signal, 0 to 15 | number | redstone |
-| `link` | a symbolic link's target | string | disk's `stat` |
+| `link` | a symbolic link's target, a link's `stat` only | string | disk's `stat` (`kind = "link"`) |
 | `lost` | how many events went before this one, its queue full | number | any event |
 | `max` | a limit's most | number | `limit` |
 | `maxDamage` | an item's most wear (0: it doesn't wear) | number | items |
@@ -177,7 +176,7 @@ reads this table and the Fields below and checks the code against them.
 | `reason` | why, a word from its why's closed list | word | `denied`, `network` |
 | `result` | a done command's answer; a Minecraft command's value | any | ends, operator |
 | `sent` | a request body's whole size, bytes | number | internet log's `progress` |
-| `size` | a file's size in bytes | number | disk's `stat` |
+| `size` | a file's size in bytes (a directory's 0; a link's its target's length) | number | disk's `stat` |
 | `slot` | a container's slot, from 1 | number | items in containers |
 | `solid` | whether a block can't be walked through | boolean | a scan's block |
 | `source` | whether a fluid is a source block | boolean | a scan's fluid |

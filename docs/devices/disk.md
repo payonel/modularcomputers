@@ -150,11 +150,20 @@ The names in a directory, sorted; directories end in `/`. With `typed` true, a t
 `{name, type}` each, where type is `file`, `directory` or `link`. `path` defaults to `/`. Fails
 with `not_found` (`kind = "file"`) when it is not a directory.
 
-### stat(path[, nofollow]) → {size, directory, modified} or nil
+### stat(path[, nofollow]) → {kind, size, modified} or nil
 
-`modified` is the world's time when the file last changed, in milliseconds (a game tick is 50). Nil
-if there is nothing there. With `nofollow`, a symbolic link is described itself, with `link` set to
-its target (and `size` its length).
+What is at `path`, its `kind` saying what it is, and each kind its own fields, all always there:
+
+| kind | fields |
+|---|---|
+| `"file"` | `size` (its bytes), `modified` |
+| `"directory"` | `size` (0), `modified` |
+| `"link"` | `size` (its target's length), `link` (its target), `modified`: only with `nofollow` |
+
+`modified` is the world's time when it last changed, in milliseconds (a game tick is 50). Nil if
+there is nothing there. Without `nofollow`, a link at the end of `path` stops the call
+(`symbolic_link`, below), as a link on the way does: the operating system follows it and asks
+again, so mcos's `stat` gives what the link leads to.
 
 ### mkdir(path) → nothing
 

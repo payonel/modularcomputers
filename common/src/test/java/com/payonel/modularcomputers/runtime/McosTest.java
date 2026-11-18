@@ -1647,6 +1647,24 @@ class McosTest extends McosHarness {
 	}
 
 	@Test
+	void statOnADiskSaysEachTypeWithItsSizeAndALinksTarget() {
+		file("real/a.txt", "through\n");
+		file("t.lua", """
+			local sys = require("sys")
+			assert(sys.symlink("real", "/rel"))
+			local out = assert(io.open("/r", "w"))
+			for _, at in ipairs({{"/real/a.txt"}, {"/real"}, {"/rel"}, {"/rel", true}}) do
+			  local st = assert((at[2] and sys.lstat or sys.stat)(at[1]))
+			  out:write(st.type, " ", st.size, " ", tostring(st.target), " ", math.type(st.modified), "\\n")
+			end
+			out:close()
+			""");
+		boot();
+		type("/t.lua\r");
+		untilFile(root().resolve("r"), "file 8 nil integer\ndirectory 0 nil integer\ndirectory 0 nil integer\nlink 4 real integer\n");
+	}
+
+	@Test
 	void symbolicLinksAreKeptByTheDiskAndFollowedByTheKernel() {
 		file("real/a.txt", "through\n");
 		file("t.lua", """

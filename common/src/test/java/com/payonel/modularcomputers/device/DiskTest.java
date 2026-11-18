@@ -120,7 +120,7 @@ class DiskTest {
 		});
 		assertThat(seen.get(0)).isEqualTo(false);
 		assertThat(seen.get(1)).isEqualTo("/real");
-		assertThat(seen.get(2)).isEqualTo(Map.of("size", 5L, "directory", false, "link", "/real",
+		assertThat(seen.get(2)).isEqualTo(Map.of("kind", "link", "size", 5L, "link", "/real",
 			"modified", ((Map<?, ?>) seen.get(2)).get("modified")));
 		assertThat(seen.get(3)).isEqualTo(List.of(Map.of("name", "real", "type", "directory"), Map.of("name", "to", "type", "link")));
 		assertThat(seen.get(4)).isEqualTo(Map.of("why", "symbolic_link", "at", "/to", "target", "/real"));
@@ -129,6 +129,38 @@ class DiskTest {
 		assertThat(seen.get(7)).isEqualTo(Map.of("why", "bad_state", "of", "path", "value", "/real", "expected", "link"));
 		assertThat(seen.subList(8, 11)).containsExactly(false, false, true);
 		assertThat(Files.exists(storage().resolve("moved"))).isFalse();
+	}
+
+	@Test
+	void statSaysWhatAPathIsByItsKindEachKindsFieldsAllThere() throws Exception {
+		run(DiskTier.TIER_1, board -> {
+			board.invoke("sata:0", "mkdir", "/dir");
+			Handle out = (Handle) board.invoke("sata:0", "open", "/file", "w").first();
+			board.invoke(out, "write", "hello");
+			board.invoke(out, "close");
+			board.invoke("sata:0", "symlink", "/dir", "/to");
+			seen.add(board.invoke("sata:0", "stat", "/file").first());
+			seen.add(board.invoke("sata:0", "stat", "/dir").first());
+			seen.add(board.invoke("sata:0", "stat", "/").first());
+			seen.add(board.invoke("sata:0", "stat", "/to", true).first());
+			seen.add(board.invoke("sata:0", "stat", "/file", true).first()); // nofollow on what isn't a link: as without
+			seen.add(board.invoke("sata:0", "stat", "/to").failure().table()); // followed: the OS's, from the link's target
+			com.payonel.modularcomputers.machine.Program.park(board);
+		});
+		assertThat(stat(0)).containsOnlyKeys("kind", "size", "modified")
+			.containsEntry("kind", "file").containsEntry("size", 5L);
+		assertThat(stat(1)).containsOnlyKeys("kind", "size", "modified")
+			.containsEntry("kind", "directory").containsEntry("size", 0L);
+		assertThat(seen.get(2)).isEqualTo(Map.of("kind", "directory", "size", 0L, "modified", 0L));
+		assertThat(stat(3)).containsOnlyKeys("kind", "size", "link", "modified")
+			.containsEntry("kind", "link").containsEntry("size", 4L).containsEntry("link", "/dir");
+		assertThat(stat(4)).containsOnlyKeys("kind", "size", "modified").containsEntry("kind", "file");
+		assertThat(seen.get(5)).isEqualTo(Map.of("why", "symbolic_link", "at", "/to", "target", "/dir"));
+	}
+
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> stat(int seen) {
+		return (Map<String, Object>) this.seen.get(seen);
 	}
 
 	@Test
@@ -173,7 +205,7 @@ class DiskTest {
 			List.of("notes/"), List.of("hello.txt"), seen.get(12));
 		@SuppressWarnings("unchecked")
 		Map<String, Object> stat = (Map<String, Object>) seen.get(12);
-		assertThat(stat).containsEntry("size", 11L).containsEntry("directory", false);
+		assertThat(stat).containsEntry("size", 11L).containsEntry("kind", "file");
 		assertThat(Files.readString(storage().resolve("notes/hello.txt"))).isEqualTo("hello disk\n");
 	}
 
