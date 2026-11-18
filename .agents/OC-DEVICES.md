@@ -108,7 +108,7 @@ mcos's threads) are on the `openos` branch only.
 - `isReadOnly(): boolean`: **missing** as a method (`Disk.isReadOnly()` is Java's: a Disk Station's source; `info()` doesn't say).
 - `spaceTotal(): number`: `getCapacity()` (the tier's bytes; never infinite).
 - `spaceUsed(): number`: `getUsed()` (512 bytes an entry, plus open handles' uncommitted writes).
-- `exists(path)`, `size(path)`, `isDirectory(path)`: `stat(path)` (nil when nothing; `.size`, `.kind`); no separate methods.
+- `exists(path)`, `size(path)`, `isDirectory(path)`: `stat(path)` (nil when nothing; `.size`, `.type`); no separate methods.
 - `lastModified(path): number`: `stat(path).modified`, world time in ms (a tick 50), not real time; `stat(path, true)` a link's target too.
 - `list(path): table`: `list(path[, typed])`: path optional (`/`), sorted, directories with `/`; `typed` gives `{name, type}`.
 - `makeDirectory(path): boolean`: `mkdir(path)`: not recursive, fails when it exists (OC makes the parents).

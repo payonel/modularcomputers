@@ -796,14 +796,14 @@ public final class Disk implements Device {
 		});
 	}
 
-	@Method(doc = "stat(path[, nofollow]): {kind, size, modified}, kind file or directory (modified: the world's time when it last changed, in milliseconds: a tick is 50), or nil if there's nothing there; nofollow: a link itself, {kind = link, size, link, modified}, link its target (and size its length)")
+	@Method(doc = "stat(path[, nofollow]): {type, size, modified}, type file or directory (modified: the world's time when it last changed, in milliseconds: a tick is 50), or nil if there's nothing there; nofollow: a link itself, {type = link, size, target, modified}, target what it points to (and size its length)")
 	public Result stat(Arguments args) {
 		String path = args.checkString(0);
 		boolean nofollow = args.optBoolean(1, false);
 		return run(() -> {
 			Path at = resolve(path, !nofollow);
 			if (at.equals(storage)) {
-				return Result.ok(Map.of("kind", DIRECTORY, "size", 0L, "modified", 0L));
+				return Result.ok(Map.of("type", DIRECTORY, "size", 0L, "modified", 0L));
 			}
 			if (!Files.exists(at)) {
 				return Result.ok((Object) null); // (none: nil, not done)
@@ -812,13 +812,13 @@ public final class Disk implements Device {
 				Map<String, Object> stat = new LinkedHashMap<>();
 				String target = nofollow ? linkTarget(at) : null;
 				if (target != null) {
-					stat.put("kind", LINK);
+					stat.put("type", LINK);
 					stat.put("size", (long) target.length());
-					stat.put("link", target);
+					stat.put("target", target);
 					stat.put("modified", Files.getLastModifiedTime(at).toMillis());
 					return Result.ok(stat);
 				}
-				stat.put("kind", Files.isDirectory(at) ? DIRECTORY : FILE);
+				stat.put("type", Files.isDirectory(at) ? DIRECTORY : FILE);
 				stat.put("size", size(at));
 				stat.put("modified", Files.getLastModifiedTime(at).toMillis());
 				return Result.ok(stat);

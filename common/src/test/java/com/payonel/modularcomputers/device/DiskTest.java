@@ -120,7 +120,7 @@ class DiskTest {
 		});
 		assertThat(seen.get(0)).isEqualTo(false);
 		assertThat(seen.get(1)).isEqualTo("/real");
-		assertThat(seen.get(2)).isEqualTo(Map.of("kind", "link", "size", 5L, "link", "/real",
+		assertThat(seen.get(2)).isEqualTo(Map.of("type", "link", "size", 5L, "target", "/real",
 			"modified", ((Map<?, ?>) seen.get(2)).get("modified")));
 		assertThat(seen.get(3)).isEqualTo(List.of(Map.of("name", "real", "type", "directory"), Map.of("name", "to", "type", "link")));
 		assertThat(seen.get(4)).isEqualTo(Map.of("why", "symbolic_link", "at", "/to", "target", "/real"));
@@ -147,14 +147,14 @@ class DiskTest {
 			seen.add(board.invoke("sata:0", "stat", "/to").failure().table()); // followed: the OS's, from the link's target
 			com.payonel.modularcomputers.machine.Program.park(board);
 		});
-		assertThat(stat(0)).containsOnlyKeys("kind", "size", "modified")
-			.containsEntry("kind", "file").containsEntry("size", 5L);
-		assertThat(stat(1)).containsOnlyKeys("kind", "size", "modified")
-			.containsEntry("kind", "directory").containsEntry("size", 0L);
-		assertThat(seen.get(2)).isEqualTo(Map.of("kind", "directory", "size", 0L, "modified", 0L));
-		assertThat(stat(3)).containsOnlyKeys("kind", "size", "link", "modified")
-			.containsEntry("kind", "link").containsEntry("size", 4L).containsEntry("link", "/dir");
-		assertThat(stat(4)).containsOnlyKeys("kind", "size", "modified").containsEntry("kind", "file");
+		assertThat(stat(0)).containsOnlyKeys("type", "size", "modified")
+			.containsEntry("type", "file").containsEntry("size", 5L);
+		assertThat(stat(1)).containsOnlyKeys("type", "size", "modified")
+			.containsEntry("type", "directory").containsEntry("size", 0L);
+		assertThat(seen.get(2)).isEqualTo(Map.of("type", "directory", "size", 0L, "modified", 0L));
+		assertThat(stat(3)).containsOnlyKeys("type", "size", "target", "modified")
+			.containsEntry("type", "link").containsEntry("size", 4L).containsEntry("target", "/dir");
+		assertThat(stat(4)).containsOnlyKeys("type", "size", "modified").containsEntry("type", "file");
 		assertThat(seen.get(5)).isEqualTo(Map.of("why", "symbolic_link", "at", "/to", "target", "/dir"));
 	}
 
@@ -205,7 +205,7 @@ class DiskTest {
 			List.of("notes/"), List.of("hello.txt"), seen.get(12));
 		@SuppressWarnings("unchecked")
 		Map<String, Object> stat = (Map<String, Object>) seen.get(12);
-		assertThat(stat).containsEntry("size", 11L).containsEntry("kind", "file");
+		assertThat(stat).containsEntry("size", 11L).containsEntry("type", "file");
 		assertThat(Files.readString(storage().resolve("notes/hello.txt"))).isEqualTo("hello disk\n");
 	}
 

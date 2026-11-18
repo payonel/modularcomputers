@@ -93,7 +93,7 @@ answers are shown the same way, tables as `{key = value}`.
 
 ```
 # call sata:1 stat "/init.lua"
-{kind = "file", modified = 1200850, size = 8431}
+{modified = 1200850, size = 8431, type = "file"}
 # call sata:1 nope
 failed: no such method: nope
 ```

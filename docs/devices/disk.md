@@ -150,15 +150,16 @@ The names in a directory, sorted; directories end in `/`. With `typed` true, a t
 `{name, type}` each, where type is `file`, `directory` or `link`. `path` defaults to `/`. Fails
 with `not_found` (`kind = "file"`) when it is not a directory.
 
-### stat(path[, nofollow]) → {kind, size, modified} or nil
+### stat(path[, nofollow]) → {type, size, modified} or nil
 
-What is at `path`, its `kind` saying what it is, and each kind its own fields, all always there:
+What is at `path`, its `type` saying what it is (as `list` names it), and each type its own fields,
+all always there:
 
-| kind | fields |
+| type | fields |
 |---|---|
 | `"file"` | `size` (its bytes), `modified` |
 | `"directory"` | `size` (0), `modified` |
-| `"link"` | `size` (its target's length), `link` (its target), `modified`: only with `nofollow` |
+| `"link"` | `size` (its target's length), `target` (what it points to), `modified`: only with `nofollow` |
 
 `modified` is the world's time when it last changed, in milliseconds (a game tick is 50). Nil if
 there is nothing there. Without `nofollow`, a link at the end of `path` stops the call

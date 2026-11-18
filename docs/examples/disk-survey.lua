@@ -28,7 +28,7 @@ local function survey(device)
       if entry.type == "directory" then
         lines[#lines + 1] = "  " .. entry.name .. "/"
       elseif entry.type == "link" then
-        lines[#lines + 1] = "  " .. entry.name .. " -> " .. stat.link
+        lines[#lines + 1] = "  " .. entry.name .. " -> " .. stat.target
       else
         lines[#lines + 1] = string.format("  %s %d", entry.name, stat.size)
       end

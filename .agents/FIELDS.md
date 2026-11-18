@@ -142,12 +142,11 @@ reads this table and the Fields below and checks the code against them.
 | `id` | a thing's or device's own UUID (`""` for a block) | string | things, `busy`, `held`, devices |
 | `kept` | how many of what a broken block dropped a swing caught | number | a swing's `result` |
 | `key` | a Minecraft message's translation key | string | operator card |
-| `kind` | what sort of thing (`entity`, `item`, `block`, `fluid`, `air`; `not_found`'s `device`, `file`...); what a disk's path is (`file`, `directory`, `link`) | word | things, `not_found`, disk's `stat` |
+| `kind` | what sort of thing (`entity`, `item`, `block`, `fluid`, `air`; `not_found`'s `device`, `file`...) | word | things, `not_found` |
 | `label` | a device's or entry's label | string | device info, boot entries, items |
 | `length` | how many bytes, from an `offset` | number | a raw disk's `write` change |
 | `legs` | whether the robot stands on its legs | boolean | robotics' `get` |
 | `level` | a redstone face's signal, 0 to 15 | number | redstone |
-| `link` | a symbolic link's target, a link's `stat` only | string | disk's `stat` (`kind = "link"`) |
 | `lost` | how many events went before this one, its queue full | number | any event |
 | `max` | a limit's most | number | `limit` |
 | `maxDamage` | an item's most wear (0: it doesn't wear) | number | items |
@@ -183,11 +182,11 @@ reads this table and the Fields below and checks the code against them.
 | `state` | what a device is doing (a word: robotics' `walking`, the field card's `holding`); a scanned block's block state, its properties' values (vanilla's word) | word / table | robotics, field card; a scan's block |
 | `status` | an HTTP status; `0` no response | number | internet card |
 | `successes` | how many of a Minecraft command's runs succeeded | number | operator card |
-| `target` | a symbolic link's target | string | `symbolic_link` |
+| `target` | a symbolic link's target | string | `symbolic_link`; a link's disk `stat` (`type = "link"`) |
 | `tier` | a device's tier | number | disk info |
 | `time` | when, the world's time | number | `lastShutdown()` |
 | `took` | how many cards took a frame | number | network log |
-| `type` | what kind of device (`storage`), or of path (`file`, `directory`, `link`) | word | device info; disk's `list` |
+| `type` | what kind of device (`storage`), or of path (`file`, `directory`, `link`) | word | device info; disk's `list` and `stat` (its shape by its type) |
 | `url` | a URL | string | internet card |
 | `used` | bytes in use | number | disk |
 | `value` | what was given or named, as given | any | `bad_argument`, `bad_state`, `denied`, `not_found` |
