@@ -127,10 +127,10 @@ changed", which is how a redstone file reports that an input moved.
 
 ### 8. Relative faces
 
-A face named `west` is west wherever the case is turned. If you would rather say "the side to my
-right", the card also takes `front`, `back`, `left` and `right`, measured from the case's front, as
-someone standing facing the case sees them. A program written that way works however the case is
-placed. The card's file always reports the world's names. See [faces](/concepts/faces/).
+A face named `west` is west wherever the case is turned. If you would rather name a side by the case
+itself, the card also takes `front`, `back`, `left` and `right`, measured from the case's front: its
+own left and right, as if it faced out of its front (standing in front of it, facing it, its left is
+on your right). A program written that way works however the case is placed. The card's file always reports the world's names. See [faces](/concepts/faces/).
 
 ## When something is missing
 
