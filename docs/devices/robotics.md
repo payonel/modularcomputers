@@ -518,7 +518,9 @@ as anything does.
 Only a walk pushes: it needs its legs. On its thrusters (a flight, a landing) it pushes nothing,
 and whatever is in its way stops it, a pig as much as another golem: its move ends `blocked`,
 `name` the thing's type (`minecraft:pig`), `face` its own that met it (`down` for a creature under
-a landing), and it hovers there. A field's carry moves through things, as it always has.
+a landing), and it hovers there. Off its legs it never pushes anything, not even the game's gentle
+crowding: a creature pressed against it while it hovers can push it, and it doesn't push back. A
+field's carry moves through things, as it always has.
 
 ### In water, lava and other fluids
 

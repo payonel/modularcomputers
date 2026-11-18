@@ -749,10 +749,33 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		return !standing() && super.isPushable();
 	}
 
+	/** How hard the game's crowding pushes two bodies apart, a tick (its Entity.push's). */
+	private static final double CROWDING_PUSH = 0.05;
+
+	/**
+	 * The game's crowding between it and another body: standing, nothing moves it; off its legs
+	 * (flying, hovering, falling) it's moved, but never moves the other (the user's, 2026-11-18: a
+	 * flying bot golem can't shove, period; only walking ones do), so the push is its own half only.
+	 */
 	@Override
 	public void push(net.minecraft.world.entity.Entity other) {
-		if (!standing()) {
-			super.push(other);
+		if (standing() || isPassengerOfSameVehicle(other) || other.noPhysics || noPhysics || isVehicle() || !isPushable()) {
+			return;
+		}
+		double x = other.getX() - getX(), z = other.getZ() - getZ();
+		double far = Mth.absMax(x, z);
+		if (far >= 0.01) { // (the game's: closer, no push)
+			far = Math.sqrt(far);
+			double strength = Math.min(1, 1 / far) * CROWDING_PUSH / far;
+			push(-x * strength, 0, -z * strength);
+		}
+	}
+
+	/** Off its legs it pushes nothing of its own crowding either (the game's pushEntities: each near body's push of it). */
+	@Override
+	protected void doPush(net.minecraft.world.entity.Entity other) {
+		if (standing()) {
+			super.doPush(other);
 		}
 	}
 

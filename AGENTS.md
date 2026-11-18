@@ -508,7 +508,10 @@ what it broke it `kept` and `dropped`.
   many went into the world. A face left out is the front for containers, below for drops. A player's hit picks it up as its item, parts kept; nothing else harms
 it; it's solid, as a boat is (players walk into it, not through it), and standing nothing shoves
 it (players, mobs, knockback, another golem's walk; `standing`: on the ground or walking, thrusters off; hovering it's pushed, even
-resting on its own legs) but a piston, which moves it as it moves anything. Creative
+resting on its own legs) but a piston, which moves it as it moves anything. Off its legs it pushes
+nothing, not even the game's crowding (the user's, 2026-11-18: a flying bot can't shove, period):
+`push(Entity)` moves only itself and `doPush` does nothing, so a creature against it moves it, never
+the other way. Creative
 only until the Advanced Robotics Assembly. Its board's state reaches players by
 `BoardStatePayload` (an entity has no block update), its screen's rows as a block's do.
 

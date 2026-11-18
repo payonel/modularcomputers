@@ -96,8 +96,10 @@ function devices.open(name)
 end
 
 -- devices.info(device): what a device is: an opened one, or one by its name (operator0, or
--- /dev/operator0): {name, type, id, path, label, methods} (path: its slot, nil when it's cabled;
--- methods: their names), and an opened one's fd. Nil and why when there's no such device.
+-- /dev/operator0): {name, type, id, path, label, methods, fd}, every field always there, as a
+-- device's answers are: path its slot ("" when it's cabled), label ("" when it has none), methods
+-- their names, fd an opened one's descriptor (-1 when it isn't open). Nil and why when there's no
+-- such device.
 function devices.info(device)
   local opened = type(device) == "table" and about[device]
   local name = opened and opened.name or type(device) == "string" and (device:match("([^/]+)$") or device)
@@ -108,10 +110,10 @@ function devices.info(device)
   local base = CLASS .. "/" .. kind .. "/" .. name
   local function attribute(key)
     local value = (slurp(base .. "/" .. key) or "-"):gsub("\n$", "")
-    return value ~= "-" and value or nil
+    return value ~= "-" and value or ""
   end
   local info = {name = name, type = kind, id = attribute("id"), path = attribute("path"), label = attribute("label"), methods = {},
-    fd = opened and opened.fd or nil}
+    fd = opened and opened.fd or -1}
   for i, method in ipairs(fs.list(base .. "/methods") or {}) do
     info.methods[i] = method.name
   end

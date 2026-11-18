@@ -881,6 +881,35 @@ public class GolemFlightGameTest {
 	}
 
 	/**
+	 * Hovering, it pushes nothing (the user's: a flying bot can't shove, period): a pig pressed against
+	 * it is given no push by the game's crowding, from its side or the pig's. (The game's crowding
+	 * pushed the pig away: seen failing.)
+	 */
+	@GameTest(maxTicks = 200)
+	public void hoveringItGivesACreatureAgainstItNoPush(GameTestHelper helper) {
+		BotGolem golem = golem(helper, false);
+		Object[] pig = new Object[1];
+		helper.startSequence()
+			.thenExecuteAfter(3, () -> helper.assertTrue(!golem.robotics().fly(args()).failed(), "it takes off"))
+			.thenWaitUntil(() -> same(helper, golem.robotics().state(), RoboticsDevice.HOVERING, "hovering"))
+			.thenExecute(() -> {
+				var still = GolemWalkGameTest.stillPig(helper, new BlockPos(1, 1, 1));
+				still.setPos(golem.getX() + CROWDED, still.getY(), golem.getZ()); // (pressed against it, overlapping)
+				pig[0] = still;
+			})
+			.thenExecuteAfter(CROWDING_TICKS, () -> {
+				var moving = ((net.minecraft.world.entity.Entity) pig[0]).getDeltaMovement();
+				helper.assertTrue(moving.horizontalDistance() < 1e-9, "the pig given no push: " + moving);
+			})
+			.thenSucceed();
+	}
+
+	/** How far off the golem's middle that test's pig stands, in blocks: overlapping its body. */
+	private static final double CROWDED = 0.5;
+	/** How long it waits for the game's crowding to act, in ticks (it acts every tick). */
+	private static final int CROWDING_TICKS = 10;
+
+	/**
 	 * A landing without its legs onto a creature is blocked by it (a flying bot can't shove): down,
 	 * by its type, and it goes on hovering, the pig where it was. (It shoved the pig aside and landed:
 	 * seen failing.)

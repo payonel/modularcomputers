@@ -44,8 +44,9 @@ device`.
 
 What a device is: one opened, or one by its name (`devices.info("operator0")`, or
 `"/dev/operator0"`): its name, type, id (`id:...`, the same wherever it's connected), path (its
-slot, `exp:1`; nil when it's cabled), label (nil when it has none), and its methods' names, a list.
-An opened one's adds its file's descriptor, `fd` (for `sys.poll`).
+slot, `exp:1`; `""` when it's cabled), label (`""` when it has none), its methods' names, a list,
+and `fd`, an opened one's file descriptor (for `sys.poll`; `-1` when it isn't open). Every field is
+always there, as in a device's own answers.
 
 ```lua
 local devices = require("devices")
