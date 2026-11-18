@@ -14,7 +14,7 @@ The photomask prints chips from silicon, the way real ones are made. Every part 
 | Kind | Block |
 | Stack | 64 |
 | Slots | Silicon in, chips out, a battery |
-| Power | 5 W idle; a turn of work on power costs as much as a running CPU's tick |
+| Power | A little idle; each turn of work costs more (server settings: see [Settings](/settings/#power-draw)) |
 | Faces | Its gear faces you when you place it |
 
 </div>
@@ -32,10 +32,12 @@ The photomask prints chips from silicon, the way real ones are made. Every part 
 A wafer of silicon takes 8 turns and gives 4 chips. The output holds a stack of chips; it stops
 when there is no room.
 
-You need no battery: turning the gear by hand charges its small buffer. With power, it turns by
+You need no battery: turning the gear by hand charges its small buffer, a turn of work and its idle
+power till the next each time; the buffer holds four turns of the gear. With power, it turns by
 itself: a battery in its bay (right-click one on it to put it in), or a running computer that has
 it on its bus (it is a device, joined by cable). It turns while there is
-silicon to print, and idles at 5 W when there is none.
+silicon to print, and idles, drawing a little, when there is none. What it draws and what a turn costs
+are server settings (see [Settings](/settings/#power-draw)), and the crank and the buffer follow them.
 
 Breaking a photomask keeps what is in it, but its buffer is lost.
 

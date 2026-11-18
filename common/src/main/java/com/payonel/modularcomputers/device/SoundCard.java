@@ -20,12 +20,10 @@ import java.util.Map;
 public final class SoundCard extends Card {
 	/** What its buffer holds, in seconds of the format. */
 	public static final double BUFFER_SECONDS = 1.0;
-	/** Its draw a tick. */
-	public static final int DRAW = 6;
 	/** Game ticks a second. */
 	private static final int TICKS_PER_SECOND = 20;
 	private final InterruptLine line = new InterruptLine();
-	private final BusPower power = new BusPower(DRAW);
+	private final BusPower power = new BusPower(() -> com.payonel.modularcomputers.config.ModConfig.draws().soundCard());
 	private SoundFormat format = SoundFormat.DEFAULT;
 	private byte[] buffer = new byte[capacity(format)];
 	private int start;

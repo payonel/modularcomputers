@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
  * ({@code SettingsPayload}).
  * <p>
  * Every setting's default is {@link Defaults}', and its key is its path there (the user's,
- * 2026-11-18): {@code Defaults.Robot.Cost.WALK} is {@code robot.cost.walk}. A value missing or not
+ * 2026-11-18): {@code Defaults.Power.Cost.Robot.WALK} is {@code power.cost.robot.walk}. A value missing or not
  * understood takes its default, with a warning; a key that's no setting is warned of too (a
  * setting renamed: no old names are read).
  */
@@ -64,6 +64,33 @@ public final class ModConfig {
 		new Setting("power.battery.tier3.duration", Defaults.Power.Battery.Tier3.DURATION));
 	public static final Setting TIER2_RECHARGE_RATE = new Setting("power.battery.tier2.recharge_rate", Defaults.Power.Battery.Tier2.RECHARGE_RATE);
 	public static final Setting CHARGING_PAD_RATE = new Setting("power.rate.charging_pad", Defaults.Power.Rate.CHARGING_PAD);
+	/** A CPU's draws by tier: running, then waiting, each tier's. */
+	public static final List<Setting> CPU_DRAWS = List.of(
+		new Setting("power.draw.cpu.tier1.running", Defaults.Power.Draw.Cpu.Tier1.RUNNING),
+		new Setting("power.draw.cpu.tier1.waiting", Defaults.Power.Draw.Cpu.Tier1.WAITING),
+		new Setting("power.draw.cpu.tier2.running", Defaults.Power.Draw.Cpu.Tier2.RUNNING),
+		new Setting("power.draw.cpu.tier2.waiting", Defaults.Power.Draw.Cpu.Tier2.WAITING),
+		new Setting("power.draw.cpu.tier3.running", Defaults.Power.Draw.Cpu.Tier3.RUNNING),
+		new Setting("power.draw.cpu.tier3.waiting", Defaults.Power.Draw.Cpu.Tier3.WAITING));
+	public static final Setting TERMINAL_DRAW = new Setting("power.draw.terminal", Defaults.Power.Draw.TERMINAL);
+	public static final Setting SOUND_CARD_DRAW = new Setting("power.draw.sound_card", Defaults.Power.Draw.SOUND_CARD);
+	public static final Setting MOTION_SENSOR_DRAW = new Setting("power.draw.motion_sensor", Defaults.Power.Draw.MOTION_SENSOR);
+	public static final Setting AUDIO_SENSOR_DRAW = new Setting("power.draw.audio_sensor", Defaults.Power.Draw.AUDIO_SENSOR);
+	public static final Setting WIRED_DRAW = new Setting("power.draw.network.wired", Defaults.Power.Draw.Network.WIRED);
+	public static final Setting WIRELESS_DRAW = new Setting("power.draw.network.wireless", Defaults.Power.Draw.Network.WIRELESS);
+	public static final Setting INTERNET_DRAW = new Setting("power.draw.internet", Defaults.Power.Draw.INTERNET);
+	public static final Setting DISK_STATION_DRAW = new Setting("power.draw.disk_station", Defaults.Power.Draw.DISK_STATION);
+	/** A disk's draw by tier. */
+	public static final List<Setting> DISK_DRAWS = List.of(
+		new Setting("power.draw.disk.tier1", Defaults.Power.Draw.Disk.TIER1),
+		new Setting("power.draw.disk.tier2", Defaults.Power.Draw.Disk.TIER2),
+		new Setting("power.draw.disk.tier3", Defaults.Power.Draw.Disk.TIER3));
+	public static final Setting PHOTOMASK_DRAW = new Setting("power.draw.photomask", Defaults.Power.Draw.PHOTOMASK);
+	public static final Setting WALK = new Setting("power.cost.robot.walk", Defaults.Power.Cost.Robot.WALK);
+	public static final Setting TURN = new Setting("power.cost.robot.turn", Defaults.Power.Cost.Robot.TURN);
+	public static final Setting HAND = new Setting("power.cost.robot.hand", Defaults.Power.Cost.Robot.HAND);
+	public static final Setting THRUSTERS = new Setting("power.cost.robot.thrusters", Defaults.Power.Cost.Robot.THRUSTERS);
+	public static final Setting PHOTOMASK_TURN = new Setting("power.cost.photomask.turn", Defaults.Power.Cost.Photomask.TURN);
 	public static final Setting REDSTONE_CHANGE = new Setting("power.cost.redstone.change", Defaults.Power.Cost.Redstone.CHANGE);
 	public static final Setting PISTON_PUSH = new Setting("power.cost.robotic_piston.push", Defaults.Power.Cost.RoboticPiston.PUSH);
 	public static final Setting FIELD_HOLD = new Setting("power.cost.field.hold", Defaults.Power.Cost.Field.HOLD);
@@ -83,10 +110,6 @@ public final class ModConfig {
 	public static final Setting INTERNET_DENY = new Setting("internet.deny", Defaults.Internet.DENY);
 	public static final Setting INTERNET_RESPONSE_BUFFER = new Setting("internet.response_buffer_kib", Defaults.Internet.RESPONSE_BUFFER_KIB);
 	public static final Setting PATHFINDING_RANGE = new Setting("robot.pathfinding_range", Defaults.Robot.PATHFINDING_RANGE);
-	public static final Setting WALK = new Setting("robot.cost.walk", Defaults.Robot.Cost.WALK);
-	public static final Setting TURN = new Setting("robot.cost.turn", Defaults.Robot.Cost.TURN);
-	public static final Setting HAND = new Setting("robot.cost.hand", Defaults.Robot.Cost.HAND);
-	public static final Setting THRUSTERS = new Setting("robot.cost.thrusters", Defaults.Robot.Cost.THRUSTERS);
 	/** Where a type's own ring depth is: this, then its /sys class's name ({@code device.ring_depth.robotics}). */
 	public static final String RING_DEPTH_TYPE_PREFIX = "device.ring_depth.";
 
@@ -107,6 +130,8 @@ public final class ModConfig {
 			new Block("""
 				# How many Minecraft days (20 minutes each) a full battery of each tier runs a computer
 				# (its CPU running, and its screen). 0 means it never runs out. Fractions work: 0.5 is ten minutes.
+				# A day is counted at the default draws (a tier 1 CPU running and a screen, 110 a tick), so a
+				# battery holds a fixed amount of power: with power.draw set higher, it runs out sooner.
 				""", BATTERY_DURATIONS),
 			new Block("""
 				# How fast a tier 2 battery recharges itself while not in use, as a share of what a running
@@ -120,9 +145,44 @@ public final class ModConfig {
 				# What a charging pad gives the robot on it.
 				""", List.of(CHARGING_PAD_RATE)))),
 		new Group("""
-			# power.cost: what devices' actions cost, in ticks of a running CPU's power (the bot golem's own
-			# are robot.cost). Fractions work; 0 makes one free.
+			# power.draw: what devices draw each tick they have power, in power units a tick (a watt each).
+			# Their work costs more (power.cost). Whole numbers, 0 or more; 0 makes one free. A change
+			# reaches devices already built, from the next time their power is counted.
 			""", List.of(
+			new Block("""
+				# A CPU of each tier: each tick it runs, and each tick it waits for an interrupt. Off, nothing.
+				""", CPU_DRAWS),
+			new Block("""
+				# A screen, each tick it has power.
+				""", List.of(TERMINAL_DRAW)),
+			new Block("""
+				# A sound card, a motion sensor and an audio sensor.
+				""", List.of(SOUND_CARD_DRAW, MOTION_SENSOR_DRAW, AUDIO_SENSOR_DRAW)),
+			new Block("""
+				# Network cards at rest: a wired card, a WLAN card (its radio listening).
+				""", List.of(WIRED_DRAW, WIRELESS_DRAW)),
+			new Block("""
+				# An internet card at rest, and a Disk Station at rest.
+				""", List.of(INTERNET_DRAW, DISK_STATION_DRAW)),
+			new Block("""
+				# A disk of each tier.
+				""", DISK_DRAWS),
+			new Block("""
+				# A photomask, idling (each turn of its work costs power.cost.photomask.turn more).
+				""", List.of(PHOTOMASK_DRAW)))),
+		new Group("""
+			# power.cost: what devices' actions cost, in ticks of a running CPU's power: 100 power units, a
+			# tier 1's default draw, whatever power.draw sets. Fractions work; 0 makes one free.
+			""", List.of(
+			new Block("""
+				# The bot golem's robotics: each block walked, each turn, each action with its hand (a use, a
+				# swing, a store into a container, a take from one), and each tick its thrusters fire.
+				""", List.of(WALK, TURN, HAND, THRUSTERS)),
+			new Block("""
+				# A photomask: each turn of its work, on a computer's power or its own. A turn of its crank by
+				# hand charges a turn of work and its idle draw till its next turn (power.draw.photomask), and
+				# its buffer holds four cranks.
+				""", List.of(PHOTOMASK_TURN)),
 			new Block("""
 				# A redstone card: each change of an output.
 				""", List.of(REDSTONE_CHANGE)),
@@ -180,7 +240,7 @@ public final class ModConfig {
 				# the program to read it. A whole count, 1 or more.
 				""", List.of(INTERNET_RESPONSE_BUFFER)))),
 		new Group("""
-			# robot: the bot golem.
+			# robot: the bot golem (what its robotics costs is power.cost.robot).
 			""", List.of(
 			new Block("""
 				# How far its pathfinding searches, in blocks walked. A walk keeps to its line, and where
@@ -188,17 +248,14 @@ public final class ModConfig {
 				# more places than the game's own budget for a search this far: 16 a block); none found, the walk
 				# ends blocked. A walk itself goes however far it's told. A flight's way is found whole within
 				# this, or not at all. A whole count, 1 or more.
-				""", List.of(PATHFINDING_RANGE)),
-			new Block("""
-				# What its robotics costs, in ticks of a running CPU's power: each block walked, each turn, each
-				# action with its hand (a use, a swing, a store into a container, a take from one), and each tick
-				# its thrusters fire. Fractions work; 0 makes one free.
-				""", List.of(WALK, TURN, HAND, THRUSTERS)))));
+				""", List.of(PATHFINDING_RANGE)))));
 
 	/** The internet's settings, as last loaded (the server's: clients never use them). */
 	private static volatile InternetPolicy internet = InternetPolicy.DEFAULT;
 	/** What actions cost and blocks give, as last loaded. */
 	private static volatile PowerCosts costs = costs(new Values(new Properties()));
+	/** What devices draw, as last loaded (or as a server sent them, on its players' games). */
+	private static volatile PowerDraws draws = draws(new Values(new Properties()));
 
 	private ModConfig() {
 	}
@@ -210,6 +267,16 @@ public final class ModConfig {
 	/** What devices' actions cost and the rates blocks give power at, as last loaded (the server's). */
 	public static PowerCosts costs() {
 		return costs;
+	}
+
+	/** What devices draw, as last loaded: read as their power's settled, so a reload reaches them all. */
+	public static PowerDraws draws() {
+		return draws;
+	}
+
+	/** A player's game: the server's draws, which its tooltips show ({@code SettingsPayload}). */
+	public static void useDraws(PowerDraws server) {
+		draws = server;
 	}
 
 	/** Every setting the file has, in its order. */
@@ -230,8 +297,8 @@ public final class ModConfig {
 	 * Reads the settings file, writing the defaults first if there isn't one, and adding any
 	 * settings it doesn't have yet.
 	 */
-	public static void load() {
-		load(path());
+	public static List<String> load() {
+		return load(path());
 	}
 
 	/** Loads this file: what it warned of (each logged too). */
@@ -269,6 +336,7 @@ public final class ModConfig {
 		InternetCard.responseBuffer(values.count(INTERNET_RESPONSE_BUFFER));
 		internet = new InternetPolicy(values.flag(INTERNET_ENABLED), values.list(INTERNET_ALLOW), values.list(INTERNET_DENY));
 		costs = costs(values);
+		draws = draws(values);
 		values.unknown();
 		return values.warnings;
 	}
@@ -280,7 +348,18 @@ public final class ModConfig {
 			PowerCosts.units(values.cost(FIELD_HOLD)), PowerCosts.units(values.cost(FIELD_MOVE)), PowerCosts.units(values.cost(CRAFT)),
 			PowerCosts.units(values.cost(CRAFTING_MOVE)), PowerCosts.units(values.cost(DISK_STATION_ACTION)), PowerCosts.units(values.cost(WIRED_SEND)),
 			PowerCosts.exact(values.cost(WIRELESS_SEND)), PowerCosts.units(values.cost(INTERNET_REQUEST)), PowerCosts.units(values.cost(INTERNET_DATA)),
-			PowerCosts.units(values.cost(TERMINAL_WRITE)), PowerCosts.units(values.cost(CHARGING_PAD_RATE)));
+			PowerCosts.units(values.cost(TERMINAL_WRITE)), PowerCosts.units(values.cost(CHARGING_PAD_RATE)), PowerCosts.units(values.cost(PHOTOMASK_TURN)));
+	}
+
+	/** What devices draw, from these values. */
+	private static PowerDraws draws(Values values) {
+		List<PowerDraws.Cpu> cpu = new ArrayList<>();
+		for (int at = 0; at < CPU_DRAWS.size(); at += 2) { // (a tier's running, then its waiting)
+			cpu.add(new PowerDraws.Cpu(values.draw(CPU_DRAWS.get(at)), values.draw(CPU_DRAWS.get(at + 1))));
+		}
+		return new PowerDraws(cpu, values.draw(TERMINAL_DRAW), values.draw(SOUND_CARD_DRAW), values.draw(MOTION_SENSOR_DRAW),
+			values.draw(AUDIO_SENSOR_DRAW), values.draw(WIRED_DRAW), values.draw(WIRELESS_DRAW), values.draw(INTERNET_DRAW),
+			values.draw(DISK_STATION_DRAW), DISK_DRAWS.stream().map(values::draw).toList(), values.draw(PHOTOMASK_DRAW));
 	}
 
 	/** Ring depths: everyone's, then a type's own where it's set (the user's, 2026-11-11). */
@@ -340,6 +419,18 @@ public final class ModConfig {
 		/** A power cost or rate: running CPUs' ticks, 0 or more. */
 		double cost(Setting setting) {
 			return number(setting, "a number of running CPU ticks, 0 or more");
+		}
+
+		/** A draw: power units a tick, a whole number 0 or more, or its default (with a warning) if it isn't. */
+		int draw(Setting setting) {
+			String what = "a whole number of power units a tick, 0 or more";
+			int fallback = (Integer) setting.fallback();
+			double number = number(setting, what);
+			if (number != Math.rint(number)) {
+				bad(setting, what);
+				return fallback;
+			}
+			return (int) Math.min(Integer.MAX_VALUE, number);
 		}
 
 		/** A whole count, 1 or more, or its default (with a warning) if it isn't. */

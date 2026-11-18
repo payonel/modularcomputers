@@ -41,10 +41,6 @@ public final class NetworkCard extends Card {
 	public static final int TIER2_RANGE = 400;
 	/** The most data a frame carries, in bytes (OpenComputers' packet size). */
 	public static final int MTU = 8192;
-	/** What a wired card draws a tick, at rest. */
-	public static final int WIRED_DRAW = 2;
-	/** What a WLAN card draws a tick, at rest (its radio listening). */
-	public static final int WIRELESS_DRAW = 5;
 	/** The longest wake message, in bytes. */
 	public static final int MAX_WAKE = 256;
 	private final InterruptLine line = new InterruptLine();
@@ -68,7 +64,8 @@ public final class NetworkCard extends Card {
 
 	public NetworkCard(CardKind kind) {
 		super(kind);
-		power = new BusPower(kind == CardKind.NETWORK ? WIRED_DRAW : WIRELESS_DRAW);
+		power = new BusPower(kind == CardKind.NETWORK ? () -> com.payonel.modularcomputers.config.ModConfig.draws().wiredCard()
+			: () -> com.payonel.modularcomputers.config.ModConfig.draws().wirelessCard());
 		strength = maxRange();
 	}
 

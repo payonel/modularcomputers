@@ -25,7 +25,7 @@ its [position](#where-it-is-its-position).
 | Type | `robotics` |
 | Where | Soldered onto a bot golem's last expansion lane (`exp:3`) |
 | `/dev` | `robotics0` |
-| Power | Each block walked, each turn, and each action with its hand costs power (a server setting: see [Settings](/settings/#robot)) |
+| Power | Each block walked, each turn, and each action with its hand costs power (a server setting: see [Settings](/settings/#power-cost)) |
 
 </div>
 
@@ -362,7 +362,7 @@ other cards work. It pushes nothing out of its way (only a walk does): a creatur
 boat, anything there stops it, as a block does ([things in its way](#things-in-its-way)). Its event, `fly`: `ok` (then it holds
 there), or not and why (`blocked`, a block over it: `name = "minecraft:stone", face = "up"`; a
 pig in front: `name = "minecraft:pig", face = "front"`). Its thrusters cost power each
-tick they fire (a server setting: see [Settings](/settings/#robot)). It flies as far as it's told. Fails with `bad_argument` (`expected = "squared"`).
+tick they fire (a server setting: see [Settings](/settings/#power-cost)). It flies as far as it's told. Fails with `bad_argument` (`expected = "squared"`).
 
 If its program ends while its thrusters hold it up, or its power runs out, it falls and powers off:
 its torso lies on the ground, off, to be picked up as a Tier 2 Bot Golem Torso.

@@ -20,8 +20,6 @@ import java.util.Map;
  * Disks go in and come out by hand, in its GUI.
  */
 public final class DiskStation implements Device {
-	/** What it draws at rest, a tick. */
-	public static final int DRAW = 1;
 	public static final String TARGET = "target";
 	public static final String SOURCE = "source";
 	/** What's missing for an action (a {@link Buffered#FAULT}'s part): its target disk, the one it writes; a clone's source. */
@@ -44,7 +42,7 @@ public final class DiskStation implements Device {
 		List<Path> copyImage(String image, Path folder, boolean replace);
 	}
 
-	private final BusPower power = new BusPower(DRAW);
+	private final BusPower power = new BusPower(() -> com.payonel.modularcomputers.config.ModConfig.draws().diskStation());
 	private final Bay bay;
 
 	public DiskStation(Bay bay) {

@@ -24,9 +24,11 @@ Put a battery in a battery bay of a [case](/hardware/case/): tier 1 has one bay,
 tier 3 four. A computer is ready to run when it has a [CPU](/hardware/cpu/) and a battery with
 charge. The case view shows the charge, the load, and how long the batteries will last.
 
-A battery is rated in days of a running computer: a [CPU](/hardware/cpu/)'s 100 W and a
-[screen](/hardware/screen/)'s 10 W, 110 W. How many days each tier lasts full is a server
-setting (see [Settings](/settings/#power-battery)), as is how fast a tier 2 recharges itself.
+A battery is rated in days of a running computer: a tier 1 [CPU](/hardware/cpu/) running and a
+[screen](/hardware/screen/), 110 W, the [yardstick](/concepts/power/#units). It holds a fixed amount
+of power, so a computer that draws more (a higher tier, more devices) runs it down sooner. How many
+days each tier lasts full is a server setting (see [Settings](/settings/#power-battery)), as is how
+fast a tier 2 recharges itself.
 
 | | Tier 1 | Tier 2 | Tier 3 |
 |---|---|---|---|

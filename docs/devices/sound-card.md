@@ -17,7 +17,7 @@ its block hear them.
 | Formats | Rates 8000, 11025, 22050 or 44100 a second; unsigned 8-bit (`u8`), signed 16-bit little-endian (`s16le`) or IMA ADPCM (`ima_adpcm`); 1 or 2 channels |
 | Buffer | One second of the current format |
 | Interrupt | Raised when a refused write has room, or when what is queued has played out |
-| Power | 6 W |
+| Power | A draw while it has power (a server setting: see [Settings](/settings/#power-draw)) |
 | Info | `kind` (`sound`) |
 
 </div>

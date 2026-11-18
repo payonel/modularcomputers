@@ -16,7 +16,7 @@ crafting it alone. Each action is a method, a line written to its file, and a sw
 | In `/dev` | `diskstation0`, `diskstation1`... in bus order |
 | Address | Cabled: it is known by its `id:` name |
 | Interrupt | None |
-| Power | 1 W at rest; each action costs power (a server setting: see [Settings](/settings/#power-cost)), paid from the bus's power while a running computer supplies it, else from the station's battery |
+| Power | A little at rest (a server setting: see [Settings](/settings/#power-draw)); each action costs power (a server setting: see [Settings](/settings/#power-cost)), paid from the bus's power while a running computer supplies it, else from the station's battery |
 | Info | none beyond the common ones |
 
 </div>

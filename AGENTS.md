@@ -93,7 +93,7 @@ computers really work.
 - **Named constants**, each with a comment, for every tunable; no magic numbers.
 - **Every setting's default lives in one place** (`config/Defaults`, the user's, 2026-11-18): nested
   classes a group, a commented constant a setting, its key in `config/modularcomputers.properties`
-  its path there, in snake_case (`Defaults.Robot.Cost.WALK` is `robot.cost.walk`), grouped as
+  its path there, in snake_case (`Defaults.Power.Cost.Robot.WALK` is `power.cost.robot.walk`), grouped as
   OpenComputers grouped its settings. Code reads a setting's value through `ModConfig` (and the
   holders it configures), never from `Defaults`. A setting with no default of its own (a type's own
   ring depth) has no constant and is documented as falling back. The file is `.properties`, dotted
@@ -252,6 +252,14 @@ blank, and its files leave the world save when the player takes it.
   first sunrise at 06:00), not the Gregorian one: the world has no months.
 - **Power is lazy:** devices and batteries settle what they owe when someone looks (every 20 ticks,
   or at an event), from game time; nothing ticks per device (big builds).
+- **Draws and costs are settings, read live** (`power.draw`, `power.cost`; the user's, 2026-11-18):
+  a device reads its draw from `ModConfig.draws()` as it's settled (`BusPower`'s supplier), a CPU
+  tier and a disk tier theirs as asked, and a buffer sized from settings (a photomask's) its size
+  as it's used, so a reload reaches everything already built; no device keeps a copy.
+- **The yardstick is fixed:** a running computer at the default draws (a tier 1 CPU running and a
+  terminal, `PowerUnits.COMPUTER`, built from `Defaults` on purpose). Battery days and the case's
+  buffer are in it, so a battery holds a fixed amount and a hungrier computer runs it down sooner
+  (a real battery's watt-hours); costs are in ticks of its CPU (`PowerUnits.CPU`).
 - **Power is named in one place** (`PowerUnits.rate`, `amount`): a unit a tick shows as a watt,
   stored units as watt-hours. Every draw, load and charge shown goes through them (the user may
   rename the unit).
@@ -480,7 +488,7 @@ what it broke it `kept` and `dropped`.
 - **It flies two ways, each with its price** (the user's design, 2026-10-25), never with its legs
   on and its tools as on the ground: on its **thrusters**, built into a tier 2 (a tier 1's thruster calls fail: a `fault`, `thrusters` missing), no card (`fly`, `land`;
   `fly()` takes off where it stands), its legs left standing where it took off (`GolemLegs`, a boat's kind of object), red
-  beams from their sockets, 25 blocks a second, five CPUs' power a tick by default (`robot.cost.thrusters`); legless it walks nowhere,
+  beams from their sockets, 25 blocks a second, five CPUs' power a tick by default (`power.cost.robot.thrusters`); legless it walks nowhere,
   works as a player off the ground does (its hand's fake player off the ground: the game's rules,
   a break slower), ignores
   block triggers, and can be shoved; `land` comes down onto its legs below it and refuses with none

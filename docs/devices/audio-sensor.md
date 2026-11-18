@@ -16,7 +16,7 @@ one, and where it came from.
 | Address | An expansion slot path such as `exp:0`, or a hub's |
 | Range | The game's own range for each sound |
 | Interrupt | Raised while events wait |
-| Power | 9 W |
+| Power | A draw while it has power (a server setting: see [Settings](/settings/#power-draw)) |
 | Info | `kind` (`audio_sensor`) |
 
 </div>

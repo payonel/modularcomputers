@@ -3,18 +3,21 @@ package com.payonel.modularcomputers.config;
 /**
  * Every setting's default, here and nowhere else (the user's, 2026-11-18). A setting's key in the
  * settings file is its path in this class: its groups' names and its own, lowercase, joined by dots,
- * each name's words in snake_case ({@code Robot.Cost.WALK} is {@code robot.cost.walk}, {@code
- * Power.Rate.CHARGING_PAD} is {@code power.rate.charging_pad}). Grouped as OpenComputers grouped its
- * own ({@code computer}, {@code power} with its {@code cost}s, {@code internet}, {@code robot}).
+ * each name's words in snake_case ({@code Power.Cost.Robot.WALK} is {@code power.cost.robot.walk},
+ * {@code Power.Rate.CHARGING_PAD} is {@code power.rate.charging_pad}). Grouped as OpenComputers
+ * grouped its own ({@code computer}, {@code power} with its {@code draw}s and {@code cost}s,
+ * {@code internet}, {@code robot}).
  * <p>
  * Only defaults live here: code reads a setting's value as loaded, through {@link ModConfig} and the
  * holders it configures, never from this class. A setting with no default of its own (a device
  * type's own ring depth) has no constant: its group's comment names it and what it falls back to.
  * {@code ModConfigTest} checks that every constant here is a setting the file explains, and every
- * setting the file has is a constant here.
+ * setting the file has is a constant here. (The power yardstick, {@code PowerUnits}' running
+ * computer, is built from two of these on purpose: a computer at the default draws, a fixed unit.)
  * <p>
- * Power costs are in ticks of a running CPU's power ({@code PowerUnits.CPU} units), as the manual
- * says them; fractions work.
+ * Draws are in power units a tick (a watt each), whole numbers. Power costs are in ticks of a
+ * running CPU's power ({@code PowerUnits.CPU} units: a tier 1's default draw, fixed whatever its
+ * draw is set to), as the manual says them; fractions work.
  */
 public final class Defaults {
 	private Defaults() {
@@ -29,12 +32,16 @@ public final class Defaults {
 		}
 	}
 
-	/** Power: batteries, the rates blocks give it at, and what devices' actions cost. */
+	/** Power: batteries, the rates blocks give it at, what devices draw, and what their actions cost. */
 	public static final class Power {
 		private Power() {
 		}
 
-		/** Batteries: how long each tier runs a computer, and tier 2's recharging. */
+		/**
+		 * Batteries: how long each tier runs a computer, and tier 2's recharging. A day is of the
+		 * yardstick computer (its CPU and screen at their default draws), so a battery holds a fixed
+		 * amount of power: draws set higher run it down sooner.
+		 */
 		public static final class Battery {
 			private Battery() {
 			}
@@ -75,9 +82,123 @@ public final class Defaults {
 			}
 		}
 
-		/** What devices' actions cost, in running CPUs' ticks (the bot golem's are {@link Robot.Cost}). */
+		/**
+		 * What devices draw each tick they have power, in power units a tick (a watt each): whole
+		 * numbers, 0 or more. A device's work costs more on top ({@link Cost}).
+		 */
+		public static final class Draw {
+			/** A screen (a terminal), each tick it has power: the yardstick's screen. */
+			public static final int TERMINAL = 10;
+			/** A sound card. */
+			public static final int SOUND_CARD = 6;
+			/** A motion sensor card. */
+			public static final int MOTION_SENSOR = 9;
+			/** An audio sensor card, as a motion sensor. */
+			public static final int AUDIO_SENSOR = 9;
+			/** An internet card, at rest. */
+			public static final int INTERNET = 4;
+			/** A Disk Station, at rest. */
+			public static final int DISK_STATION = 1;
+			/** A photomask, idling: very little, as a tier 3 CPU waiting (user, 2026-10-12). */
+			public static final int PHOTOMASK = 5;
+
+			private Draw() {
+			}
+
+			/**
+			 * CPUs, by tier: while they run, and while they wait for an interrupt (off, nothing).
+			 * Higher tiers run hungrier and idle leaner, as real chips with deeper idle states do.
+			 */
+			public static final class Cpu {
+				private Cpu() {
+				}
+
+				public static final class Tier1 {
+					/** Each tick it runs: the yardstick's CPU. */
+					public static final int RUNNING = 100;
+					/** Each tick it waits for an interrupt. */
+					public static final int WAITING = 50;
+
+					private Tier1() {
+					}
+				}
+
+				public static final class Tier2 {
+					/** Each tick it runs. */
+					public static final int RUNNING = 150;
+					/** Each tick it waits for an interrupt. */
+					public static final int WAITING = 20;
+
+					private Tier2() {
+					}
+				}
+
+				public static final class Tier3 {
+					/** Each tick it runs. */
+					public static final int RUNNING = 200;
+					/** Each tick it waits for an interrupt. */
+					public static final int WAITING = 5;
+
+					private Tier3() {
+					}
+				}
+			}
+
+			/** Network cards, at rest. */
+			public static final class Network {
+				/** A wired card. */
+				public static final int WIRED = 2;
+				/** A WLAN card (its radio listening). */
+				public static final int WIRELESS = 5;
+
+				private Network() {
+				}
+			}
+
+			/** Disks, by tier: higher tiers draw less (user design, 2026-10-11). */
+			public static final class Disk {
+				/** A tier 1 disk. */
+				public static final int TIER1 = 8;
+				/** A tier 2 disk. */
+				public static final int TIER2 = 5;
+				/** A tier 3 disk. */
+				public static final int TIER3 = 2;
+
+				private Disk() {
+				}
+			}
+		}
+
+		/** What devices' actions cost, in running CPUs' ticks. */
 		public static final class Cost {
 			private Cost() {
+			}
+
+			/** The bot golem's robotics. */
+			public static final class Robot {
+				/** Each block walked (a part of a block, its part). */
+				public static final double WALK = 1;
+				/** Each turn, however far. */
+				public static final double TURN = 1;
+				/** Each action with its hand: a use, a swing, a store into a container, a take from one. */
+				public static final double HAND = 1;
+				/** Each tick its thrusters fire (flying or hovering). */
+				public static final double THRUSTERS = 5;
+
+				private Robot() {
+				}
+			}
+
+			/** The photomask. */
+			public static final class Photomask {
+				/**
+				 * Each turn of its work (a wafer takes several). A turn of its crank by hand charges
+				 * this and its idle draw till its next turn, and its buffer holds a few cranks.
+				 */
+				public static final double TURN = 1;
+
+				private Photomask() {
+				}
 			}
 
 			/** The redstone card. */
@@ -197,27 +318,12 @@ public final class Defaults {
 		}
 	}
 
-	/** The bot golem. */
+	/** The bot golem (what its robotics costs is {@link Power.Cost.Robot}'s). */
 	public static final class Robot {
 		/** How far its pathfinding searches, in blocks walked: the game's own pathfinding range for its mobs. */
 		public static final int PATHFINDING_RANGE = 96;
 
 		private Robot() {
-		}
-
-		/** What its robotics costs, in running CPUs' ticks. */
-		public static final class Cost {
-			/** Each block walked (a part of a block, its part). */
-			public static final double WALK = 1;
-			/** Each turn, however far. */
-			public static final double TURN = 1;
-			/** Each action with its hand: a use, a swing, a store into a container, a take from one. */
-			public static final double HAND = 1;
-			/** Each tick its thrusters fire (flying or hovering). */
-			public static final double THRUSTERS = 5;
-
-			private Cost() {
-			}
 		}
 	}
 }

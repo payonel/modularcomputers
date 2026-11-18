@@ -17,11 +17,9 @@ import java.util.Map;
  * until a program reads them, one each.
  */
 public final class AudioSensorCard extends Card {
-	/** Its draw a tick, as a motion sensor's. */
-	public static final int DRAW = 9;
 	private final InterruptLine line = new InterruptLine();
 	private final EventQueue events = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.HEARING, line, this::changed, this::isAccepting);
-	private final BusPower power = new BusPower(DRAW);
+	private final BusPower power = new BusPower(() -> com.payonel.modularcomputers.config.ModConfig.draws().audioSensor());
 
 	public AudioSensorCard() {
 		super(CardKind.AUDIO_SENSOR);

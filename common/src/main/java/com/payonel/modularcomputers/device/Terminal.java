@@ -7,7 +7,6 @@ import com.payonel.modularcomputers.bus.InterruptLine;
 import com.payonel.modularcomputers.display.Resolution;
 import com.payonel.modularcomputers.display.TextBuffer;
 import com.payonel.modularcomputers.display.VtDecoder;
-import com.payonel.modularcomputers.power.PowerUnits;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
 import com.payonel.modularcomputers.runtime.Result;
@@ -28,7 +27,7 @@ import java.util.Optional;
  * reads first gets the key, as under UEFI's splitter). Typing comes from the screen
  * view: only the terminal a player has open gets the keys.
  * <p>
- * It's bus-powered ({@link #DRAW}, plus a write's cost, {@code power.cost.terminal.write}): with no running computer
+ * It's bus-powered ({@code power.draw.terminal}, plus a write's cost, {@code power.cost.terminal.write}): with no running computer
  * supplying it, it's dark.
  * <p>
  * <b>Scrollback</b> (user, 2026-10-15): lines that scroll off the top of its main screen are kept
@@ -47,10 +46,8 @@ import java.util.Optional;
  * the width they had.
  */
 public final class Terminal implements Device {
-	/** What a terminal draws each tick it has power: a tenth of a running CPU. */
-	public static final int DRAW = PowerUnits.TERMINAL;
 
-	private final BusPower power = new BusPower(DRAW);
+	private final BusPower power = new BusPower(() -> com.payonel.modularcomputers.config.ModConfig.draws().terminal());
 	private final InterruptLine interruptLine = new InterruptLine();
 	/** Sends what it shows to players; set by the block it's in. */
 	private Runnable flusher = () -> {

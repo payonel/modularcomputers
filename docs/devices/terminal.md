@@ -15,7 +15,7 @@ text to it, with escape sequences to move the cursor and set colors, and reads b
 | Type | `terminal` |
 | Tiers | 1 (50 by 16, monochrome), 2 (80 by 25, 16 colors), 3 (160 by 50, every color and sixel pictures) |
 | Interrupt | Raised while keys wait to be read |
-| Power | 10 W while powered, and a little per write |
+| Power | A draw while powered, and a little per write (server settings: see [Settings](/settings/#power-draw)) |
 | Info | `tier`, `width`, `height`, `colors` |
 
 </div>

@@ -18,15 +18,24 @@ are comments.
 - Edit the file, then run `/modularcomputers reload` (an operator's command) to read it again
   without a restart, or restart the game.
 - A setting missing from the file, or with a value it can't use, takes its default, and the game
-  logs a warning saying which. A line whose key isn't a setting is ignored, with a warning too.
+  logs a warning saying which. A line whose key isn't a setting is ignored, with a warning too (a
+  setting renamed: its old name isn't read). `/modularcomputers reload` shows its warnings, in red,
+  to whoever ran it, after its success message.
 - A file from an older version gets the settings it's missing added at the end, at their defaults,
   so new settings show up to edit. What you set is kept.
-- A server sends the settings players see (how long batteries last, for charge bars and tooltips)
-  to each player who joins it, so a player sees the server's, not their own game's.
+- A server sends the settings players see (how long batteries last, for charge bars and tooltips,
+  and what CPUs and disks draw, for theirs) to each player who joins it, and again at a reload, so a
+  player sees the server's, not their own game's.
 
-Costs are counted in ticks of a running [CPU](/hardware/cpu/)'s power (100 W for a tick): `1` costs
-what a running CPU draws in one tick, `0.5` half that. Fractions work everywhere a number does; a
-cost of `0` makes that action free. See [Power](/concepts/power/).
+Draws are in watts (power units a tick), whole numbers. Costs are counted in ticks of a running
+[CPU](/hardware/cpu/)'s power, 100 W for a tick (a tier 1 CPU's default draw, and fixed: setting
+`power.draw` doesn't change it): `1` costs 100 units, `0.5` half that. Fractions work in costs and
+every other number but a draw; `0` makes a draw or a cost free. See [Power](/concepts/power/).
+
+**A changed draw or cost reaches what's already built** at a reload: a device's draw is read each
+time its power is counted (every 20 ticks, or at an event), so the ticks since it was last counted
+are paid at the new draw. A photomask's buffer is sized from its settings each time it's used, so
+a placed one grows or shrinks with them (shrunk, what it held past its new size is gone).
 
 ## computer {#computer}
 
@@ -37,7 +46,9 @@ cost of `0` makes that action free. See [Power](/concepts/power/).
 ## power.battery {#power-battery}
 
 [Batteries](/hardware/battery/) are rated in Minecraft days (20 minutes each) of a running computer:
-its CPU running and its screen.
+its CPU running and its screen. A day is counted at the default draws (a tier 1 CPU running and a
+screen, 110 W), so a battery holds a fixed amount of power: with [power.draw](#power-draw) set
+higher, a computer runs it down sooner, as a hungrier laptop runs down the same battery sooner.
 
 | Setting | Default | What it does | Values |
 |---|---|---|---|
@@ -54,13 +65,43 @@ How fast blocks give power, in running CPU ticks each tick.
 |---|---|---|---|
 | `power.rate.charging_pad` | `10` | What a [charging pad](/hardware/charging-pad/) gives the robot on it. | a number, 0 or more |
 
-## power.cost {#power-cost}
+## power.draw {#power-draw}
 
-What devices' actions cost, in running CPU ticks. The bot golem's own costs are under
-[robot](#robot).
+What devices draw each tick they have power, in watts (power units a tick). Their work costs more
+on top: see [power.cost](#power-cost).
 
 | Setting | Default | What it does | Values |
 |---|---|---|---|
+| `power.draw.cpu.tier1.running` | `100` | A tier 1 [CPU](/hardware/cpu/), each tick it runs. An off CPU draws nothing. | a whole number, 0 or more |
+| `power.draw.cpu.tier1.waiting` | `50` | A tier 1 CPU, each tick it waits for an [interrupt](/concepts/interrupts/). | a whole number, 0 or more |
+| `power.draw.cpu.tier2.running` | `150` | A tier 2 CPU, each tick it runs. | a whole number, 0 or more |
+| `power.draw.cpu.tier2.waiting` | `20` | A tier 2 CPU, each tick it waits. | a whole number, 0 or more |
+| `power.draw.cpu.tier3.running` | `200` | A tier 3 CPU, each tick it runs. | a whole number, 0 or more |
+| `power.draw.cpu.tier3.waiting` | `5` | A tier 3 CPU, each tick it waits. | a whole number, 0 or more |
+| `power.draw.terminal` | `10` | A [screen](/devices/terminal/), each tick it has power. | a whole number, 0 or more |
+| `power.draw.sound_card` | `6` | A [sound card](/devices/sound-card/). | a whole number, 0 or more |
+| `power.draw.motion_sensor` | `9` | A [motion sensor](/devices/motion-sensor/). | a whole number, 0 or more |
+| `power.draw.audio_sensor` | `9` | An [audio sensor](/devices/audio-sensor/). | a whole number, 0 or more |
+| `power.draw.network.wired` | `2` | A [network card](/devices/network-card/), at rest. | a whole number, 0 or more |
+| `power.draw.network.wireless` | `5` | A [WLAN card](/devices/wlan-card/), at rest (its radio listening). | a whole number, 0 or more |
+| `power.draw.internet` | `4` | An [internet card](/devices/internet-card/), at rest. | a whole number, 0 or more |
+| `power.draw.disk_station` | `1` | A [Disk Station](/devices/disk-station/), at rest. | a whole number, 0 or more |
+| `power.draw.disk.tier1` | `8` | A tier 1 [disk](/devices/disk/). | a whole number, 0 or more |
+| `power.draw.disk.tier2` | `5` | A tier 2 disk. | a whole number, 0 or more |
+| `power.draw.disk.tier3` | `2` | A tier 3 disk. | a whole number, 0 or more |
+| `power.draw.photomask` | `5` | A [photomask](/hardware/photomask/), idling. | a whole number, 0 or more |
+
+## power.cost {#power-cost}
+
+What devices' actions cost, in running CPU ticks.
+
+| Setting | Default | What it does | Values |
+|---|---|---|---|
+| `power.cost.robot.walk` | `1` | The [bot golem](/hardware/bot-golem/)'s [robotics](/devices/robotics/): each block walked (a part of a block, its part). | a number, 0 or more |
+| `power.cost.robot.turn` | `1` | The bot golem: each turn, however far. | a number, 0 or more |
+| `power.cost.robot.hand` | `1` | The bot golem: each action with its hand (a use, a swing, a store into a container, a take from one). | a number, 0 or more |
+| `power.cost.robot.thrusters` | `5` | The bot golem: each tick its thrusters fire, flying or hovering. | a number, 0 or more |
+| `power.cost.photomask.turn` | `1` | A [photomask](/hardware/photomask/): each turn of its work, on a computer's power or its own. A turn of its crank by hand charges a turn of work and its idle draw till its next turn (`power.draw.photomask`), and its buffer holds four cranks. | a number, 0 or more |
 | `power.cost.redstone.change` | `1` | A [redstone card](/devices/redstone-card/): each change of an output. | a number, 0 or more |
 | `power.cost.robotic_piston.push` | `5` | A [robotic piston](/devices/robotic-piston/): each push, extend or retract, whether it moved anything or not. | a number, 0 or more |
 | `power.cost.field.hold` | `2` | An [energy field card](/devices/energy-field-card/): each tick it holds something. | a number, 0 or more |
@@ -102,12 +143,9 @@ private and reserved ranges.
 
 ## robot {#robot}
 
-The [bot golem](/hardware/bot-golem/) and its [robotics](/devices/robotics/).
+The [bot golem](/hardware/bot-golem/) and its [robotics](/devices/robotics/). What its robotics
+costs is under [power.cost](#power-cost).
 
 | Setting | Default | What it does | Values |
 |---|---|---|---|
 | `robot.pathfinding_range` | `96` | How far its pathfinding searches, in blocks walked. Where something stops a walk, it searches once, within this, for its way back onto its line past it; none found, the walk ends blocked. A walk itself goes however far it's told. A flight's way is found whole within this, or not at all. | a whole number, 1 or more |
-| `robot.cost.walk` | `1` | Each block walked (a part of a block, its part). | a number, 0 or more |
-| `robot.cost.turn` | `1` | Each turn, however far. | a number, 0 or more |
-| `robot.cost.hand` | `1` | Each action with its hand: a use, a swing, a store into a container, a take from one. | a number, 0 or more |
-| `robot.cost.thrusters` | `5` | Each tick its thrusters fire, flying or hovering. | a number, 0 or more |

@@ -15,7 +15,7 @@ A screen is a display and keyboard in one block, for a computer to show its cons
 | Tiers | 1 (VT102), 2 (VT525), 3 (Sixel) |
 | Stack | 64 |
 | Faces | Its glass faces you when you place it |
-| Power | 10 W while it has power |
+| Power | A draw while it has power (a server setting: see [Settings](/settings/#power-draw)) |
 
 </div>
 

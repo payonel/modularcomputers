@@ -1,17 +1,21 @@
 package com.payonel.modularcomputers.power;
 
+import com.payonel.modularcomputers.config.Defaults;
+
 /**
- * Power is counted in whole units. What draws it, per tick: a CPU while it executes
- * ({@link #CPU}), ten times a terminal ({@link #TERMINAL}). A running computer (its CPU and one
- * terminal) is the yardstick: batteries are rated in days of it ({@link #DAY}), so a full
- * tier 1 runs one for ten days by default. Times shown to players ("DD:MM:SS") are at that rate.
+ * Power is counted in whole units. What draws it, per tick, is a setting a device
+ * ({@code power.draw}, {@code ModConfig.draws}). The yardstick is a running computer at the
+ * default draws (a tier 1 CPU running, {@link #CPU}, and one terminal, {@link #TERMINAL}): a
+ * fixed unit, whatever the draws are set to. Batteries are rated in days of it ({@link #DAY}), so
+ * a battery holds a fixed amount and a hungrier computer runs it down sooner (a real battery's
+ * watt-hours); costs are in ticks of its CPU. Times shown to players ("DD:MM:SS") are at its rate.
  */
 public final class PowerUnits {
-	/** A CPU, each tick it executes (nothing while off, its waiting rate while it waits for an interrupt). */
-	public static final int CPU = 100;
-	/** A terminal, each tick it has power. */
-	public static final int TERMINAL = 10;
-	/** A running computer (a CPU and a terminal), each tick: the yardstick. */
+	/** The yardstick's CPU, each tick: a tier 1 running, at its default draw. The unit costs are counted in. */
+	public static final int CPU = Defaults.Power.Draw.Cpu.Tier1.RUNNING;
+	/** The yardstick's terminal, each tick: at its default draw. */
+	public static final int TERMINAL = Defaults.Power.Draw.TERMINAL;
+	/** A running computer (a CPU and a terminal) at the default draws, each tick: the yardstick. */
 	public static final int COMPUTER = CPU + TERMINAL;
 	/** A day of a running computer. */
 	public static final int DAY = BatteryCharge.DAY_TICKS * COMPUTER;

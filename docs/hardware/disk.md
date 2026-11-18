@@ -16,14 +16,14 @@ A hard disk stores files, and holds the operating system a computer boots.
 | Tiers | 1 (1 MiB), 2 (4 MiB), 3 (16 MiB) |
 | Stack | 1 |
 | Slot | A SATA socket in the case |
-| Power | Tier 1 8 W, tier 2 5 W, tier 3 2 W, while powered |
+| Power | Each tier its own draw, while powered (a server setting: see [Settings](/settings/#power-draw)) |
 
 </div>
 
 ## Use
 
 Put disks in the SATA sockets of a [case](/hardware/case/): a tier 1 case has two, tier 2 three,
-and tier 3 four. Higher tiers hold more and draw less power. A disk crafted at the table comes
+and tier 3 four. Higher tiers hold more and, by default, draw less power. A disk crafted at the table comes
 with mcos, the operating system, on it.
 
 A disk has one of two formats, shown in its tooltip with Shift held:

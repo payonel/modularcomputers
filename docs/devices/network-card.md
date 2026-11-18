@@ -15,7 +15,7 @@ It has the shape of a real NIC.
 | Type | `network` |
 | Address | An expansion slot path such as `exp:0` |
 | Interrupt | Raised while frames wait; also a wake line |
-| Power | 2 W at rest; each send costs power (a server setting: see [Settings](/settings/#power-cost)) |
+| Power | A little at rest (a server setting: see [Settings](/settings/#power-draw)); each send costs power (a server setting: see [Settings](/settings/#power-cost)) |
 | Frame size | At most 8192 bytes |
 | Info | `kind` (`network`), `wireless` (false) |
 

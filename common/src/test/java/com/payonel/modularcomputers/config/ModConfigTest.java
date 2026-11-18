@@ -2,9 +2,18 @@ package com.payonel.modularcomputers.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.DeviceType;
+import com.payonel.modularcomputers.device.CardKind;
+import com.payonel.modularcomputers.device.Disk;
+import com.payonel.modularcomputers.device.DiskTier;
+import com.payonel.modularcomputers.device.NetworkCard;
+import com.payonel.modularcomputers.device.Photomask;
 import com.payonel.modularcomputers.device.RoboticPiston;
 import com.payonel.modularcomputers.device.RoboticsDevice;
+import com.payonel.modularcomputers.device.SoundCard;
+import com.payonel.modularcomputers.machine.CpuTier;
+import com.payonel.modularcomputers.power.PowerBuffer;
 import com.payonel.modularcomputers.entity.GolemWayfinder;
 import com.payonel.modularcomputers.power.BatteryTier;
 import com.payonel.modularcomputers.power.PowerUnits;
@@ -45,7 +54,7 @@ class ModConfigTest {
 		return ModConfig.load(file);
 	}
 
-	/** Defaults' constants by the keys their paths name (the user's, 2026-11-18: Robot.Cost.WALK is robot.cost.walk). */
+	/** Defaults' constants by the keys their paths name (the user's, 2026-11-18: Power.Cost.Robot.WALK is power.cost.robot.walk). */
 	static Map<String, Object> defaultsByKey() throws IllegalAccessException {
 		Map<String, Object> keys = new LinkedHashMap<>();
 		walk(Defaults.class, "", keys);
@@ -159,8 +168,8 @@ class ModConfigTest {
 			"power.battery.tier2.duration: 20\n", "power.battery.tier3.duration: 0\n", "power.battery.tier2.recharge_rate: 0.5\n",
 			"power.rate.charging_pad: 10\n", "power.cost.network.wireless_send_per_block: 0.0625\n", "power.cost.terminal.write: 0.01\n",
 			"device.ring_depth.all: 512\n", "internet.enabled: true\n", "internet.allow:\n", "internet.deny:\n",
-			"internet.response_buffer_kib: 64\n", "robot.pathfinding_range: 96\n", "robot.cost.walk: 1\n", "robot.cost.turn: 1\n",
-			"robot.cost.hand: 1\n", "robot.cost.thrusters: 5\n");
+			"internet.response_buffer_kib: 64\n", "robot.pathfinding_range: 96\n", "power.cost.robot.walk: 1\n", "power.cost.robot.turn: 1\n",
+			"power.cost.robot.hand: 1\n", "power.cost.robot.thrusters: 5\n");
 		assertThat(BatteryTier.TIER_2.rechargeRate()).isEqualTo(0.5);
 		assertThat(BatteryTier.TIER_1.days()).isEqualTo(10);
 		assertThat(BatteryTier.TIER_3.infinite()).isTrue();
@@ -227,7 +236,7 @@ class ModConfigTest {
 		load("# mine\npower.battery.tier1.duration: 0.5\npower.battery.tier2.duration: 1\npower.battery.tier3.duration: 0\n");
 		String text = Files.readString(file());
 		assertThat(text).startsWith("# mine\npower.battery.tier1.duration: 0.5\n").contains("\n# power.battery: ",
-			"power.battery.tier2.recharge_rate: 0.5\n", "\n# robot: ", "robot.cost.thrusters: 5\n");
+			"power.battery.tier2.recharge_rate: 0.5\n", "\n# robot: ", "power.cost.robot.thrusters: 5\n");
 		assertThat(text).containsOnlyOnce("power.battery.tier1.duration");
 		assertThat(BatteryTier.TIER_1.days()).isEqualTo(0.5);
 		ModConfig.load(file());
@@ -251,7 +260,7 @@ class ModConfigTest {
 	@Test
 	void badValuesFallBackToTheDefaultsWithAWarning() {
 		List<String> warnings = ModConfig.apply(props("power.battery.tier1.duration", "lots", "power.battery.tier2.duration", "-4",
-			"computer.cpu_cores", "1.5", "internet.enabled", "maybe", "robot.cost.walk", "-1", "cpu_cores", "8"));
+			"computer.cpu_cores", "1.5", "internet.enabled", "maybe", "power.cost.robot.walk", "-1", "cpu_cores", "8"));
 		assertThat(BatteryTier.TIER_1.days()).isEqualTo(10);
 		assertThat(BatteryTier.TIER_2.days()).isEqualTo(20);
 		assertThat(CpuCores.size()).isEqualTo(4);
@@ -260,7 +269,7 @@ class ModConfigTest {
 		assertThat(warnings).hasSize(6).anySatisfy(warning -> assertThat(warning).startsWith("power.battery.tier1.duration should be")
 			.endsWith("not \"lots\"; using 10")).anySatisfy(warning -> assertThat(warning).startsWith("computer.cpu_cores should be a whole count"))
 			.anySatisfy(warning -> assertThat(warning).startsWith("internet.enabled should be true or false"))
-			.anySatisfy(warning -> assertThat(warning).startsWith("robot.cost.walk should be"))
+			.anySatisfy(warning -> assertThat(warning).startsWith("power.cost.robot.walk should be"))
 			.contains("cpu_cores is no setting; ignored");
 		assertThat(ModConfig.apply(props("device.ring_depth.robotics", "40"))).as("a type's own depth is a setting").isEmpty();
 	}
@@ -280,9 +289,9 @@ class ModConfigTest {
 			.containsExactly(100, 500, 200, 100, 100, 100, 2000, 10, 100, 10, 1, 1000);
 		assertThat(costs.wirelessSendPerBlock()).isEqualTo(6.25);
 
-		Files.writeString(file(), Files.readString(file()).replace("robot.cost.walk: 1\n", "robot.cost.walk: 0.5\n")
-			.replace("robot.cost.thrusters: 5\n", "robot.cost.thrusters: 2\n").replace("robot.cost.turn: 1\n", "robot.cost.turn: 0\n")
-			.replace("robot.cost.hand: 1\n", "robot.cost.hand: 3\n").replace("power.cost.robotic_piston.push: 5\n", "power.cost.robotic_piston.push: 0.25\n"));
+		Files.writeString(file(), Files.readString(file()).replace("power.cost.robot.walk: 1\n", "power.cost.robot.walk: 0.5\n")
+			.replace("power.cost.robot.thrusters: 5\n", "power.cost.robot.thrusters: 2\n").replace("power.cost.robot.turn: 1\n", "power.cost.robot.turn: 0\n")
+			.replace("power.cost.robot.hand: 1\n", "power.cost.robot.hand: 3\n").replace("power.cost.robotic_piston.push: 5\n", "power.cost.robotic_piston.push: 0.25\n"));
 		assertThat(ModConfig.load(file())).isEmpty();
 		RoboticsDevice robotics = new RoboticsDevice();
 		robotics.power().supply(this);
@@ -297,6 +306,101 @@ class ModConfigTest {
 		piston.moveWith((side, motion) -> RoboticPiston.Moved.DONE);
 		piston.extend(new Arguments(List.of("up")));
 		assertThat(piston.power().collect(0)).isEqualTo(25);
+	}
+
+	/**
+	 * The bot golem's costs are with every other action's (the user's, 2026-11-18): power.cost.robot,
+	 * and their old keys are no settings (renamed: never read).
+	 */
+	@Test
+	void theRobotsCostsAreUnderPowerCostRobot() {
+		assertThat(ModConfig.apply(props("power.cost.robot.walk", "2", "power.cost.robot.turn", "3", "power.cost.robot.hand", "0.5",
+			"power.cost.robot.thrusters", "4"))).isEmpty();
+		PowerCosts costs = ModConfig.costs();
+		assertThat(List.of(costs.walk(), (double) costs.turn(), (double) costs.hand(), (double) costs.thrusters())).containsExactly(200.0, 300.0, 50.0, 400.0);
+		assertThat(ModConfig.apply(props("robot.cost.walk", "2"))).containsExactly("robot.cost.walk is no setting; ignored");
+		assertThat(ModConfig.costs().walk()).as("the default").isEqualTo(100.0);
+	}
+
+	/** Every idle draw is a setting (the user's, 2026-11-18), its default today's, read where it's used. */
+	@Test
+	void theDrawsAreSettingsAtTodaysValues() {
+		PowerDraws draws = ModConfig.draws();
+		assertThat(draws.cpu()).containsExactly(new PowerDraws.Cpu(100, 50), new PowerDraws.Cpu(150, 20), new PowerDraws.Cpu(200, 5));
+		assertThat(List.of(draws.terminal(), draws.soundCard(), draws.motionSensor(), draws.audioSensor(), draws.wiredCard(), draws.wirelessCard(),
+			draws.internetCard(), draws.diskStation(), draws.photomask())).containsExactly(10, 6, 9, 9, 2, 5, 4, 1, 5);
+		assertThat(draws.disk()).containsExactly(8, 5, 2);
+
+		ModConfig.apply(props("power.draw.cpu.tier2.running", "300", "power.draw.cpu.tier3.waiting", "0", "power.draw.disk.tier1", "12"));
+		assertThat(CpuTier.TIER_2.running()).isEqualTo(300);
+		assertThat(CpuTier.TIER_3.waiting()).as("free").isZero();
+		assertThat(CpuTier.TIER_1.running()).as("the rest their defaults").isEqualTo(100);
+		assertThat(DiskTier.TIER_1.draw()).isEqualTo(12);
+		assertThat(PowerDraws.of(ModConfig.draws().values(), CpuTier.values().length, DiskTier.values().length)).as("sent as a list")
+			.isEqualTo(ModConfig.draws());
+		assertThat(PowerDraws.of(List.of(1, 2), CpuTier.values().length, DiskTier.values().length)).as("not a list of them").isNull();
+	}
+
+	/**
+	 * A draw set is what a device is charged, and a reload reaches a device already built (its draw is
+	 * read as its power's settled): the ticks since it was last settled are paid at the new draw.
+	 */
+	@Test
+	void aDrawSetIsWhatADeviceIsChargedEvenOneBuiltBeforeTheReload() {
+		SoundCard sound = new SoundCard();
+		NetworkCard wlan = new NetworkCard(CardKind.TIER1_WLAN);
+		Disk disk = new Disk(DiskTier.TIER_2, dir.resolve("disk"));
+		for (BusPower power : List.of(sound.power(), wlan.power(), disk.power())) {
+			power.supply(this);
+			power.collect(0);
+		}
+		assertThat(sound.power().collect(10)).as("today's: 6 a tick").isEqualTo(60);
+		assertThat(ModConfig.apply(props("power.draw.sound_card", "20", "power.draw.network.wireless", "0", "power.draw.disk.tier2", "7"))).isEmpty();
+		assertThat(sound.power().collect(20)).as("set: 20 a tick").isEqualTo(200);
+		assertThat(wlan.power().collect(20)).as("free").isZero();
+		assertThat(disk.power().collect(20)).isEqualTo(20 * 7);
+	}
+
+	/** A draw is a whole number of units a tick, 0 or more: anything else is its default, with a warning. */
+	@Test
+	void aDrawIsAWholeNumber() {
+		List<String> warnings = ModConfig.apply(props("power.draw.terminal", "2.5", "power.draw.sound_card", "-1", "power.draw.photomask", "0"));
+		assertThat(warnings).hasSize(2).allSatisfy(warning -> assertThat(warning).contains("should be a whole number of power units a tick"));
+		assertThat(ModConfig.draws().terminal()).isEqualTo(10);
+		assertThat(ModConfig.draws().soundCard()).isEqualTo(6);
+		assertThat(ModConfig.draws().photomask()).as("0 is free").isZero();
+	}
+
+	/**
+	 * A battery's day is the yardstick's, a computer at the default draws, so a battery holds a fixed
+	 * amount whatever the draws are set to: a hungrier CPU runs it down sooner (a real battery's
+	 * watt-hours), and a battery's charge doesn't change under it at a reload.
+	 */
+	@Test
+	void aBatteryHoldsAFixedAmountWhateverTheDraws() {
+		int full = BatteryTier.TIER_1.capacity();
+		ModConfig.apply(props("power.draw.cpu.tier1.running", "300", "power.draw.terminal", "50"));
+		assertThat(BatteryTier.TIER_1.capacity()).isEqualTo(full).isEqualTo(10 * PowerUnits.DAY);
+		assertThat(PowerUnits.COMPUTER).as("the yardstick: the default draws").isEqualTo(110);
+	}
+
+	/**
+	 * A photomask's turn costs a setting (the user's, 2026-11-18): its crank charges a turn and its
+	 * idle draw till the next, and its buffer holds four cranks, both from the settings as they are,
+	 * so a reload reaches a photomask already placed.
+	 */
+	@Test
+	void aPhotomasksTurnCostIsASettingAndItsCrankAndBufferFollow() {
+		assertThat(List.of(Photomask.turnCost(), Photomask.crank(), Photomask.buffer())).as("today's").containsExactly(100, 125, 500);
+		PowerBuffer buffer = new PowerBuffer(Photomask::buffer);
+		buffer.fill(Long.MAX_VALUE);
+		assertThat(ModConfig.apply(props("power.cost.photomask.turn", "2", "power.draw.photomask", "1"))).isEmpty();
+		assertThat(List.of(Photomask.turnCost(), Photomask.crank(), Photomask.buffer())).containsExactly(200, 205, 820);
+		assertThat(buffer.capacity()).as("one built before the reload, resized").isEqualTo(820);
+		assertThat(buffer.level()).as("with room").isEqualTo(500);
+		ModConfig.apply(props("power.cost.photomask.turn", "0.5"));
+		assertThat(Photomask.crank()).isEqualTo(75);
+		assertThat(buffer.level()).as("shrunk: what's past its size is gone").isEqualTo(300);
 	}
 
 	private static Properties props(String... pairs) {

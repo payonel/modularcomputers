@@ -56,8 +56,6 @@ public final class InternetCard extends Card {
 	public static final String REQUEST = "request";
 	/** A body's bytes a failed request's call keeps (the user's: its start, enough to tell which; its size is the progress's sent). */
 	public static final int BODY_KEPT = 16;
-	/** Its draw a tick, at rest. */
-	public static final int DRAW = 4;
 	/** How many bytes of a body cost its data cost ({@code power.cost.internet.data}; a part of them costs it whole): 4 KiB. */
 	public static final int DATA_UNIT = 4096;
 	/** How long what's downloaded waits for room before looking again whether its request was closed, in milliseconds. */
@@ -71,7 +69,7 @@ public final class InternetCard extends Card {
 		return thread;
 	});
 	private final InterruptLine line = new InterruptLine();
-	private final BusPower power = new BusPower(DRAW);
+	private final BusPower power = new BusPower(() -> com.payonel.modularcomputers.config.ModConfig.draws().internetCard());
 	private final Map<Long, Request> open = new ConcurrentHashMap<>();
 	/**
 	 * Its access log, kept as a device's events are (the user's): a window, its oldest going past

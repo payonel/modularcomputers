@@ -10,7 +10,7 @@ import com.payonel.modularcomputers.power.PowerUnits;
  */
 public record PowerCosts(double walk, int turn, int hand, int thrusters, int redstoneChange, int pistonPush, int fieldHold,
 	int fieldMove, int craft, int craftingMove, int diskStationAction, int wiredSend, double wirelessSendPerBlock, int internetRequest,
-	int internetData, int terminalWrite, int chargingPadRate) {
+	int internetData, int terminalWrite, int chargingPadRate, int photomaskTurn) {
 	/** Running CPUs' ticks as whole power units, to the nearest. */
 	public static int units(double cpuTicks) {
 		return (int) Math.min(Integer.MAX_VALUE, Math.round(cpuTicks * PowerUnits.CPU));

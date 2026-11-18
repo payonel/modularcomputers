@@ -60,7 +60,7 @@ public class PhotomaskGameTest {
 			}
 		};
 		turnTheGear.run();
-		helper.assertValueEqual(mask.buffer().level(), PhotomaskBlockEntity.BUFFER, "four turns fill its buffer");
+		helper.assertValueEqual(mask.buffer().level(), com.payonel.modularcomputers.device.Photomask.buffer(), "four turns fill its buffer");
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertValueEqual(mask.progress(), PhotomaskBlockEntity.WORK / 2, "a turn of work for each"))
 			.thenExecute(turnTheGear)
@@ -80,7 +80,7 @@ public class PhotomaskGameTest {
 		mask.items().setItem(PhotomaskBlockEntity.INPUT, new ItemStack(ModItems.SILICON));
 		mask.items().setItem(PhotomaskBlockEntity.OUTPUT, new ItemStack(ModItems.CHIP, 62)); // no room for a wafer's chips
 		mask.crank();
-		helper.assertValueEqual(mask.buffer().level(), PhotomaskBlockEntity.CRANK, "a turn's charge");
+		helper.assertValueEqual(mask.buffer().level(), com.payonel.modularcomputers.device.Photomask.crank(), "a turn's charge");
 		helper.startSequence()
 			.thenWaitUntil(() -> helper.assertBlockProperty(POS, PhotomaskBlock.WORKING, true))
 			.thenWaitUntil(() -> helper.assertBlockProperty(POS, PhotomaskBlock.WORKING, false))
@@ -106,10 +106,10 @@ public class PhotomaskGameTest {
 			.thenExecute(() -> {
 				helper.assertBlockProperty(POS, PhotomaskBlock.WORKING, true); // nothing left to print: it idles, still running
 				int used = full - BatteryItem.charge(mask.items().getItem(PhotomaskBlockEntity.BATTERY)).units();
-				int work = 2 * PhotomaskBlockEntity.WORK * PhotomaskBlockEntity.TURN_COST;
-				helper.assertTrue(used > work + PhotomaskBlockEntity.BUFFER / 2, "a turn's power for each turn, its buffer topped up, idling: " + used);
+				int work = 2 * PhotomaskBlockEntity.WORK * com.payonel.modularcomputers.device.Photomask.turnCost();
+				helper.assertTrue(used > work + com.payonel.modularcomputers.device.Photomask.buffer() / 2, "a turn's power for each turn, its buffer topped up, idling: " + used);
 				helper.assertTrue(used < work * 2, "idling draws very little: " + used);
-				helper.assertValueEqual(mask.buffer().level() > PhotomaskBlockEntity.BUFFER / 2, true, "the battery keeps its buffer full");
+				helper.assertValueEqual(mask.buffer().level() > com.payonel.modularcomputers.device.Photomask.buffer() / 2, true, "the battery keeps its buffer full");
 				mask.items().setItem(PhotomaskBlockEntity.BATTERY, ItemStack.EMPTY);
 			})
 			.thenWaitUntil(() -> helper.assertBlockProperty(POS, PhotomaskBlock.WORKING, false)) // its buffer idled away: it stops

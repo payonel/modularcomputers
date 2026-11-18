@@ -22,17 +22,17 @@ computer's [bus](/concepts/bus/) can hold.
 ## Use
 
 Put a CPU in the CPU socket of a [case](/hardware/case/). Without one the computer cannot start.
-Each tier holds more devices on the bus, and idles more cheaply, but draws more while it works.
+Each tier holds more devices on the bus, and by default idles more cheaply, but draws more while it
+works, as real chips with deeper idle states do.
 The bus counts every device, the case's own parts included, so a tier 1 CPU's four are used up by
 an EEPROM, a battery, a disk and one card or external device.
 
 | | Tier 1 | Tier 2 | Tier 3 |
 |---|---|---|---|
 | Bus devices | 4 | 16 | 64 |
-| Draw while running | 100 W | 150 W | 200 W |
-| Draw while waiting for an interrupt | 50 W | 20 W | 5 W |
 
-An off CPU draws nothing. See [Power](/concepts/power/).
+What each tier draws while it runs, and while it waits for an interrupt, is a server setting (see
+[Settings](/settings/#power-draw)). An off CPU draws nothing. See [Power](/concepts/power/).
 
 Every tier runs Lua at the same speed: as fast as the server's core it runs on. The server lets a
 number of computers run at once (a server setting: see [Settings](/settings/#computer)), and when more are busy than that, they take turns, a slice each. A computer waiting for

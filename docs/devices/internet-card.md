@@ -15,7 +15,7 @@ because a program's Lua cannot do TLS.
 | Type | `internet` |
 | Address | An expansion slot path such as `exp:0` |
 | Interrupt | Raised while a request has news for the program |
-| Power | 4 W at rest; each request, and each 4 KiB of a body read, costs power (a server setting: see [Settings](/settings/#power-cost)) |
+| Power | A little at rest (a server setting: see [Settings](/settings/#power-draw)); each request, and each 4 KiB of a body read, costs power (a server setting: see [Settings](/settings/#power-cost)) |
 | Limits | 4 requests open per card, 64 on the server; a server-set amount of a body waits unread per request ([Settings](/settings/#internet)); a request body of at most 1 MiB |
 | Info | `kind` (`internet`) |
 

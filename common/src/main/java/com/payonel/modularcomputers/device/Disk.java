@@ -104,7 +104,7 @@ public final class Disk implements Device {
 
 	public Disk(DiskTier tier, Path storage) {
 		this.tier = tier;
-		this.power = new BusPower(tier.draw());
+		this.power = new BusPower(tier::draw);
 		this.storage = storage == null ? null : storage.toAbsolutePath().normalize(); // (the inside-the-folder checks compare normalized paths)
 		if (storage != null) {
 			LIVE.put(id(), this);

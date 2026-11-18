@@ -19,11 +19,9 @@ import java.util.Map;
 public final class MotionSensorCard extends Card {
 	/** How far it looks, in blocks. */
 	public static final int RANGE = 8;
-	/** Its draw a tick. */
-	public static final int DRAW = 9;
 	private final InterruptLine line = new InterruptLine();
 	private final EventQueue events = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.MOTION, line, this::changed, this::isAccepting);
-	private final BusPower power = new BusPower(DRAW);
+	private final BusPower power = new BusPower(() -> com.payonel.modularcomputers.config.ModConfig.draws().motionSensor());
 
 	public MotionSensorCard() {
 		super(CardKind.MOTION_SENSOR);

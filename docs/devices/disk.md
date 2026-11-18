@@ -18,7 +18,7 @@ or **raw**, where it is bytes you read and write by offset.
 | Address | A SATA slot path such as `sata:0` |
 | Tiers | 1 (1 MiB), 2 (4 MiB), 3 (16 MiB) |
 | Interrupt | Raised while a change report waits (`changes`) |
-| Power | Tier 1 8 W, tier 2 5 W, tier 3 2 W |
+| Power | Each tier its own draw (a server setting: see [Settings](/settings/#power-draw)) |
 | Info | `tier`, `capacity`, `mode` |
 
 </div>

@@ -126,11 +126,11 @@ class BusPowerTest {
 		assertThat(machine.currentDraw()).as("off").isZero();
 		machine.pressPower();
 		machine.tick();
-		assertThat(machine.currentDraw()).as("running").isEqualTo(CpuTier.TIER_3.running() + Terminal.DRAW);
+		assertThat(machine.currentDraw()).as("running").isEqualTo(CpuTier.TIER_3.running() + com.payonel.modularcomputers.config.ModConfig.draws().terminal());
 		for (int i = 0; i < 5; i++) {
 			machine.tick();
 		}
-		assertThat(machine.currentDraw()).as("waiting, at once: no average").isEqualTo(CpuTier.TIER_3.waiting() + Terminal.DRAW);
+		assertThat(machine.currentDraw()).as("waiting, at once: no average").isEqualTo(CpuTier.TIER_3.waiting() + com.payonel.modularcomputers.config.ModConfig.draws().terminal());
 	}
 
 	@Test

@@ -16,7 +16,7 @@ where.
 | Address | An expansion slot path such as `exp:0`, or a hub's |
 | Range | 8 blocks around its block |
 | Interrupt | Raised while events wait |
-| Power | 9 W |
+| Power | A draw while it has power (a server setting: see [Settings](/settings/#power-draw)) |
 | Info | `kind` (`motion_sensor`) |
 
 </div>

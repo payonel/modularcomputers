@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.bus;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
+import java.util.function.IntSupplier;
 
 /**
  * A bus-powered device's power, like a USB device's: it has power while at least one running
@@ -16,7 +17,8 @@ import java.util.Set;
  * a shared device is a race, and doesn't matter.
  */
 public final class BusPower {
-	private int draw;
+	/** What it uses each tick it has power: read as it's settled, so a setting changed reaches it. */
+	private IntSupplier draw;
 	private final Set<Object> suppliers = Collections.newSetFromMap(new IdentityHashMap<>());
 	/** Game time it's paid up to, or -1 when it isn't powered (or no one has collected yet). */
 	private long paidUntil = -1;
@@ -24,16 +26,25 @@ public final class BusPower {
 
 	/** {@code draw}: what it uses each tick it has power, in power units ({@link com.payonel.modularcomputers.power.PowerUnits}). */
 	public BusPower(int draw) {
+		this(() -> draw);
+	}
+
+	/**
+	 * {@code draw}: what it uses each tick it has power, read each time it's needed (a setting's
+	 * value as loaded, {@code ModConfig.draws}), so a reload reaches a device already built: the ticks
+	 * since its last settling are paid at the draw then.
+	 */
+	public BusPower(IntSupplier draw) {
 		this.draw = draw;
 	}
 
 	public int draw() {
-		return draw;
+		return draw.getAsInt();
 	}
 
 	/** A device whose draw changes with what it's set to do (a motion sensor's range). */
 	public void setDraw(int draw) {
-		this.draw = draw;
+		this.draw = () -> draw;
 	}
 
 	public boolean powered() {
@@ -70,7 +81,7 @@ public final class BusPower {
 			return 0;
 		}
 		if (paidUntil >= 0 && now > paidUntil) {
-			owed += draw * (now - paidUntil);
+			owed += (long) draw() * (now - paidUntil);
 		}
 		paidUntil = Math.max(paidUntil, now);
 		long paid = owed;

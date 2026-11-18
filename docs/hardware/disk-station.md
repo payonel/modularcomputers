@@ -15,7 +15,7 @@ a disk alone.
 | Kind | Block |
 | Stack | 64 |
 | Slots | The disk it works on, a source disk (optional), a battery, a Bluetooth card |
-| Power | 1 W at rest; each action costs power |
+| Power | A little at rest (a server setting: see [Settings](/settings/#power-draw)); each action costs power (see [Settings](/settings/#power-cost)) |
 | Faces | Its front faces you when you place it |
 
 </div>

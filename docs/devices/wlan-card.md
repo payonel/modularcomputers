@@ -17,7 +17,7 @@ over cables. It has the same methods, plus a signal strength.
 | Address | An expansion slot path such as `exp:0` |
 | Tiers | 1 (reaches 16 blocks), 2 (reaches 400 blocks) |
 | Interrupt | Raised while frames wait; also a wake line |
-| Power | 5 W at rest; a send costs more the farther the signal reaches |
+| Power | A little at rest (a server setting: see [Settings](/settings/#power-draw)); a send costs more the farther the signal reaches (see [Settings](/settings/#power-cost)) |
 | Frame size | At most 8192 bytes |
 | Info | `kind` (`tier1_wlan` or `tier2_wlan`), `wireless` (true) |
 

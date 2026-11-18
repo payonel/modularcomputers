@@ -6,7 +6,6 @@ import com.payonel.modularcomputers.item.ModItems;
 import com.payonel.modularcomputers.menu.PhotomaskMenu;
 import com.payonel.modularcomputers.device.Photomask;
 import com.payonel.modularcomputers.power.PowerBuffer;
-import com.payonel.modularcomputers.power.PowerUnits;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentGetter;
@@ -40,13 +39,15 @@ import java.util.UUID;
 /**
  * A photomask's frame: silicon in, chips out, and a bay for a battery. Each wafer of silicon takes
  * {@link #WORK} turns of the crank and gives {@link #CHIPS} chips, as a wafer is printed and diced
- * into dies. With power it runs (its gear turns), idling at {@link Photomask#STANDBY} a tick when
- * there's nothing to print (user, 2026-10-12), and working a turn every {@link #TICKS_PER_TURN}
- * ticks, for {@link #TURN_COST} units more a turn, when there is. Power comes from the bus, when a
+ * into dies. With power it runs (its gear turns), idling at its draw when there's nothing to print
+ * (user, 2026-10-12), and working a turn every {@link Photomask#TICKS_PER_TURN} ticks, for
+ * {@link Photomask#turnCost} units more a turn, when there is. Power comes from the bus, when a
  * running computer has it on its bus (it's a device, wired by cable), or else from its own small
- * buffer (user, 2026-10-12), which turning its gear by hand fills ({@link #CRANK} a turn: one turn
- * of work) and a battery in its bay tops up. So it prints, slowly, with no battery at all. Broken,
- * it keeps what's in it and its id (like a shulker box); its buffer is lost.
+ * buffer (user, 2026-10-12), which turning its gear by hand fills ({@link Photomask#crank} a turn:
+ * one turn of work) and a battery in its bay tops up. So it prints, slowly, with no battery at all.
+ * Its buffer is sized from the settings as they are now ({@link Photomask#buffer}), so a reload
+ * reaches one already placed. Broken, it keeps what's in it and its id (like a shulker box); its
+ * buffer is lost.
  */
 public final class PhotomaskBlockEntity extends BlockEntity implements MenuProvider {
 	public static final int INPUT = 0;
@@ -57,16 +58,8 @@ public final class PhotomaskBlockEntity extends BlockEntity implements MenuProvi
 	public static final int WORK = 8;
 	/** Chips a wafer gives. */
 	public static final int CHIPS = 4;
-	/** On a battery, it turns once this many ticks. */
-	public static final int TICKS_PER_TURN = 5;
-	/** Power units a battery-driven turn takes: a running CPU's tick. */
-	public static final int TURN_COST = PowerUnits.CPU;
 	/** The block event that tells clients the crank was turned (the gear turns an eighth). */
 	public static final int SPIN_EVENT = 1;
-	/** What a hand turn of the gear puts in its buffer: one turn of work, and the idle draw till the next. */
-	public static final int CRANK = TURN_COST + Photomask.STANDBY * TICKS_PER_TURN;
-	/** Its buffer: a few hand turns' worth. */
-	public static final int BUFFER = 4 * CRANK;
 	private static final float TURN_DEGREES = 45;
 	private static final String CHARGE = "buffer";
 	private static final String PROGRESS = "progress";
@@ -85,7 +78,7 @@ public final class PhotomaskBlockEntity extends BlockEntity implements MenuProvi
 		}
 	};
 	private int progress;
-	private final PowerBuffer buffer = new PowerBuffer(BUFFER);
+	private final PowerBuffer buffer = new PowerBuffer(Photomask::buffer);
 	/** Its id, its bus address ({@code id:<uuid>}); kept on its item when broken. */
 	private UUID id = UUID.randomUUID();
 	private final Photomask device = new Photomask();
@@ -174,7 +167,7 @@ public final class PhotomaskBlockEntity extends BlockEntity implements MenuProvi
 
 	/** A player turned the gear: its buffer fills by a turn of work, and the gear turns for everyone watching. */
 	public void crank() {
-		buffer.fill(CRANK);
+		buffer.fill(Photomask.crank());
 		setChanged();
 		level.blockEvent(worldPosition, getBlockState().getBlock(), SPIN_EVENT, 0);
 		level.playSound(null, worldPosition, SoundEvents.LEVER_CLICK, SoundSource.BLOCKS, 0.4f, 1.6f);
@@ -200,25 +193,25 @@ public final class PhotomaskBlockEntity extends BlockEntity implements MenuProvi
 	}
 
 	/**
-	 * Server, every {@link #TICKS_PER_TURN} ticks: with power it runs, idling, or working a turn
+	 * Server, every {@link Photomask#TICKS_PER_TURN} ticks: with power it runs, idling, or working a turn
 	 * while there's silicon to print. On the bus, the computers supplying it pay (the idle draw is
-	 * the device's own, {@link Photomask#STANDBY}); otherwise its buffer pays for the ticks to come,
+	 * the device's own); otherwise its buffer pays for the ticks to come,
 	 * topped up from a battery first. Without enough in the buffer it stops.
 	 */
 	void serverTick() {
 		long now = level.getGameTime();
-		if (now % TICKS_PER_TURN != 0) {
+		if (now % Photomask.TICKS_PER_TURN != 0) {
 			return;
 		}
 		boolean running;
 		if (device.power().powered()) {
 			running = true;
 			if (turn()) {
-				device.power().charge(TURN_COST);
+				device.power().charge(Photomask.turnCost());
 			}
 		} else {
 			topUp(now);
-			int cost = (canWork() ? TURN_COST : 0) + Photomask.STANDBY * TICKS_PER_TURN;
+			int cost = (canWork() ? Photomask.turnCost() : 0) + Photomask.idle();
 			running = buffer.level() >= cost;
 			if (running) {
 				buffer.use(cost);
@@ -250,7 +243,7 @@ public final class PhotomaskBlockEntity extends BlockEntity implements MenuProvi
 	void clientTick() {
 		previousAngle = angle;
 		if (getBlockState().getValue(PhotomaskBlock.WORKING)) {
-			angle += TURN_DEGREES / TICKS_PER_TURN;
+			angle += TURN_DEGREES / Photomask.TICKS_PER_TURN;
 		} else if (pending > 0) {
 			float step = Math.min(pending, 15);
 			angle += step;

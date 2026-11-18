@@ -14,25 +14,22 @@ in watt-hours. Every draw, load and charge you see in a screen or tooltip goes t
 conversions, so the unit's name is one change in the mod. (The names may change; the
 numbers will stay as they are.)
 
-The yardstick is a running computer: a tier 1 CPU running plus one terminal,
-110 W. [Batteries](/hardware/battery/) are rated in days of it.
+The yardstick is a running computer: a tier 1 CPU running plus one terminal, at their default
+draws, 110 W. It's fixed, whatever the draws are set to. [Batteries](/hardware/battery/) are rated
+in days of it, so a battery holds a fixed amount and a hungrier computer runs it down sooner.
+Costs are counted in ticks of its CPU, 100 W for a tick.
 
 ## What draws power
 
-| Thing | Draw |
-|---|---|
-| [CPU](/hardware/cpu/) tier 1, running | 100 W |
-| CPU tier 2, running | 150 W |
-| CPU tier 3, running | 200 W |
-| CPU tier 1, waiting for an [interrupt](/concepts/interrupts/) | 50 W |
-| CPU tier 2, waiting | 20 W |
-| CPU tier 3, waiting | 5 W |
-| CPU, off | nothing |
-| A [terminal](/devices/terminal/), while it has power | 10 W |
-| One write to a terminal | 1 unit, once |
+A [CPU](/hardware/cpu/) draws while it runs, and much less while it waits for an
+[interrupt](/concepts/interrupts/); off, nothing. Every device draws while it has power (a
+[terminal](/devices/terminal/), a card, a disk), and its work costs more on top (a write to a
+terminal, a robot's step). What each draws and what each action costs are server settings: see
+[Settings](/settings/#power-draw) and [Settings](/settings/#power-cost). A change reaches what's
+already built.
 
-A higher CPU tier draws more while it runs and less while it waits, as real chips with deeper idle
-states do. A computer that is mostly waiting for a key, as mcos is at its prompt, costs the waiting
+By default a higher CPU tier draws more while it runs and less while it waits, as real chips with
+deeper idle states do. A computer that is mostly waiting for a key, as mcos is at its prompt, costs the waiting
 rate, not the running one.
 
 ## What stores it

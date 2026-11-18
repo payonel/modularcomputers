@@ -22,7 +22,8 @@ import net.minecraft.world.item.ItemStack;
 /**
  * {@code /modularcomputers giveall}: a cheat for testing that gives the player one of every
  * item this mod adds (it finds them in the registry, so new items are included).
- * {@code /modularcomputers reload}: rereads the settings file and sends it to the players.
+ * {@code /modularcomputers reload}: rereads the settings file and sends it to the players; each
+ * bad value or unknown key it warned of follows its success message, to whoever ran it.
  * Both need the same permission as {@code /give}.
  */
 public final class ModCommands {
@@ -41,9 +42,11 @@ public final class ModCommands {
 					return count;
 				}))
 				.then(Commands.literal("reload").executes(command -> {
-					ModConfig.load();
+					List<String> warnings = ModConfig.load();
 					SettingsPayload.sendToAll(command.getSource().getServer());
 					command.getSource().sendSuccess(() -> Component.translatable("commands.modularcomputers.reload", ModConfig.FILE_NAME), true);
+					// What the log warned of, to whoever ran it, as the game says what went wrong (its own /reload's failure)
+					warnings.forEach(warning -> command.getSource().sendFailure(Component.literal(warning)));
 					return 1;
 				})));
 	}
