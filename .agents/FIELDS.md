@@ -17,7 +17,9 @@ kept by this document and the test that checks the code against it.
 3. **No data inside a string.** A number is a number field, a list a list; a string a program would
    have to cut up is two fields. A `message` is a person's words, never parsed.
 4. **Every field is always there** (`""` when there's nothing to say; a number field's "none" said
-   by its own documented value: `status = 0`, `distance = -1`).
+   by its own documented value: `status = 0`, `distance = -1`). One exception, the user's
+   (2026-11-18): a field whose value is a thing in a slot (the Disk Station's `target` and
+   `source` disks) is left out while the slot is empty, Lua's own nothing.
 5. **`event` is what caused it.** An event a method caused carries that method's name, literally,
    always; a device's own news (no method caused it) has its own word, listed below, never a
    method's name (the user's, 2026-11-06). So an `event` naming a method means that method caused it.
