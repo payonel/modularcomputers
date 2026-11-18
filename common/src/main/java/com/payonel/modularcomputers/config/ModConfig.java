@@ -110,6 +110,7 @@ public final class ModConfig {
 	public static final Setting INTERNET_DENY = new Setting("internet.deny", Defaults.Internet.DENY);
 	public static final Setting INTERNET_RESPONSE_BUFFER = new Setting("internet.response_buffer_kib", Defaults.Internet.RESPONSE_BUFFER_KIB);
 	public static final Setting PATHFINDING_RANGE = new Setting("robot.pathfinding_range", Defaults.Robot.PATHFINDING_RANGE);
+	public static final Setting TURN_SPEED = new Setting("robot.turn_speed", Defaults.Robot.TURN_SPEED);
 	/** Where a type's own ring depth is: this, then its /sys class's name ({@code device.ring_depth.robotics}). */
 	public static final String RING_DEPTH_TYPE_PREFIX = "device.ring_depth.";
 
@@ -248,7 +249,11 @@ public final class ModConfig {
 				# more places than the game's own budget for a search this far: 16 a block); none found, the walk
 				# ends blocked. A walk itself goes however far it's told. A flight's way is found whole within
 				# this, or not at all. A whole count, 1 or more.
-				""", List.of(PATHFINDING_RANGE)))));
+				""", List.of(PATHFINDING_RANGE)),
+			new Block("""
+				# How fast it turns, in degrees a tick (a tick is a twentieth of a second): 18 turns a right
+				# angle in five ticks. More than 0; 90 or more turns a right angle in one tick.
+				""", List.of(TURN_SPEED)))));
 
 	/** The internet's settings, as last loaded (the server's: clients never use them). */
 	private static volatile InternetPolicy internet = InternetPolicy.DEFAULT;
@@ -258,6 +263,13 @@ public final class ModConfig {
 	private static volatile PowerDraws draws = draws(new Values(new Properties()));
 
 	private ModConfig() {
+	}
+
+	/** How far a bot golem turns a tick, in degrees, as last loaded. */
+	private static volatile double turnSpeed = Defaults.Robot.TURN_SPEED;
+
+	public static double turnSpeed() {
+		return turnSpeed;
 	}
 
 	public static InternetPolicy internet() {
@@ -333,6 +345,12 @@ public final class ModConfig {
 		RingDepths.configure(ringDepths(values));
 		CpuCores.configure(values.count(CPU_CORES));
 		GolemWayfinder.configure(values.count(PATHFINDING_RANGE));
+		double turning = values.number(TURN_SPEED, "a number of degrees more than 0");
+		if (turning <= 0) {
+			values.bad(TURN_SPEED, "a number of degrees more than 0");
+			turning = Defaults.Robot.TURN_SPEED;
+		}
+		turnSpeed = turning;
 		InternetCard.responseBuffer(values.count(INTERNET_RESPONSE_BUFFER));
 		internet = new InternetPolicy(values.flag(INTERNET_ENABLED), values.list(INTERNET_ALLOW), values.list(INTERNET_DENY));
 		costs = costs(values);
@@ -393,7 +411,7 @@ public final class ModConfig {
 			ModularComputers.LOGGER.warn("{}: {}", FILE_NAME, warning);
 		}
 
-		private void bad(Setting setting, String what) {
+		void bad(Setting setting, String what) {
 			warn(setting.key() + " should be " + what + ", not \"" + properties.getProperty(setting.key()) + "\"; using " + setting.text());
 		}
 

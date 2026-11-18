@@ -322,6 +322,8 @@ public final class Defaults {
 	public static final class Robot {
 		/** How far its pathfinding searches, in blocks walked: the game's own pathfinding range for its mobs. */
 		public static final int PATHFINDING_RANGE = 96;
+		/** How far it turns a tick, in degrees: a right angle in five ticks. */
+		public static final double TURN_SPEED = 18;
 
 		private Robot() {
 		}

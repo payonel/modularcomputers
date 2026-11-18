@@ -149,3 +149,4 @@ costs is under [power.cost](#power-cost).
 | Setting | Default | What it does | Values |
 |---|---|---|---|
 | `robot.pathfinding_range` | `96` | How far its pathfinding searches, in blocks walked. Where something stops a walk, it searches once, within this, for its way back onto its line past it; none found, the walk ends blocked. A walk itself goes however far it's told. A flight's way is found whole within this, or not at all. | a whole number, 1 or more |
+| `robot.turn_speed` | `18` | How fast it turns, in degrees a tick (a tick is a twentieth of a second): 18 turns a right angle in five ticks. | a number more than 0 |

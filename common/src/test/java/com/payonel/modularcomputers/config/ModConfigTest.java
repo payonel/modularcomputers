@@ -218,6 +218,24 @@ class ModConfigTest {
 		assertThat(GolemWayfinder.range()).isEqualTo(40);
 	}
 
+	/**
+	 * How fast a bot golem turns is a setting (the user's, 2026-11-18): 18 degrees a tick by default
+	 * (a right angle in five ticks); set, it turns that fast; 0 or less would never turn, so it falls
+	 * back with a warning.
+	 */
+	@Test
+	void theTurnSpeedIsASetting() throws IOException {
+		ModConfig.load(file());
+		assertThat(Files.readString(file())).contains("robot.turn_speed: 18\n");
+		assertThat(ModConfig.turnSpeed()).isEqualTo(18);
+		Files.writeString(file(), Files.readString(file()).replace("robot.turn_speed: 18", "robot.turn_speed: 45"));
+		ModConfig.load(file());
+		assertThat(ModConfig.turnSpeed()).isEqualTo(45);
+		Files.writeString(file(), Files.readString(file()).replace("robot.turn_speed: 45", "robot.turn_speed: 0"));
+		assertThat(ModConfig.load(file())).anyMatch(warning -> warning.startsWith("robot.turn_speed"));
+		assertThat(ModConfig.turnSpeed()).isEqualTo(18);
+	}
+
 	@Test
 	void readsKeyColonValueLinesWithFractionsAndZeroForever() throws IOException {
 		load("power.battery.tier1.duration: 0.5\npower.battery.tier2.duration: 1\npower.battery.tier3.duration: 0\n");

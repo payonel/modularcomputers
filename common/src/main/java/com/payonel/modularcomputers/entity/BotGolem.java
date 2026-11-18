@@ -74,8 +74,6 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 	 * (Mob.setSpeed sets its forward input to it too), so it moves as a player at its square.
 	 */
 	public static final double WALKING_SPEED = Math.sqrt(PLAYER_SPEED * PLAYER_INPUT);
-	/** How far it turns a tick, in degrees: a right angle in five ticks. */
-	public static final float TURN_SPEED = 18;
 	/** How far its parts view reaches, in blocks (a container's). */
 	private static final double PARTS_REACH = 4.0;
 
@@ -1637,9 +1635,10 @@ public final class BotGolem extends PathfinderMob implements BoardHolder, MenuPr
 		}
 		if (!Float.isNaN(turnTo)) {
 			float left = Mth.wrapDegrees(turnTo - getYRot());
-			float step = Mth.clamp(left, -TURN_SPEED, TURN_SPEED);
+			float turning = (float) com.payonel.modularcomputers.config.ModConfig.turnSpeed(); // (the setting, as loaded: a reload reaches a turn under way)
+			float step = Mth.clamp(left, -turning, turning);
 			face(getYRot() + step);
-			if (Math.abs(left) <= TURN_SPEED) {
+			if (Math.abs(left) <= turning) {
 				face(turnTo);
 				turnTo = Float.NaN;
 				robotics.turned();

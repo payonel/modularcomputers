@@ -215,7 +215,8 @@ frame: the numbers `position` gives. `walkTo(0, 0, 0)` goes home. Its event: `wa
 
 Turns a right angle in place: `"left"` or `"right"`, or two, `"around"`, from the heading its last
 command left it; or to face the world's way, `"north"`, `"south"`, `"east"` or `"west"` (facing it
-already, it doesn't turn, and its event comes all the same).
+already, it doesn't turn, and its event comes all the same). How fast it turns is a server setting
+(see [Settings](/settings/#robot)).
 Its event: `turn`. It fails with `bad_argument` (`expected = "way"`) for anything else: its heading is always a right
 angle from its origin's.
 
