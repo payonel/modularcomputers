@@ -37,13 +37,15 @@ board 9a210000-0000-0000-0000-000000000000
 ```
 
 `link -` means no link, and `board -` means the card has no board. The state is taken at the first
-read after the file is opened (or sought back to its start). Writing a line relinks the card as soon
-as the line is written (flushed): `link <id>`, or `link -` for none. A line that is not a link, or
-an id that is not a board's, fails the write with `EINVAL`.
+read after the file is opened (or sought back to its start). A line written is a call of the
+card's `setLink` method, by its own name, as an ioctl is, relinking the card as soon as the line is
+written (flushed): `setLink <id>`, or `setLink` alone for none. A line that is not `setLink`'s call
+(`link <id>`, the state's own words), or an id that is not a board's, fails the write with
+`EINVAL`.
 
 ```sh
 cat /dev/bluetooth0
-echo link - > /dev/bluetooth0
+echo setLink > /dev/bluetooth0
 ```
 
 The card has no events, so `poll` never reports it `PRI`; the file is always readable (`IN`) and
@@ -86,7 +88,7 @@ Run these with `lua name.lua`, from a computer with a Bluetooth card.
 ### Link from a shell
 
 ```sh
-echo link 5f0c0000-0000-0000-0000-000000000000 > /dev/bluetooth0
+echo setLink 5f0c0000-0000-0000-0000-000000000000 > /dev/bluetooth0
 cat /dev/bluetooth0
 ```
 

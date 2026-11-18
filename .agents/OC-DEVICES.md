@@ -448,7 +448,7 @@ mcos's threads) are on the `openos` branch only.
 - none in OC; modcomp adds `crafted` (`{name, count}`) and `failed` (`why`: input, output) through `pull()`.
 **API:**
 - `craft([count]): number`: CraftingCard `craft([count])`: from its own 3x3 grid (slots 1-9), not the robot's top-left; `true` at once (or `false, why`), the result an event; half a second a craft; into storage, all or nothing.
-**Deliberate (AGENTS.md / PLAN.md):** crafting takes time, each card on its own (more cards, more throughput); needs robotics; players craft in its tab; its `/dev` file reads its items, a line written dumps its storage.
+**Deliberate (AGENTS.md / PLAN.md):** crafting takes time, each card on its own (more cards, more throughput); needs robotics; players craft in its tab; its `/dev` file reads its items, a line written is `drop`'s call (`drop [face] [slot [count]]`), dumping its storage.
 
 ### experience (UpgradeExperience.scala)
 **modcomp:** none
@@ -518,7 +518,7 @@ mcos's threads) are on the `openos` branch only.
 - `runCommand(command): number`: `command(text)` → `{success, result, output}`, at its block, a command block's permission (gamemaster); `get()` the last output; `set({command})` runs one.
 - `changeBuffer(delta)`, `connectToBlock(x, y, z)`, `test()`, `isModLoaded(name)`, `sendToDebugCard(address, ...)`, `sendToClipboard(player, text)`, `getWorlds()`, `getX/getY/getZ()`, `scanContentsAt(x, y, z[, world])`: **missing**.
 - World (getDimensionId/Name, getSeed, is/setRaining, is/setThundering, get/setTime, get/setSpawnPoint, playSoundAt, getBlockId, getMetadata, getBlockState, isLoaded, hasTileEntity, get/setTileNBT, getLightOpacity, getLightValue, canSeeSky, setBlock, setBlocks, insert/removeItem, insert/removeFluid), player (get/setGameType, get/setPosition, get/setHealth, getMaxHealth, getLevel, getExperienceTotal, add/removeExperienceLevel, clearInventory, insertItem), scoreboard (teams, objectives, scores) objects: **missing** as methods; vanilla commands through `command` reach many (time, weather, setblock, fill, data, playsound, setworldspawn, item, gamemode, tp, xp, clear, give, list, scoreboard, team) as text, not typed answers.
-**Deliberate (AGENTS.md / PLAN.md):** named for Minecraft's operators, creative only; a command block's permission (not `op` or `stop`), each command logged; `/dev/operator0` a line a command, a read its output.
+**Deliberate (AGENTS.md / PLAN.md):** named for Minecraft's operators, creative only; a command block's permission (not `op` or `stop`), each command logged; `/dev/operator0` a line a command (`command time set day`, the method's call), a read its log.
 
 ### geolyzer (Geolyzer.scala + trait WorldControl)
 **modcomp:** RoboticsDevice `scan` (robots only); WeatherCard for weather

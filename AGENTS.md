@@ -543,7 +543,8 @@ grid too (the user's, 2026-10-27 and -28), so each waits for the robot's moves t
 start costs the robot nothing: the craft is then the card's own work, a tick a craft, the card busy
 (its next command waits) and the robot free, so cards craft side by side; its `stop` is its own,
 and the robot's leaves it (one device's stop isn't another's). Its `/dev` file reads as its
-items (`name count` a line) and a line written dumps its storage (below, or at the face named).
+items (`name count` a line) and a line written is `drop`'s call (`drop [face] [slot [count]]`:
+its storage dumped below, or at the face named).
 A view's tabs are one mechanism (`SideTabs`, the user's): a tab for each card whose kind
 registered one, each opening its panel left of the board (the bus order is the parts view's own
 panel), the same list in the screen view; a new card's tab is a registration, nothing else.
@@ -584,7 +585,8 @@ server. A command that ran answers `true` and what the game gave of it, nothing 
 `{successes, result, message, key}`, a command block's success count, its last run's value, what it
 said, its last message's translation key. Its `get` is its last answer (a command block's own
 state, as it keeps SuccessCount and LastOutput: a device's state, not a second door), and its
-`pull` its log, a `command` event a command run; in mcos, `/dev/operator0`'s line written runs one,
+`pull` its log, a `command` event a command run; in mcos, `/dev/operator0`'s line written runs one
+(`command time set day`, the method's call),
 and a read is its log from the file's open (the driver's `stream`).
 
 ### The internet card
@@ -732,7 +734,8 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   (methods, events, reports), and mcos turns them into what Linux gives: text, never Lua syntax (the
   kernel loads no user-space library). A device whose data is a table has a driver
   (`lib/modules/drivers/<type>.lua`, found by its type) making it text: a redstone card's file is a
-  line a face (`north 7 7`), a line written takes effect at once (a sysfs attribute's write); a
+  line a face (`north 7 7`), a line written (`set north 7`) takes effect at once (a sysfs
+  attribute's write); a
   device without one (the EEPROM) takes everything written at close, all or nothing.
 - **Every device has a `/dev` file, and it's the device's API** (the user's call: no kernel device
   library): `/dev` is flat, `console`, `tty`, `null`, `zero` and a node for each
@@ -748,8 +751,12 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   program waits with `sys.poll` and takes with either. Reading gives the
   device's data: `get`'s answer (the EEPROM too: convenient, the user's call), what's written going
   to `set` at close, the device deciding what `set` means; with a driver, its read is the answers
-  of the methods it names (`reads`), and a line written calls the method the line names (the
-  driver's `line`: `walk 3` is `walk(3)`); a device with nothing to read says what
+  of the methods it names (`reads`), and **a line written is a method's call**, no exceptions
+  (the user's, 2026-11-18): the method's own name, then its arguments, the same names as its
+  methods and ioctls, so a shell line and a Lua call use one name (the driver's `line`: `walkTo 3
+  0 5` is `walkTo(3, 0, 5)`, `set north 15` is `set({north = {powered = 15}})`); booleans `true`
+  and `false` as Lua writes them, an argument left off the method's own default, and a line that
+  isn't a call fails the write (`EINVAL`); a device with nothing to read says what
   it is (type, id, label, methods). **One door a command** (the user's, 2026-11-03): no device
   method stands for others (a `set` taking an action table, a `get` repeating another's answer),
   so an event's name is literally the method called, always; events no method caused have their

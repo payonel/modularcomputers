@@ -108,6 +108,7 @@ class BufferedWaitsMcosTest extends McosHarness {
 
 			@Override
 			public Result drop(String face, int slot, int count) {
+				asked.add("drop " + face + " " + slot + " " + count);
 				return Result.ok(0L);
 			}
 
@@ -176,6 +177,35 @@ class BufferedWaitsMcosTest extends McosHarness {
 		type("lua /walkstore.lua\r");
 		untilFile(root().resolve("out"), "true 0\n");
 		assertThat(asked).containsExactly("walk 3", "store front");
+	}
+
+	/**
+	 * A line written to a crafting card's file is drop's call by its own name, its arguments as the
+	 * method takes them (the user's: no exceptions), its face left off its own default (below); the
+	 * old lines (a face alone, an empty line) aren't calls: EINVAL.
+	 */
+	@Test
+	void aLineWrittenToACraftingCardsFileCallsDropWithItsArguments() {
+		card();
+		file("lines.lua", """
+			local sys = require("sys")
+			local out = io.open("/out", "w")
+			for _, line in ipairs({"drop", "drop up", "drop up 3", "drop up 3 2", "drop 4", "down", "", "drop up 3 2 1", "drop up x"}) do
+			  local fd = assert(sys.open("/dev/crafting0", "w"))
+			  local wrote, why, errno = sys.write(fd, line .. "\\n")
+			  sys.close(fd)
+			  out:write("[", line, "] ", tostring(errno or "ok"), "\\n")
+			end
+			out:close()
+			""");
+		boot();
+		type("lua /lines.lua\r");
+		settle(() -> java.nio.file.Files.isRegularFile(root().resolve("out")) && read(root().resolve("out")).lines().count() == 9);
+		int all = Integer.MAX_VALUE; // (no count given: all of it)
+		assertThat(asked).as("drop's calls, in order").containsExactly("drop down 0 " + all, "drop up 0 " + all, "drop up 3 " + all,
+			"drop up 3 2", "drop down 4 " + all);
+		assertThat(read(root().resolve("out"))).as("the old lines, and too many or bad arguments, are no calls")
+			.contains("[down] EINVAL\n", "[] EINVAL\n", "[drop up 3 2 1] EINVAL\n", "[drop up x] EINVAL\n");
 	}
 
 	/** A card's craft is its own: its robot's stop leaves it, and the card's stop ends it, which says so. */

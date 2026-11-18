@@ -63,11 +63,14 @@ piston's `push`. Each device page has an *In mcos* section saying what its file 
 ```sh
 lsdev -i
 cat /dev/redstone0
-echo "north 15" > /dev/redstone0
+echo "set north 15" > /dev/redstone0
 ```
 
 A device whose data is a table (a redstone card, a sensor) has a driver that turns it into text: a
-line a face, an event a line. A device with no data says what it is when read (its type, id and
+line a face, an event a line. A line written to a device's file is a call of one of its methods,
+by the method's own name, then its arguments, as its ioctl is (`set north 15` is
+`set({north = {powered = 15}})`); a line that isn't one fails the write with `EINVAL`. A device
+with no data says what it is when read (its type, id and
 methods), and is used through its ioctls. A network card's data goes through sockets
 ([Networking](/mcos/networking/)); its file is its traffic. Terminals are merged into the console
 (`/dev/console`).

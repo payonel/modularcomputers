@@ -98,7 +98,7 @@ ready, so one loop can serve a sensor and the keyboard together.
 | `event.pull()` in a loop | A blocking read on the device's file, or `sys.poll` |
 | `os.sleep(t)` | `sys.sleep(t)` |
 | A program that does not yield for a while is killed | No such limit: a busy program is frozen and thawed |
-| `component.redstone.setOutput(sides.north, 15)` | `redstone:write("north 15\n")` on `/dev/redstone0` |
+| `component.redstone.setOutput(sides.north, 15)` | `redstone:write("set north 15\n")` on `/dev/redstone0` |
 | `sides.north` | the string `"north"`: faces are strings |
 | Components found by address | Devices found by [their names](/concepts/names/) |
 

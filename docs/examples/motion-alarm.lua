@@ -11,7 +11,7 @@ local motion = io.open("/dev/motion0")
 local alarm = io.open("/dev/redstone0", "w")
 
 local function set(strength)
-  alarm:write(ALARM, " ", strength, "\n")
+  alarm:write("set ", ALARM, " ", strength, "\n")
   alarm:flush()
 end
 

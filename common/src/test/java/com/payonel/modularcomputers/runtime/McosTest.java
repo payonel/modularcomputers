@@ -281,15 +281,28 @@ class McosTest extends McosHarness {
 		com.payonel.modularcomputers.device.RedstoneCard card = new com.payonel.modularcomputers.device.RedstoneCard();
 		devices.put(Motherboard.exp(0), card); // (a card in a slot, as in a case)
 		boot();
-		file("set.txt", "north 11\n");
-		file("bad.txt", "not a face\n");
-		type("cp /set.txt /dev/redstone0; cat /dev/redstone0 > /r; cp /bad.txt /dev/redstone0 2> /err; touch /done\r");
+		file("set.txt", "set north 11 east 4\n"); // (a line is set's call, the whole of it: several faces at once)
+		file("codes.lua", """
+			local sys = require("sys")
+			local out = io.open("/codes", "w")
+			-- the old line (a face and its signal), and lines that aren't set's whole call
+			for _, line in ipairs({"south 9", "set south", "set south x", "set 9 south"}) do
+			  local fd = assert(sys.open("/dev/redstone0", "w"))
+			  local _, _, errno = sys.write(fd, line .. "\\n")
+			  sys.close(fd)
+			  out:write(line, " ", tostring(errno or "ok"), "\\n")
+			end
+			out:close()
+			""");
+		type("cp /set.txt /dev/redstone0; cat /dev/redstone0 > /r; lua /codes.lua; touch /done\r");
 		untilFile(root().resolve("done"), "");
 		assertThat(card.output(0)).as("north, as written").isEqualTo(11);
+		assertThat(card.output(2)).as("east, in the same call").isEqualTo(4);
 		assertThat(read(root().resolve("r"))).as("a line a face: face level powered")
-			.isEqualTo("north 11 11\nsouth 0 0\neast 0 0\nwest 0 0\nup 0 0\ndown 0 0\n");
-		assertThat(read(root().resolve("err"))).as("a line that isn't \"face powered\": the write fails").isNotEmpty();
-		assertThat(card.output(0)).isEqualTo(11);
+			.isEqualTo("north 11 11\nsouth 0 0\neast 4 4\nwest 0 0\nup 0 0\ndown 0 0\n");
+		assertThat(read(root().resolve("codes"))).as("a line that isn't set's call fails the write")
+			.isEqualTo("south 9 EINVAL\nset south EINVAL\nset south x EINVAL\nset 9 south EINVAL\n");
+		assertThat(card.output(1)).as("south, untouched").isZero();
 	}
 
 	/** A WAV file: its format chunk (tag, channels, rate, bits, block align) and its data. */
@@ -792,18 +805,29 @@ class McosTest extends McosHarness {
 		});
 		devices.put(Motherboard.exp(0), card);
 		boot();
-		file("bogus.txt", "bogus\n");
+		file("bogus.txt", "command bogus\n");
 		file("last.lua", """
 			local sys = require("sys")
 			local out = assert(io.open("/last", "w"))
 			out:write(sys.ioctl(assert(sys.open("/dev/operator0")), "get").message)
 			out:close()
+			-- the old line (the command alone), and a word that isn't the method's: no calls
+			local codes = assert(io.open("/codes", "w"))
+			for _, line in ipairs({"time set night", "commands time set night"}) do
+			  local fd = assert(sys.open("/dev/operator0", "w"))
+			  local _, _, errno = sys.write(fd, line .. "\\n")
+			  sys.close(fd)
+			  codes:write(line, " ", tostring(errno or "ok"), "\\n")
+			end
+			codes:close()
 			""");
 		type("tail -f /dev/operator0 | head -n 2 > /o &\r"); // (its log, from its open: as they run)
 		untilIdle();
-		type("echo /time set day > /dev/operator0; cp /bogus.txt /dev/operator0 2> /e; lua /last.lua; touch /done\r");
+		type("echo command /time set day > /dev/operator0; cp /bogus.txt /dev/operator0 2> /e; lua /last.lua; touch /done\r");
 		untilFile(root().resolve("done"), "");
-		assertThat(ran).as("each line a command, its / dropped").containsExactly("time set day", "bogus");
+		assertThat(ran).as("each line command's call, its text one argument, its / dropped").containsExactly("time set day", "bogus");
+		assertThat(read(root().resolve("codes"))).as("a line that isn't command's call fails the write")
+			.isEqualTo("time set night EINVAL\ncommands time set night EINVAL\n");
 		assertThat(read(root().resolve("e"))).as("a command that failed fails its write").isNotEmpty();
 		assertThat(read(root().resolve("last"))).as("its last answer, the card's own").isEqualTo("Unknown command\n");
 		untilFile(root().resolve("o"), "time set day: 1 1000 Set the time to 1000\nbogus: 0 0 Unknown command\n");
@@ -863,11 +887,23 @@ class McosTest extends McosHarness {
 		card.boardFrom(() -> board);
 		devices.put(Motherboard.exp(0), card);
 		boot();
-		file("bad.txt", "nonsense\n");
-		type("cat /dev/bluetooth0 > /b1; echo link " + other + " > /dev/bluetooth0; cat /dev/bluetooth0 > /b2; echo link - > /dev/bluetooth0; "
-			+ "cp /bad.txt /dev/bluetooth0 2> /err; touch /done\r");
+		file("old.lua", """
+			local sys = require("sys")
+			local other = ...
+			local out = io.open("/codes", "w")
+			-- the old lines (link <id>, link - for none), and lines that aren't setLink's call
+			for _, line in ipairs({"link " .. other, "link -", "nonsense", "setLink " .. other .. " " .. other}) do
+			  local fd = assert(sys.open("/dev/bluetooth0", "w"))
+			  local _, _, errno = sys.write(fd, line .. "\\n")
+			  sys.close(fd)
+			  out:write(tostring(errno or "ok"), "\\n")
+			end
+			out:close()
+			""");
+		type("cat /dev/bluetooth0 > /b1; echo setLink " + other + " > /dev/bluetooth0; cat /dev/bluetooth0 > /b2; echo setLink > /dev/bluetooth0; "
+			+ "lua /old.lua " + other + "; touch /done\r");
 		untilFile(root().resolve("done"), "");
-		assertThat(read(root().resolve("err"))).as("a line that isn't a link: the write fails").isNotEmpty();
+		assertThat(read(root().resolve("codes"))).as("a line that isn't setLink's call fails the write").isEqualTo("EINVAL\nEINVAL\nEINVAL\nEINVAL\n");
 		assertThat(read(root().resolve("b1"))).isEqualTo("link -\nboard " + board + "\n");
 		assertThat(read(root().resolve("b2"))).isEqualTo("link " + other + "\nboard " + board + "\n");
 		assertThat(link[0]).as("unlinked").isNull();
@@ -1030,12 +1066,12 @@ class McosTest extends McosHarness {
 		file("pulse.lua", """
 			local sys = require("sys")
 			local f = io.open("/dev/redstone0", "w")
-			f:write("north 15\\n")
+			f:write("set north 15\\n")
 			f:flush()
 			local started = io.open("/started", "w")
 			started:close()
 			sys.sleep(0.5)
-			f:write("north 0\\n")
+			f:write("set north 0\\n")
 			f:close()
 			""");
 		type("lua /pulse.lua; touch /done\r");

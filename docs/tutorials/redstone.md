@@ -70,21 +70,22 @@ a face changes, until you press `Ctrl+C`. See [tail](/programs/tail/).
 
 ### 5. Drive a lamp
 
-Put a redstone lamp on the west side of the case, touching it. Write a line, a face and a strength,
-to the card's file:
+Put a redstone lamp on the west side of the case, touching it. Write a line to the card's file:
+`set`, the name of the card's method that sets its outputs, then a face and a strength:
 
 ```
-echo "west 15" > /dev/redstone0
+echo "set west 15" > /dev/redstone0
 ```
 
 You will see the lamp light at once. A line written takes effect immediately.
 
 ```
-echo "west 0" > /dev/redstone0
+echo "set west 0" > /dev/redstone0
 ```
 
-and it goes dark. If you write a line that is not a face and a number, the write fails and the shell
-tells you.
+and it goes dark. A line written to a device's file is always a call of one of its methods, by its
+name, then its arguments. If you write a line that is not one (`west 0`, without the `set`), the
+write fails and the shell tells you.
 
 ### 6. A blinking lamp, forever
 
@@ -138,7 +139,7 @@ placed. The card's file always reports the world's names. See [faces](/concepts/
 | No `redstone0` in `lsdev` | The card is not in a socket, or the computer was started before it was fitted. | Turn the computer off, fit the card, start again. |
 | `/dev/redstone0: No such file or directory` | Same as above. | The same. |
 | The lamp does not light | The card has no power, or the lamp is not touching that face. | Check the computer is on and that the face you wrote is the one the lamp touches. |
-| A write fails | The line is not `face number`. | Write `west 15`, not `west on`. |
+| A write fails | The line is not `set face number`. | Write `set west 15`, not `west 15` or `set west on`. |
 
 ## Congratulations
 

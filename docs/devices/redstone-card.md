@@ -53,9 +53,12 @@ down 0 0
 Each line is `face level powered`. The state is taken at the first read after the file is opened
 or sought back to its start, so a read from the start always gives the faces as they are then.
 
-A line written, `face powered`, sets that face once the line is written
-(flushed), as a sysfs attribute does: `north 11`. Relative names work too (`front 15`). A line that is not a face and a
-number fails the write with `EINVAL`, and so does an unknown face (`bad_argument`, `expected = "face"`).
+A line written is a call of the card's `set` method, by its own name, as an ioctl is: `set`, then a
+face and its signal, as many pairs as you like, all in one call, taking effect once the line is
+written (flushed), as a sysfs attribute does: `set north 11` is `set({north = {powered = 11}})`,
+and `set north 11 south 0` sets both. Relative names work too (`set front 15`). A line that is
+not `set`'s call (`north 11`, without its method; a face without its number) fails the write with
+`EINVAL`, and so does an unknown face (`bad_argument`, `expected = "face"`).
 
 The file is always readable (`poll`'s `IN`) and writable (`OUT`). A change to any face since the
 file was last sought to its start shows as `PRI`, and stays until the file is sought there again
@@ -64,7 +67,7 @@ faces again each time they change.
 
 ```sh
 cat /dev/redstone0
-echo "north 15" > /dev/redstone0
+echo "set north 15" > /dev/redstone0
 tail -f /dev/redstone0
 ```
 
@@ -165,12 +168,12 @@ see [Writing programs](/mcos/programs/).
 
 ```lua
 local f = io.open("/dev/redstone0", "w")
-f:write("north 15\n")  -- "face strength": 0 to 15
+f:write("set north 15\n")  -- set's call: "set face strength", 0 to 15
 f:close()
 ```
 
 A line written takes effect when it is flushed (`f:flush()`, or closing the file). From a shell,
-`echo "north 15" > /dev/redstone0` does the same.
+`echo "set north 15" > /dev/redstone0` does the same.
 
 ### Read an input
 

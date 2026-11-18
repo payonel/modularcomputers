@@ -91,10 +91,11 @@ east 15 15
 west 15 0
 up 0 0
 down 0 0
-$ echo "east 0" > /dev/redstone0
+$ echo "set east 0" > /dev/redstone0
 ```
 
-(A line a face: its level, then this card's own signal. A line written sets a face.)
+(A line a face: its level, then this card's own signal. A line written is a call of the card's
+`set` method, by its name, as the ioctl is: `set east 0` is `set({east = {powered = 0}})`.)
 
 ## Layer 3: `devices`, step by step
 
@@ -157,7 +158,7 @@ print(devices.event(robot).ok)  -- the walk's end: true, or false (its why says 
   face's level change), and that the program's still running (`ps`).
 - **`no redstone card`** (layer 1) or **`no such device`** (layers 2 and 3): the card isn't in the
   computer, or it's not the computer you think (`lsdev`).
-- **The lamp stays lit after the program ends:** a card's signal stays as it was set. `echo "east 0" >
+- **The lamp stays lit after the program ends:** a card's signal stays as it was set. `echo "set east 0" >
   /dev/redstone0` turns it off.
 
 Next: [Coming from OpenComputers](/tutorials/from-opencomputers/).

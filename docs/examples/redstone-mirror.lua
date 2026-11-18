@@ -22,7 +22,7 @@ local last = -1
 while true do
   local now = level(FROM)
   if now ~= last then
-    writer:write(TO, " ", now, "\n")
+    writer:write("set ", TO, " ", now, "\n")
     writer:flush()
     last = now
   end

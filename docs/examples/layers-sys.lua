@@ -3,7 +3,7 @@
 -- reaches it through its file, /dev/redstone0. sys.poll sleeps until the file has news (PRI: the
 -- card's interrupt, as the kernel sees it), and the file's ioctls are the card's own methods:
 -- "pull" takes a change, "set" sets its output. (The file's text is the card too: cat it for a line
--- a face, or echo "east 15" into it.)
+-- a face, or echo "set east 15" into it: set's call, by its name.)
 local sys = require("sys")
 
 local LEVER = "west"

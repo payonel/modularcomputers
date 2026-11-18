@@ -3,9 +3,9 @@
 --
 -- The plate's signal comes in on a redstone card (/dev/redstone0, a line a face: "face level
 -- powered"); sys.poll waits for its change (PRI). On each step the program runs a server command
--- through the operator card's set method (as a line written to its file would: a command that
--- fails fails the call, with what the server said), then its get method gives what the command
--- said (who was shown the greeting), which goes in the log with the world's date and time.
+-- through the operator card's command method (an ioctl; a line "command <text>" written to its
+-- file is the same call), whose answer says how it went (successes 0: it failed) and what the
+-- command said (who was shown the greeting), which goes in the log with the world's date and time.
 local sys = require("sys")
 
 local PLATE = "south"                  -- the face the plate's signal comes in on

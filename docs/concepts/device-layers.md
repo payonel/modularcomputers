@@ -78,7 +78,10 @@ decides who waits for what. A program uses a device's file as any file:
 - **`sys.poll({[fd] = {PRI = true}}, seconds)`** sleeps until the device has news: `PRI` is its
   interrupt, as the kernel sees it. Then `sys.ioctl(fd, "pull")` takes an event.
 - **Its text is the device too**, for the shell: `cat /dev/redstone0` reads a line a face, and
-  `echo "east 15" > /dev/redstone0` sets one. Each device's page says what its file reads and takes.
+  `echo "set east 15" > /dev/redstone0` sets one. A line written is a method's call, by the
+  method's own name, then its arguments, as its ioctl is (`set east 15` is
+  `set({east = {powered = 15}})`); a line that isn't one fails with `EINVAL`. Each device's page
+  says what its file reads and takes.
 
 ```lua
 local fd = sys.open("/dev/redstone0")

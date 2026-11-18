@@ -30,9 +30,12 @@ any player.
 
 `/dev/operator0` (`operator1` for the next card) runs commands.
 
-- **Write:** a line written runs one, at once (a leading `/` is allowed). A write whose command
-  succeeded in no run fails (`EINVAL`); the card's `get` then says what the server answered. An
-  empty line fails the same way.
+- **Write:** a line written is a call of the card's `command` method, by its own name, as an ioctl
+  is: `command <text>`, everything after `command` the command's text, one argument
+  (`command time set day` is `command("time set day")`; a leading `/` is allowed), run at once. A
+  write whose command succeeded in no run fails (`EINVAL`); the card's `get` then says what the
+  server answered. A line that is not `command`'s call (the command alone, `time set day`), or
+  `command` with no text, fails the same way.
 - **Read:** its log, a line for each command it runs (any program's), from the moment the file was
   opened: the command, how many of its runs succeeded, its result and what it said. A read waits for
   the next one, so a `cat` or `tail -f` left running shows commands as they run. The card keeps as many
@@ -45,7 +48,7 @@ any player.
 
 ```sh
 tail -f /dev/operator0 &
-echo time set day > /dev/operator0
+echo command time set day > /dev/operator0
 ```
 
 The `tail` shows the command as it runs: `time set day: 1 1000 Set the time to 1000`.

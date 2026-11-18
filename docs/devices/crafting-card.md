@@ -73,15 +73,20 @@ minecraft:oak_log 12
 minecraft:stick 4
 ```
 
-A line written drops everything in its storage (not its grid) at a face of the robot: an empty
-line in front of it, or a face's name. A container there is filled first; the rest go into the world.
-So a golem back from mining empties itself into a chest in front of it, or a hopper under it, in
-one write:
+A line written is a call of the card's `drop` method, by its own name, as an ioctl is:
+`drop [face] [slot [count]]`, its arguments as `drop` takes them. With no face it drops below the
+robot, `drop`'s own default; with no slot, everything in its storage (not its grid). A container
+there is filled first; the rest go into the world. So a golem back from mining empties itself into
+a hopper under it, or a chest in front of it, in one write. A line that is not `drop`'s call (a
+face alone, an empty line) fails the write with `EINVAL`.
 
 ```sh
-echo > /dev/crafting0
-echo down > /dev/crafting0
+echo drop > /dev/crafting0
+echo drop front > /dev/crafting0
+echo drop up 3 16 > /dev/crafting0
 ```
+
+The last drops 16 items from storage slot 3 above it.
 
 Its file's ioctls are its methods, by name. Its events come as `sys.poll`'s `PRI`, and the `pull`
 ioctl takes them.

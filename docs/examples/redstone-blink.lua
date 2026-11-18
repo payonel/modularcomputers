@@ -7,11 +7,11 @@ local sys = require("sys")
 local FACE = "north"  -- any face: north, south, east, west, up, down (or front, back, left, right)
 local HALF = 0.5      -- seconds on, and seconds off
 
--- A line written to the card's file is "face strength" and takes effect at once.
+-- A line written to the card's file is its set method's call, "set face strength", taking effect at once.
 local card = io.open("/dev/redstone0", "w")
 
 local function set(strength)
-  card:write(FACE, " ", strength, "\n")
+  card:write("set ", FACE, " ", strength, "\n")
   card:flush()
 end
 

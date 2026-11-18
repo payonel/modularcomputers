@@ -18,7 +18,8 @@ import java.util.function.Function;
  * said, and its last message's translation key. It keeps its last command's answer, as a command
  * block keeps its SuccessCount and LastOutput ({@link #get}), and a log of the commands it runs
  * ({@link #pull}: what's happening on it, a device's events). In mcos it's a file: a line written
- * runs a command, and a read gives its log from the file's open on, an entry a line.
+ * is its command's call ({@code command time set day}), and a read gives its log from the file's
+ * open on, an entry a line.
  */
 public final class OperatorCard extends Card {
 	/**

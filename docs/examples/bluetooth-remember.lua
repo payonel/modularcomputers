@@ -5,15 +5,17 @@
 --   lua bluetooth-remember.lua save | restore | clear
 --
 -- It works only through the card's file: a read gives "link <id>" and "board <id>" lines, and a
--- line written ("link <id>", or "link -" for none) relinks the card as soon as it is written.
+-- line written is its setLink method's call ("setLink <id>", or "setLink" alone for none),
+-- relinking the card as soon as it is written.
 local sys = require("sys")
 
 local CARD = "/dev/bluetooth0"
 local SAVED = "/home/bluetooth.link"
 
+-- Links the card to the board with that id ("-", as its file says none: to none).
 local function relink(id)
   local card = assert(io.open(CARD, "w"))
-  card:write("link ", id, "\n")
+  card:write("setLink", id ~= "-" and " " .. id or "", "\n")
   local ok, why = card:flush() -- (the line goes to the card here: a bad one fails)
   card:close()
   if not ok then

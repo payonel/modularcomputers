@@ -38,11 +38,11 @@ for `front` fails with a message saying so. `left` and `right` also fail on a bl
 
 ## Example
 
-A redstone card in a case whose front faces north. In mcos, its `/dev` file takes a line a face
-(see [/dev](/mcos/dev/)):
+A redstone card in a case whose front faces north. In mcos, a line written to its `/dev` file is
+its `set` method's call, a face and its signal (see [/dev](/mcos/dev/)):
 
 ```
-$ echo "front 15" > /dev/redstone0
+$ echo "set front 15" > /dev/redstone0
 $ cat /dev/redstone0
 north 15 15
 ...

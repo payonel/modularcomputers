@@ -110,8 +110,11 @@ A program waits for a device with a watch on `/dev`, or with `devices.wait`: see
 Reading gives what the device's `get` returns, taken at the first read. What you write goes to the
 device's `set`, all of it in one call, when the file is closed; the device decides what that
 means (replace, append...). A device whose data is a table has a driver that makes its file text:
-its read is a line or a few, from the methods that say its state, and each line written calls the
-device's method it names (`walk 3` is `walk(3)`), the method and nothing standing in for it. A device with nothing to read gives what it is: its type, id, label
+its read is a line or a few, from the methods that say its state, and each line written is a
+call of one of the device's methods, by the method's own name, then its arguments, the same names
+as its methods and ioctls, with no exceptions (`walk 3` is `walk(3)`; `true` and `false` as Lua
+writes them; an argument left off is the method's own default), the method and nothing standing
+in for it. A line that isn't a call fails the write with `EINVAL`. A device with nothing to read gives what it is: its type, id, label
 and methods, a line each. A write to a device that can't be set, or a read from one that can't
 be read, fails with `EACCES`. The kernel does not let a read-only open write, or the other way round.
 
@@ -127,26 +130,33 @@ a sysfs file is: lines and words, never Lua syntax.
 ## Drivers
 
 **Redstone card.** A read gives a line a face, `face level powered`: the signal now on that face
-(coming in or put out) and how much of it this card puts out. A line written sets a face and takes
-effect at once, `face powered`. Faces are named as in [Faces](/concepts/faces/).
+(coming in or put out) and how much of it this card puts out. A line written is `set`'s call,
+`set face powered`, a face and its signal in pairs, as many as you like in one call
+(`set north 15 south 0`), and takes effect at once. Faces are named as in [Faces](/concepts/faces/).
 
 ```
 $ cat /dev/redstone0
 north 7 7
 south 0 0
 ...
-$ echo "front 15" > /dev/redstone0
+$ echo "set front 15" > /dev/redstone0
 ```
 
 **Bluetooth card.** A read gives two lines, `link <id>` (the board it links to, `-` for none) and
-`board <id>` (the board it is in). A line written, `link <id>` or `link -`, relinks it.
+`board <id>` (the board it is in). A line written is `setLink`'s call: `setLink <id>` relinks it,
+`setLink` alone unlinks it.
+
+**Crafting card.** A read gives a line for each slot that holds something, `minecraft:stick 4`. A
+line written is `drop`'s call, `drop [face] [slot [count]]`: its storage (or a slot of it) dropped
+at a face of the robot, below it when none is given.
 
 **Disk Station.** A read gives a line for each slot: `target 2 hfs 40960 4194304 backups`
 (its disk's tier, mode, bytes used, capacity and label) or `source -` for an empty slot. A line
 written names an action: `format`, `wipe`, `clone`, `install` or `update`.
 
-**Operator card.** A line written runs a server command, as a command block does (a leading `/` is
-allowed); a read gives what the last command said.
+**Operator card.** A line written is `command`'s call, `command <text>`: everything after
+`command` is the server command it runs, as a command block does (a leading `/` is allowed). A read
+gives its log, a line a command it ran, from the file's open on.
 
 **Network card, WLAN card.** Read-only: its traffic, a line a frame, in or out: the other card's
 address (or `broadcast`), how far it is, the frame's size and how it went (`taken`; a refusal's
