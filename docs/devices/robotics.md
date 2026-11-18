@@ -138,26 +138,28 @@ with the field's moves (it can't look while it's held), and set down on the ledg
 `/dev/robotics0` reads as what it's doing now, a word (`idle`, `walking`, `turning`, `breaking`,
 `flying`, `hovering`, `landing`, `falling` or `held`), then where it really is, a
 line: `position forward right up heading`, where its last command left it, `planned forward right up
-heading`, and when it's away from there, `drift forward right up`. A line written is an action, as a command (a line
-given while one runs waits for it, the writing thread only; a `stop` never waits):
+heading`, and when it's away from there, `drift forward right up`. A line written is a method's call: its name, then its arguments, the
+same names as its methods and ioctls (`walkTo 3 0 5` is `walkTo(3, 0, 5)`; `true` and `false` as
+Lua writes them). A line given while a command runs waits for it, the writing thread only; a `stop`
+never waits:
 
 | Line | Does |
 |---|---|
 | `walk forward [right [up]]` | Walks that far from where its last command left it, in its own frame, ending squared |
 | `walk` | Walks back to where its last command left it |
-| `walkto forward [right [up]]` | Walks to whole blocks from its origin, in the origin's frame |
+| `walkTo forward [right [up]]` | Walks to whole blocks from its origin, in the origin's frame |
 | `fly forward [right [up]]` | Flies on its thrusters that far from where its last command left it, ending squared, its legs left standing |
 | `fly` | Takes off where it stands and holds there; in the air, back to where its last command left it |
-| `flyto forward [right [up]]` | Flies to whole blocks from its origin |
+| `flyTo forward [right [up]]` | Flies to whole blocks from its origin |
 | `land` | Comes down onto its legs, below it |
-| `land force` | With no legs there, comes straight down onto the ground without them |
+| `land true` | With no legs there, comes straight down onto the ground without them |
 | `turn left`, `turn right`, `turn around` | Turns a right angle in place (or two) |
 | `turn north` (`south`, `east`, `west`) | Turns to face the world's way |
 | `use face` | Uses what it holds on the space at a face |
 | `swing face` | Swings what it holds at a face: hits a mob, or breaks the block |
 | `stop` | Stops at once, where it is, and takes it as where its last command left it |
-| `position [forward [right [up [heading]]]]` | Says where it is, its origin moved to make it so (none: its origin here) |
-| `pathfinding on`, `pathfinding off` | Whether its moves find their way round things |
+| `setPosition [forward [right [up [heading]]]]` | Says where it is, its origin moved to make it so (none: its origin here) |
+| `setPathfinding true`, `setPathfinding false` | Whether its moves find their way round things |
 
 A line that isn't one fails the write with `EINVAL`. How an action went comes as an event: the
 file is ready for `sys.poll`'s `PRI` while one waits, and the `pull` ioctl takes it. Each file open

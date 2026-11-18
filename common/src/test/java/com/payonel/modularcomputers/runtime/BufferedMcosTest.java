@@ -158,6 +158,92 @@ class BufferedMcosTest extends McosHarness {
 		}
 	}
 
+	/**
+	 * A line written to a robot's file is a method's call by the method's own name (the user's,
+	 * 2026-11-18: one name, the shell's and Lua's alike): walkTo, flyTo, land true, setPosition and
+	 * setPathfinding reach the methods they name, and the old words (walkto, land force, position,
+	 * pathfinding on) are no lines at all.
+	 */
+	@Test
+	void aLineWrittenToARobotsFileCallsTheMethodItNames() {
+		com.payonel.modularcomputers.device.RoboticsDevice robotics = new com.payonel.modularcomputers.device.RoboticsDevice();
+		java.util.List<String> asked = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+		boolean[] moving = {false}; // (a move under way, ended at the next tick, as a body's moves end)
+		robotics.moveWith(new com.payonel.modularcomputers.device.RoboticsDevice.Body() {
+			@Override
+			public String walk(double forward, double right, double up) {
+				asked.add("walk " + (long) forward + " " + (long) right + " " + (long) up);
+				moving[0] = true;
+				return null;
+			}
+
+			@Override
+			public String turn(double degrees) {
+				return null;
+			}
+
+			@Override
+			public String walkTo(double forward, double right, double up) {
+				asked.add("walkTo " + (long) forward + " " + (long) right + " " + (long) up);
+				moving[0] = true;
+				return null;
+			}
+
+			@Override
+			public String land(boolean force) {
+				asked.add("land " + force);
+				moving[0] = true;
+				return null;
+			}
+
+			@Override
+			public String setPosition(long forward, long right, long up, int heading) {
+				asked.add("setPosition " + forward + " " + right + " " + up + " " + heading);
+				return null;
+			}
+
+			@Override
+			public void pathfinding(boolean on) {
+				asked.add("setPathfinding " + on);
+			}
+
+			@Override
+			public void stop() {
+			}
+
+			@Override
+			public Result position() {
+				return Result.ok(java.util.Map.of("forward", 0L, "right", 0L, "up", 0L, "heading", 0L));
+			}
+		});
+		ticks.add(() -> {
+			if (moving[0]) {
+				moving[0] = false;
+				robotics.arrived();
+			}
+		});
+		devices.put(Motherboard.exp(com.payonel.modularcomputers.machine.GolemLayout.ROBOTICS_LANE), robotics);
+		file("lines.lua", """
+			local sys = require("sys")
+			local out = io.open("/out", "w")
+			for _, line in ipairs({"setPathfinding true", "walkTo 3 0 5", "land true", "setPosition 1 2 0 0", "setPathfinding false",
+			    "walkto 3 0 5", "land force", "position 1 2 0 0", "pathfinding on"}) do
+			  local fd = assert(sys.open("/dev/robotics0", "w"))
+			  local wrote, why, errno = sys.write(fd, line .. "\\n")
+			  sys.close(fd)
+			  out:write(line, " ", tostring(errno or "ok"), "\\n")
+			end
+			out:close()
+			""");
+		boot();
+		type("lua /lines.lua\r");
+		settle(() -> java.nio.file.Files.isRegularFile(root().resolve("out")) && read(root().resolve("out")).lines().count() == 9);
+		assertThat(asked).as("the methods named, in order").containsExactly("setPathfinding true", "walkTo 3 0 5", "land true",
+			"setPosition 1 2 0 0", "setPathfinding false");
+		assertThat(read(root().resolve("out"))).as("the old words are no lines").contains("walkto 3 0 5 EINVAL\n", "land force EINVAL\n",
+			"position 1 2 0 0 EINVAL\n", "pathfinding on EINVAL\n");
+	}
+
 	@Test
 	void aStopEndsTheThreadsWaitingToGiveItACommand() {
 		file("stop.lua", """
