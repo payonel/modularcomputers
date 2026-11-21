@@ -596,7 +596,7 @@ ender). The card speaks HTTP itself (`HttpExchange`, its own small client), sinc
 program's Lua. A program uses the card as any device (the user's call: no `sys.http`): its methods
 start a request (a handle), give its status and headers and read its body as it comes (`false`: not
 yet, its interrupt saying when to ask again; a read takes all the card holds, up to `n`, as `read(2)`:
-the card joins what came, never the kernel, the user's, 2026-11-13; its buffer is bytes, 64 KiB, so a
+the card joins what came, never the kernel, the user's, 2026-11-13; its buffer is bytes (`internet.response_buffer_kib`, 64 KiB), so a
 request carries its buffer a tick at most), and `/dev/internet0`'s read is its access log (each
 entry a request's end, the user's, 2026-11-05: a request is a command over time, `{event =
 "request", ok, method, url, ...}`, its `url` and `method` always, its `call` only a failure's and
@@ -609,8 +609,9 @@ IPv4 and IPv6 (embedded IPv4 judged as itself); every address a host resolves to
 socket opens to the address judged (no second lookup: no DNS rebinding); redirects are the
 program's, so each hop is judged again; a request can't set the headers that frame it (Host,
 Content-Length, Connection...), carry line breaks, or send credentials in its URL; no proxies,
-cookies or server details are sent. Admins can turn it off and allow or deny hosts and ranges
-(`internet.*` settings). Its events wait in the card with a handshake (a full card pauses the
+cookies or server details are sent. Admins can turn it off, allow or deny hosts and ranges, and set its limits
+(its timeouts, the sizes of a response's headers and a request's body, requests a card and a
+server): `internet.*` settings, each request taking them as it starts (`InternetLimits`). Its events wait in the card with a handshake (a full card pauses the
 download), and the kernel caps what it holds unread.
 
 ### Network cards

@@ -6,15 +6,16 @@ import java.util.Set;
 import java.util.function.IntSupplier;
 
 /**
- * A bus-powered device's power, like a USB device's: it has power while at least one running
- * computer has it on its bus (its suppliers), and goes dark when the last one lets go. Nothing
- * here ticks: power comes and goes on events (power on and off, hot-plug, a computer unloading),
- * and what the device used is settled lazily.
+ * A bus-powered device's power, like a USB device's: it has power while a running computer has it
+ * on its bus (its supplier), and goes dark when that one lets go. Nothing here ticks: power comes
+ * and goes on events (power on and off, hot-plug, a computer unloading), and what the device used
+ * is settled lazily.
  * <p>
- * What it uses is a debt, in power units: its draw for every
- * tick it's had power, plus whatever its work cost ({@link #charge}). The first supplier to
- * {@link #collect} pays all of it; whoever comes next owes only what's new. Which computer pays
- * a shared device is a race, and doesn't matter.
+ * What it uses is a debt, in power units: its draw for every tick it's had power, plus whatever
+ * its work cost ({@link #charge}), paid by its supplier at {@link #collect}. A device is on one bus
+ * at a time ({@link BusHolds}: a board's layout leaves out what another board holds), so it has one
+ * supplier, and no two computers ever share its debt. Its suppliers are still kept as a set, which
+ * {@code BusHolds} leaves one at most: a supply and a release each come from the board holding it.
  */
 public final class BusPower {
 	/** What it uses each tick it has power: read as it's settled, so a setting changed reaches it. */

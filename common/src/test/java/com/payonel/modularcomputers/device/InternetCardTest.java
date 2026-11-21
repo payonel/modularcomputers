@@ -224,4 +224,46 @@ class InternetCardTest {
 			web.stop(0);
 		}
 	}
+
+	/**
+	 * How many requests a card has open, and the server runs, are settings (the user's, 2026-11-21:
+	 * internet.requests_per_card, internet.requests_per_server), and a request past either is refused
+	 * saying the max set. A request this card has open stays open till it's closed, however it went
+	 * (the default policy refuses its address as it runs); one that's running (a server that takes it
+	 * and never answers) runs till then too.
+	 */
+	@Test
+	@ResourceLock("InternetCard.policy")
+	void aRequestPastTheCountsSetIsRefusedSayingTheMaxSet() throws Exception {
+		java.util.Properties set = new java.util.Properties();
+		set.setProperty("internet.requests_per_card", "2");
+		try (java.net.ServerSocket quiet = new java.net.ServerSocket(0, 1, InetAddress.getLoopbackAddress())) { // (never answers)
+			assertThat(com.payonel.modularcomputers.config.ModConfig.apply(set)).isEmpty();
+			InternetCard card = new InternetCard();
+			card.accepting(true); // (as on a running computer's bus: it takes data)
+			List<Long> handles = new java.util.ArrayList<>();
+			for (int i = 0; i < 2; i++) {
+				handles.add((Long) card.request(args("http://127.0.0.1:1/")).first()); // (refused as it runs: open till closed)
+			}
+			var full = card.request(args("http://127.0.0.1:1/"));
+			assertThat(full.failed()).isTrue();
+			assertThat(full.failure().table()).isEqualTo(Map.of("why", "limit", "of", "open_requests", "max", 2L));
+			handles.forEach(handle -> card.close(args(handle)));
+
+			set.setProperty("internet.requests_per_server", "1");
+			assertThat(com.payonel.modularcomputers.config.ModConfig.apply(set)).isEmpty();
+			InternetCard.policyFrom(() -> new InternetPolicy(true, List.of("127.0.0.1"), List.of()));
+			String url = "http://127.0.0.1:" + quiet.getLocalPort() + "/";
+			var first = card.request(args(url)); // (running, or refused if another's still is: either way, one runs now)
+			var next = card.request(args(url));
+			assertThat(next.failed()).isTrue();
+			assertThat(next.failure().table()).isEqualTo(Map.of("why", "limit", "of", "server_requests", "max", 1L));
+			if (!first.failed()) {
+				card.close(args(first.first()));
+			}
+		} finally {
+			InternetCard.policyFrom(() -> InternetPolicy.DEFAULT);
+			com.payonel.modularcomputers.config.ModConfig.apply(new java.util.Properties());
+		}
+	}
 }

@@ -24,6 +24,7 @@ import java.util.Map;
 public final class CraftingCard extends Card implements Buffered {
 	/** The crafting grid's slots (1 to 9, its rows left to right, top to bottom), and the storage's after them (10 on). */
 	public static final int GRID = 9;
+	/** Its storage's slots: fixed, not a setting, as the card's panel (its tab in a computer's view, {@code CaseMenu}) is drawn for this many, four rows of four under its grid. */
 	public static final int STORAGE = 16;
 	public static final int SLOTS = GRID + STORAGE;
 	/** How long a craft takes, in ticks: its robot's hands at the grid, as quick as a player's click at a crafting table. */

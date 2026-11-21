@@ -16,7 +16,7 @@ because a program's Lua cannot do TLS.
 | Address | An expansion slot path such as `exp:0` |
 | Interrupt | Raised while a request has news for the program |
 | Power | A little at rest (a server setting: see [Settings](/settings/#power-draw)); each request, and each 4 KiB of a body read, costs power (a server setting: see [Settings](/settings/#power-cost)) |
-| Limits | 4 requests open per card, 64 on the server; a server-set amount of a body waits unread per request ([Settings](/settings/#internet)); a request body of at most 1 MiB |
+| Limits | How many requests are open per card and on the server, how much of a body waits unread per request, how big a request's body may be, and its timeouts: server settings ([Settings](/settings/#internet)) |
 | Info | `kind` (`internet`) |
 
 </div>
@@ -38,9 +38,10 @@ response's body each request holds unread before its download waits for the prog
 settings: see [Settings](/settings/#internet)). When it is off, `request` fails with
 `{why = "denied", reason = "disabled", value = ""}`.
 
-Timeouts: 10 seconds to connect, 30 with nothing read, 10 minutes in all. The status line and
-headers together are at most 64 KiB. The methods are `GET`, `HEAD`, `POST`, `PUT`, `DELETE`, `PATCH`
-and `OPTIONS`.
+A request has timeouts: to connect, waiting with nothing read, and in all; and a response's status
+line and headers together have a most they may take. Each is a server setting (see
+[Settings](/settings/#internet)); past one, the request fails (`timed_out`, `headers_too_long`). The
+methods are `GET`, `HEAD`, `POST`, `PUT`, `DELETE`, `PATCH` and `OPTIONS`.
 
 ## In mcos
 
@@ -88,12 +89,12 @@ server's own error (Java's) never reaches a program; it goes to the server's log
 |---|---|---|
 | `bad_argument` | `argument` (its position), `value` (as given), `expected`: `url`, `http`, `host`, `method`, `header` or `handle` | a request can't be made of it, or a handle names no open request |
 | `denied` | `reason`, `value` (what was refused) | not allowed: `disabled` (the card is off, `""`), `credentials` (the URL), `reserved_header` (the header), or the address judged (`"127.0.0.1"`): `admin` (the operator's deny list), `loopback`, `private`, `link_local`, `shared`, `reserved`, `multicast`, `unspecified`, `documentation`, `teredo` |
-| `limit` | `of`, `max` | `open_requests` (the card's 4), `body` (1048576 bytes), `server_requests` (64, every card on the server) |
+| `limit` | `of`, `max` | `open_requests` (the card's), `body` (its `max` in bytes), `server_requests` (every card's on the server); each `max` the server's setting as it is ([Settings](/settings/#internet)) |
 | `network` | `reason`, `message` (that reason's words) | in transit: `unknown_host` ("host not found"), `connection_refused` ("connection refused"), `timed_out` ("timed out"), `tls` ("secure connection failed"), `connection_lost` ("connection lost"); or the answer was bad: `not_http` ("not an HTTP response"), `bad_content_length` ("bad Content-Length"), `bad_chunk` ("bad chunked encoding"), `closed_early` ("connection closed early"), `headers_too_long` ("response headers too long") |
 | `fault` | `condition`, `part`, `message` | the card itself failed: `internal_error`, part `internet` ("internal error") |
 
 ```lua
-local full = {why = "limit", of = "open_requests", max = 4}
+local full = {why = "limit", of = "open_requests", max = 4} -- (max: the server's setting, here its default)
 local tls = {why = "network", reason = "tls", message = "secure connection failed"}
 ```
 
@@ -132,7 +133,7 @@ Reading costs power by the 4 KiB.
 ### close(handle) → nothing
 
 Stops a request: its connection closes and what it had waiting goes. A program closes every request
-it makes, finished or not: a card has only 4. In mcos, a request still open when the file it was
+it makes, finished or not: a card has only so many ([Settings](/settings/#internet)). In mcos, a request still open when the file it was
 made through closes (its program ended, or crashed) is closed with it, as closing a socket closes
 its connection.
 

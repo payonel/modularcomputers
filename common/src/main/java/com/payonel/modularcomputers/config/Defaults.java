@@ -301,9 +301,23 @@ public final class Defaults {
 			private RingDepth() {
 			}
 		}
+
+		/** The motion sensor card's looks at the world. */
+		public static final class MotionSensor {
+			/** How often it looks for creatures that moved, in ticks: four times a second. */
+			public static final int INTERVAL = 5;
+			/**
+			 * How far a creature must have moved since its last look to be an event, in blocks, along
+			 * any one axis: a tenth of a block. 0 makes every creature it sees at a look an event.
+			 */
+			public static final double THRESHOLD = 0.1;
+
+			private MotionSensor() {
+			}
+		}
 	}
 
-	/** The internet card's reach and buffers. */
+	/** The internet card's reach, buffers and limits. */
 	public static final class Internet {
 		/** Whether internet cards work at all. */
 		public static final boolean ENABLED = true;
@@ -313,6 +327,20 @@ public final class Defaults {
 		public static final String DENY = "";
 		/** How much of a response's body a request holds unread before its download waits, in KiB. */
 		public static final int RESPONSE_BUFFER_KIB = 64;
+		/** How long a request may take to connect, in seconds. */
+		public static final double CONNECT_TIMEOUT = 10;
+		/** How long a request may wait with nothing read, in seconds. */
+		public static final double READ_TIMEOUT = 30;
+		/** How long a request may take in all, in seconds, time its download waits for room counted: ten minutes (a server dripping a byte a while can't keep its thread for ever). */
+		public static final double REQUEST_TIMEOUT = 600;
+		/** The most a response's status line and headers may take together, in KiB. */
+		public static final int MAX_HEADER_KIB = 64;
+		/** The most a request's own body (an upload) may be, in KiB: 1 MiB. */
+		public static final int MAX_UPLOAD_KIB = 1024;
+		/** How many requests a card has open at once. */
+		public static final int REQUESTS_PER_CARD = 4;
+		/** How many requests run at once on the whole server, every card's: however many computers players build, their threads are bounded. */
+		public static final int REQUESTS_PER_SERVER = 64;
 
 		private Internet() {
 		}

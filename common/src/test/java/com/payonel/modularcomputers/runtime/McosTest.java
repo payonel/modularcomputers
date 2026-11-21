@@ -714,7 +714,7 @@ class McosTest extends McosHarness {
 			out:write(entry.event, " ", tostring(entry.ok), " ", entry.method, " ", entry.url, " ", entry.why, " ", entry.reason, " ", entry.value, " ",
 			  entry.call.args[1], " ", entry.call.progress.status, " ", tostring(entry.failure), "\\n")
 			out:close()
-			""".formatted(com.payonel.modularcomputers.device.InternetCard.MAX_OPEN));
+			""".formatted(com.payonel.modularcomputers.config.ModConfig.internetLimits().perCard()));
 		boot();
 		type("lua /fail.lua 2> /err; touch /done\r");
 		untilFile(root().resolve("done"), "");
@@ -725,7 +725,7 @@ class McosTest extends McosHarness {
 			nil denied loopback 127.0.0.2
 			bad_argument 1 999 handle
 			request false GET http://127.0.0.2:1/ denied loopback 127.0.0.2 http://127.0.0.2:1/ 0 nil
-			""".formatted(com.payonel.modularcomputers.device.InternetCard.MAX_OPEN));
+			""".formatted(com.payonel.modularcomputers.config.ModConfig.internetLimits().perCard()));
 	}
 
 	/**
@@ -765,7 +765,7 @@ class McosTest extends McosHarness {
 				  assert(sys.ioctl(card, "request", "%s"))
 				end
 				-- (ends without closing them)
-				""".formatted(com.payonel.modularcomputers.device.InternetCard.MAX_OPEN, url));
+				""".formatted(com.payonel.modularcomputers.config.ModConfig.internetLimits().perCard(), url));
 			file("again.lua", """
 				local sys = require("sys")
 				local card = assert(sys.open("/dev/internet0"))

@@ -168,7 +168,9 @@ class ModConfigTest {
 			"power.battery.tier2.duration: 20\n", "power.battery.tier3.duration: 0\n", "power.battery.tier2.recharge_rate: 0.5\n",
 			"power.rate.charging_pad: 10\n", "power.cost.network.wireless_send_per_block: 0.0625\n", "power.cost.terminal.write: 0.01\n",
 			"device.ring_depth.all: 512\n", "internet.enabled: true\n", "internet.allow:\n", "internet.deny:\n",
-			"internet.response_buffer_kib: 64\n", "robot.pathfinding_range: 96\n", "power.cost.robot.walk: 1\n", "power.cost.robot.turn: 1\n",
+			"internet.response_buffer_kib: 64\n", "internet.connect_timeout: 10\n", "internet.read_timeout: 30\n", "internet.request_timeout: 600\n",
+			"internet.max_header_kib: 64\n", "internet.max_upload_kib: 1024\n", "internet.requests_per_card: 4\n", "internet.requests_per_server: 64\n",
+			"device.motion_sensor.interval: 5\n", "device.motion_sensor.threshold: 0.1\n", "robot.pathfinding_range: 96\n", "power.cost.robot.walk: 1\n", "power.cost.robot.turn: 1\n",
 			"power.cost.robot.hand: 1\n", "power.cost.robot.thrusters: 5\n");
 		assertThat(BatteryTier.TIER_2.rechargeRate()).isEqualTo(0.5);
 		assertThat(BatteryTier.TIER_1.days()).isEqualTo(10);
@@ -234,6 +236,52 @@ class ModConfigTest {
 		Files.writeString(file(), Files.readString(file()).replace("robot.turn_speed: 45", "robot.turn_speed: 0"));
 		assertThat(ModConfig.load(file())).anyMatch(warning -> warning.startsWith("robot.turn_speed"));
 		assertThat(ModConfig.turnSpeed()).isEqualTo(18);
+	}
+
+	/**
+	 * How often a motion sensor looks and how far a creature must move to count are settings (the
+	 * user's, 2026-11-21): 5 ticks and a tenth of a block by default; set, those; 0 is a threshold (every
+	 * creature seen), not an interval, which is a whole count.
+	 */
+	@Test
+	void theMotionSensorsLookIsASetting() {
+		assertThat(ModConfig.motionSensorInterval()).isEqualTo(5);
+		assertThat(ModConfig.motionSensorThreshold()).isEqualTo(0.1);
+		assertThat(ModConfig.apply(props("device.motion_sensor.interval", "20", "device.motion_sensor.threshold", "0"))).isEmpty();
+		assertThat(ModConfig.motionSensorInterval()).isEqualTo(20);
+		assertThat(ModConfig.motionSensorThreshold()).isZero();
+		List<String> warnings = ModConfig.apply(props("device.motion_sensor.interval", "0", "device.motion_sensor.threshold", "-1"));
+		assertThat(warnings).hasSize(2).anySatisfy(warning -> assertThat(warning).startsWith("device.motion_sensor.interval should be a whole count"))
+			.anySatisfy(warning -> assertThat(warning).startsWith("device.motion_sensor.threshold should be a number of blocks, 0 or more"));
+		assertThat(ModConfig.motionSensorInterval()).isEqualTo(5);
+		assertThat(ModConfig.motionSensorThreshold()).isEqualTo(0.1);
+		assertThat(ModConfig.apply(props("device.motion_sensor.interval", "2.5"))).hasSize(1);
+		assertThat(ModConfig.motionSensorInterval()).isEqualTo(5);
+	}
+
+	/**
+	 * The internet card's limits are settings (the user's, 2026-11-21), in an admin's units: its
+	 * timeouts in seconds (more than 0, fractions too), its sizes in KiB and its counts, whole, 1 or
+	 * more; their defaults today's, a value set what a request is held to.
+	 */
+	@Test
+	void theInternetCardsLimitsAreSettings() {
+		assertThat(ModConfig.internetLimits()).as("today's").isEqualTo(new com.payonel.modularcomputers.internet.InternetLimits(10_000, 30_000,
+			600_000_000_000L, 64 * 1024, 1024 * 1024, 4, 64));
+		assertThat(ModConfig.apply(props("internet.connect_timeout", "2.5", "internet.read_timeout", "5", "internet.request_timeout", "60",
+			"internet.max_header_kib", "8", "internet.max_upload_kib", "16", "internet.requests_per_card", "2", "internet.requests_per_server", "10")))
+			.isEmpty();
+		assertThat(ModConfig.internetLimits()).isEqualTo(new com.payonel.modularcomputers.internet.InternetLimits(2500, 5000, 60_000_000_000L,
+			8 * 1024, 16 * 1024, 2, 10));
+		List<String> warnings = ModConfig.apply(props("internet.connect_timeout", "0", "internet.read_timeout", "-1", "internet.request_timeout", "soon",
+			"internet.max_header_kib", "0", "internet.max_upload_kib", "1.5", "internet.requests_per_card", "0", "internet.requests_per_server", "-3"));
+		assertThat(warnings).hasSize(7);
+		assertThat(warnings.subList(0, 3)).allSatisfy(warning -> assertThat(warning).contains("should be a number of seconds more than 0"));
+		assertThat(ModConfig.internetLimits()).as("bad: the defaults").isEqualTo(new com.payonel.modularcomputers.internet.InternetLimits(10_000,
+			30_000, 600_000_000_000L, 64 * 1024, 1024 * 1024, 4, 64));
+		ModConfig.apply(props("internet.request_timeout", "1e300", "internet.read_timeout", "0.0001"));
+		assertThat(ModConfig.internetLimits().requestNanos()).as("for ever, near enough: no deadline wraps round").isEqualTo(Long.MAX_VALUE / 2);
+		assertThat(ModConfig.internetLimits().readMillis()).as("never 0, a socket's for ever").isEqualTo(1);
 	}
 
 	@Test

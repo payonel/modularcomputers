@@ -5,6 +5,7 @@ import com.payonel.modularcomputers.bus.DeviceType;
 import com.payonel.modularcomputers.device.InternetCard;
 import com.payonel.modularcomputers.device.RingDepths;
 import com.payonel.modularcomputers.entity.GolemWayfinder;
+import com.payonel.modularcomputers.internet.InternetLimits;
 import com.payonel.modularcomputers.internet.InternetPolicy;
 import com.payonel.modularcomputers.platform.Platform;
 import com.payonel.modularcomputers.power.BatteryTier;
@@ -105,10 +106,19 @@ public final class ModConfig {
 	public static final Setting TERMINAL_WRITE = new Setting("power.cost.terminal.write", Defaults.Power.Cost.Terminal.WRITE);
 	/** Every device's ring depth; a type's own is opt-in ({@link #ringDepthKey}), with no default of its own: this. */
 	public static final Setting RING_DEPTH = new Setting("device.ring_depth.all", Defaults.Device.RingDepth.ALL);
+	public static final Setting MOTION_SENSOR_INTERVAL = new Setting("device.motion_sensor.interval", Defaults.Device.MotionSensor.INTERVAL);
+	public static final Setting MOTION_SENSOR_THRESHOLD = new Setting("device.motion_sensor.threshold", Defaults.Device.MotionSensor.THRESHOLD);
 	public static final Setting INTERNET_ENABLED = new Setting("internet.enabled", Defaults.Internet.ENABLED);
 	public static final Setting INTERNET_ALLOW = new Setting("internet.allow", Defaults.Internet.ALLOW);
 	public static final Setting INTERNET_DENY = new Setting("internet.deny", Defaults.Internet.DENY);
 	public static final Setting INTERNET_RESPONSE_BUFFER = new Setting("internet.response_buffer_kib", Defaults.Internet.RESPONSE_BUFFER_KIB);
+	public static final Setting INTERNET_CONNECT_TIMEOUT = new Setting("internet.connect_timeout", Defaults.Internet.CONNECT_TIMEOUT);
+	public static final Setting INTERNET_READ_TIMEOUT = new Setting("internet.read_timeout", Defaults.Internet.READ_TIMEOUT);
+	public static final Setting INTERNET_REQUEST_TIMEOUT = new Setting("internet.request_timeout", Defaults.Internet.REQUEST_TIMEOUT);
+	public static final Setting INTERNET_MAX_HEADER = new Setting("internet.max_header_kib", Defaults.Internet.MAX_HEADER_KIB);
+	public static final Setting INTERNET_MAX_UPLOAD = new Setting("internet.max_upload_kib", Defaults.Internet.MAX_UPLOAD_KIB);
+	public static final Setting INTERNET_REQUESTS_PER_CARD = new Setting("internet.requests_per_card", Defaults.Internet.REQUESTS_PER_CARD);
+	public static final Setting INTERNET_REQUESTS_PER_SERVER = new Setting("internet.requests_per_server", Defaults.Internet.REQUESTS_PER_SERVER);
 	public static final Setting PATHFINDING_RANGE = new Setting("robot.pathfinding_range", Defaults.Robot.PATHFINDING_RANGE);
 	public static final Setting TURN_SPEED = new Setting("robot.turn_speed", Defaults.Robot.TURN_SPEED);
 	/** Where a type's own ring depth is: this, then its /sys class's name ({@code device.ring_depth.robotics}). */
@@ -221,7 +231,13 @@ public final class ModConfig {
 				# card's frames wait as many. device.ring_depth.all is every device's; a type sets its own with
 				# device.ring_depth.<type> (device.ring_depth.robotics, .redstone, .motion, .network...), which
 				# isn't set unless you add it. Each a whole count, 1 or more.
-				""", List.of(RING_DEPTH)))),
+				""", List.of(RING_DEPTH)),
+			new Block("""
+				# A motion sensor: how often it looks for creatures that moved, in ticks (a tick is a twentieth of a
+				# second; a whole count, 1 or more), and how far one must have moved since its last look to be an
+				# event, in blocks along any one way (a number, 0 or more; 0 makes every creature it sees at each
+				# look an event, moved or not). A creature it didn't see at its last look is always one.
+				""", List.of(MOTION_SENSOR_INTERVAL, MOTION_SENSOR_THRESHOLD)))),
 		new Group("""
 			# internet: internet cards, HTTP and HTTPS requests from computers, made by this server. By default
 			# they reach only the public internet: never this machine (localhost), its network (10.x,
@@ -239,7 +255,22 @@ public final class ModConfig {
 			new Block("""
 				# How much of a response's body each request holds unread, in KiB, before its download waits for
 				# the program to read it. A whole count, 1 or more.
-				""", List.of(INTERNET_RESPONSE_BUFFER)))),
+				""", List.of(INTERNET_RESPONSE_BUFFER)),
+			new Block("""
+				# How long a request may take, in seconds: to connect; waiting with nothing read; and in all, from
+				# its start to its end, the time its download waits for the program counted. Each more than 0;
+				# fractions work. A request past one fails, timed out.
+				""", List.of(INTERNET_CONNECT_TIMEOUT, INTERNET_READ_TIMEOUT, INTERNET_REQUEST_TIMEOUT)),
+			new Block("""
+				# How big, in KiB: the most a response's status line and headers may take together (past it, the
+				# request fails); the most a request's own body may be (an upload: past it, the request isn't
+				# made). Each a whole count, 1 or more.
+				""", List.of(INTERNET_MAX_HEADER, INTERNET_MAX_UPLOAD)),
+			new Block("""
+				# How many requests may be open at once: on one card, and running on the whole server (every
+				# card's: each runs on a thread of its own). Past either, a request isn't made. Each a whole
+				# count, 1 or more.
+				""", List.of(INTERNET_REQUESTS_PER_CARD, INTERNET_REQUESTS_PER_SERVER)))),
 		new Group("""
 			# robot: the bot golem (what its robotics costs is power.cost.robot).
 			""", List.of(
@@ -257,6 +288,8 @@ public final class ModConfig {
 
 	/** The internet's settings, as last loaded (the server's: clients never use them). */
 	private static volatile InternetPolicy internet = InternetPolicy.DEFAULT;
+	/** Internet cards' timeouts, sizes and counts, as last loaded (the server's). */
+	private static volatile InternetLimits internetLimits = internetLimits(new Values(new Properties()));
 	/** What actions cost and blocks give, as last loaded. */
 	private static volatile PowerCosts costs = costs(new Values(new Properties()));
 	/** What devices draw, as last loaded (or as a server sent them, on its players' games). */
@@ -270,6 +303,25 @@ public final class ModConfig {
 
 	public static double turnSpeed() {
 		return turnSpeed;
+	}
+
+	/** How often a motion sensor looks, in ticks, and how far a creature must move to count, in blocks, as last loaded. */
+	private static volatile int motionSensorInterval = Defaults.Device.MotionSensor.INTERVAL;
+	private static volatile double motionSensorThreshold = Defaults.Device.MotionSensor.THRESHOLD;
+
+	/** How often a motion sensor looks for creatures that moved, in ticks: read at each tick, so a reload reaches sensors placed. */
+	public static int motionSensorInterval() {
+		return motionSensorInterval;
+	}
+
+	/** How far a creature must have moved since a motion sensor's last look to be an event, in blocks along any one way. */
+	public static double motionSensorThreshold() {
+		return motionSensorThreshold;
+	}
+
+	/** Internet cards' timeouts, sizes and counts, as last loaded: each request takes them as it starts. */
+	public static InternetLimits internetLimits() {
+		return internetLimits;
 	}
 
 	public static InternetPolicy internet() {
@@ -345,13 +397,11 @@ public final class ModConfig {
 		RingDepths.configure(ringDepths(values));
 		CpuCores.configure(values.count(CPU_CORES));
 		GolemWayfinder.configure(values.count(PATHFINDING_RANGE));
-		double turning = values.number(TURN_SPEED, "a number of degrees more than 0");
-		if (turning <= 0) {
-			values.bad(TURN_SPEED, "a number of degrees more than 0");
-			turning = Defaults.Robot.TURN_SPEED;
-		}
-		turnSpeed = turning;
+		turnSpeed = values.positive(TURN_SPEED, "a number of degrees more than 0");
+		motionSensorInterval = values.count(MOTION_SENSOR_INTERVAL);
+		motionSensorThreshold = values.number(MOTION_SENSOR_THRESHOLD, "a number of blocks, 0 or more");
 		InternetCard.responseBuffer(values.count(INTERNET_RESPONSE_BUFFER));
+		internetLimits = internetLimits(values);
 		internet = new InternetPolicy(values.flag(INTERNET_ENABLED), values.list(INTERNET_ALLOW), values.list(INTERNET_DENY));
 		costs = costs(values);
 		draws = draws(values);
@@ -367,6 +417,14 @@ public final class ModConfig {
 			PowerCosts.units(values.cost(CRAFTING_MOVE)), PowerCosts.units(values.cost(DISK_STATION_ACTION)), PowerCosts.units(values.cost(WIRED_SEND)),
 			PowerCosts.exact(values.cost(WIRELESS_SEND)), PowerCosts.units(values.cost(INTERNET_REQUEST)), PowerCosts.units(values.cost(INTERNET_DATA)),
 			PowerCosts.units(values.cost(TERMINAL_WRITE)), PowerCosts.units(values.cost(CHARGING_PAD_RATE)), PowerCosts.units(values.cost(PHOTOMASK_TURN)));
+	}
+
+	/** Internet cards' limits, from these values. */
+	private static InternetLimits internetLimits(Values values) {
+		String seconds = "a number of seconds more than 0";
+		return InternetLimits.of(values.positive(INTERNET_CONNECT_TIMEOUT, seconds), values.positive(INTERNET_READ_TIMEOUT, seconds),
+			values.positive(INTERNET_REQUEST_TIMEOUT, seconds), values.count(INTERNET_MAX_HEADER), values.count(INTERNET_MAX_UPLOAD),
+			values.count(INTERNET_REQUESTS_PER_CARD), values.count(INTERNET_REQUESTS_PER_SERVER));
 	}
 
 	/** What devices draw, from these values. */
@@ -432,6 +490,16 @@ public final class ModConfig {
 			}
 			bad(setting, what);
 			return fallback;
+		}
+
+		/** A number more than 0, or its default (with a warning) if it isn't. */
+		double positive(Setting setting, String what) {
+			double number = number(setting, what);
+			if (number <= 0) {
+				bad(setting, what);
+				return ((Number) setting.fallback()).doubleValue();
+			}
+			return number;
 		}
 
 		/** A power cost or rate: running CPUs' ticks, 0 or more. */

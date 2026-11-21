@@ -1,7 +1,7 @@
 -- Mirror a list of files from a web server into a folder, several downloads at once.
 --
--- A card has up to 4 requests open at a time. Each is started with the request method and its
--- handle kept; then one loop waits for the card's news (its file's PRI) and asks every open
+-- A card has only so many requests open at once (a server setting); this keeps 4. Each is
+-- started with the request method and its handle kept; then one loop waits for the card's news (its file's PRI) and asks every open
 -- request for what it has: its response first (false: not yet), then pieces of its body
 -- (false: none yet; "": its end). A download whose file is full of unread pieces waits for the
 -- program, so nothing is lost however slowly it goes.
@@ -10,7 +10,7 @@
 local sys = require("sys")
 
 local CARD = "/dev/internet0"
-local OPEN = 4 -- requests open at once: the card's most
+local OPEN = 4 -- requests open at once: a card's most, at the setting's default
 local PIECE = 4096 -- the most one read of a body takes
 
 local base, folder = arg[1], arg[2]

@@ -40,11 +40,11 @@ tier 2 also recharges itself while the computer isn't running anything.
 
 ## Bus-powered devices
 
-Cards and cabled devices are powered like a USB device is: a device has power while at least one
-running computer has it on its [bus](/concepts/bus/), and goes dark when the last one lets go. What
-it used is a debt, settled lazily: every 20 ticks, or at an event such as a power-on or a hot-plug.
-The first computer to look pays the whole debt, and any other computer owes only what's new. Which
-computer pays a shared device is a race, and doesn't matter.
+Cards and cabled devices are powered like a USB device is: a device has power while a running
+computer has it on its [bus](/concepts/bus/), and goes dark when that computer lets go. What it used
+is a debt, settled lazily: every 20 ticks, or at an event such as a power-on or a hot-plug, and that
+computer pays it. A device is on [one computer's bus at a time](/concepts/bus/#one-bus-at-a-time),
+so one computer always pays for it.
 
 Work costs power too. A [Disk Station](/devices/disk-station/)'s format, clone or install is paid
 from the bus's power while a running computer supplies it, and from its battery

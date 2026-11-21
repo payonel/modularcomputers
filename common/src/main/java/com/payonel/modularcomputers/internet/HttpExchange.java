@@ -36,20 +36,11 @@ import javax.net.ssl.SSLSocketFactory;
  * follows a redirect (the program does, so each hop is judged again). The response comes to the
  * {@link Listener} as it's read: its status and headers, then its body in pieces, each handed over
  * only when the card has room (a full card stops the reading: TCP's own flow control), then its end
- * or why it failed. Limits: {@link #CONNECT_MILLIS} to connect, {@link #READ_MILLIS} with nothing
- * read, {@link #TOTAL_MILLIS} in all, {@link #MAX_HEADERS} bytes of headers.
+ * or why it failed. Its limits are the server's settings ({@link InternetLimits}, as the request
+ * starts): how long it may take to connect, to wait with nothing read and in all, and how many bytes
+ * its headers and its own body may be.
  */
 public final class HttpExchange implements Runnable {
-	/** How long connecting may take. */
-	public static final int CONNECT_MILLIS = 10_000;
-	/** How long a read may wait with nothing coming. */
-	public static final int READ_MILLIS = 30_000;
-	/** How long a request may take in all (a server dripping a byte a while can't keep its thread forever). */
-	public static final long TOTAL_MILLIS = 10 * 60_000;
-	/** The most a response's status line and headers may take, in bytes. */
-	public static final int MAX_HEADERS = 64 * 1024;
-	/** The most a request's body may be, in bytes. */
-	public static final int MAX_BODY = 1024 * 1024;
 	/** A piece of a response's body handed over at a time, at most. */
 	public static final int CHUNK = 4096;
 	/** What it says it is. */
@@ -110,26 +101,29 @@ public final class HttpExchange implements Runnable {
 	private final Map<String, String> headers;
 	private final byte[] body;
 	private final InternetPolicy policy;
+	private final InternetLimits limits;
 	private final Resolver resolver;
 	private final Listener listener;
 	private volatile Socket socket;
 	private volatile boolean closed;
-	/** When it must be done by (System.nanoTime), from its start. */
-	private long deadline;
+	/** When it started (System.nanoTime): it must be done within its limits' time in all from then. */
+	private long started;
 
-	private HttpExchange(URI uri, String method, Map<String, String> headers, byte[] body, InternetPolicy policy, Resolver resolver, Listener listener) {
+	private HttpExchange(URI uri, String method, Map<String, String> headers, byte[] body, InternetPolicy policy, InternetLimits limits,
+		Resolver resolver, Listener listener) {
 		this.uri = uri;
 		this.method = method;
 		this.headers = headers;
 		this.body = body;
 		this.policy = policy;
+		this.limits = limits;
 		this.resolver = resolver;
 		this.listener = listener;
 	}
 
 	/** A request, checked before any thread starts: why it can't be made, as an exception. */
-	public static HttpExchange of(String url, String method, Map<String, String> headers, byte[] body, InternetPolicy policy, Resolver resolver,
-		Listener listener) {
+	public static HttpExchange of(String url, String method, Map<String, String> headers, byte[] body, InternetPolicy policy, InternetLimits limits,
+		Resolver resolver, Listener listener) {
 		URI uri;
 		try {
 			uri = new URI(url);
@@ -145,8 +139,8 @@ public final class HttpExchange implements Runnable {
 		String verb = method == null ? (body == null ? "GET" : "POST") : method.toUpperCase(Locale.ROOT);
 		if (!METHODS.contains(verb)) {
 			throw new Refused(com.payonel.modularcomputers.runtime.Failure.badArgument(2, method, "method"));
-		} else if (body != null && body.length > MAX_BODY) {
-			throw new Refused(com.payonel.modularcomputers.runtime.Failure.limit("body", MAX_BODY));
+		} else if (body != null && body.length > limits.maxUploadBytes()) {
+			throw new Refused(com.payonel.modularcomputers.runtime.Failure.limit("body", limits.maxUploadBytes()));
 		}
 		Map<String, String> checked = new LinkedHashMap<>();
 		for (var header : headers.entrySet()) {
@@ -159,7 +153,7 @@ public final class HttpExchange implements Runnable {
 			}
 			checked.put(name, value);
 		}
-		return new HttpExchange(uri, verb, checked, body, policy, resolver, listener);
+		return new HttpExchange(uri, verb, checked, body, policy, limits, resolver, listener);
 	}
 
 	/** Stops it: its connection closes, and its thread ends. */
@@ -210,15 +204,15 @@ public final class HttpExchange implements Runnable {
 	/** The card's part, as an internal error names it (its device's type). */
 	private static final String PART = "internet";
 
-	/** Past its deadline: it ends. */
+	/** Past its time in all: it ends. */
 	private void inTime() throws IOException {
-		if (System.nanoTime() > deadline) {
+		if (System.nanoTime() - started > limits.requestNanos()) { // (elapsed, compared: a deadline added up could wrap round)
 			throw new java.net.SocketTimeoutException("timed out");
 		}
 	}
 
 	private void exchange() throws IOException, InterruptedException {
-		deadline = System.nanoTime() + TOTAL_MILLIS * 1_000_000;
+		started = System.nanoTime();
 		String host = uri.getHost().startsWith("[") ? uri.getHost().substring(1, uri.getHost().length() - 1) : uri.getHost();
 		List<InetAddress> addresses = resolver.resolve(host);
 		com.payonel.modularcomputers.runtime.Failure refused = policy.refused(host, addresses);
@@ -233,8 +227,8 @@ public final class HttpExchange implements Runnable {
 		if (closed) {
 			return;
 		}
-		plain.connect(new InetSocketAddress(addresses.getFirst(), port), CONNECT_MILLIS); // (the address it judged: no second lookup)
-		plain.setSoTimeout(READ_MILLIS);
+		plain.connect(new InetSocketAddress(addresses.getFirst(), port), limits.connectMillis()); // (the address it judged: no second lookup)
+		plain.setSoTimeout(limits.readMillis());
 		Socket open = plain;
 		if (tls) {
 			SSLSocket secure = (SSLSocket) ((SSLSocketFactory) SSLSocketFactory.getDefault()).createSocket(plain, host, port, true);
@@ -284,7 +278,7 @@ public final class HttpExchange implements Runnable {
 	}
 
 	private void response(InputStream in) throws IOException, InterruptedException {
-		int[] budget = {MAX_HEADERS};
+		int[] budget = {limits.maxHeaderBytes()};
 		String statusLine;
 		int status;
 		Map<String, String> fields;

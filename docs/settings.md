@@ -121,6 +121,8 @@ What devices' actions cost, in running CPU ticks.
 |---|---|---|---|
 | `device.ring_depth.all` | `512` | Every device's [ring depth](/concepts/interrupts/#no-end-is-ever-lost): how many of its news events it keeps (the oldest go when more come), and how many of its commands' ends wait unread before it refuses its next command. A network card's frames wait as many. | a whole number, 1 or more |
 | `device.ring_depth.<type>` | not set | One type's own ring depth, in place of `device.ring_depth.all` (see below). | a whole number, 1 or more |
+| `device.motion_sensor.interval` | `5` | How often a [motion sensor](/devices/motion-sensor/) looks for creatures that moved, in ticks (a tick is a twentieth of a second). | a whole number, 1 or more |
+| `device.motion_sensor.threshold` | `0.1` | How far a creature must have moved since a motion sensor's last look to be an event, in blocks along any one way (north and south, east and west, up and down). A creature it didn't see at its last look is always one. | a number, 0 or more; 0 makes every creature it sees at each look an event, moved or not |
 
 **A type's own ring depth is opt-in.** It isn't in the file: add a line for the type you want, named
 by its kind as `/sys/class` names it (`device.ring_depth.robotics`, `device.ring_depth.redstone`,
@@ -140,6 +142,13 @@ private and reserved ranges.
 | `internet.allow` | nothing | Hosts, domains or ranges reached though they'd be refused: a LAN service you mean computers to use. | a comma-separated list: hosts, domains (`.example.com`), ranges (`203.0.113.0/24`) |
 | `internet.deny` | nothing | Hosts, domains or ranges also refused. A deny wins over an allow. | a comma-separated list, as `internet.allow` |
 | `internet.response_buffer_kib` | `64` | How much of a response's body each request holds unread, in KiB, before its download waits for the program to read it. | a whole number, 1 or more |
+| `internet.connect_timeout` | `10` | How long a request may take to connect, in seconds. Past it, the request fails, `timed_out`. | a number more than 0 |
+| `internet.read_timeout` | `30` | How long a request may wait with nothing read from the server, in seconds. Past it, the request fails, `timed_out`. | a number more than 0 |
+| `internet.request_timeout` | `600` | How long a request may take in all, from its start to its end, in seconds, the time its download waits for the program to read counted. Past it, the request fails, `timed_out`. | a number more than 0 |
+| `internet.max_header_kib` | `64` | The most a response's status line and headers may take together, in KiB. Past it, the request fails, `headers_too_long`. | a whole number, 1 or more |
+| `internet.max_upload_kib` | `1024` | The most a request's own body (what it sends) may be, in KiB. Past it, the request isn't made: `limit`, `of = "body"`, its `max` this in bytes. | a whole number, 1 or more |
+| `internet.requests_per_card` | `4` | How many requests a card has open at once. Past it, a request isn't made: `limit`, `of = "open_requests"`. | a whole number, 1 or more |
+| `internet.requests_per_server` | `64` | How many requests run at once on the whole server, every card's (each runs on a thread of its own). Past it, a request isn't made: `limit`, `of = "server_requests"`. | a whole number, 1 or more |
 
 ## robot {#robot}
 

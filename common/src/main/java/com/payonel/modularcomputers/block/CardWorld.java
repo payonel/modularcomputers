@@ -38,10 +38,6 @@ public final class CardWorld {
 	/** An audio sensor's event: a sound heard, {event = "sound", name, at}. */
 	public static final String SOUND = "sound";
 
-	/** How often a motion sensor looks for entities that moved, in ticks. */
-	private static final int MOTION_TICKS = 5;
-	/** How far a mob must move to count. */
-	private static final double MOVED = 0.1;
 	/** A redstone card's faces as world directions, in its order ({@link RedstoneCard#SIDES}). */
 	public static final java.util.List<Direction> REDSTONE_FACES = java.util.List.of(Direction.NORTH, Direction.SOUTH, Direction.EAST,
 		Direction.WEST, Direction.UP, Direction.DOWN);
@@ -125,7 +121,7 @@ public final class CardWorld {
 				watch.pos = pos;
 				watch.frame = frame;
 				watch.seen = now;
-				if (now % MOTION_TICKS == 0) {
+				if (MotionSensorCard.looks(now, com.payonel.modularcomputers.config.ModConfig.motionSensorInterval())) {
 					entities(motion, watch);
 				}
 			}
@@ -204,6 +200,7 @@ public final class CardWorld {
 		int range = MotionSensorCard.RANGE;
 		AABB box = new AABB(watch.pos).inflate(range);
 		Map<UUID, double[]> now = new HashMap<>();
+		double threshold = com.payonel.modularcomputers.config.ModConfig.motionSensorThreshold();
 		// Living things, but its own computer (a golem: what holds the frame's middle), where they are by
 		// their middles (as the field card's scan says).
 		for (Entity entity : watch.level.getEntities((Entity) null, box, entity -> entity.isAlive() && entity instanceof LivingEntity
@@ -212,7 +209,7 @@ public final class CardWorld {
 			double[] at = {middle.x, middle.y, middle.z};
 			now.put(entity.getUUID(), at);
 			double[] was = watch.entities.get(entity.getUUID());
-			if (was != null && Math.abs(at[0] - was[0]) < MOVED && Math.abs(at[1] - was[1]) < MOVED && Math.abs(at[2] - was[2]) < MOVED) {
+			if (!MotionSensorCard.moved(was, at, threshold)) {
 				continue;
 			}
 			Map<String, Object> event = new LinkedHashMap<>();

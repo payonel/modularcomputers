@@ -3,6 +3,7 @@ package com.payonel.modularcomputers.device;
 import com.payonel.modularcomputers.bus.BusPower;
 import com.payonel.modularcomputers.bus.InterruptLine;
 import com.payonel.modularcomputers.internet.HttpExchange;
+import com.payonel.modularcomputers.internet.InternetLimits;
 import com.payonel.modularcomputers.internet.InternetPolicy;
 import com.payonel.modularcomputers.runtime.Arguments;
 import com.payonel.modularcomputers.runtime.Method;
@@ -26,7 +27,8 @@ import java.util.function.Supplier;
  * ({@link HttpExchange}, which keeps it to the public internet: {@link InternetPolicy}); its body
  * waits in the card, at most its setting's worth a request ({@code internet.response_buffer_kib}), and a request whose next piece
  * finds no room waits (the handshake: nothing dropped), so a download goes at the program's pace.
- * At most {@link #MAX_OPEN} requests at a time.
+ * At most so many requests at a time, a card and on the server ({@code internet.requests_per_card},
+ * {@code internet.requests_per_server}: {@link InternetLimits}, the server's settings).
  * <p>
  * Its stream ({@link #pull}) is its access log, as a web server's: each request as it ends, as a
  * command's end (the user's, 2026-11-05: a request is a command over time), its method and URL
@@ -36,10 +38,7 @@ import java.util.function.Supplier;
  * program closed it first; its call the arguments as given, a body cut to {@link #BODY_KEPT} bytes).
  */
 public final class InternetCard extends Card {
-	/** Requests open at once, a card. */
-	public static final int MAX_OPEN = 4;
-	/** And on the whole server: however many computers a player builds, its threads are bounded. */
-	public static final int MAX_RUNNING = 64;
+	/** Requests running on the whole server, every card's (bounded by {@link InternetLimits#perServer}: their threads). */
 	private static final java.util.concurrent.atomic.AtomicInteger RUNNING = new java.util.concurrent.atomic.AtomicInteger();
 	/** Bytes of a body a request holds unread, as last loaded ({@code internet.response_buffer_kib}: a data buffer, its own setting). */
 	private static volatile int bodyBytes = bytes(com.payonel.modularcomputers.config.Defaults.Internet.RESPONSE_BUFFER_KIB);
@@ -135,10 +134,12 @@ public final class InternetCard extends Card {
 	public Result request(Arguments args) {
 		if (!policy.get().enabled()) {
 			return Result.fail(com.payonel.modularcomputers.runtime.Failure.denied("disabled", ""));
-		} else if (open.size() >= MAX_OPEN) {
-			return Result.fail(com.payonel.modularcomputers.runtime.Failure.limit("open_requests", MAX_OPEN));
-		} else if (RUNNING.get() >= MAX_RUNNING) {
-			return Result.fail(com.payonel.modularcomputers.runtime.Failure.limit("server_requests", MAX_RUNNING)); // (the server's, every card's: no device's news ends it, so not busy)
+		}
+		InternetLimits limits = com.payonel.modularcomputers.config.ModConfig.internetLimits(); // (the settings as the request starts)
+		if (open.size() >= limits.perCard()) {
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.limit("open_requests", limits.perCard()));
+		} else if (RUNNING.get() >= limits.perServer()) {
+			return Result.fail(com.payonel.modularcomputers.runtime.Failure.limit("server_requests", limits.perServer())); // (the server's, every card's: no device's news ends it, so not busy)
 		}
 		String url = args.checkString(0);
 		String method = args.get(1) instanceof String verb ? verb : null;
@@ -155,7 +156,7 @@ public final class InternetCard extends Card {
 		Request request = new Request(method != null ? method.toUpperCase(java.util.Locale.ROOT) : body == null ? "GET" : "POST", url,
 			java.util.Collections.unmodifiableList(given), body == null ? 0 : body.length);
 		try {
-			request.exchange = HttpExchange.of(url, method, headers, body, policy.get(), resolver, listener(handle, request));
+			request.exchange = HttpExchange.of(url, method, headers, body, policy.get(), limits, resolver, listener(handle, request));
 		} catch (com.payonel.modularcomputers.internet.HttpExchange.Refused e) {
 			return Result.fail(e.failure());
 		}

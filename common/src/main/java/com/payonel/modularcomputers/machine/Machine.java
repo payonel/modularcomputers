@@ -372,8 +372,8 @@ public final class Machine {
 	 * Power used since the last call, up to game time {@code now}, in power units:
 	 * the CPU's own (its tier's running draw for each tick it executed, its waiting draw for each
 	 * tick it waited for an interrupt) and what its bus
-	 * devices owe (see {@link BusPower}; a device shared with another computer pays once, to
-	 * whichever collects first). Nothing while off.
+	 * devices owe (see {@link BusPower}; each is on this bus alone, {@link com.payonel.modularcomputers.bus.BusHolds},
+	 * so this machine pays all it owes). Nothing while off.
 	 */
 	public long powerUse(long now) {
 		if (!powered) {

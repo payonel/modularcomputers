@@ -21,9 +21,10 @@ where.
 
 </div>
 
-It has no settings. It keeps looking at every living entity in a box
-8 blocks around its block (players too; never the golem it's in), by their middles. An entity that has moved 0.1 of a block or more in any
-direction since the last look, or that it did not see last time, is an event. It works while a
+A program sets nothing on it. It keeps looking at every living entity in a box
+8 blocks around its block (players too; never the golem it's in), by their middles. An entity that has moved far enough in any
+direction since the last look, or that it did not see last time, is an event. How often it looks, and how far is far
+enough, are server settings (see [Settings](/settings/#device)). It works while a
 running computer powers it.
 
 ## In mcos

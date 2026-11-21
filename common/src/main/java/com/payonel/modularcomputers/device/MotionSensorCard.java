@@ -13,8 +13,9 @@ import java.util.Map;
  * mob ({@code mob}, its type: {@code "minecraft:pig"}) and where, in its computer's frame ({@code
  * forward, right, up}: a block's front and right as {@link Face} names them, a robot's heading and
  * its own right; as the energy field card's). Its events wait in a buffer of its own, as typed keys
- * do, until a program reads them, one each. It has no settings: finer kinds of motion (fluids, drops, filters) may make a
- * tier 2 (user, 2026-10-21).
+ * do, until a program reads them, one each. A program sets nothing on it: finer kinds of motion (fluids, drops, filters) may make a
+ * tier 2 (user, 2026-10-21). How often it looks and how far a creature must move are the server's
+ * settings ({@code device.motion_sensor.interval}, {@code .threshold}), read at each look.
  */
 public final class MotionSensorCard extends Card {
 	/** How far it looks, in blocks. */
@@ -22,6 +23,28 @@ public final class MotionSensorCard extends Card {
 	private final InterruptLine line = new InterruptLine();
 	private final EventQueue events = new EventQueue(com.payonel.modularcomputers.bus.DeviceType.MOTION, line, this::changed, this::isAccepting);
 	private final BusPower power = new BusPower(() -> com.payonel.modularcomputers.config.ModConfig.draws().motionSensor());
+
+	/** Whether a sensor looks this tick of the world's, looking every {@code interval} ticks (1 or more). */
+	public static boolean looks(long tick, int interval) {
+		return tick % interval == 0;
+	}
+
+	/**
+	 * Whether a creature at {@code at} ({x, y, z}) has moved since a look saw it at {@code was} (null:
+	 * not seen then, so it has): by {@code threshold} blocks or more along any one axis. A threshold
+	 * of 0 counts every creature seen, moved or not.
+	 */
+	public static boolean moved(double[] was, double[] at, double threshold) {
+		if (was == null) {
+			return true;
+		}
+		for (int axis = 0; axis < at.length; axis++) {
+			if (Math.abs(at[axis] - was[axis]) >= threshold) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 	public MotionSensorCard() {
 		super(CardKind.MOTION_SENSOR);
