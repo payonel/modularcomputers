@@ -18,7 +18,8 @@ different places in it.
 | `/run` | Another one, for services' pids; made by `/etc/rc` | Until the computer is turned off |
 | `/mnt/...` | Every other disk on the bus | On the disk |
 
-The kernel mounts the other disks by itself as they come and go, as udisks does. A disk in
+The kernel mounts the other disks by itself as they come and go (on Linux, udisks does that in user
+space, at `/media/<user>/<label>`; mcos names the place by where the disk is). A disk in
 `sata:1` appears at `/mnt/sata/1`; a disk known by its id, `id:<uuid>`, appears at
 `/mnt/id/<uuid>`. When a disk leaves the bus (its [Disk Station](/devices/disk-station/) is
 disconnected, say), it is unmounted, and files that were open on it fail with an I/O error.

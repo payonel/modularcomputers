@@ -27,7 +27,8 @@ local sys = require("sys")
   other processes run meanwhile. There is nothing to yield; the kernel stops and resumes the process
   (see [Persistence](/concepts/persistence/)).
 - **Files are descriptors.** `open` returns a small integer, `0`, `1` and `2` are standard input,
-  output and error. A process may hold 64.
+  output and error. A process may hold 64 (Linux usually allows 1024; each open file takes some of
+  the computer's RAM).
 - **Paths** are relative to the process's working directory, or absolute.
 - `sys` makes each wrapper the first time a program uses it, so a call you never make costs nothing.
 
@@ -68,8 +69,11 @@ The entries of an open directory, `{name, type}` each, where type is `"file"`, `
 `"link"`, `"device"` or `"fifo"`. Once.
 
 ### sys.pipe() → readfd, writefd
-A pipe. It holds 4096 bytes: a writer waits for room, a reader for data. The read end reads the end
-of file once every write end is closed.
+A pipe. It holds 4096 bytes (a Linux pipe holds 64 KiB; a computer's memory is its RAM): a writer
+waits for room, a reader for data. A write of at most 4096 bytes (POSIX's `PIPE_BUF`) is atomic:
+it waits until all of it fits, so it's never split around another writer's data; a larger one may
+be. So the write end is ready for `poll`'s `OUT` only with 4096 bytes free (empty), as Linux's is
+with `PIPE_BUF` free. The read end reads the end of file once every write end is closed.
 
 ### sys.isatty(fd) → boolean
 Whether the descriptor is a terminal.

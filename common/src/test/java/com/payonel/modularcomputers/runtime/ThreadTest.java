@@ -162,6 +162,59 @@ class ThreadTest extends McosHarness {
 		assertThat(read(root().resolve("out"))).isEqualTo("10 nil\n");
 	}
 
+	/**
+	 * POSIX's rule, as Linux keeps it: a write of at most PIPE_BUF bytes is atomic, never split
+	 * around another writer's data, so it waits for room for all of it; and a pipe polls writable
+	 * only with PIPE_BUF bytes free (a write it promises won't block). The pipe is filled to less room
+	 * than a second thread's write; once that thread is blocked in it, nothing of its write may be in
+	 * the pipe. The old pipe took what fit and waited with the rest (seen failing).
+	 */
+	@Test
+	void aWriteUpToPipeBufIsNeverSplit() {
+		String status = runFor("""
+			local thread = require("thread")
+			local sys = require("sys")
+			local r, w = sys.pipe()
+			local out = {}
+			out[#out + 1] = tostring(sys.write(w, string.rep("a", 4000))) -- (96 bytes of room left)
+			out[#out + 1] = tostring(next(sys.poll({[w] = {OUT = true}}, 0)) ~= nil) -- (not writable: less than PIPE_BUF free)
+			local writer = thread.create(function() return sys.write(w, string.rep("b", 200)) end)
+			while writer:status() ~= "suspended" do sys.sleep(0.05) end -- (blocked in its write)
+			local first = sys.read(r, 8192)
+			out[#out + 1] = #first .. " " .. select(2, first:gsub("b", ""))
+			local _, wrote = writer:join()
+			out[#out + 1] = tostring(wrote)
+			out[#out + 1] = tostring(sys.read(r, 8192) == string.rep("b", 200))
+			out[#out + 1] = tostring(next(sys.poll({[w] = {OUT = true}}, 0)) ~= nil) -- (empty: writable)
+			local f = io.open("/out", "w") f:write(table.concat(out, "\\n"), "\\n") f:close()
+			""");
+		assertThat(status).as(() -> "its errors: " + read(root().resolve("err"))).isEqualTo("0\n");
+		assertThat(read(root().resolve("out"))).isEqualTo(String.join("\n",
+			"4000", "false", "4000 0", "200", "true", "true") + "\n");
+	}
+
+	/**
+	 * A pty's terminal end polls writable only while a write to it wouldn't wait: with its master
+	 * holding all it holds unread, a write waits, so it isn't writable (Linux's n_tty_poll: write
+	 * room). It said writable whenever it wasn't hung up (seen failing).
+	 */
+	@Test
+	void aPtysTerminalEndIsntWritableWhileItsMasterIsFull() {
+		String status = runFor("""
+			local sys = require("sys")
+			local master, terminal = assert(sys.openpty())
+			local function writable() return tostring(next(sys.poll({[terminal] = {OUT = true}}, 0)) ~= nil) end
+			local out = {writable()}
+			sys.write(terminal, string.rep("x", 4096)) -- (all the master holds unread)
+			out[#out + 1] = writable()
+			out[#out + 1] = tostring(#sys.read(master, 8192))
+			out[#out + 1] = writable()
+			local f = io.open("/out", "w") f:write(table.concat(out, " "), "\\n") f:close()
+			""");
+		assertThat(status).as(() -> "its errors: " + read(root().resolve("err"))).isEqualTo("0\n");
+		assertThat(read(root().resolve("out"))).isEqualTo("true false 4096 true\n");
+	}
+
 	@Test
 	void theMainThreadEndingEndsItsThreads() {
 		String status = runFor("""

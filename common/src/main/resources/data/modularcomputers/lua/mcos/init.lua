@@ -36,7 +36,10 @@ local MODULES = "/lib/modules/" -- the kernel's own parts
 -- When init can't be started (its file missing or broken), how long before the kernel tries again.
 local RESPAWN_RETRY_TICKS = 100 -- 5 seconds
 local READ_SIZE = 4096 -- the most one read(2) of a file takes (a disk's most)
-local MAX_FDS = 64 -- file descriptors a process may hold (RLIMIT_NOFILE)
+-- File descriptors a process may hold: its RLIMIT_NOFILE, fixed. Linux's soft limit is 1024 by
+-- default (the kernel's, as systemd keeps it); mcos's is smaller, as each open file costs some of a
+-- computer's RAM, a few MiB in all.
+local MAX_FDS = 64
 local TICKS_PER_SECOND = 20
 local MOUNT_BASE = "/mnt" -- where disks found on the bus are mounted (sata:1 at /mnt/sata/1, id:x at /mnt/id/x)
 
@@ -1500,8 +1503,10 @@ vfs.mount("/dev", devfs, "devfs")
 vfs.mount("/sys", sysfs, "sysfs")
 vfs.mount("/tmp", tmpfs(), "tmpfs")
 
--- Disks on the bus, mounted as the kernel finds them (as udisks does: sata:1 at /mnt/sata/1, id:x at
--- /mnt/id/x) and unmounted as they go.
+-- Disks on the bus, mounted by the kernel itself as it finds them, and unmounted as they go: a disk
+-- in a slot at /mnt/<kind>/<n> (sata:1 at /mnt/sata/1), any other at /mnt/id/<its id>. (Linux's
+-- kernel mounts nothing by itself: udev and udisks do it in user space, at /media/<user>/<label>.
+-- mcos's kernel does it, with no daemon, at paths named by where a disk is, not its label.)
 local function hotplug()
   local present, mounted = {[root] = true}, {}
   for _, mount in ipairs(vfs.mounts) do

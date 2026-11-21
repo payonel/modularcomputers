@@ -5,7 +5,10 @@
 -- LINES, for eval. It talks to its terminal through /dev/tty, so its output can be redirected.
 local sys = require("sys")
 
-local ANSWER_SECONDS = 1 -- how long it waits for the terminal's answer
+-- How long it waits for the terminal's answer: xterm's resize's (resize.c's TIMEOUT, 3 seconds since
+-- xterm 379; 10 before). A terminal answers within a tick or so; this is only how long one with no
+-- answer takes to fail.
+local ANSWER_SECONDS = 3
 local SETTLE_SECONDS = 0.1 -- after it: more answers (every terminal in the console's group answers) are dropped
 local USAGE = "usage: resize [-s rows columns]\n"
 

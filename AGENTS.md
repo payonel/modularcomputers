@@ -1024,6 +1024,12 @@ Lessons from mistakes, each with its test:
   device's news stays pending till what it's about is taken. (`aLogEntryStaysPendingTillItsTaken...`)
 - **"None" isn't "done":** a method that answers nothing gives `true` through an ioctl, so one whose
   answer means none says nil (`Result.ok((Object) null)`). (`aMethodWhoseAnswerIsNone...`)
+- **A write up to PIPE_BUF is atomic** (POSIX's, as Linux keeps it): a pipe that took what fit and
+  waited with the rest split a short write around another writer's, so two writers' lines could mix.
+  A write of at most PIPE_BUF bytes waits until all of it fits; a larger one may be split. And a
+  file polls `OUT` only when a write wouldn't wait (a pipe with PIPE_BUF free, a pty whose master
+  isn't full): a buffer's poll and its write agree. (`aWriteUpToPipeBufIsNeverSplit`,
+  `aPtysTerminalEndIsntWritableWhileItsMasterIsFull`)
 - **Never drain and refill a bounded queue another thread fills:** keep what's left of an item
   beside the queue. (`readsSmallerThanAPiece...`)
 - **Edit by matching text, never by line numbers:** an earlier edit moves the lines.

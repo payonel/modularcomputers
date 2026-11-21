@@ -31,7 +31,11 @@ local DEFAULT_COLUMNS = 80
 local READ_SIZE = 256
 local GAP = 2 -- spaces between columns of completions
 local CSI = "\27["
-local REPORT_SECONDS = 0.5 -- how long the terminal has to say where its cursor is (no answer: column 0)
+-- How long the terminal has to say where its cursor is (no answer: column 0). xterm's resize waits
+-- this long for a terminal's answer (resize.c's TIMEOUT, 3 seconds since xterm 379; 10 before). A
+-- terminal answers within a tick or so; this is only how long a line with none waits.
+local REPORT_SECONDS = 3
+local REPORT_STEP = 0.1 -- (a poll's, while waiting: input meanwhile is kept, and the wait goes on)
 local KEYSEQ_SECONDS = 0.5 -- how long the rest of an escape sequence is waited for (GNU readline's keyseq-timeout)
 local KEYSEQ_STEP = 0.05 -- (a poll's, while waiting)
 local PASTE_START, PASTE_END = "\27[200~", "\27[201~" -- what a terminal wraps a paste in (bracketed paste)
@@ -185,9 +189,9 @@ function editor:read(shown)
     end
     io.stdout:write(CSI .. "6n")
     io.stdout:flush()
-    local got, waited, step = "", 0, REPORT_SECONDS / 5
+    local got, waited = "", 0
     while waited < REPORT_SECONDS do
-      if next(sys.poll({[0] = {IN = true}}, step) or {}) then
+      if next(sys.poll({[0] = {IN = true}}, REPORT_STEP) or {}) then
         got = got .. (sys.read(0, READ_SIZE) or "")
         local a, b, col = got:find("\27%[%d+;(%d+)R")
         if a then
@@ -195,7 +199,7 @@ function editor:read(shown)
           return (math.tointeger(tonumber(col)) or 1) - 1
         end
       else
-        waited = waited + step
+        waited = waited + REPORT_STEP
       end
     end
     pending = pending .. got

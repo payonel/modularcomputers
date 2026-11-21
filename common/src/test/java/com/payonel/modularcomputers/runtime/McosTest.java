@@ -2208,7 +2208,11 @@ class McosTest extends McosHarness {
 			    end
 			    local ready = sys.poll({[master] = {IN = true}}, 0.05)
 			    if ready[master] then
-			      shown = shown .. (sys.read(master) or "")
+			      local got = sys.read(master) or ""
+			      if got:find("\\27[6n", 1, true) then
+			        sys.write(master, "\\27[1;1R") -- (as a terminal: where its cursor is, for readline)
+			      end
+			      shown = shown .. got
 			    end
 			  end
 			  return false

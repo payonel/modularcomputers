@@ -55,7 +55,8 @@ function k.ttyfile(t)
     type = "tty",
     tty = t,
     events = function(self)
-      return {IN = #t.ready > 0 or t.hungup, OUT = not t.hungup, HUP = t.hungup}
+      -- (OUT only while a write wouldn't wait: a pty's master holding all it holds, it would)
+      return {IN = #t.ready > 0 or t.hungup, OUT = not t.hungup and not (t.full and t:full()), HUP = t.hungup}
     end,
     read = function(self, n, p, request)
       if t.hungup then

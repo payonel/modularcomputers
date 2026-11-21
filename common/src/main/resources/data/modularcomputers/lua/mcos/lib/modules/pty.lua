@@ -5,12 +5,16 @@
 -- terminal end is a tty file like any other (a shell on it is interactive; stty works).
 --
 -- A writer to the terminal end waits while the master holds BUFFER bytes unread (echo is taken
--- anyway). The master reads EIO once no file is open on the terminal end (its poll: HUP), as
--- Linux's. Closing the master hangs the line up: SIGHUP to its foreground group, and from then the
--- terminal end reads as ended and its writes fail (EIO).
+-- anyway), and its poll isn't OUT then. The master reads EIO once no file is open on the terminal
+-- end (its poll: HUP), as Linux's. Closing the master hangs the line up: SIGHUP to its foreground
+-- group, and from then the terminal end reads as ended and its writes fail (EIO).
 local k, vfs, tty = ...
 
-local BUFFER = 4096 -- what the master holds unread before a writer to the terminal end waits
+-- What the master holds unread before a writer to the terminal end waits (a write is taken whole
+-- below it, so a write to a pty is never split around another's). A Linux pty holds far more (the
+-- master's tty buffers: tens of KiB and up); mcos's holds 4 KiB, a pipe's worth, as a computer's
+-- memory is its RAM, a few MiB.
+local BUFFER = 4096
 
 local fail = vfs.fail
 
@@ -27,6 +31,9 @@ return function()
     return #text
   end)
   t.ends = 0 -- files open on the terminal end
+  function t:full() -- (a write to the terminal end would wait: its poll isn't OUT)
+    return held >= BUFFER
+  end
   function t:opened()
     self.ends = self.ends + 1
   end
