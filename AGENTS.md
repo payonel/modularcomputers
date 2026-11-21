@@ -790,8 +790,12 @@ recipe uses a disk up, and that disk's files go (`DiskUsingRecipe`, as crafting 
   own flow control) runs one command at a time; a command while one runs is refused `busy`
   at the board (the manual's layer 1, which can't wait: a board call freezes the whole program), and mcos blocks
   the calling thread only until the device is free (devfs's `command`, asked again as each command's
-  end event comes), so more work in flight means threads. Its live state, its events and `stop` are
-  free (`Buffered.free`); a `stop` also ends the threads waiting on it (`ECANCELED`). Every one has
+  end event comes), so more work in flight means threads. Its events, `stop` and `sync` are free
+  (`Buffered.free`); a `stop` also ends the threads waiting on it (`ECANCELED`). **A reading of its
+  state is a command, in order behind the commands given before it** (the user's, 2026-11-21: so a
+  program reads what its own commands did, the same every run, never a set not yet propagated: the
+  redstone card's `get`, robotics' `position`); a device may also have a live look, free, said to
+  be live (robotics' `get`: where it really is, its drift). Every one has
   `sync` (the user's, 2026-10-29), free: whether its queue (one deep) is empty, as the sound card's
   OSS sync; mcos's ioctl, and `devices.sync`, wait until it is and answer `true`, taking no events.
   How a command went is its end event, read as any (no wait on one command's end: the user's). Each command's
